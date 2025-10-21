@@ -62,4 +62,13 @@ describe('Observability HTTP routes', () => {
 
     expect(notFound.status).toBe(404);
   });
+
+  it('validates includeDefinition query parameters', async () => {
+    const response = await request(app)
+      .get('/api/v1/observability/slos?includeDefinition=not-a-boolean')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(422);
+    expect(response.body.success).toBe(false);
+  });
 });

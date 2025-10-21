@@ -1,0 +1,1665 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Risk register, audit evidence, continuity planning, and security assessment governance endpoints.",
+    "version": "1.50.0",
+    "description": "Risk register, audit evidence, continuity planning, and security assessment governance endpoints. (Capability: security-compliance-operations)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/security/assessments": {
+      "get": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "List security assessments",
+        "operationId": "listSecurityAssessments",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tenant scope override."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by assessment status."
+          },
+          {
+            "name": "assessmentType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by assessment type."
+          },
+          {
+            "name": "scheduledFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Assessments scheduled after this timestamp."
+          },
+          {
+            "name": "scheduledTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Assessments scheduled before this timestamp."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "description": "Maximum assessments to return."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Offset for pagination."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityAssessmentList"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "Schedule a security assessment",
+        "operationId": "scheduleSecurityAssessment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "assessmentType",
+                  "scheduledFor"
+                ],
+                "properties": {
+                  "assessmentType": {
+                    "type": "string"
+                  },
+                  "scheduledFor": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "owner": {
+                    "$ref": "#/components/schemas/SecurityRiskOwner"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "methodology": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Assessment scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityAssessment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/security/audit-evidence": {
+      "get": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "List audit evidence records",
+        "operationId": "listSecurityAuditEvidence",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tenant scope override."
+          },
+          {
+            "name": "framework",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by compliance framework."
+          },
+          {
+            "name": "controlReference",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by control reference."
+          },
+          {
+            "name": "riskId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter by risk id."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by evidence status."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "description": "Maximum number of evidence records."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Offset for pagination."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityAuditEvidenceList"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "Record audit evidence metadata",
+        "operationId": "recordSecurityAuditEvidence",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "storagePath"
+                ],
+                "properties": {
+                  "riskId": {
+                    "type": "integer"
+                  },
+                  "framework": {
+                    "type": "string"
+                  },
+                  "controlReference": {
+                    "type": "string"
+                  },
+                  "evidenceType": {
+                    "type": "string"
+                  },
+                  "storagePath": {
+                    "type": "string"
+                  },
+                  "checksum": {
+                    "type": "string"
+                  },
+                  "sources": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "capturedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "submittedBy": {
+                    "type": "integer"
+                  },
+                  "submittedByEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Evidence recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityAuditEvidence"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/security/continuity/exercises": {
+      "get": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "List business continuity exercises",
+        "operationId": "listSecurityContinuityExercises",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tenant scope override."
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by exercise outcome."
+          },
+          {
+            "name": "ownerId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter by owner id."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Return exercises started after this timestamp."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "description": "Maximum number of exercises to return."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Offset for pagination."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityContinuityResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "Log a business continuity exercise",
+        "operationId": "logSecurityContinuityExercise",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "scenarioKey",
+                  "scenarioSummary"
+                ],
+                "properties": {
+                  "scenarioKey": {
+                    "type": "string"
+                  },
+                  "scenarioSummary": {
+                    "type": "string"
+                  },
+                  "exerciseType": {
+                    "type": "string"
+                  },
+                  "startedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "completedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "rtoTargetMinutes": {
+                    "type": "integer"
+                  },
+                  "rpoTargetMinutes": {
+                    "type": "integer"
+                  },
+                  "actualRtoMinutes": {
+                    "type": "integer"
+                  },
+                  "actualRpoMinutes": {
+                    "type": "integer"
+                  },
+                  "outcome": {
+                    "type": "string"
+                  },
+                  "lessonsLearned": {
+                    "type": "string"
+                  },
+                  "followUpActions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "owner": {
+                    "$ref": "#/components/schemas/SecurityRiskOwner"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Continuity exercise recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityContinuityExercise"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/security/risk-register": {
+      "get": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "List risk register entries",
+        "operationId": "listSecurityRisks",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tenant scope override."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "description": "Maximum number of risks to return."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Offset for pagination."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by risk status."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by risk category."
+          },
+          {
+            "name": "ownerId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter by risk owner id."
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by risk tag."
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by inherent severity."
+          },
+          {
+            "name": "includeClosed",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When false, hides closed/retired risks."
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "residualRisk",
+                "inherentRisk",
+                "updatedAt",
+                "createdAt",
+                "nextReviewAt",
+                "status"
+              ]
+            },
+            "description": "Sort column."
+          },
+          {
+            "name": "sortDirection",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "description": "Sort direction."
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Full-text search over titles and descriptions."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityRiskListResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "Create a risk register entry",
+        "operationId": "createSecurityRisk",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "description"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "severity": {
+                    "type": "string"
+                  },
+                  "likelihood": {
+                    "type": "string"
+                  },
+                  "reviewCadenceDays": {
+                    "type": "integer"
+                  },
+                  "mitigationPlan": {
+                    "type": "string"
+                  },
+                  "residualNotes": {
+                    "type": "string"
+                  },
+                  "regulatoryDriver": {
+                    "type": "string"
+                  },
+                  "detectionControls": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "mitigationControls": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "owner": {
+                    "$ref": "#/components/schemas/SecurityRiskOwner"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Risk entry created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityRiskRecord"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/security/risk-register/{riskId}/reviews": {
+      "post": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "Record a risk review and update residual scoring",
+        "operationId": "recordSecurityRiskReview",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "riskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Numeric identifier for the risk."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "residualSeverity": {
+                    "type": "string"
+                  },
+                  "residualLikelihood": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "evidenceReferences": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "reviewer": {
+                    "$ref": "#/components/schemas/SecurityRiskOwner"
+                  },
+                  "nextReviewAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "reviewedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "review": {
+                              "$ref": "#/components/schemas/SecurityRiskReviewRecord"
+                            },
+                            "risk": {
+                              "$ref": "#/components/schemas/SecurityRiskRecord"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/security/risk-register/{riskId}/status": {
+      "patch": {
+        "tags": [
+          "Security Operations"
+        ],
+        "summary": "Update a risk status and residual profile",
+        "operationId": "updateSecurityRiskStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "riskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Numeric identifier for the risk."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "residualSeverity": {
+                    "type": "string"
+                  },
+                  "residualLikelihood": {
+                    "type": "string"
+                  },
+                  "residualNotes": {
+                    "type": "string"
+                  },
+                  "mitigationPlan": {
+                    "type": "string"
+                  },
+                  "nextReviewAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Risk entry updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SecurityRiskRecord"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SecurityRiskReviewRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "reviewUuid": {
+            "type": "string"
+          },
+          "riskId": {
+            "type": "integer"
+          },
+          "reviewerId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "reviewerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewerEmail": {
+            "type": "string",
+            "nullable": true,
+            "format": "email"
+          },
+          "status": {
+            "type": "string"
+          },
+          "residualSeverity": {
+            "type": "string"
+          },
+          "residualLikelihood": {
+            "type": "string"
+          },
+          "residualRiskScore": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextReviewAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "SecurityRiskRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "riskUuid": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "likelihood": {
+            "type": "string"
+          },
+          "residualSeverity": {
+            "type": "string"
+          },
+          "residualLikelihood": {
+            "type": "string"
+          },
+          "inherentRiskScore": {
+            "type": "number"
+          },
+          "residualRiskScore": {
+            "type": "number"
+          },
+          "mitigationPlan": {
+            "type": "string",
+            "nullable": true
+          },
+          "residualNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "regulatoryDriver": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewCadenceDays": {
+            "type": "integer"
+          },
+          "identifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "remediatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nextReviewAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "owner": {
+            "$ref": "#/components/schemas/SecurityRiskOwner"
+          },
+          "riskOwnerUserId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectionControls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mitigationControls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "riskUuid",
+          "tenantId",
+          "title",
+          "description",
+          "status",
+          "severity",
+          "likelihood",
+          "residualRiskScore"
+        ]
+      },
+      "SecurityRiskOwner": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          }
+        }
+      },
+      "SecurityRiskListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityRiskRecord"
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              }
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SecurityRiskSummary"
+          }
+        },
+        "required": [
+          "items",
+          "pagination",
+          "summary"
+        ]
+      },
+      "SecurityRiskSummary": {
+        "type": "object",
+        "properties": {
+          "statusTotals": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "risks": {
+                "type": "integer"
+              },
+              "dueForReview": {
+                "type": "integer"
+              },
+              "openFollowUps": {
+                "type": "integer"
+              }
+            }
+          },
+          "averages": {
+            "type": "object",
+            "properties": {
+              "inherent": {
+                "type": "number"
+              },
+              "residual": {
+                "type": "number"
+              }
+            }
+          },
+          "nextReviewAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "topOwners": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "owner": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "total": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "topTags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SecurityContinuityExercise": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "exerciseUuid": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "scenarioKey": {
+            "type": "string"
+          },
+          "scenarioSummary": {
+            "type": "string"
+          },
+          "exerciseType": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "rtoTargetMinutes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "rpoTargetMinutes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "actualRtoMinutes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "actualRpoMinutes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "lessonsLearned": {
+            "type": "string",
+            "nullable": true
+          },
+          "followUpActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "$ref": "#/components/schemas/SecurityRiskOwner"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityContinuityResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityContinuityExercise"
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              }
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SecurityContinuitySummary"
+          }
+        }
+      },
+      "SecurityContinuitySummary": {
+        "type": "object",
+        "properties": {
+          "totals": {
+            "type": "object",
+            "properties": {
+              "completed": {
+                "type": "integer"
+              },
+              "inProgress": {
+                "type": "integer"
+              },
+              "breachedTargets": {
+                "type": "integer"
+              }
+            }
+          },
+          "latest": {
+            "type": "object",
+            "nullable": true,
+            "$ref": "#/components/schemas/SecurityContinuityExercise"
+          }
+        }
+      },
+      "SecurityAuditEvidence": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "evidenceUuid": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "riskId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "framework": {
+            "type": "string",
+            "nullable": true
+          },
+          "controlReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceType": {
+            "type": "string"
+          },
+          "storagePath": {
+            "type": "string"
+          },
+          "checksum": {
+            "type": "string",
+            "nullable": true
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "submittedBy": {
+            "type": "integer",
+            "nullable": true
+          },
+          "submittedByEmail": {
+            "type": "string",
+            "nullable": true,
+            "format": "email"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityAuditEvidenceList": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAuditEvidence"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "records",
+          "total"
+        ]
+      },
+      "SecurityAssessment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "assessmentUuid": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "assessmentType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "scheduledFor": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "owner": {
+            "$ref": "#/components/schemas/SecurityRiskOwner"
+          },
+          "scope": {
+            "type": "string",
+            "nullable": true
+          },
+          "methodology": {
+            "type": "string",
+            "nullable": true
+          },
+          "findings": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextSteps": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityAssessmentList": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityAssessment"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

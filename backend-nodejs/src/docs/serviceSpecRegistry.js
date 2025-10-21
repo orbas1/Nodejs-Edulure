@@ -85,14 +85,114 @@ const SPEC_INDEX_SCHEMA = z.object({
   services: z.array(SERVICE_DESCRIPTOR_SCHEMA).min(1)
 });
 
-let cachedIndex;
+let cachedRegistry;
 const specCache = new Map();
 
-function clone(value) {
-  if (value == null) {
-    return value;
+const REQUIRED_DESCRIPTOR_FIELDS = ['service', 'capability', 'description', 'version'];
+
+function normalizeServiceKey(value) {
+  if (value === undefined || value === null) {
+    return '';
   }
 
+  return String(value).trim().toLowerCase();
+}
+
+function ensureLeadingSlash(value, fallback) {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) {
+    return `/${fallback}`;
+  }
+
+  if (/\s/u.test(trimmed)) {
+    throw new Error(`Base path for service '${fallback}' must not contain whitespace.`);
+  }
+
+  const withoutPrefix = trimmed.replace(/^\/+/u, '');
+  return `/${withoutPrefix}`;
+}
+
+function readJsonFile(filePath, contextLabel) {
+  let content;
+  try {
+    content = readFileSync(filePath, 'utf8');
+  } catch (error) {
+    const wrapped = new Error(`${contextLabel} not found at ${filePath}`);
+    wrapped.cause = error;
+    wrapped.code = error.code;
+    throw wrapped;
+  }
+
+  try {
+    return JSON.parse(content);
+  } catch (error) {
+    const wrapped = new Error(`Unable to parse ${contextLabel} at ${filePath}: ${error.message}`);
+    wrapped.cause = error;
+    throw wrapped;
+  }
+}
+
+function resolveDocumentPath(rawFile, serviceId, version) {
+  const defaultPath = path.join(serviceId, version, 'openapi.json');
+  const candidate = String(rawFile ?? defaultPath).trim().replace(/^\.\//u, '');
+  const resolvedPath = path.resolve(GENERATED_ROOT, candidate);
+
+  if (!resolvedPath.startsWith(GENERATED_ROOT)) {
+    throw new Error(
+      `OpenAPI document for service '${serviceId}' resolved outside of generated spec directory`
+    );
+  }
+
+  return resolvedPath;
+}
+
+function sanitizeDescriptor(rawDescriptor, indexPath, descriptorIndex) {
+  if (!rawDescriptor || typeof rawDescriptor !== 'object') {
+    throw new Error(
+      `OpenAPI index at ${indexPath} contains an invalid descriptor at position ${descriptorIndex}`
+    );
+  }
+
+  for (const field of REQUIRED_DESCRIPTOR_FIELDS) {
+    if (!rawDescriptor[field]) {
+      throw new Error(
+        `OpenAPI index at ${indexPath} is missing required field '${field}' for descriptor ${descriptorIndex}`
+      );
+    }
+  }
+
+  const serviceId = String(rawDescriptor.service).trim();
+  if (!serviceId) {
+    throw new Error(
+      `OpenAPI index at ${indexPath} declares an empty service identifier for descriptor ${descriptorIndex}`
+    );
+  }
+
+  const name = rawDescriptor.name ? String(rawDescriptor.name).trim() : serviceId;
+  const capability = String(rawDescriptor.capability).trim();
+  const version = String(rawDescriptor.version).trim();
+  const description = String(rawDescriptor.description).trim();
+
+  if (!capability || !version || !description) {
+    throw new Error(
+      `OpenAPI index at ${indexPath} is missing required metadata for service '${serviceId}'.`
+    );
+  }
+  const basePath = ensureLeadingSlash(rawDescriptor.basePath, serviceId);
+  const documentPath = resolveDocumentPath(rawDescriptor.file, serviceId, version);
+
+  return {
+    service: serviceId,
+    name,
+    capability,
+    version,
+    description,
+    basePath,
+    documentPath
+  };
+}
+
+function cloneValue(value) {
   if (typeof globalThis.structuredClone === 'function') {
     return globalThis.structuredClone(value);
   }
@@ -100,143 +200,108 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function readJsonFile(filePath) {
-  try {
-    const raw = readFileSync(filePath, 'utf8');
-    return raw;
-  } catch (error) {
-    throw new Error(`Failed to read OpenAPI artefact at '${filePath}': ${error.message}`);
-  }
-}
-
-function parseJson(filePath, contents) {
-  try {
-    return JSON.parse(contents);
-  } catch (error) {
-    throw new Error(`Malformed JSON in OpenAPI artefact '${filePath}': ${error.message}`);
-  }
-}
-
-function loadIndex() {
-  if (cachedIndex) {
-    return cachedIndex;
+function loadRegistry() {
+  if (cachedRegistry) {
+    return cachedRegistry;
   }
 
-  try {
-    const contents = readJsonFile(INDEX_FILE_PATH);
-    const parsed = parseJson(INDEX_FILE_PATH, contents);
-    const { services, ...metadata } = SPEC_INDEX_SCHEMA.parse(parsed);
-    const preparedServices = services.map((serviceDescriptor) => ({
-      ...serviceDescriptor,
-      basePath: serviceDescriptor.basePath === '' ? '/' : serviceDescriptor.basePath
-    }));
+  const indexPath = path.join(GENERATED_ROOT, 'index.json');
+  const indexJson = readJsonFile(indexPath, 'OpenAPI service index');
 
-    const serviceLookup = new Map();
-    for (const descriptor of preparedServices) {
-      const key = descriptor.service;
-      if (serviceLookup.has(key)) {
-        throw new Error(`Duplicate OpenAPI descriptor registered for service '${key}'.`);
+  if (!Array.isArray(indexJson?.services)) {
+    throw new Error(`OpenAPI index at ${indexPath} must contain a 'services' array.`);
+  }
+
+  const descriptors = indexJson.services.map((descriptor, idx) =>
+    sanitizeDescriptor(descriptor, indexPath, idx)
+  );
+
+  const lookup = new Map();
+  for (const descriptor of descriptors) {
+    const aliases = new Set([descriptor.service, descriptor.name]);
+    for (const alias of aliases) {
+      const normalized = normalizeServiceKey(alias);
+      if (!normalized) {
+        continue;
       }
-      serviceLookup.set(key, descriptor);
+      lookup.set(normalized, descriptor);
     }
-
-    cachedIndex = {
-      metadata,
-      services: preparedServices,
-      serviceLookup
-    };
-
-    return cachedIndex;
-  } catch (error) {
-    throw new Error(`Failed to load service spec index: ${error.message}`, { cause: error });
-  }
-}
-
-function resolveDescriptor(service) {
-  if (typeof service !== 'string' || service.trim() === '') {
-    return null;
   }
 
-  const normalisedLookupKey = service.trim().toLowerCase();
-  const index = loadIndex();
-  const { serviceLookup, services } = index;
+  cachedRegistry = {
+    descriptors,
+    lookup,
+    indexPath,
+    generatedAt: indexJson.generatedAt ?? null,
+    baseSpec: indexJson.baseSpec ?? null
+  };
 
-  if (serviceLookup.has(normalisedLookupKey)) {
-    return serviceLookup.get(normalisedLookupKey);
-  }
-
-  return services.find((descriptor) => descriptor.name.toLowerCase() === normalisedLookupKey) ?? null;
-}
-
-function resolveSpecPath(descriptor) {
-  const candidatePath = path.resolve(GENERATED_ROOT, descriptor.service, descriptor.version, 'openapi.json');
-  const relative = path.relative(GENERATED_ROOT, candidatePath);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error(`Refusing to resolve OpenAPI document outside registry root for service '${descriptor.service}'.`);
-  }
-  return candidatePath;
-}
-
-function parseSpecDocument(descriptor) {
-  const specPath = resolveSpecPath(descriptor);
-  const contents = readJsonFile(specPath);
-  const spec = parseJson(specPath, contents);
-
-  if (typeof spec.openapi !== 'string' || !/^3\.\d+\.\d+/.test(spec.openapi)) {
-    throw new Error(`OpenAPI document for service '${descriptor.service}' does not declare a supported OpenAPI version.`);
-  }
-
-  if (!spec.info || typeof spec.info.title !== 'string') {
-    throw new Error(`OpenAPI document for service '${descriptor.service}' is missing an info.title field.`);
-  }
-
-  if (!spec.paths || typeof spec.paths !== 'object') {
-    throw new Error(`OpenAPI document for service '${descriptor.service}' is missing a paths object.`);
-  }
-
-  return spec;
+  return cachedRegistry;
 }
 
 export function getServiceSpecIndex() {
-  const { services } = loadIndex();
-  return services.map(
-    ({ service, name, capability, version, description, basePath, documentationUrl, checksum, lastUpdated }) => {
-      const payload = { service, name, capability, version, description, basePath };
+  const { descriptors } = loadRegistry();
+  return descriptors.map(({ documentPath, ...publicDescriptor }) => ({ ...publicDescriptor }));
+}
 
-      if (documentationUrl) {
-        payload.documentationUrl = documentationUrl;
-      }
+function validateSpecAgainstDescriptor(document, descriptor) {
+  const openApiVersion = String(document?.openapi ?? '').trim();
+  if (!/^3\.\d+\.\d+/u.test(openApiVersion)) {
+    throw new Error(
+      `OpenAPI document for service '${descriptor.service}' must declare an OpenAPI 3.x version`
+    );
+  }
 
-      if (checksum) {
-        payload.checksum = checksum;
-      }
+  const paths = document?.paths;
+  if (!paths || typeof paths !== 'object') {
+    throw new Error(
+      `OpenAPI document for service '${descriptor.service}' must expose a paths object`
+    );
+  }
 
-      if (lastUpdated) {
-        payload.lastUpdated = lastUpdated;
-      }
-
-      return clone(payload);
-    }
+  const invalidPaths = Object.keys(paths).filter(
+    (pathKey) => !pathKey.startsWith(descriptor.basePath)
   );
+
+  if (invalidPaths.length > 0) {
+    throw new Error(
+      `OpenAPI document for service '${descriptor.service}' declares paths outside its base path '${descriptor.basePath}': ${invalidPaths.join(', ')}`
+    );
+  }
+}
+
+function getDescriptorForService(service) {
+  if (!service && service !== 0) {
+    return null;
+  }
+
+  const { lookup } = loadRegistry();
+  const normalized = normalizeServiceKey(service);
+  return lookup.get(normalized) ?? null;
+}
+
+function createCacheKey(descriptor) {
+  return `${descriptor.service}@${descriptor.version}`;
 }
 
 export function getServiceSpecDocument(service) {
-  const descriptor = resolveDescriptor(service);
+  const descriptor = getDescriptorForService(service);
   if (!descriptor) {
     return null;
   }
 
-  if (specCache.has(descriptor.service)) {
-    return clone(specCache.get(descriptor.service));
+  const cacheKey = createCacheKey(descriptor);
+  if (!specCache.has(cacheKey)) {
+    const document = readJsonFile(descriptor.documentPath, `OpenAPI document for ${descriptor.service}`);
+    validateSpecAgainstDescriptor(document, descriptor);
+    specCache.set(cacheKey, document);
   }
 
-  const parsed = parseSpecDocument(descriptor);
-  specCache.set(descriptor.service, parsed);
-  return clone(parsed);
+  return cloneValue(specCache.get(cacheKey));
 }
 
 export function clearServiceSpecCache() {
-  cachedIndex = undefined;
+  cachedRegistry = undefined;
   specCache.clear();
 }
 

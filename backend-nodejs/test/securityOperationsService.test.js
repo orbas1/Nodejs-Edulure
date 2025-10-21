@@ -251,18 +251,27 @@ describe('SecurityOperationsService', () => {
       riskId: 77,
       tenantId: 'tenant-ops',
       actor: { id: 'admin-1', role: 'admin', type: 'user' },
-      requestContext: { requestId: 'req-risk-delete' }
+      requestContext: { requestId: 'req-risk-delete' },
+      reason: 'Consolidated with centralised certificate automation'
     });
 
     expect(repository.deleteRisk).toHaveBeenCalledWith(77);
     expect(auditLogger.record).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'risk.register.deleted',
-        metadata: expect.objectContaining({ title: 'Expired TLS certificates', residualRiskScore: 9 })
+        metadata: expect.objectContaining({
+          title: 'Expired TLS certificates',
+          residualRiskScore: 9,
+          reason: 'Consolidated with centralised certificate automation'
+        })
       })
     );
     expect(changeDataCapture.recordEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ entityName: 'security_risk_register', operation: 'DELETE' })
+      expect.objectContaining({
+        entityName: 'security_risk_register',
+        operation: 'DELETE',
+        payload: expect.objectContaining({ reason: 'Consolidated with centralised certificate automation' })
+      })
     );
     expect(result).toEqual({ success: true });
   });
