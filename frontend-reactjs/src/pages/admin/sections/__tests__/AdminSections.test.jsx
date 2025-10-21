@@ -2,13 +2,19 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import AdminActivitySection from '../AdminActivitySection.jsx';
+import AdminApprovalsSection from '../AdminApprovalsSection.jsx';
 import AdminCoursesSection from '../AdminCoursesSection.jsx';
 import AdminEbooksSection from '../AdminEbooksSection.jsx';
 import AdminCalendarSection from '../AdminCalendarSection.jsx';
 import AdminBookingsSection from '../AdminBookingsSection.jsx';
 import AdminGrowthSection from '../AdminGrowthSection.jsx';
 import AdminRevenueManagementSection from '../AdminRevenueManagementSection.jsx';
+import AdminRevenueSection from '../AdminRevenueSection.jsx';
+import AdminOperationsSection from '../AdminOperationsSection.jsx';
+import AdminPolicyHubSection from '../AdminPolicyHubSection.jsx';
 import AdminAdsManagementSection from '../AdminAdsManagementSection.jsx';
+import { formatNumber } from '../../utils.js';
 import adminGrowthApi from '../../../../api/adminGrowthApi.js';
 import adminRevenueApi from '../../../../api/adminRevenueApi.js';
 import adminAdsApi from '../../../../api/adminAdsApi.js';
@@ -398,5 +404,102 @@ describe('Admin operational sections', () => {
       expect(screen.queryByText(/failed to load ad metrics/i)).not.toBeInTheDocument();
       expect(screen.getByText('Active campaigns').parentElement).toHaveTextContent('0');
     });
+  });
+
+  it('normalises approvals data and pending counts', () => {
+    render(
+      <AdminApprovalsSection
+        pendingCount={null}
+        items={[
+          {
+            id: null,
+            name: '',
+            type: null,
+            summary: '',
+            status: null,
+            submittedAt: null
+          }
+        ]}
+        formatNumber={formatNumber}
+      />
+    );
+
+    expect(screen.getByText(/pending item/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 items awaiting action/i)).toBeInTheDocument();
+    expect(screen.getByText('REVIEW')).toBeInTheDocument();
+  });
+
+  it('renders activity alerts and events with fallbacks', () => {
+    render(
+      <AdminActivitySection
+        alerts={[
+          {
+            id: undefined,
+            severity: 'CRITICAL',
+            detectedLabel: '',
+            resolvedLabel: null,
+            message: ''
+          }
+        ]}
+        events={[
+          {
+            id: null,
+            entity: '',
+            occurredLabel: '',
+            summary: ''
+          }
+        ]}
+      />
+    );
+
+    expect(screen.getByText(/critical/i)).toBeInTheDocument();
+    expect(screen.getByText('No additional context available.')).toBeInTheDocument();
+    expect(screen.getByText('Activity captured')).toBeInTheDocument();
+  });
+
+  it('shows revenue metrics with fallback text when values are missing', () => {
+    render(
+      <AdminRevenueSection
+        revenueCards={[{ label: '', value: null, helper: null }]}
+        paymentHealthBreakdown={[{ label: null, value: null }]}
+      />
+    );
+
+    expect(screen.getByText('Metric 1')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('Entry 1')).toBeInTheDocument();
+  });
+
+  it('ensures operations stats gracefully handle invalid entries', () => {
+    render(
+      <AdminOperationsSection
+        supportStats={[{ label: '', value: null }]}
+        riskStats={[]}
+        platformStats={[null, { label: 'Latency', value: '120ms' }]}
+      />
+    );
+
+    expect(screen.getByText('Entry 1')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('Latency')).toBeInTheDocument();
+  });
+
+  it('sanitises policy hub details before rendering', () => {
+    render(
+      <AdminPolicyHubSection
+        sectionId="policies"
+        status=""
+        owner=""
+        contact=""
+        lastReviewed=""
+        slaHours={-12}
+        policyHubUrl=""
+      />
+    );
+
+    expect(screen.getByText('Operational')).toBeInTheDocument();
+    expect(screen.getByText(/0 hours/)).toBeInTheDocument();
+    expect(screen.getByText('Contact owner')).toBeInTheDocument();
+    expect(screen.getByText('Awaiting review')).toBeInTheDocument();
   });
 });

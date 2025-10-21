@@ -1,8 +1,35 @@
+import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 
-import { getSeverityStyles } from '../utils.js';
+import { ensureArray, ensureString, takeItems, getSeverityStyles } from '../utils.js';
+
+function normaliseAlerts(alerts) {
+  return takeItems(alerts, 8).map((alert, index) => {
+    const id = ensureString(alert?.id, `alert-${index}`);
+    const severity = ensureString(alert?.severity, 'info').toLowerCase();
+    return {
+      id,
+      severity,
+      detectedLabel: ensureString(alert?.detectedLabel, 'Just now'),
+      resolvedLabel: ensureString(alert?.resolvedLabel),
+      message: ensureString(alert?.message, 'No additional context available.')
+    };
+  });
+}
+
+function normaliseEvents(events) {
+  return takeItems(events, 10).map((event, index) => ({
+    id: ensureString(event?.id, `event-${index}`),
+    entity: ensureString(event?.entity, 'System'),
+    occurredLabel: ensureString(event?.occurredLabel),
+    summary: ensureString(event?.summary, 'Activity captured')
+  }));
+}
 
 export default function AdminActivitySection({ alerts, events, onOpenAnalytics }) {
+  const resolvedAlerts = useMemo(() => normaliseAlerts(ensureArray(alerts)), [alerts]);
+  const resolvedEvents = useMemo(() => normaliseEvents(ensureArray(events)), [events]);
+
   return (
     <section id="activity" className="grid gap-6 lg:grid-cols-2">
       <div className="dashboard-section">
@@ -18,16 +45,16 @@ export default function AdminActivitySection({ alerts, events, onOpenAnalytics }
           </button>
         </div>
         <ul className="mt-4 space-y-3 text-sm text-slate-600">
-          {alerts.length === 0 ? (
+          {resolvedAlerts.length === 0 ? (
             <li className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500">
               No active alerts. All systems nominal.
             </li>
           ) : (
-            alerts.map((alert) => (
+            resolvedAlerts.map((alert) => (
               <li key={alert.id} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between">
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getSeverityStyles(alert.severity)}`}>
-                    {alert.severity ?? 'info'}
+                    {alert.severity || 'info'}
                   </span>
                   <span className="text-xs text-slate-500">{alert.detectedLabel}</span>
                 </div>
@@ -41,12 +68,12 @@ export default function AdminActivitySection({ alerts, events, onOpenAnalytics }
       <div className="dashboard-section">
         <h3 className="text-lg font-semibold text-slate-900">Latest operational activity</h3>
         <ul className="mt-4 space-y-3 text-sm text-slate-600">
-          {events.length === 0 ? (
+          {resolvedEvents.length === 0 ? (
             <li className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500">
               No recent events captured.
             </li>
           ) : (
-            events.map((event) => (
+            resolvedEvents.map((event) => (
               <li key={event.id} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span className="uppercase tracking-wide">{event.entity}</span>

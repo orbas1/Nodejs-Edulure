@@ -1,14 +1,41 @@
+import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 
+import { coerceNumber, ensureArray, ensureString } from '../utils.js';
+
+function normaliseApprovalItems(items) {
+  return ensureArray(items).map((item, index) => ({
+    id: ensureString(item?.id, `approval-${index}`),
+    name: ensureString(item?.name, 'Pending item'),
+    type: ensureString(item?.type, 'General').toUpperCase(),
+    summary: ensureString(item?.summary, 'Awaiting review details'),
+    status: ensureString(item?.status, 'pending').toUpperCase(),
+    submittedAt: ensureString(item?.submittedAt),
+    amount: ensureString(item?.amount),
+    action: ensureString(item?.action, 'Review')
+  }));
+}
+
 export default function AdminApprovalsSection({ pendingCount, items, formatNumber, onRefresh }) {
+  const approvalItems = useMemo(() => normaliseApprovalItems(items), [items]);
+  const safePendingCount = useMemo(
+    () => coerceNumber(pendingCount ?? approvalItems.length, { min: 0, fallback: 0 }),
+    [pendingCount, approvalItems]
+  );
+
+  const safeFormatNumber = useMemo(
+    () => (typeof formatNumber === 'function' ? formatNumber : (value) => ensureString(value)),
+    [formatNumber]
+  );
+
   return (
     <section id="approvals" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-slate-900">Approvals queue</h2>
           <p className="text-sm text-slate-600">
-            {pendingCount > 0
-              ? `${formatNumber(pendingCount)} items awaiting action across communities, payouts, and follow controls.`
+            {safePendingCount > 0
+              ? `${safeFormatNumber(safePendingCount)} items awaiting action across communities, payouts, and follow controls.`
               : 'All approval workflows are clear right now.'}
           </p>
         </div>
@@ -22,12 +49,12 @@ export default function AdminApprovalsSection({ pendingCount, items, formatNumbe
         </button>
       </div>
       <div className="mt-6 space-y-4">
-        {items.length === 0 ? (
+        {approvalItems.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
             Nothing requires approval right now.
           </div>
         ) : (
-          items.map((item) => (
+          approvalItems.map((item) => (
             <div
               key={item.id}
               className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between"
