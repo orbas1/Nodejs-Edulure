@@ -33,6 +33,8 @@ function renderWithRouter() {
           <Route path="dashboard" element={<DashboardEntryRedirect />} />
           <Route path="dashboard/:role" element={<div>Role dashboard</div>} />
           <Route path="feed" element={<div>Feed route</div>} />
+          <Route path="settings/security/verification" element={<div>Verification route</div>} />
+          <Route path="settings/security/mfa" element={<div>MFA route</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -116,5 +118,134 @@ describe('DashboardEntryRedirect', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location').textContent).toBe('/feed');
     });
+  });
+
+  it('prompts identity verification when required by the role', async () => {
+    useDashboardMock.mockReturnValue({
+      activeRole: null,
+      roles: [{ id: 'admin', name: 'Admin', requiresVerification: true, status: 'pending' }],
+      loading: false,
+      error: null,
+      refresh: vi.fn()
+    });
+
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    expect(screen.getByText('Verify your identity')).toBeInTheDocument();
+    expect(
+      screen.getByText('We need to verify your identity before granting access to the Admin workspace.')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /start verification/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/settings/security/verification');
+    });
+  });
+
+  it('guides the user to enable MFA when the role enforces it', async () => {
+    useDashboardMock.mockReturnValue({
+      activeRole: null,
+      roles: [
+        {
+          id: 'operations',
+          name: 'Operations',
+          requiresTwoFactor: true,
+          status: 'pending'
+        }
+      ],
+      loading: false,
+      error: null,
+      refresh: vi.fn()
+    });
+
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    expect(screen.getByText('Secure your account')).toBeInTheDocument();
+    expect(
+      screen.getByText('Enable multi-factor authentication to unlock the Operations dashboard.')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /secure account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/settings/security/mfa');
+    });
+  });
+
+  it('displays a pending message when the dashboard is awaiting approval', async () => {
+    const refreshMock = vi.fn();
+    useDashboardMock.mockReturnValue({
+      activeRole: null,
+      roles: [{ id: 'learner', name: 'Learner', status: 'pending' }],
+      loading: false,
+      error: null,
+      refresh: refreshMock
+    });
+
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    expect(screen.getByText('Access awaiting approval')).toBeInTheDocument();
+    expect(
+      screen.getByText("Your Learner dashboard access is pending approval. We'll notify you once it's ready.")
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /check again/i }));
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a suspension message and opens the support channel when access is paused', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {});
+    useDashboardMock.mockReturnValue({
+      activeRole: null,
+      roles: [
+        {
+          id: 'community',
+          name: 'Community',
+          status: 'suspended',
+          suspensionReason: 'Compliance review in progress'
+        }
+      ],
+      loading: false,
+      error: null,
+      refresh: vi.fn()
+    });
+
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    expect(screen.getByText('Dashboard access paused')).toBeInTheDocument();
+    expect(screen.getByText('Compliance review in progress')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /contact support/i }));
+    expect(openSpy).toHaveBeenCalledWith('mailto:support@edulure.com', '_blank', 'noopener');
+
+    openSpy.mockRestore();
+  });
+
+  it('communicates when a dashboard role has expired', () => {
+    useDashboardMock.mockReturnValue({
+      activeRole: null,
+      roles: [
+        {
+          id: 'campaigns',
+          name: 'Campaigns',
+          status: 'expired',
+          expiresAt: new Date('2024-02-01T12:00:00Z').toISOString()
+        }
+      ],
+      loading: false,
+      error: null,
+      refresh: vi.fn()
+    });
+
+    renderWithRouter();
+
+    expect(screen.getByText('Dashboard access expired')).toBeInTheDocument();
+    expect(screen.getByText(/Access to the Campaigns dashboard/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /request renewal/i })).toBeInTheDocument();
   });
 });
