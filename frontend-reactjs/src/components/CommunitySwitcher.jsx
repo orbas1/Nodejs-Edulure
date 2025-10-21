@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Menu, Transition } from '@headlessui/react';
-import { MagnifyingGlassIcon } from '@heroicons/react/20/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 
 export default function CommunitySwitcher({
