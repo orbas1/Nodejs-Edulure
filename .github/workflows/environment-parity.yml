@@ -17,7 +17,54 @@ on:
       - '.github/workflows/environment-parity.yml'
       - 'scripts/bootstrap-environment.sh'
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
+  application-quality:
+    name: Verify application quality gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.12.2'
+          cache: 'npm'
+      - name: Install workspace dependencies
+        run: npm install --include-workspace-root
+      - name: Run backend lint checks
+        run: npm --workspace backend-nodejs run lint -- --max-warnings=0
+      - name: Build frontend bundle
+        run: npm --workspace frontend-reactjs run build
+      - name: Run release readiness verification
+        id: release_readiness
+        run: |
+          set +e
+          npm run release:readiness
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload release readiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-readiness-report
+          path: reports/release/readiness-summary.json
+          if-no-files-found: warn
+      - name: Summarise release readiness outcome
+        if: always()
+        run: |
+          if [ "${{ steps.release_readiness.outputs.status }}" = "0" ]; then
+            printf '✅ All release readiness gates passed.\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '❌ Release readiness gates failed with exit code %s. See the attached readiness summary for details.\n' "${{ steps.release_readiness.outputs.status }}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Enforce release readiness gates
+        if: steps.release_readiness.outputs.status != '0'
+        run: exit 1
+
   terraform:
     name: Validate Terraform modules
     runs-on: ubuntu-latest
@@ -53,8 +100,17 @@ jobs:
   docker:
     name: Build reference images
     runs-on: ubuntu-latest
+    needs:
+      - application-quality
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare backend pnpm lockfile
+        working-directory: backend-nodejs
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.10.0 --activate
+          pnpm import
+          pnpm install --lockfile-only
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:

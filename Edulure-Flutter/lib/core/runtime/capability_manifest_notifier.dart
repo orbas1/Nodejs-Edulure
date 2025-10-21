@@ -15,6 +15,7 @@ class CapabilityManifestSnapshot {
     required this.manifest,
     required this.fetchedAt,
     required this.fromCache,
+    this.isStale = false,
     this.isRefreshing = false,
     this.lastError,
     this.lastErrorStackTrace,
@@ -23,6 +24,7 @@ class CapabilityManifestSnapshot {
   final CapabilityManifest manifest;
   final DateTime fetchedAt;
   final bool fromCache;
+  final bool isStale;
   final bool isRefreshing;
   final Object? lastError;
   final StackTrace? lastErrorStackTrace;
@@ -33,6 +35,7 @@ class CapabilityManifestSnapshot {
     CapabilityManifest? manifest,
     DateTime? fetchedAt,
     bool? fromCache,
+    bool? isStale,
     bool? isRefreshing,
     Object? lastError,
     StackTrace? lastErrorStackTrace,
@@ -42,6 +45,7 @@ class CapabilityManifestSnapshot {
       manifest: manifest ?? this.manifest,
       fetchedAt: fetchedAt ?? this.fetchedAt,
       fromCache: fromCache ?? this.fromCache,
+      isStale: isStale ?? this.isStale,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       lastError: clearError ? null : (lastError ?? this.lastError),
       lastErrorStackTrace: clearError ? null : (lastErrorStackTrace ?? this.lastErrorStackTrace),
@@ -61,6 +65,7 @@ class CapabilityManifestNotifier extends AsyncNotifier<CapabilityManifestSnapsho
       manifest: cached.manifest,
       fetchedAt: cached.fetchedAt,
       fromCache: true,
+      isStale: cached.isStale,
     );
   }
 
@@ -73,6 +78,7 @@ class CapabilityManifestNotifier extends AsyncNotifier<CapabilityManifestSnapsho
           manifest: cached.manifest,
           fetchedAt: cached.fetchedAt,
           fromCache: true,
+          isStale: cached.isStale,
         ),
       );
     } else {
@@ -98,6 +104,7 @@ class CapabilityManifestNotifier extends AsyncNotifier<CapabilityManifestSnapsho
         manifest: result.manifest,
         fetchedAt: result.fetchedAt,
         fromCache: result.fromCache,
+        isStale: result.isStale,
       );
       state = AsyncData(snapshot);
       telemetry.recordProviderUpdate(
@@ -119,6 +126,20 @@ class CapabilityManifestNotifier extends AsyncNotifier<CapabilityManifestSnapsho
         state = AsyncData(
           previous.copyWith(
             isRefreshing: false,
+            lastError: error,
+            lastErrorStackTrace: stackTrace,
+          ),
+        );
+        return;
+      }
+
+      final fallback = await repository.loadCachedManifest();
+      if (fallback != null) {
+        state = AsyncData(
+          CapabilityManifestSnapshot(
+            manifest: fallback.manifest,
+            fetchedAt: fallback.fetchedAt,
+            fromCache: true,
             lastError: error,
             lastErrorStackTrace: stackTrace,
           ),

@@ -2,8 +2,13 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Edulure Platform API – Payments, escrow, and billing orchestration endpoints.",
-    "version": "1.50.0",
-    "description": "Payments, escrow, and billing orchestration endpoints. (Capability: payments-and-payouts)."
+    "version": "1.51.0",
+    "description": "Payments, escrow, and billing orchestration endpoints. (Capability: payments-and-payouts).",
+    "x-release": {
+      "version": "1.51.0",
+      "releasedAt": "2025-10-20T23:52:56.000Z",
+      "stability": "stable"
+    }
   },
   "servers": [
     {
@@ -809,6 +814,18 @@
           "unitAmount"
         ]
       }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     }
-  }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
 }

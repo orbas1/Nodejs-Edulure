@@ -2,8 +2,13 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Edulure Platform API",
-    "version": "1.50.0",
-    "description": "Production-ready API contracts for the Edulure platform. All responses follow the `{ success, message, data, meta }` envelope."
+    "version": "1.51.0",
+    "description": "Production-ready API contracts for the Edulure platform. All responses follow the `{ success, message, data, meta }` envelope.",
+    "x-release": {
+      "version": "1.51.0",
+      "releasedAt": "2025-10-20T23:52:56.000Z",
+      "stability": "stable"
+    }
   },
   "servers": [
     {
@@ -23176,6 +23181,11 @@
     {
       "name": "Release",
       "description": "Release readiness orchestration APIs."
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
     }
   ]
 }

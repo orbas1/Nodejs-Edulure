@@ -16,8 +16,17 @@ Routes available:
 - `/register` Learnspace onboarding
 - `/feed` live community feed mock
 - `/profile` member profile overview
+- `/provider-transition` provider migration announcements with RBAC-guarded actions
 
 The app uses the Inter font via `google_fonts` and Material 3 design system.
+
+## Provider transition hub
+
+- Provider acknowledgements and status updates now validate the active Edulure role before
+  sending any API calls. Administrators and provider operators can record updates while other
+  roles see contextual messaging when actions are blocked.
+- When the device is offline the hub automatically falls back to the cached announcement bundle
+  and temporarily disables write actions so users do not lose context.
 
 ## Push notifications
 

@@ -8,20 +8,121 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../config/app_config.dart';
 
+typedef _PackageInfoLoader = Future<PackageInfo> Function();
+typedef _DebugLogger = void Function(String message);
+
+class TelemetryInitOptions {
+  const TelemetryInitOptions({
+    required this.dsn,
+    required this.environment,
+    required this.tracesSampleRate,
+    this.release,
+  });
+
+  final String dsn;
+  final String environment;
+  final double tracesSampleRate;
+  final String? release;
+}
+
+abstract class TelemetryClient {
+  const TelemetryClient();
+
+  Future<void> init({
+    required TelemetryInitOptions options,
+    required FutureOr<void> Function() runner,
+  });
+
+  Future<void> captureException(
+    Object error, {
+    StackTrace? stackTrace,
+    Map<String, dynamic>? context,
+  });
+
+  void addBreadcrumb(Breadcrumb breadcrumb);
+}
+
+class SentryTelemetryClient implements TelemetryClient {
+  const SentryTelemetryClient();
+
+  @override
+  Future<void> init({
+    required TelemetryInitOptions options,
+    required FutureOr<void> Function() runner,
+  }) async {
+    await SentryFlutter.init(
+      (config) {
+        config.dsn = options.dsn;
+        config.tracesSampleRate = options.tracesSampleRate;
+        config.environment = options.environment;
+        if (options.release != null) {
+          config.release = options.release;
+        }
+      },
+      appRunner: () {
+        runZonedGuarded(
+          () async {
+            await Future.sync(runner);
+          },
+          (error, stackTrace) {
+            Sentry.captureException(error, stackTrace: stackTrace);
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Future<void> captureException(
+    Object error, {
+    StackTrace? stackTrace,
+    Map<String, dynamic>? context,
+  }) {
+    return Sentry.captureException(
+      error,
+      stackTrace: stackTrace,
+      withScope: (scope) {
+        if (context != null) {
+          for (final entry in context.entries) {
+            scope.setExtra(entry.key, entry.value);
+          }
+        }
+      },
+    );
+  }
+
+  @override
+  void addBreadcrumb(Breadcrumb breadcrumb) {
+    Sentry.addBreadcrumb(breadcrumb);
+  }
+}
+
 class TelemetryService {
-  TelemetryService(this._config);
+  TelemetryService(
+    this._config, {
+    TelemetryClient? client,
+    _PackageInfoLoader? packageInfoLoader,
+    _DebugLogger? debugLogger,
+  })  : _client = client ?? const SentryTelemetryClient(),
+        _packageInfoLoader = packageInfoLoader ?? PackageInfo.fromPlatform,
+        _debugLogger = debugLogger ?? ((message) => debugPrint(message));
 
   final AppConfig _config;
+  final TelemetryClient _client;
+  final _PackageInfoLoader _packageInfoLoader;
+  final _DebugLogger _debugLogger;
   PackageInfo? _packageInfo;
   bool _sentryEnabled = false;
 
   Future<void> prepare() async {
     try {
-      _packageInfo = await PackageInfo.fromPlatform();
+      _packageInfo = await _packageInfoLoader();
     } catch (error, stackTrace) {
-      debugPrint('Failed to load package info: $error');
-      if (_config.sentryDsn != null) {
-        unawaited(Sentry.captureException(error, stackTrace: stackTrace));
+      _debugLogger('Failed to load package info: $error');
+      if (_config.sentryDsn != null && _config.sentryDsn!.isNotEmpty) {
+        unawaited(
+          _client.captureException(error, stackTrace: stackTrace),
+        );
       }
     }
   }
@@ -29,30 +130,20 @@ class TelemetryService {
   Future<void> runApp(FutureOr<void> Function() runner) async {
     final dsn = _config.sentryDsn;
     if (dsn == null || dsn.isEmpty) {
-      await runner();
+      await Future.sync(runner);
       return;
     }
 
-    await SentryFlutter.init(
-      (options) {
-        options.dsn = dsn;
-        options.tracesSampleRate = _config.tracesSampleRate;
-        options.environment = _config.environment.name;
-        if (_packageInfo != null) {
-          options.release =
-              '${_packageInfo!.packageName}@${_packageInfo!.version}+${_packageInfo!.buildNumber}';
-        }
-      },
-      appRunner: () {
-        runZonedGuarded(
-          () {
-            runner();
-          },
-          (error, stackTrace) {
-            Sentry.captureException(error, stackTrace: stackTrace);
-          },
-        );
-      },
+    await _client.init(
+      options: TelemetryInitOptions(
+        dsn: dsn,
+        environment: _config.environment.name,
+        tracesSampleRate: _config.tracesSampleRate,
+        release: _packageInfo != null
+            ? '${_packageInfo!.packageName}@${_packageInfo!.version}+${_packageInfo!.buildNumber}'
+            : null,
+      ),
+      runner: runner,
     );
 
     _sentryEnabled = true;
@@ -64,23 +155,17 @@ class TelemetryService {
     Map<String, dynamic>? context,
   }) async {
     if (_sentryEnabled) {
-      await Sentry.captureException(
+      await _client.captureException(
         error,
         stackTrace: stackTrace,
-        withScope: (scope) {
-          if (context != null) {
-            for (final entry in context.entries) {
-              scope.setExtra(entry.key, entry.value);
-            }
-          }
-        },
+        context: context,
       );
       return;
     }
     if (kDebugMode) {
-      debugPrint('Telemetry exception: $error');
+      _debugLogger('Telemetry exception: $error');
       if (stackTrace != null) {
-        debugPrint(stackTrace.toString());
+        _debugLogger(stackTrace.toString());
       }
     }
   }
@@ -103,12 +188,12 @@ class TelemetryService {
       level: error != null ? SentryLevel.error : SentryLevel.info,
     );
     if (_sentryEnabled) {
-      Sentry.addBreadcrumb(breadcrumb);
+      _client.addBreadcrumb(breadcrumb);
     }
     if (kDebugMode) {
-      debugPrint('[network] ${request.method} ${request.uri} status=$statusCode duration=${duration?.inMilliseconds ?? '-'}ms');
+      _debugLogger('[network] ${request.method} ${request.uri} status=$statusCode duration=${duration?.inMilliseconds ?? '-'}ms');
       if (error != null) {
-        debugPrint('↳ error: ${error.message}');
+        _debugLogger('↳ error: ${error.message}');
       }
     }
   }
@@ -128,10 +213,10 @@ class TelemetryService {
       },
     );
     if (_sentryEnabled) {
-      Sentry.addBreadcrumb(breadcrumb);
+      _client.addBreadcrumb(breadcrumb);
     }
     if (kDebugMode) {
-      debugPrint('[state] $providerName -> $value');
+      _debugLogger('[state] $providerName -> $value');
     }
   }
 }

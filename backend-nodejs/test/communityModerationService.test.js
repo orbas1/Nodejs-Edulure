@@ -103,19 +103,7 @@ vi.mock('../src/models/DomainEventModel.js', () => ({
   default: mocks.domainEventModel
 }));
 
-const {
-  db,
-  builder,
-  trx,
-  logger,
-  memberModel,
-  postModel,
-  caseModel,
-  actionModel,
-  analyticsModel,
-  scamReportModel,
-  domainEventModel
-} = mocks;
+const { db, builder, trx, memberModel, postModel, caseModel, actionModel, analyticsModel, domainEventModel } = mocks;
 
 import CommunityModerationService from '../src/services/CommunityModerationService.js';
 

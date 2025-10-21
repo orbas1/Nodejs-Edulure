@@ -151,6 +151,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: 'Search by subject, requester, or tag',
+              labelText: 'Search by subject, requester, or tag',
               suffixIcon: _searchController.text.isEmpty
                   ? null
                   : IconButton(

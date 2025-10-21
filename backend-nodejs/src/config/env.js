@@ -1,3 +1,4 @@
+import fs from 'fs';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -195,6 +196,20 @@ function clampRate(rate) {
   return Number(normalised.toFixed(6));
 }
 
+function readCertificateFile(filePath) {
+  const expanded = filePath.startsWith('~')
+    ? path.join(process.env.HOME ?? '', filePath.slice(1))
+    : path.isAbsolute(filePath)
+      ? filePath
+      : path.resolve(projectRoot, filePath);
+
+  if (!fs.existsSync(expanded)) {
+    throw new Error(`Certificate file not found at ${expanded}`);
+  }
+
+  return fs.readFileSync(expanded, 'utf8');
+}
+
 function maybeDecodeCertificate(value) {
   if (!value) {
     return null;
@@ -207,6 +222,26 @@ function maybeDecodeCertificate(value) {
 
   if (trimmed.includes('-----BEGIN')) {
     return trimmed;
+  }
+
+  const lowered = trimmed.toLowerCase();
+
+  if (lowered.startsWith('file://')) {
+    const filePath = fileURLToPath(new URL(trimmed));
+    return fs.readFileSync(filePath, 'utf8');
+  }
+
+  if (trimmed.startsWith('@')) {
+    return readCertificateFile(trimmed.slice(1));
+  }
+
+  if (fs.existsSync(trimmed)) {
+    return readCertificateFile(trimmed);
+  }
+
+  if (lowered.startsWith('base64:')) {
+    const payload = trimmed.slice('base64:'.length);
+    return Buffer.from(payload, 'base64').toString('utf8');
   }
 
   try {
@@ -601,6 +636,8 @@ const envSchema = z
     JWT_ISSUER: z.string().optional(),
     TOKEN_EXPIRY_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(120),
     REFRESH_TOKEN_EXPIRY_DAYS: z.coerce.number().int().min(1).max(180).default(30),
+    DB_URL: z.string().min(5).optional(),
+    DB_READ_REPLICA_URLS: z.string().optional(),
     DB_HOST: z.string().min(1),
     DB_PORT: z.coerce.number().int().min(1).max(65535).default(3306),
     DB_USER: z.string().min(1),
@@ -608,6 +645,23 @@ const envSchema = z
     DB_NAME: z.string().min(1),
     DB_POOL_MIN: z.coerce.number().int().min(0).default(2),
     DB_POOL_MAX: z.coerce.number().int().min(2).default(10),
+    DB_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600000).default(60000),
+    DB_POOL_ACQUIRE_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600000).default(60000),
+    DB_POOL_CREATE_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600000).default(30000),
+    DB_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(10000),
+    DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).max(600000).default(0),
+    DB_SOCKET_PATH: z.string().optional(),
+    DB_TIMEZONE: z.string().min(1).default('UTC'),
+    DB_DEBUG: z.coerce.boolean().default(false),
+    DB_MIGRATIONS_TABLE: z.string().min(1).default('schema_migrations'),
+    DB_SSL_MODE: z
+      .enum(['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full'])
+      .default('prefer'),
+    DB_SSL_CA: z.string().optional(),
+    DB_SSL_CERT: z.string().optional(),
+    DB_SSL_KEY: z.string().optional(),
+    DB_SSL_PASSPHRASE: z.string().optional(),
+    DB_SSL_REJECT_UNAUTHORIZED: z.coerce.boolean().default(true),
     RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
     RATE_LIMIT_MAX: z.coerce.number().int().min(25).max(2000).default(300),
     SESSION_VALIDATION_CACHE_TTL_MS: z.coerce.number().int().min(1000).max(10 * 60 * 1000).default(60000),
@@ -1154,6 +1208,23 @@ const telemetryExportPrefix = normalizePrefix(raw.TELEMETRY_EXPORT_PREFIX, 'ware
 const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRESH_SECRET;
 const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
 const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
+const databaseUrl = (raw.DB_URL ?? process.env.DATABASE_URL ?? '').trim() || null;
+const readReplicaUrls = Array.from(
+  new Set(
+    parseCsv(raw.DB_READ_REPLICA_URLS ?? process.env.DATABASE_READ_REPLICAS ?? '')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  )
+);
+const databaseSslCa = maybeDecodeCertificate(raw.DB_SSL_CA);
+const databaseSslCert = maybeDecodeCertificate(raw.DB_SSL_CERT);
+const databaseSslKey = maybeDecodeCertificate(raw.DB_SSL_KEY);
+const requestedSslMode = (raw.DB_SSL_MODE ?? 'prefer').toLowerCase().replace(/_/g, '-');
+const allowedSslModes = new Set(['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full']);
+const normalizedSslMode = allowedSslModes.has(requestedSslMode) ? requestedSslMode : 'prefer';
+const effectiveSslMode = normalizedSslMode === 'allow' ? 'prefer' : normalizedSslMode;
+const socketPath = raw.DB_SOCKET_PATH?.trim() || null;
+const databaseTimezone = raw.DB_TIMEZONE?.trim() || 'UTC';
 const monetizationTenantAllowlist = Array.from(
   new Set(
     parseCsv(raw.MONETIZATION_RECONCILIATION_TENANTS ?? '')
@@ -1310,13 +1381,35 @@ export const env = {
     }
   },
   database: {
+    url: databaseUrl,
+    readReplicaUrls,
     host: raw.DB_HOST,
     port: raw.DB_PORT,
     user: raw.DB_USER,
     password: raw.DB_PASSWORD,
     name: raw.DB_NAME,
+    socketPath,
+    timezone: databaseTimezone,
     poolMin: raw.DB_POOL_MIN,
-    poolMax: raw.DB_POOL_MAX
+    poolMax: raw.DB_POOL_MAX,
+    poolIdleTimeoutMs: raw.DB_POOL_IDLE_TIMEOUT_MS,
+    poolAcquireTimeoutMs: raw.DB_POOL_ACQUIRE_TIMEOUT_MS,
+    poolCreateTimeoutMs: raw.DB_POOL_CREATE_TIMEOUT_MS,
+    connectTimeoutMs: raw.DB_CONNECT_TIMEOUT_MS,
+    statementTimeoutMs: raw.DB_STATEMENT_TIMEOUT_MS,
+    debug: raw.DB_DEBUG,
+    migrations: {
+      tableName: raw.DB_MIGRATIONS_TABLE ?? 'schema_migrations'
+    },
+    ssl: {
+      mode: effectiveSslMode,
+      rejectUnauthorized: raw.DB_SSL_REJECT_UNAUTHORIZED,
+      ca: databaseSslCa,
+      cert: databaseSslCert,
+      key: databaseSslKey,
+      passphrase: raw.DB_SSL_PASSPHRASE ?? null,
+      minVersion: 'TLSv1.2'
+    }
   },
   storage: {
     accountId: raw.R2_ACCOUNT_ID,

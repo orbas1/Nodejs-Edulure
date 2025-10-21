@@ -345,6 +345,8 @@ registry.registerMetric(explorerSearchDisplayedResults);
 registry.registerMetric(explorerSearchLatencyMs);
 registry.registerMetric(explorerSearchInteractionsTotal);
 
+const ACTIVE_ROUTE_LOCAL_KEY = '__metricsActiveRouteLabel';
+
 function normalizeRoute(req) {
   if (req.route?.path) {
     return req.baseUrl ? `${req.baseUrl}${req.route.path}` : req.route.path;
@@ -368,7 +370,14 @@ export function httpMetricsMiddleware(req, res, next) {
     : null;
 
   if (metricsEnabled) {
-    httpActiveRequests.inc({ route: 'pending' });
+    const activeRouteLabel = {
+      route: req.originalUrl ? req.originalUrl.split('?')[0] : 'pending'
+    };
+    if (!res.locals || typeof res.locals !== 'object') {
+      res.locals = {};
+    }
+    res.locals[ACTIVE_ROUTE_LOCAL_KEY] = activeRouteLabel;
+    httpActiveRequests.inc(activeRouteLabel);
   }
 
   onFinished(res, () => {
@@ -386,7 +395,11 @@ export function httpMetricsMiddleware(req, res, next) {
       if (statusCode >= 500) {
         httpRequestErrors.inc(labels);
       }
-      httpActiveRequests.dec({ route: 'pending' });
+      const activeRouteLabel = res.locals?.[ACTIVE_ROUTE_LOCAL_KEY];
+      if (activeRouteLabel) {
+        httpActiveRequests.dec(activeRouteLabel);
+        delete res.locals[ACTIVE_ROUTE_LOCAL_KEY];
+      }
     }
 
     const durationNs = process.hrtime.bigint() - startTime;
@@ -508,6 +521,8 @@ export async function metricsHandler(req, res, next) {
   try {
     validateMetricsAuth(req);
     res.setHeader('Content-Type', registry.contentType);
+    res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     res.end(await registry.metrics());
   } catch (error) {
     if (!error.status) {
@@ -523,6 +538,10 @@ export async function metricsHandler(req, res, next) {
 }
 
 export async function recordStorageOperation(operation, visibility, handler) {
+  if (!env.observability.metrics.enabled) {
+    return handler();
+  }
+
   const labels = { operation, visibility };
   storageOperationsInFlight.inc({ operation });
   const endTimer = storageOperationDurationSeconds.startTimer({
@@ -916,11 +935,19 @@ export function recordTelemetryFreshness({ pipeline, status, lastEventAt, thresh
 }
 
 export function recordUnhandledException(error) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
   const type = error?.name ?? 'Error';
   unhandledExceptionsTotal.inc({ type });
 }
 
 export function recordFeatureGateDecision({ flagKey, result, route, audience, reason }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
   const resolvedFlag = flagKey ?? 'unknown';
   const resolvedResult = result ?? 'unknown';
   const resolvedRoute = route ?? 'unknown';
@@ -937,6 +964,10 @@ export function recordFeatureGateDecision({ flagKey, result, route, audience, re
 }
 
 export function recordAntivirusScan({ status, bytesScanned, durationSeconds, signature, bucket }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
   const resolvedStatus = status ?? 'unknown';
   const bytes = Number(bytesScanned ?? 0);
   const duration = Number(durationSeconds ?? 0);

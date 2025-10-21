@@ -13,7 +13,44 @@ function toIso(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function parseAttachments(payload) {
+function safeParseJsonColumn(value, fallback) {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  if (typeof value === 'object') {
+    if (Array.isArray(fallback) && Array.isArray(value)) {
+      return value;
+    }
+    if (!Array.isArray(fallback) && !Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) {
+      return fallback;
+    }
+    if (!Array.isArray(fallback) && typeof parsed !== 'object') {
+      return fallback;
+    }
+    return parsed ?? fallback;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function normaliseAttachmentInput(payload) {
   if (!payload) {
     return [];
   }
@@ -21,12 +58,56 @@ function parseAttachments(payload) {
     return payload.map((item) => ({
       id: item.id ?? crypto.randomUUID(),
       name: item.name ?? item.filename ?? 'Attachment',
-      size: item.size ?? item.bytes ?? null,
+      size: (() => {
+        const raw = item.size ?? item.bytes;
+        if (raw === null || raw === undefined || raw === '') {
+          return null;
+        }
+        const numeric = Number(raw);
+        return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+      })(),
       url: item.url ?? item.href ?? null,
       type: item.type ?? item.mimeType ?? null
     }));
   }
   return [];
+}
+
+function serialiseAttachments(payload) {
+  const attachments = normaliseAttachmentInput(payload);
+  if (!attachments.length) {
+    return JSON.stringify([]);
+  }
+  return JSON.stringify(attachments);
+}
+
+function serialiseMetadata(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    try {
+      JSON.parse(trimmed);
+      return trimmed;
+    } catch (_error) {
+      return JSON.stringify({});
+    }
+  }
+
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch (_error) {
+      return JSON.stringify({});
+    }
+  }
+
+  return null;
 }
 
 function mapMessage(row) {
@@ -37,7 +118,7 @@ function mapMessage(row) {
     id: row.id,
     author: row.author,
     body: row.body,
-    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    attachments: normaliseAttachmentInput(safeParseJsonColumn(row.attachments, [])),
     createdAt: toIso(row.created_at)
   };
 }
@@ -57,7 +138,7 @@ function mapCase(row, messages = []) {
     satisfaction: row.satisfaction,
     owner: row.owner,
     lastAgent: row.last_agent,
-    metadata: row.metadata ?? null,
+    metadata: safeParseJsonColumn(row.metadata, {}),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
     messages: messages.map((message) => mapMessage(message)).filter(Boolean)
@@ -110,7 +191,7 @@ export default class LearnerSupportRepository {
         owner: payload.owner ?? null,
         last_agent: payload.lastAgent ?? payload.owner ?? null,
         satisfaction: payload.satisfaction ?? null,
-        metadata: payload.metadata ?? null
+        metadata: serialiseMetadata(payload.metadata)
       },
       ['id']
     );
@@ -128,7 +209,7 @@ export default class LearnerSupportRepository {
           case_id: resolvedCaseId,
           author: message.author ?? 'learner',
           body: message.body ?? '',
-          attachments: parseAttachments(message.attachments ?? message.files),
+          attachments: serialiseAttachments(message.attachments ?? message.files),
           created_at: toIso(message.createdAt ?? message.sentAt ?? new Date())
         }))
       );
@@ -161,7 +242,7 @@ export default class LearnerSupportRepository {
       payload.satisfaction = updates.satisfaction;
     }
     if (updates.metadata !== undefined) {
-      payload.metadata = updates.metadata;
+      payload.metadata = serialiseMetadata(updates.metadata);
     }
     if (Object.keys(payload).length === 0) {
       return this.findCase(userId, caseId);
@@ -182,7 +263,7 @@ export default class LearnerSupportRepository {
         case_id: caseId,
         author: message.author ?? 'learner',
         body: message.body ?? '',
-        attachments: parseAttachments(message.attachments ?? message.files),
+        attachments: serialiseAttachments(message.attachments ?? message.files),
         created_at: toIso(message.createdAt ?? new Date())
       },
       ['id']
@@ -200,15 +281,17 @@ export default class LearnerSupportRepository {
     if (!existing) {
       return null;
     }
+    const existingMetadata = safeParseJsonColumn(existing.metadata, {});
+    const updatedMetadata = {
+      ...existingMetadata,
+      resolutionNote: resolutionNote ?? existingMetadata.resolutionNote ?? null
+    };
     await db('learner_support_cases')
       .where({ id: caseId })
       .update({
         status: 'closed',
         satisfaction: satisfaction ?? existing.satisfaction,
-        metadata: {
-          ...existing.metadata,
-          resolutionNote: resolutionNote ?? existing.metadata?.resolutionNote ?? null
-        },
+        metadata: serialiseMetadata(updatedMetadata),
         updated_at: db.fn.now()
       });
     if (resolutionNote) {
@@ -216,10 +299,19 @@ export default class LearnerSupportRepository {
         case_id: caseId,
         author: 'support',
         body: resolutionNote,
-        attachments: [],
+        attachments: JSON.stringify([]),
         created_at: db.fn.now()
       });
     }
     return this.findCase(userId, caseId);
   }
 }
+
+export const __testables = {
+  safeParseJsonColumn,
+  normaliseAttachmentInput,
+  serialiseAttachments,
+  serialiseMetadata,
+  mapMessage,
+  mapCase
+};

@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasTable = await knex.schema.hasTable('community_donations');
   if (!hasTable) {
@@ -44,7 +46,7 @@ export async function up(knex) {
       table.string('referral_code', 60);
       table.string('donor_name', 120);
       table.text('message');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('captured_at');
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table

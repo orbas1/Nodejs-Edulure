@@ -1,4 +1,7 @@
-import centroidsData from '../data/countryCentroids.json' with { type: 'json' };
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const centroidsData = require('../data/countryCentroids.json');
 
 function isFiniteNumber(value) {
   return Number.isFinite(value) || (!Number.isNaN(Number(value)) && Number.isFinite(Number(value)));

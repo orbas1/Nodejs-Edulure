@@ -54,7 +54,6 @@ function extractCount(row) {
 
   const value =
     row.count ??
-    row['count'] ??
     row['count(*)'] ??
     row['COUNT(*)'] ??
     row['count(`*`)'] ??
@@ -124,13 +123,27 @@ export default class ReleaseChecklistItemModel {
 
   static async updateBySlug(slug, updates, connection = db) {
     const payload = {};
-    if (updates.category !== undefined) payload.category = updates.category;
-    if (updates.title !== undefined) payload.title = updates.title;
-    if (updates.description !== undefined) payload.description = updates.description;
-    if (updates.autoEvaluated !== undefined) payload.auto_evaluated = updates.autoEvaluated;
-    if (updates.weight !== undefined) payload.weight = Number.parseInt(updates.weight ?? 1, 10) || 1;
-    if (updates.defaultOwnerEmail !== undefined) payload.default_owner_email = updates.defaultOwnerEmail ?? null;
-    if (updates.successCriteria !== undefined) payload.success_criteria = serialiseJson(updates.successCriteria, {});
+    if (updates.category !== undefined) {
+      payload.category = updates.category;
+    }
+    if (updates.title !== undefined) {
+      payload.title = updates.title;
+    }
+    if (updates.description !== undefined) {
+      payload.description = updates.description;
+    }
+    if (updates.autoEvaluated !== undefined) {
+      payload.auto_evaluated = updates.autoEvaluated;
+    }
+    if (updates.weight !== undefined) {
+      payload.weight = Number.parseInt(updates.weight ?? 1, 10) || 1;
+    }
+    if (updates.defaultOwnerEmail !== undefined) {
+      payload.default_owner_email = updates.defaultOwnerEmail ?? null;
+    }
+    if (updates.successCriteria !== undefined) {
+      payload.success_criteria = serialiseJson(updates.successCriteria, {});
+    }
 
     if (!Object.keys(payload).length) {
       return this.findBySlug(slug, connection);

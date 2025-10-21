@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { safeJsonParse, safeJsonStringify } from '../utils/modelUtils.js';
 
 const TABLE = 'asset_conversion_outputs';
 
@@ -23,7 +24,7 @@ export default class AssetConversionOutputModel {
       storage_bucket: data.storageBucket,
       checksum: data.checksum ?? null,
       size_bytes: data.sizeBytes ?? null,
-      metadata: JSON.stringify(data.metadata ?? {})
+      metadata: safeJsonStringify(data.metadata)
     };
 
     const existing = await connection(TABLE).where({ asset_id: assetId, format }).first();
@@ -58,7 +59,7 @@ export default class AssetConversionOutputModel {
   static deserialize(row) {
     return {
       ...row,
-      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : row.metadata
+      metadata: safeJsonParse(row.metadata, {})
     };
   }
 }

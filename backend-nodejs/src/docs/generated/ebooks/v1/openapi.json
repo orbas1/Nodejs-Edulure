@@ -2,8 +2,13 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Edulure Platform API – E-book catalogue and DRM-controlled delivery endpoints.",
-    "version": "1.50.0",
-    "description": "E-book catalogue and DRM-controlled delivery endpoints. (Capability: digital-asset-delivery)."
+    "version": "1.51.0",
+    "description": "E-book catalogue and DRM-controlled delivery endpoints. (Capability: digital-asset-delivery).",
+    "x-release": {
+      "version": "1.51.0",
+      "releasedAt": "2025-10-20T23:52:56.000Z",
+      "stability": "stable"
+    }
   },
   "servers": [
     {
@@ -1162,6 +1167,18 @@
           }
         }
       }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     }
-  }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
 }

@@ -62,4 +62,64 @@ describe('SLO registry', () => {
     expect(graphqlSnapshot.totalRequests).toBe(0);
     expect(graphqlSnapshot.latency).toBeNull();
   });
+
+  it('honours method whitelists, exclusions, and regex flags', () => {
+    resetSloRegistry([
+      {
+        id: 'custom-api-availability',
+        name: 'Custom API availability',
+        description: 'Tracks POST success rate for custom API routes',
+        targetAvailability: 0.99,
+        windowMinutes: 60,
+        indicator: {
+          type: 'http',
+          routePattern: '^/api/v1/example',
+          routePatternFlags: 'gi',
+          methodWhitelist: ['POST'],
+          excludeRoutePatterns: [{ pattern: '^/api/v1/example/internal' }],
+          treat4xxAsFailures: true,
+          failureStatusCodes: [500, 503],
+          successStatusCodes: [200, 201]
+        },
+        alerting: {
+          burnRateWarning: 2,
+          burnRateCritical: 4,
+          minRequests: 1
+        },
+        tags: []
+      }
+    ]);
+
+    recordHttpSloObservation({
+      route: '/api/v1/example/resource',
+      method: 'post',
+      statusCode: 200,
+      durationMs: 18
+    });
+    recordHttpSloObservation({
+      route: '/api/v1/example/resource',
+      method: 'POST',
+      statusCode: 503,
+      durationMs: 34
+    });
+    recordHttpSloObservation({
+      route: '/api/v1/example/internal/health',
+      method: 'POST',
+      statusCode: 500,
+      durationMs: 15
+    });
+    recordHttpSloObservation({
+      route: '/api/v1/example/resource',
+      method: 'GET',
+      statusCode: 200
+    });
+
+    const snapshot = getSloSummary('custom-api-availability', { includeDefinition: true });
+    expect(snapshot.totalRequests).toBe(2);
+    expect(snapshot.errorCount).toBe(1);
+    expect(snapshot.latency?.sampleSize).toBe(2);
+    expect(snapshot.definition.indicator.methodWhitelist).toEqual(['POST']);
+
+    resetSloRegistry();
+  });
 });

@@ -1,15 +1,6 @@
 import db from '../config/database.js';
 import DataEncryptionService from '../services/DataEncryptionService.js';
-
-function parseJson(value, fallback) {
-  if (!value) return fallback;
-  if (typeof value === 'object') return value;
-  try {
-    return JSON.parse(value);
-  } catch (_error) {
-    return fallback;
-  }
-}
+import { ensureIntegerInRange, normaliseOptionalString, readJsonColumn, writeJsonColumn } from '../utils/modelUtils.js';
 
 const BASE_COLUMNS = [
   'cap.id',
@@ -71,6 +62,19 @@ function deserializeDisbursement(row) {
   };
 }
 
+const PAYOUT_STATUSES = new Set(['pending', 'scheduled', 'processing', 'completed', 'failed', 'cancelled']);
+
+function normaliseStatus(status) {
+  if (!status) {
+    return 'pending';
+  }
+  const candidate = String(status).trim().toLowerCase();
+  if (!PAYOUT_STATUSES.has(candidate)) {
+    throw new Error(`Unsupported affiliate payout status '${status}'`);
+  }
+  return candidate;
+}
+
 function mapRecord(record) {
   if (!record) return null;
   const disbursement = deserializeDisbursement(record);
@@ -83,11 +87,18 @@ function mapRecord(record) {
     scheduledAt: record.scheduledAt,
     processedAt: record.processedAt,
     failureReason: disbursement.failureReason,
-    metadata: parseJson(record.metadata, {}),
+    metadata: readJsonColumn(record.metadata, {}),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     disbursementHash: record.disbursementHash,
     disbursementClassification: record.disbursementClassification
+  };
+}
+
+function normaliseDisbursementDetails(payout) {
+  return {
+    payoutReference: normaliseOptionalString(payout.payoutReference, { maxLength: 120 }),
+    failureReason: normaliseOptionalString(payout.failureReason, { maxLength: 400 })
   };
 }
 
@@ -97,14 +108,14 @@ function buildInsertPayload(payout) {
   const masked = maskDisbursement(disbursement, `enc-${payout.affiliateId ?? 'affiliate'}`);
 
   return {
-    affiliate_id: payout.affiliateId,
-    amount_cents: payout.amountCents,
-    status: payout.status ?? 'pending',
+    affiliate_id: ensureIntegerInRange(payout.affiliateId, { fieldName: 'affiliateId', min: 1 }),
+    amount_cents: ensureIntegerInRange(payout.amountCents, { fieldName: 'amountCents', min: 1 }),
+    status: normaliseStatus(payout.status),
     payout_reference: masked.payout_reference,
     scheduled_at: payout.scheduledAt ?? null,
     processed_at: payout.processedAt ?? null,
     failure_reason: masked.failure_reason,
-    metadata: JSON.stringify(payout.metadata ?? {}),
+    metadata: writeJsonColumn(payout.metadata, {}),
     disbursement_payload_ciphertext: encrypted.ciphertext,
     disbursement_payload_hash: encrypted.hash,
     classification_tag: encrypted.classificationTag,
@@ -114,10 +125,11 @@ function buildInsertPayload(payout) {
 
 function buildUpdatePayload(payout, existing) {
   const current = deserializeDisbursement(existing);
-  const disbursement = buildDisbursement({
+  const overrides = normaliseDisbursementDetails({
     payoutReference: payout.payoutReference ?? current.payoutReference,
     failureReason: payout.failureReason ?? current.failureReason
   });
+  const disbursement = buildDisbursement(overrides);
   const encrypted = encryptDisbursement(disbursement);
   const masked = maskDisbursement(disbursement, existing.payoutReferenceMask ?? `enc-${existing.affiliateId}`);
 
@@ -133,7 +145,7 @@ function buildUpdatePayload(payout, existing) {
 
 export default class CommunityAffiliatePayoutModel {
   static async create(payout, connection = db) {
-    const payload = buildInsertPayload(payout);
+    const payload = buildInsertPayload({ ...payout, ...normaliseDisbursementDetails(payout) });
     const [id] = await connection('community_affiliate_payouts').insert(payload);
     return this.findById(id, connection);
   }
@@ -150,10 +162,10 @@ export default class CommunityAffiliatePayoutModel {
     const disbursementUpdates = buildUpdatePayload(updates, current);
     const payload = { ...disbursementUpdates };
 
-    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.status !== undefined) payload.status = normaliseStatus(updates.status);
     if (updates.processedAt !== undefined) payload.processed_at = updates.processedAt;
     if (updates.scheduledAt !== undefined) payload.scheduled_at = updates.scheduledAt;
-    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
+    if (updates.metadata !== undefined) payload.metadata = writeJsonColumn(updates.metadata, {});
 
     await connection('community_affiliate_payouts')
       .where({ id })

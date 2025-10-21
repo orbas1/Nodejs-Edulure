@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasCategories = await knex.schema.hasTable('blog_categories');
   if (!hasCategories) {
@@ -53,7 +55,7 @@ export async function up(knex) {
       table.enum('status', ['draft', 'scheduled', 'published', 'archived']).defaultTo('draft');
       table.timestamp('published_at');
       table.timestamp('scheduled_for');
-      table.json('metadata').notNullable().defaultTo(JSON.stringify({}));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.boolean('is_featured').notNullable().defaultTo(false);
       table.integer('reading_time_minutes').unsigned().defaultTo(3);
       table.integer('view_count').unsigned().defaultTo(0);
@@ -105,7 +107,7 @@ export async function up(knex) {
       table.string('alt_text', 160);
       table.string('media_type', 60).notNullable().defaultTo('image');
       table.integer('display_order').unsigned().defaultTo(0);
-      table.json('metadata').notNullable().defaultTo(JSON.stringify({}));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
     });
   }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createReadinessTracker } from '../src/observability/readiness.js';
 
@@ -36,5 +36,47 @@ describe('createReadinessTracker', () => {
     expect(beta?.status).toBe('degraded');
     expect(beta?.ready).toBe(true);
     expect(beta?.message).toContain('warnings');
+  });
+
+  it('supports change subscriptions and lifecycle helpers', async () => {
+    const tracker = createReadinessTracker('svc-observability', ['database']);
+    const listener = vi.fn();
+    const unsubscribe = tracker.onChange(listener);
+
+    tracker.markReady('database', 'Primary database ready', { region: 'us-east-1' });
+    await tracker.withComponent('queue-worker', async () => ({
+      status: 'degraded',
+      message: 'Backlog building',
+      details: { lagSeconds: 42 }
+    }));
+
+    await expect(
+      tracker.withComponent('search-index', async () => {
+        throw new Error('Elasticsearch unavailable');
+      })
+    ).rejects.toThrow('Elasticsearch unavailable');
+
+    tracker.markMaintenance('cdn', 'Planned maintenance');
+
+    const snapshot = tracker.snapshot();
+    expect(snapshot.ready).toBe(false);
+    expect(tracker.listComponents()).toEqual(
+      expect.arrayContaining(['database', 'queue-worker', 'search-index', 'cdn'])
+    );
+
+    const queueState = tracker.getComponentState('queue-worker');
+    expect(queueState?.status).toBe('degraded');
+    expect(queueState?.details).toEqual({ lagSeconds: 42 });
+
+    const searchState = tracker.getComponentState('search-index');
+    expect(searchState?.status).toBe('failed');
+    expect(searchState?.error?.message).toContain('Elasticsearch unavailable');
+
+    const maintenanceState = tracker.getComponentState('cdn');
+    expect(maintenanceState?.status).toBe('maintenance');
+    expect(maintenanceState?.ready).toBe(false);
+
+    expect(listener).toHaveBeenCalled();
+    unsubscribe();
   });
 });

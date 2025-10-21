@@ -1,9 +1,89 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { z } from 'zod';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const GENERATED_ROOT = path.join(__dirname, 'generated');
+const INDEX_FILE_PATH = path.join(GENERATED_ROOT, 'index.json');
+
+const SERVICE_IDENTIFIER_PATTERN = /^[a-z0-9-]+$/i;
+const ISO_INSTANT_PATTERN = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/;
+const HEX_CHECKSUM_PATTERN = /^[a-f0-9]{64}$/i;
+
+const SERVICE_DESCRIPTOR_SCHEMA = z
+  .object({
+    service: z.string().min(1),
+    name: z.string().min(1),
+    capability: z.string().min(1),
+    version: z.string().min(1),
+    description: z.string().min(1),
+    basePath: z
+      .string()
+      .min(1)
+      .transform((value) => value.trim())
+      .refine((value) => value.startsWith('/'), {
+        message: 'OpenAPI base paths must be absolute.'
+      }),
+    file: z.string().optional(),
+    documentationUrl: z.string().url().optional(),
+    checksum: z
+      .string()
+      .trim()
+      .regex(HEX_CHECKSUM_PATTERN, 'OpenAPI checksum must be a SHA-256 hex digest.')
+      .optional(),
+    lastUpdated: z
+      .string()
+      .trim()
+      .refine((value) => {
+        if (!value) {
+          return true;
+        }
+
+        const parsed = Date.parse(value);
+        return Number.isFinite(parsed) && ISO_INSTANT_PATTERN.test(new Date(parsed).toISOString());
+      }, 'lastUpdated must be an ISO-8601 instant string.')
+      .optional()
+  })
+  .transform((descriptor) => {
+    const normalisedService = descriptor.service.trim();
+    if (!SERVICE_IDENTIFIER_PATTERN.test(normalisedService)) {
+      throw new Error(`Invalid service identifier '${descriptor.service}'.`);
+    }
+
+    const normalisedVersion = descriptor.version.trim().toLowerCase();
+    if (!/^v\d+(?:\.\d+)?$/.test(normalisedVersion)) {
+      throw new Error(`Unsupported OpenAPI version tag '${descriptor.version}'.`);
+    }
+
+    const sanitisedBasePath = descriptor.basePath.replace(/\/$/, '') || '/';
+
+    const normalisedDocumentationUrl = descriptor.documentationUrl?.trim();
+    const normalisedChecksum = descriptor.checksum?.toLowerCase();
+    const trimmedFile = descriptor.file?.trim();
+    const lastUpdatedIso = descriptor.lastUpdated
+      ? new Date(descriptor.lastUpdated).toISOString()
+      : undefined;
+
+    return {
+      service: normalisedService.toLowerCase(),
+      name: descriptor.name.trim(),
+      capability: descriptor.capability.trim(),
+      version: normalisedVersion,
+      description: descriptor.description.trim(),
+      basePath: sanitisedBasePath,
+      file: trimmedFile,
+      documentationUrl: normalisedDocumentationUrl,
+      checksum: normalisedChecksum,
+      lastUpdated: lastUpdatedIso
+    };
+  });
+
+const SPEC_INDEX_SCHEMA = z.object({
+  generatedAt: z.string().optional(),
+  baseSpec: z.string().optional(),
+  services: z.array(SERVICE_DESCRIPTOR_SCHEMA).min(1)
+});
 
 let cachedRegistry;
 const specCache = new Map();

@@ -7,11 +7,25 @@ const feedServiceMock = {
   getAnalytics: vi.fn()
 };
 
+const authState = {
+  user: { id: '555', role: 'user' }
+};
+
+const dashboardServiceMock = {
+  getDashboardForUser: vi.fn()
+};
+
 vi.mock('../src/middleware/auth.js', () => ({
   default: () => (req, _res, next) => {
-    req.user = { id: 555, role: 'user' };
+    if (authState.user) {
+      req.user = authState.user;
+    }
     return next();
   }
+}));
+
+vi.mock('../src/services/DashboardService.js', () => ({
+  default: dashboardServiceMock
 }));
 
 vi.mock('../src/services/LiveFeedService.js', () => ({
@@ -26,6 +40,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   Object.values(feedServiceMock).forEach((mockFn) => mockFn.mockReset());
+  Object.values(dashboardServiceMock).forEach((mockFn) => mockFn.mockReset());
+  authState.user = { id: '555', role: 'user' };
 });
 
 describe('Feed GraphQL endpoint', () => {
@@ -75,7 +91,8 @@ describe('Feed GraphQL endpoint', () => {
     expect(response.body.data.feed.items).toHaveLength(1);
   });
 
-  it('resolves placements query', async () => {
+  it('resolves placements query for actors with ads access', async () => {
+    authState.user = { id: '555', role: 'service' };
     feedServiceMock.getPlacements.mockResolvedValue([
       { placementId: 'pl1', position: 1 }
     ]);
@@ -83,7 +100,7 @@ describe('Feed GraphQL endpoint', () => {
     const response = await request(app)
       .post('/api/v1/graphql')
       .set('x-actor-id', '555')
-      .set('x-actor-role', 'user')
+      .set('x-actor-role', 'service')
       .send({
         query: `query Placements($input: FeedPlacementInput!) {
           feedPlacements(input: $input) { placementId position }
@@ -127,5 +144,182 @@ describe('Feed GraphQL endpoint', () => {
       filters: { search: undefined, postType: undefined }
     });
     expect(response.body.data.feedAnalytics.engagement.postsSampled).toBe(3);
+  });
+
+  it('rejects requests without a resolved actor', async () => {
+    authState.user = null;
+
+    const response = await request(app)
+      .post('/api/v1/graphql')
+      .send({
+        query: `query Feed { feed { context } }`
+      })
+      .expect(401);
+
+    expect(response.body.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');
+    expect(feedServiceMock.getFeed).not.toHaveBeenCalled();
+  });
+
+  it('allows service actors to be resolved from headers when session is missing', async () => {
+    authState.user = null;
+    feedServiceMock.getFeed.mockResolvedValue({
+      context: 'global',
+      items: [],
+      highlights: [],
+      analytics: null,
+      pagination: { page: 1, perPage: 20, total: 0, pageCount: 0 }
+    });
+
+    await request(app)
+      .post('/api/v1/graphql')
+      .set('x-actor-id', '777')
+      .set('x-actor-role', 'service')
+      .send({
+        query: `query Feed { feed { context } }`
+      })
+      .expect(200);
+
+    expect(feedServiceMock.getFeed).toHaveBeenCalledWith({
+      actor: { id: 777, role: 'service' },
+      context: 'global',
+      community: undefined,
+      page: 1,
+      perPage: 20,
+      includeAnalytics: true,
+      includeHighlights: true,
+      range: '30d',
+      filters: { search: undefined, postType: undefined }
+    });
+  });
+
+  it('blocks documents containing more than one operation', async () => {
+    authState.user = { id: '555', role: 'user' };
+
+    const response = await request(app)
+      .post('/api/v1/graphql')
+      .send({
+        query: `
+          query First { feed { context } }
+          query Second { feedPlacements(input: { context: GLOBAL_FEED }) { placementId } }
+        `
+      })
+      .expect(200);
+
+    expect(response.body.errors?.[0]?.extensions?.code).toBe('OPERATION_LIMIT_EXCEEDED');
+    expect(response.body.errors?.[0]?.extensions?.http?.status).toBe(400);
+    expect(feedServiceMock.getFeed).not.toHaveBeenCalled();
+    expect(feedServiceMock.getPlacements).not.toHaveBeenCalled();
+  });
+
+  it('enforces query depth limits to mitigate expensive introspection', async () => {
+    const response = await request(app)
+      .post('/api/v1/graphql')
+      .send({
+        query: `
+          query DeepIntrospection {
+            __schema {
+              types {
+                fields {
+                  type {
+                    ofType {
+                      ofType {
+                        ofType {
+                          ofType {
+                            ofType {
+                              ofType {
+                                ofType {
+                                  name
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `
+      })
+      .expect(200);
+
+    expect(response.body.errors?.[0]?.extensions?.code).toBe('DEPTH_LIMIT_EXCEEDED');
+    expect(response.body.errors?.[0]?.extensions?.http?.status).toBe(400);
+  });
+
+  it('rejects actors without required permissions for feed queries', async () => {
+    authState.user = { id: '555', role: 'user', permissions: [], inheritRolePermissions: false };
+
+    const response = await request(app)
+      .post('/api/v1/graphql')
+      .set('x-actor-id', '555')
+      .set('x-actor-role', 'user')
+      .send({
+        query: `query Feed { feed { context } }`
+      })
+      .expect(200);
+
+    expect(response.body.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    expect(feedServiceMock.getFeed).not.toHaveBeenCalled();
+  });
+
+  it('rejects feed placements without ads permission', async () => {
+    authState.user = { id: '555', role: 'user', permissions: [] };
+
+    const response = await request(app)
+      .post('/api/v1/graphql')
+      .set('x-actor-id', '555')
+      .set('x-actor-role', 'user')
+      .send({
+        query: `query Placements($input: FeedPlacementInput!) {
+          feedPlacements(input: $input) { placementId }
+        }`,
+        variables: { input: { context: 'SEARCH' } }
+      })
+      .expect(200);
+
+    expect(response.body.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    expect(feedServiceMock.getPlacements).not.toHaveBeenCalled();
+  });
+
+  it('applies default permissions when explicit list is empty', async () => {
+    authState.user = { id: '555', role: 'user', permissions: [] };
+    feedServiceMock.getFeed.mockResolvedValue({
+      context: 'global',
+      items: [],
+      highlights: [],
+      analytics: null,
+      pagination: { page: 1, perPage: 20, total: 0, pageCount: 0 }
+    });
+
+    const response = await request(app)
+      .post('/api/v1/graphql')
+      .set('x-actor-id', '555')
+      .set('x-actor-role', 'user')
+      .send({
+        query: `query Feed { feed { context } }`
+      })
+      .expect(200);
+
+    expect(feedServiceMock.getFeed).toHaveBeenCalledTimes(1);
+    expect(response.body.data.feed.context).toBe('global');
+  });
+
+  it('rejects requests with unsupported header actor roles', async () => {
+    authState.user = null;
+
+    const response = await request(app)
+      .post('/api/v1/graphql')
+      .set('x-actor-id', '777')
+      .set('x-actor-role', 'banned')
+      .send({
+        query: `query Feed { feed { context } }`
+      })
+      .expect(403);
+
+    expect(response.body.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
+    expect(feedServiceMock.getFeed).not.toHaveBeenCalled();
   });
 });

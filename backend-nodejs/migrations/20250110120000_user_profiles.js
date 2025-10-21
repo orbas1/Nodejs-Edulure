@@ -1,3 +1,6 @@
+const JSON_EMPTY_OBJECT = JSON.stringify({});
+const JSON_EMPTY_ARRAY = JSON.stringify([]);
+
 export async function up(knex) {
   const hasTable = await knex.schema.hasTable('user_profiles');
   if (!hasTable) {
@@ -16,8 +19,8 @@ export async function up(knex) {
       table.string('avatar_url', 500);
       table.string('banner_url', 500);
       table.text('bio');
-      table.json('social_links').notNullable().defaultTo('[]');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('social_links').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')

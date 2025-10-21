@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class FeatureFlagRepository {
@@ -31,6 +32,12 @@ class FeatureFlagRepository {
     return <String, bool>{};
   }
 
+  Future<void> clearCache() async {
+    final box = await _ensureBox();
+    await box.delete(_cacheKey);
+    await box.delete(_timestampKey);
+  }
+
   Future<Map<String, bool>> refresh({bool force = false}) async {
     final box = await _ensureBox();
     if (!force) {
@@ -46,24 +53,32 @@ class FeatureFlagRepository {
       }
     }
 
-    final response = await _dio.get(
-      '/runtime/feature-flags/mobile',
-      options: Options(extra: {'requiresAuth': false}),
-    );
-    final payload = response.data;
-    final data = payload is Map<String, dynamic>
-        ? payload['data']
-        : null;
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/runtime/feature-flags/mobile',
+        options: Options(extra: const {'requiresAuth': false}),
+      );
+      final payload = response.data;
+      final data = payload is Map<String, dynamic> ? payload['data'] : null;
 
-    final flags = <String, bool>{};
-    if (data is Map) {
-      for (final entry in data.entries) {
-        flags[entry.key.toString()] = entry.value == true;
+      final flags = <String, bool>{};
+      if (data is Map) {
+        for (final entry in data.entries) {
+          flags[entry.key.toString()] = entry.value == true;
+        }
       }
-    }
 
-    await box.put(_cacheKey, flags);
-    await box.put(_timestampKey, DateTime.now().toIso8601String());
-    return flags;
+      await box.put(_cacheKey, flags);
+      await box.put(_timestampKey, DateTime.now().toIso8601String());
+      return flags;
+    } on DioException catch (error, stackTrace) {
+      debugPrint('Failed to refresh feature flags: ${error.message}');
+      debugPrintStack(stackTrace: stackTrace);
+      final cached = await loadCachedFlags();
+      if (cached.isNotEmpty) {
+        return cached;
+      }
+      rethrow;
+    }
   }
 }

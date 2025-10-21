@@ -36,7 +36,10 @@
       "version": "v1",
       "description": "User registration, login, session lifecycle, and verification endpoints.",
       "basePath": "/auth",
-      "file": "./auth/v1/openapi.json"
+      "file": "./auth/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/auth/v1",
+      "checksum": "fc7778c0ef6ce01e13509fb934a38164d5f8633d10972fe702277dda65900ff6"
     },
     {
       "service": "chat",
@@ -54,7 +57,10 @@
       "version": "v1",
       "description": "Community creation, membership, and scheduling APIs.",
       "basePath": "/communities",
-      "file": "./communities/v1/openapi.json"
+      "file": "./communities/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/communities/v1",
+      "checksum": "d863070076fc2bf6deea578e3c7cb82664e03933d20f5168f95589cc891baa6c"
     },
     {
       "service": "content",
@@ -63,7 +69,10 @@
       "version": "v1",
       "description": "Content ingestion, cataloguing, and lifecycle management endpoints.",
       "basePath": "/content",
-      "file": "./content/v1/openapi.json"
+      "file": "./content/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/content/v1",
+      "checksum": "8c967e2ece6bb2a3fd2b8430c3a4a0750562a3796627909b4280e0894a5fc1c3"
     },
     {
       "service": "creation",
@@ -117,7 +126,10 @@
       "version": "v1",
       "description": "Explorer search, browse, and recommendation endpoints.",
       "basePath": "/explorer",
-      "file": "./explorer/v1/openapi.json"
+      "file": "./explorer/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/explorer/v1",
+      "checksum": "29c6b2d524b58c2f74199b437a30d4572dfbe1391d4c9e3653dd1e1c67369840"
     },
     {
       "service": "feed",

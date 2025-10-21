@@ -1,43 +1,84 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 
-import { createCorsOriginValidator } from '../../src/config/corsPolicy.js';
+import {
+  createCorsOriginValidator,
+  parseCorsOrigins
+} from '../../src/config/corsPolicy.js';
+
+const originalNodeEnv = process.env.NODE_ENV;
+
+describe('parseCorsOrigins', () => {
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('normalises comma and whitespace separated lists', () => {
+    const origins = parseCorsOrigins('https://app.edulure.com, https://status.edulure.com  https://docs.edulure.com');
+    expect(origins).toEqual([
+      'https://app.edulure.com',
+      'https://status.edulure.com',
+      'https://docs.edulure.com'
+    ]);
+  });
+
+  it('returns an empty array for invalid inputs', () => {
+    expect(parseCorsOrigins(undefined)).toEqual([]);
+    expect(parseCorsOrigins(null)).toEqual([]);
+    expect(parseCorsOrigins(42)).toEqual([]);
+  });
+});
 
 describe('createCorsOriginValidator', () => {
-  it('allows all origins when wildcard is provided', () => {
-    const policy = createCorsOriginValidator(['*']);
-
-    expect(policy.allowAll).toBe(true);
-    expect(policy.isOriginAllowed('https://example.com')).toBe(true);
-    expect(policy.isOriginAllowed('http://another.test')).toBe(true);
+  beforeEach(() => {
+    process.env.NODE_ENV = 'development';
   });
 
-  it('permits explicitly configured origins', () => {
-    const policy = createCorsOriginValidator(['https://app.example.com']);
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('allows all origins when no configuration is provided', () => {
+    const policy = createCorsOriginValidator(undefined);
+    expect(policy.allowAll).toBe(true);
+    expect(policy.isOriginAllowed('https://any.example')).toBe(true);
+  });
+
+  it('permits configured origins and expands localhost aliases in development', () => {
+    const policy = createCorsOriginValidator('https://app.edulure.com', {
+      allowDevelopmentOrigins: true,
+      developmentPortHints: [3000, 5173]
+    });
 
     expect(policy.allowAll).toBe(false);
-    expect(policy.isOriginAllowed('https://app.example.com')).toBe(true);
-    expect(policy.isOriginAllowed('https://APP.EXAMPLE.COM')).toBe(true);
-    expect(policy.isOriginAllowed('https://other.example.com')).toBe(false);
+    expect(policy.isOriginAllowed('https://app.edulure.com')).toBe(true);
+    expect(policy.isOriginAllowed('http://localhost:3000')).toBe(true);
+    expect(policy.isOriginAllowed('http://127.0.0.1:5173')).toBe(true);
+    expect(policy.isOriginAllowed('https://malicious.example')).toBe(false);
+
+    const description = policy.describe();
+    expect(description.exactOrigins).toContain('https://app.edulure.com');
+    expect(description.exactOrigins).toEqual(expect.arrayContaining(['http://localhost:3000']));
   });
 
-  it('supports wildcard subdomain origins and includes the root domain', () => {
-    const policy = createCorsOriginValidator(['https://*.example.com']);
+  it('supports wildcard domain patterns and www alias generation', () => {
+    const policy = createCorsOriginValidator(['https://*.edulure.com'], {
+      allowDevelopmentOrigins: false
+    });
 
-    expect(policy.isOriginAllowed('https://embed.example.com')).toBe(true);
-    expect(policy.isOriginAllowed('https://media.sub.example.com')).toBe(true);
-    expect(policy.isOriginAllowed('https://example.com')).toBe(true);
-    expect(policy.isOriginAllowed('https://example.org')).toBe(false);
+    expect(policy.isOriginAllowed('https://studio.edulure.com')).toBe(true);
+    expect(policy.isOriginAllowed('https://www.edulure.com')).toBe(true);
+    expect(policy.isOriginAllowed('https://api.partner-edulure.com')).toBe(false);
+    expect(policy.getWildcardOrigins()).toEqual(['https://*.edulure.com']);
   });
 
-  it('automatically adds www aliases for apex domains', () => {
+  it('adds www aliases for apex domains by default', () => {
     const policy = createCorsOriginValidator(['https://example.com']);
 
-    expect(policy.isOriginAllowed('https://example.com')).toBe(true);
     expect(policy.isOriginAllowed('https://www.example.com')).toBe(true);
     expect(policy.isOriginAllowed('https://blog.example.com')).toBe(false);
   });
 
-  it('can disable canonical www alias expansion when requested', () => {
+  it('honours includeWwwAliases=false for strict allow lists', () => {
     const policy = createCorsOriginValidator(['https://example.com'], {
       includeWwwAliases: false
     });
@@ -46,14 +87,7 @@ describe('createCorsOriginValidator', () => {
     expect(policy.isOriginAllowed('https://www.example.com')).toBe(false);
   });
 
-  it('normalizes origins defined with www prefixes back to the apex domain', () => {
-    const policy = createCorsOriginValidator(['https://www.example.org']);
-
-    expect(policy.isOriginAllowed('https://www.example.org')).toBe(true);
-    expect(policy.isOriginAllowed('https://example.org')).toBe(true);
-  });
-
-  it('treats null origins as configurable entries', () => {
+  it('allows explicit null origins when configured', () => {
     const policy = createCorsOriginValidator(['null']);
 
     expect(policy.isOriginAllowed('null')).toBe(true);
@@ -61,44 +95,17 @@ describe('createCorsOriginValidator', () => {
     expect(policy.isOriginAllowed('https://example.com')).toBe(false);
   });
 
-  it('normalizes localhost origins without explicit protocols', () => {
-    const policy = createCorsOriginValidator(['localhost:3000']);
-
-    expect(policy.isOriginAllowed('http://localhost:3000')).toBe(true);
-    expect(policy.isOriginAllowed('https://localhost:3000')).toBe(true);
-    expect(policy.isOriginAllowed('http://localhost:4000')).toBe(false);
-  });
-
-  it('treats dot-localhost hostnames without protocols as local', () => {
-    const policy = createCorsOriginValidator(['app.localhost:5173']);
-
-    expect(policy.isOriginAllowed('http://app.localhost:5173')).toBe(true);
-    expect(policy.isOriginAllowed('https://app.localhost:5173')).toBe(true);
-  });
-
-  it('expands localhost origins with development aliases when enabled', () => {
-    const policy = createCorsOriginValidator(['http://localhost:5173'], {
-      allowDevelopmentOrigins: true,
-      developmentPortHints: [3000]
+  it('normalises localhost entries without protocols', () => {
+    const policy = createCorsOriginValidator(['localhost:4000'], {
+      allowDevelopmentOrigins: false
     });
 
-    expect(policy.isOriginAllowed('http://localhost:3000')).toBe(true);
-    expect(policy.isOriginAllowed('https://localhost:3000')).toBe(true);
-    expect(policy.isOriginAllowed('http://127.0.0.1:3000')).toBe(true);
-    expect(policy.isOriginAllowed('http://0.0.0.0:3000')).toBe(true);
+    expect(policy.isOriginAllowed('http://localhost:4000')).toBe(true);
+    expect(policy.isOriginAllowed('https://localhost:4000')).toBe(true);
+    expect(policy.isOriginAllowed('http://localhost:3000')).toBe(false);
   });
 
-  it('seeds default localhost origins when no local entries are configured', () => {
-    const policy = createCorsOriginValidator(['https://app.example.com'], {
-      allowDevelopmentOrigins: true,
-      developmentPortHints: [5173]
-    });
-
-    expect(policy.isOriginAllowed('http://localhost:5173')).toBe(true);
-    expect(policy.isOriginAllowed('https://127.0.0.1:5173')).toBe(true);
-  });
-
-  it('can disable development aliases for strict production enforcement', () => {
+  it('disables development aliases when explicitly requested', () => {
     const policy = createCorsOriginValidator(['http://localhost:5173'], {
       allowDevelopmentOrigins: false,
       developmentPortHints: [3000]

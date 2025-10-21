@@ -43,11 +43,18 @@ export default class CommunityRoleDefinitionModel {
 
   static async updateById(id, updates, connection = db) {
     const payload = {};
-    if (updates.name !== undefined) payload.name = updates.name;
-    if (updates.description !== undefined) payload.description = updates.description ?? null;
-    if (updates.permissions !== undefined) payload.permissions = JSON.stringify(updates.permissions ?? {});
-    if (updates.isDefaultAssignable !== undefined)
+    if (updates.name !== undefined) {
+      payload.name = updates.name;
+    }
+    if (updates.description !== undefined) {
+      payload.description = updates.description ?? null;
+    }
+    if (updates.permissions !== undefined) {
+      payload.permissions = JSON.stringify(updates.permissions ?? {});
+    }
+    if (updates.isDefaultAssignable !== undefined) {
       payload.is_default_assignable = updates.isDefaultAssignable ? 1 : 0;
+    }
 
     if (Object.keys(payload).length === 0) {
       return this.findById(id, connection);

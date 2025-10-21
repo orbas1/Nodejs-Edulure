@@ -36,12 +36,19 @@ Future<void> _pumpStoreHydration() async {
 }
 
 void main() {
-  group('InboxStore', () {
-    test('creates collaborative threads with multimedia attachments and persists flags', () async {
-      final persistence = InMemoryCommunicationPersistence();
-      final store = InboxStore(persistence: persistence);
-      await _pumpStoreHydration();
+  TestWidgetsFlutterBinding.ensureInitialized();
 
+  group('InboxStore', () {
+    late InMemoryCommunicationPersistence persistence;
+    late InboxStore store;
+
+    setUp(() async {
+      persistence = InMemoryCommunicationPersistence();
+      store = InboxStore(persistence: persistence);
+      await _pumpStoreHydration();
+    });
+
+    test('creates collaborative threads with multimedia attachments and persists flags', () async {
       final message = store.buildMessage(
         author: 'You',
         body: 'Drafted the onboarding walkthrough. Feedback welcome!',
@@ -82,10 +89,6 @@ void main() {
     });
 
     test('sends messages, updates read receipts, and keeps persistence in sync', () async {
-      final persistence = InMemoryCommunicationPersistence();
-      final store = InboxStore(persistence: persistence);
-      await _pumpStoreHydration();
-
       final thread = store.state.first;
       final initialUnread = thread.unreadCount;
 
@@ -114,14 +117,65 @@ void main() {
       expect(cached.messages.last.body, contains('breakout prompts'));
       expect(cached.lastReadAt, readAt);
     });
+
+    test('moderation toggles and archival flags persist', () async {
+      final thread = store.state.first;
+
+      store.togglePinned(thread.id);
+      store.toggleMuted(thread.id);
+      store.toggleArchived(thread.id);
+
+      final followUp = store.buildMessage(
+        author: 'Moderator',
+        body: 'Flagged follow-up with policy reminder.',
+      );
+      store.sendMessage(thread.id, followUp);
+      final acknowledgedAt = DateTime.now();
+      store.markRead(thread.id, acknowledgedAt);
+
+      await _pumpStoreHydration();
+
+      final updated = store.state.firstWhere((item) => item.id == thread.id);
+      expect(updated.pinned, isNot(thread.pinned));
+      expect(updated.muted, isNot(thread.muted));
+      expect(updated.archived, isNot(thread.archived));
+      expect(updated.lastReadAt, acknowledgedAt);
+      expect(updated.messages.last.body, contains('policy reminder'));
+
+      final cached = persistence.snapshotThreads()!.firstWhere((item) => item.id == thread.id);
+      expect(cached.archived, updated.archived);
+      expect(cached.messages.last.body, contains('policy reminder'));
+    });
+
+    test('restoreSeedData replenishes the original snapshot ordering', () async {
+      final originalIds = store.state.map((thread) => thread.id).toList(growable: false);
+      final removedId = originalIds.first;
+
+      store.deleteThread(removedId);
+      await _pumpStoreHydration();
+      expect(store.state.map((thread) => thread.id), isNot(contains(removedId)));
+
+      await store.restoreSeedData();
+      await _pumpStoreHydration();
+
+      expect(store.state.map((thread) => thread.id), originalIds);
+      final cachedIds =
+          persistence.snapshotThreads()!.map((thread) => thread.id).toList(growable: false);
+      expect(cachedIds, originalIds);
+    });
   });
 
   group('SupportTicketStore', () {
-    test('escalates tickets with updates, attachments, and status transitions', () async {
-      final persistence = InMemoryCommunicationPersistence();
-      final store = SupportTicketStore(persistence: persistence);
-      await _pumpStoreHydration();
+    late InMemoryCommunicationPersistence persistence;
+    late SupportTicketStore store;
 
+    setUp(() async {
+      persistence = InMemoryCommunicationPersistence();
+      store = SupportTicketStore(persistence: persistence);
+      await _pumpStoreHydration();
+    });
+
+    test('escalates tickets with updates, attachments, and status transitions', () async {
       final ticket = store.buildTicket(
         subject: 'Learner cannot play cohort replay',
         description: 'Replay video returns a DRM error for multiple learners.',
@@ -162,6 +216,43 @@ void main() {
       final cached = persistence.snapshotTickets()!.firstWhere((item) => item.id == ticket.id);
       expect(cached.status, SupportStatus.inProgress);
       expect(cached.updates.last.attachments.single.url, contains('drm-diagnostics'));
+    });
+
+    test('deletes tickets and mirrors the change in persistence', () async {
+      final initialId = store.state.first.id;
+
+      store.deleteTicket(initialId);
+      await _pumpStoreHydration();
+
+      expect(store.state.map((ticket) => ticket.id), isNot(contains(initialId)));
+      expect(
+        persistence.snapshotTickets()!.map((ticket) => ticket.id),
+        isNot(contains(initialId)),
+      );
+
+      await store.restoreSeedData();
+      await _pumpStoreHydration();
+      expect(store.state, isNotEmpty);
+    });
+
+    test('refreshFromPersistence rehydrates externally cached changes', () async {
+      final seeded = store.buildTicket(
+        subject: 'Accessibility feedback',
+        description: 'Learner reported missing captions in the recorded replay.',
+        priority: SupportPriority.normal,
+        status: SupportStatus.awaitingCustomer,
+        contactName: 'Nia Harper',
+        contactEmail: 'nia@example.com',
+        tags: const ['accessibility'],
+        assignedTo: 'Learner Success',
+      );
+
+      await persistence.saveSupportTickets([seeded]);
+
+      await store.refreshFromPersistence();
+
+      expect(store.state.single.subject, 'Accessibility feedback');
+      expect(store.state.single.status, SupportStatus.awaitingCustomer);
     });
   });
 }

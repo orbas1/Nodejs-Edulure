@@ -7,91 +7,137 @@ import 'session_manager.dart';
 typedef JsonMap = Map<String, dynamic>;
 
 class CommunityService {
-  CommunityService()
-      : _dio = Dio(
-          BaseOptions(
-            baseUrl: apiBaseUrl,
-            connectTimeout: const Duration(seconds: 12),
-            receiveTimeout: const Duration(seconds: 20),
-          ),
-        );
+  CommunityService({
+    Dio? client,
+    String? Function()? tokenProvider,
+  })  : _dio = client ?? ApiConfig.createHttpClient(requiresAuth: true),
+        _tokenProvider = tokenProvider ?? SessionManager.getAccessToken;
 
   final Dio _dio;
+  final String? Function() _tokenProvider;
 
   Options _authOptions() {
-    final token = SessionManager.getAccessToken();
+    final token = _tokenProvider();
     if (token == null || token.isEmpty) {
-      throw Exception('Authentication required');
+      throw const CommunityServiceException('Authentication required to manage communities.');
     }
-    return Options(headers: {'Authorization': 'Bearer $token'});
+    return Options(
+      headers: {
+        ..._dio.options.headers,
+        'Authorization': 'Bearer $token',
+      },
+      extra: {
+        ...?_dio.options.extra,
+        'requiresAuth': true,
+      },
+    );
+  }
+
+  Future<T> _guard<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } on CommunityServiceException {
+      rethrow;
+    } on DioException catch (error) {
+      throw CommunityServiceException(_resolveErrorMessage(error), cause: error);
+    } catch (error) {
+      throw CommunityServiceException('Community request failed.', cause: error);
+    }
+  }
+
+  String _resolveErrorMessage(DioException error) {
+    final data = error.response?.data;
+    if (data is Map && data['message'] is String) {
+      return data['message'] as String;
+    }
+    if (data is Map && data['errors'] is List && data['errors'].isNotEmpty) {
+      return data['errors'].first.toString();
+    }
+    return error.message ?? 'Community request failed.';
   }
 
   Future<List<CommunitySummary>> listCommunities() async {
-    final response = await _dio.get('/communities', options: _authOptions());
-    final payload = response.data['data'];
-    if (payload is List) {
-      return payload
-          .whereType<Map>()
-          .map((entry) => CommunitySummary.fromJson(Map<String, dynamic>.from(entry as Map)))
-          .toList();
-    }
-    return const <CommunitySummary>[];
+    return _guard(() async {
+      final response = await _dio.get('/communities', options: _authOptions());
+      final data = response.data;
+      dynamic payload;
+      if (data is Map<String, dynamic>) {
+        payload = data['data'];
+      } else if (data is Map) {
+        payload = Map<String, dynamic>.from(data as Map)['data'];
+      }
+      if (payload is List) {
+        return payload
+            .whereType<Map>()
+            .map((entry) => CommunitySummary.fromJson(Map<String, dynamic>.from(entry as Map)))
+            .toList(growable: false);
+      }
+      return const <CommunitySummary>[];
+    });
   }
 
   Future<CommunityDetail> getCommunity(String communityId) async {
-    final response = await _dio.get('/communities/$communityId', options: _authOptions());
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return CommunityDetail.fromJson(payload);
-    }
-    if (payload is Map) {
-      return CommunityDetail.fromJson(Map<String, dynamic>.from(payload as Map));
-    }
-    throw Exception('Unexpected community payload');
+    return _guard(() async {
+      final response = await _dio.get('/communities/$communityId', options: _authOptions());
+      final data = _ensureMap(response.data)['data'];
+      if (data is Map<String, dynamic>) {
+        return CommunityDetail.fromJson(data);
+      }
+      if (data is Map) {
+        return CommunityDetail.fromJson(Map<String, dynamic>.from(data as Map));
+      }
+      throw const CommunityServiceException('Unexpected community payload.');
+    });
   }
 
   Future<CommunitySummary> createCommunity(CreateCommunityInput input) async {
-    final response = await _dio.post(
-      '/communities',
-      data: input.toJson(),
-      options: _authOptions(),
-    );
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return CommunitySummary.fromJson(payload);
-    }
-    if (payload is Map) {
-      return CommunitySummary.fromJson(Map<String, dynamic>.from(payload as Map));
-    }
-    throw Exception('Unexpected community creation payload');
+    return _guard(() async {
+      final response = await _dio.post(
+        '/communities',
+        data: input.toJson(),
+        options: _authOptions(),
+      );
+      final payload = _ensureMap(response.data)['data'];
+      if (payload is Map<String, dynamic>) {
+        return CommunitySummary.fromJson(payload);
+      }
+      if (payload is Map) {
+        return CommunitySummary.fromJson(Map<String, dynamic>.from(payload as Map));
+      }
+      throw const CommunityServiceException('Unexpected community creation payload.');
+    });
   }
 
   Future<CommunitySummary> joinCommunity(String communityId) async {
-    final response = await _dio.post('/communities/$communityId/join', options: _authOptions());
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return CommunitySummary.fromJson(payload);
-    }
-    if (payload is Map) {
-      return CommunitySummary.fromJson(Map<String, dynamic>.from(payload as Map));
-    }
-    throw Exception('Unexpected join response payload');
+    return _guard(() async {
+      final response = await _dio.post('/communities/$communityId/join', options: _authOptions());
+      final payload = _ensureMap(response.data)['data'];
+      if (payload is Map<String, dynamic>) {
+        return CommunitySummary.fromJson(payload);
+      }
+      if (payload is Map) {
+        return CommunitySummary.fromJson(Map<String, dynamic>.from(payload as Map));
+      }
+      throw const CommunityServiceException('Unexpected join response payload.');
+    });
   }
 
   Future<CommunityLeaveSummary> leaveCommunity(String communityId, {String? reason}) async {
-    final response = await _dio.post(
-      '/communities/$communityId/leave',
-      data: reason != null && reason.isNotEmpty ? {'reason': reason} : null,
-      options: _authOptions(),
-    );
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return CommunityLeaveSummary.fromJson(payload);
-    }
-    if (payload is Map) {
-      return CommunityLeaveSummary.fromJson(Map<String, dynamic>.from(payload as Map));
-    }
-    throw Exception('Unexpected leave response payload');
+    return _guard(() async {
+      final response = await _dio.post(
+        '/communities/$communityId/leave',
+        data: reason != null && reason.isNotEmpty ? {'reason': reason} : null,
+        options: _authOptions(),
+      );
+      final payload = _ensureMap(response.data)['data'];
+      if (payload is Map<String, dynamic>) {
+        return CommunityLeaveSummary.fromJson(payload);
+      }
+      if (payload is Map) {
+        return CommunityLeaveSummary.fromJson(Map<String, dynamic>.from(payload as Map));
+      }
+      throw const CommunityServiceException('Unexpected leave response payload.');
+    });
   }
 
   Future<CommunityFeedPage> fetchCommunityFeed(
@@ -101,48 +147,42 @@ class CommunityService {
     String? query,
     String? postType,
   }) async {
-    final response = await _dio.get(
-      '/communities/$communityId/posts',
-      queryParameters: <String, dynamic>{
-        'page': page,
-        'perPage': perPage,
-        if (query != null && query.trim().isNotEmpty) 'query': query.trim(),
-        if (postType != null && postType.trim().isNotEmpty) 'postType': postType.trim(),
-      },
-      options: _authOptions(),
-    );
+    return _guard(() async {
+      final response = await _dio.get(
+        '/communities/$communityId/posts',
+        queryParameters: <String, dynamic>{
+          'page': page,
+          'perPage': perPage,
+          if (query != null && query.trim().isNotEmpty) 'query': query.trim(),
+          if (postType != null && postType.trim().isNotEmpty) 'postType': postType.trim(),
+        },
+        options: _authOptions(),
+      );
 
-    final data = response.data;
-    if (data is Map<String, dynamic>) {
+      final data = _ensureMap(response.data);
       return CommunityFeedPage.fromJson({
         'data': data['data'],
         'meta': data['meta'],
       });
-    }
-    if (data is Map) {
-      final map = Map<String, dynamic>.from(data as Map);
-      return CommunityFeedPage.fromJson({
-        'data': map['data'],
-        'meta': map['meta'],
-      });
-    }
-    throw Exception('Unexpected community feed response');
+    });
   }
 
   Future<CommunityPost> createPost(String communityId, CreateCommunityPostInput input) async {
-    final response = await _dio.post(
-      '/communities/$communityId/posts',
-      data: input.toJson(),
-      options: _authOptions(),
-    );
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return CommunityPost.fromJson(payload);
-    }
-    if (payload is Map) {
-      return CommunityPost.fromJson(Map<String, dynamic>.from(payload as Map));
-    }
-    throw Exception('Unexpected create post payload');
+    return _guard(() async {
+      final response = await _dio.post(
+        '/communities/$communityId/posts',
+        data: input.toJson(),
+        options: _authOptions(),
+      );
+      final payload = _ensureMap(response.data)['data'];
+      if (payload is Map<String, dynamic>) {
+        return CommunityPost.fromJson(payload);
+      }
+      if (payload is Map) {
+        return CommunityPost.fromJson(Map<String, dynamic>.from(payload as Map));
+      }
+      throw const CommunityServiceException('Unexpected create post payload.');
+    });
   }
 
   Future<CommunityPost> moderatePost(
@@ -151,38 +191,42 @@ class CommunityService {
     required String action,
     String? reason,
   }) async {
-    final response = await _dio.post(
-      '/communities/$communityId/posts/$postId/moderate',
-      data: <String, dynamic>{
-        'action': action,
-        if (reason != null && reason.isNotEmpty) 'reason': reason,
-      },
-      options: _authOptions(),
-    );
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return CommunityPost.fromJson(payload);
-    }
-    if (payload is Map) {
-      return CommunityPost.fromJson(Map<String, dynamic>.from(payload as Map));
-    }
-    throw Exception('Unexpected moderation payload');
+    return _guard(() async {
+      final response = await _dio.post(
+        '/communities/$communityId/posts/$postId/moderate',
+        data: <String, dynamic>{
+          'action': action,
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+        },
+        options: _authOptions(),
+      );
+      final payload = _ensureMap(response.data)['data'];
+      if (payload is Map<String, dynamic>) {
+        return CommunityPost.fromJson(payload);
+      }
+      if (payload is Map) {
+        return CommunityPost.fromJson(Map<String, dynamic>.from(payload as Map));
+      }
+      throw const CommunityServiceException('Unexpected moderation payload.');
+    });
   }
 
   Future<CommunityPost> removePost(String communityId, String postId, {String? reason}) async {
-    final response = await _dio.delete(
-      '/communities/$communityId/posts/$postId',
-      data: reason != null && reason.isNotEmpty ? {'reason': reason} : null,
-      options: _authOptions(),
-    );
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return CommunityPost.fromJson(payload);
-    }
-    if (payload is Map) {
-      return CommunityPost.fromJson(Map<String, dynamic>.from(payload as Map));
-    }
-    throw Exception('Unexpected remove payload');
+    return _guard(() async {
+      final response = await _dio.delete(
+        '/communities/$communityId/posts/$postId',
+        data: reason != null && reason.isNotEmpty ? {'reason': reason} : null,
+        options: _authOptions(),
+      );
+      final payload = _ensureMap(response.data)['data'];
+      if (payload is Map<String, dynamic>) {
+        return CommunityPost.fromJson(payload);
+      }
+      if (payload is Map) {
+        return CommunityPost.fromJson(Map<String, dynamic>.from(payload as Map));
+      }
+      throw const CommunityServiceException('Unexpected remove payload.');
+    });
   }
 
   Future<CommunityPost> updatePost(
@@ -190,26 +234,55 @@ class CommunityService {
     String postId,
     CreateCommunityPostInput input,
   ) async {
-    final metadata = {
-      ...input.metadata,
-      'replacementFor': postId,
-    };
-    await moderatePost(communityId, postId, action: 'suppress', reason: 'Edited via mobile app');
-    return createPost(
-      communityId,
-      CreateCommunityPostInput(
-        body: input.body,
-        channelId: input.channelId,
-        postType: input.postType,
-        title: input.title,
-        tags: input.tags,
-        visibility: input.visibility,
-        status: input.status,
-        scheduledAt: input.scheduledAt,
-        metadata: metadata,
-      ),
-    );
+    return _guard(() async {
+      final metadata = {
+        ...input.metadata,
+        'replacementFor': postId,
+      };
+      await moderatePost(
+        communityId,
+        postId,
+        action: 'suppress',
+        reason: 'Edited via mobile app',
+      );
+      return createPost(
+        communityId,
+        CreateCommunityPostInput(
+          body: input.body,
+          channelId: input.channelId,
+          postType: input.postType,
+          title: input.title,
+          tags: input.tags,
+          visibility: input.visibility,
+          status: input.status,
+          scheduledAt: input.scheduledAt,
+          metadata: metadata,
+          featured: input.featured,
+          attachments: input.attachments,
+        ),
+      );
+    });
   }
+
+  Map<String, dynamic> _ensureMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value as Map);
+    }
+    throw const CommunityServiceException('Unexpected response payload.');
+  }
+}
+
+class CommunityServiceException implements Exception {
+  const CommunityServiceException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => 'CommunityServiceException: $message';
 }
 
 class CreateCommunityInput {

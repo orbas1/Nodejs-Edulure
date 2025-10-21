@@ -33,8 +33,10 @@ jobs:
       - name: Install workspace dependencies
         run: npm install --include-workspace-root
 
-      - name: Prepare report directories
-        run: mkdir -p reports
+      - name: Prepare artifact directories
+        run: |
+          rm -rf reports sbom
+          mkdir -p reports/licenses sbom
 
       - name: Run npm audit across workspaces
         run: npm run audit:ci
@@ -61,7 +63,7 @@ jobs:
           path: sbom/edulure-cyclonedx.json
 
       - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.20.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
