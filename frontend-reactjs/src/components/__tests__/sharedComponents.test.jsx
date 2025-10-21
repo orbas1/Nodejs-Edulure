@@ -60,7 +60,10 @@ describe('SearchBar', () => {
     await user.type(input, 'analytics');
     await user.keyboard('{Enter}');
 
-    expect(handleSubmit).toHaveBeenCalledWith('analytics', expect.any(Object));
+    expect(handleSubmit).toHaveBeenCalledTimes(1);
+    const [submitEvent] = handleSubmit.mock.calls[0];
+    expect(submitEvent).toBeInstanceOf(Event);
+    expect(submitEvent.target.search.value).toBe('analytics');
   });
 });
 

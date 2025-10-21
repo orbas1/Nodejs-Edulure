@@ -13,10 +13,21 @@ export default function SearchBar({
   const handleSubmit = (event) => {
     if (typeof onSubmit !== 'function') return;
     event.preventDefault();
+
     const form = event.currentTarget;
-    const formData = new FormData(form);
-    const submittedValue = formData.get('search');
-    onSubmit(typeof submittedValue === 'string' ? submittedValue : '', event);
+
+    if (typeof HTMLFormElement !== 'undefined' && form instanceof HTMLFormElement) {
+      const formData = new FormData(form);
+      const submittedValue = formData.get('search');
+      if (typeof submittedValue === 'string') {
+        const searchField = form.elements.namedItem('search');
+        if (searchField && 'value' in searchField) {
+          searchField.value = submittedValue;
+        }
+      }
+    }
+
+    onSubmit(event);
   };
 
   const inputProps = {
