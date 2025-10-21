@@ -10,6 +10,7 @@ import {
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import useMountedRef from '../../hooks/useMountedRef.js';
 
 const STORAGE_KEY = 'edulure:tutor-schedule';
 const TAG_DELIMITERS = /(?:\r?\n|[•,])/u;
@@ -310,6 +311,7 @@ export default function InstructorTutorSchedule() {
   const [editor, setEditor] = useState({ mode: 'idle', targetId: null, draft: null });
   const [saving, setSaving] = useState(false);
   const [notificationDraft, setNotificationDraft] = useState({ title: '', detail: '' });
+  const mounted = useMountedRef();
 
   useEffect(() => {
     if (state.entries.length === 0 && seed?.entries?.length) {
@@ -370,6 +372,9 @@ export default function InstructorTutorSchedule() {
   const handleSubmit = (payload) => {
     setSaving(true);
     setTimeout(() => {
+      if (!mounted.current) {
+        return;
+      }
       setState((prev) => {
         const tags = normaliseTags(payload.tags);
         const entry = {
