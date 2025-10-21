@@ -1,7 +1,10 @@
+import crypto from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const SALESFORCE_API_VERSION = 'v58.0';
 const SALESFORCE_BATCH_LIMIT = 25;
+const DEFAULT_RETRY_BASE_DELAY_MS = 600;
+const DEFAULT_RETRY_MAX_DELAY_MS = 4000;
 
 function normaliseLoginUrl(url) {
   if (!url) {
@@ -25,7 +28,10 @@ export default class SalesforceClient {
     fetchImpl,
     auditLogger,
     refreshSkewMs = 60000,
-    sleep
+    sleep,
+    random = Math.random,
+    retryBaseDelayMs = DEFAULT_RETRY_BASE_DELAY_MS,
+    retryMaxDelayMs = DEFAULT_RETRY_MAX_DELAY_MS
   } = {}) {
     if (!clientId || !clientSecret || !username || !password) {
       throw new Error('SalesforceClient requires clientId, clientSecret, username, and password.');
@@ -45,6 +51,14 @@ export default class SalesforceClient {
     this.auditLogger = typeof auditLogger === 'function' ? auditLogger : null;
     this.refreshSkewMs = Number.isFinite(refreshSkewMs) && refreshSkewMs >= 0 ? refreshSkewMs : 60000;
     this.sleep = typeof sleep === 'function' ? sleep : delay;
+    this.random = typeof random === 'function' ? random : Math.random;
+    this.retryBaseDelayMs = Number.isFinite(retryBaseDelayMs) && retryBaseDelayMs > 0
+      ? retryBaseDelayMs
+      : DEFAULT_RETRY_BASE_DELAY_MS;
+    const normalisedMaxDelay = Number.isFinite(retryMaxDelayMs) && retryMaxDelayMs > 0
+      ? retryMaxDelayMs
+      : DEFAULT_RETRY_MAX_DELAY_MS;
+    this.retryMaxDelayMs = Math.max(this.retryBaseDelayMs, normalisedMaxDelay);
 
     this.accessToken = null;
     this.instanceUrl = null;
@@ -202,24 +216,34 @@ export default class SalesforceClient {
           return this.request(path, { method, body, query, headers, retryOnUnauthorized: false });
         }
 
+        let outcome = 'success';
+        let auditMetadata = metadata;
+        let backoffMs = null;
+        let retryAfterMs = null;
         if (response.status === 429 || response.status >= 500) {
           const retryAfterSeconds = Number(response.headers?.get?.('Retry-After') ?? 0);
-          const retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : null;
-          const backoff = retryAfterMs ?? Math.min(attempt * 600, 5000);
+          retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : null;
+          backoffMs = this.computeRetryDelayMs(attempt, { retryAfterMs });
           lastError = new Error(`Salesforce request failed with status ${response.status}`);
           if (retryAfterMs) {
             lastError.retryAfterMs = retryAfterMs;
           }
+          outcome = response.status === 429 ? 'degraded' : 'failure';
+          auditMetadata = {
+            ...metadata,
+            retryAfterMs,
+            backoffMs
+          };
           await this.recordAudit({
             requestMethod: method,
             requestPath: url.pathname,
             statusCode: response.status,
-            outcome: response.status === 429 ? 'degraded' : 'failure',
+            outcome,
             durationMs,
-            metadata: { ...metadata, backoff, retryAfterMs }
+            metadata: auditMetadata
           });
           if (attempt <= this.maxRetries) {
-            await this.sleep(backoff);
+            await this.sleep(backoffMs);
             continue;
           }
         }
@@ -244,9 +268,9 @@ export default class SalesforceClient {
           requestMethod: method,
           requestPath: url.pathname,
           statusCode: response.status,
-          outcome: 'success',
+          outcome,
           durationMs,
-          metadata
+          metadata: auditMetadata
         });
 
         return this.safeJson(response);
@@ -260,6 +284,7 @@ export default class SalesforceClient {
         }
 
         const durationMs = Date.now() - attemptStartedAt;
+        const backoffMs = attempt <= this.maxRetries ? this.computeRetryDelayMs(attempt) : null;
         await this.recordAudit({
           requestMethod: method,
           requestPath: url.pathname,
@@ -271,7 +296,8 @@ export default class SalesforceClient {
             maxRetries: this.maxRetries,
             hasBody: Boolean(body),
             queryKeys: Array.from(url.searchParams.keys()),
-            timeout: error.name === 'AbortError'
+            timeout: error.name === 'AbortError',
+            backoffMs
           },
           error
         });
@@ -280,11 +306,23 @@ export default class SalesforceClient {
           throw error;
         }
 
-        await this.sleep(Math.min(attempt * 600, 4000));
+        await this.sleep(backoffMs);
       }
     }
 
     throw lastError ?? new Error('Salesforce request failed without response');
+  }
+
+  computeRetryDelayMs(attempt, { retryAfterMs } = {}) {
+    const safeAttempt = Math.max(1, Number(attempt) || 1);
+    const exponent = Math.min(safeAttempt - 1, 6);
+    const exponential = Math.min(this.retryBaseDelayMs * 2 ** exponent, this.retryMaxDelayMs);
+    const candidate = Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? Math.min(retryAfterMs, this.retryMaxDelayMs)
+      : exponential;
+    const jitterFactor = 0.75 + this.random() * 0.5;
+    const jittered = candidate * jitterFactor;
+    return Math.max(100, Math.round(jittered));
   }
 
   async safeJson(response) {
@@ -315,11 +353,15 @@ export default class SalesforceClient {
       await Promise.all(
         batch.map(async (lead) => {
           const externalId = encodeURIComponent(lead.externalId);
+          const idempotencyKey = this.getLeadIdempotencyKey(lead);
           try {
             const response = await this.request(`sobjects/Lead/${this.externalIdField}/${externalId}`, {
               method: 'PATCH',
               body: lead.payload,
-              headers: { 'Sforce-Auto-Assign': 'FALSE' }
+              headers: {
+                'Sforce-Auto-Assign': 'FALSE',
+                'Idempotency-Key': idempotencyKey
+              }
             });
 
             succeeded += 1;
@@ -364,5 +406,18 @@ export default class SalesforceClient {
     });
 
     return Array.isArray(response.records) ? response.records : [];
+  }
+
+  getLeadIdempotencyKey(lead) {
+    if (lead?.hash) {
+      return lead.hash;
+    }
+
+    const payload = {
+      externalId: lead?.externalId ?? null,
+      payload: lead?.payload ?? {}
+    };
+
+    return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
   }
 }

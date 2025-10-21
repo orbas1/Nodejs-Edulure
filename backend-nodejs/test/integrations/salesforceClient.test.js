@@ -29,7 +29,7 @@ function createResponse({ status = 200, body, jsonBody, ok, headers = {} } = {})
   };
 }
 
-function createClient({ fetchImpl, auditLogger, logger, sleep } = {}) {
+function createClient({ fetchImpl, auditLogger, logger, sleep, random } = {}) {
   return new SalesforceClient({
     clientId: 'id',
     clientSecret: 'secret',
@@ -38,7 +38,8 @@ function createClient({ fetchImpl, auditLogger, logger, sleep } = {}) {
     fetchImpl,
     auditLogger,
     logger,
-    sleep
+    sleep,
+    random: random ?? (() => 0.5)
   });
 }
 
@@ -160,6 +161,7 @@ describe('SalesforceClient', () => {
     expect(sleep).toHaveBeenCalledWith(2000);
     const degradeAudit = auditLogger.mock.calls.find(([entry]) => entry.outcome === 'degraded');
     expect(degradeAudit?.[0]?.metadata?.retryAfterMs).toBe(2000);
+    expect(degradeAudit?.[0]?.metadata?.backoffMs).toBe(2000);
   });
 
   it('coalesces concurrent authentication requests', async () => {
@@ -226,6 +228,10 @@ describe('SalesforceClient', () => {
     const result = await client.upsertLeads(leads);
 
     expect(client.request).toHaveBeenCalledTimes(3);
+    const [, firstCallOptions] = client.request.mock.calls[0];
+    expect(firstCallOptions.headers['Idempotency-Key']).toBe(
+      client.getLeadIdempotencyKey(leads[0])
+    );
     expect(result.succeeded).toBe(2);
     expect(result.failed).toBe(1);
     expect(result.results).toHaveLength(3);

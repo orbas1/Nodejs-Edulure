@@ -35,7 +35,8 @@ describe('HubSpotClient', () => {
       auditLogger,
       logger,
       timeoutMs: 1000,
-      maxRetries: 0
+      maxRetries: 0,
+      random: () => 0.5
     });
 
     const response = await client.request('crm/v3/objects/contacts/batch/upsert', {
@@ -74,7 +75,8 @@ describe('HubSpotClient', () => {
       auditLogger,
       logger,
       maxRetries: 1,
-      timeoutMs: 1000
+      timeoutMs: 1000,
+      random: () => 0.5
     });
 
     const requestPromise = client.request('crm/v3/objects/contacts/search', {
@@ -92,6 +94,9 @@ describe('HubSpotClient', () => {
     expect(calls.some((entry) => entry?.outcome === 'success' && entry.statusCode === 200)).toBe(
       true
     );
+    const degradedEntry = calls.find((entry) => entry?.outcome === 'degraded');
+    expect(degradedEntry?.metadata?.retryAfterMs).toBe(1000);
+    expect(degradedEntry?.metadata?.backoffMs).toBe(1000);
   });
 
   it('summarises batch upsert outcomes including failures', async () => {
@@ -100,7 +105,8 @@ describe('HubSpotClient', () => {
       fetchImpl: vi.fn(),
       auditLogger,
       logger,
-      maxRetries: 0
+      maxRetries: 0,
+      random: () => 0.5
     });
 
     const contacts = [
@@ -141,7 +147,8 @@ describe('HubSpotClient', () => {
       fetchImpl: vi.fn(),
       auditLogger,
       logger,
-      maxRetries: 0
+      maxRetries: 0,
+      random: () => 0.5
     });
 
     const contacts = [
@@ -169,7 +176,8 @@ describe('HubSpotClient', () => {
       fetchImpl,
       auditLogger,
       logger,
-      maxRetries: 0
+      maxRetries: 0,
+      random: () => 0.5
     });
 
     const updatedSince = '2024-03-01T00:00:00.000Z';
