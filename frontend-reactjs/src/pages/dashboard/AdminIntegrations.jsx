@@ -923,6 +923,8 @@ function ReconciliationPanel({ reconciliation }) {
 
 export default function AdminIntegrations() {
   const { session } = useAuth();
+  const resolvedRole = typeof session?.user?.role === 'string' && session.user.role.length > 0;
+  const isAdmin = String(session?.user?.role ?? '').toLowerCase() === 'admin';
   const token = session?.tokens?.accessToken;
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1440,6 +1442,36 @@ export default function AdminIntegrations() {
       }
     ];
   }, [apiKeys, invites]);
+
+  if (!isAdmin) {
+    if (!resolvedRole) {
+      return (
+        <section
+          aria-busy="true"
+          aria-live="polite"
+          className="flex min-h-[50vh] items-center justify-center bg-slate-50 px-6 py-16"
+        >
+          <div className="space-y-4 text-center">
+            <span className="mx-auto block h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+            <p className="text-sm font-semibold text-slate-700">Checking your access…</p>
+            <p className="text-xs text-slate-500">Hang tight while we confirm your administrator permissions.</p>
+          </div>
+        </section>
+      );
+    }
+
+    return (
+      <section className="flex min-h-[60vh] items-center justify-center bg-slate-50 px-6 py-16" role="alert">
+        <div className="max-w-lg space-y-6 text-center">
+          <h1 className="text-2xl font-semibold text-slate-900">Access restricted</h1>
+          <p className="text-sm leading-relaxed text-slate-600">
+            You do not have administrator permissions for the integrations workspace. If you believe this is a mistake,
+            refresh your dashboard or contact the platform operations team to request access.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="space-y-8">
