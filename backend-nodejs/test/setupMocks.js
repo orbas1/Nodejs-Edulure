@@ -1,4 +1,8 @@
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 vi.mock('nodemailer', () => {
   return {

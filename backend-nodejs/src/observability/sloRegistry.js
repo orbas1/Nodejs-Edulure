@@ -465,7 +465,12 @@ class SloRegistry {
       totalRequests
     });
 
-    const annotations = this.generateAnnotations(status, burnRate, definition.alerting);
+    const annotations = this.generateAnnotations(status, {
+      burnRate,
+      alerting: definition.alerting,
+      availability,
+      targetAvailability: definition.targetAvailability
+    });
 
     const snapshot = {
       id: definition.id,
@@ -529,13 +534,13 @@ class SloRegistry {
     }
 
     if (availability < definition.targetAvailability) {
-      return 'breaching';
+      return 'warning';
     }
 
     return 'healthy';
   }
 
-  generateAnnotations(status, burnRate, alerting) {
+  generateAnnotations(status, { burnRate, alerting, availability, targetAvailability }) {
     const annotations = [];
     if (status === 'critical') {
       annotations.push({
@@ -543,17 +548,19 @@ class SloRegistry {
         code: 'burn-rate-critical',
         message: `Burn rate ${burnRate.toFixed(2)} exceeds critical threshold ${alerting.burnRateCritical}.`
       });
-    } else if (status === 'warning') {
+    } else if (status === 'warning' && burnRate >= alerting.burnRateWarning) {
       annotations.push({
         severity: 'warning',
         code: 'burn-rate-warning',
         message: `Burn rate ${burnRate.toFixed(2)} exceeds warning threshold ${alerting.burnRateWarning}.`
       });
-    } else if (status === 'breaching') {
+    }
+
+    if (availability !== null && availability < targetAvailability) {
       annotations.push({
-        severity: 'warning',
-        code: 'availability-breach',
-        message: 'Availability dipped below target while error budget remains under thresholds.'
+        severity: status === 'critical' ? 'critical' : 'warning',
+        code: 'availability-below-target',
+        message: `Availability ${(availability * 100).toFixed(2)}% is below target ${(targetAvailability * 100).toFixed(2)}%.`
       });
     }
     return annotations;
