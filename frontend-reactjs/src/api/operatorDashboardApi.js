@@ -10,6 +10,13 @@ function ensureArray(value) {
   return [value].filter(Boolean);
 }
 
+function unwrapPayload(payload) {
+  if (payload && typeof payload === 'object' && 'data' in payload && payload.data !== undefined) {
+    return payload.data;
+  }
+  return payload ?? {};
+}
+
 function normaliseKpi(metric, index) {
   const id = metric?.id ?? metric?.metric ?? `kpi-${index}`;
   const direction = metric?.direction ?? (metric?.change ?? 0) >= 0 ? 'up' : 'down';
@@ -106,7 +113,8 @@ function normaliseOperations(operations = {}) {
   };
 }
 
-function normaliseExecutiveOverview(payload = {}) {
+function normaliseExecutiveOverview(rawPayload = {}) {
+  const payload = unwrapPayload(rawPayload);
   const kpis = ensureArray(payload.kpis).map(normaliseKpi);
   const incidentsRaw = payload.incidents ?? {};
   const releasesRaw = payload.releases ?? {};
@@ -130,7 +138,8 @@ function normaliseExecutiveOverview(payload = {}) {
   };
 }
 
-function normaliseTenants(payload = {}) {
+function normaliseTenants(rawPayload = {}) {
+  const payload = unwrapPayload(rawPayload);
   const tenants = ensureArray(payload.items ?? payload.tenants).map((tenant, index) => ({
     id: tenant?.id ?? tenant?.tenantId ?? `tenant-${index}`,
     name: tenant?.name ?? tenant?.label ?? tenant?.slug ?? 'Tenant',
@@ -278,7 +287,8 @@ function normaliseNotificationPolicy(policy, index) {
   };
 }
 
-function normaliseSupportOverview(payload = {}) {
+function normaliseSupportOverview(rawPayload = {}) {
+  const payload = unwrapPayload(rawPayload);
   const queue = payload.queue ?? payload.tickets ?? {};
   const stats = queue.stats ?? {};
   const communications = payload.communications ?? {};
@@ -356,7 +366,8 @@ function normaliseSupportOverview(payload = {}) {
   };
 }
 
-function normaliseFinanceOverview(payload = {}) {
+function normaliseFinanceOverview(rawPayload = {}) {
+  const payload = unwrapPayload(rawPayload);
   const revenueSummary = ensureArray(payload.revenue?.summary ?? payload.revenue?.metrics).map(normaliseKpi);
   const collectionsRaw = payload.revenue?.collections ?? {};
   const agingBuckets = ensureArray(collectionsRaw.aging ?? collectionsRaw.agingBuckets ?? []);
@@ -782,6 +793,46 @@ export async function stopFinanceExperiment({ token, experimentId, tenantId } = 
   );
 }
 
+export async function fetchOperationsDigest({ token, tenantId, signal } = {}) {
+  if (!token) {
+    throw new Error('Authentication token is required to fetch operations digest');
+  }
+
+  const response = await httpClient.get('/operator/operations/digest', {
+    token,
+    signal,
+    params: buildTenantParams(tenantId),
+    cache: {
+      ttl: 60_000,
+      tags: [`operator:operations:${tenantId ?? 'default'}`],
+      varyByToken: true,
+      varyByHeaders: ['Accept-Language']
+    }
+  });
+
+  return response?.data ?? response;
+}
+
+export async function acknowledgeOperationsIncident({ token, tenantId, incidentId, note } = {}) {
+  if (!token) {
+    throw new Error('Authentication token is required to acknowledge incidents');
+  }
+  if (!incidentId) {
+    throw new Error('An incident identifier is required to acknowledge an incident');
+  }
+
+  return httpClient.post(
+    `/operator/operations/incidents/${encodeURIComponent(incidentId)}/acknowledge`,
+    note ? { note } : {},
+    {
+      token,
+      params: buildTenantParams(tenantId),
+      cache: { enabled: false },
+      invalidateTags: [`operator:operations:${tenantId ?? 'default'}`]
+    }
+  );
+}
+
 export async function assignSupportTicket({ token, tenantId, ticketId, assigneeId } = {}) {
   if (!token) {
     throw new Error('Authentication token is required to assign support tickets');
@@ -892,7 +943,9 @@ export const operatorDashboardApi = {
   escalateSupportTicket,
   resolveSupportTicket,
   scheduleSupportBroadcast,
-  updateSupportNotificationPolicy
+  updateSupportNotificationPolicy,
+  fetchOperationsDigest,
+  acknowledgeOperationsIncident
 };
 
 export default operatorDashboardApi;
