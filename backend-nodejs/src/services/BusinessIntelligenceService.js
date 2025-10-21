@@ -284,10 +284,22 @@ export class BusinessIntelligenceService {
         )
       : 0;
 
-    const recognisedNetRevenueCents =
-      revenueTotals.recognisedVolumeCents - revenueTotals.refundedCents;
-    const previousRecognisedNetRevenueCents =
-      previousRevenueTotals.recognisedVolumeCents - previousRevenueTotals.refundedCents;
+    const recognisedNetRevenueCents = Math.max(
+      revenueTotals.recognisedVolumeCents - revenueTotals.refundedCents,
+      0
+    );
+    const previousRecognisedNetRevenueCents = Math.max(
+      previousRevenueTotals.recognisedVolumeCents - previousRevenueTotals.refundedCents,
+      0
+    );
+
+    const discountDelta = revenueTotals.discountCents - previousRevenueTotals.discountCents;
+    const refundDelta = revenueTotals.refundedCents - previousRevenueTotals.refundedCents;
+    const leakageAdjustment = Math.round(
+      (Math.max(discountDelta, 0) + Math.max(refundDelta, 0)) / 2
+    );
+    const normalisedPreviousNetRevenueCents =
+      previousRecognisedNetRevenueCents + Math.max(leakageAdjustment, 0);
 
     const revenueByCurrency = resolveCurrencyBreakdown(revenueDaily);
 
@@ -328,7 +340,7 @@ export class BusinessIntelligenceService {
         },
         netRevenue: {
           cents: recognisedNetRevenueCents,
-          change: buildDelta(recognisedNetRevenueCents, previousRecognisedNetRevenueCents)
+          change: buildDelta(recognisedNetRevenueCents, normalisedPreviousNetRevenueCents)
         },
         averageProgressPercent: {
           value: enrollmentTotals.averageProgressPercent,

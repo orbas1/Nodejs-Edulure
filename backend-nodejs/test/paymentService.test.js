@@ -19,6 +19,15 @@ const escrowServiceMock = vi.hoisted(() => ({
   createTransaction: vi.fn()
 }));
 
+const monetizationFinanceServiceMock = vi.hoisted(() => ({
+  handlePaymentCaptured: vi.fn(async () => undefined),
+  handleRefundProcessed: vi.fn(async () => undefined)
+}));
+
+const communityAffiliateCommissionServiceMock = vi.hoisted(() => ({
+  handlePaymentCaptured: vi.fn(async () => undefined)
+}));
+
 vi.mock('../src/config/logger.js', () => ({
   default: {
     child: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }),
@@ -45,6 +54,14 @@ vi.mock('../src/services/PlatformSettingsService.js', () => ({
 
 vi.mock('../src/services/EscrowService.js', () => ({
   default: escrowServiceMock
+}));
+
+vi.mock('../src/services/MonetizationFinanceService.js', () => ({
+  default: monetizationFinanceServiceMock
+}));
+
+vi.mock('../src/services/CommunityAffiliateCommissionService.js', () => ({
+  default: communityAffiliateCommissionServiceMock
 }));
 
 const mockedModules = vi.hoisted(() => {
@@ -141,9 +158,13 @@ describe('PaymentService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     transactionSpy.mockClear();
+    transactionSpy.mockImplementation(async (handler) => handler({ isTransaction: () => true }));
     escrowServiceMock.isConfigured.mockReset();
     escrowServiceMock.createTransaction.mockReset();
     escrowServiceMock.isConfigured.mockReturnValue(true);
+    monetizationFinanceServiceMock.handlePaymentCaptured.mockClear();
+    monetizationFinanceServiceMock.handleRefundProcessed.mockClear();
+    communityAffiliateCommissionServiceMock.handlePaymentCaptured.mockClear();
     platformSettingsServiceMock.getMonetizationSettings.mockResolvedValue({
       commissions: {
         enabled: true,
@@ -721,5 +742,101 @@ describe('PaymentService', () => {
       }),
       expect.objectContaining({ source: 'stripe-webhook' })
     );
+  });
+
+  it('passes transactional connections to monetization finance when Stripe payments succeed', async () => {
+    const transactionalConnection = {
+      isTransaction: () => true,
+      select: vi.fn(),
+      from: vi.fn()
+    };
+
+    transactionSpy.mockImplementationOnce(async (handler) => handler(transactionalConnection));
+
+    const intentRecord = {
+      id: 77,
+      publicId: 'pay_tx',
+      provider: 'stripe',
+      providerIntentId: 'pi_tx',
+      status: 'requires_payment_method',
+      currency: 'USD',
+      amountSubtotal: 1000,
+      amountDiscount: 0,
+      amountTax: 100,
+      amountTotal: 0,
+      amountRefunded: 0,
+      metadata: {}
+    };
+
+    paymentIntentModel.findByProviderIntentId.mockResolvedValue(intentRecord);
+    paymentIntentModel.updateById.mockResolvedValue({
+      ...intentRecord,
+      status: 'succeeded',
+      amountTotal: 1100,
+      capturedAt: '2024-05-05T00:00:00.000Z'
+    });
+    paymentLedgerEntryModel.record.mockResolvedValue();
+
+    await PaymentService.handleStripePaymentSucceeded({
+      id: 'pi_tx',
+      amount_received: 1100,
+      currency: 'usd',
+      created: Math.floor(Date.now() / 1000),
+      payment_method_types: ['card'],
+      charges: { data: [{ id: 'ch_tx', balance_transaction: 'txn_tx', receipt_url: 'https://example.com/r' }] }
+    });
+
+    expect(monetizationFinanceServiceMock.handlePaymentCaptured).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 77 }),
+      transactionalConnection
+    );
+
+    const [, , eventOptions] = webhookEventBusMock.publish.mock.calls.at(-1);
+    expect(eventOptions).toMatchObject({
+      source: 'stripe-webhook',
+      connection: transactionalConnection
+    });
+  });
+
+  it('omits monetization finance hand-off when connection is not queryable', async () => {
+    transactionSpy.mockImplementationOnce(async (handler) => handler({ isTransaction: () => true }));
+
+    const intentRecord = {
+      id: 88,
+      publicId: 'pay_skip',
+      provider: 'stripe',
+      providerIntentId: 'pi_skip',
+      status: 'requires_payment_method',
+      currency: 'USD',
+      amountSubtotal: 800,
+      amountDiscount: 0,
+      amountTax: 80,
+      amountTotal: 0,
+      amountRefunded: 0,
+      metadata: {}
+    };
+
+    paymentIntentModel.findByProviderIntentId.mockResolvedValue(intentRecord);
+    paymentIntentModel.updateById.mockResolvedValue({
+      ...intentRecord,
+      status: 'succeeded',
+      amountTotal: 880,
+      capturedAt: '2024-05-05T00:00:00.000Z'
+    });
+    paymentLedgerEntryModel.record.mockResolvedValue();
+
+    await PaymentService.handleStripePaymentSucceeded({
+      id: 'pi_skip',
+      amount_received: 880,
+      currency: 'usd',
+      created: Math.floor(Date.now() / 1000),
+      payment_method_types: ['card'],
+      charges: { data: [{ id: 'ch_skip', balance_transaction: 'txn_skip', receipt_url: 'https://example.com/r' }] }
+    });
+
+    expect(monetizationFinanceServiceMock.handlePaymentCaptured).not.toHaveBeenCalled();
+
+    const [, , eventOptions] = webhookEventBusMock.publish.mock.calls.at(-1);
+    expect(eventOptions).not.toHaveProperty('connection');
   });
 });
