@@ -42,7 +42,7 @@ FormField.propTypes = {
   placeholder: PropTypes.string,
   required: PropTypes.bool,
   children: PropTypes.node,
-  helper: PropTypes.string,
+  helper: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onChange: PropTypes.func
 };

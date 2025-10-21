@@ -3,6 +3,8 @@ import { Menu, Transition } from '@headlessui/react';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 
 export default function CommunitySwitcher({ communities, selected, onSelect, disabled = false }) {
+  const safeCommunities = Array.isArray(communities) ? communities : [];
+
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
@@ -32,29 +34,35 @@ export default function CommunitySwitcher({ communities, selected, onSelect, dis
       >
         <Menu.Items className="absolute z-40 mt-3 w-64 origin-top-left rounded-3xl border border-slate-200 bg-white p-3 shadow-xl focus:outline-none">
           <div className="space-y-1">
-            {communities.map((community) => (
-              <Menu.Item key={community.id}>
-                {({ active }) => (
-                  <button
-                    type="button"
-                    onClick={() => onSelect(community)}
-                    aria-current={selected?.id === community.id ? 'true' : 'false'}
-                    className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
-                      selected?.id === community.id
-                        ? 'bg-primary/10 text-primary'
-                        : active
-                        ? 'bg-slate-100 text-slate-900'
-                        : 'text-slate-600'
-                    }`}
-                  >
+            {safeCommunities.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                No communities available yet.
+              </div>
+            ) : (
+              safeCommunities.map((community) => (
+                <Menu.Item key={community.id}>
+                  {({ active }) => (
+                    <button
+                      type="button"
+                      onClick={() => onSelect(community)}
+                      aria-current={selected?.id === community.id ? 'true' : 'false'}
+                      className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
+                        selected?.id === community.id
+                          ? 'bg-primary/10 text-primary'
+                          : active
+                          ? 'bg-slate-100 text-slate-900'
+                          : 'text-slate-600'
+                      }`}
+                    >
                     <div className="font-semibold">{community.name}</div>
                     {community.description && (
                       <p className="text-xs font-normal text-slate-500">{community.description}</p>
                     )}
-                  </button>
-                )}
-              </Menu.Item>
-            ))}
+                      </button>
+                    )}
+                </Menu.Item>
+              ))
+            )}
           </div>
         </Menu.Items>
       </Transition>
@@ -69,7 +77,7 @@ CommunitySwitcher.propTypes = {
       name: PropTypes.string.isRequired,
       description: PropTypes.string
     })
-  ).isRequired,
+  ),
   selected: PropTypes.shape({
     id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     name: PropTypes.string,
@@ -77,4 +85,10 @@ CommunitySwitcher.propTypes = {
   }),
   onSelect: PropTypes.func.isRequired,
   disabled: PropTypes.bool
+};
+
+CommunitySwitcher.defaultProps = {
+  communities: [],
+  selected: undefined,
+  disabled: false
 };
