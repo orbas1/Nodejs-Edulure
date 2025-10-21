@@ -5,6 +5,7 @@ import DashboardActionFeedback from "../../../components/dashboard/DashboardActi
 import DashboardStateMessage from "../../../components/dashboard/DashboardStateMessage.jsx";
 import { scheduleCommunityEvent } from "../../../api/communityApi.js";
 import { useAuth } from "../../../context/AuthContext.jsx";
+import useRoleGuard from "../../../hooks/useRoleGuard.js";
 
 function toLocalDateTimeInput(value) {
   if (!value) {
@@ -31,6 +32,7 @@ const defaultEventForm = {
 };
 
 export default function CommunityProgramming({ dashboard, onRefresh }) {
+  const { allowed, explanation } = useRoleGuard(["community", "admin"]);
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const initialEvents = useMemo(
@@ -202,6 +204,16 @@ export default function CommunityProgramming({ dashboard, onRefresh }) {
     },
     [eventForm, formatEvent, token]
   );
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Community privileges required"
+        description={explanation ?? "Switch to a community workspace to orchestrate programming."}
+      />
+    );
+  }
 
   if (!dashboard) {
     return (

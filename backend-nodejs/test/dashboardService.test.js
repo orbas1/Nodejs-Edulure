@@ -264,6 +264,145 @@ describe('buildLearnerDashboard', () => {
     expect(snapshot.feedHighlights.length).toBeGreaterThan(0);
     expect(snapshot.profileBio).toContain('Learning across 1 course');
   });
+
+  it('deduplicates upcoming entries and orders them chronologically for the learner', () => {
+    const now = new Date('2024-04-01T10:00:00Z');
+    const user = { id: 9, firstName: 'Jordan', lastName: 'Learner', email: 'jordan@example.com' };
+    const mentorBooking = {
+      id: 301,
+      publicId: 'tb-1',
+      tutorId: 17,
+      learnerId: user.id,
+      tutorFirstName: 'Morgan',
+      tutorLastName: 'Guide',
+      scheduledStart: new Date('2024-04-02T14:00:00Z'),
+      scheduledEnd: new Date('2024-04-02T14:30:00Z'),
+      status: 'confirmed',
+      metadata: { topic: 'Career strategy' }
+    };
+
+    const dashboard = buildLearnerDashboard({
+      user,
+      now,
+      enrollments: [],
+      courses: [],
+      courseProgress: [],
+      assignments: [],
+      tutorBookings: [mentorBooking, { ...mentorBooking }],
+      tutorAvailability: [],
+      liveClassrooms: [],
+      instructorDirectory: new Map(),
+      ebookProgress: [],
+      ebooks: new Map(),
+      invoices: [
+        {
+          id: 'inv-1',
+          label: 'April Tuition',
+          amountCents: 5_000,
+          currency: 'USD',
+          status: 'open',
+          date: '2024-04-01T09:00:00Z'
+        }
+      ],
+      paymentIntents: [],
+      ebookRecommendations: [],
+      communityMemberships: [],
+      communityEvents: [],
+      communityPipelines: [],
+      communitySubscriptions: [],
+      followerSummary: {},
+      privacySettings: null,
+      messagingSummary: null,
+      notifications: [],
+      libraryEntries: [],
+      fieldServiceWorkspace: null,
+      financialProfile: null,
+      paymentMethods: [],
+      billingContacts: [],
+      financePurchases: [],
+      financeSubscriptions: [],
+      systemPreferences: null,
+      growthInitiatives: [],
+      growthExperimentsByInitiative: new Map(),
+      affiliateChannels: [],
+      affiliatePayouts: [],
+      adCampaigns: [],
+      instructorApplication: null,
+      supportCases: [],
+      supportMetrics: {}
+    });
+
+    expect(dashboard).not.toBeNull();
+    expect(dashboard.upcoming.map((entry) => entry.id)).toEqual(['inv-1', 'tb-1']);
+    expect(dashboard.calendar.map((entry) => entry.id)).toEqual(['calendar-inv-1', 'calendar-tb-1']);
+  });
+
+  it('returns a learner snapshot even when only support workspace data exists', () => {
+    const now = new Date('2024-06-01T08:00:00Z');
+    const user = { id: 12, firstName: 'Sky', lastName: 'Support', email: 'sky@example.com' };
+
+    const dashboard = buildLearnerDashboard({
+      user,
+      now,
+      enrollments: [],
+      courses: [],
+      courseProgress: [],
+      assignments: [],
+      tutorBookings: [],
+      tutorAvailability: [],
+      liveClassrooms: [],
+      instructorDirectory: new Map(),
+      ebookProgress: [],
+      ebooks: new Map(),
+      invoices: [],
+      paymentIntents: [],
+      ebookRecommendations: [],
+      communityMemberships: [],
+      communityEvents: [],
+      communityPipelines: [],
+      communitySubscriptions: [],
+      followerSummary: {},
+      privacySettings: null,
+      messagingSummary: null,
+      notifications: [],
+      libraryEntries: [],
+      fieldServiceWorkspace: null,
+      financialProfile: null,
+      paymentMethods: [],
+      billingContacts: [],
+      financePurchases: [],
+      financeSubscriptions: [],
+      systemPreferences: null,
+      growthInitiatives: [],
+      growthExperimentsByInitiative: new Map(),
+      affiliateChannels: [],
+      affiliatePayouts: [],
+      adCampaigns: [],
+      instructorApplication: null,
+      supportCases: [
+        {
+          id: 'case-1',
+          status: 'open',
+          subject: 'Billing question',
+          updatedAt: '2024-05-31T11:00:00Z',
+          messages: []
+        }
+      ],
+      supportMetrics: {
+        open: 1,
+        waiting: 0,
+        resolved: 0,
+        closed: 0,
+        awaitingLearner: 0,
+        averageResponseMinutes: 18,
+        latestUpdatedAt: '2024-05-31T11:00:00Z'
+      }
+    });
+
+    expect(dashboard).not.toBeNull();
+    expect(dashboard.support.cases).toHaveLength(1);
+    expect(dashboard.support.metrics.open).toBe(1);
+  });
 });
 
 describe('buildCommunityDashboard', () => {
@@ -541,6 +680,57 @@ describe('buildAffiliateOverview', () => {
     expect(growthProgramme.performance.conversions).toBe(2);
     expect(growthProgramme.performance.conversions30d).toBe(1);
     expect(growthProgramme.performance.volume30dFormatted).toBe('$450.00');
+  });
+
+  it('matches referral performance using alternate codes defined in metadata', () => {
+    const monetizationSettings = normaliseMonetization(resolveDefaultMonetization());
+    const now = new Date('2024-06-15T12:00:00Z');
+    const affiliates = [
+      {
+        id: 7,
+        referralCode: 'PRIMARY-CODE',
+        referralCodes: ['TEAM-ALPHA', 'TEAM-BETA'],
+        metadata: JSON.stringify({ referralCodes: ['legacy-code'], affiliateCode: 'legacy' }),
+        communityId: 21,
+        communityName: 'Creators League',
+        status: 'active',
+        totalEarnedCents: 12_000,
+        totalPaidCents: 4_000
+      }
+    ];
+    const paymentIntents = [
+      {
+        metadata: JSON.stringify({ referral_code: 'team-alpha' }),
+        amountTotal: 5_000,
+        amountRefunded: 0,
+        capturedAt: '2024-06-10T12:00:00Z'
+      },
+      {
+        metadata: JSON.stringify({ attribution: { referralCode: 'legacy' } }),
+        amountTotal: 3_000,
+        amountRefunded: 0,
+        capturedAt: '2024-05-20T12:00:00Z'
+      },
+      {
+        metadata: JSON.stringify({ referralCodes: ['unused-code'] }),
+        amountTotal: 2_500,
+        amountRefunded: 0,
+        capturedAt: '2024-06-12T12:00:00Z'
+      }
+    ];
+
+    const overview = buildAffiliateOverview({
+      affiliates,
+      affiliatePayouts: [],
+      paymentIntents,
+      memberships: [{ communityId: 21, communityName: 'Creators League' }],
+      monetizationSettings,
+      now
+    });
+
+    expect(overview.programs).toHaveLength(1);
+    expect(overview.programs[0].performance.conversions).toBe(2);
+    expect(overview.programs[0].performance.volumeCents).toBe(8_000);
   });
 });
 

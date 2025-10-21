@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowPathIcon,
   ArrowTrendingDownIcon,
@@ -24,6 +24,7 @@ import {
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import useFinanceDashboard from '../../../hooks/useFinanceDashboard.js';
+import useRoleGuard from '../../../hooks/useRoleGuard.js';
 
 const currencyFormatterCache = new Map();
 const compactNumberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
@@ -222,6 +223,7 @@ const pendingStateTemplate = {
   stopping: new Set()
 };
 export default function AdminFinanceMonetisation() {
+  const { allowed, explanation } = useRoleGuard(['admin']);
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
   const {
@@ -242,6 +244,12 @@ export default function AdminFinanceMonetisation() {
   const [pending, setPending] = useState(pendingStateTemplate);
   const [feedback, setFeedback] = useState(null);
 
+  useEffect(() => {
+    if (!allowed && explanation) {
+      setFeedback({ message: explanation, tone: 'error' });
+    }
+  }, [allowed, explanation]);
+
   const currency = data?.revenue?.collections?.currency ?? 'USD';
   const summaryMetrics = useMemo(() => data?.revenue?.summary ?? [], [data?.revenue?.summary]);
   const collections = data?.revenue?.collections ?? { agingBuckets: [], openInvoices: [], totalOutstanding: 0 };
@@ -252,6 +260,20 @@ export default function AdminFinanceMonetisation() {
   const reconciliation = data?.ledger?.reconciliation ?? {};
   const experiments = data?.experiments ?? { active: [], toggles: [] };
   const pricing = data?.pricing ?? { catalogues: [], guardrails: {}, pendingApprovals: [] };
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Admin privileges required"
+        description={explanation ?? 'You need administrator access to manage finance and monetisation controls.'}
+        actionLabel="Return home"
+        onAction={() => {
+          window.location.assign('/dashboard');
+        }}
+      />
+    );
+  }
 
   const setPendingFor = (type, id, active) => {
     setPending((prev) => {

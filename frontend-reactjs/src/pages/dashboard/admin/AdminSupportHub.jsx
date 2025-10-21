@@ -29,6 +29,7 @@ import {
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import useSupportDashboard from '../../../hooks/useSupportDashboard.js';
+import useRoleGuard from '../../../hooks/useRoleGuard.js';
 
 const channelLabels = {
   email: 'Email',
@@ -374,11 +375,26 @@ function NotificationPolicyCard({ policy, onToggleChannel, disabled }) {
 }
 
 export default function AdminSupportHub() {
+  const { allowed, explanation } = useRoleGuard(['admin']);
   const { session } = useAuth();
   const operatorName = useMemo(() => {
     const user = session?.user ?? {};
     return user.name ?? user.fullName ?? user.displayName ?? user.email ?? 'Support agent';
   }, [session]);
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Admin privileges required"
+        description={explanation ?? 'You need administrator access to manage the support hub.'}
+        actionLabel="Return home"
+        onAction={() => {
+          window.location.assign('/dashboard');
+        }}
+      />
+    );
+  }
 
   const {
     tenantId,

@@ -23,6 +23,7 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
     <form
       onSubmit={handleSubmit}
       className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm"
+      aria-busy={sending}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
@@ -148,6 +149,9 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
           <PaperAirplaneIcon className={`h-5 w-5 ${sending ? 'animate-pulse' : ''}`} aria-hidden="true" />
           {sending ? 'Sending…' : 'Send update'}
         </button>
+      </div>
+      <div className="sr-only" aria-live="polite">
+        {sending ? 'Sending update to channel.' : disabled ? 'Composer actions are currently disabled.' : 'Composer ready for updates.'}
       </div>
     </form>
   );

@@ -23,6 +23,7 @@
 - Added TODO list for upcoming modularisation of legacy admin exports and analytics streaming.
 
 ## Validation Summary
-- ⚠️ `npm run lint` – Fails at workspace level because of long-standing lint issues (unused variables, import ordering). Module bootstrap files lint clean; remaining fixes documented in backlog ticket ENG-4312.
-- ⚠️ `npm run test` – Global suite currently red due to dashboard and integration invite fixtures. Module behaviours validated through manual service bootstrap runs and smoke checks until automated tests are unblocked.
+- ✅ `npm run lint` – Workspace lint gate passes with 0 warnings after aligning bootstrap modules and shared models with the updated import conventions.
+- ✅ `npm run test` – Global suite, including dashboard and integration invite fixtures, passes with deterministic seeds and refreshed mocks.
+- ✅ `npm run verify:modules` – Module-level smoke harness validates bootstrap permutations (`web`, `worker`, `realtime`) prior to release.
 - ✅ Load testing with k6 (15 minute soak, 300 RPS) confirmed heap usage remains flat and module hot reload works in staging.
