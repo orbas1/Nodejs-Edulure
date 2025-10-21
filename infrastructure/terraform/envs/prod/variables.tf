@@ -145,6 +145,24 @@ variable "assign_public_ip" {
   default     = false
 }
 
+variable "certificate_arn" {
+  type        = string
+  description = "ACM certificate ARN to enable HTTPS on the ALB."
+  default     = null
+}
+
+variable "https_listener_port" {
+  type        = number
+  description = "Port exposed for HTTPS when a certificate ARN is supplied."
+  default     = 443
+}
+
+variable "https_ssl_policy" {
+  type        = string
+  description = "SSL policy applied to the HTTPS listener."
+  default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+}
+
 variable "database_username" {
   type        = string
   description = "Master username for Postgres."

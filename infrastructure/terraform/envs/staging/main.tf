@@ -89,6 +89,9 @@ module "backend" {
   enable_alb_deletion_protection   = var.enable_alb_deletion_protection
   cpu_architecture                 = var.cpu_architecture
   assign_public_ip                 = var.assign_public_ip
+  certificate_arn                  = var.certificate_arn
+  https_listener_port              = var.https_listener_port
+  https_ssl_policy                 = var.https_ssl_policy
   tags                             = var.tags
 }
 

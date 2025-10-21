@@ -101,6 +101,24 @@ variable "secret_arns" {
   default     = []
 }
 
+variable "certificate_arn" {
+  type        = string
+  description = "ACM certificate ARN enabling HTTPS on the load balancer."
+  default     = null
+}
+
+variable "https_listener_port" {
+  type        = number
+  description = "Port to expose HTTPS traffic on when a certificate ARN is supplied."
+  default     = 443
+}
+
+variable "https_ssl_policy" {
+  type        = string
+  description = "SSL policy applied to the HTTPS listener."
+  default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+}
+
 variable "assign_public_ip" {
   type        = bool
   description = "Assign a public IP to ECS tasks (only for environments without NAT)."

@@ -38,13 +38,15 @@ terraform apply -var="project=edulure" \
   -var="database_password=$(aws secretsmanager get-secret-value --secret-id edulure/dev/db | jq -r .SecretString)"
 ```
 
+Provide `-var="certificate_arn=arn:aws:acm:..."` (and optionally override `https_listener_port` or `https_ssl_policy`) to terminate HTTPS directly on the load balancer. HTTP requests are redirected to HTTPS automatically when the certificate is present.
+
 CI pipelines should run `terraform plan` for each environment with the same variables to guarantee parity before deployment.
 
 ## Security
 
 - Postgres is deployed inside private subnets with encryption, IAM auth support, and configurable backup retention.
 - ECS tasks read secrets through IAM policies limited to explicitly enumerated ARNs.
-- Application Load Balancers enforce TLS (terminate at AWS ACM) and block deletion in staging/production by default.
+- When an ACM `certificate_arn` is supplied, the backend module provisions an HTTPS listener with a strict TLS policy and automatically redirects HTTP traffic. Staging and production environments keep ALB deletion protection enabled by default.
 
 ## Observability
 

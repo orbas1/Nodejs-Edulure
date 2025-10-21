@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
@@ -67,9 +67,19 @@ describe('Release accessibility guardrails', () => {
     expect(outageAlert).toHaveTextContent('Realtime API outage');
     expect(outageAlert).toHaveAttribute('aria-live', 'assertive');
 
+    const capabilityStatuses = screen.getAllByRole('status');
+    expect(capabilityStatuses).toHaveLength(1);
+    expect(capabilityStatuses[0]).toHaveAttribute('aria-live', 'polite');
+    expect(within(capabilityStatuses[0]).getByText(/billing reconciliation delays/i)).toBeInTheDocument();
+
     const refreshButton = screen.getByRole('button', { name: /refresh status/i });
     await user.click(refreshButton);
     expect(refreshSpy).toHaveBeenCalledTimes(1);
+
+    refreshButton.focus();
+    expect(refreshButton).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(refreshSpy).toHaveBeenCalledTimes(2);
 
     let accessibilityScan;
     await act(async () => {

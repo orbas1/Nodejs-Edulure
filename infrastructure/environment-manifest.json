@@ -11,21 +11,21 @@
     },
     "backendService": {
       "path": "infrastructure/terraform/modules/backend_service",
-      "hash": "05b6d14891ff58edd80a99950322e508f934e8e588cc28345d147deb9d33deee"
+      "hash": "f37e1733b11c69f00da73ea173afc2bd1c89c8f1e119826e84f8d2bf6fc9fa48"
     }
   },
   "environments": {
     "dev": {
       "path": "infrastructure/terraform/envs/dev",
-      "hash": "bc1e789f0621666dbbcef71280b8992c16eee9b12141c961a17f4df21adfa855"
+      "hash": "0b124f25b8afda0adaf75f64321f3d816562d4cd217bacf64e9631c5f602509d"
     },
     "staging": {
       "path": "infrastructure/terraform/envs/staging",
-      "hash": "e988d77e0e2821c2bee34be404d4adc47c06011de9b58b814dbe9ef8661c5986"
+      "hash": "493e56881cb0b9f673e22442513bf05082c5eae13b35a4b91a3c0afcf38f8bbb"
     },
     "prod": {
       "path": "infrastructure/terraform/envs/prod",
-      "hash": "1de6d4e714ccfdbd25264efded11d035653694376de8ca803ef3f7f2de6688e1"
+      "hash": "8fafedba294489b812eb69898a88099f7985b9c2756449f5bae2b2dc51f55e32"
     }
   },
   "docker": {

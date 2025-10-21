@@ -22,6 +22,7 @@ locals {
       valueFrom = item.arn
     }
   ]
+  https_enabled = var.certificate_arn != null && trimspace(var.certificate_arn) != ""
 }
 
 resource "aws_security_group" "service" {
@@ -176,6 +177,35 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
 
+  dynamic "default_action" {
+    for_each = local.https_enabled ? [1] : []
+    content {
+      type = "redirect"
+      redirect {
+        port        = tostring(var.https_listener_port)
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = local.https_enabled ? [] : [1]
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.this.arn
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  count             = local.https_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.this.arn
+  port              = var.https_listener_port
+  protocol          = "HTTPS"
+  ssl_policy        = var.https_ssl_policy
+  certificate_arn   = var.certificate_arn
+
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.this.arn
@@ -253,10 +283,6 @@ resource "aws_ecs_service" "this" {
 
   lifecycle {
     ignore_changes = [desired_count]
-  }
-
-  deployment_controller {
-    type = "CODE_DEPLOY"
   }
 
   deployment_minimum_healthy_percent = 50
