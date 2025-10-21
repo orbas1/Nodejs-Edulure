@@ -5,6 +5,28 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 const reactRecommended = reactPlugin.configs.flat?.recommended ?? reactPlugin.configs.recommended;
 
+const baseLanguageOptions = {
+  ecmaVersion: 'latest',
+  sourceType: 'module',
+  globals: {
+    ...globals.browser,
+    ...globals.es2021,
+    describe: 'readonly',
+    it: 'readonly',
+    expect: 'readonly',
+    beforeEach: 'readonly',
+    afterEach: 'readonly',
+    beforeAll: 'readonly',
+    afterAll: 'readonly',
+    vi: 'readonly'
+  },
+  parserOptions: {
+    ecmaFeatures: {
+      jsx: true
+    }
+  }
+};
+
 export default [
   {
     ignores: ['dist/**', 'coverage/**', 'build/**', 'node_modules/**', 'src/pages/dashboard/**']
@@ -16,19 +38,7 @@ export default [
       react: reactPlugin,
       'react-hooks': reactHooks
     },
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: {
-        ...globals.browser,
-        ...globals.es2021
-      },
-      parserOptions: {
-        ecmaFeatures: {
-          jsx: true
-        }
-      }
-    },
+    languageOptions: baseLanguageOptions,
     rules: {
       ...reactRecommended?.rules,
       ...reactHooks.configs?.recommended?.rules,
@@ -39,6 +49,16 @@ export default [
     settings: {
       react: {
         version: 'detect'
+      }
+    }
+  },
+  {
+    files: ['src/**/*.{test.js,test.jsx,spec.js,spec.jsx}', 'src/**/__tests__/**/*.{js,jsx}'],
+    languageOptions: {
+      ...baseLanguageOptions,
+      globals: {
+        ...baseLanguageOptions.globals,
+        ...globals.node
       }
     }
   }
