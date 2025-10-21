@@ -532,6 +532,55 @@ describe('LearnerDashboardService', () => {
     expect(result).toEqual({ id: 'order-2', status: 'on_site', serviceType: 'lab setup' });
   });
 
+  it('returns a conflict payload when client updates are stale', async () => {
+    const order = {
+      id: 'order-2',
+      reference: 'fs_456',
+      status: 'dispatched',
+      priority: 'standard',
+      serviceType: 'lab setup',
+      metadata: { owner: 'Ops' },
+      updatedAt: '2024-01-02T12:00:00.000Z'
+    };
+
+    fieldServiceOrderModel.findByIdForCustomer.mockResolvedValue(order);
+    fieldServiceEventModel.listByOrderIds.mockResolvedValue([]);
+    fieldServiceProviderModel.listByIds.mockResolvedValue([]);
+    fieldServiceWorkspaceBuilder
+      .mockReturnValueOnce({
+        customer: {
+          assignments: [
+            { id: 'order-2', status: 'dispatched', serviceType: 'lab setup', lastUpdate: '2024-01-02T12:00:00.000Z' }
+          ]
+        }
+      })
+      .mockReturnValueOnce({
+        customer: {
+          assignments: [
+            { id: 'order-2', status: 'on_site', serviceType: 'lab setup', lastUpdate: '2024-01-02T12:00:00.000Z' }
+          ]
+        }
+      });
+
+    await expect(
+      LearnerDashboardService.updateFieldServiceAssignment(42, 'order-2', {
+        status: 'on_site',
+        clientUpdatedAt: '2024-01-01T10:00:00.000Z'
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: 'FIELD_SERVICE_CONFLICT',
+      details: expect.objectContaining({
+        assignmentId: 'order-2',
+        serverAssignment: expect.objectContaining({ id: 'order-2' }),
+        suggestedAssignment: expect.objectContaining({ status: 'on_site' }),
+        conflictingFields: expect.arrayContaining(['status'])
+      })
+    });
+
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
   it('closes a field service assignment and returns an acknowledgement', async () => {
     const order = {
       id: 'order-3',
