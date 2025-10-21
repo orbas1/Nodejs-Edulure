@@ -52,19 +52,37 @@ describe('InstructorBookingService', () => {
 
   it('lists bookings with aggregated stats', async () => {
     tutorProfileModelMock.findByUserId.mockResolvedValue({ id: 21, hourlyRateCurrency: 'USD' });
-    tutorBookingModelMock.listForInstructor
-      .mockResolvedValueOnce([
-        { publicId: 'a', status: 'confirmed' },
-        { publicId: 'b', status: 'completed' }
-      ])
-      .mockResolvedValueOnce([
-        { publicId: 'a', status: 'confirmed' },
-        { publicId: 'b', status: 'completed' },
-        { publicId: 'c', status: 'cancelled' }
-      ]);
-    tutorBookingModelMock.countForInstructor.mockResolvedValue(2);
+    tutorBookingModelMock.listForInstructor.mockResolvedValue([
+      { publicId: 'a', status: 'confirmed' },
+      { publicId: 'b', status: 'completed' }
+    ]);
+
+    tutorBookingModelMock.countForInstructor.mockImplementation(async (_instructorId, filters = {}) => {
+      switch (filters.status) {
+        case 'all':
+          return 3;
+        case 'confirmed':
+          return 1;
+        case 'requested':
+          return 0;
+        case 'completed':
+          return 1;
+        case 'cancelled':
+          return 1;
+        default:
+          return 2;
+      }
+    });
 
     const result = await InstructorBookingService.listBookings(5, { page: 1, perPage: 10 });
+
+    expect(tutorBookingModelMock.listForInstructor).toHaveBeenCalledWith(5, {
+      limit: 10,
+      offset: 0,
+      search: undefined,
+      status: undefined
+    });
+
     expect(result.items).toHaveLength(2);
     expect(result.stats).toMatchObject({ total: 3, upcoming: 1, completed: 1, cancelled: 1 });
   });
