@@ -865,6 +865,9 @@ export default function LearnerEbooks() {
         <section className="space-y-6">
           {libraryStatus ? (
             <div
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
               className={`rounded-3xl border px-5 py-4 text-sm ${
                 libraryStatus.type === 'success'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-700'

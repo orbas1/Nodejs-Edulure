@@ -51,6 +51,14 @@ export default function ChannelSidebar({
   onSelectChannel,
   interactive
 }) {
+  const errorMessage = error
+    ? error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
+      : null
+    : null;
+
   return (
     <aside className="flex h-full w-full flex-col gap-6">
       <div className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
@@ -97,11 +105,18 @@ export default function ChannelSidebar({
           <span className="text-xs text-slate-400">{channels.length} spaces</span>
         </header>
 
-        <div className="custom-scrollbar h-full max-h-[520px] overflow-y-auto px-2 py-2">
+        <div
+          className="custom-scrollbar h-full max-h-[520px] overflow-y-auto px-2 py-2"
+          aria-busy={loading}
+          aria-live="polite"
+        >
           {loading ? (
             <p className="px-3 py-2 text-xs text-slate-500">Loading channels…</p>
-          ) : error ? (
-            <p className="px-3 py-2 text-xs text-rose-600">Unable to load channels. Refresh to retry.</p>
+          ) : errorMessage ? (
+            <p className="px-3 py-2 text-xs text-rose-600" role="alert">
+              Unable to load channels. Refresh to retry.
+              <span className="mt-1 block text-[11px] text-rose-500">{errorMessage}</span>
+            </p>
           ) : channels.length === 0 ? (
             <p className="px-3 py-2 text-xs text-slate-500">No channels detected for this community yet.</p>
           ) : (

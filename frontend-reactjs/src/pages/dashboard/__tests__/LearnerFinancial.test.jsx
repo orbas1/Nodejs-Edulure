@@ -183,4 +183,18 @@ describe('<LearnerFinancial />', () => {
     expect(screen.getByText('Jordan CFO')).toBeInTheDocument();
     expect(screen.queryByText('Existing finance partner')).not.toBeInTheDocument();
   });
+
+  it('shows a gating message when the viewer is not a learner', () => {
+    useLearnerDashboardSectionMock.mockReturnValueOnce({
+      isLearner: false,
+      section: null,
+      loading: false,
+      error: null,
+      refresh: vi.fn()
+    });
+
+    render(<LearnerFinancial />);
+
+    expect(screen.getByText(/Learner Learnspace required/i)).toBeInTheDocument();
+  });
 });

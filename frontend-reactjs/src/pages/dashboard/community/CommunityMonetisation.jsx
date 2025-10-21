@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
 import { updateCommunityTier } from '../../../api/communityApi.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import useRoleGuard from '../../../hooks/useRoleGuard.js';
 
 export default function CommunityMonetisation({ dashboard, onRefresh }) {
+  const { allowed, explanation } = useRoleGuard(['community', 'admin']);
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const initialTiers = useMemo(
@@ -65,6 +67,16 @@ export default function CommunityMonetisation({ dashboard, onRefresh }) {
     },
     [initialTiers, tiers, token]
   );
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Community privileges required"
+        description={explanation ?? 'Switch to a community workspace to review monetisation telemetry.'}
+      />
+    );
+  }
 
   if (!dashboard) {
     return (
