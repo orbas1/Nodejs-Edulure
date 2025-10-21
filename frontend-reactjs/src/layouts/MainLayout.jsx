@@ -757,12 +757,12 @@ export default function MainLayout() {
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <a href="/" className="flex items-center gap-4">
+        <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+          <a href="/" className="flex items-center gap-3 sm:gap-4" aria-label="Edulure home">
             <img
               src="https://i.ibb.co/twQyCm1N/Edulure-Logo.png"
               alt="Edulure logo"
-              className="h-20 w-auto"
+              className="h-10 w-auto object-contain sm:h-12 lg:h-16 xl:h-20"
             />
           </a>
           <div className="hidden items-center gap-4 lg:flex">
@@ -820,107 +820,136 @@ export default function MainLayout() {
                   <Transition
                     as={Fragment}
                     enter="transition duration-200 ease-out"
-                    enterFrom="transform scale-95 opacity-0"
-                    enterTo="transform scale-100 opacity-100"
+                    enterFrom="opacity-0"
+                    enterTo="opacity-100"
                     leave="transition duration-150 ease-in"
-                    leaveFrom="transform scale-100 opacity-100"
-                    leaveTo="transform scale-95 opacity-0"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
                   >
-                    <Disclosure.Panel className="absolute inset-x-4 top-20 z-50 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl backdrop-blur">
-                      <div className="flex flex-col gap-5">
-                        <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
-                          <LanguageSelector size="compact" variant="light" align="start" fullWidth />
-                        </div>
-                        {isAuthenticated ? (
-                          <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                            {avatarUrl ? (
-                              <img src={avatarUrl} alt={displayName} className="h-11 w-11 rounded-full object-cover" />
-                            ) : (
-                              <span className={avatarClass}>{initials}</span>
-                            )}
-                            <div>
-                              <p className="text-sm font-semibold text-slate-900">{displayName}</p>
-                              {emailLabel ? <p className="text-xs text-slate-500">{emailLabel}</p> : null}
-                              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">Secure session</p>
-                            </div>
+                    <Disclosure.Panel className="lg:hidden">
+                      <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm" aria-hidden="true" />
+                      <div className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] flex-col overflow-y-auto overscroll-contain bg-white/95 px-4 pb-10 pt-6 shadow-2xl backdrop-blur-sm sm:px-6 lg:px-8">
+                        <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6">
+                          <div className="flex items-center justify-between gap-4">
+                            <a href="/" className="inline-flex items-center gap-3" aria-label="Edulure home">
+                              <img
+                                src="https://i.ibb.co/twQyCm1N/Edulure-Logo.png"
+                                alt="Edulure logo"
+                                className="h-10 w-auto object-contain"
+                              />
+                              <span className="text-base font-semibold text-slate-900">Edulure</span>
+                            </a>
+                            <Disclosure.Button className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-600 shadow-sm transition hover:border-primary hover:text-primary">
+                              <span className="sr-only">Close menu</span>
+                              <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+                            </Disclosure.Button>
                           </div>
-                        ) : null}
 
-                        <div className="space-y-3">
-                          {navigation.map((item) => {
-                            if (item.type === 'mega') {
-                              return <MobileMegaMenu key={item.id} item={item} />;
-                            }
-                            return (
-                              <NavLink
-                                key={item.id}
-                                to={item.to}
-                                className={({ isActive }) =>
-                                  `block rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                                    isActive
-                                      ? 'border-primary bg-primary/10 text-primary'
-                                      : 'border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary'
-                                  }`
-                                }
+                          <div className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                            <LanguageSelector size="compact" variant="light" align="start" fullWidth />
+                          </div>
+
+                          {isAuthenticated ? (
+                            <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                              {avatarUrl ? (
+                                <img src={avatarUrl} alt={displayName} className="h-11 w-11 rounded-full object-cover" />
+                              ) : (
+                                <span className={avatarClass}>{initials}</span>
+                              )}
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{displayName}</p>
+                                {emailLabel ? <p className="text-xs text-slate-500">{emailLabel}</p> : null}
+                                <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">Secure session</p>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div className="space-y-3">
+                            {navigation.map((item) => {
+                              if (item.type === 'mega') {
+                                return <MobileMegaMenu key={item.id} item={item} onNavigate={() => document.activeElement?.blur()} />;
+                              }
+                              return (
+                                <NavLink
+                                  key={item.id}
+                                  to={item.to}
+                                  className={({ isActive }) =>
+                                    `block rounded-2xl border px-5 py-3 text-base font-semibold transition ${
+                                      isActive
+                                        ? 'border-primary bg-primary/10 text-primary'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:border-primary/60 hover:bg-primary/5 hover:text-primary'
+                                    }`
+                                  }
+                                  onClick={() => {
+                                    document.activeElement?.blur();
+                                  }}
+                                >
+                                  {item.label}
+                                </NavLink>
+                              );
+                            })}
+                          </div>
+
+                          {isAuthenticated ? (
+                            <div className="space-y-3">
+                              <button
+                                type="button"
                                 onClick={() => {
+                                  navigate('/profile');
                                   document.activeElement?.blur();
                                 }}
+                                className="w-full rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-primary/60 hover:text-primary"
                               >
-                                {item.label}
+                                View profile
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigate(`${dashboardPath}/settings`);
+                                  document.activeElement?.blur();
+                                }}
+                                className="w-full rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-primary/60 hover:text-primary"
+                              >
+                                Settings
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  logout();
+                                  document.activeElement?.blur();
+                                }}
+                                className="w-full rounded-2xl bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                              >
+                                Sign out
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-3">
+                              <NavLink
+                                to="/login"
+                                className="rounded-full border border-primary/30 px-5 py-3 text-center text-sm font-semibold text-primary transition hover:border-primary hover:text-primary-dark"
+                              >
+                                {t('navigation.login')}
                               </NavLink>
-                            );
-                          })}
-                        </div>
+                              <NavLink
+                                to="/register"
+                                className="rounded-full bg-primary px-5 py-3 text-center text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+                              >
+                                {t('navigation.register')}
+                              </NavLink>
+                            </div>
+                          )}
 
-                        {isAuthenticated ? (
-                          <div className="space-y-3">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigate('/profile');
-                                document.activeElement?.blur();
-                              }}
-                              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
-                            >
-                              View profile
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigate(`${dashboardPath}/settings`);
-                                document.activeElement?.blur();
-                              }}
-                              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
-                            >
-                              Settings
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                logout();
-                                document.activeElement?.blur();
-                              }}
-                              className="w-full rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
-                            >
-                              Sign out
-                            </button>
+                          <div className="mt-auto space-y-3 border-t border-slate-200 pt-6 text-xs text-slate-500">
+                            <p className="font-semibold uppercase tracking-[0.3em] text-slate-400">Stay in sync</p>
+                            <p>
+                              {t(
+                                'navigation.mobilePrompt',
+                                'Scroll the full menu to explore programs, resources, and support options tailored for your screen.'
+                              )}
+                            </p>
                           </div>
-                        ) : (
-                          <div className="flex flex-col gap-3">
-                            <NavLink
-                              to="/login"
-                              className="rounded-full border border-primary/30 px-5 py-2 text-center text-sm font-semibold text-primary transition hover:border-primary hover:text-primary-dark"
-                            >
-                              {t('navigation.login')}
-                            </NavLink>
-                            <NavLink
-                              to="/register"
-                              className="rounded-full bg-primary px-5 py-2 text-center text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
-                            >
-                              {t('navigation.register')}
-                            </NavLink>
-                          </div>
-                        )}
+                        </div>
                       </div>
                     </Disclosure.Panel>
                   </Transition>
