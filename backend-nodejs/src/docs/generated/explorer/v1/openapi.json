@@ -2,8 +2,13 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Edulure Platform API – Explorer search, browse, and recommendation endpoints.",
-    "version": "1.50.0",
-    "description": "Explorer search, browse, and recommendation endpoints. (Capability: search-and-discovery)."
+    "version": "1.51.0",
+    "description": "Explorer search, browse, and recommendation endpoints. (Capability: search-and-discovery).",
+    "x-release": {
+      "version": "1.51.0",
+      "releasedAt": "2025-10-20T23:52:56.000Z",
+      "stability": "stable"
+    }
   },
   "servers": [
     {
@@ -783,6 +788,18 @@
           }
         }
       }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     }
-  }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
 }

@@ -7,7 +7,7 @@
   "products": ["communications-hub", "knowledge-base", "release-management"],
   "tags": ["communications", "roadmap", "governance"],
   "capabilities": ["Task 5"],
-  "lastUpdated": "2025-03-02",
+  "lastUpdated": "2025-10-20",
   "owner": "Go-to-Market Enablement",
   "timeToCompleteMinutes": 60,
   "deliverables": [
@@ -48,3 +48,8 @@ The communications kit provides reusable assets that ensure operators, customer 
 - Owners must review templates monthly and after every major incident or release. Updates should reference supporting Jira issues and commit hashes where appropriate.
 - Success metrics include average time to publish incident updates (<15 minutes), stakeholder satisfaction (≥4.6/5), and reduction in duplicated communications (target 50% decrease).
 - The enablement content API records every template download and generates a usage report for quarterly governance reviews.
+
+## API documentation sync
+- Embed the canonical OpenAPI links for `/feed`, `/social`, and `/users` in the roadmap and incident templates. Use the registry index to confirm checksum matches before publishing external communications.
+- Highlight the platform-wide bearer authentication requirement in the release announcement template to pre-empt security questions from customers.
+- When communicating roadmap changes, include the generated timestamp from the OpenAPI index so stakeholders know the currency of referenced API capabilities.

@@ -1,4 +1,5 @@
 import {
+  GraphQLError,
   GraphQLBoolean,
   GraphQLEnumType,
   GraphQLFloat,
@@ -74,7 +75,7 @@ const DateTimeScalar = new GraphQLScalarType({
   }
 });
 
-function parseLiteral(ast) {
+function parseLiteralValue(ast) {
   switch (ast.kind) {
     case Kind.STRING:
     case Kind.BOOLEAN:
@@ -85,11 +86,11 @@ function parseLiteral(ast) {
     case Kind.NULL:
       return null;
     case Kind.LIST:
-      return ast.values.map(parseLiteral);
+      return ast.values.map(parseLiteralValue);
     case Kind.OBJECT: {
       const value = Object.create(null);
       for (const field of ast.fields) {
-        value[field.name.value] = parseLiteral(field.value);
+        value[field.name.value] = parseLiteralValue(field.value);
       }
       return value;
     }
@@ -107,7 +108,9 @@ const JSONScalar = new GraphQLScalarType({
   parseValue(value) {
     return value;
   },
-  parseLiteral
+  parseLiteral(ast) {
+    return parseLiteralValue(ast);
+  }
 });
 
 const FeedPostStatsType = new GraphQLObjectType({
@@ -371,19 +374,42 @@ const FeedAnalyticsInputType = new GraphQLInputObjectType({
   }
 });
 
-function ensureActor(context) {
-  const actor = context?.actor;
-  if (!actor) {
-    throw new Error('Unauthorised GraphQL request');
-  }
-  return actor;
-}
-
 function buildFilterPayload(input = {}) {
   return {
     search: input.search,
     postType: input.postType
   };
+}
+
+function ensureActor(context) {
+  const actor = context?.actor;
+  if (!actor) {
+    throw new GraphQLError('Unauthorised GraphQL request', {
+      extensions: {
+        code: 'UNAUTHENTICATED',
+        http: { status: 401 }
+      }
+    });
+  }
+  return actor;
+}
+
+function requirePermission(context, requiredPermissions) {
+  const actor = ensureActor(context);
+  const permissions = Array.isArray(context?.permissions) ? new Set(context.permissions) : new Set();
+  const required = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
+  const hasPermission = required.every((permission) => permissions.has(permission));
+
+  if (!hasPermission) {
+    throw new GraphQLError('Forbidden', {
+      extensions: {
+        code: 'FORBIDDEN',
+        http: { status: 403 }
+      }
+    });
+  }
+
+  return actor;
 }
 
 function buildPlacementMetadata(input = {}) {
@@ -404,7 +430,7 @@ const QueryType = new GraphQLObjectType({
         input: { type: FeedQueryInputType }
       },
       resolve: async (_root, args, context) => {
-        const actor = ensureActor(context);
+        const actor = requirePermission(context, 'feed:read');
         const input = args.input ?? {};
         return LiveFeedService.getFeed({
           actor,
@@ -424,7 +450,8 @@ const QueryType = new GraphQLObjectType({
       args: {
         input: { type: new GraphQLNonNull(FeedPlacementInputType) }
       },
-      resolve: async (_root, args) => {
+      resolve: async (_root, args, context) => {
+        requirePermission(context, ['ads:read', 'feed:read']);
         const input = args.input ?? {};
         return LiveFeedService.getPlacements({
           context: input.context ?? 'global_feed',
@@ -439,7 +466,7 @@ const QueryType = new GraphQLObjectType({
         input: { type: FeedAnalyticsInputType }
       },
       resolve: async (_root, args, context) => {
-        const actor = ensureActor(context);
+        const actor = requirePermission(context, 'feed:read');
         const input = args.input ?? {};
         return LiveFeedService.getAnalytics({
           actor,
