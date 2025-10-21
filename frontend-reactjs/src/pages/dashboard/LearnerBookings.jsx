@@ -9,6 +9,7 @@ import {
   cancelTutorBooking
 } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import useMountedRef from '../../hooks/useMountedRef.js';
 
 const prepShareDefaultState = {
   open: false,
@@ -23,6 +24,7 @@ export default function LearnerBookings() {
   const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('tutorBookings');
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const mounted = useMountedRef();
 
   const [activeBookings, setActiveBookings] = useState([]);
   const [historicalBookings, setHistoricalBookings] = useState([]);
@@ -387,6 +389,9 @@ export default function LearnerBookings() {
         setStatusMessage({ type: 'pending', message: 'Submitting your mentor booking request…' });
         try {
           const response = await createTutorBookingRequest({ token, payload });
+          if (!mounted.current) {
+            return;
+          }
           const acknowledgement = response?.data ?? {};
           const newBooking = {
             id: acknowledgement.reference ?? `request-${Date.now()}`,
@@ -411,15 +416,19 @@ export default function LearnerBookings() {
           });
           closeBookingForm();
         } catch (requestError) {
-          setStatusMessage({
-            type: 'error',
-            message:
-              requestError instanceof Error
-                ? requestError.message
-                : 'We were unable to submit your mentor booking request.'
-          });
+          if (mounted.current) {
+            setStatusMessage({
+              type: 'error',
+              message:
+                requestError instanceof Error
+                  ? requestError.message
+                  : 'We were unable to submit your mentor booking request.'
+            });
+          }
         } finally {
-          setPendingAction(null);
+          if (mounted.current) {
+            setPendingAction(null);
+          }
         }
         return;
       }
@@ -428,6 +437,9 @@ export default function LearnerBookings() {
       setStatusMessage({ type: 'pending', message: 'Updating mentor booking details…' });
       try {
         await updateTutorBooking({ token, bookingId: editingBookingId, payload });
+        if (!mounted.current) {
+          return;
+        }
         setActiveBookings((current) =>
           current.map((booking) =>
             booking.id === editingBookingId
@@ -448,15 +460,19 @@ export default function LearnerBookings() {
         setStatusMessage({ type: 'success', message: 'Mentor booking updated.' });
         closeBookingForm();
       } catch (updateError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            updateError instanceof Error
-              ? updateError.message
-              : 'We were unable to update the mentor booking.'
-        });
+        if (mounted.current) {
+          setStatusMessage({
+            type: 'error',
+            message:
+              updateError instanceof Error
+                ? updateError.message
+                : 'We were unable to update the mentor booking.'
+          });
+        }
       } finally {
-        setPendingAction(null);
+        if (mounted.current) {
+          setPendingAction(null);
+        }
       }
     },
     [
@@ -465,6 +481,7 @@ export default function LearnerBookings() {
       closeBookingForm,
       createTutorBookingRequest,
       editingBookingId,
+      mounted,
       setActiveBookings,
       token,
       updateTutorBooking,
@@ -486,6 +503,9 @@ export default function LearnerBookings() {
           bookingId: booking.id,
           payload: { reason: 'Learner cancelled from dashboard' }
         });
+        if (!mounted.current) {
+          return;
+        }
         setActiveBookings((current) => current.filter((item) => item.id !== booking.id));
         setHistoricalBookings((current) => [
           {
@@ -498,18 +518,22 @@ export default function LearnerBookings() {
         ]);
         setStatusMessage({ type: 'success', message: `${booking.topic} has been cancelled.` });
       } catch (cancelError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            cancelError instanceof Error
-              ? cancelError.message
-              : 'We were unable to cancel this booking.'
-        });
+        if (mounted.current) {
+          setStatusMessage({
+            type: 'error',
+            message:
+              cancelError instanceof Error
+                ? cancelError.message
+                : 'We were unable to cancel this booking.'
+          });
+        }
       } finally {
-        setPendingAction(null);
+        if (mounted.current) {
+          setPendingAction(null);
+        }
       }
     },
-    [cancelTutorBooking, setActiveBookings, setHistoricalBookings, token]
+    [cancelTutorBooking, mounted, setActiveBookings, setHistoricalBookings, token]
   );
 
   const handleRequestSession = useCallback(async () => {
@@ -525,6 +549,9 @@ export default function LearnerBookings() {
         token,
         payload: { topic: 'Mentorship session', preferredDate: new Date().toISOString() }
       });
+      if (!mounted.current) {
+        return;
+      }
       const acknowledgement = response?.data ?? {};
       const newBooking = {
         id: acknowledgement.reference ?? `request-${Date.now()}`,
@@ -543,17 +570,21 @@ export default function LearnerBookings() {
         message: response?.message ?? 'Mentor booking request captured.'
       });
     } catch (requestError) {
-      setStatusMessage({
-        type: 'error',
-        message:
-          requestError instanceof Error
-            ? requestError.message
-            : 'We were unable to submit your mentor booking request.'
-      });
+      if (mounted.current) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            requestError instanceof Error
+              ? requestError.message
+              : 'We were unable to submit your mentor booking request.'
+        });
+      }
     } finally {
-      setPendingAction(null);
+      if (mounted.current) {
+        setPendingAction(null);
+      }
     }
-  }, [token]);
+  }, [mounted, setActiveBookings, token]);
 
   const handleExportAgenda = useCallback(async () => {
     if (!token) {
@@ -565,6 +596,9 @@ export default function LearnerBookings() {
     setStatusMessage({ type: 'pending', message: 'Preparing tutor agenda export…' });
     try {
       const response = await exportTutorSchedule({ token });
+      if (!mounted.current) {
+        return;
+      }
       const acknowledgement = response?.data ?? {};
       const downloadUrl = acknowledgement.meta?.downloadUrl ?? null;
       setStatusMessage({
@@ -575,17 +609,21 @@ export default function LearnerBookings() {
             : response?.message ?? 'Agenda export prepared.'
       });
     } catch (exportError) {
-      setStatusMessage({
-        type: 'error',
-        message:
-          exportError instanceof Error
-            ? exportError.message
-            : 'We were unable to export your mentor agenda.'
-      });
+      if (mounted.current) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            exportError instanceof Error
+              ? exportError.message
+              : 'We were unable to export your mentor agenda.'
+        });
+      }
     } finally {
-      setPendingAction(null);
+      if (mounted.current) {
+        setPendingAction(null);
+      }
     }
-  }, [token]);
+  }, [mounted, token]);
 
   const closePrepShareModal = useCallback(() => {
     setPrepShareModal({ ...prepShareDefaultState });
@@ -661,6 +699,9 @@ export default function LearnerBookings() {
             }
           }
         });
+        if (!mounted.current) {
+          return;
+        }
         setActiveBookings((current) =>
           current.map((booking) =>
             booking.id === prepShareModal.booking.id
@@ -679,18 +720,22 @@ export default function LearnerBookings() {
         });
         closePrepShareModal();
       } catch (shareError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            shareError instanceof Error
-              ? shareError.message
-              : 'We were unable to share the preparation notes.'
-        });
+        if (mounted.current) {
+          setStatusMessage({
+            type: 'error',
+            message:
+              shareError instanceof Error
+                ? shareError.message
+                : 'We were unable to share the preparation notes.'
+          });
+        }
       } finally {
-        setPendingAction(null);
+        if (mounted.current) {
+          setPendingAction(null);
+        }
       }
     },
-    [closePrepShareModal, prepShareModal, setActiveBookings, token, updateTutorBooking]
+    [closePrepShareModal, mounted, prepShareModal, setActiveBookings, token, updateTutorBooking]
   );
 
   const handleCompleteBooking = useCallback(
@@ -707,6 +752,9 @@ export default function LearnerBookings() {
       );
       try {
         await updateTutorBooking({ token, bookingId: booking.id, payload: { status: 'completed' } });
+        if (!mounted.current) {
+          return;
+        }
         setActiveBookings((current) => current.filter((item) => item.id !== booking.id));
         setHistoricalBookings((current) => [
           {
@@ -720,18 +768,22 @@ export default function LearnerBookings() {
         ]);
         setStatusMessage({ type: 'success', message: `${booking.topic} has been archived.` });
       } catch (completeError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            completeError instanceof Error
-              ? completeError.message
-              : 'We were unable to complete this session.'
-        });
+        if (mounted.current) {
+          setStatusMessage({
+            type: 'error',
+            message:
+              completeError instanceof Error
+                ? completeError.message
+                : 'We were unable to complete this session.'
+          });
+        }
       } finally {
-        setPendingAction(null);
+        if (mounted.current) {
+          setPendingAction(null);
+        }
       }
     },
-    [setActiveBookings, setHistoricalBookings, token, updateTutorBooking]
+    [mounted, setActiveBookings, setHistoricalBookings, token, updateTutorBooking]
   );
 
   if (!isLearner) {

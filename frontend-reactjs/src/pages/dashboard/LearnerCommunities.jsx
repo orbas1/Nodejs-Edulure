@@ -6,6 +6,7 @@ import DashboardStateMessage from '../../components/dashboard/DashboardStateMess
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { triggerCommunityAction } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import useMountedRef from '../../hooks/useMountedRef.js';
 
 export default function LearnerCommunities() {
   const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('communities');
@@ -15,6 +16,7 @@ export default function LearnerCommunities() {
 
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const mounted = useMountedRef();
 
   useEffect(() => {
     if (error) {
@@ -74,21 +76,27 @@ export default function LearnerCommunities() {
           communityId: communityId ?? 'community',
           payload: { action }
         });
-        setStatusMessage({
-          type: 'success',
-          message: response?.message ?? 'Community action triggered.'
-        });
+        if (mounted.current) {
+          setStatusMessage({
+            type: 'success',
+            message: response?.message ?? 'Community action triggered.'
+          });
+        }
       } catch (actionError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            actionError instanceof Error ? actionError.message : 'We were unable to trigger that community action.'
-        });
+        if (mounted.current) {
+          setStatusMessage({
+            type: 'error',
+            message:
+              actionError instanceof Error ? actionError.message : 'We were unable to trigger that community action.'
+          });
+        }
       } finally {
-        setPendingAction(null);
+        if (mounted.current) {
+          setPendingAction(null);
+        }
       }
     },
-    [token]
+    [mounted, token]
   );
 
   const handleCreateInitiative = useCallback(() => {

@@ -6,6 +6,7 @@ import usePersistentCollection from '../../hooks/usePersistentCollection.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import useMountedRef from '../../hooks/useMountedRef.js';
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -17,6 +18,7 @@ export default function LearnerCourses() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const mounted = useMountedRef();
 
   const storageKey = useMemo(
     () => `edulure.learner.orders.v1:${session?.user?.id ?? 'anonymous'}`,
@@ -219,27 +221,33 @@ export default function LearnerCourses() {
         courseId: primaryCourse.id ?? primaryCourse.slug ?? 'course',
         payload: { target: 'Complete next module', dueDate: new Date().toISOString() }
       });
-      setStatusMessage({
-        type: 'success',
-        message: response?.message ?? 'Learning goal created.'
-      });
-      setActiveCourses((current) =>
-        current.map((course) =>
-          course.id === primaryCourse.id
-            ? { ...course, goalStatus: 'In progress', goalReference: response?.data?.reference }
-            : course
-        )
-      );
+      if (mounted.current) {
+        setStatusMessage({
+          type: 'success',
+          message: response?.message ?? 'Learning goal created.'
+        });
+        setActiveCourses((current) =>
+          current.map((course) =>
+            course.id === primaryCourse.id
+              ? { ...course, goalStatus: 'In progress', goalReference: response?.data?.reference }
+              : course
+          )
+        );
+      }
     } catch (goalError) {
-      setStatusMessage({
-        type: 'error',
-        message:
-          goalError instanceof Error ? goalError.message : 'We were unable to create your learning goal.'
-      });
+      if (mounted.current) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            goalError instanceof Error ? goalError.message : 'We were unable to create your learning goal.'
+        });
+      }
     } finally {
-      setPendingAction(null);
+      if (mounted.current) {
+        setPendingAction(null);
+      }
     }
-  }, [activeCourses, token]);
+  }, [activeCourses, mounted, setActiveCourses, token]);
 
   const handleSyncCalendar = useCallback(async () => {
     if (!token) {
@@ -252,20 +260,26 @@ export default function LearnerCourses() {
     try {
       const response = await exportTutorSchedule({ token });
       const url = response?.data?.meta?.downloadUrl ?? null;
-      setStatusMessage({
-        type: 'success',
-        message: url ? `Calendar export ready. Download from ${url}.` : 'Calendar sync prepared.'
-      });
+      if (mounted.current) {
+        setStatusMessage({
+          type: 'success',
+          message: url ? `Calendar export ready. Download from ${url}.` : 'Calendar sync prepared.'
+        });
+      }
     } catch (calendarError) {
-      setStatusMessage({
-        type: 'error',
-        message:
-          calendarError instanceof Error ? calendarError.message : 'We were unable to prepare your calendar sync.'
-      });
+      if (mounted.current) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            calendarError instanceof Error ? calendarError.message : 'We were unable to prepare your calendar sync.'
+        });
+      }
     } finally {
-      setPendingAction(null);
+      if (mounted.current) {
+        setPendingAction(null);
+      }
     }
-  }, [token]);
+  }, [mounted, token]);
 
   return (
     <div className="space-y-8">
