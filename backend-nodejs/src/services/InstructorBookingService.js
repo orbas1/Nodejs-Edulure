@@ -77,36 +77,45 @@ export default class InstructorBookingService {
   }
 
   static async listBookings(instructorUserId, { page = 1, perPage = 25, status, search } = {}) {
+    await this.resolveTutorProfile(instructorUserId);
     const offset = (page - 1) * perPage;
-    const [
-      items,
-      total,
-      statsTotal,
-      statsConfirmed,
-      statsRequested,
-      statsCompleted,
-      statsCancelled
-    ] = await Promise.all([
+
+    const [items, total, summary] = await Promise.all([
       TutorBookingModel.listForInstructor(instructorUserId, { status, search, limit: perPage, offset }),
       TutorBookingModel.countForInstructor(instructorUserId, { status, search }),
-      TutorBookingModel.countForInstructor(instructorUserId, { status: 'all', search: undefined }),
-      TutorBookingModel.countForInstructor(instructorUserId, { status: 'confirmed', search: undefined }),
-      TutorBookingModel.countForInstructor(instructorUserId, { status: 'requested', search: undefined }),
-      TutorBookingModel.countForInstructor(instructorUserId, { status: 'completed', search: undefined }),
-      TutorBookingModel.countForInstructor(instructorUserId, { status: 'cancelled', search: undefined })
+      TutorBookingModel.listForInstructor(instructorUserId, {
+        status: status ?? 'all',
+        search,
+        limit: null,
+        offset: 0
+      })
     ]);
 
-    const stats = {
-      total: statsTotal,
-      upcoming: statsConfirmed + statsRequested,
-      completed: statsCompleted,
-      cancelled: statsCancelled
-    };
+    const stats = summary.reduce(
+      (acc, booking) => {
+        acc.total += 1;
+        const bookingStatus = humaniseStatus(booking.status);
+        if (bookingStatus === 'confirmed' || bookingStatus === 'requested') {
+          acc.upcoming += 1;
+        } else if (bookingStatus === 'completed') {
+          acc.completed += 1;
+        } else if (bookingStatus === 'cancelled') {
+          acc.cancelled += 1;
+        }
+        return acc;
+      },
+      { total: 0, upcoming: 0, completed: 0, cancelled: 0 }
+    );
 
     return {
       items,
       pagination: buildPagination(page, perPage, total),
-      stats
+      stats: {
+        total: stats.total,
+        upcoming: stats.upcoming,
+        completed: stats.completed,
+        cancelled: stats.cancelled
+      }
     };
   }
 
