@@ -18,7 +18,7 @@ export default function SearchBar({
     const form = event.currentTarget;
     const formData = new FormData(form);
     const submittedValue = formData.get('search');
-    onSubmit(typeof submittedValue === 'string' ? submittedValue : '', event);
+    onSubmit(event, typeof submittedValue === 'string' ? submittedValue : '');
   };
 
   const inputProps = {
