@@ -23,12 +23,16 @@ const uploadSchema = Joi.object({
       if (!value) {
         return helpers.error('any.required');
       }
+
+      const hasTraversal = /(^|[\\/])\.\.(?:[\\/]|$)/.test(value);
+      if (hasTraversal) {
+        return helpers.error('string.pathTraversal');
+      }
+
       if (value.includes('/') || value.includes('\\')) {
         return helpers.error('string.path');
       }
-      if (value.includes('..')) {
-        return helpers.error('string.pathTraversal');
-      }
+
       return value;
     }, 'storage key filename sanitiser')
     .messages({

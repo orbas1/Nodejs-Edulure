@@ -339,7 +339,7 @@ async function main() {
 
   try {
     await executeRuntimeConfig(options);
-  } catch (error) {
+  } catch {
     process.exitCode = 1;
   } finally {
     await db.destroy();

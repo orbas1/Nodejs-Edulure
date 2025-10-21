@@ -10,7 +10,7 @@ function normaliseReferralCode(code) {
     throw new Error('referralCode is required');
   }
 
-  if (!/^[A-Z0-9\-]{3,60}$/.test(value)) {
+  if (!/^[A-Z0-9-]{3,60}$/.test(value)) {
     throw new Error('referralCode must contain only letters, numbers, or dashes');
   }
 
