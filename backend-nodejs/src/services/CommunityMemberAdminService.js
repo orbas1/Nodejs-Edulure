@@ -115,29 +115,26 @@ export default class CommunityMemberAdminService {
   static async listMembers(communityIdentifier, actorId, { status, role, search } = {}, { actorRole } = {}) {
     const { community } = await resolveCommunityForActor(communityIdentifier, actorId, actorRole);
     const members = await CommunityMemberModel.listByCommunity(community.id, { status, role });
-    let filtered = members;
-    if (search) {
-      const term = search.trim().toLowerCase();
-      filtered = members.filter((member) => {
-        const metadata = member.metadata ?? {};
-        return [metadata.title, metadata.location]
-          .concat(member.userId ? [String(member.userId)] : [])
-          .some((value) => (value ? String(value).toLowerCase().includes(term) : false));
-      });
+    const hydratedMembers = await hydrateMembers(members);
+    if (!search) {
+      return hydratedMembers;
     }
-    const hydrated = await hydrateMembers(filtered);
-    if (search) {
-      const term = search.trim().toLowerCase();
-      return hydrated.filter((member) => {
-        const matchUser = member.user?.email?.toLowerCase().includes(term) || member.user?.name?.toLowerCase().includes(term);
-        const metadata = member.metadata ?? {};
-        const metadataMatch = Object.values(metadata).some((value) =>
-          value ? String(value).toLowerCase().includes(term) : false
-        );
-        return matchUser || metadataMatch || String(member.userId ?? '').includes(term);
-      });
-    }
-    return hydrated;
+
+    const term = search.trim().toLowerCase();
+    return hydratedMembers.filter((member) => {
+      const metadata = member.metadata ?? {};
+      const metadataValues = Object.values(metadata).flatMap((value) =>
+        Array.isArray(value) ? value : value !== undefined && value !== null ? [value] : []
+      );
+      const metadataMatch = metadataValues.some((value) =>
+        String(value).toLowerCase().includes(term)
+      );
+      const userMatch = [member.user?.email, member.user?.name]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term));
+      const identifierMatch = member.userId != null && String(member.userId).includes(term);
+      return metadataMatch || userMatch || identifierMatch;
+    });
   }
 
   static async createMember(communityIdentifier, actorId, payload = {}, { actorRole } = {}) {

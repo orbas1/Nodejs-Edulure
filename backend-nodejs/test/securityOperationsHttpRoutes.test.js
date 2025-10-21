@@ -177,7 +177,7 @@ describe('Security operations HTTP routes', () => {
       expect.objectContaining({ riskId: 23, riskUuid: 'risk-uuid-23' })
     );
     expect(deleteRisk).toHaveBeenCalledWith(
-      expect.objectContaining({ riskId: 23, reason: null })
+      expect.objectContaining({ riskId: 23, reason: 'Duplicate entry resolved' })
     );
   });
 

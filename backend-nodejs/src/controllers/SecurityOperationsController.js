@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import createHttpError from 'http-errors';
 
 import securityOperationsService from '../services/SecurityOperationsService.js';
 
@@ -10,12 +11,61 @@ const deleteRiskSchema = Joi.object({
   reason: Joi.string().trim().max(240).allow('', null).default(null)
 });
 
-function handleValidationError(error, next) {
-  if (error.isJoi) {
-    error.status = 422;
-    error.details = error.details.map((detail) => detail.message);
+function resolveStatus(error, fallback = 500) {
+  if (!error || typeof error !== 'object') {
+    return fallback;
   }
-  return next(error);
+
+  const candidates = [error.status, error.statusCode, error.httpStatus, error.response?.status];
+  const resolved = candidates.find((value) => Number.isInteger(value));
+  return resolved ?? fallback;
+}
+
+function formatErrorMessage(error, fallback = 'Unexpected security operations error') {
+  if (typeof error?.message === 'string' && error.message.trim()) {
+    return error.message.trim();
+  }
+  if (typeof error?.response?.data?.message === 'string' && error.response.data.message.trim()) {
+    return error.response.data.message.trim();
+  }
+  return fallback;
+}
+
+function handleValidationError(error, res) {
+  if (!error?.isJoi) {
+    return false;
+  }
+
+  const details = Array.isArray(error.details)
+    ? error.details.map((detail) => detail.message ?? String(detail))
+    : [];
+
+  res.status(422).json({
+    success: false,
+    error: {
+      message: details[0] ?? 'Validation failed',
+      details
+    }
+  });
+
+  return true;
+}
+
+function handleControllerError(error, res, next) {
+  if (handleValidationError(error, res)) {
+    return true;
+  }
+
+  const status = resolveStatus(error);
+  const message = formatErrorMessage(error);
+
+  if (status >= 500) {
+    next(error);
+    return true;
+  }
+
+  res.status(status).json({ success: false, error: message });
+  return true;
 }
 
 function resolveActor(req) {
@@ -236,7 +286,7 @@ export default class SecurityOperationsController {
       });
       return res.json({ success: true, data: payload });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -286,7 +336,7 @@ export default class SecurityOperationsController {
       });
       return res.status(201).json({ success: true, data: record });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -313,7 +363,7 @@ export default class SecurityOperationsController {
       });
       return res.json({ success: true, data: updated });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -342,7 +392,7 @@ export default class SecurityOperationsController {
 
       return res.json({ success: true, data: result });
     } catch (error) {
-      return handleValidationError(error, next);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -374,7 +424,7 @@ export default class SecurityOperationsController {
       });
       return res.status(201).json({ success: true, data: payload });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -392,7 +442,7 @@ export default class SecurityOperationsController {
       });
       return res.json({ success: true, data: payload });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -429,7 +479,7 @@ export default class SecurityOperationsController {
       });
       return res.status(201).json({ success: true, data: evidence });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -446,7 +496,7 @@ export default class SecurityOperationsController {
       });
       return res.json({ success: true, data: payload });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -483,7 +533,7 @@ export default class SecurityOperationsController {
       });
       return res.status(201).json({ success: true, data: record });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -501,7 +551,7 @@ export default class SecurityOperationsController {
       });
       return res.json({ success: true, data: payload });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 
@@ -531,7 +581,7 @@ export default class SecurityOperationsController {
       });
       return res.status(201).json({ success: true, data: assessment });
     } catch (error) {
-      return next(error);
+      return handleControllerError(error, res, next);
     }
   }
 }

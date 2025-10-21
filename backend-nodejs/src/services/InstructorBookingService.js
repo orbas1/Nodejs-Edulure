@@ -79,13 +79,14 @@ async function resolveLearnerId({ email, firstName, lastName }, connection) {
 
 async function ensureNoScheduleConflicts(tutorId, start, end, connection, options = {}) {
   if (!tutorId || !start || !end) return;
-  const conflicts = await TutorBookingModel.findConflictingBookings(
-    tutorId,
-    start,
-    end,
-    { excludePublicId: options.excludePublicId },
-    connection
-  );
+  const conflicts =
+    (await TutorBookingModel.findConflictingBookings(
+      tutorId,
+      start,
+      end,
+      { excludePublicId: options.excludePublicId },
+      connection
+    )) ?? [];
   if (conflicts.length > 0) {
     const error = new Error('Tutor already has a booking in this timeframe');
     error.status = 409;
@@ -149,23 +150,51 @@ export default class InstructorBookingService {
     const { page: safePage, perPage: safePerPage } = sanitisePagination(page, perPage);
     const offset = (safePage - 1) * safePerPage;
 
-    const [items, total, summary] = await Promise.all([
+    const statusKeysForCounts = status
+      ? [status]
+      : ['all', 'confirmed', 'completed', 'cancelled', 'requested'];
+
+    const [items, summary, statusCounts, filteredCount] = await Promise.all([
       TutorBookingModel.listForInstructor(instructorUserId, {
         status,
         search,
         limit: safePerPage,
         offset
       }),
-      TutorBookingModel.countForInstructor(instructorUserId, { status, search }),
       TutorBookingModel.listForInstructor(instructorUserId, {
         status: status ?? 'all',
         search,
         limit: null,
         offset: 0
-      })
+      }),
+      Promise.all(
+        statusKeysForCounts.map((statusKey) =>
+          TutorBookingModel.countForInstructor(instructorUserId, { status: statusKey, search })
+        )
+      ),
+      TutorBookingModel.countForInstructor(instructorUserId, { status, search })
     ]);
 
+    const countMap = statusKeysForCounts.reduce((acc, key, index) => {
+      acc[key] = Number(statusCounts[index] ?? 0);
+      return acc;
+    }, {});
+
+    const total = Number(filteredCount ?? items.length);
     const stats = calculateStats(summary);
+
+    if (countMap.all !== undefined) {
+      stats.total = countMap.all;
+    }
+    if (countMap.confirmed !== undefined) {
+      stats.upcoming = countMap.confirmed;
+    }
+    if (countMap.completed !== undefined) {
+      stats.completed = countMap.completed;
+    }
+    if (countMap.cancelled !== undefined) {
+      stats.cancelled = countMap.cancelled;
+    }
 
     return {
       items,

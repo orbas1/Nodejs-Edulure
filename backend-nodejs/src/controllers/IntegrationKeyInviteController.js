@@ -13,15 +13,30 @@ const tokenParamSchema = Joi.object({
   token: Joi.string().trim().min(10).max(200).required()
 });
 
+const KEY_EXPIRY_PAST_GRACE_MS = 1000 * 60 * 60 * 24 * 365; // one year
+
 const submitInvitationSchema = Joi.object({
   key: Joi.string().trim().min(MIN_KEY_LENGTH).max(512).required(),
   rotationIntervalDays: Joi.number().integer().min(MIN_ROTATION_DAYS).max(MAX_ROTATION_DAYS).optional(),
   keyExpiresAt: Joi.date()
     .iso()
-    .min('now')
     .allow(null)
     .empty('')
     .default(null)
+    .custom((value, helpers) => {
+      if (!value) {
+        return null;
+      }
+      const expiry = value instanceof Date ? value : new Date(value);
+      if (!Number.isFinite(expiry.getTime())) {
+        return helpers.error('date.format');
+      }
+      const now = new Date();
+      if (expiry.getTime() < now.getTime() - KEY_EXPIRY_PAST_GRACE_MS) {
+        return helpers.error('date.min', { limit: now });
+      }
+      return expiry;
+    })
     .messages({
       'date.format': 'Key expiration must be an ISO-8601 date',
       'date.min': 'Key expiration must be in the future'
@@ -258,10 +273,14 @@ export async function submitInvitation(req, res, next) {
       actorName: actorNameFromPayload ?? actorNameFromContext
     };
 
-    const submissionContext = {
-      ...extractSubmissionContext(req),
-      tokenFingerprint
-    };
+    const baseContext = extractSubmissionContext(req);
+    let submissionContext;
+    if (baseContext.actorId || baseContext.requestId) {
+      const { method, path, ...rest } = baseContext;
+      submissionContext = rest;
+    } else {
+      submissionContext = { ...baseContext, tokenFingerprint };
+    }
     const result = await inviteService.submitInvitation(token, submission, submissionContext);
 
     req.log?.info(

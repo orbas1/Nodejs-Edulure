@@ -52,7 +52,7 @@ vi.mock('../src/models/UserProfileModel.js', () => ({
   default: mocks.userProfileModel
 }));
 
-vi.mock('bcrypt', () => mocks.bcrypt);
+vi.mock('bcryptjs', () => mocks.bcrypt);
 
 vi.mock('crypto', () => ({
   default: { randomBytes: mocks.crypto.randomBytes },
