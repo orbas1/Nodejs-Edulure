@@ -425,7 +425,11 @@ export class SecurityOperationsService {
     }
 
     const cleanedReason = typeof reason === 'string' ? reason.trim() : null;
-    const reasonForAudit = cleanedReason ? cleanedReason : null;
+    const normalisedStatus = typeof risk.status === 'string' ? risk.status.toLowerCase() : '';
+    const shouldPersistReason =
+      !!cleanedReason &&
+      ['accepted', 'mitigated', 'remediated', 'resolved', 'closed'].includes(normalisedStatus);
+    const reasonForAudit = shouldPersistReason ? cleanedReason : null;
 
     await this.repository.deleteRisk(riskId);
 

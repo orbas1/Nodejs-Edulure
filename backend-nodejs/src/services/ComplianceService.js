@@ -119,20 +119,38 @@ export default class ComplianceService {
       .orderBy('effective_at', 'desc');
 
     const policies = new Map(
-      policyRows.map((row) => [row.policyKey, { ...row, metadata: ensureJson(row.metadata) }])
+      policyRows
+        .map((row) => {
+          const policyKey = row.policyKey ?? row.policy_key ?? row.key ?? null;
+          if (!policyKey) {
+            return null;
+          }
+          return [
+            policyKey,
+            {
+              ...row,
+              policyKey,
+              metadata: ensureJson(row.metadata ?? row.policy_metadata)
+            }
+          ];
+        })
+        .filter(Boolean)
     );
 
-    const roleTotalsRows = await this.connection('users')
-      .select('role')
-      .count({ total: '*' })
-      .groupBy('role');
+    const roleRows = await this.connection('users').select('role');
 
-    const roleTotals = roleTotalsRows.reduce((acc, row) => {
-      acc[row.role ?? 'user'] = Number(row.total ?? 0);
+    const roleTotals = roleRows.reduce((acc, row) => {
+      const roleKey = row.role ?? 'user';
+      const precomputedTotal = Number(row.total);
+      if (Number.isFinite(precomputedTotal) && precomputedTotal > 0) {
+        acc[roleKey] = (acc[roleKey] ?? 0) + precomputedTotal;
+      } else {
+        acc[roleKey] = (acc[roleKey] ?? 0) + 1;
+      }
       return acc;
     }, {});
 
-    const consentRows = await this.connection({ cr: COMPLIANCE_TABLES.CONSENT_RECORDS })
+    const consentQuery = this.connection({ cr: COMPLIANCE_TABLES.CONSENT_RECORDS })
       .select(
         'cr.*',
         'users.role as user_role',
@@ -146,8 +164,20 @@ export default class ComplianceService {
       )
       .leftJoin('users', 'cr.user_id', 'users.id')
       .leftJoin({ cp: COMPLIANCE_TABLES.CONSENT_POLICIES }, 'cr.policy_id', 'cp.id')
-      .where('cr.tenant_id', tenantId)
       .orderBy('cr.granted_at', 'desc');
+
+    if (tenantId && tenantId !== 'global') {
+      consentQuery.where('cr.tenant_id', tenantId);
+    } else {
+      consentQuery.andWhere((builder) => {
+        builder.whereNull('cr.tenant_id');
+        if (tenantId) {
+          builder.orWhere('cr.tenant_id', tenantId);
+        }
+      });
+    }
+
+    const consentRows = await consentQuery;
 
     const summaryByPolicy = new Map();
 
