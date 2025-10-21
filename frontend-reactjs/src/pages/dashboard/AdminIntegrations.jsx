@@ -23,6 +23,7 @@ import {
   cancelIntegrationApiKeyInvitation
 } from '../../api/integrationAdminApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 
 const HEALTH_THEME = {
   operational: {
@@ -924,6 +925,7 @@ function ReconciliationPanel({ reconciliation }) {
 export default function AdminIntegrations() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
+  const isAdmin = session?.user?.role === 'admin';
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -954,8 +956,18 @@ export default function AdminIntegrations() {
   const [disableState, setDisableState] = useState({});
   const [inviteToast, setInviteToast] = useState(null);
 
+  if (!isAdmin) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Admin privileges required"
+        description="Only administrators can review integration health and manage API credentials."
+      />
+    );
+  }
+
   useEffect(() => {
-    if (!token) return undefined;
+    if (!token || !isAdmin) return undefined;
     const controller = new AbortController();
     setLoading(true);
     fetchIntegrationDashboard({ token, signal: controller.signal })
@@ -974,10 +986,10 @@ export default function AdminIntegrations() {
     return () => {
       controller.abort();
     };
-  }, [token, refreshToken]);
+  }, [token, refreshToken, isAdmin]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!token || !isAdmin) return undefined;
     const controller = new AbortController();
     setApiKeysLoading(true);
     listIntegrationApiKeys({ token, signal: controller.signal })
@@ -996,10 +1008,10 @@ export default function AdminIntegrations() {
     return () => {
       controller.abort();
     };
-  }, [token, apiKeyRefreshToken]);
+  }, [token, apiKeyRefreshToken, isAdmin]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!token || !isAdmin) return undefined;
     const controller = new AbortController();
     setInvitesLoading(true);
     listIntegrationApiKeyInvitations({ token, signal: controller.signal })
@@ -1018,7 +1030,7 @@ export default function AdminIntegrations() {
     return () => {
       controller.abort();
     };
-  }, [token, inviteRefreshToken]);
+  }, [token, inviteRefreshToken, isAdmin]);
 
   useEffect(() => {
     if (actionState.status === 'success' || actionState.status === 'error') {
@@ -1075,7 +1087,7 @@ export default function AdminIntegrations() {
   };
 
   const handleManualSync = async (integration) => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     setActionState({ integration, status: 'pending', message: null });
     try {
       await triggerIntegrationRun({ token, integration });
@@ -1097,7 +1109,7 @@ export default function AdminIntegrations() {
 
   const handleCreateSubmit = async (event) => {
     event.preventDefault();
-    if (!token) return;
+    if (!token || !isAdmin) return;
 
     const trimmedAlias = createForm.alias.trim();
     const trimmedOwner = createForm.ownerEmail.trim();
@@ -1269,7 +1281,7 @@ export default function AdminIntegrations() {
   };
 
   const handleDisable = async (record) => {
-    if (!token || record.status === 'disabled') {
+    if (!token || !isAdmin || record.status === 'disabled') {
       return;
     }
     if (disableState[record.id] === 'pending') {
@@ -1296,7 +1308,7 @@ export default function AdminIntegrations() {
   };
 
   const handleInviteResend = async (invite) => {
-    if (!token) {
+    if (!token || !isAdmin) {
       return;
     }
     setInviteToast(null);
@@ -1318,7 +1330,7 @@ export default function AdminIntegrations() {
   };
 
   const handleInviteCancel = async (invite) => {
-    if (!token) {
+    if (!token || !isAdmin) {
       return;
     }
     const confirmed = typeof window === 'undefined'

@@ -9,6 +9,9 @@ import AdminBookingsSection from '../AdminBookingsSection.jsx';
 import AdminGrowthSection from '../AdminGrowthSection.jsx';
 import AdminRevenueManagementSection from '../AdminRevenueManagementSection.jsx';
 import AdminAdsManagementSection from '../AdminAdsManagementSection.jsx';
+import AdminTopCommunitiesSection from '../AdminTopCommunitiesSection.jsx';
+import AdminUpcomingLaunchesSection from '../AdminUpcomingLaunchesSection.jsx';
+import AdminToolsSection from '../AdminToolsSection.jsx';
 import adminGrowthApi from '../../../../api/adminGrowthApi.js';
 import adminRevenueApi from '../../../../api/adminRevenueApi.js';
 import adminAdsApi from '../../../../api/adminAdsApi.js';
@@ -332,5 +335,115 @@ describe('Admin operational sections', () => {
     await waitFor(() => {
       expect(adminAdsApi.getAdsSummary).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('normalises top communities table values and fallbacks', () => {
+    const communities = [
+      { id: 'ops', name: 'Ops Guild', revenue: 125000, currency: 'USD', subscribers: 1234, share: 45.25 },
+      { id: 'growth', name: null, revenue: null, subscribers: null, share: null }
+    ];
+
+    render(<AdminTopCommunitiesSection sectionId="communities" communities={communities} />);
+
+    expect(screen.getByText('Ops Guild')).toBeInTheDocument();
+    expect(screen.getByText('$125,000')).toBeInTheDocument();
+    expect(screen.getByText('1,234')).toBeInTheDocument();
+    expect(screen.getByText('45.3%')).toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('formats upcoming launches with derived schedule metadata', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-11-01T12:00:00Z'));
+
+    const launches = [
+      {
+        id: 'launch-1',
+        title: 'Instructor Kickoff',
+        community: 'Growth Ops',
+        startAt: '2024-11-03T12:00:00Z'
+      },
+      { id: 'launch-2', title: 'Monetisation Briefing', community: null }
+    ];
+
+    render(<AdminUpcomingLaunchesSection sectionId="launches" launches={launches} />);
+
+    expect(screen.getByText('Instructor Kickoff')).toBeInTheDocument();
+    expect(screen.getByText(/in 48 hours/i)).toBeInTheDocument();
+    expect(screen.getByText('Monetisation Briefing')).toBeInTheDocument();
+    expect(screen.getByText('Date TBC')).toBeInTheDocument();
+    expect(screen.getByText('Schedule pending')).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it('renders tooling lifecycle telemetry with resilient fallbacks', () => {
+    const toolsPayload = {
+      summary: {
+        cards: [
+          { id: 'occupancy', label: 'Occupancy', value: null, helper: 'Across active rentals' }
+        ],
+        meta: { occupancy: '74%', pipelineValue: '$12k', lastAudit: '3 days ago' }
+      },
+      listing: [
+        {
+          id: 'tool-1',
+          name: null,
+          status: null,
+          lifecycleStage: null,
+          category: null,
+          owner: null,
+          availableUnits: null,
+          totalCapacity: null,
+          adoptionVelocity: null,
+          demandLevel: null,
+          healthScore: null,
+          rentalContracts: null,
+          value: null,
+          lastAudit: null
+        }
+      ],
+      sales: {
+        metrics: { pipelineValue: '$12k', winRate: '42%' },
+        pipeline: [{ id: 'stage-1', stage: null, deals: null, velocity: null, value: null, conversion: null }],
+        forecast: { committed: '$8k' }
+      },
+      rental: {
+        metrics: {},
+        active: [
+          {
+            id: 'rent-1',
+            tool: null,
+            lessee: null,
+            value: null,
+            utilisation: null,
+            startAt: null,
+            endAt: null,
+            status: null,
+            remaining: null
+          }
+        ],
+        utilisation: { topPerformers: [{ id: 'top-1', tool: null, utilisation: null }] },
+        expiring: [{ id: 'exp-1', tool: null, owner: null, expiresAt: null, remaining: null }]
+      },
+      management: {
+        maintenance: [{ id: 'maint-1', tool: null, owner: null, severity: null, status: null, updated: null }],
+        audits: [{ id: 'audit-1', title: null, owner: null, status: null, dueAt: null }],
+        governance: {}
+      },
+      finalisation: {
+        readinessScore: null,
+        checklist: [{ id: 'check-1', label: null, owner: null, status: null }],
+        communications: [{ id: 'comm-1', channel: null, audience: null, status: null }],
+        pipeline: [{ id: 'pipe-1', tool: null, owner: null, stage: null, eta: null }]
+      }
+    };
+
+    render(<AdminToolsSection sectionId="tools" tools={toolsPayload} />);
+
+    expect(screen.getByText('Untitled tool')).toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getByText(/No active deals/i)).toBeInTheDocument();
+    expect(screen.getByText(/ETA TBC/i)).toBeInTheDocument();
   });
 });

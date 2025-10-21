@@ -14,10 +14,20 @@ import {
 export default function AdminControl() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const isAdmin = session?.user?.role === 'admin';
   const [activeTab, setActiveTab] = useState('communities');
 
   const resourceConfigs = useMemo(() => createAdminControlResourceConfigs(), []);
 
+  if (!isAdmin) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Admin privileges required"
+        description="Switch to an administrator Learnspace or request elevated permissions to manage operational resources."
+      />
+    );
+  }
 
   if (!token) {
     return (

@@ -18,7 +18,7 @@ function SummaryCards({ cards, meta }) {
             className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm transition hover:border-primary/40 hover:shadow-card"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">{card.label}</p>
-            <p className="mt-3 text-2xl font-semibold text-slate-900">{card.value}</p>
+            <p className="mt-3 text-2xl font-semibold text-slate-900">{card.value ?? '—'}</p>
             {card.helper ? <p className="mt-2 text-xs text-slate-500">{card.helper}</p> : null}
           </article>
         ))}
@@ -86,50 +86,51 @@ function ToolsListing({ listing }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-lg font-semibold text-slate-900">{tool.name}</h3>
+                <h3 className="text-lg font-semibold text-slate-900">{tool.name ?? 'Untitled tool'}</h3>
                 <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-                  {tool.status}
+                  {tool.status ?? 'Planned'}
                 </span>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  {tool.lifecycleStage}
+                  {tool.lifecycleStage ?? 'Unassigned'}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                {tool.category} • Stewarded by <span className="font-semibold text-slate-700">{tool.owner}</span>
+                {(tool.category ?? 'Platform tooling')} • Stewarded by{' '}
+                <span className="font-semibold text-slate-700">{tool.owner ?? 'TBC'}</span>
               </p>
               {tool.ownerEmail ? <p className="text-xs text-slate-400">{tool.ownerEmail}</p> : null}
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold text-slate-900">{tool.utilisation}</p>
+              <p className="text-sm font-semibold text-slate-900">{tool.utilisation ?? '—'}</p>
               <p className="text-xs text-slate-500">
-                Available units {tool.availableUnits} / {tool.totalCapacity}
+                Available units {tool.availableUnits ?? '—'} / {tool.totalCapacity ?? '—'}
               </p>
             </div>
           </div>
           <dl className="mt-4 grid gap-3 text-xs text-slate-500 sm:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-xl bg-slate-100/70 px-3 py-2">
               <dt className="font-semibold text-slate-600">Adoption velocity</dt>
-              <dd className="mt-1 text-slate-900">{tool.adoptionVelocity}</dd>
+              <dd className="mt-1 text-slate-900">{tool.adoptionVelocity ?? '—'}</dd>
             </div>
             <div className="rounded-xl bg-slate-100/70 px-3 py-2">
               <dt className="font-semibold text-slate-600">Demand signal</dt>
-              <dd className="mt-1 text-slate-900">{tool.demandLevel}</dd>
+              <dd className="mt-1 text-slate-900">{tool.demandLevel ?? '—'}</dd>
             </div>
             <div className="rounded-xl bg-slate-100/70 px-3 py-2">
               <dt className="font-semibold text-slate-600">Lifecycle health</dt>
-              <dd className="mt-1 text-slate-900">{tool.healthScore}</dd>
+              <dd className="mt-1 text-slate-900">{tool.healthScore ?? '—'}</dd>
             </div>
             <div className="rounded-xl bg-slate-100/70 px-3 py-2">
               <dt className="font-semibold text-slate-600">Active contracts</dt>
-              <dd className="mt-1 text-slate-900">{tool.rentalContracts}</dd>
+              <dd className="mt-1 text-slate-900">{tool.rentalContracts ?? '—'}</dd>
             </div>
             <div className="rounded-xl bg-slate-100/70 px-3 py-2">
               <dt className="font-semibold text-slate-600">Projected value</dt>
-              <dd className="mt-1 text-slate-900">{tool.value}</dd>
+              <dd className="mt-1 text-slate-900">{tool.value ?? '—'}</dd>
             </div>
             <div className="rounded-xl bg-slate-100/70 px-3 py-2">
               <dt className="font-semibold text-slate-600">Last audit</dt>
-              <dd className="mt-1 text-slate-900">{tool.lastAudit}</dd>
+              <dd className="mt-1 text-slate-900">{tool.lastAudit ?? '—'}</dd>
             </div>
           </dl>
         </article>
@@ -149,14 +150,14 @@ ToolsListing.propTypes = {
       owner: PropTypes.string,
       ownerEmail: PropTypes.string,
       utilisation: PropTypes.string,
-      availableUnits: PropTypes.string,
-      totalCapacity: PropTypes.string,
-      adoptionVelocity: PropTypes.string,
-      demandLevel: PropTypes.string,
-      lastAudit: PropTypes.string,
-      healthScore: PropTypes.string,
-      rentalContracts: PropTypes.string,
-      value: PropTypes.string
+      availableUnits: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      totalCapacity: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      adoptionVelocity: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      demandLevel: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      lastAudit: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      healthScore: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      rentalContracts: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      value: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
     })
   )
 };
@@ -176,7 +177,7 @@ function SalesInsights({ sales }) {
     { id: 'averageDealSize', label: 'Avg. deal size', value: metrics.averageDealSize },
     { id: 'cycleTime', label: 'Sales cycle', value: metrics.cycleTime },
     { id: 'renewalRate', label: 'Renewal rate', value: metrics.renewalRate }
-  ].filter((entry) => entry.value);
+  ].filter((entry) => entry.value !== undefined && entry.value !== null && entry.value !== '');
 
   return (
     <div className="space-y-5">
@@ -202,12 +203,14 @@ function SalesInsights({ sales }) {
                 className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">{stage.stage}</p>
-                  <p className="mt-1 text-xs text-slate-500">{stage.deals} deals • {stage.velocity}</p>
+                  <p className="text-sm font-semibold text-slate-900">{stage.stage ?? 'Stage pending'}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {stage.deals ? `${stage.deals} deals` : 'No active deals'} • {stage.velocity ?? 'Velocity TBC'}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-900">{stage.value}</p>
-                  <p className="mt-1 text-xs text-primary">Conversion {stage.conversion}</p>
+                  <p className="text-sm font-semibold text-slate-900">{stage.value ?? '—'}</p>
+                  <p className="mt-1 text-xs text-primary">Conversion {stage.conversion ?? '—'}</p>
                 </div>
               </li>
             ))
@@ -290,18 +293,18 @@ function RentalOverview({ rental }) {
               >
                 <div className="flex flex-col gap-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{record.tool}</p>
-                    <p className="mt-1 text-slate-500">Lessee • {record.lessee}</p>
+                    <p className="text-sm font-semibold text-slate-900">{record.tool ?? 'Unnamed tool'}</p>
+                    <p className="mt-1 text-slate-500">Lessee • {record.lessee ?? 'Unassigned'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-slate-900">{record.value}</p>
-                    <p className="mt-1 text-slate-500">Utilisation {record.utilisation}</p>
+                    <p className="text-sm font-semibold text-slate-900">{record.value ?? '—'}</p>
+                    <p className="mt-1 text-slate-500">Utilisation {record.utilisation ?? '—'}</p>
                   </div>
                 </div>
                 <div className="mt-3 grid gap-2 text-[11px] text-slate-500 sm:grid-cols-3">
-                  <span>Start {record.startAt}</span>
-                  <span>End {record.endAt}</span>
-                  <span>Status {record.status} • {record.remaining}</span>
+                  <span>Start {record.startAt ?? 'TBC'}</span>
+                  <span>End {record.endAt ?? 'TBC'}</span>
+                  <span>Status {record.status ?? 'Scheduled'} • {record.remaining ?? '—'}</span>
                 </div>
               </li>
             ))
@@ -315,8 +318,8 @@ function RentalOverview({ rental }) {
             {Array.isArray(utilisation.topPerformers) && utilisation.topPerformers.length > 0 ? (
               utilisation.topPerformers.map((entry) => (
                 <li key={entry.id} className="flex items-center justify-between rounded-xl bg-white/90 px-3 py-2 shadow-sm">
-                  <span className="font-semibold text-slate-700">{entry.tool}</span>
-                  <span className="text-primary">{entry.utilisation}</span>
+                  <span className="font-semibold text-slate-700">{entry.tool ?? '—'}</span>
+                  <span className="text-primary">{entry.utilisation ?? '—'}</span>
                 </li>
               ))
             ) : (
@@ -337,12 +340,12 @@ function RentalOverview({ rental }) {
               expiring.map((entry) => (
                 <li key={entry.id} className="flex items-center justify-between rounded-xl bg-white/90 px-3 py-2 shadow-sm">
                   <div>
-                    <p className="font-semibold text-slate-700">{entry.tool}</p>
-                    <p className="text-[11px] text-slate-500">Owner {entry.owner}</p>
+                    <p className="font-semibold text-slate-700">{entry.tool ?? '—'}</p>
+                    <p className="text-[11px] text-slate-500">Owner {entry.owner ?? '—'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-slate-700">{entry.expiresAt}</p>
-                    <p className="text-[11px] text-primary">{entry.remaining}</p>
+                    <p className="font-semibold text-slate-700">{entry.expiresAt ?? 'Date TBC'}</p>
+                    <p className="text-[11px] text-primary">{entry.remaining ?? '—'}</p>
                   </div>
                 </li>
               ))
@@ -385,12 +388,12 @@ function ManagementPanel({ management }) {
             maintenance.map((ticket) => (
               <li key={ticket.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm">
                 <div>
-                  <p className="font-semibold text-slate-700">{ticket.tool}</p>
-                  <p className="text-[11px] text-slate-500">Owner {ticket.owner}</p>
+                  <p className="font-semibold text-slate-700">{ticket.tool ?? '—'}</p>
+                  <p className="text-[11px] text-slate-500">Owner {ticket.owner ?? '—'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{ticket.severity} priority</p>
-                  <p className="text-[11px] text-slate-500">{ticket.status} • {ticket.updated}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{ticket.severity ?? 'Normal'} priority</p>
+                  <p className="text-[11px] text-slate-500">{ticket.status ?? 'Scheduled'} • {ticket.updated ?? '—'}</p>
                 </div>
               </li>
             ))
@@ -408,11 +411,11 @@ function ManagementPanel({ management }) {
             audits.map((audit) => (
               <li key={audit.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm">
                 <div>
-                  <p className="font-semibold text-slate-700">{audit.title}</p>
-                  <p className="text-[11px] text-slate-500">Owner {audit.owner}</p>
+                  <p className="font-semibold text-slate-700">{audit.title ?? 'Audit milestone'}</p>
+                  <p className="text-[11px] text-slate-500">Owner {audit.owner ?? '—'}</p>
                 </div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{audit.status}</p>
-                <p className="text-[11px] text-slate-500">Due {audit.dueAt}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{audit.status ?? 'Planned'}</p>
+                <p className="text-[11px] text-slate-500">Due {audit.dueAt ?? 'TBC'}</p>
               </li>
             ))
           )}
@@ -487,10 +490,10 @@ function FinalisationPanel({ finalisation }) {
               checklist.map((item) => (
                 <li key={item.id} className="flex items-center justify-between rounded-xl bg-white/95 px-3 py-2 shadow-sm">
                   <div>
-                    <p className="font-semibold text-slate-700">{item.label}</p>
-                    <p className="text-[11px] text-slate-500">Owner {item.owner}</p>
+                    <p className="font-semibold text-slate-700">{item.label ?? 'Checklist item'}</p>
+                    <p className="text-[11px] text-slate-500">Owner {item.owner ?? '—'}</p>
                   </div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{item.status}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{item.status ?? 'Draft'}</p>
                 </li>
               ))
             )}
@@ -507,10 +510,10 @@ function FinalisationPanel({ finalisation }) {
               communications.map((item) => (
                 <li key={item.id} className="flex items-center justify-between rounded-xl bg-white/95 px-3 py-2 shadow-sm">
                   <div>
-                    <p className="font-semibold text-slate-700">{item.channel}</p>
-                    <p className="text-[11px] text-slate-500">Audience {item.audience}</p>
+                    <p className="font-semibold text-slate-700">{item.channel ?? 'Channel TBC'}</p>
+                    <p className="text-[11px] text-slate-500">Audience {item.audience ?? '—'}</p>
                   </div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{item.status}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{item.status ?? 'Draft'}</p>
                 </li>
               ))
             )}
@@ -525,18 +528,18 @@ function FinalisationPanel({ finalisation }) {
               No tooling suites in finalisation.
             </li>
           ) : (
-            pipeline.map((item) => (
-              <li key={item.id} className="flex flex-col gap-1 rounded-xl bg-slate-50/80 px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-semibold text-slate-700">{item.tool}</p>
-                  <p className="text-[11px] text-slate-500">Owner {item.owner}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{item.stage}</p>
-                  <p className="text-[11px] text-slate-500">ETA {item.eta}</p>
-                </div>
-              </li>
-            ))
+              pipeline.map((item) => (
+                <li key={item.id} className="flex flex-col gap-1 rounded-xl bg-slate-50/80 px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-700">{item.tool ?? '—'}</p>
+                    <p className="text-[11px] text-slate-500">Owner {item.owner ?? '—'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{item.stage ?? 'Planned'}</p>
+                    <p className="text-[11px] text-slate-500">ETA {item.eta ?? 'TBC'}</p>
+                  </div>
+                </li>
+              ))
           )}
         </ul>
       </div>

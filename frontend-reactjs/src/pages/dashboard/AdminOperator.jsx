@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 import { useAuth } from '../../context/AuthContext.jsx';
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useDashboard } from '../../context/DashboardContext.jsx';
 import { useServiceHealth } from '../../context/ServiceHealthContext.jsx';
 import {
@@ -141,6 +142,7 @@ export default function AdminOperator() {
   const operatorDashboard = dashboards?.admin?.operator;
   const numberFormatter = useMemo(() => new Intl.NumberFormat('en-US'), []);
   const token = session?.tokens?.accessToken ?? null;
+  const isAdmin = session?.user?.role === 'admin';
 
   const [riskRecords, setRiskRecords] = useState([]);
   const [riskSummary, setRiskSummary] = useState(() => normalizeRiskSummary());
@@ -162,8 +164,18 @@ export default function AdminOperator() {
     [statusTotals]
   );
 
+  if (!isAdmin) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Admin privileges required"
+        description="Switch to an administrator Learnspace to manage risk operations and continuity programs."
+      />
+    );
+  }
+
   useEffect(() => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     let isMounted = true;
     const controller = new AbortController();
     setRiskLoading(true);
@@ -195,10 +207,10 @@ export default function AdminOperator() {
       isMounted = false;
       controller.abort();
     };
-  }, [token, riskFilters.status, riskFilters.severity]);
+  }, [token, riskFilters.status, riskFilters.severity, isAdmin]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     let isMounted = true;
     const controller = new AbortController();
     fetchContinuityExercises({ token, params: { limit: 10 }, signal: controller.signal })
@@ -214,10 +226,10 @@ export default function AdminOperator() {
       isMounted = false;
       controller.abort();
     };
-  }, [token]);
+  }, [token, isAdmin]);
 
   const refreshRiskRegister = async () => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     try {
       const params = {
         limit: 20,
@@ -234,7 +246,7 @@ export default function AdminOperator() {
   };
 
   const refreshContinuity = async () => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     try {
       const payload = await fetchContinuityExercises({ token, params: { limit: 10 } });
       setContinuityRecords(Array.isArray(payload?.items) ? payload.items : payload ?? []);
@@ -250,7 +262,7 @@ export default function AdminOperator() {
 
   const handleRiskCreate = async (event) => {
     event.preventDefault();
-    if (!token) return;
+    if (!token || !isAdmin) return;
     const title = riskDraft.title.trim();
     const description = riskDraft.description.trim();
     if (!title || !description) {
@@ -312,7 +324,7 @@ export default function AdminOperator() {
 
   const handleStatusSubmit = async (event) => {
     event.preventDefault();
-    if (!token || !statusDraft.riskId) return;
+    if (!token || !isAdmin || !statusDraft.riskId) return;
     setStatusDraft((prev) => ({ ...prev, submitting: true, message: '' }));
     try {
       if (statusDraft.mode === 'status') {
@@ -361,7 +373,7 @@ export default function AdminOperator() {
 
   const handleContinuitySubmit = async (event) => {
     event.preventDefault();
-    if (!token) return;
+    if (!token || !isAdmin) return;
     const scenarioKey = continuityDraft.scenarioKey.trim();
     const scenarioSummary = continuityDraft.scenarioSummary.trim();
     if (!scenarioKey || !scenarioSummary) {

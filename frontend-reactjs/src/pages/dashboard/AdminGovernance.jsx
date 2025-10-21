@@ -80,13 +80,14 @@ function DsrRequestRow({ request, onStatusChange }) {
 export default function AdminGovernance() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
+  const isAdmin = session?.user?.role === 'admin';
   const [queue, setQueue] = useState({ data: [], total: 0, overdue: 0 });
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     let isMounted = true;
     const controller = new AbortController();
     setLoading(true);
@@ -113,10 +114,10 @@ export default function AdminGovernance() {
       isMounted = false;
       controller.abort();
     };
-  }, [token]);
+  }, [token, isAdmin]);
 
   const handleStatusChange = async (requestId, status) => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     try {
       await updateDsrStatus({ token, requestId, status });
       const updated = await fetchDsrQueue({ token });
@@ -149,6 +150,19 @@ export default function AdminGovernance() {
     ],
     [queue.total, queue.overdue, policies.length]
   );
+
+  if (!isAdmin) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
+          <p className="text-lg font-semibold">Admin privileges required</p>
+          <p className="mt-2 text-sm">
+            You need an administrator Learnspace to review governance posture and DSR queues.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
