@@ -23,26 +23,26 @@
 20. `backend-nodejs/test/integrationOrchestratorService.test.js` – HubSpot sync hits MySQL connection refusals.
 
 #### Group 2 (Items 21-40)
-21. `backend-nodejs/test/learnerDashboardHttpRoutes.test.js` – suite failed without message.
-22. `backend-nodejs/test/mediaUploadHttpRoutes.test.js` – traversal validation not triggered.
-23. `backend-nodejs/test/observabilityContracts.test.js` – suite failed without message.
-24. `backend-nodejs/test/observabilityHttpRoutes.test.js` – suite failed without message.
-25. `backend-nodejs/test/openApiContracts.test.js` – suite failed without message.
-26. `backend-nodejs/test/paymentsWebhookHttpRoutes.test.js` – `deepMerge` identifier redeclared.
-27. `backend-nodejs/test/platformSettingsAdminSettings.test.js` – `deepMerge` identifier redeclared.
-28. `backend-nodejs/test/platformSettingsService.test.js` – `deepMerge` identifier redeclared.
-29. `backend-nodejs/test/providerTransitionHttpRoutes.test.js` – `deepMerge` identifier redeclared.
-30. `backend-nodejs/test/providerTransitionService.test.js` – vi.mock hoisting error around `PlatformSettingsService`.
-31. `backend-nodejs/test/releaseHttpRoutes.test.js` – suite failed without message.
-32. `backend-nodejs/test/socialGraphHttpRoutes.test.js` – `deepMerge` identifier redeclared.
-33. `backend-nodejs/test/telemetryHttpRoutes.test.js` – suite failed without message.
-34. `backend-nodejs/test/userHttpRoutes.test.js` – pagination meta assertion mismatch.
-35. `backend-nodejs/test/userService.test.js` – missing `bcrypt` dependency.
-36. `backend-nodejs/test/release/releaseReadiness.test.js` – `deepMerge` identifier redeclared.
-37. `backend-nodejs/test/routes/routeMetadata.test.js` – `deepMerge` identifier redeclared.
-38. `backend-nodejs/scripts/generate-erd.js:4:1` – duplicate `node:fs` import.
-39. `backend-nodejs/scripts/runtime-config.js:342:12` – unused `error` catch variable.
-40. `backend-nodejs/scripts/wait-for-db.js:391:12` – unused `error` catch variable.
+21. ✅ `backend-nodejs/test/learnerDashboardHttpRoutes.test.js` – suite failed without message.
+22. ✅ `backend-nodejs/test/mediaUploadHttpRoutes.test.js` – traversal validation not triggered.
+23. ✅ `backend-nodejs/test/observabilityContracts.test.js` – suite failed without message.
+24. ✅ `backend-nodejs/test/observabilityHttpRoutes.test.js` – suite failed without message.
+25. ✅ `backend-nodejs/test/openApiContracts.test.js` – suite failed without message.
+26. ✅ `backend-nodejs/test/paymentsWebhookHttpRoutes.test.js` – `deepMerge` identifier redeclared.
+27. ✅ `backend-nodejs/test/platformSettingsAdminSettings.test.js` – `deepMerge` identifier redeclared.
+28. ✅ `backend-nodejs/test/platformSettingsService.test.js` – `deepMerge` identifier redeclared.
+29. ✅ `backend-nodejs/test/providerTransitionHttpRoutes.test.js` – `deepMerge` identifier redeclared.
+30. ✅ `backend-nodejs/test/providerTransitionService.test.js` – vi.mock hoisting error around `PlatformSettingsService`.
+31. ✅ `backend-nodejs/test/releaseHttpRoutes.test.js` – suite failed without message.
+32. ✅ `backend-nodejs/test/socialGraphHttpRoutes.test.js` – `deepMerge` identifier redeclared.
+33. ✅ `backend-nodejs/test/telemetryHttpRoutes.test.js` – suite failed without message.
+34. ✅ `backend-nodejs/test/userHttpRoutes.test.js` – pagination meta assertion mismatch.
+35. ✅ `backend-nodejs/test/userService.test.js` – missing `bcrypt` dependency.
+36. ✅ `backend-nodejs/test/release/releaseReadiness.test.js` – `deepMerge` identifier redeclared.
+37. ✅ `backend-nodejs/test/routes/routeMetadata.test.js` – `deepMerge` identifier redeclared.
+38. ✅ `backend-nodejs/scripts/generate-erd.js:4:1` – duplicate `node:fs` import.
+39. ✅ `backend-nodejs/scripts/runtime-config.js:342:12` – unused `error` catch variable.
+40. ✅ `backend-nodejs/scripts/wait-for-db.js:391:12` – unused `error` catch variable.
 
 #### Group 3 (Items 41-60)
 41. `backend-nodejs/scripts/wait-for-db.js:590:46` – unused `env` argument.

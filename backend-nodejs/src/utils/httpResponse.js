@@ -108,6 +108,17 @@ export function paginated(
   { data, pagination, message, status = DEFAULT_SUCCESS_STATUS, meta = {}, headers, code }
 ) {
   const safePagination = pagination && typeof pagination === 'object' ? pagination : {};
+  const paginationMeta = Object.fromEntries(
+    Object.entries({
+      limit: safePagination.limit,
+      offset: safePagination.offset,
+      page: safePagination.page,
+      perPage: safePagination.perPage,
+      total: safePagination.total,
+      totalPages: safePagination.totalPages
+    }).filter(([, value]) => value !== undefined && value !== null)
+  );
+
   return success(res, {
     data,
     message,
@@ -116,12 +127,7 @@ export function paginated(
     code,
     meta: {
       ...meta,
-      pagination: {
-        page: safePagination.page ?? 1,
-        perPage: safePagination.perPage ?? safePagination.limit ?? null,
-        total: safePagination.total ?? null,
-        totalPages: safePagination.totalPages ?? null
-      }
+      ...(Object.keys(paginationMeta).length ? { pagination: paginationMeta } : {})
     }
   });
 }
