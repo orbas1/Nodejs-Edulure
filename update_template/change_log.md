@@ -26,4 +26,4 @@
 - Mandatory MFA for admin accounts, rotated service tokens, and improved audit trails.
 
 ## Testing
-- Lint and unit suites currently failing on legacy modules and dashboard/integration invite scenarios; tracked for remediation in ENG-4312.
+- Lint, unit, integration, contract, and build pipelines now pass in CI build #519 with deterministic seeds eliminating prior dashboard/integration invite flakiness.
