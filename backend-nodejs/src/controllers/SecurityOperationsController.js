@@ -113,6 +113,27 @@ export default class SecurityOperationsController {
     }
   }
 
+  static async deleteRisk(req, res, next) {
+    try {
+      const tenantId = resolveTenant(req);
+      const actor = resolveActor(req);
+      const { riskId } = req.params;
+      const reason = req.body?.reason ?? req.query?.reason ?? null;
+
+      const result = await securityOperationsService.deleteRisk({
+        riskId: Number(riskId),
+        tenantId,
+        reason,
+        actor,
+        requestContext: resolveRequestContext(req)
+      });
+
+      return res.json({ success: true, data: result });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async recordRiskReview(req, res, next) {
     try {
       const tenantId = resolveTenant(req);
