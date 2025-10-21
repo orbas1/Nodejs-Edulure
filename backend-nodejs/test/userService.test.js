@@ -1,177 +1,110 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => {
-  const db = vi.fn();
-  db.transaction = vi.fn();
-  const trx = {};
-
-  return {
-    db,
-    trx,
-    userModel: {
-      list: vi.fn(),
-      findById: vi.fn(),
-      findByEmail: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn()
-    },
-    domainEventModel: {
-      record: vi.fn()
-    },
-    bcrypt: {
-      default: {
-        hash: vi.fn()
-      }
-    },
-    crypto: {
-      randomBytes: vi.fn()
-    }
-  };
-});
+const transactionMock = vi.hoisted(() => vi.fn());
+const userModel = vi.hoisted(() => ({
+  list: vi.fn(),
+  findById: vi.fn(),
+  updateById: vi.fn()
+}));
+const userProfileModel = vi.hoisted(() => ({
+  findByUserId: vi.fn(),
+  upsert: vi.fn()
+}));
 
 vi.mock('../src/config/database.js', () => ({
-  default: mocks.db
+  default: { transaction: transactionMock }
 }));
 
 vi.mock('../src/models/UserModel.js', () => ({
-  default: mocks.userModel
+  default: userModel
 }));
 
-vi.mock('../src/models/DomainEventModel.js', () => ({
-  default: mocks.domainEventModel
+vi.mock('../src/models/UserProfileModel.js', () => ({
+  default: userProfileModel
 }));
-
-vi.mock('bcrypt', () => mocks.bcrypt);
-
-vi.mock('crypto', () => ({
-  default: { randomBytes: mocks.crypto.randomBytes },
-  randomBytes: mocks.crypto.randomBytes
-}));
-
-const { db, trx, userModel, domainEventModel, bcrypt, crypto } = mocks;
 
 import UserService from '../src/services/UserService.js';
 
 describe('UserService', () => {
+  const trxStub = {
+    fn: { now: () => new Date() }
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    db.transaction.mockImplementation(async (handler) => handler(trx));
-    crypto.randomBytes.mockReturnValue({ toString: () => 'TempPass123' });
-    bcrypt.default.hash.mockResolvedValue('hashed-password');
+    transactionMock.mockImplementation(async (handler) => handler(trxStub));
   });
 
-  it('creates new users with generated passwords and emits domain events', async () => {
-    userModel.findByEmail.mockResolvedValue(null);
-    userModel.create.mockResolvedValue({
-      id: 1,
-      firstName: 'Alex',
-      lastName: null,
-      email: 'alex@example.com',
-      role: 'user'
+  it('returns a composed user profile when found', async () => {
+    userModel.findById.mockResolvedValueOnce({ id: 7, address: '{"city":"Paris"}' });
+    userProfileModel.findByUserId.mockResolvedValueOnce({
+      id: 12,
+      displayName: 'Learner',
+      socialLinks: JSON.stringify([{ label: 'LinkedIn', url: 'https://linkedin.com/in/test' }]),
+      metadata: JSON.stringify({ locale: 'fr' })
     });
 
-    const result = await UserService.create(
-      {
-        firstName: ' Alex ',
-        email: 'alex@example.com',
-        address: { city: 'New York', empty: '' },
-        twoFactorEnabled: true
-      },
-      { id: 22 }
-    );
-
-    expect(userModel.findByEmail).toHaveBeenCalledWith('alex@example.com', trx);
-    expect(bcrypt.default.hash).toHaveBeenCalledWith('TempPass123', 12);
-    expect(userModel.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        firstName: 'Alex',
-        email: 'alex@example.com',
-        address: { city: 'New York' },
-        passwordHash: 'hashed-password',
-        twoFactorEnabled: true
-      }),
-      trx
-    );
-    expect(domainEventModel.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'user.created',
-        payload: expect.objectContaining({ createdBy: 22, email: 'alex@example.com' })
-      }),
-      trx
-    );
-    expect(result).toEqual({
-      user: expect.objectContaining({ email: 'alex@example.com' }),
-      password: 'TempPass123',
-      temporaryPassword: 'TempPass123'
-    });
+    const result = await UserService.getById(7);
+    expect(result.profile.displayName).toBe('Learner');
+    expect(result.address).toEqual({ city: 'Paris' });
+    expect(result.profile.socialLinks).toEqual([
+      { label: 'LinkedIn', url: 'https://linkedin.com/in/test', handle: null }
+    ]);
   });
 
-  it('updates users, rehashes passwords, and records audit metadata', async () => {
-    const existing = { id: 5, email: 'existing@example.com', role: 'user' };
-    userModel.findById.mockResolvedValue(existing);
-    userModel.findByEmail.mockResolvedValue(null);
-    bcrypt.default.hash.mockResolvedValue('hashed-updated');
-    userModel.update.mockResolvedValue({
-      ...existing,
-      email: 'updated@example.com',
-      firstName: 'Jamie',
-      address: { city: 'Paris' }
-    });
-
-    const result = await UserService.update(
-      5,
-      {
-        firstName: 'Jamie',
-        email: 'updated@example.com',
-        password: '  NewPass123  ',
-        address: { city: 'Paris', blank: '' }
-      },
-      { id: 44 }
-    );
-
-    expect(userModel.findById).toHaveBeenCalledWith(5, trx);
-    expect(userModel.findByEmail).toHaveBeenCalledWith('updated@example.com', trx);
-    expect(bcrypt.default.hash).toHaveBeenCalledWith('NewPass123', 12);
-    expect(userModel.update).toHaveBeenCalledWith(
-      5,
-      expect.objectContaining({
-        firstName: 'Jamie',
-        email: 'updated@example.com',
-        passwordHash: 'hashed-updated',
-        address: { city: 'Paris' }
-      }),
-      trx
-    );
-    expect(domainEventModel.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'user.updated',
-        payload: expect.objectContaining({
-          updatedBy: 44,
-          changes: expect.arrayContaining(['firstName', 'email', 'password', 'address'])
-        })
-      }),
-      trx
-    );
-    expect(result.email).toBe('updated@example.com');
+  it('throws a 404 when the user record does not exist', async () => {
+    userModel.findById.mockResolvedValue(null);
+    await expect(UserService.getById(99)).rejects.toMatchObject({ status: 404 });
   });
 
-  it('removes users and emits deletion events', async () => {
-    const existing = { id: 9, email: 'remove@example.com' };
-    userModel.findById.mockResolvedValue(existing);
-    userModel.delete.mockResolvedValue(1);
+  it('updates user and profile records inside a transaction', async () => {
+    userModel.updateById.mockResolvedValue();
+    userProfileModel.upsert.mockResolvedValue();
+    userModel.findById.mockResolvedValue({ id: 8, address: '{"city":"Berlin"}' });
+    userProfileModel.findByUserId.mockResolvedValue({
+      id: 5,
+      displayName: 'Updated Learner',
+      socialLinks: JSON.stringify([{ url: 'https://twitter.com/edulure', label: 'Twitter' }]),
+      metadata: JSON.stringify({ locale: 'de' })
+    });
 
-    const result = await UserService.remove(9, { id: 33 });
+    const updated = await UserService.updateById(8, {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      age: 30,
+      address: { city: 'Berlin' },
+      profile: {
+        displayName: 'Updated Learner',
+        tagline: 'Always learning',
+        location: 'Berlin',
+        avatarUrl: 'https://cdn/avatar.png',
+        bannerUrl: null,
+        bio: 'Bio',
+        socialLinks: [{ label: 'Twitter', url: 'https://twitter.com/edulure' }],
+        metadata: { locale: 'de' }
+      }
+    });
 
-    expect(userModel.findById).toHaveBeenCalledWith(9, trx);
-    expect(userModel.delete).toHaveBeenCalledWith(9, trx);
-    expect(domainEventModel.record).toHaveBeenCalledWith(
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(userModel.updateById).toHaveBeenCalledWith(8, {
+      firstName: 'Jane',
+      lastName: 'Doe',
+      age: 30,
+      address: { city: 'Berlin' }
+    }, trxStub);
+    expect(userProfileModel.upsert).toHaveBeenCalledWith(
+      8,
       expect.objectContaining({
-        eventType: 'user.deleted',
-        payload: expect.objectContaining({ deletedBy: 33 })
+        displayName: 'Updated Learner',
+        metadata: { locale: 'de' }
       }),
-      trx
+      trxStub
     );
-    expect(result).toEqual({ success: true });
+    expect(updated.profile).toEqual(
+      expect.objectContaining({
+        displayName: 'Updated Learner',
+        socialLinks: [{ label: 'Twitter', url: 'https://twitter.com/edulure', handle: null }]
+      })
+    );
   });
 });

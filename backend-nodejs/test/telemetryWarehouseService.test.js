@@ -1,168 +1,223 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TelemetryWarehouseService } from '../src/services/TelemetryWarehouseService.js';
-import * as metrics from '../src/observability/metrics.js';
+import { recordTelemetryExport, recordTelemetryFreshness } from '../src/observability/metrics.js';
 
-const loggerStub = {
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn()
-};
+vi.mock('../src/observability/metrics.js', async () => {
+  const actual = await vi.importActual('../src/observability/metrics.js');
+  return {
+    ...actual,
+    recordTelemetryExport: vi.fn(),
+    recordTelemetryFreshness: vi.fn()
+  };
+});
 
 describe('TelemetryWarehouseService', () => {
-  let eventModel;
-  let batchModel;
-  let freshnessModel;
-  let lineageModel;
-  let storage;
-  let service;
+  const eventModel = {
+    listPendingForExport: vi.fn(),
+    markExported: vi.fn(),
+    markExportFailed: vi.fn(),
+    markFailed: vi.fn()
+  };
+  const batchModel = {
+    create: vi.fn(),
+    markExported: vi.fn(),
+    markFailed: vi.fn()
+  };
+  const freshnessModel = {
+    touchCheckpoint: vi.fn()
+  };
+  const lineageModel = {
+    startRun: vi.fn(),
+    completeRun: vi.fn()
+  };
+  const storage = {
+    uploadBuffer: vi.fn()
+  };
+  const loggerInstance = { child: () => loggerInstance, info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+  const baseConfig = {
+    export: {
+      enabled: true,
+      destination: 's3',
+      bucket: 'telemetry-bucket',
+      prefix: 'warehouse/telemetry',
+      batchSize: 2,
+      compress: true,
+      runOnStartup: true
+    },
+    freshness: {
+      ingestionThresholdMinutes: 10,
+      warehouseThresholdMinutes: 30
+    },
+    lineage: {
+      tool: 'dbt',
+      autoRecord: true
+    }
+  };
 
   beforeEach(() => {
-    eventModel = {
-      listPendingForExport: vi.fn(),
-      markExported: vi.fn().mockResolvedValue(),
-      markExportFailed: vi.fn().mockResolvedValue()
-    };
-
-    batchModel = {
-      create: vi.fn(),
-      markExported: vi.fn().mockResolvedValue(),
-      markFailed: vi.fn().mockResolvedValue()
-    };
-
-    freshnessModel = {
-      touchCheckpoint: vi.fn().mockResolvedValue({})
-    };
-
-    lineageModel = {
-      startRun: vi.fn(),
-      completeRun: vi.fn().mockResolvedValue()
-    };
-
-    storage = {
-      uploadBuffer: vi.fn()
-    };
-
-    vi.spyOn(metrics, 'recordTelemetryExport').mockImplementation(() => {});
-    vi.spyOn(metrics, 'recordTelemetryFreshness').mockImplementation(() => {});
+    vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('returns disabled summary when export is disabled', async () => {
-    service = new TelemetryWarehouseService({
+  it('returns disabled status when export pipeline is disabled', async () => {
+    const service = new TelemetryWarehouseService({
       eventModel,
       batchModel,
       freshnessModel,
       lineageModel,
       storage,
-      loggerInstance: loggerStub,
+      loggerInstance,
       config: {
-        export: {
-          enabled: false,
-          destination: 's3',
-          bucket: 'private',
-          prefix: 'warehouse/telemetry',
-          batchSize: 10,
-          compress: true,
-          runOnStartup: false
-        },
-        freshness: {
-          warehouseThresholdMinutes: 30
-        },
-        lineage: {
-          tool: 'dbt',
-          autoRecord: true
-        }
+        ...baseConfig,
+        export: { ...baseConfig.export, enabled: false }
       }
     });
 
-    const summary = await service.exportPendingEvents();
-    expect(summary).toEqual({ status: 'disabled', exported: 0 });
-    expect(metrics.recordTelemetryExport).toHaveBeenCalledWith({
-      destination: 's3',
-      result: 'disabled',
-      eventCount: 0
-    });
+    const result = await service.exportPendingEvents({ trigger: 'test' });
+    expect(result).toEqual({ status: 'disabled', exported: 0 });
+    expect(recordTelemetryExport).toHaveBeenCalledWith({ destination: 's3', result: 'disabled', eventCount: 0 });
   });
 
-  it('uploads pending events to storage and marks them exported', async () => {
-    const event = {
-      id: 1,
-      eventUuid: 'uuid-1',
-      eventName: 'app.launch',
-      eventVersion: '1',
-      eventSource: 'web',
-      schemaVersion: 'v1',
-      occurredAt: new Date('2025-03-03T10:00:00Z'),
-      receivedAt: new Date('2025-03-03T10:00:01Z'),
-      tenantId: 'global',
-      userId: 44,
-      sessionId: 'session-1',
-      deviceId: 'ios',
-      correlationId: 'corr-1',
-      consentScope: 'product.analytics',
-      consentStatus: 'granted',
-      payload: { platform: 'ios' },
-      context: { network: { ipHash: 'abc' } },
-      metadata: { consentVersion: 'v1' },
-      tags: [],
-      ingestionStatus: 'pending'
-    };
-
-    eventModel.listPendingForExport.mockResolvedValue([event]);
-    batchModel.create.mockResolvedValue({ id: 55, batchUuid: 'batch-123', status: 'exporting' });
-    lineageModel.startRun.mockResolvedValue({ id: 777 });
-    storage.uploadBuffer.mockResolvedValue({ bucket: 'private', key: 'warehouse/telemetry/batch-123.jsonl.gz', checksum: 'abc123' });
-
-    service = new TelemetryWarehouseService({
+  it('skips export when no pending events exist', async () => {
+    eventModel.listPendingForExport.mockResolvedValue([]);
+    const service = new TelemetryWarehouseService({
       eventModel,
       batchModel,
       freshnessModel,
       lineageModel,
       storage,
-      loggerInstance: loggerStub,
-      config: {
-        export: {
-          enabled: true,
-          destination: 's3',
-          bucket: 'private',
-          prefix: 'warehouse/telemetry',
-          batchSize: 10,
-          compress: true,
-          runOnStartup: false
-        },
-        freshness: {
-          warehouseThresholdMinutes: 30
-        },
-        lineage: {
-          tool: 'dbt',
-          autoRecord: true
-        }
-      }
+      loggerInstance,
+      config: baseConfig
     });
 
-    const summary = await service.exportPendingEvents({ trigger: 'test' });
-
-    expect(summary.status).toBe('exported');
-    expect(summary.exported).toBe(1);
-    expect(batchModel.create).toHaveBeenCalledWith({
-      destination: 's3',
-      metadata: { trigger: 'test', requestedSize: 10 }
-    });
-    expect(storage.uploadBuffer).toHaveBeenCalledTimes(1);
-    expect(eventModel.markExported).toHaveBeenCalledWith([1], expect.objectContaining({ batchId: 55 }));
-    expect(metrics.recordTelemetryExport).toHaveBeenCalledWith(
-      expect.objectContaining({ destination: 's3', result: 'success', eventCount: 1, durationSeconds: expect.any(Number) })
+    const result = await service.exportPendingEvents({ trigger: 'scheduled' });
+    expect(result).toEqual({ status: 'noop', exported: 0 });
+    expect(freshnessModel.touchCheckpoint).toHaveBeenCalledWith(
+      'warehouse.export',
+      expect.objectContaining({ metadata: expect.objectContaining({ eventsExported: 0 }) })
     );
-    expect(metrics.recordTelemetryFreshness).toHaveBeenCalledWith(
-      expect.objectContaining({ pipeline: 'warehouse.export', status: 'success' })
+    expect(recordTelemetryFreshness).toHaveBeenCalledWith({
+      pipeline: 'warehouse.export',
+      status: 'noop',
+      lastEventAt: expect.any(Date),
+      thresholdMinutes: 30
+    });
+  });
+
+  it('exports events, uploads compressed payload, and records lineage', async () => {
+    const events = [
+      {
+        id: 1,
+        eventUuid: 'evt-1',
+        eventName: 'app.launched',
+        eventVersion: 'v1',
+        eventSource: 'web',
+        schemaVersion: 'v1',
+        occurredAt: new Date('2024-01-01T00:00:00Z'),
+        receivedAt: new Date('2024-01-01T00:00:01Z'),
+        tenantId: 'tenant-1',
+        userId: 5,
+        sessionId: 'sess',
+        deviceId: null,
+        correlationId: 'corr-1',
+        consentScope: 'product.analytics',
+        consentStatus: 'granted',
+        payload: { plan: 'pro' },
+        context: { actor: 1 },
+        metadata: { version: '1.0.0' },
+        tags: ['launch'],
+        ingestionStatus: 'pending'
+      }
+    ];
+
+    eventModel.listPendingForExport.mockResolvedValue(events);
+    batchModel.create.mockResolvedValue({ id: 10, batchUuid: 'batch-uuid' });
+    lineageModel.startRun.mockResolvedValue({ id: 99 });
+    storage.uploadBuffer.mockResolvedValue({ bucket: 'telemetry-bucket', key: 'warehouse/telemetry/batch-uuid.jsonl.gz', checksum: 'abc123' });
+
+    const service = new TelemetryWarehouseService({
+      eventModel,
+      batchModel,
+      freshnessModel,
+      lineageModel,
+      storage,
+      loggerInstance,
+      config: baseConfig
+    });
+
+    const result = await service.exportPendingEvents({ trigger: 'manual' });
+
+    expect(storage.uploadBuffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bucket: 'telemetry-bucket',
+        key: 'warehouse/telemetry/batch-uuid.jsonl.gz',
+        contentType: 'application/gzip',
+        visibility: 'workspace'
+      })
+    );
+    const uploadPayload = storage.uploadBuffer.mock.calls[0][0];
+    expect(uploadPayload.metadata).toEqual({ 'edulure-pipeline': 'telemetry', 'edulure-trigger': 'manual' });
+    expect(uploadPayload.body).toBeInstanceOf(Buffer);
+
+    expect(batchModel.markExported).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ eventsCount: 1, fileKey: 'warehouse/telemetry/batch-uuid.jsonl.gz' })
+    );
+    expect(eventModel.markExported).toHaveBeenCalledWith(
+      [1],
+      expect.objectContaining({ metadata: expect.objectContaining({ destination: 'warehouse/telemetry/batch-uuid.jsonl.gz' }) })
+    );
+    expect(lineageModel.startRun).toHaveBeenCalledWith(
+      expect.objectContaining({ modelName: 'warehouse.telemetry_events', metadata: expect.objectContaining({ batchId: 10 }) })
     );
     expect(lineageModel.completeRun).toHaveBeenCalledWith(
-      777,
-      expect.objectContaining({ status: 'success', output: expect.objectContaining({ batchId: 55 }) })
+      99,
+      expect.objectContaining({ status: 'success', output: expect.objectContaining({ batchId: 10 }) })
     );
+    expect(result).toEqual({ status: 'exported', exported: 1, batchId: 10, fileKey: 'warehouse/telemetry/batch-uuid.jsonl.gz' });
+  });
+
+  it('marks exports as failed when upload throws', async () => {
+    eventModel.listPendingForExport.mockResolvedValue([
+      {
+        id: 2,
+        eventUuid: 'evt-2',
+        eventName: 'app.closed',
+        eventVersion: 'v1',
+        eventSource: 'web',
+        schemaVersion: 'v1',
+        occurredAt: new Date('2024-01-01T01:00:00Z'),
+        receivedAt: new Date('2024-01-01T01:00:01Z'),
+        tenantId: 'tenant-1',
+        userId: 5,
+        sessionId: 'sess',
+        deviceId: null,
+        correlationId: 'corr-2',
+        consentScope: 'product.analytics',
+        consentStatus: 'granted',
+        payload: {},
+        context: {},
+        metadata: {},
+        tags: [],
+        ingestionStatus: 'pending'
+      }
+    ]);
+    batchModel.create.mockResolvedValue({ id: 11, batchUuid: 'batch-fail' });
+    storage.uploadBuffer.mockRejectedValue(new Error('upload failed'));
+
+    const service = new TelemetryWarehouseService({
+      eventModel,
+      batchModel,
+      freshnessModel,
+      lineageModel,
+      storage,
+      loggerInstance,
+      config: baseConfig
+    });
+
+    await expect(service.exportPendingEvents({ trigger: 'manual' })).rejects.toThrow('upload failed');
+    expect(batchModel.markFailed).toHaveBeenCalledWith(11, expect.any(Error));
+    expect(eventModel.markExportFailed).toHaveBeenCalledWith([2], expect.any(Error));
   });
 });

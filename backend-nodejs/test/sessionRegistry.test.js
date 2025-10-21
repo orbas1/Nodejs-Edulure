@@ -1,63 +1,100 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import UserSessionModel from '../src/models/UserSessionModel.js';
+const findByIdMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../src/models/UserSessionModel.js', () => ({
+  default: { findById: findByIdMock }
+}));
+
 import { SessionRegistry } from '../src/services/SessionRegistry.js';
 
 describe('SessionRegistry', () => {
-  const now = Date.now();
-  const activeSession = {
-    id: 42,
-    userId: 7,
-    expiresAt: new Date(now + 60_000),
-    lastUsedAt: new Date(now),
-    revokedAt: null,
-    revokedReason: null,
-    revokedBy: null,
-    userAgent: 'UnitTest',
-    ipAddress: '127.0.0.1'
-  };
-
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(now);
+    vi.useRealTimers();
+    findByIdMock.mockReset();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('returns cached sessions without hitting the database', async () => {
+    const activeSession = {
+      id: 'session-123',
+      userId: 42,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      lastUsedAt: new Date(),
+      ipAddress: '127.0.0.1',
+      userAgent: 'vitest'
+    };
+
+    findByIdMock.mockResolvedValueOnce(activeSession);
+
+    const registry = new SessionRegistry({ ttlMs: 1000 });
+    const first = await registry.ensureActive('session-123');
+    expect(first.id).toBe('session-123');
+    expect(findByIdMock).toHaveBeenCalledTimes(1);
+
+    const second = await registry.ensureActive('session-123');
+    expect(second).toEqual(first);
+    expect(findByIdMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes cache entries after ttl expiry', async () => {
+    const now = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    const sessionA = {
+      id: 'session-ttl',
+      userId: 99,
+      expiresAt: new Date(now + 60_000),
+      lastUsedAt: new Date(now)
+    };
+
+    findByIdMock.mockResolvedValueOnce(sessionA).mockResolvedValueOnce(sessionA);
+
+    const registry = new SessionRegistry({ ttlMs: 50 });
+    await registry.ensureActive('session-ttl');
+    expect(findByIdMock).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(60);
+
+    await registry.ensureActive('session-ttl');
+    expect(findByIdMock).toHaveBeenCalledTimes(2);
+
     vi.useRealTimers();
   });
 
-  it('caches validated sessions and avoids duplicate lookups within TTL', async () => {
-    const registry = new SessionRegistry({ ttlMs: 5_000 });
-    const spy = vi.spyOn(UserSessionModel, 'findById').mockResolvedValue(activeSession);
+  it('marks unknown sessions as revoked and throws', async () => {
+    findByIdMock.mockResolvedValue(null);
+    const registry = new SessionRegistry({ ttlMs: 100 });
 
-    const first = await registry.ensureActive(activeSession.id);
-    const second = await registry.ensureActive(activeSession.id);
-
-    expect(first.id).toBe(activeSession.id);
-    expect(second.id).toBe(activeSession.id);
-    expect(spy).toHaveBeenCalledTimes(1);
-  });
-
-  it('marks sessions as revoked when expiration has elapsed', async () => {
-    const registry = new SessionRegistry({ ttlMs: 5_000 });
-    const expiredSession = { ...activeSession, id: 100, expiresAt: new Date(now - 1_000) };
-    vi.spyOn(UserSessionModel, 'findById').mockResolvedValue(expiredSession);
-
-    await expect(registry.ensureActive(expiredSession.id)).rejects.toMatchObject({
+    await expect(registry.ensureActive('missing-session')).rejects.toMatchObject({
+      status: 401,
       code: 'SESSION_REVOKED'
     });
+
+    const cached = registry.getCacheEntry('missing-session');
+    expect(cached?.status).toBe('revoked');
+    expect(cached?.reason).toBe('unknown');
   });
 
-  it('prevents access to revoked sessions once marked', async () => {
-    const registry = new SessionRegistry({ ttlMs: 5_000 });
-    vi.spyOn(UserSessionModel, 'findById').mockResolvedValue(activeSession);
+  it('rejects revoked or expired sessions and caches revoked marker', async () => {
+    const revoked = {
+      id: 'session-revoked',
+      userId: 55,
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: new Date(),
+      revokedReason: 'user-signout'
+    };
 
-    await registry.ensureActive(activeSession.id);
-    registry.markRevoked(activeSession.id, 'manual');
+    findByIdMock.mockResolvedValue(revoked);
+    const registry = new SessionRegistry({ ttlMs: 100 });
 
-    await expect(registry.ensureActive(activeSession.id)).rejects.toMatchObject({
+    await expect(registry.ensureActive('session-revoked')).rejects.toMatchObject({
+      status: 401,
       code: 'SESSION_REVOKED'
     });
+
+    const cached = registry.getCacheEntry('session-revoked');
+    expect(cached?.status).toBe('revoked');
+    expect(cached?.reason).toBe('user-signout');
   });
 });

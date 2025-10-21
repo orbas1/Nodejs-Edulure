@@ -97,4 +97,27 @@ describe('StorageService', () => {
     expect(result.bytes).toBe(4096);
     expect(client.send).toHaveBeenCalledTimes(1);
   });
+
+  it('normalises metadata values when preparing uploads', () => {
+    const metadata = service.normaliseMetadata({ retry: 3, enabled: true, note: 'value', ignore: null });
+    expect(metadata).toEqual({ retry: '3', enabled: 'true', note: 'value' });
+  });
+
+  it('encodes copy source paths when copying objects', async () => {
+    const client = createMockClient();
+    client.send.mockResolvedValue({});
+    service = new StorageService(client);
+
+    await service.copyObject({
+      sourceBucket: 'source-bucket',
+      sourceKey: 'folder/file name.pdf',
+      destinationBucket: 'dest-bucket',
+      destinationKey: 'copied/file.pdf',
+      visibility: 'workspace'
+    });
+
+    expect(client.send).toHaveBeenCalledTimes(1);
+    const command = client.send.mock.calls[0][0];
+    expect(command.input.CopySource).toBe(encodeURIComponent('source-bucket/folder/file name.pdf'));
+  });
 });

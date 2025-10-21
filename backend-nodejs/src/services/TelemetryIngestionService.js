@@ -152,6 +152,8 @@ export class TelemetryIngestionService {
       payload: parsed.payload
     });
 
+    const requestedIngestionStatus = ingestionStatus;
+
     const { event, duplicate } = await this.eventModel.create({
       tenantId,
       eventName: parsed.eventName,
@@ -166,7 +168,7 @@ export class TelemetryIngestionService {
       correlationId,
       consentScope,
       consentStatus,
-      ingestionStatus: duplicate ? 'duplicate' : ingestionStatus,
+      ingestionStatus: requestedIngestionStatus,
       payload: parsed.payload,
       context,
       metadata,
@@ -175,6 +177,9 @@ export class TelemetryIngestionService {
     });
 
     const resolvedStatus = duplicate ? 'duplicate' : event.ingestionStatus;
+    if (duplicate && event.ingestionStatus !== 'duplicate') {
+      event.ingestionStatus = 'duplicate';
+    }
 
     recordTelemetryIngestion({
       scope: consentScope,

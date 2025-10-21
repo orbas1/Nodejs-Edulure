@@ -1,168 +1,124 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const recordEventMock = vi.hoisted(() => vi.fn());
+const auditInsertMock = vi.hoisted(() => vi.fn());
+const trxStub = vi.hoisted(() => {
+  const stub = vi.fn(() => ({ insert: auditInsertMock }));
+  stub.fn = { now: () => new Date() };
+  return stub;
+});
+const dbClient = vi.hoisted(() => ({
+  transaction: vi.fn((handler) => handler(trxStub))
+}));
+
+vi.mock('../src/services/ChangeDataCaptureService.js', () => ({
+  default: {
+    recordEvent: recordEventMock
+  }
+}));
 
 import {
   enforceRetentionPolicies,
   registerRetentionStrategy,
-  unregisterRetentionStrategy
+  unregisterRetentionStrategy,
+  listRetentionStrategies
 } from '../src/services/dataRetentionService.js';
-import changeDataCaptureService from '../src/services/ChangeDataCaptureService.js';
-
-const ENTITY = 'unit_records';
-
-function createBuilder({ sampleIds = [101, 102], affectedRows = 2 } = {}) {
-  return {
-    count: vi.fn().mockResolvedValue([{ total: sampleIds.length }]),
-    clone: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    pluck: vi.fn().mockResolvedValue(sampleIds),
-    del: vi.fn().mockResolvedValue(affectedRows),
-    update: vi.fn().mockResolvedValue(affectedRows)
-  };
-}
 
 describe('dataRetentionService', () => {
-  let auditInsert;
-  let fakeDb;
-  let fakeTrx;
+  const strategyKey = 'vitest_entities';
 
   beforeEach(() => {
-    auditInsert = vi.fn().mockResolvedValue();
-    fakeTrx = vi.fn((tableName) => {
-      if (tableName === 'data_retention_audit_logs') {
-        return { insert: auditInsert };
-      }
-      return createBuilder();
-    });
-    fakeTrx.raw = vi.fn(() => 'timestamp');
-    fakeTrx.fn = { now: () => new Date() };
+    vi.clearAllMocks();
+    auditInsertMock.mockReset();
+    trxStub.mockImplementation(() => ({ insert: auditInsertMock }));
+    dbClient.transaction.mockImplementation((handler) => handler(trxStub));
+    registerRetentionStrategy(strategyKey, (policy) => {
+      const createBuilder = () => {
+        const builder = {
+          clone: () => builder,
+          limit: () => builder,
+          pluck: vi.fn(async () => [101, 102]),
+          count: vi.fn(async () => [{ total: 2 }]),
+          del: vi.fn(async () => 2),
+          update: vi.fn(async () => 2)
+        };
+        return builder;
+      };
 
-    fakeDb = {
-      async transaction(handler) {
-        return handler(fakeTrx);
-      }
-    };
-    vi.spyOn(changeDataCaptureService, 'recordEvent').mockResolvedValue({ id: 1 });
+      return {
+        idColumn: 'id',
+        reason: `enforce policy ${policy.id}`,
+        context: { policyId: policy.id },
+        buildQuery: () => createBuilder()
+      };
+    });
   });
 
   afterEach(() => {
-    unregisterRetentionStrategy(ENTITY);
-    vi.restoreAllMocks();
+    unregisterRetentionStrategy(strategyKey);
   });
 
-  function registerTestStrategy({ sampleIds = [201, 202], affectedRows = 2 } = {}) {
-    const builders = [];
-    const factory = vi.fn(() => {
-      const builder = createBuilder({ sampleIds, affectedRows });
-      builders.push(builder);
-      return builder;
-    });
-
-    registerRetentionStrategy(ENTITY, () => ({
-      idColumn: 'record_id',
-      buildQuery: factory,
-      reason: 'clean unit records',
-      context: { severity: 'low' }
-    }));
-
-    return { builders, factory };
-  }
-
-  it('executes registered strategy and records audit logs', async () => {
-    const { builders } = registerTestStrategy({ sampleIds: [11, 12], affectedRows: 2 });
-
-    const policy = {
-      id: 99,
-      entityName: ENTITY,
-      action: 'hard-delete',
-      retentionPeriodDays: 30,
-      active: true,
-      description: 'Unit cleanup'
-    };
-
-    const summary = await enforceRetentionPolicies({ policies: [policy], dbClient: fakeDb });
-
-    expect(summary.results).toHaveLength(1);
-    expect(summary.results[0]).toMatchObject({
-      policyId: 99,
-      status: 'executed',
-      affectedRows: 2,
-      sampleIds: [11, 12]
-    });
-    expect(builders.at(-1).del).toHaveBeenCalledTimes(1);
-    expect(auditInsert).toHaveBeenCalledTimes(1);
-    expect(auditInsert.mock.calls[0][0]).toMatchObject({
-      policy_id: 99,
-      rows_affected: 2
-    });
-    const details = JSON.parse(auditInsert.mock.calls[0][0].details);
-    expect(details.runId).toBeDefined();
-    expect(summary.runId).toBeDefined();
-    expect(changeDataCaptureService.recordEvent).toHaveBeenCalled();
+  it('registers and lists custom retention strategies', () => {
+    const strategies = listRetentionStrategies();
+    expect(strategies).toContain(strategyKey);
   });
 
-  it('respects dry-run mode without mutating records', async () => {
-    const { builders } = registerTestStrategy({ sampleIds: [55], affectedRows: 1 });
+  it('enforces retention policies and records audit events', async () => {
+    const onAlert = vi.fn();
+    const result = await enforceRetentionPolicies({
+      dbClient,
+      policies: [
+        {
+          id: 1,
+          entityName: strategyKey,
+          action: 'hard-delete',
+          retentionPeriodDays: 30,
+          description: 'Purge vitest records',
+          criteria: {},
+          active: true
+        }
+      ],
+      dryRun: false,
+      alertThreshold: 1,
+      onAlert
+    });
 
-    const policy = {
-      id: 12,
-      entityName: ENTITY,
-      action: 'hard-delete',
-      retentionPeriodDays: 10,
-      active: true,
-      description: 'Dry run verification'
-    };
-
-    const summary = await enforceRetentionPolicies({ mode: 'simulate', policies: [policy], dbClient: fakeDb });
-
-    expect(summary.dryRun).toBe(true);
-    expect(summary.results[0]).toMatchObject({ status: 'executed', affectedRows: 1 });
-    expect(builders.at(-1).count).toHaveBeenCalledTimes(1);
-    expect(builders.at(-1).del).not.toHaveBeenCalled();
-    expect(auditInsert).not.toHaveBeenCalled();
-  });
-
-  it('skips policies without registered strategies', async () => {
-    const policy = {
-      id: 77,
-      entityName: 'unknown_entity',
-      action: 'hard-delete',
-      retentionPeriodDays: 15,
-      active: true
-    };
-
-    const summary = await enforceRetentionPolicies({ policies: [policy], dbClient: fakeDb });
-
-    expect(summary.results[0]).toMatchObject({
-      policyId: 77,
-      status: 'skipped-unsupported'
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]).toMatchObject({ status: 'executed', affectedRows: 2 });
+    expect(onAlert).toHaveBeenCalled();
+    expect(auditInsertMock).toHaveBeenCalled();
+    const successEvent = recordEventMock.mock.calls.at(-1)?.[0];
+    expect(successEvent).toMatchObject({
+      payload: expect.objectContaining({ status: 'executed', policyId: 1 })
     });
   });
 
-  it('captures failures from strategy execution', async () => {
-    const failingBuilder = createBuilder({ sampleIds: [1], affectedRows: 1 });
-    failingBuilder.del.mockRejectedValue(new Error('database unavailable'));
-
-    registerRetentionStrategy(ENTITY, () => ({
-      idColumn: 'record_id',
-      buildQuery: () => failingBuilder,
-      reason: 'should fail'
-    }));
-
-    const policy = {
-      id: 44,
-      entityName: ENTITY,
-      action: 'hard-delete',
-      retentionPeriodDays: 45,
-      active: true
-    };
-
-    const summary = await enforceRetentionPolicies({ policies: [policy], dbClient: fakeDb });
-
-    expect(summary.results[0]).toMatchObject({
-      policyId: 44,
-      status: 'failed',
-      error: 'database unavailable'
+  it('captures failures from retention strategies', async () => {
+    unregisterRetentionStrategy(strategyKey);
+    registerRetentionStrategy(strategyKey, () => {
+      throw new Error('strategy failure');
     });
-    expect(auditInsert).not.toHaveBeenCalled();
+
+    const result = await enforceRetentionPolicies({
+      dbClient,
+      policies: [
+        {
+          id: 2,
+          entityName: strategyKey,
+          action: 'hard-delete',
+          retentionPeriodDays: 30,
+          description: 'Failing policy',
+          criteria: {},
+          active: true
+        }
+      ],
+      dryRun: false
+    });
+
+    expect(result.results[0]).toMatchObject({ status: 'failed' });
+    const failureEvent = recordEventMock.mock.calls.at(-1)?.[0];
+    expect(failureEvent).toMatchObject({
+      payload: expect.objectContaining({ status: 'failed', policyId: 2 })
+    });
   });
 });

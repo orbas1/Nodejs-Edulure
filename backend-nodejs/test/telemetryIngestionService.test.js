@@ -1,173 +1,188 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TelemetryIngestionService } from '../src/services/TelemetryIngestionService.js';
-import * as metrics from '../src/observability/metrics.js';
+import { recordTelemetryIngestion, recordTelemetryFreshness } from '../src/observability/metrics.js';
+import { generateTelemetryDedupeHash } from '../src/database/domains/telemetry.js';
 
-const loggerStub = {
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn()
-};
+vi.mock('../src/database/domains/telemetry.js', () => ({
+  generateTelemetryDedupeHash: vi.fn(() => 'dedupe-hash')
+}));
+
+vi.mock('../src/observability/metrics.js', async () => {
+  const actual = await vi.importActual('../src/observability/metrics.js');
+  return {
+    ...actual,
+    recordTelemetryIngestion: vi.fn(),
+    recordTelemetryFreshness: vi.fn()
+  };
+});
 
 describe('TelemetryIngestionService', () => {
-  let consentModel;
-  let eventModel;
-  let freshnessModel;
-  let service;
+  const consentModel = {
+    recordDecision: vi.fn(),
+    getActiveConsent: vi.fn()
+  };
+  const eventModel = {
+    create: vi.fn()
+  };
+  const freshnessModel = {
+    touchCheckpoint: vi.fn()
+  };
+  const loggerInstance = { child: () => loggerInstance, debug: vi.fn(), warn: vi.fn(), info: vi.fn(), error: vi.fn() };
+
+  const baseConfig = {
+    ingestion: {
+      enabled: true,
+      defaultScope: 'product.analytics',
+      allowedSources: ['web', 'backend'],
+      strictSourceEnforcement: true,
+      consent: {
+        hardBlockWithoutConsent: true,
+        defaultVersion: 'v1'
+      }
+    },
+    freshness: {
+      ingestionThresholdMinutes: 10
+    }
+  };
 
   beforeEach(() => {
-    consentModel = {
-      getActiveConsent: vi.fn(),
-      recordDecision: vi.fn()
+    vi.clearAllMocks();
+    consentModel.recordDecision.mockReset();
+    consentModel.getActiveConsent.mockReset();
+    eventModel.create.mockReset();
+    freshnessModel.touchCheckpoint.mockReset();
+  });
+
+  it('ingests telemetry events when consent is granted', async () => {
+    consentModel.getActiveConsent.mockResolvedValue({
+      status: 'granted',
+      consentVersion: 'v2',
+      recordedAt: new Date('2024-12-01T00:00:00Z')
+    });
+
+    const createdEvent = {
+      id: 44,
+      eventName: 'app.launched',
+      ingestionStatus: 'pending'
     };
 
-    eventModel = {
-      create: vi.fn()
-    };
+    eventModel.create.mockResolvedValue({ event: createdEvent, duplicate: false });
 
-    freshnessModel = {
-      touchCheckpoint: vi.fn().mockResolvedValue({})
-    };
-
-    vi.spyOn(metrics, 'recordTelemetryIngestion').mockImplementation(() => {});
-    vi.spyOn(metrics, 'recordTelemetryFreshness').mockImplementation(() => {});
-
-    service = new TelemetryIngestionService({
+    const service = new TelemetryIngestionService({
       consentModel,
       eventModel,
       freshnessModel,
-      loggerInstance: loggerStub,
-      config: {
-        ingestion: {
-          enabled: true,
-          defaultScope: 'product.analytics',
-          allowedSources: [],
-          strictSourceEnforcement: false,
-          consent: {
-            hardBlockWithoutConsent: true,
-            defaultVersion: 'v1'
-          }
-        },
-        freshness: {
-          ingestionThresholdMinutes: 15
-        }
-      }
+      loggerInstance,
+      config: baseConfig
     });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('ingests events when consent is granted', async () => {
-    const consentRecord = {
-      status: 'granted',
-      consentVersion: 'v3',
-      recordedAt: new Date('2025-01-01T00:00:00Z')
-    };
-    consentModel.getActiveConsent.mockResolvedValue(consentRecord);
-
-    const eventResponse = {
-      id: 42,
-      eventUuid: 'uuid-1',
-      eventName: 'app.launch',
-      eventSource: 'web',
-      consentScope: 'product.analytics',
-      consentStatus: 'granted',
-      ingestionStatus: 'pending',
-      occurredAt: new Date('2025-03-01T10:00:00Z'),
-      receivedAt: new Date('2025-03-01T10:00:01Z'),
-      createdAt: new Date()
-    };
-
-    eventModel.create.mockResolvedValue({ event: eventResponse, duplicate: false });
 
     const result = await service.ingestEvent(
       {
-        eventName: 'app.launch',
+        eventName: 'app.launched',
         eventSource: 'web',
-        payload: { platform: 'ios' }
+        userId: 123,
+        payload: { plan: 'pro' }
       },
-      {
-        actorId: 999,
-        ipAddress: '192.168.0.1',
-        userAgent: 'vitest'
-      }
+      { actorId: 321, ipAddress: '203.0.113.10', userAgent: 'Vitest/1.0' }
     );
 
-    expect(result.duplicate).toBe(false);
-    expect(result.suppressed).toBe(false);
-    expect(result.event.ingestionStatus).toBe('pending');
-    expect(eventModel.create).toHaveBeenCalledTimes(1);
-    const createArgs = eventModel.create.mock.calls[0][0];
-    expect(createArgs.consentScope).toBe('product.analytics');
-    expect(createArgs.ingestionStatus).toBe('pending');
-    expect(createArgs.metadata.consentVersion).toBe('v3');
-    expect(metrics.recordTelemetryIngestion).toHaveBeenCalledWith({
+    expect(eventModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        consentStatus: 'granted',
+        ingestionStatus: 'pending',
+        context: expect.objectContaining({
+          network: expect.objectContaining({ ipHash: expect.any(String), userAgent: 'Vitest/1.0' }),
+          actor: 321
+        }),
+        metadata: expect.objectContaining({ consentVersion: 'v2' })
+      })
+    );
+    expect(result).toEqual({
+      event: createdEvent,
+      duplicate: false,
+      consent: expect.objectContaining({ status: 'granted' }),
+      suppressed: false
+    });
+    expect(recordTelemetryIngestion).toHaveBeenCalledWith({
       scope: 'product.analytics',
       source: 'web',
       status: 'pending'
     });
-    expect(metrics.recordTelemetryFreshness).toHaveBeenCalled();
+    expect(recordTelemetryFreshness).toHaveBeenCalled();
+    expect(freshnessModel.touchCheckpoint).toHaveBeenCalledWith(
+      'ingestion.raw',
+      expect.objectContaining({ metadata: expect.objectContaining({ eventId: 44 }) })
+    );
+    expect(generateTelemetryDedupeHash).toHaveBeenCalled();
   });
 
-  it('suppresses events when consent is missing and hard block is enabled', async () => {
-    consentModel.getActiveConsent.mockResolvedValue(null);
+  it('suppresses events when consent is not granted and hard block enabled', async () => {
+    consentModel.getActiveConsent.mockResolvedValue({ status: 'revoked' });
 
-    const suppressedEvent = {
-      id: 11,
-      eventUuid: 'uuid-2',
-      eventName: 'app.launch',
-      eventSource: 'web',
-      consentScope: 'product.analytics',
-      consentStatus: 'revoked',
-      ingestionStatus: 'suppressed',
-      occurredAt: new Date('2025-03-02T09:00:00Z'),
-      receivedAt: new Date('2025-03-02T09:00:01Z'),
-      createdAt: new Date()
-    };
-
-    eventModel.create.mockResolvedValue({ event: suppressedEvent, duplicate: false });
-
-    const result = await service.ingestEvent({
-      eventName: 'app.launch',
-      eventSource: 'web',
-      payload: {}
+    eventModel.create.mockResolvedValue({
+      event: { id: 55, eventName: 'app.launched', ingestionStatus: 'suppressed' },
+      duplicate: false
     });
 
-    expect(result.suppressed).toBe(true);
-    expect(result.event.ingestionStatus).toBe('suppressed');
-    expect(eventModel.create).toHaveBeenCalledWith(
-      expect.objectContaining({ ingestionStatus: 'suppressed', consentStatus: 'revoked' })
-    );
-  });
-
-  it('rejects telemetry from unauthorised sources when enforcement is strict', async () => {
-    service = new TelemetryIngestionService({
+    const service = new TelemetryIngestionService({
       consentModel,
       eventModel,
       freshnessModel,
-      loggerInstance: loggerStub,
+      loggerInstance,
+      config: baseConfig
+    });
+
+    const result = await service.ingestEvent({
+      eventName: 'app.launched',
+      eventSource: 'backend',
+      userId: 777,
+      payload: {}
+    });
+
+    expect(eventModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        consentStatus: 'revoked',
+        ingestionStatus: 'suppressed'
+      })
+    );
+    expect(result.suppressed).toBe(true);
+    expect(recordTelemetryIngestion).toHaveBeenCalledWith({
+      scope: 'product.analytics',
+      source: 'backend',
+      status: 'suppressed'
+    });
+  });
+
+  it('rejects events from disallowed sources when strict enforcement is enabled', async () => {
+    const service = new TelemetryIngestionService({
+      consentModel,
+      eventModel,
+      freshnessModel,
+      loggerInstance,
+      config: baseConfig
+    });
+
+    await expect(
+      service.ingestEvent({ eventName: 'app.launched', eventSource: 'untrusted' })
+    ).rejects.toMatchObject({ status: 403 });
+    expect(eventModel.create).not.toHaveBeenCalled();
+  });
+
+  it('throws when pipeline is disabled', async () => {
+    const disabledService = new TelemetryIngestionService({
+      consentModel,
+      eventModel,
+      freshnessModel,
+      loggerInstance,
       config: {
-        ingestion: {
-          enabled: true,
-          defaultScope: 'product.analytics',
-          allowedSources: ['web'],
-          strictSourceEnforcement: true,
-          consent: {
-            hardBlockWithoutConsent: true,
-            defaultVersion: 'v1'
-          }
-        },
-        freshness: {
-          ingestionThresholdMinutes: 15
-        }
+        ...baseConfig,
+        ingestion: { ...baseConfig.ingestion, enabled: false }
       }
     });
 
     await expect(
-      service.ingestEvent({ eventName: 'app.launch', eventSource: 'mobile' })
-    ).rejects.toMatchObject({ status: 403 });
-    expect(eventModel.create).not.toHaveBeenCalled();
+      disabledService.ingestEvent({ eventName: 'test', eventSource: 'web' })
+    ).rejects.toMatchObject({ status: 503 });
   });
 });

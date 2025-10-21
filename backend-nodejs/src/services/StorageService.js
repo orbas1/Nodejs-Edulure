@@ -43,6 +43,20 @@ export class StorageService {
     this.client = client;
   }
 
+  normaliseMetadata(metadata = {}) {
+    if (!metadata || typeof metadata !== 'object') {
+      return {};
+    }
+
+    return Object.entries(metadata).reduce((acc, [key, value]) => {
+      if (value === undefined || value === null) {
+        return acc;
+      }
+      acc[key] = typeof value === 'string' ? value : String(value);
+      return acc;
+    }, {});
+  }
+
   generateStorageKey(prefix, originalFilename) {
     const extension = mime.extension(mime.lookup(originalFilename) || '') || originalFilename.split('.').pop() || 'bin';
     return `${prefix}/${randomUUID()}.${extension}`;
@@ -132,7 +146,7 @@ export class StorageService {
             Body: body,
             ContentType: contentType,
             ACL: visibility === 'public' ? 'public-read' : undefined,
-            Metadata: metadata
+            Metadata: this.normaliseMetadata(metadata)
           }
         });
         await upload.done();
@@ -158,7 +172,7 @@ export class StorageService {
             Body: stream,
             ContentType: contentType,
             ACL: visibility === 'public' ? 'public-read' : undefined,
-            Metadata: metadata
+            Metadata: this.normaliseMetadata(metadata)
           }
         });
         const result = await upload.done();
@@ -266,7 +280,7 @@ export class StorageService {
           new CopyObjectCommand({
             Bucket: targetBucket,
             Key: destinationKey,
-            CopySource: `${sourceBucket}/${encodeURIComponent(sourceKey)}`,
+            CopySource: encodeURIComponent(`${sourceBucket}/${sourceKey}`),
             ACL: visibility === 'public' ? 'public-read' : undefined
           })
         );
