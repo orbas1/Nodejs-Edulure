@@ -15,6 +15,15 @@ const mocks = vi.hoisted(() => ({
   domainEventModelMock: {
     record: vi.fn()
   },
+  db: {
+    transaction: vi.fn(async (handler) =>
+      handler({
+        fn: {
+          now: () => new Date().toISOString()
+        }
+      })
+    )
+  },
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -35,13 +44,17 @@ vi.mock('../src/models/DomainEventModel.js', () => ({
   default: mocks.domainEventModelMock
 }));
 
+vi.mock('../src/config/database.js', () => ({
+  default: mocks.db
+}));
+
 vi.mock('../src/config/logger.js', () => ({
   default: {
     child: () => mocks.logger
   }
 }));
 
-const { adsCampaignModelMock, adsCampaignMetricModelMock, domainEventModelMock } = mocks;
+const { adsCampaignModelMock, adsCampaignMetricModelMock, domainEventModelMock, db } = mocks;
 
 import AdsService from '../src/services/AdsService.js';
 
@@ -77,6 +90,13 @@ const baseCampaign = {
 describe('AdsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    db.transaction.mockImplementation(async (handler) =>
+      handler({
+        fn: {
+          now: () => new Date().toISOString()
+        }
+      })
+    );
   });
 
   it('applies compliance automation when campaigns overspend beyond tolerance', async () => {
@@ -156,5 +176,22 @@ describe('AdsService', () => {
     expect(insights.daily).toHaveLength(2);
     expect(insights.daily[0].date).toBe('2024-12-01T00:00:00.000Z');
     expect(insights.daily[1].ctr).toBeGreaterThan(0);
+  });
+
+  it('prevents actors without campaign permissions from listing campaigns', async () => {
+    await expect(
+      AdsService.listCampaigns({
+        actor: { id: 99, role: 'user' }
+      })
+    ).rejects.toMatchObject({ status: 403 });
+    expect(adsCampaignModelMock.list).not.toHaveBeenCalled();
+  });
+
+  it('requires an authenticated identity when requesting campaigns', async () => {
+    await expect(
+      AdsService.listCampaigns({
+        actor: { role: 'instructor' }
+      })
+    ).rejects.toMatchObject({ status: 401 });
   });
 });
