@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import logger from './config/logger.js';
 import { startRealtimeServer } from './servers/realtimeServer.js';
+import { createProcessSignalRegistry } from './servers/processSignalRegistry.js';
 import { startWebServer } from './servers/webServer.js';
 import { startWorkerService } from './servers/workerService.js';
 
@@ -125,6 +126,7 @@ export async function bootstrapServices({
   const resolvedTargets = resolveTargets({ explicitTargets: targets, argv, env });
   const startedServices = [];
   let shuttingDown = false;
+  const registry = createProcessSignalRegistry();
 
   const shutdown = async (signal = 'manual', { exitProcess = false, exitCode = 0 } = {}) => {
     if (shuttingDown) {
@@ -132,19 +134,26 @@ export async function bootstrapServices({
     }
     shuttingDown = true;
 
+    let shutdownError = null;
+    let computedExitCode = exitCode;
+
     try {
       await stopServices(startedServices, loggerInstance, signal);
       loggerInstance.info({ signal }, 'All services stopped');
     } catch (error) {
       loggerInstance.error({ err: error, signal }, 'Errors encountered while stopping services');
-      if (exitProcess) {
-        process.exit(Math.max(exitCode, 1));
-      }
-      throw error;
+      shutdownError = error;
+      computedExitCode = Math.max(exitCode, 1);
     }
 
+    registry.cleanup();
+
     if (exitProcess) {
-      process.exit(exitCode);
+      process.exit(computedExitCode);
+    }
+
+    if (shutdownError) {
+      throw shutdownError;
     }
   };
 
@@ -172,14 +181,14 @@ export async function bootstrapServices({
       });
     };
 
-    process.once('SIGINT', handleTermination);
-    process.once('SIGTERM', handleTermination);
+    registry.add('SIGINT', handleTermination, { once: true });
+    registry.add('SIGTERM', handleTermination, { once: true });
 
-    process.on('unhandledRejection', (reason) => {
+    registry.add('unhandledRejection', (reason) => {
       loggerInstance.error({ err: reason }, 'Unhandled promise rejection detected');
     });
 
-    process.on('uncaughtException', (error) => {
+    registry.add('uncaughtException', (error) => {
       loggerInstance.fatal({ err: error }, 'Uncaught exception detected');
       shutdown('uncaughtException', { exitProcess: true, exitCode: 1 }).catch(() => {
         process.exit(1);

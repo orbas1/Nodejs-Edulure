@@ -136,4 +136,43 @@ describe('server bootstrap orchestrator', () => {
 
     expect(stopWeb).toHaveBeenCalled();
   });
+
+  it('cleans up process signal handlers when stopping with signal management enabled', async () => {
+    const stop = vi.fn();
+    startWebServer.mockResolvedValue({ stop });
+
+    const onceSpy = vi.spyOn(process, 'once');
+    const onSpy = vi.spyOn(process, 'on');
+    const offSpy = vi.spyOn(process, 'off');
+
+    try {
+      const orchestrator = await bootstrapServices({ withSignalHandlers: true });
+
+      const sigintCall = onceSpy.mock.calls.find(([event]) => event === 'SIGINT');
+      const sigtermCall = onceSpy.mock.calls.find(([event]) => event === 'SIGTERM');
+      const uncaughtCall = onSpy.mock.calls.find(([event]) => event === 'uncaughtException');
+      const rejectionCall = onSpy.mock.calls.find(([event]) => event === 'unhandledRejection');
+
+      expect(sigintCall).toBeDefined();
+      expect(sigtermCall).toBeDefined();
+      expect(uncaughtCall).toBeDefined();
+      expect(rejectionCall).toBeDefined();
+
+      await orchestrator.stop();
+
+      const [, sigintHandler] = sigintCall;
+      const [, sigtermHandler] = sigtermCall;
+      const [, uncaughtHandler] = uncaughtCall;
+      const [, rejectionHandler] = rejectionCall;
+
+      expect(offSpy).toHaveBeenCalledWith('SIGINT', sigintHandler);
+      expect(offSpy).toHaveBeenCalledWith('SIGTERM', sigtermHandler);
+      expect(offSpy).toHaveBeenCalledWith('uncaughtException', uncaughtHandler);
+      expect(offSpy).toHaveBeenCalledWith('unhandledRejection', rejectionHandler);
+    } finally {
+      onceSpy.mockRestore();
+      onSpy.mockRestore();
+      offSpy.mockRestore();
+    }
+  });
 });
