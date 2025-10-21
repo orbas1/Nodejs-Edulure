@@ -85,12 +85,95 @@
         }
       }
     },
-    "/content/assets/upload-session": {
-      "post": {
-        "summary": "Create signed upload session",
+    "/content/assets/{assetId}": {
+      "get": {
+        "summary": "Retrieve content asset",
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Asset detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset not found"
+          }
+        }
+      }
+    },
+    "/content/assets/{assetId}/analytics": {
+      "get": {
+        "summary": "Content analytics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analytics payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Asset not found"
+          }
+        }
+      }
+    },
+    "/content/assets/{assetId}/events": {
+      "post": {
+        "summary": "Record asset event",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -100,29 +183,14 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "type",
-                  "filename",
-                  "mimeType",
-                  "size"
+                  "eventType"
                 ],
                 "properties": {
-                  "type": {
+                  "eventType": {
                     "type": "string"
                   },
-                  "filename": {
-                    "type": "string"
-                  },
-                  "mimeType": {
-                    "type": "string"
-                  },
-                  "size": {
-                    "type": "integer"
-                  },
-                  "checksum": {
-                    "type": "string"
-                  },
-                  "visibility": {
-                    "type": "string"
+                  "metadata": {
+                    "type": "object"
                   }
                 }
               }
@@ -130,21 +198,11 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "Upload session created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
+          "200": {
+            "description": "Event captured"
           },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "422": {
-            "description": "Validation error"
+          "404": {
+            "description": "Asset not found"
           }
         }
       }
@@ -204,79 +262,6 @@
           },
           "422": {
             "description": "Validation error"
-          }
-        }
-      }
-    },
-    "/content/assets/{assetId}": {
-      "get": {
-        "summary": "Retrieve content asset",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "assetId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Asset detail",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Asset not found"
-          }
-        }
-      }
-    },
-    "/content/assets/{assetId}/viewer-token": {
-      "get": {
-        "summary": "Generate viewer token",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "assetId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Viewer token issued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "404": {
-            "description": "Asset not found"
           }
         }
       }
@@ -363,58 +348,9 @@
         }
       }
     },
-    "/content/assets/{assetId}/events": {
-      "post": {
-        "summary": "Record asset event",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "assetId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "eventType"
-                ],
-                "properties": {
-                  "eventType": {
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Event captured"
-          },
-          "404": {
-            "description": "Asset not found"
-          }
-        }
-      }
-    },
-    "/content/assets/{assetId}/analytics": {
+    "/content/assets/{assetId}/viewer-token": {
       "get": {
-        "summary": "Content analytics",
+        "summary": "Generate viewer token",
         "security": [
           {
             "bearerAuth": []
@@ -432,7 +368,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Analytics payload",
+            "description": "Viewer token issued",
             "content": {
               "application/json": {
                 "schema": {
@@ -442,10 +378,74 @@
             }
           },
           "403": {
-            "description": "Insufficient permissions"
+            "description": "Access denied"
           },
           "404": {
             "description": "Asset not found"
+          }
+        }
+      }
+    },
+    "/content/assets/upload-session": {
+      "post": {
+        "summary": "Create signed upload session",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "filename",
+                  "mimeType",
+                  "size"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "integer"
+                  },
+                  "checksum": {
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upload session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "422": {
+            "description": "Validation error"
           }
         }
       }

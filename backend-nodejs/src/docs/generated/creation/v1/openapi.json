@@ -1,0 +1,371 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Creation studio projects, templates, collaboration, and campaign promotion endpoints.",
+    "version": "1.50.0",
+    "description": "Creation studio projects, templates, collaboration, and campaign promotion endpoints. (Capability: creation-studio)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/creation/recommendations": {
+      "get": {
+        "summary": "Fetch creation studio recommendations",
+        "description": "Returns prioritised actions for instructors based on project lifecycle, marketing coverage, and recency signals. Evaluations are gated by the `creation.recommendations` feature flag.",
+        "operationId": "getCreationRecommendations",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "description": "Maximum number of recommendations to return (default 5)."
+          },
+          {
+            "name": "includeHistory",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When true, include recent generation metadata for observability."
+          },
+          {
+            "name": "ownerId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Admin-only override to evaluate recommendations for a specific instructor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recommendations generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreationRecommendationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorised"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreationRecommendationResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/CreationRecommendationsPayload"
+              }
+            },
+            "required": [
+              "data"
+            ]
+          }
+        ]
+      },
+      "CreationRecommendationsPayload": {
+        "type": "object",
+        "properties": {
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreationRecommendation"
+            }
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/FeatureFlagEvaluation"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CreationRecommendationMeta"
+          }
+        },
+        "required": [
+          "recommendations",
+          "evaluation",
+          "meta"
+        ]
+      },
+      "CreationRecommendationMeta": {
+        "type": "object",
+        "properties": {
+          "algorithmVersion": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "totalProjectsEvaluated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreationRecommendationHistoryItem"
+            }
+          }
+        },
+        "required": [
+          "algorithmVersion",
+          "generatedAt",
+          "tenantId",
+          "totalProjectsEvaluated"
+        ]
+      },
+      "CreationRecommendationHistoryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "algorithmVersion": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "featureFlagState": {
+            "type": "string"
+          },
+          "featureFlagVariant": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recommendationCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "generatedAt",
+          "algorithmVersion",
+          "tenantId",
+          "featureFlagState",
+          "recommendationCount"
+        ]
+      },
+      "FeatureFlagEvaluation": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "variant": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bucket": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "strategy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "key",
+          "enabled",
+          "evaluatedAt"
+        ]
+      },
+      "CreationRecommendation": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "projectPublicId": {
+            "type": "string",
+            "description": "Stable identifier used across clients."
+          },
+          "projectTitle": {
+            "type": "string"
+          },
+          "projectType": {
+            "type": "string",
+            "enum": [
+              "course",
+              "ebook",
+              "community",
+              "ads_asset"
+            ]
+          },
+          "collaboratorCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "action": {
+            "$ref": "#/components/schemas/CreationRecommendationAction"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "recommendedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreationRecommendationSignal"
+            }
+          }
+        },
+        "required": [
+          "projectPublicId",
+          "projectTitle",
+          "projectType",
+          "priority",
+          "action",
+          "score",
+          "recommendedAt",
+          "signals"
+        ]
+      },
+      "CreationRecommendationSignal": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Signal identifier describing the heuristic that contributed to the score."
+          },
+          "weight": {
+            "type": "number",
+            "format": "double",
+            "description": "Positive or negative weighting applied to the overall score."
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw evidence captured for the signal."
+          }
+        },
+        "required": [
+          "code",
+          "weight"
+        ]
+      },
+      "CreationRecommendationAction": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "instructions"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

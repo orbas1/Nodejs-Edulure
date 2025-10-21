@@ -21,31 +21,6 @@
     }
   ],
   "paths": {
-    "/users/me": {
-      "get": {
-        "summary": "Current user profile",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Profile retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      }
-    },
     "/users": {
       "get": {
         "summary": "List users",
@@ -91,6 +66,31 @@
           },
           "403": {
             "description": "Insufficient permissions"
+          }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Current user profile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
           }
         }
       }

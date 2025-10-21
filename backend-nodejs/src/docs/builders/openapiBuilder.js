@@ -8,13 +8,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, '../../..');
 
 function normaliseServiceName(name) {
-  return String(name)
+  const slug = String(name ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$|--+/g, '-');
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return slug || 'service';
 }
 
 function deepClone(value) {
+  if (value === undefined) {
+    return undefined;
+  }
   return JSON.parse(JSON.stringify(value));
 }
 
@@ -121,6 +126,20 @@ function collectTagsFromPaths(paths) {
   return Array.from(tags);
 }
 
+function extractServicePaths(paths = {}, basePath) {
+  if (!basePath) {
+    return {};
+  }
+
+  const entries = Object.entries(paths).filter(([pathKey]) => pathKey.startsWith(basePath));
+  entries.sort(([pathA], [pathB]) => pathA.localeCompare(pathB));
+
+  return entries.reduce((acc, [pathKey, pathValue]) => {
+    acc[pathKey] = deepClone(pathValue);
+    return acc;
+  }, {});
+}
+
 export function generateServiceSpecs({
   baseSpecPath = path.join(ROOT_DIR, 'src/docs/openapi.json'),
   outputDir,
@@ -133,13 +152,7 @@ export function generateServiceSpecs({
 
   for (const entry of apiRouteMetadata) {
     const serviceName = normaliseServiceName(entry.name);
-    const servicePaths = {};
-
-    for (const [pathKey, pathValue] of Object.entries(baseSpec.paths ?? {})) {
-      if (pathKey.startsWith(entry.basePath)) {
-        servicePaths[pathKey] = deepClone(pathValue);
-      }
-    }
+    const servicePaths = extractServicePaths(baseSpec.paths, entry.basePath);
 
     if (Object.keys(servicePaths).length === 0) {
       continue;
@@ -175,6 +188,8 @@ export function generateServiceSpecs({
 
     services.push(descriptor);
   }
+
+  services.sort((a, b) => a.service.localeCompare(b.service));
 
   if (outputDir) {
     for (const descriptor of services) {

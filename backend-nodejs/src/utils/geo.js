@@ -1,12 +1,70 @@
 import centroidsData from '../data/countryCentroids.json' with { type: 'json' };
 
-const countryCentroids = new Map(
-  Object.entries(centroidsData.countries).map(([code, value]) => [code.toUpperCase(), value])
-);
+function isFiniteNumber(value) {
+  return Number.isFinite(value) || (!Number.isNaN(Number(value)) && Number.isFinite(Number(value)));
+}
 
-const aliasToCode = new Map(
-  Object.entries(centroidsData.aliases).map(([alias, code]) => [alias.trim().toLowerCase(), code.toUpperCase()])
-);
+function coerceNumber(value) {
+  if (typeof value === 'number') {
+    return value;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sanitiseCentroidEntry(code, raw) {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const normalizedCode = String(code ?? '').trim().toUpperCase();
+  if (!normalizedCode || normalizedCode.length !== 2) {
+    return null;
+  }
+
+  const name = String(raw.name ?? '').trim();
+  if (!name) {
+    return null;
+  }
+
+  const latitude = coerceNumber(raw.latitude);
+  const longitude = coerceNumber(raw.longitude);
+  if (!isFiniteNumber(latitude) || !isFiniteNumber(longitude)) {
+    return null;
+  }
+
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return null;
+  }
+
+  return Object.freeze({
+    code: normalizedCode,
+    name,
+    latitude,
+    longitude
+  });
+}
+
+const countryCentroids = new Map();
+for (const [code, value] of Object.entries(centroidsData?.countries ?? {})) {
+  const entry = sanitiseCentroidEntry(code, value);
+  if (entry) {
+    countryCentroids.set(entry.code, entry);
+  }
+}
+
+const aliasToCode = new Map();
+for (const [alias, code] of Object.entries(centroidsData?.aliases ?? {})) {
+  const sanitizedAlias = String(alias ?? '').trim().toLowerCase();
+  const normalizedCode = String(code ?? '').trim().toUpperCase();
+  if (!sanitizedAlias || sanitizedAlias.length < 2) {
+    continue;
+  }
+  if (!countryCentroids.has(normalizedCode)) {
+    continue;
+  }
+  aliasToCode.set(sanitizedAlias, normalizedCode);
+}
 
 export function normaliseCountryCode(input) {
   if (!input || typeof input !== 'string') {

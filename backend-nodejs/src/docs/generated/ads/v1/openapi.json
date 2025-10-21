@@ -269,6 +269,120 @@
         ]
       }
     },
+    "/ads/campaigns/{campaignId}/insights": {
+      "get": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Fetch rolling performance insights",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "windowDays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Insights generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsInsightsResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ads/campaigns/{campaignId}/metrics": {
+      "post": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Record daily metrics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAdsMetricsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metrics recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsCampaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ads/campaigns/{campaignId}/pause": {
       "post": {
         "tags": [
@@ -362,124 +476,46 @@
           }
         }
       }
-    },
-    "/ads/campaigns/{campaignId}/metrics": {
-      "post": {
-        "tags": [
-          "Ads"
-        ],
-        "summary": "Record daily metrics",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "campaignId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordAdsMetricsRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Metrics recorded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/AdsCampaign"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/ads/campaigns/{campaignId}/insights": {
-      "get": {
-        "tags": [
-          "Ads"
-        ],
-        "summary": "Fetch rolling performance insights",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "campaignId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "windowDays",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 60
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Insights generated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/AdsInsightsResponse"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
     "schemas": {
+      "RecordAdsMetricsRequest": {
+        "type": "object",
+        "properties": {
+          "metricDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "impressions": {
+            "type": "integer"
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "conversions": {
+            "type": "integer"
+          },
+          "spendCents": {
+            "type": "integer"
+          },
+          "revenueCents": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "impressions",
+          "clicks",
+          "conversions",
+          "spendCents"
+        ]
+      },
       "AdsInsightsResponse": {
         "type": "object",
         "properties": {
@@ -565,42 +601,6 @@
             "type": "integer"
           }
         }
-      },
-      "RecordAdsMetricsRequest": {
-        "type": "object",
-        "properties": {
-          "metricDate": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "impressions": {
-            "type": "integer"
-          },
-          "clicks": {
-            "type": "integer"
-          },
-          "conversions": {
-            "type": "integer"
-          },
-          "spendCents": {
-            "type": "integer"
-          },
-          "revenueCents": {
-            "type": "integer",
-            "nullable": true
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "required": [
-          "impressions",
-          "clicks",
-          "conversions",
-          "spendCents"
-        ]
       },
       "UpdateAdsCampaignRequest": {
         "type": "object",
