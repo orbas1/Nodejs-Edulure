@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
 import usePersistentCollection from '../../../hooks/usePersistentCollection.js';
+import useRoleGuard from '../../../hooks/useRoleGuard.js';
 
 const createEmptyPost = () => ({
   community: '',
@@ -48,6 +49,7 @@ function parseTags(tagsInput) {
 }
 
 export default function CommunityCommunications({ dashboard, onRefresh }) {
+  const { allowed, explanation } = useRoleGuard(['community', 'admin']);
   const rawHighlights = useMemo(
     () => (Array.isArray(dashboard?.communications?.highlights) ? dashboard.communications.highlights : []),
     [dashboard?.communications?.highlights]
@@ -279,6 +281,16 @@ export default function CommunityCommunications({ dashboard, onRefresh }) {
     setEditingLeaderboardId(null);
     setLeaderboardDraft(createEmptyLeaderboardEntry());
   }, []);
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Community privileges required"
+        description={explanation ?? 'Switch to a community workspace to manage communications.'}
+      />
+    );
+  }
 
   if (!dashboard) {
     return (
