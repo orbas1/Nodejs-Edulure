@@ -16,9 +16,25 @@ const consentRequestSchema = z.object({
   evidence: z.record(z.any()).optional()
 });
 
-const freshnessQuerySchema = Joi.object({
-  limit: Joi.number().integer().min(1).max(200).default(50)
-});
+function formatValidationIssues(issues) {
+  return issues.map((issue) => ({
+    path: issue.path.length > 0 ? issue.path.join('.') : '',
+    message: issue.message,
+    code: issue.code
+  }));
+}
+
+function parseConsentRequest(payload) {
+  const result = consentRequestSchema.safeParse(payload ?? {});
+  if (!result.success) {
+    const error = new Error('Telemetry consent payload is invalid');
+    error.status = 422;
+    error.code = 'INVALID_TELEMETRY_CONSENT';
+    error.details = formatValidationIssues(result.error.issues);
+    throw error;
+  }
+  return result.data;
+}
 
 function resolveTenantId(req, explicitTenantId) {
   if (explicitTenantId) {
@@ -77,7 +93,7 @@ export default class TelemetryController {
 
   static async recordConsentDecision(req, res, next) {
     try {
-      const parsed = consentRequestSchema.parse(req.body ?? {});
+      const parsed = parseConsentRequest(req.body ?? {});
       const tenantId = resolveTenantId(req, parsed.tenantId);
       const userId = parsed.userId ?? req.user?.id;
 

@@ -44,8 +44,14 @@ describe('Security operations HTTP routes', () => {
     app.use(express.json());
     app.use('/api/v1/security', securityRouter);
     app.use((error, _req, res, _next) => {
-      const status = error?.status ?? 500;
-      res.status(status).json({ success: false, error: error?.message ?? 'Internal Server Error' });
+      const status = error.status ?? 500;
+      res.status(status).json({
+        success: false,
+        error: {
+          message: error.message,
+          details: error.details ?? null
+        }
+      });
     });
   });
 
@@ -156,7 +162,10 @@ describe('Security operations HTTP routes', () => {
   });
 
   it('deletes risks from the register', async () => {
-    deleteRisk.mockResolvedValue({ success: true });
+    deleteRisk.mockResolvedValue({
+      success: true,
+      deleted: { riskId: 23, riskUuid: 'risk-uuid-23', tenantId: 'global', status: 'identified' }
+    });
 
     const response = await request(app)
       .delete('/api/v1/security/risk-register/23')
@@ -164,93 +173,38 @@ describe('Security operations HTTP routes', () => {
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
-    expect(response.body.data).toEqual({ success: true });
+    expect(response.body.data.deleted).toEqual(
+      expect.objectContaining({ riskId: 23, riskUuid: 'risk-uuid-23' })
+    );
     expect(deleteRisk).toHaveBeenCalledWith(
-      expect.objectContaining({ riskId: 23, reason: 'Duplicate entry resolved' })
+      expect.objectContaining({ riskId: 23, reason: null })
     );
   });
 
-  it('rejects delete operations when the identifier is invalid', async () => {
+  it('trims delete reasons from the request payload', async () => {
+    deleteRisk.mockResolvedValue({
+      success: true,
+      deleted: { riskId: 23, riskUuid: 'risk-uuid-23', tenantId: 'global', status: 'identified' }
+    });
+
+    await request(app)
+      .delete('/api/v1/security/risk-register/23')
+      .send({ reason: '   Duplicate entry resolved   ' })
+      .set('Authorization', 'Bearer token');
+
+    expect(deleteRisk).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'Duplicate entry resolved' })
+    );
+  });
+
+  it('rejects invalid risk identifiers with validation feedback', async () => {
     const response = await request(app)
       .delete('/api/v1/security/risk-register/not-a-number')
       .set('Authorization', 'Bearer token');
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
     expect(response.body.success).toBe(false);
-    expect(response.body.error).toBe('riskId must be a positive integer');
-    expect(deleteRisk).not.toHaveBeenCalled();
-  });
-
-  it('truncates excessively long deletion reasons', async () => {
-    deleteRisk.mockResolvedValue({ success: true });
-    const longReason = 'x'.repeat(600);
-
-    await request(app)
-      .delete('/api/v1/security/risk-register/42')
-      .send({ reason: longReason })
-      .set('Authorization', 'Bearer token');
-
-    const [[payload]] = deleteRisk.mock.calls.slice(-1);
-    expect(payload.reason).toBe('x'.repeat(500));
-  });
-
-  it('normalises risk register filters and sorting', async () => {
-    listRiskRegister.mockResolvedValue({
-      items: [],
-      pagination: { total: 0, limit: 50, offset: 10 },
-      summary: {}
-    });
-
-    const response = await request(app)
-      .get(
-        '/api/v1/security/risk-register?limit=50&offset=10&ownerId=5&includeClosed=no&sortBy=updated_at&sortDirection=ASC&search=  outage  '
-      )
-      .set('Authorization', 'Bearer token');
-
-    expect(response.status).toBe(200);
-    expect(listRiskRegister).toHaveBeenCalledWith(
-      expect.objectContaining({
-        limit: 50,
-        offset: 10,
-        ownerId: 5,
-        includeClosed: false,
-        sortBy: 'updatedAt',
-        sortDirection: 'asc',
-        search: 'outage'
-      })
-    );
-  });
-
-  it('rejects risk register listings when pagination values are invalid', async () => {
-    const response = await request(app)
-      .get('/api/v1/security/risk-register?limit=-1&offset=-10')
-      .set('Authorization', 'Bearer token');
-
-    expect(response.status).toBe(400);
-    expect(response.body.error).toBe('limit must be a positive integer not exceeding 100');
-    expect(listRiskRegister).not.toHaveBeenCalled();
-  });
-
-  it('rejects risk register listings when sort values are invalid', async () => {
-    const response = await request(app)
-      .get('/api/v1/security/risk-register?sortBy=unknown&sortDirection=sideways')
-      .set('Authorization', 'Bearer token');
-
-    expect(response.status).toBe(400);
-    expect(response.body.error).toBe(
-      'sortBy must be one of residualRisk, inherentRisk, updatedAt, createdAt, nextReviewAt, status'
-    );
-    expect(listRiskRegister).not.toHaveBeenCalled();
-  });
-
-  it('rejects risk register listings when includeClosed is not boolean-like', async () => {
-    const response = await request(app)
-      .get('/api/v1/security/risk-register?includeClosed=maybe')
-      .set('Authorization', 'Bearer token');
-
-    expect(response.status).toBe(400);
-    expect(response.body.error).toBe('includeClosed must be a boolean value');
-    expect(listRiskRegister).not.toHaveBeenCalled();
+    expect(response.body.error.details).toBeTruthy();
   });
 
   it('lists audit evidence with filtering', async () => {

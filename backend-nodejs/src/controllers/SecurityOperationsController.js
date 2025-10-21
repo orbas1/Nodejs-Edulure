@@ -1,21 +1,21 @@
+import Joi from 'joi';
+
 import securityOperationsService from '../services/SecurityOperationsService.js';
 
-const RISK_SORT_FIELDS = new Map([
-  ['residualrisk', 'residualRisk'],
-  ['inherentrisk', 'inherentRisk'],
-  ['updatedat', 'updatedAt'],
-  ['createdat', 'createdAt'],
-  ['nextreviewat', 'nextReviewAt'],
-  ['status', 'status']
-]);
+const riskIdParamSchema = Joi.object({
+  riskId: Joi.number().integer().positive().required()
+});
 
-const BOOLEAN_TRUE_VALUES = new Set(['true', '1', 'yes', 'y', 'on']);
-const BOOLEAN_FALSE_VALUES = new Set(['false', '0', 'no', 'n', 'off']);
+const deleteRiskSchema = Joi.object({
+  reason: Joi.string().trim().max(240).allow('', null).default(null)
+});
 
-function createHttpError(status, message) {
-  const error = new Error(message);
-  error.status = status;
-  return error;
+function handleValidationError(error, next) {
+  if (error.isJoi) {
+    error.status = 422;
+    error.details = error.details.map((detail) => detail.message);
+  }
+  return next(error);
 }
 
 function resolveActor(req) {
@@ -321,23 +321,28 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
-      const parsedRiskId = requirePositiveInteger(req.params?.riskId, 'riskId');
-      const reason = sanitiseOptionalText(req.body?.reason ?? req.query?.reason, { maxLength: 500 });
 
-      const acknowledgement = await securityOperationsService.deleteRisk({
-        riskId: parsedRiskId,
+      const [{ riskId }, { reason }] = await Promise.all([
+        riskIdParamSchema.validateAsync(req.params ?? {}, { abortEarly: false, convert: true }),
+        deleteRiskSchema.validateAsync(
+          {
+            reason: req.body?.reason ?? req.query?.reason ?? null
+          },
+          { abortEarly: false, stripUnknown: true }
+        )
+      ]);
+
+      const result = await securityOperationsService.deleteRisk({
+        riskId,
         tenantId,
+        reason: reason === '' ? null : reason,
         actor,
-        reason,
         requestContext: resolveRequestContext(req)
       });
 
-      return res.json({ success: true, data: acknowledgement });
+      return res.json({ success: true, data: result });
     } catch (error) {
-      if (error?.message?.toLowerCase().includes('not found')) {
-        error.status = 404;
-      }
-      return next(error);
+      return handleValidationError(error, next);
     }
   }
 
