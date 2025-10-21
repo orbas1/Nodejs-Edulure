@@ -57,15 +57,20 @@ const PROVIDERS = [
   }
 ];
 
-export default function SocialSignOn({ onSelect }) {
+export default function SocialSignOn({ onSelect, providers }) {
+  const availableProviders = providers?.length ? providers : PROVIDERS;
+
   return (
     <div className="space-y-3">
-      {PROVIDERS.map((provider) => (
+      {availableProviders.map((provider) => (
         <button
           key={provider.id}
           type="button"
-          onClick={() => onSelect(provider.id)}
-          className={`flex h-12 w-full items-center justify-center gap-3 rounded-full border px-4 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring ${provider.buttonClass}`}
+          onClick={() => !provider.disabled && onSelect(provider.id)}
+          disabled={provider.disabled}
+          className={`flex h-12 w-full items-center justify-center gap-3 rounded-full border px-4 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring ${provider.buttonClass} ${
+            provider.disabled ? 'cursor-not-allowed opacity-60' : ''
+          }`}
         >
           <span className="flex h-5 w-5 items-center justify-center" aria-hidden="true">
             {provider.icon}
@@ -78,9 +83,19 @@ export default function SocialSignOn({ onSelect }) {
 }
 
 SocialSignOn.propTypes = {
-  onSelect: PropTypes.func
+  onSelect: PropTypes.func,
+  providers: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      label: PropTypes.string.isRequired,
+      buttonClass: PropTypes.string.isRequired,
+      icon: PropTypes.node.isRequired,
+      disabled: PropTypes.bool
+    })
+  )
 };
 
 SocialSignOn.defaultProps = {
-  onSelect: () => {}
+  onSelect: () => {},
+  providers: undefined
 };
