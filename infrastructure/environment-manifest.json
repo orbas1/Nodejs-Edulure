@@ -3,43 +3,43 @@
   "modules": {
     "networking": {
       "path": "infrastructure/terraform/modules/networking",
-      "hash": "2f2b36d1cece1c67a2e49877beb71863855cacdbc8b94edeb3023d2ed5c2a44d"
+      "hash": "4f6fff7cffea7c92537d5a8eca6158155311e49e77d71e63ea0945906ce3a746"
     },
     "postgres": {
       "path": "infrastructure/terraform/modules/postgres",
-      "hash": "f544c4d8cbf53d0570c8d82939fa624d06c8d0c7158bb4b87b654de8ffeccaf3"
+      "hash": "0c1c8b643256894b572b789b942ae13602e334f5495d69e98f04548aa83f3413"
     },
     "backendService": {
       "path": "infrastructure/terraform/modules/backend_service",
-      "hash": "655f010d566a3e573f1c99a12cb9d97a73a11b5a363411ff67fc795e7ec1aae3"
+      "hash": "2216846856f730288d1df40b6dc33861a9f618e7dd994bfd49634c90e5da8086"
     }
   },
   "environments": {
     "dev": {
       "path": "infrastructure/terraform/envs/dev",
-      "hash": "ccca7501aefa7a134eb46a91c149b9cd95148e6cc3d4784486b0a8bcbe588e35"
+      "hash": "d22ef8188f06f0ce515b09833b1018195a1d658929b6aa4c970cf6fc2727d4ef"
     },
     "staging": {
       "path": "infrastructure/terraform/envs/staging",
-      "hash": "5477e0489ae2a3df5128f4ede180c38d27cc3a74ff5d0b758af4edbd14159a18"
+      "hash": "334a1d99d31a73eb49b7e5fb42b5a7b104e0615b7dc0bd9e2871a71fb45ff696"
     },
     "prod": {
       "path": "infrastructure/terraform/envs/prod",
-      "hash": "d7d3a0e247d10538f88cfbfc16a4ec9568c234e17048907a0b3e91ff47714f66"
+      "hash": "56d386e32f9a2a2c25a0d6f25f00cbef77c3b2661beecd833cb9f8752cc335d9"
     }
   },
   "docker": {
     "backend": {
       "path": "infrastructure/docker/Dockerfile.backend",
-      "hash": "9c1b4f9c807f344508b642f319e4fde42dc4887589883fc3393e33691a539762"
+      "hash": "ec2f686f53944347521171045762aa3187883b956a2de24fc2a7de0afdd63314"
     },
     "frontend": {
       "path": "infrastructure/docker/Dockerfile.frontend",
-      "hash": "1a7fb31cdcbcece44bb3f51f2359a56fed22dbb135b5270f1b6d1728c6f971e9"
+      "hash": "c601c475d4465e0895c483771c341a8e5751749140711860d4fd0543b32592e7"
     },
     "nginx": {
       "path": "infrastructure/docker/nginx.conf",
-      "hash": "884a77fbf069288507f31efd19169ad4ea79cfa07fc2d1be0a1b03d3b822ced7"
+      "hash": "c5899a315acff587d20dd8ab0c9c1201a8c18321cdbee8bd97762373d9506567"
     }
   },
   "scripts": {

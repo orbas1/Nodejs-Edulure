@@ -8,6 +8,10 @@ terraform {
   }
 }
 
+locals {
+  flow_logs_group_name = "/aws/vpc/${var.project}/${var.environment}/flow-logs"
+}
+
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -129,6 +133,62 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private[0].id
 }
 
+resource "aws_cloudwatch_log_group" "flow_logs" {
+  count             = var.enable_flow_logs ? 1 : 0
+  name              = local.flow_logs_group_name
+  retention_in_days = var.flow_logs_retention_in_days
+  kms_key_id        = var.flow_logs_log_group_kms_key_arn
+  tags = merge(
+    {
+      Name = "${var.project}-${var.environment}-vpc-flow-logs"
+    },
+    var.tags,
+  )
+}
+
+resource "aws_iam_role" "flow_logs" {
+  count = var.enable_flow_logs ? 1 : 0
+  name  = "${var.project}-${var.environment}-vpc-flow-logs"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "flow_logs" {
+  count = var.enable_flow_logs ? 1 : 0
+  name  = "${var.project}-${var.environment}-vpc-flow-logs"
+  role  = aws_iam_role.flow_logs[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.flow_logs[0].arn}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_flow_log" "this" {
+  count                = var.enable_flow_logs ? 1 : 0
+  iam_role_arn         = aws_iam_role.flow_logs[0].arn
+  log_destination_type = "cloud-watch-logs"
+  log_group_name       = aws_cloudwatch_log_group.flow_logs[0].name
+  traffic_type         = var.flow_logs_traffic_type
+  vpc_id               = aws_vpc.this.id
+}
+
 output "vpc_id" {
   value = aws_vpc.this.id
 }
@@ -139,4 +199,16 @@ output "public_subnet_ids" {
 
 output "private_subnet_ids" {
   value = [for subnet in aws_subnet.private : subnet.id]
+}
+
+output "public_route_table_id" {
+  value = aws_route_table.public.id
+}
+
+output "private_route_table_id" {
+  value = var.create_nat_gateway ? aws_route_table.private[0].id : null
+}
+
+output "flow_logs_log_group_name" {
+  value = var.enable_flow_logs ? aws_cloudwatch_log_group.flow_logs[0].name : null
 }

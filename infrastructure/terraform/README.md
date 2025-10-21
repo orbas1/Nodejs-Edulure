@@ -16,7 +16,7 @@ infrastructure/terraform
     └── prod
 ```
 
-Each environment directory contains a `main.tf` that assembles the shared modules with environment-specific sizing, retention, and deletion-protection rules. Variables define sensible defaults for each environment but can be overridden with `terraform.tfvars` files or pipeline-provided values.
+Each environment directory contains a `main.tf` that assembles the shared modules with environment-specific sizing, retention, logging, and deletion-protection rules. Variables define sensible defaults for each environment but can be overridden with `terraform.tfvars` files or pipeline-provided values.
 
 ## Remote state
 
@@ -38,13 +38,16 @@ terraform apply -var="project=edulure" \
   -var="database_password=$(aws secretsmanager get-secret-value --secret-id edulure/dev/db | jq -r .SecretString)"
 ```
 
+Provide `-var="certificate_arn=arn:aws:acm:..."` (and optionally override `https_listener_port` or `https_ssl_policy`) to terminate HTTPS directly on the load balancer. HTTP requests are redirected to HTTPS automatically when the certificate is present. To enable WAF protections or access logging on the load balancer, provide `waf_web_acl_arn`, set `enable_alb_access_logs=true`, and supply `alb_access_logs_bucket`/`alb_access_logs_prefix` values that point to an S3 bucket with the correct ACLs.
+
 CI pipelines should run `terraform plan` for each environment with the same variables to guarantee parity before deployment.
 
 ## Security
 
-- Postgres is deployed inside private subnets with encryption, IAM auth support, and configurable backup retention.
-- ECS tasks read secrets through IAM policies limited to explicitly enumerated ARNs.
-- Application Load Balancers enforce TLS (terminate at AWS ACM) and block deletion in staging/production by default.
+- Networking stacks can enable VPC flow logs (encrypted with an optional KMS key) to emit connection metadata for SIEM ingestion while keeping subnets private.
+- Postgres is deployed inside private subnets with encryption, IAM auth support, configurable backup/maintenance windows, and optional deletion protection.
+- ECS tasks read secrets through IAM policies limited to explicitly enumerated ARNs, and the service can enable deployment circuit breakers for automatic rollbacks.
+- When an ACM `certificate_arn` is supplied, the backend module provisions an HTTPS listener with a strict TLS policy, optional WAF association, ALB access logging, and HTTP-to-HTTPS redirects. Staging and production environments keep ALB deletion protection enabled by default.
 
 ## Observability
 

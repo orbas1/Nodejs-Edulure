@@ -101,6 +101,30 @@ variable "secret_arns" {
   default     = []
 }
 
+variable "certificate_arn" {
+  type        = string
+  description = "ACM certificate ARN enabling HTTPS on the load balancer."
+  default     = null
+}
+
+variable "https_listener_port" {
+  type        = number
+  description = "Port to expose HTTPS traffic on when a certificate ARN is supplied."
+  default     = 443
+}
+
+variable "https_ssl_policy" {
+  type        = string
+  description = "SSL policy applied to the HTTPS listener."
+  default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+}
+
+variable "assign_public_ip" {
+  type        = bool
+  description = "Assign a public IP to ECS tasks (only for environments without NAT)."
+  default     = false
+}
+
 variable "healthcheck_path" {
   type        = string
   description = "Path used by load balancer and container health checks."
@@ -129,6 +153,52 @@ variable "enable_alb_deletion_protection" {
   type        = bool
   description = "Whether to enable deletion protection on the ALB."
   default     = false
+}
+
+variable "load_balancer_idle_timeout" {
+  type        = number
+  description = "Idle timeout in seconds for the Application Load Balancer."
+  default     = 60
+}
+
+variable "enable_alb_access_logs" {
+  type        = bool
+  description = "Enable ALB access logs to the specified S3 bucket."
+  default     = false
+}
+
+variable "alb_access_logs_bucket" {
+  type        = string
+  description = "S3 bucket name that stores ALB access logs."
+  default     = null
+  validation {
+    condition     = var.enable_alb_access_logs ? (var.alb_access_logs_bucket != null && trimspace(var.alb_access_logs_bucket) != "") : true
+    error_message = "Specify alb_access_logs_bucket when enable_alb_access_logs is true."
+  }
+}
+
+variable "alb_access_logs_prefix" {
+  type        = string
+  description = "S3 prefix for ALB access logs."
+  default     = null
+}
+
+variable "waf_web_acl_arn" {
+  type        = string
+  description = "Optional WAFv2 Web ACL ARN to associate with the load balancer."
+  default     = null
+}
+
+variable "enable_deployment_circuit_breaker" {
+  type        = bool
+  description = "Toggle ECS deployment circuit breaker for automatic rollbacks."
+  default     = true
+}
+
+variable "rollback_on_failure" {
+  type        = bool
+  description = "Whether the deployment circuit breaker should trigger rollbacks."
+  default     = true
 }
 
 variable "tags" {
