@@ -103,21 +103,40 @@ const DEFAULT_THIRD_PARTY = Object.freeze({
   credentials: []
 });
 
+const ARRAY_MERGE_LIMIT = 20;
+
 function deepMerge(base, patch) {
-  if (!patch || typeof patch !== 'object') {
-    return { ...base };
+  if (Array.isArray(patch)) {
+    return patch.slice(0, ARRAY_MERGE_LIMIT);
   }
 
   const result = Array.isArray(base) ? [...base] : { ...base };
-  for (const [key, value] of Object.entries(patch)) {
-    if (Array.isArray(value)) {
-      result[key] = value.slice(0, 20);
-    } else if (value && typeof value === 'object') {
-      result[key] = deepMerge(base?.[key] ?? {}, value);
-    } else {
-      result[key] = value;
-    }
+
+  if (!patch || typeof patch !== 'object') {
+    return result;
   }
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      result[key] = value.slice(0, ARRAY_MERGE_LIMIT);
+      continue;
+    }
+
+    if (value && typeof value === 'object') {
+      const baseValue = result[key];
+      const nextBase =
+        baseValue && typeof baseValue === 'object' && !Array.isArray(baseValue) ? baseValue : {};
+      result[key] = deepMerge(nextBase, value);
+      continue;
+    }
+
+    result[key] = value;
+  }
+
   return result;
 }
 
@@ -1319,34 +1338,6 @@ function sanitizeFinanceSettingsPayload(payload = {}) {
     sanitized.approvals = normaliseFinanceSettings({ approvals: payload.approvals }).approvals;
   }
   return sanitized;
-}
-
-function deepMerge(base, overrides) {
-  const result = Array.isArray(base) ? [...base] : { ...base };
-  if (!overrides || typeof overrides !== 'object') {
-    return result;
-  }
-
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value === undefined) {
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      result[key] = [...value];
-      return;
-    }
-
-    if (value && typeof value === 'object') {
-      const baseValue = result[key] && typeof result[key] === 'object' ? result[key] : {};
-      result[key] = deepMerge(baseValue, value);
-      return;
-    }
-
-    result[key] = value;
-  });
-
-  return result;
 }
 
 function clampInt(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER, fallback = 0 } = {}) {
