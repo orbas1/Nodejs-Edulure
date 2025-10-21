@@ -70,8 +70,14 @@ variable "master_password" {
   description = "Master database password."
   sensitive   = true
   validation {
-    condition     = length(var.master_password) >= 16 && can(regex("[A-Z]", var.master_password)) && can(regex("[0-9]", var.master_password))
-    error_message = "Master password must be at least 16 characters and include an uppercase letter and a number."
+    condition = (
+      length(var.master_password) >= 16 &&
+      can(regex("[A-Z]", var.master_password)) &&
+      can(regex("[a-z]", var.master_password)) &&
+      can(regex("[0-9]", var.master_password)) &&
+      can(regex("[^A-Za-z0-9]", var.master_password))
+    )
+    error_message = "Master password must be at least 16 characters and include upper, lower, numeric, and special characters."
   }
 }
 
@@ -79,12 +85,22 @@ variable "skip_final_snapshot" {
   type        = bool
   description = "Skip final snapshot on destroy (set false for production)."
   default     = false
+  validation {
+    condition     = !(lower(var.environment) == "prod" && var.skip_final_snapshot)
+    error_message = "Production environments must retain a final snapshot on database destruction."
+  }
 }
 
 variable "backup_retention_period" {
   type        = number
   description = "Number of days to retain automated backups."
   default     = 7
+  validation {
+    condition = var.backup_retention_period >= (
+      contains(["prod"], lower(var.environment)) ? 14 : 7
+    )
+    error_message = "Production environments require at least 14 days of backup retention; lower tiers must retain 7 or more days."
+  }
 }
 
 variable "apply_immediately" {
@@ -109,11 +125,12 @@ variable "allowed_cidr_blocks" {
   default     = []
   validation {
     condition = alltrue([
-      for cidr in var.allowed_cidr_blocks : can(cidrnetmask(cidr)) && (
-        cidr != "0.0.0.0/0" ? true : lower(var.environment) == "local"
+      for cidr in var.allowed_cidr_blocks : (
+        can(cidrhost(cidr, 0)) &&
+        (cidr != "0.0.0.0/0" ? true : lower(var.environment) == "local")
       )
     ])
-    error_message = "CIDR blocks must be valid IPv4 ranges. 0.0.0.0/0 is only permitted for the local environment."
+    error_message = "CIDR blocks must be valid IPv4 ranges resolvable by Terraform. 0.0.0.0/0 is only permitted for the local environment."
   }
 }
 
@@ -123,11 +140,12 @@ variable "allowed_ipv6_cidr_blocks" {
   default     = []
   validation {
     condition = alltrue([
-      for cidr in var.allowed_ipv6_cidr_blocks : can(cidrnetmask(cidr)) && (
-        cidr != "::/0" ? true : lower(var.environment) == "local"
+      for cidr in var.allowed_ipv6_cidr_blocks : (
+        can(cidrhost(cidr, 0)) &&
+        (cidr != "::/0" ? true : lower(var.environment) == "local")
       )
     ])
-    error_message = "CIDR blocks must be valid IPv6 ranges. ::/0 is only permitted for the local environment."
+    error_message = "CIDR blocks must be valid IPv6 ranges resolvable by Terraform. ::/0 is only permitted for the local environment."
   }
 }
 

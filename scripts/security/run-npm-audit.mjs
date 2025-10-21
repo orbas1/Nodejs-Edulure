@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'process';
 
-const ALLOWLIST = [
+const DEFAULT_ALLOWLIST = [
   {
     id: '1088594',
     package: 'd3-color',
@@ -17,23 +17,60 @@ const ALLOWLIST = [
 ];
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
-const REPORTS_DIR = path.resolve(repoRoot, 'reports', 'security');
 
 function parseArgs() {
   const args = process.argv.slice(2);
   const parsed = {
     workspace: null,
-    severity: 'moderate'
+    severity: 'moderate',
+    outputDir: path.join('reports', 'security'),
+    allowlistPath: process.env.NPM_AUDIT_ALLOWLIST ?? null
   };
 
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
-    if ((token === '--workspace' || token === '-w') && args[index + 1]) {
-      parsed.workspace = args[index + 1];
-      index += 1;
-    } else if ((token === '--severity' || token === '-s') && args[index + 1]) {
-      parsed.severity = args[index + 1].toLowerCase();
-      index += 1;
+    switch (token) {
+      case '--workspace':
+      case '-w': {
+        const value = args[index + 1];
+        if (!value) {
+          throw new Error('Missing value for --workspace option.');
+        }
+        parsed.workspace = value;
+        index += 1;
+        break;
+      }
+      case '--severity':
+      case '-s': {
+        const value = args[index + 1];
+        if (!value) {
+          throw new Error('Missing value for --severity option.');
+        }
+        parsed.severity = value.toLowerCase();
+        index += 1;
+        break;
+      }
+      case '--output-dir':
+      case '-o': {
+        const value = args[index + 1];
+        if (!value) {
+          throw new Error('Missing value for --output-dir option.');
+        }
+        parsed.outputDir = value;
+        index += 1;
+        break;
+      }
+      case '--allowlist': {
+        const value = args[index + 1];
+        if (!value) {
+          throw new Error('Missing value for --allowlist option.');
+        }
+        parsed.allowlistPath = value;
+        index += 1;
+        break;
+      }
+      default:
+        throw new Error(`Unsupported argument '${token}'.`);
     }
   }
 
@@ -48,19 +85,67 @@ function validateSeverity(severity) {
   return severity;
 }
 
-const cliOptions = (() => {
-  const parsed = parseArgs();
-  parsed.severity = validateSeverity(parsed.severity);
-  return parsed;
-})();
+async function readJsonIfExists(filePath) {
+  try {
+    const contents = await fs.readFile(filePath, 'utf8');
+    return JSON.parse(contents);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
 
-function runAudit({ cwd }) {
+async function loadAllowlist(allowlistPath) {
+  if (!allowlistPath) {
+    return DEFAULT_ALLOWLIST;
+  }
+  const resolved = path.isAbsolute(allowlistPath) ? allowlistPath : path.join(repoRoot, allowlistPath);
+  const payload = await readJsonIfExists(resolved);
+  if (!payload) {
+    throw new Error(`Allowlist file not found at ${resolved}`);
+  }
+  if (!Array.isArray(payload)) {
+    throw new Error(`Allowlist file at ${resolved} must export an array of entries.`);
+  }
+  return payload;
+}
+
+async function discoverWorkspaces() {
+  const rootPackage = await readJsonIfExists(path.join(repoRoot, 'package.json'));
+  const workspaces = [{ name: 'root', location: repoRoot }];
+  const patterns = Array.isArray(rootPackage?.workspaces) ? rootPackage.workspaces : [];
+
+  for (const pattern of patterns) {
+    if (pattern.includes('*')) {
+      console.warn(`[npm-audit] Workspace pattern '${pattern}' contains a wildcard. Expand it manually in package.json to enable automated audits.`);
+      continue;
+    }
+    const workspacePath = path.join(repoRoot, pattern);
+    workspaces.push({ name: pattern, location: workspacePath });
+  }
+  return workspaces;
+}
+
+function selectTargets(allWorkspaces, requestedWorkspace) {
+  if (!requestedWorkspace || requestedWorkspace === 'all') {
+    return allWorkspaces;
+  }
+  const match = allWorkspaces.find((entry) => entry.name === requestedWorkspace);
+  if (!match) {
+    throw new Error(`Unknown workspace '${requestedWorkspace}'. Valid options: ${allWorkspaces.map((entry) => entry.name).join(', ')}`);
+  }
+  return [match];
+}
+
+function runAudit({ cwd, severity }) {
   const npmCli = process.env.npm_execpath;
   if (!npmCli) {
     throw new Error('npm_execpath is not defined. Run this script via an npm script context.');
   }
   const command = process.env.npm_node_execpath || process.execPath;
-  const args = [npmCli, 'audit', '--json', `--audit-level=${cliOptions.severity}`];
+  const args = [npmCli, 'audit', '--json', `--audit-level=${severity}`];
 
   return new Promise((resolve, reject) => {
     execFile(command, args, { cwd, maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
@@ -70,7 +155,7 @@ function runAudit({ cwd }) {
       }
       try {
         const report = JSON.parse(stdout);
-        resolve({ report, stderr });
+        resolve({ report, stderr: stderr || null });
       } catch (parseError) {
         reject(new Error(`Failed to parse npm audit output: ${parseError.message}`));
       }
@@ -78,8 +163,8 @@ function runAudit({ cwd }) {
   });
 }
 
-function isAllowlisted({ advisoryId, workspace }) {
-  const match = ALLOWLIST.find((entry) => {
+function isAllowlisted({ advisoryId, workspace }, allowlist) {
+  const match = allowlist.find((entry) => {
     if (entry.id !== advisoryId) {
       return false;
     }
@@ -133,12 +218,12 @@ function extractFindings({ report }) {
   return findings;
 }
 
-async function ensureReportsDir() {
-  await fs.mkdir(REPORTS_DIR, { recursive: true });
+async function ensureReportsDir(dirPath) {
+  await fs.mkdir(dirPath, { recursive: true });
 }
 
-async function persistReport({ workspace, severity, findings, accepted, unapproved, report }) {
-  await ensureReportsDir();
+async function persistReport({ workspace, severity, findings, accepted, unapproved, report, reportDir, allowlistSource }) {
+  await ensureReportsDir(reportDir);
   const reportName = `${workspace || 'root'}-npm-audit.json`;
   const payload = {
     generatedAt: new Date().toISOString(),
@@ -149,36 +234,47 @@ async function persistReport({ workspace, severity, findings, accepted, unapprov
       allowlisted: accepted.length,
       unapproved: unapproved.length
     },
+    allowlistSource,
     report,
     findings,
     accepted,
     unapproved
   };
-  const outputPath = path.join(REPORTS_DIR, reportName);
+  const outputPath = path.join(reportDir, reportName);
   await fs.writeFile(outputPath, JSON.stringify(payload, null, 2));
   return outputPath;
 }
 
-async function main() {
-  const { workspace, severity } = cliOptions;
-  const cwdUrl = workspace ? new URL(`../../${workspace}/`, import.meta.url) : new URL('../../', import.meta.url);
-  const resolvedCwd = fileURLToPath(cwdUrl);
-
-  const { report } = await runAudit({ cwd: resolvedCwd });
+async function runAuditForWorkspace({ workspace, location, severity, allowlist, reportDir, allowlistSource }) {
+  const { report } = await runAudit({ cwd: location, severity });
   const findings = extractFindings({ report });
 
   if (!findings.length) {
-    console.log('npm audit: no actionable vulnerabilities detected');
-    const reportPath = await persistReport({ workspace, severity, findings: [], accepted: [], unapproved: [], report });
-    console.log(`Audit report saved to ${path.relative(process.cwd(), reportPath)}`);
-    return;
+    const reportPath = await persistReport({
+      workspace,
+      severity,
+      findings: [],
+      accepted: [],
+      unapproved: [],
+      report,
+      reportDir,
+      allowlistSource
+    });
+    return {
+      workspace,
+      reportPath,
+      findings: 0,
+      accepted: 0,
+      unapproved: 0,
+      exitCode: 0
+    };
   }
 
   const unapproved = [];
   const accepted = [];
 
   for (const finding of findings) {
-    const allowlistEntry = isAllowlisted({ advisoryId: finding.advisoryId, workspace });
+    const allowlistEntry = isAllowlisted({ advisoryId: finding.advisoryId, workspace }, allowlist);
     if (!allowlistEntry) {
       unapproved.push(finding);
       continue;
@@ -192,30 +288,110 @@ async function main() {
     accepted.push({ ...finding, allowlistEntry });
   }
 
-  const reportPath = await persistReport({ workspace, severity, findings, accepted, unapproved, report });
-  console.log(`Audit report saved to ${path.relative(process.cwd(), reportPath)}`);
+  const reportPath = await persistReport({
+    workspace,
+    severity,
+    findings,
+    accepted,
+    unapproved,
+    report,
+    reportDir,
+    allowlistSource
+  });
 
-  if (accepted.length) {
-    console.log('⚠️  Allowlisted vulnerabilities detected:');
-    for (const finding of accepted) {
-      console.log(
-        ` - [${finding.advisoryId}] ${finding.title} (${finding.severity}) in ${finding.dependency}. Mitigation: ${finding.allowlistEntry.mitigation}`
-      );
+  return {
+    workspace,
+    reportPath,
+    findings: findings.length,
+    accepted: accepted.length,
+    unapproved: unapproved.length,
+    exitCode: unapproved.length ? 1 : 0,
+    acceptedFindings: accepted,
+    unapprovedFindings: unapproved
+  };
+}
+
+async function main() {
+  let cliOptions;
+  try {
+    cliOptions = parseArgs();
+    cliOptions.severity = validateSeverity(cliOptions.severity);
+  } catch (error) {
+    console.error(`\n❌  ${error.message}`);
+    process.exit(1);
+    return;
+  }
+
+  const reportDir = path.isAbsolute(cliOptions.outputDir)
+    ? cliOptions.outputDir
+    : path.join(repoRoot, cliOptions.outputDir);
+
+  const allowlist = await loadAllowlist(cliOptions.allowlistPath);
+  const allowlistSource = cliOptions.allowlistPath ? path.resolve(cliOptions.allowlistPath) : 'embedded';
+
+  const allWorkspaces = await discoverWorkspaces();
+  const targets = selectTargets(allWorkspaces, cliOptions.workspace);
+  if (targets.length === 0) {
+    console.error('No workspaces found to audit.');
+    process.exit(1);
+    return;
+  }
+
+  const summary = [];
+  let hasFailures = false;
+
+  for (const target of targets) {
+    console.log(`\n🔐 Auditing npm dependencies for workspace ${target.name}`);
+    const result = await runAuditForWorkspace({
+      workspace: target.name === 'root' ? null : target.name,
+      location: target.location,
+      severity: cliOptions.severity,
+      allowlist,
+      reportDir,
+      allowlistSource
+    });
+
+    summary.push(result);
+    console.log(`Audit report saved to ${path.relative(process.cwd(), result.reportPath)}`);
+
+    if (result.acceptedFindings?.length) {
+      console.log('⚠️  Allowlisted vulnerabilities detected:');
+      for (const finding of result.acceptedFindings) {
+        console.log(
+          ` - [${finding.advisoryId}] ${finding.title} (${finding.severity}) in ${finding.dependency}. Mitigation: ${finding.allowlistEntry.mitigation}`
+        );
+      }
+    }
+
+    if (result.unapprovedFindings?.length) {
+      hasFailures = true;
+      console.error('\n❌ Unapproved vulnerabilities detected:');
+      for (const finding of result.unapprovedFindings) {
+        let note = '';
+        if (finding.allowlistExpired) {
+          note = finding.allowlistEntry?.reason === 'missing_expiry' ? ' (allowlist missing expiry)' : ' (allowlist expired)';
+        }
+        console.error(` - [${finding.advisoryId}] ${finding.title}${note}`);
+        if (finding.url) {
+          console.error(`   ${finding.url}`);
+        }
+      }
     }
   }
 
-  if (unapproved.length) {
-    console.error('\n❌ Unapproved vulnerabilities detected:');
-    for (const finding of unapproved) {
-      let note = '';
-      if (finding.allowlistExpired) {
-        note = finding.allowlistEntry?.reason === 'missing_expiry' ? ' (allowlist missing expiry)' : ' (allowlist expired)';
-      }
-      console.error(` - [${finding.advisoryId}] ${finding.title}${note}`);
-      if (finding.url) {
-        console.error(`   ${finding.url}`);
-      }
-    }
+  if (summary.length) {
+    console.table(
+      summary.map((entry) => ({
+        workspace: entry.workspace || 'root',
+        findings: entry.findings,
+        allowlisted: entry.accepted,
+        unapproved: entry.unapproved,
+        report: path.relative(process.cwd(), entry.reportPath)
+      }))
+    );
+  }
+
+  if (hasFailures) {
     process.exit(1);
   }
 }

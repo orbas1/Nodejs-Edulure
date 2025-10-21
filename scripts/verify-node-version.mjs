@@ -49,6 +49,17 @@ const loadPackageConfig = async (rootDir) => {
   return JSON.parse(packageContents);
 };
 
+const parsePackageManagerVersion = (packageManagerValue) => {
+  if (!packageManagerValue) {
+    return null;
+  }
+  const [manager, version] = packageManagerValue.split('@');
+  if (!manager || !version) {
+    return null;
+  }
+  return { manager, version };
+};
+
 const extractNpmVersionFromAgent = () => {
   const agent = process.env.npm_config_user_agent;
   if (!agent) {
@@ -92,6 +103,12 @@ const main = async () => {
     process.exit(1);
   }
 
+  const declaredPackageManager = parsePackageManagerVersion(pkg.packageManager ?? '');
+  if (declaredPackageManager && declaredPackageManager.manager !== 'npm') {
+    console.error('\u274c  Workspace is pinned to use npm but packageManager field declares %s.', pkg.packageManager);
+    process.exit(1);
+  }
+
   const currentNode = process.version;
   const currentNpm = readNpmVersion();
 
@@ -109,6 +126,16 @@ const main = async () => {
   if (!satisfiesMinimum(currentNpm, minimumNpm)) {
     console.error('\u274c  npm %s does not meet the minimum required version %s.', currentNpm, minimumNpm);
     console.error('    Update npm with `npm install -g npm@%s`.', minimumNpm);
+    process.exit(1);
+  }
+
+  if (declaredPackageManager && !satisfiesMinimum(currentNpm, declaredPackageManager.version)) {
+    console.error(
+      '\u274c  npm %s does not satisfy the packageManager requirement %s.',
+      currentNpm,
+      pkg.packageManager
+    );
+    console.error('    Use `npm install -g %s` to align with the documented toolchain.', pkg.packageManager);
     process.exit(1);
   }
 
