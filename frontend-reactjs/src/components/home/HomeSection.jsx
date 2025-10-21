@@ -10,12 +10,12 @@ const SIZE_CLASSES = {
 };
 
 const PAD_CLASSES = {
-  default: 'py-24',
-  cozy: 'py-20',
-  tight: 'py-16',
-  balanced: 'py-24 sm:py-28',
-  relaxed: 'py-28',
-  loose: 'py-32',
+  default: 'py-16 sm:py-24',
+  cozy: 'py-14 sm:py-20',
+  tight: 'py-12 sm:py-16',
+  balanced: 'py-16 sm:py-28',
+  relaxed: 'py-20 sm:py-28',
+  loose: 'py-24 sm:py-32',
   none: 'py-0'
 };
 
@@ -25,7 +25,7 @@ export default function HomeSection({
   className,
   pad = 'default',
   size = 'default',
-  px = 'px-6',
+  px = 'px-4 sm:px-6 lg:px-10',
   ...props
 }) {
   const resolvedSize = SIZE_CLASSES[size] ?? size;
