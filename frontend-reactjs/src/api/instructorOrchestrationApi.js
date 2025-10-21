@@ -1,37 +1,72 @@
 import { httpClient } from './httpClient.js';
 
-export function generateCourseOutline({ token, payload } = {}) {
-  return httpClient
-    .post('/instructor/orchestration/course-outline', payload ?? {}, { token })
-    .then((response) => response.data);
+function buildRequestOptions({ token, signal, idempotencyKey } = {}) {
+  const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
+  return {
+    token,
+    signal,
+    headers,
+    cache: false
+  };
 }
 
-export function importFromNotion({ token, payload } = {}) {
-  return httpClient
-    .post('/instructor/orchestration/notion-import', payload ?? {}, { token })
-    .then((response) => response.data);
+async function postOrchestrationAction(endpoint, { token, payload, signal, idempotencyKey } = {}) {
+  const body = payload ?? {};
+  const response = await httpClient.post(endpoint, body, buildRequestOptions({ token, signal, idempotencyKey }));
+  return response?.data ?? response;
 }
 
-export function syncFromLms({ token, payload } = {}) {
-  return httpClient
-    .post('/instructor/orchestration/lms-sync', payload ?? {}, { token })
-    .then((response) => response.data);
+export function generateCourseOutline(options = {}) {
+  return postOrchestrationAction('/instructor/orchestration/course-outline', options);
 }
 
-export function routeTutorRequest({ token, payload } = {}) {
-  return httpClient
-    .post('/instructor/orchestration/tutor-routing', payload ?? {}, { token })
-    .then((response) => response.data);
+export function importFromNotion(options = {}) {
+  return postOrchestrationAction('/instructor/orchestration/notion-import', options);
 }
 
-export function sendMentorInvite({ token, payload } = {}) {
-  return httpClient
-    .post('/instructor/orchestration/mentor-invite', payload ?? {}, { token })
-    .then((response) => response.data);
+export function syncFromLms(options = {}) {
+  return postOrchestrationAction('/instructor/orchestration/lms-sync', options);
 }
 
-export function exportPricing({ token, payload } = {}) {
-  return httpClient
-    .post('/instructor/orchestration/pricing-export', payload ?? {}, { token })
-    .then((response) => response.data);
+export function routeTutorRequest(options = {}) {
+  return postOrchestrationAction('/instructor/orchestration/tutor-routing', options);
 }
+
+export function sendMentorInvite(options = {}) {
+  return postOrchestrationAction('/instructor/orchestration/mentor-invite', options);
+}
+
+export function exportPricing(options = {}) {
+  return postOrchestrationAction('/instructor/orchestration/pricing-export', options);
+}
+
+export function simulateCurriculumAudit(options = {}) {
+  return postOrchestrationAction('/instructor/orchestration/curriculum-audit', options);
+}
+
+export function scheduleWorkshopRun(options = {}) {
+  return postOrchestrationAction('/instructor/orchestration/workshops/schedule', options);
+}
+
+export function cancelWorkshopRun({ workshopId, ...options } = {}) {
+  if (!workshopId || (typeof workshopId === 'string' && !workshopId.trim())) {
+    throw new Error('A workshop identifier is required to cancel a run.');
+  }
+
+  const endpoint = `/instructor/orchestration/workshops/${encodeURIComponent(String(workshopId).trim())}/cancel`;
+  return postOrchestrationAction(endpoint, options);
+}
+
+export const instructorOrchestrationApi = {
+  generateCourseOutline,
+  importFromNotion,
+  syncFromLms,
+  routeTutorRequest,
+  sendMentorInvite,
+  exportPricing,
+  simulateCurriculumAudit,
+  scheduleWorkshopRun,
+  cancelWorkshopRun
+};
+
+export default instructorOrchestrationApi;

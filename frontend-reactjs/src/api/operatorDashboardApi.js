@@ -793,6 +793,46 @@ export async function stopFinanceExperiment({ token, experimentId, tenantId } = 
   );
 }
 
+export async function fetchOperationsDigest({ token, tenantId, signal } = {}) {
+  if (!token) {
+    throw new Error('Authentication token is required to fetch operations digest');
+  }
+
+  const response = await httpClient.get('/operator/operations/digest', {
+    token,
+    signal,
+    params: buildTenantParams(tenantId),
+    cache: {
+      ttl: 60_000,
+      tags: [`operator:operations:${tenantId ?? 'default'}`],
+      varyByToken: true,
+      varyByHeaders: ['Accept-Language']
+    }
+  });
+
+  return response?.data ?? response;
+}
+
+export async function acknowledgeOperationsIncident({ token, tenantId, incidentId, note } = {}) {
+  if (!token) {
+    throw new Error('Authentication token is required to acknowledge incidents');
+  }
+  if (!incidentId) {
+    throw new Error('An incident identifier is required to acknowledge an incident');
+  }
+
+  return httpClient.post(
+    `/operator/operations/incidents/${encodeURIComponent(incidentId)}/acknowledge`,
+    note ? { note } : {},
+    {
+      token,
+      params: buildTenantParams(tenantId),
+      cache: { enabled: false },
+      invalidateTags: [`operator:operations:${tenantId ?? 'default'}`]
+    }
+  );
+}
+
 export async function assignSupportTicket({ token, tenantId, ticketId, assigneeId } = {}) {
   if (!token) {
     throw new Error('Authentication token is required to assign support tickets');
@@ -903,7 +943,9 @@ export const operatorDashboardApi = {
   escalateSupportTicket,
   resolveSupportTicket,
   scheduleSupportBroadcast,
-  updateSupportNotificationPolicy
+  updateSupportNotificationPolicy,
+  fetchOperationsDigest,
+  acknowledgeOperationsIncident
 };
 
 export default operatorDashboardApi;

@@ -67,3 +67,44 @@ export function capturePayPalOrder({ token, paymentId, signal } = {}) {
     })
     .then((response) => response?.data ?? null);
 }
+
+export async function refundPayment({ token, paymentId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!paymentId) {
+    throw new Error('A payment identifier is required to issue a refund');
+  }
+
+  const response = await httpClient.post(`/payments/${encodeURIComponent(paymentId)}/refunds`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`payments:${paymentId}`]
+  });
+
+  return response?.data ?? response;
+}
+
+export async function listPaymentIntents({ token, params, signal } = {}) {
+  ensureToken(token);
+
+  const response = await httpClient.get('/payments', {
+    token,
+    params,
+    signal,
+    cache: {
+      ttl: 30_000,
+      tags: ['payments:intents'],
+      varyByToken: true
+    }
+  });
+
+  return response?.data ?? response;
+}
+
+export const paymentsApi = {
+  createPaymentIntent,
+  capturePayPalOrder,
+  refundPayment,
+  listPaymentIntents
+};
+
+export default paymentsApi;

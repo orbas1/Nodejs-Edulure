@@ -1,13 +1,28 @@
 import { httpClient } from './httpClient.js';
 
-export async function fetchIntegrationInvite({ token, signal } = {}) {
-  if (!token) {
-    throw new Error('Invitation token is required');
+function ensureInviteToken(token, action) {
+  if (!token || !token.trim()) {
+    throw new Error(`Invitation token is required to ${action}.`);
   }
 
-  const encodedToken = encodeURIComponent(token.trim());
+  return encodeURIComponent(token.trim());
+}
+
+export async function fetchIntegrationInvite({ token, signal } = {}) {
+  const encodedToken = ensureInviteToken(token, 'load invitation details');
 
   const response = await httpClient.get(`/integration-invites/${encodedToken}`, {
+    signal,
+    cache: { enabled: false }
+  });
+
+  return response?.data ?? response;
+}
+
+export async function previewIntegrationInvite({ token, signal } = {}) {
+  const encodedToken = ensureInviteToken(token, 'preview the invitation');
+
+  const response = await httpClient.get(`/integration-invites/${encodedToken}/preview`, {
     signal,
     cache: { enabled: false }
   });
@@ -25,14 +40,11 @@ export async function submitIntegrationInvite({
   reason,
   signal
 } = {}) {
-  if (!token) {
-    throw new Error('Invitation token is required to submit credentials');
-  }
+  const encodedToken = ensureInviteToken(token, 'submit credentials for the invitation');
+
   if (!key) {
     throw new Error('API key value is required');
   }
-
-  const encodedToken = encodeURIComponent(token.trim());
 
   const payload = { key, rotationIntervalDays, keyExpiresAt, actorEmail, actorName, reason };
 
@@ -44,9 +56,26 @@ export async function submitIntegrationInvite({
   return response?.data ?? response;
 }
 
+export async function declineIntegrationInvite({ token, reason, signal } = {}) {
+  const encodedToken = ensureInviteToken(token, 'decline the invitation');
+
+  const response = await httpClient.post(
+    `/integration-invites/${encodedToken}/decline`,
+    reason ? { reason } : {},
+    {
+      signal,
+      cache: false
+    }
+  );
+
+  return response?.data ?? response;
+}
+
 export const integrationInviteApi = {
   fetchIntegrationInvite,
-  submitIntegrationInvite
+  previewIntegrationInvite,
+  submitIntegrationInvite,
+  declineIntegrationInvite
 };
 
 export default integrationInviteApi;
