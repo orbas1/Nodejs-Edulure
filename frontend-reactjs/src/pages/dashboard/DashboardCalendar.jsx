@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   ArrowDownTrayIcon,
@@ -24,6 +24,8 @@ const EVENT_TYPE_LABELS = {
   podcast: 'Podcast',
   event: 'Community event'
 };
+
+const BASE_EVENT_TYPES = Object.freeze(Object.keys(EVENT_TYPE_LABELS));
 
 const DEFAULT_SEEDED_EVENTS = [
   {
@@ -160,6 +162,18 @@ function computeStatus(event) {
   if (end < now) return 'completed';
   if (start <= now && end >= now) return 'live';
   return 'scheduled';
+}
+
+function formatDynamicTypeLabel(type) {
+  if (!type) {
+    return 'Event';
+  }
+  return type
+    .toString()
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
 
 function resolveEmbedUrl(url) {
@@ -302,7 +316,9 @@ export default function DashboardCalendar() {
   });
 
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [typeFilters, setTypeFilters] = useState(() => new Set(BASE_EVENT_TYPES));
+  const [knownTypes, setKnownTypes] = useState(BASE_EVENT_TYPES);
+  const previousKnownTypesRef = useRef(BASE_EVENT_TYPES);
   const [phaseFilter, setPhaseFilter] = useState('upcoming');
   const [dialogMode, setDialogMode] = useState('create');
   const [activeEvent, setActiveEvent] = useState(null);
@@ -319,12 +335,100 @@ export default function DashboardCalendar() {
     return () => window.clearTimeout(timeout);
   }, [announcement]);
 
+  useEffect(() => {
+    setKnownTypes((prev) => {
+      const registry = new Set(prev);
+      let changed = false;
+      events.forEach((event) => {
+        const type = event.type ?? 'event';
+        if (!registry.has(type)) {
+          registry.add(type);
+          changed = true;
+        }
+      });
+      const activeTypes = new Set(events.map((event) => event.type ?? 'event'));
+      Array.from(registry)
+        .filter((type) => !activeTypes.has(type) && !BASE_EVENT_TYPES.includes(type))
+        .forEach((type) => {
+          registry.delete(type);
+          changed = true;
+        });
+      if (!changed) {
+        return prev;
+      }
+      return Array.from(registry);
+    });
+  }, [events]);
+
+  useEffect(() => {
+    const prevKnown = new Set(previousKnownTypesRef.current);
+    const currentKnown = new Set(knownTypes);
+    setTypeFilters((current) => {
+      const next = new Set(Array.from(current).filter((type) => currentKnown.has(type)));
+      let changed = next.size !== current.size;
+      currentKnown.forEach((type) => {
+        if (!prevKnown.has(type) && !next.has(type)) {
+          next.add(type);
+          changed = true;
+        }
+      });
+      if (next.size === 0 && currentKnown.size) {
+        currentKnown.forEach((type) => next.add(type));
+        changed = true;
+      }
+      if (changed) {
+        return next;
+      }
+      return current;
+    });
+    previousKnownTypesRef.current = knownTypes;
+  }, [knownTypes]);
+
   const now = Date.now();
+
+  const toggleTypeFilter = useCallback(
+    (type) => {
+      setTypeFilters((current) => {
+        const next = new Set(current);
+        if (next.has(type)) {
+          next.delete(type);
+        } else {
+          next.add(type);
+        }
+        if (next.size === 0) {
+          const fallback = type ?? knownTypes[0] ?? 'event';
+          next.add(fallback);
+        }
+        return next;
+      });
+    },
+    [knownTypes]
+  );
+
+  const availableTypes = useMemo(() => {
+    const baseEntries = BASE_EVENT_TYPES.map((type) => [type, EVENT_TYPE_LABELS[type]]);
+    const dynamicEntries = knownTypes
+      .filter((type) => !BASE_EVENT_TYPES.includes(type))
+      .map((type) => [type, formatDynamicTypeLabel(type)]);
+    return [...baseEntries, ...dynamicEntries];
+  }, [knownTypes]);
+
+  const allFormatsSelected = typeFilters.size === knownTypes.length;
+
+  const resetTypeFilters = useCallback(() => {
+    setTypeFilters(new Set(knownTypes));
+  }, [knownTypes]);
+
+  const resetFilters = useCallback(() => {
+    setSearch('');
+    resetTypeFilters();
+    setPhaseFilter('upcoming');
+  }, [resetTypeFilters]);
 
   const filteredEvents = useMemo(() => {
     return events
       .filter((event) => {
-        if (typeFilter !== 'all' && event.type !== typeFilter) {
+        if (!typeFilters.has(event.type ?? 'event')) {
           return false;
         }
         if (phaseFilter === 'upcoming' && toDate(event.endAt)?.getTime() < now) {
@@ -343,7 +447,7 @@ export default function DashboardCalendar() {
         return haystack.includes(search.toLowerCase());
       })
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  }, [events, typeFilter, phaseFilter, search, now]);
+  }, [events, typeFilters, phaseFilter, search, now]);
 
   const groupedEvents = useMemo(() => groupEventsByDay(filteredEvents), [filteredEvents]);
   const leaderboard = useMemo(() => computeLeaderboard(events), [events]);
@@ -455,8 +559,9 @@ export default function DashboardCalendar() {
     if (!confirmed) return;
     setEvents([]);
     deletePersistentState(STORAGE_KEY);
+    resetFilters();
     setAnnouncement('Calendar cleared.');
-  }, []);
+  }, [resetFilters]);
 
   const handleExport = useCallback(() => {
     if (!events.length) {
@@ -578,20 +683,35 @@ export default function DashboardCalendar() {
             <h2 className="text-lg font-semibold text-slate-900">Activation insights</h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="flex flex-col text-xs font-medium text-slate-600">
-              Format
-              <select
-                className="dashboard-input"
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value)}
+            <fieldset className="rounded-3xl border border-slate-200 bg-white/60 p-3">
+              <legend className="text-xs font-semibold uppercase tracking-wide text-slate-500">Formats</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {availableTypes.map(([type, label]) => {
+                  const checked = typeFilters.has(type);
+                  return (
+                    <label key={type} className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleTypeFilter(type)}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                className="mt-3 text-xs font-semibold text-primary hover:underline disabled:text-slate-400"
+                onClick={resetTypeFilters}
+                disabled={allFormatsSelected}
               >
-                <option value="all">All formats</option>
-                <option value="classroom">Classroom</option>
-                <option value="livestream">Live stream</option>
-                <option value="podcast">Podcast</option>
-                <option value="event">Community event</option>
-              </select>
-            </label>
+                {allFormatsSelected ? 'All formats selected' : 'Select all formats'}
+              </button>
+              <p className="mt-2 text-[11px] uppercase tracking-wide text-slate-400">
+                Showing {typeFilters.size} of {knownTypes.length} format(s)
+              </p>
+            </fieldset>
             <label className="flex flex-col text-xs font-medium text-slate-600">
               Phase
               <select
@@ -654,11 +774,7 @@ export default function DashboardCalendar() {
             title="Calendar is clear"
             description="No commitments found for this filter range. Create an event or reset your filters."
             actionLabel="Reset filters"
-            onAction={() => {
-              setSearch('');
-              setTypeFilter('all');
-              setPhaseFilter('upcoming');
-            }}
+            onAction={resetFilters}
           />
         ) : (
           <div className="space-y-6">
