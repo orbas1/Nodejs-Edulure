@@ -5,6 +5,7 @@ import { useOutletContext } from 'react-router-dom';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 import {
   createCommunityTier,
   deleteCommunityTier,
@@ -59,7 +60,7 @@ const parseSeats = (value) => {
   return { reserved, total };
 };
 
-export default function InstructorPricing({
+function InstructorPricing({
   onExportFinanceReport,
   onConfigureRules,
   onLaunchOffer,
@@ -604,3 +605,5 @@ InstructorPricing.defaultProps = {
   onEditSessions: undefined,
   onRefreshRevenue: undefined
 };
+
+export default withInstructorDashboardAccess(InstructorPricing);

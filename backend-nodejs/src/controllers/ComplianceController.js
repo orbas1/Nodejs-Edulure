@@ -1,4 +1,5 @@
 import ComplianceService from '../services/ComplianceService.js';
+import { recordConsentMutationOutcome } from '../observability/metrics.js';
 
 const complianceService = new ComplianceService();
 
@@ -23,6 +24,17 @@ function resolveRequestContext(req) {
     method: req.method ?? null,
     path: req.originalUrl ?? req.url ?? null
   };
+}
+
+function resolveTenant(req) {
+  if (req.user?.tenantId) {
+    return req.user.tenantId;
+  }
+  const candidate = req.body?.tenantId ?? req.headers?.['x-tenant-id'];
+  if (typeof candidate === 'string' && candidate.trim()) {
+    return candidate.trim();
+  }
+  return 'global';
 }
 
 export default class ComplianceController {
@@ -91,9 +103,17 @@ export default class ComplianceController {
   }
 
   static async createConsent(req, res, next) {
+    const operationKey = 'compliance.create_consent';
+    const tenantId = resolveTenant(req);
     try {
       const { userId, consentType, policyVersion, channel, metadata, evidenceCiphertext } = req.body;
       if (!userId || !consentType || !policyVersion) {
+        recordConsentMutationOutcome({
+          operation: operationKey,
+          tenantId,
+          success: false,
+          reason: 'validation_error'
+        });
         return res
           .status(400)
           .json({ success: false, message: 'userId, consentType, and policyVersion are required' });
@@ -108,13 +128,26 @@ export default class ComplianceController {
         actor: resolveActor(req),
         requestContext: resolveRequestContext(req)
       });
+      recordConsentMutationOutcome({
+        operation: operationKey,
+        tenantId,
+        success: true
+      });
       return res.status(201).json({ success: true, data: record });
     } catch (error) {
+      recordConsentMutationOutcome({
+        operation: operationKey,
+        tenantId,
+        success: false,
+        reason: error?.code ?? error?.message ?? 'error'
+      });
       return next(error);
     }
   }
 
   static async revokeConsent(req, res, next) {
+    const operationKey = 'compliance.revoke_consent';
+    const tenantId = resolveTenant(req);
     try {
       const { consentId } = req.params;
       const { reason } = req.body ?? {};
@@ -124,8 +157,19 @@ export default class ComplianceController {
         actor: resolveActor(req),
         requestContext: resolveRequestContext(req)
       });
+      recordConsentMutationOutcome({
+        operation: operationKey,
+        tenantId,
+        success: true
+      });
       return res.json({ success: true, data: record });
     } catch (error) {
+      recordConsentMutationOutcome({
+        operation: operationKey,
+        tenantId,
+        success: false,
+        reason: error?.code ?? error?.message ?? 'error'
+      });
       return next(error);
     }
   }

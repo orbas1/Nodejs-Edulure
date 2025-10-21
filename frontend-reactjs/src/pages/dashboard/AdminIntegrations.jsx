@@ -925,6 +925,8 @@ function ReconciliationPanel({ reconciliation }) {
 
 export default function AdminIntegrations() {
   const { session } = useAuth();
+  const resolvedRole = typeof session?.user?.role === 'string' && session.user.role.length > 0;
+  const isAdmin = String(session?.user?.role ?? '').toLowerCase() === 'admin';
   const token = session?.tokens?.accessToken;
   const isAdmin = session?.user?.role === 'admin';
   const [dashboard, setDashboard] = useState(null);

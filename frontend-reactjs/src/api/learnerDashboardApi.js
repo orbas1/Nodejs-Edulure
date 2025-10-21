@@ -598,6 +598,62 @@ export async function submitInstructorApplication({ token, payload, signal } = {
   });
 }
 
+function normaliseLearnerOverviewPayload(response) {
+  const payload = response?.data ?? response ?? {};
+  return {
+    stats: payload.stats ?? {},
+    recommendations: Array.isArray(payload.recommendations) ? payload.recommendations : [],
+    upcoming: Array.isArray(payload.upcoming) ? payload.upcoming : [],
+    alerts: Array.isArray(payload.alerts) ? payload.alerts : []
+  };
+}
+
+export async function fetchLearnerOverview({ token, signal } = {}) {
+  ensureToken(token);
+
+  const response = await httpClient.get('/dashboard/learner/overview', {
+    token,
+    signal,
+    cache: {
+      ttl: 30_000,
+      tags: [`dashboard:me:${token}:overview`],
+      varyByToken: true
+    }
+  });
+
+  return normaliseLearnerOverviewPayload(response);
+}
+
+export async function updateNotificationPreferences({ token, payload, signal } = {}) {
+  ensureToken(token);
+
+  return httpClient.put('/dashboard/learner/settings/notifications', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function exportLearningPath({ token, format = 'pdf', signal } = {}) {
+  ensureToken(token);
+
+  const params = {};
+  if (format) {
+    params.format = format;
+  }
+
+  const binaryFormats = new Set(['pdf', 'csv']);
+  const responseType = binaryFormats.has(String(format).toLowerCase()) ? 'blob' : 'json';
+
+  return httpClient.get('/dashboard/learner/learning-path/export', {
+    token,
+    signal,
+    params,
+    responseType,
+    cache: false
+  });
+}
+
 export const learnerDashboardApi = {
   createTutorBookingRequest,
   exportTutorSchedule,
@@ -641,7 +697,10 @@ export const learnerDashboardApi = {
   closeFieldServiceAssignment,
   fetchInstructorApplication,
   saveInstructorApplication,
-  submitInstructorApplication
+  submitInstructorApplication,
+  fetchLearnerOverview,
+  updateNotificationPreferences,
+  exportLearningPath
 };
 
 export default learnerDashboardApi;

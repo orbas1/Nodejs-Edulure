@@ -22,6 +22,7 @@ import { useMemo } from 'react';
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
 import { useServiceHealth } from '../../../context/ServiceHealthContext.jsx';
 import useExecutiveDashboard from '../../../hooks/useExecutiveDashboard.js';
+import useRoleGuard from '../../../hooks/useRoleGuard.js';
 
 const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 const percentFormatter = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 });
@@ -455,6 +456,7 @@ function DependencyList({ dependencies }) {
 }
 
 export default function AdminExecutiveOverview() {
+  const { allowed, explanation } = useRoleGuard(['admin']);
   const {
     data,
     loading,
@@ -477,6 +479,20 @@ export default function AdminExecutiveOverview() {
   const timelineEntries = data?.incidents?.timeline ?? [];
   const operations = data?.operations ?? {};
   const executiveAlerts = data?.alerts ?? [];
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Admin privileges required"
+        description={explanation ?? 'You do not have sufficient permissions to manage the executive workspace.'}
+        actionLabel="Return home"
+        onAction={() => {
+          window.location.assign('/dashboard');
+        }}
+      />
+    );
+  }
 
   if (loading && !data) {
     return (

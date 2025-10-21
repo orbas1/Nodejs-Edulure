@@ -216,6 +216,31 @@ function formatSubscription(subscription, communityMap, tierMap) {
   };
 }
 
+function clampScore(value) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function computeEngagementScore({
+  bookings = [],
+  libraryEntries = [],
+  supportCases = [],
+  subscriptions = [],
+  growthExperiments = []
+} = {}) {
+  const bookingScore = Math.min(bookings.length * 8, 30);
+  const libraryScore = Math.min(libraryEntries.length * 4, 20);
+  const subscriptionScore = subscriptions.some((subscription) => subscription.status === 'active') ? 20 : 0;
+  const supportScore = Math.max(0, 15 - Math.min(supportCases.length * 3, 15));
+  const growthScore = Math.min(growthExperiments.length * 5, 15);
+
+  const total = bookingScore + libraryScore + subscriptionScore + supportScore + growthScore;
+  return clampScore(total);
+}
+
 const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
   language: 'en',
   region: 'US',
@@ -1397,55 +1422,196 @@ export default class LearnerDashboardService {
       throw error;
     }
 
-    const nextStatus = normaliseFieldServiceStatus(payload.status, existing.status);
+    const {
+      clientUpdatedAt: rawClientUpdatedAt,
+      lastKnownUpdate,
+      expectedUpdatedAt,
+      forceResolve,
+      clientSnapshot, // eslint-disable-line no-unused-vars
+      ...candidatePayload
+    } = payload ?? {};
+
+    const metadataOverrides =
+      candidatePayload.metadata && typeof candidatePayload.metadata === 'object' ? candidatePayload.metadata : {};
+    const updatePayload = { ...candidatePayload };
+    delete updatePayload.metadata;
+
+    const clientTimestamp = rawClientUpdatedAt ?? lastKnownUpdate ?? expectedUpdatedAt ?? null;
+    const clientUpdatedAt = (() => {
+      if (!clientTimestamp) return null;
+      const parsed = new Date(clientTimestamp);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    })();
+    const serverUpdatedAt = (() => {
+      if (!existing.updatedAt) return null;
+      const parsed = new Date(existing.updatedAt);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    })();
+
+    const nextStatus = normaliseFieldServiceStatus(updatePayload.status, existing.status);
     const nextPriority =
-      payload.priority !== undefined
-        ? normaliseFieldServicePriority(payload.priority)
+      updatePayload.priority !== undefined
+        ? normaliseFieldServicePriority(updatePayload.priority)
         : existing.priority;
     const attachments =
-      payload.attachments !== undefined
-        ? normaliseFieldServiceAttachments(payload.attachments)
+      updatePayload.attachments !== undefined
+        ? normaliseFieldServiceAttachments(updatePayload.attachments)
         : normaliseFieldServiceAttachments(existing.metadata?.attachments);
 
     const owner =
-      payload.owner !== undefined
-        ? typeof payload.owner === 'string'
-          ? payload.owner.trim()
-          : payload.owner
+      updatePayload.owner !== undefined
+        ? typeof updatePayload.owner === 'string'
+          ? updatePayload.owner.trim()
+          : updatePayload.owner
         : existing.metadata?.owner ?? null;
 
     const metadata = {
       ...(existing.metadata ?? {}),
-      ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}),
+      ...metadataOverrides,
       owner,
-      fieldNotes: payload.fieldNotes ?? existing.metadata?.fieldNotes ?? null,
+      fieldNotes: updatePayload.fieldNotes ?? existing.metadata?.fieldNotes ?? null,
       attachments
     };
+
+    if (updatePayload.supportChannel !== undefined || metadataOverrides.supportChannel !== undefined) {
+      metadata.supportChannel = updatePayload.supportChannel ?? metadataOverrides.supportChannel ?? null;
+    }
+    if (updatePayload.briefUrl !== undefined || metadataOverrides.briefUrl !== undefined) {
+      metadata.briefUrl = updatePayload.briefUrl ?? metadataOverrides.briefUrl ?? null;
+    }
+    if (updatePayload.equipment !== undefined || metadataOverrides.equipment !== undefined) {
+      metadata.equipment = updatePayload.equipment ?? metadataOverrides.equipment ?? null;
+    }
+    if (updatePayload.debriefHost !== undefined || metadataOverrides.debriefHost !== undefined) {
+      metadata.debriefHost = updatePayload.debriefHost ?? metadataOverrides.debriefHost ?? null;
+    }
+    if (updatePayload.debriefAt !== undefined || metadataOverrides.debriefAt !== undefined) {
+      metadata.debriefAt = updatePayload.debriefAt ?? metadataOverrides.debriefAt ?? null;
+    }
+
+    const providedFields = Object.entries(updatePayload)
+      .filter(([, value]) => value !== undefined)
+      .map(([key]) => key);
+    const metadataFieldList = Object.entries(metadataOverrides)
+      .filter(([, value]) => value !== undefined)
+      .map(([key]) => `metadata.${key}`);
+    if (updatePayload.owner !== undefined) metadataFieldList.push('metadata.owner');
+    if (updatePayload.fieldNotes !== undefined) metadataFieldList.push('metadata.fieldNotes');
+    if (updatePayload.attachments !== undefined) metadataFieldList.push('metadata.attachments');
+    if (updatePayload.supportChannel !== undefined) metadataFieldList.push('metadata.supportChannel');
+    if (updatePayload.briefUrl !== undefined) metadataFieldList.push('metadata.briefUrl');
+    if (updatePayload.equipment !== undefined) metadataFieldList.push('metadata.equipment');
+    if (updatePayload.debriefHost !== undefined) metadataFieldList.push('metadata.debriefHost');
+    if (updatePayload.debriefAt !== undefined) metadataFieldList.push('metadata.debriefAt');
+
+    const conflictingFields = Array.from(new Set([...providedFields, ...metadataFieldList]));
+
+    const normalisedServiceType =
+      updatePayload.serviceType !== undefined
+        ? typeof updatePayload.serviceType === 'string'
+          ? updatePayload.serviceType.trim()
+          : updatePayload.serviceType
+        : existing.serviceType;
+
+    const updatePatch = {};
+    if (updatePayload.status !== undefined) updatePatch.status = nextStatus;
+    if (updatePayload.priority !== undefined) updatePatch.priority = nextPriority;
+    if (updatePayload.serviceType !== undefined) updatePatch.serviceType = normalisedServiceType;
+    if (updatePayload.summary !== undefined) updatePatch.summary = updatePayload.summary ?? existing.summary;
+    if (updatePayload.providerId !== undefined) updatePatch.providerId = updatePayload.providerId ?? existing.providerId;
+    if (updatePayload.scheduledFor !== undefined)
+      updatePatch.scheduledFor = updatePayload.scheduledFor ?? existing.scheduledFor;
+    if (updatePayload.etaMinutes !== undefined) updatePatch.etaMinutes = updatePayload.etaMinutes;
+    if (updatePayload.slaMinutes !== undefined) updatePatch.slaMinutes = updatePayload.slaMinutes;
+    if (updatePayload.distanceKm !== undefined) updatePatch.distanceKm = updatePayload.distanceKm;
+    if (updatePayload.locationLabel !== undefined) updatePatch.locationLabel = updatePayload.locationLabel;
+    updatePatch.metadata = metadata;
+
+    const mergedOrder = {
+      ...existing,
+      status: updatePayload.status !== undefined ? nextStatus : existing.status,
+      priority: updatePayload.priority !== undefined ? nextPriority : existing.priority,
+      serviceType: updatePayload.serviceType !== undefined ? normalisedServiceType : existing.serviceType,
+      summary: updatePayload.summary !== undefined ? updatePayload.summary ?? existing.summary : existing.summary,
+      metadata,
+      providerId: updatePayload.providerId !== undefined ? updatePayload.providerId ?? existing.providerId : existing.providerId,
+      scheduledFor:
+        updatePayload.scheduledFor !== undefined
+          ? updatePayload.scheduledFor ?? existing.scheduledFor
+          : existing.scheduledFor,
+      etaMinutes: updatePayload.etaMinutes !== undefined ? updatePayload.etaMinutes : existing.etaMinutes,
+      slaMinutes: updatePayload.slaMinutes !== undefined ? updatePayload.slaMinutes : existing.slaMinutes,
+      distanceKm: updatePayload.distanceKm !== undefined ? updatePayload.distanceKm : existing.distanceKm,
+      locationLabel: updatePayload.locationLabel !== undefined ? updatePayload.locationLabel : existing.locationLabel
+    };
+
+    const shouldCheckConflict = Boolean(clientUpdatedAt) && Boolean(serverUpdatedAt) && !forceResolve;
+    if (shouldCheckConflict && serverUpdatedAt.getTime() > clientUpdatedAt.getTime()) {
+      const serverAssignment = await buildFieldServiceAssignment({ userId, order: existing });
+      const suggestedAssignment = await buildFieldServiceAssignment({ userId, order: mergedOrder });
+
+      const suggestedPayload = {};
+      if (updatePayload.status !== undefined) suggestedPayload.status = nextStatus;
+      if (updatePayload.priority !== undefined) suggestedPayload.priority = nextPriority;
+      if (updatePayload.serviceType !== undefined) suggestedPayload.serviceType = normalisedServiceType;
+      if (updatePayload.summary !== undefined) suggestedPayload.summary = updatePayload.summary ?? existing.summary;
+      if (updatePayload.providerId !== undefined)
+        suggestedPayload.providerId = updatePayload.providerId ?? existing.providerId;
+      if (updatePayload.scheduledFor !== undefined)
+        suggestedPayload.scheduledFor = updatePayload.scheduledFor ?? existing.scheduledFor;
+      if (updatePayload.etaMinutes !== undefined) suggestedPayload.etaMinutes = updatePayload.etaMinutes;
+      if (updatePayload.slaMinutes !== undefined) suggestedPayload.slaMinutes = updatePayload.slaMinutes;
+      if (updatePayload.distanceKm !== undefined) suggestedPayload.distanceKm = updatePayload.distanceKm;
+      if (updatePayload.locationLabel !== undefined) suggestedPayload.locationLabel = updatePayload.locationLabel;
+      if (
+        updatePayload.attachments !== undefined ||
+        updatePayload.fieldNotes !== undefined ||
+        updatePayload.owner !== undefined ||
+        updatePayload.supportChannel !== undefined ||
+        updatePayload.briefUrl !== undefined ||
+        updatePayload.equipment !== undefined ||
+        updatePayload.debriefHost !== undefined ||
+        updatePayload.debriefAt !== undefined ||
+        Object.keys(metadataOverrides).length > 0
+      ) {
+        suggestedPayload.metadata = metadata;
+      }
+
+      const conflictError = new Error('Field service assignment has changed since your last sync.');
+      conflictError.status = 409;
+      conflictError.code = 'FIELD_SERVICE_CONFLICT';
+      conflictError.details = {
+        type: 'FIELD_SERVICE_CONFLICT',
+        assignmentId: orderId,
+        serverUpdatedAt: existing.updatedAt ?? null,
+        clientUpdatedAt: clientTimestamp ?? null,
+        serverAssignment,
+        suggestedAssignment,
+        suggestedPayload,
+        attemptedPayload: candidatePayload,
+        conflictingFields
+      };
+      throw conflictError;
+    }
 
     return db.transaction(async (trx) => {
       const updated = await FieldServiceOrderModel.updateById(
         orderId,
-        {
-          status: nextStatus,
-          priority: nextPriority,
-          summary: payload.summary ?? existing.summary,
-          metadata,
-          providerId: payload.providerId ?? existing.providerId
-        },
+        updatePatch,
         trx
       );
 
       await FieldServiceEventModel.create(
         {
           orderId: updated.id,
-          eventType: payload.status ? `status_${nextStatus}` : 'assignment_updated',
+          eventType: updatePayload.status ? `status_${nextStatus}` : 'assignment_updated',
           status: nextStatus,
-          notes: payload.fieldNotes ?? null,
+          notes: updatePayload.fieldNotes ?? null,
           author: userId,
           metadata: {
             attachments,
             owner,
-            updatedFields: Object.keys(payload)
+            updatedFields: conflictingFields
           }
         },
         trx
@@ -1787,5 +1953,56 @@ export default class LearnerDashboardService {
     }
     log.info({ userId, ticketId }, 'Learner closed support ticket');
     return ticket;
+  }
+
+  static async getEngagementOverview(userId) {
+    if (!userId) {
+      return {
+        score: 0,
+        breakdown: {
+          bookings: 0,
+          libraryEntries: 0,
+          openSupportTickets: 0,
+          subscriptions: 0,
+          growthExperiments: 0
+        },
+        generatedAt: new Date().toISOString()
+      };
+    }
+
+    const [bookings, libraryEntries, supportCases, subscriptions, initiatives] = await Promise.all([
+      TutorBookingModel.listByLearnerId(userId, { limit: 50 }, db),
+      LearnerLibraryEntryModel.listByUserId(userId, db),
+      LearnerSupportRepository.listCases(userId),
+      CommunitySubscriptionModel.listByUser(userId),
+      LearnerGrowthInitiativeModel.listByUserId(userId, { status: ['active', 'monitoring'] }, db)
+    ]);
+
+    const experimentLists = await Promise.all(
+      initiatives.slice(0, 5).map((initiative) => LearnerGrowthExperimentModel.listByInitiativeId(initiative.id, db))
+    );
+    const experiments = experimentLists.flat();
+
+    const breakdown = {
+      bookings: bookings.length,
+      libraryEntries: libraryEntries.length,
+      openSupportTickets: supportCases.filter((supportCase) => supportCase?.status !== 'resolved').length,
+      subscriptions: subscriptions.filter((subscription) => subscription?.status === 'active').length,
+      growthExperiments: experiments.length
+    };
+
+    const score = computeEngagementScore({
+      bookings,
+      libraryEntries,
+      supportCases,
+      subscriptions,
+      growthExperiments: experiments
+    });
+
+    return {
+      score,
+      breakdown,
+      generatedAt: new Date().toISOString()
+    };
   }
 }

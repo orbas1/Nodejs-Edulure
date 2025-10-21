@@ -143,3 +143,19 @@ jobs:
         with:
           check_together: 'true'
           additional_files: scripts/bootstrap-environment.sh
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.12.2'
+      - name: Validate staging security headers
+        env:
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
+        run: |
+          npm run zap:baseline -- --url "${STAGING_APP_URL:-https://staging.edulure.com}"
+      - name: Upload security header report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-security-headers
+          path: reports/security/zap-header-validation.json
+          if-no-files-found: warn

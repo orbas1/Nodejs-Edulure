@@ -17,6 +17,14 @@ export default function PresencePanel({
   onSubmit,
   interactive
 }) {
+  const errorMessage = error
+    ? error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
+      : null
+    : null;
+
   return (
     <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
       <header className="flex items-start justify-between gap-3">
@@ -38,11 +46,14 @@ export default function PresencePanel({
         Track live facilitators and support staff. Update your status to broadcast availability to moderators and learners.
       </p>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-3" aria-live="polite" aria-busy={loading}>
         {loading && presence.length === 0 ? (
           <p className="text-xs text-slate-500">Syncing live roster…</p>
-        ) : error ? (
-          <p className="text-xs text-rose-600">Unable to load presence. Refresh to retry.</p>
+        ) : errorMessage ? (
+          <p className="text-xs text-rose-600" role="alert">
+            Unable to load presence. Refresh to retry.
+            <span className="mt-1 block text-[11px] text-rose-500">{errorMessage}</span>
+          </p>
         ) : presence.length === 0 ? (
           <p className="text-xs text-slate-500">No live presence detected. Invite moderators or toggle availability.</p>
         ) : (

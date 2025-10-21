@@ -8,6 +8,7 @@ import {
   publishCommunityRunbook
 } from "../../../api/communityApi.js";
 import { useAuth } from "../../../context/AuthContext.jsx";
+import useRoleGuard from "../../../hooks/useRoleGuard.js";
 
 const emptyRunbookForm = {
   communityId: "",
@@ -20,6 +21,7 @@ const emptyRunbookForm = {
 };
 
 export default function CommunityOperations({ dashboard, onRefresh }) {
+  const { allowed, explanation } = useRoleGuard(["community", "admin"]);
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const initialRunbooks = useMemo(
@@ -210,6 +212,16 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
     },
     [ackNotes, defaultCommunityId, runbookForm.communityId, token]
   );
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Community privileges required"
+        description={explanation ?? "Switch to a community workspace to manage runbooks and escalations."}
+      />
+    );
+  }
 
   if (!dashboard) {
     return (

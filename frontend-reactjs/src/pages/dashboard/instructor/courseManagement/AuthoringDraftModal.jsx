@@ -30,6 +30,9 @@ export default function AuthoringDraftModal({ draft, onClose, onForget }) {
   }, [draft]);
 
   useEffect(() => {
+    if (typeof document === 'undefined') {
+      return () => undefined;
+    }
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const handleKeyDown = (event) => {
@@ -108,6 +111,11 @@ export default function AuthoringDraftModal({ draft, onClose, onForget }) {
       </ul>
     );
   };
+
+  const modalTarget = typeof document !== 'undefined' ? document.body : null;
+  if (!modalTarget) {
+    return null;
+  }
 
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
@@ -196,7 +204,7 @@ export default function AuthoringDraftModal({ draft, onClose, onForget }) {
     </div>
   );
 
-  return createPortal(modalContent, document.body);
+  return createPortal(modalContent, modalTarget);
 }
 
 AuthoringDraftModal.propTypes = {

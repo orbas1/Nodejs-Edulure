@@ -2,16 +2,22 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import AdminActivitySection from '../AdminActivitySection.jsx';
+import AdminApprovalsSection from '../AdminApprovalsSection.jsx';
 import AdminCoursesSection from '../AdminCoursesSection.jsx';
 import AdminEbooksSection from '../AdminEbooksSection.jsx';
 import AdminCalendarSection from '../AdminCalendarSection.jsx';
 import AdminBookingsSection from '../AdminBookingsSection.jsx';
 import AdminGrowthSection from '../AdminGrowthSection.jsx';
 import AdminRevenueManagementSection from '../AdminRevenueManagementSection.jsx';
+import AdminRevenueSection from '../AdminRevenueSection.jsx';
+import AdminOperationsSection from '../AdminOperationsSection.jsx';
+import AdminPolicyHubSection from '../AdminPolicyHubSection.jsx';
 import AdminAdsManagementSection from '../AdminAdsManagementSection.jsx';
 import AdminTopCommunitiesSection from '../AdminTopCommunitiesSection.jsx';
 import AdminUpcomingLaunchesSection from '../AdminUpcomingLaunchesSection.jsx';
 import AdminToolsSection from '../AdminToolsSection.jsx';
+import { formatNumber } from '../../utils.js';
 import adminGrowthApi from '../../../../api/adminGrowthApi.js';
 import adminRevenueApi from '../../../../api/adminRevenueApi.js';
 import adminAdsApi from '../../../../api/adminAdsApi.js';
@@ -289,6 +295,10 @@ describe('Admin operational sections', () => {
       expect(adminGrowthApi.getGrowthMetrics).toHaveBeenCalledTimes(1);
     });
 
+    const firstCallArgs = adminGrowthApi.getGrowthMetrics.mock.calls[0][0];
+    expect(firstCallArgs).toEqual(expect.objectContaining({ token: 'test-token' }));
+    expect(firstCallArgs.signal).toBeInstanceOf(AbortSignal);
+
     expect(screen.getByText('Active experiments').parentElement).toHaveTextContent('2');
     expect(screen.getByText('Enrolments (30d)').parentElement).toHaveTextContent('200');
     expect(screen.getByText('Conversion rate').parentElement).toHaveTextContent('45.1%');
@@ -297,6 +307,7 @@ describe('Admin operational sections', () => {
     await waitFor(() => {
       expect(adminGrowthApi.getGrowthMetrics).toHaveBeenCalledTimes(2);
     });
+    expect(adminGrowthApi.getGrowthMetrics.mock.calls[1][0]).toEqual({ token: 'test-token' });
   });
 
   it('displays revenue summary with trend insight and refresh control', async () => {
@@ -307,6 +318,10 @@ describe('Admin operational sections', () => {
       expect(adminRevenueApi.getRevenueSummary).toHaveBeenCalledTimes(1);
     });
 
+    const firstCallArgs = adminRevenueApi.getRevenueSummary.mock.calls[0][0];
+    expect(firstCallArgs).toEqual(expect.objectContaining({ token: 'test-token' }));
+    expect(firstCallArgs.signal).toBeInstanceOf(AbortSignal);
+
     expect(screen.getByText('Captured revenue').parentElement).toHaveTextContent('$1,250.00');
     expect(screen.getByText('Pending settlements').parentElement).toHaveTextContent('$180.00');
     expect(screen.getByText('Recognised').parentElement).toHaveTextContent('$620.00');
@@ -316,6 +331,7 @@ describe('Admin operational sections', () => {
     await waitFor(() => {
       expect(adminRevenueApi.getRevenueSummary).toHaveBeenCalledTimes(2);
     });
+    expect(adminRevenueApi.getRevenueSummary.mock.calls[1][0]).toEqual({ token: 'test-token' });
   });
 
   it('presents advertising portfolio metrics with refresh support', async () => {
@@ -326,6 +342,10 @@ describe('Admin operational sections', () => {
       expect(adminAdsApi.getAdsSummary).toHaveBeenCalledTimes(1);
     });
 
+    const firstCallArgs = adminAdsApi.getAdsSummary.mock.calls[0][0];
+    expect(firstCallArgs).toEqual(expect.objectContaining({ token: 'test-token' }));
+    expect(firstCallArgs.signal).toBeInstanceOf(AbortSignal);
+
     expect(screen.getByText('Active campaigns').parentElement).toHaveTextContent('3');
     expect(screen.getByText('Impressions (30d)').parentElement).toHaveTextContent('12,500');
     expect(screen.getByText('Spend (30d)').parentElement).toHaveTextContent('$6,750.00');
@@ -335,6 +355,155 @@ describe('Admin operational sections', () => {
     await waitFor(() => {
       expect(adminAdsApi.getAdsSummary).toHaveBeenCalledTimes(2);
     });
+    expect(adminAdsApi.getAdsSummary.mock.calls[1][0]).toEqual({ token: 'test-token' });
+  });
+
+  it('suppresses growth metrics errors when the request aborts', async () => {
+    const abortError = new Error('cancelled');
+    abortError.name = 'AbortError';
+    adminGrowthApi.getGrowthMetrics.mockRejectedValueOnce(abortError);
+
+    render(<AdminGrowthSection token="test-token" />);
+
+    await waitFor(() => {
+      expect(adminGrowthApi.getGrowthMetrics).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/failed to load growth metrics/i)).not.toBeInTheDocument();
+      expect(screen.getByText('Active experiments').parentElement).toHaveTextContent('0');
+    });
+  });
+
+  it('suppresses revenue summary errors when the request aborts', async () => {
+    const abortError = new Error('cancelled');
+    abortError.name = 'AbortError';
+    adminRevenueApi.getRevenueSummary.mockRejectedValueOnce(abortError);
+
+    render(<AdminRevenueManagementSection token="test-token" />);
+
+    await waitFor(() => {
+      expect(adminRevenueApi.getRevenueSummary).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/failed to load revenue summary/i)).not.toBeInTheDocument();
+      expect(screen.getByText('Captured').parentElement).toHaveTextContent('$0.00');
+    });
+  });
+
+  it('suppresses advertising summary errors when the request aborts', async () => {
+    const abortError = new Error('cancelled');
+    abortError.name = 'AbortError';
+    adminAdsApi.getAdsSummary.mockRejectedValueOnce(abortError);
+
+    render(<AdminAdsManagementSection token="test-token" />);
+
+    await waitFor(() => {
+      expect(adminAdsApi.getAdsSummary).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/failed to load ad metrics/i)).not.toBeInTheDocument();
+      expect(screen.getByText('Active campaigns').parentElement).toHaveTextContent('0');
+    });
+  });
+
+  it('normalises approvals data and pending counts', () => {
+    render(
+      <AdminApprovalsSection
+        pendingCount={null}
+        items={[
+          {
+            id: null,
+            name: '',
+            type: null,
+            summary: '',
+            status: null,
+            submittedAt: null
+          }
+        ]}
+        formatNumber={formatNumber}
+      />
+    );
+
+    expect(screen.getByText(/pending item/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 items awaiting action/i)).toBeInTheDocument();
+    expect(screen.getByText('REVIEW')).toBeInTheDocument();
+  });
+
+  it('renders activity alerts and events with fallbacks', () => {
+    render(
+      <AdminActivitySection
+        alerts={[
+          {
+            id: undefined,
+            severity: 'CRITICAL',
+            detectedLabel: '',
+            resolvedLabel: null,
+            message: ''
+          }
+        ]}
+        events={[
+          {
+            id: null,
+            entity: '',
+            occurredLabel: '',
+            summary: ''
+          }
+        ]}
+      />
+    );
+
+    expect(screen.getByText(/critical/i)).toBeInTheDocument();
+    expect(screen.getByText('No additional context available.')).toBeInTheDocument();
+    expect(screen.getByText('Activity captured')).toBeInTheDocument();
+  });
+
+  it('shows revenue metrics with fallback text when values are missing', () => {
+    render(
+      <AdminRevenueSection
+        revenueCards={[{ label: '', value: null, helper: null }]}
+        paymentHealthBreakdown={[{ label: null, value: null }]}
+      />
+    );
+
+    expect(screen.getByText('Metric 1')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('Entry 1')).toBeInTheDocument();
+  });
+
+  it('ensures operations stats gracefully handle invalid entries', () => {
+    render(
+      <AdminOperationsSection
+        supportStats={[{ label: '', value: null }]}
+        riskStats={[]}
+        platformStats={[null, { label: 'Latency', value: '120ms' }]}
+      />
+    );
+
+    expect(screen.getByText('Entry 1')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('Latency')).toBeInTheDocument();
+  });
+
+  it('sanitises policy hub details before rendering', () => {
+    render(
+      <AdminPolicyHubSection
+        sectionId="policies"
+        status=""
+        owner=""
+        contact=""
+        lastReviewed=""
+        slaHours={-12}
+        policyHubUrl=""
+      />
+    );
+
+    expect(screen.getByText('Operational')).toBeInTheDocument();
+    expect(screen.getByText(/0 hours/)).toBeInTheDocument();
+    expect(screen.getByText('Contact owner')).toBeInTheDocument();
+    expect(screen.getByText('Awaiting review')).toBeInTheDocument();
   });
 
   it('normalises top communities table values and fallbacks', () => {

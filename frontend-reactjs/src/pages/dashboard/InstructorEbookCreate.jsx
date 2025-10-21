@@ -4,6 +4,7 @@ import { useOutletContext } from 'react-router-dom';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { createEbookListing } from '../../api/ebookApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
 const initialFormState = {
   assetId: '',
@@ -22,7 +23,7 @@ const initialFormState = {
   isPublic: true
 };
 
-export default function InstructorEbookCreate() {
+function InstructorEbookCreate() {
   const { dashboard, refresh } = useOutletContext();
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
@@ -363,3 +364,5 @@ export default function InstructorEbookCreate() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorEbookCreate);

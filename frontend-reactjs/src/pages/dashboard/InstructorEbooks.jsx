@@ -6,6 +6,7 @@ import { ArrowPathIcon, LockClosedIcon, GlobeAltIcon } from '@heroicons/react/24
 import { listInstructorCatalogue, updateEbookState } from '../../api/ebookApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
 function buildFallbackCatalogue(rawCatalogue = []) {
   return rawCatalogue.map((entry) => ({
@@ -51,7 +52,7 @@ MetricCard.propTypes = {
   helper: PropTypes.node
 };
 
-export default function InstructorEbooks() {
+function InstructorEbooks() {
   const { dashboard, refresh: refreshDashboard } = useOutletContext();
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
@@ -395,3 +396,5 @@ export default function InstructorEbooks() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorEbooks);

@@ -50,4 +50,31 @@ describe('InstructorPricing', () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(screen.getByText(/Pricing export scheduled/i)).toBeInTheDocument();
   });
+
+  it('exposes failures when pricing export orchestration is unavailable', async () => {
+    exportPricing.mockRejectedValueOnce(new Error('Export failed'));
+
+    render(<InstructorPricing />);
+
+    const exportButton = screen.getByRole('button', { name: /Export finance report/i });
+    fireEvent.click(exportButton);
+
+    await waitFor(() => expect(exportPricing).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('Export failed')).toBeInTheDocument();
+    expect(exportButton).not.toBeDisabled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('falls back to an empty state when no monetisation signals exist', () => {
+    contextValue.dashboard.pricing.offers = [];
+    contextValue.dashboard.pricing.sessions = [];
+    contextValue.dashboard.pricing.subscriptions = [];
+    contextValue.dashboard.pricing.insights = [];
+    contextValue.dashboard.analytics.revenueStreams = [];
+
+    render(<InstructorPricing />);
+
+    expect(screen.getByText('No monetisation activity')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh/i })).toBeInTheDocument();
+  });
 });

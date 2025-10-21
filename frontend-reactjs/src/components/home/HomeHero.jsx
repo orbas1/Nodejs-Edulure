@@ -15,11 +15,11 @@ export default function HomeHero() {
 
   const headline = t(
     'home.hero.headline',
-    'Learning HQ for people building the future of education'
+    'Learn, teach, and build together.'
   );
   const subhead = t(
     'home.hero.subhead',
-    'Spin up communities, drop fresh content, and host live touchpoints without ever leaving Edulure.'
+    'Swap playbooks, host live jams, and grow with peers on Edulure.'
   );
   const primaryCta = t('home.hero.ctaPrimary', 'Get started');
   const secondaryCta = t('home.hero.ctaSecondary', 'Preview the community');
@@ -39,7 +39,7 @@ export default function HomeHero() {
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               {t('home.hero.status', 'Built for cohort-based learning')}
             </span>
-            <LanguageSelector size="small" variant="dark" align="end" className="ml-auto" />
+            <LanguageSelector size="compact" variant="dark" align="end" className="ml-auto" />
           </div>
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">{headline}</h1>

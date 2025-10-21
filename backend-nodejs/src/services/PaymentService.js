@@ -129,6 +129,18 @@ function sanitizeMetadata(metadata) {
   return metadata;
 }
 
+function fingerprintPaymentIntent(intent) {
+  if (!intent) {
+    return null;
+  }
+
+  const canonical = [intent.userId, intent.entityType, intent.entityId, intent.amountTotal, intent.currency]
+    .map((value) => (value === undefined || value === null ? '' : String(value).trim().toLowerCase()))
+    .join('::');
+
+  return canonical || null;
+}
+
 function resolveQueryConnection(candidate) {
   if (typeof candidate === 'function') {
     return candidate;
@@ -1143,6 +1155,7 @@ class PaymentService {
     }
 
     await db.transaction(async (trx) => {
+      const financeConnection = resolveFinanceConnection(trx);
       const intent = await PaymentIntentModel.findByProviderIntentId(providerIntentId, trx);
       if (!intent) {
         logger.warn({ providerIntentId }, 'Charge refund received for unknown payment intent');
@@ -1515,6 +1528,71 @@ class PaymentService {
         captured: Number(row.total ?? 0)
       };
     });
+  }
+
+  static async findDuplicatePayments({ since, windowMinutes = 30, limit = 200 } = {}) {
+    const windowStart = since ? new Date(since) : new Date(Date.now() - windowMinutes * 60 * 1000);
+    if (Number.isNaN(windowStart.getTime())) {
+      throw new Error('Invalid date provided for duplicate payment lookup');
+    }
+
+    const candidates = await db('payment_intents')
+      .select([
+        'id',
+        'public_id as publicId',
+        'user_id as userId',
+        'entity_type as entityType',
+        'entity_id as entityId',
+        'amount_total as amountTotal',
+        'currency',
+        'status',
+        'created_at as createdAt',
+        'captured_at as capturedAt',
+        'metadata'
+      ])
+      .where('created_at', '>=', windowStart)
+      .orderBy('created_at', 'desc')
+      .limit(Math.min(Math.max(limit, 50), 500));
+
+    const fingerprintMap = new Map();
+    const duplicates = [];
+
+    for (const intent of candidates) {
+      const fingerprint = fingerprintPaymentIntent(intent);
+      if (!fingerprint) {
+        continue;
+      }
+
+      if (!fingerprintMap.has(fingerprint)) {
+        fingerprintMap.set(fingerprint, []);
+      }
+
+      const bucket = fingerprintMap.get(fingerprint);
+      bucket.push(intent);
+
+      if (bucket.length === 2) {
+        duplicates.push({ fingerprint, intents: [...bucket] });
+      } else if (bucket.length > 2) {
+        duplicates[duplicates.length - 1] = { fingerprint, intents: [...bucket] };
+      }
+    }
+
+    return duplicates.map(({ fingerprint, intents }) => ({
+      fingerprint,
+      userId: intents[0]?.userId ?? null,
+      entityType: intents[0]?.entityType ?? null,
+      entityId: intents[0]?.entityId ?? null,
+      currency: intents[0]?.currency ?? null,
+      amountTotal: intents[0]?.amountTotal ?? null,
+      attempts: intents.length,
+      intents: intents.map((intent) => ({
+        id: intent.id,
+        publicId: intent.publicId,
+        status: intent.status,
+        createdAt: intent.createdAt,
+        capturedAt: intent.capturedAt
+      }))
+    }));
   }
 }
 

@@ -71,4 +71,27 @@ describe('InstructorTutorManagement', () => {
     await waitFor(() => expect(routeTutorRequest).toHaveBeenCalledTimes(1));
     expect(screen.getByText(/Tutor routing recalibrated/i)).toBeInTheDocument();
   });
+
+  it('surfaces mentor invite failures with actionable feedback', async () => {
+    inviteMentor.mockRejectedValueOnce(new Error('Email delivery failed'));
+
+    render(<InstructorTutorManagement />);
+
+    const inviteButton = screen.getByRole('button', { name: /Invite mentor/i });
+    fireEvent.click(inviteButton);
+
+    await waitFor(() => expect(inviteMentor).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('Email delivery failed')).toBeInTheDocument();
+    expect(inviteButton).not.toBeDisabled();
+  });
+
+  it('shows an empty state when no tutors or availability data exist', () => {
+    contextValue.dashboard.tutors.roster = [];
+    contextValue.dashboard.tutors.availability = [];
+
+    render(<InstructorTutorManagement />);
+
+    expect(screen.getByText('No tutor pods configured')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Invite mentor/i })).toBeInTheDocument();
+  });
 });

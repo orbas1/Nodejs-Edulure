@@ -3,11 +3,13 @@ import { Link, useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
+import useMountedRef from '../../hooks/useMountedRef.js';
 
 export default function InstructorTutorBookings() {
   const { dashboard, refresh, instructorOrchestration } = useOutletContext();
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const mounted = useMountedRef();
   const bookings = dashboard?.bookings;
 
   if (!bookings) {
@@ -52,22 +54,28 @@ export default function InstructorTutorBookings() {
           ...overrides
         };
         const result = await instructorOrchestration.routeTutorRequest(payload);
-        setFeedback({
-          tone: 'success',
-          message: 'Tutor routing recalibrated.',
-          detail: result?.summary ?? 'New matching rules will apply to incoming requests.'
-        });
+        if (mounted.current) {
+          setFeedback({
+            tone: 'success',
+            message: 'Tutor routing recalibrated.',
+            detail: result?.summary ?? 'New matching rules will apply to incoming requests.'
+          });
+        }
         await refresh?.();
       } catch (error) {
-        setFeedback({
-          tone: 'error',
-          message: error.message ?? 'Unable to update tutor routing.'
-        });
+        if (mounted.current) {
+          setFeedback({
+            tone: 'error',
+            message: error.message ?? 'Unable to update tutor routing.'
+          });
+        }
       } finally {
-        setPending(false);
+        if (mounted.current) {
+          setPending(false);
+        }
       }
     },
-    [dashboard, instructorOrchestration, pipeline.length, refresh]
+    [dashboard, instructorOrchestration, mounted, pipeline.length, refresh]
   );
 
   return (

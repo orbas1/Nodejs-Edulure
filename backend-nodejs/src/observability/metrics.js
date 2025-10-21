@@ -299,6 +299,26 @@ const explorerSearchInteractionsTotal = new promClient.Counter({
   labelNames: ['entity', 'interaction_type']
 });
 
+const consentMutationAttemptsTotal = new promClient.Counter({
+  name: 'edulure_consent_mutation_attempts_total',
+  help: 'Count of consent ledger mutation attempts grouped by operation, tenant, and outcome',
+  labelNames: ['operation', 'tenant_id', 'outcome']
+});
+
+const consentMutationErrorsTotal = new promClient.Counter({
+  name: 'edulure_consent_mutation_errors_total',
+  help: 'Count of consent ledger mutation errors grouped by operation, tenant, and reason',
+  labelNames: ['operation', 'tenant_id', 'reason']
+});
+
+const consentMutationErrorRate = new promClient.Gauge({
+  name: 'edulure_consent_mutation_error_rate',
+  help: 'Rolling error rate for consent ledger mutations grouped by operation and tenant',
+  labelNames: ['operation', 'tenant_id']
+});
+
+const consentMutationOutcomes = new Map();
+
 registry.registerMetric(httpRequestsTotal);
 registry.registerMetric(httpRequestDurationSeconds);
 registry.registerMetric(httpActiveRequests);
@@ -344,6 +364,18 @@ registry.registerMetric(explorerSearchEventsTotal);
 registry.registerMetric(explorerSearchDisplayedResults);
 registry.registerMetric(explorerSearchLatencyMs);
 registry.registerMetric(explorerSearchInteractionsTotal);
+registry.registerMetric(consentMutationAttemptsTotal);
+registry.registerMetric(consentMutationErrorsTotal);
+registry.registerMetric(consentMutationErrorRate);
+
+const originalResetMetrics =
+  typeof registry.resetMetrics === 'function' ? registry.resetMetrics.bind(registry) : null;
+if (originalResetMetrics) {
+  registry.resetMetrics = (...args) => {
+    consentMutationOutcomes.clear();
+    return originalResetMetrics(...args);
+  };
+}
 
 const ACTIVE_ROUTE_LOCAL_KEY = '__metricsActiveRouteLabel';
 
@@ -874,6 +906,54 @@ export function recordReleaseGateEvaluation({ gateKey, status, environment, vers
     },
     1
   );
+}
+
+export function recordConsentMutationOutcome({ operation, tenantId, success, reason } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedOperation = operation ? String(operation) : 'unknown';
+  const normalizedTenant = tenantId ? String(tenantId) : 'global';
+  const outcome = success ? 'success' : 'error';
+
+  consentMutationAttemptsTotal.inc({
+    operation: normalizedOperation,
+    tenant_id: normalizedTenant,
+    outcome
+  });
+
+  const key = `${normalizedOperation}:${normalizedTenant}`;
+  const state = consentMutationOutcomes.get(key) ?? { attempts: 0, errors: 0 };
+  state.attempts += 1;
+  if (!success) {
+    state.errors += 1;
+  }
+  consentMutationOutcomes.set(key, state);
+
+  const errorRate = state.attempts > 0 ? Math.min(Math.max(state.errors / state.attempts, 0), 1) : 0;
+  consentMutationErrorRate.set(
+    { operation: normalizedOperation, tenant_id: normalizedTenant },
+    Number.isFinite(errorRate) ? errorRate : 0
+  );
+
+  if (!success) {
+    const trimmed = reason ? String(reason).trim() : '';
+    const normalizedReason = trimmed
+      ?
+          trimmed
+            .slice(0, 64)
+            .toLowerCase()
+            .replace(/[^a-z0-9._-]+/g, '_')
+            .replace(/^_+|_+$/g, '') || 'unspecified'
+      : 'unspecified';
+
+    consentMutationErrorsTotal.inc({
+      operation: normalizedOperation,
+      tenant_id: normalizedTenant,
+      reason: normalizedReason
+    });
+  }
 }
 
 export function recordTelemetryIngestion({ scope, source, status }) {

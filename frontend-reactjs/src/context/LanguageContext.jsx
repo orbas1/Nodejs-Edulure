@@ -29,12 +29,12 @@ const TRANSLATIONS = {
     },
     home: {
       hero: {
-        headline: 'Where ambitious builders learn, teach, and grow together',
+        headline: 'Learn, teach, and build together.',
         subhead:
-          'Edulure is a community-first home for people obsessed with sharing skills. Swap playbooks, co-host live jams, and turn knowledge into momentum with peers who cheer you on.',
-        title: 'Where ambitious builders learn, teach, and grow together',
+          'Swap playbooks, host live jams, and grow with peers on Edulure.',
+        title: 'Learn, teach, and build together.',
         description:
-          'Edulure is a community-first home for people obsessed with sharing skills. Swap playbooks, co-host live jams, and turn knowledge into momentum with peers who cheer you on.',
+          'Swap playbooks, host live jams, and turn shared knowledge into momentum with peers who cheer you on.',
         status: 'Built for cohort-based learning',
         ctaPrimary: 'Join the community',
         ctaSecondary: 'Peek inside live circles',
@@ -64,6 +64,62 @@ const TRANSLATIONS = {
         },
         instructorPill: "I'm an instructor",
         illustrationAlt: 'Collage of instructors and learners collaborating'
+      },
+      ebooks: {
+        tagline: 'Resource vault',
+        title: 'Playbooks built for modern learning operators',
+        subtitle:
+          'Dive into living handbooks packed with launch templates, monetisation tips, and remixable rituals.',
+        meta: 'Fresh drops monthly',
+        carouselLabel: 'Featured Edulure e-books',
+        stickers: {
+          new: 'Just launched',
+          trending: 'Trending now',
+          remixable: 'Remix-friendly'
+        },
+        cards: {
+          builderNotebook: {
+            alt: 'Cover art for the Builder Notebook e-book',
+            tag: 'Operations',
+            title: "Builder's notebook",
+            description:
+              'Launch rituals, onboarding flows, and retention loops with ready-to-run templates.'
+          },
+          communityCookbook: {
+            alt: 'Cover art for the Community Cookbook e-book',
+            tag: 'Community',
+            title: 'Community cookbook',
+            description:
+              'Collect facilitation recipes from top operators and remix them into your own gatherings.'
+          },
+          remixAtlas: {
+            alt: 'Cover art for the Remix Atlas e-book',
+            tag: 'Playbooks',
+            title: 'Remix atlas',
+            description:
+              'Bundle swipeable worksheets, prompts, and agenda riffs to accelerate your next cohort.'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'For readers',
+            title: 'Stay in sync with your crew',
+            bullets: {
+              discovery: 'Follow curated drops tailored to your active communities.',
+              sync: 'Save highlights that sync across desktop and mobile readers.',
+              community: 'Share notes, questions, and riffs directly with collaborators.'
+            }
+          },
+          creators: {
+            label: 'For creators',
+            title: 'Ship knowledge faster',
+            bullets: {
+              publish: 'Publish interactive handbooks with audio, video, and checklists.',
+              analytics: 'Track opens, completions, and remix requests from one dashboard.',
+              revenue: 'Bundle e-books with cohorts and keep 95%+ of every sale.'
+            }
+          }
+        }
       },
       featureGrid: {
         eyebrow: 'Workflow shortcuts',
@@ -155,49 +211,51 @@ const TRANSLATIONS = {
         illustrationAlt: 'Collage of instructors and learners collaborating'
       },
       membership: {
-        pretitle: 'Membership snapshot',
-        title: 'Pick a playful path into the Edulure universe',
-        subtitle: 'Choose the vibe that fits your learning orbit — each plan unlocks new adventures with your crew.',
+        pretitle: 'Commission snapshot',
+        title: 'Flat commissions, zero monthly fees',
+        subtitle:
+          'Operate on transparent usage-based pricing designed for modern learning businesses.',
         defaults: {
-          feature: 'Experiential bullet point'
+          feature: 'Transparent commission highlight'
         },
         plans: {
-          freeExplorer: {
-            title: 'Free Explorer',
-            tagline: 'Dip your toes into community currents and join open sessions.',
-            price: 'Free forever',
+          communityTutor: {
+            title: 'Communities & tutoring',
+            tagline: 'Applied to memberships, subscriptions, and 1:1 bookings.',
+            price: '2.5% commission',
             features: [
-              'Drop into two live jams each month and meet fellow explorers.',
-              'Collect three community passports to sample premium spaces.',
-              'Get weekly micro-rituals from our cosmic crew.'
+              '2.5% platform commission on community subscriptions and tutor bookings.',
+              'Zero minimum fees so every transaction settles in full.',
+              'Creators control payout schedules and workforce compensation.'
             ],
-            note: 'Upgrade anytime — your progress comes with you.'
+            note: 'Keep 97.5% of revenue while Edulure handles compliance and ledgers.'
           },
-          creatorPlus: {
-            title: 'Creator Plus',
-            tagline: 'Spin up playful programs with templates, analytics, and hype loops.',
-            price: 'Most loved',
+          catalogue: {
+            title: 'Digital catalogues',
+            tagline: 'Courses and e-book sales with built-in delivery.',
+            price: '5% commission',
             features: [
-              'Host unlimited drops, quests, and synchronous events.',
-              'Launch collaborative build quests with accountability nudges.',
-              'Access priority feedback channels with veteran facilitators.'
+              '5% commission on courses and e-book sales across the marketplace.',
+              'Non-custodial settlement ensures funds move directly to you.',
+              'Share up to 25% of commission with affiliates automatically.'
             ],
-            note: 'Best for creators ready to scale shared experiences.'
+            note: 'Perfect for asynchronous learning drops and evergreen content.'
           },
-          communityCaptain: {
-            title: 'Community Captain',
-            tagline: 'Steer a flagship learning universe with dedicated support.',
-            price: 'Custom energy',
+          liveDonations: {
+            title: 'Live donations & tips',
+            tagline: 'Supporters boost your live events in real time.',
+            price: '10% commission',
             features: [
-              'Craft a custom-branded hub for cohorts, clubs, and studios.',
-              'Pair with a success navigator for ongoing launch strategy.',
-              'Host quarterly salons with curated community talent.'
+              '10% commission on community live stream donations and tips.',
+              'No minimum fees or extra payout delays.',
+              'Built-in compliance narrative keeps sponsorships audit-ready.'
             ],
-            note: 'Tell us your cosmic brief and we will co-create the path.'
+            note: 'Amplify events with transparent supporter flows and audit trails.'
           }
         },
-        cta: 'See full pricing',
-        disclaimer: 'Every plan comes with a 14-day joyride guarantee.'
+        cta: 'Launch your workspace',
+        disclaimer:
+          'Commission defaults include a 25% affiliate share and non-custodial settlement.'
       },
       faq: {
         pretitle: 'FAQ',
@@ -512,7 +570,7 @@ const TRANSLATIONS = {
             caption: 'Énergie studio, zéro chaos.',
             description:
               'Organisez jams, AMA et permanences avec une régie qui synchronise chat, notes backstage et enregistrements.',
-            highlightOne: 'Checklist de loge technique',
+            highlightOne: 'Listes de contrôle d’intégration fournisseur',
             highlightTwo: 'Enregistrements automatiques prêts',
             highlightThree: 'Backstage de discussion pour les hôtes',
             imageAlt: 'Aperçu de la régie des événements live Edulure'
@@ -2275,7 +2333,7 @@ const TRANSLATIONS = {
             caption: 'Studio-Energie ohne Chaos.',
             description:
               'Hoste Jams, AMAs und Office Hours mit einer Regie, die Chat, Backstage-Notizen und Aufnahmen synchron hält.',
-            highlightOne: 'Backstage-Checklisten',
+            highlightOne: 'Checklisten für das Provider-Onboarding',
             highlightTwo: 'Automatische Aufzeichnungen bereit',
             highlightThree: 'Backstage-Chat für Hosts',
             imageAlt: 'Vorschau des Edulure-Live-Event-Control-Centers'

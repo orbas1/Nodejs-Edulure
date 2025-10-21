@@ -1,8 +1,10 @@
-import { z } from 'zod';
+import Joi from 'joi';
+import { ZodError, z } from 'zod';
 
 import telemetryIngestionService from '../services/TelemetryIngestionService.js';
 import telemetryWarehouseService from '../services/TelemetryWarehouseService.js';
 import TelemetryFreshnessMonitorModel from '../models/TelemetryFreshnessMonitorModel.js';
+import { recordConsentMutationOutcome } from '../observability/metrics.js';
 
 const consentRequestSchema = z.object({
   consentScope: z.string().min(1, 'consentScope is required'),
@@ -14,6 +16,26 @@ const consentRequestSchema = z.object({
   metadata: z.record(z.any()).optional(),
   evidence: z.record(z.any()).optional()
 });
+
+function formatValidationIssues(issues) {
+  return issues.map((issue) => ({
+    path: issue.path.length > 0 ? issue.path.join('.') : '',
+    message: issue.message,
+    code: issue.code
+  }));
+}
+
+function parseConsentRequest(payload) {
+  const result = consentRequestSchema.safeParse(payload ?? {});
+  if (!result.success) {
+    const error = new Error('Telemetry consent payload is invalid');
+    error.status = 422;
+    error.code = 'INVALID_TELEMETRY_CONSENT';
+    error.details = formatValidationIssues(result.error.issues);
+    throw error;
+  }
+  return result.data;
+}
 
 function resolveTenantId(req, explicitTenantId) {
   if (explicitTenantId) {
@@ -62,19 +84,26 @@ export default class TelemetryController {
         event: sanitiseEventResponse(result.event)
       });
     } catch (error) {
+      if (error instanceof ZodError) {
+        error.status = 422;
+        error.details = error.errors.map((issue) => issue.message);
+      }
       return next(error);
     }
   }
 
   static async recordConsentDecision(req, res, next) {
+    const operationKey = 'telemetry.record_consent';
+    let tenantId = resolveTenantId(req, req.body?.tenantId);
     try {
-      const parsed = consentRequestSchema.parse(req.body ?? {});
-      const tenantId = resolveTenantId(req, parsed.tenantId);
+      const parsed = parseConsentRequest(req.body ?? {});
+      tenantId = resolveTenantId(req, parsed.tenantId);
       const userId = parsed.userId ?? req.user?.id;
 
       if (!userId) {
         const error = new Error('userId is required to record telemetry consent');
         error.status = 400;
+        error.metricReason = 'missing_user_id';
         throw error;
       }
 
@@ -90,16 +119,41 @@ export default class TelemetryController {
         evidence: parsed.evidence ?? {}
       });
 
+      recordConsentMutationOutcome({
+        operation: operationKey,
+        tenantId,
+        success: true
+      });
+
       return res.status(201).json({ consent: record });
     } catch (error) {
+      recordConsentMutationOutcome({
+        operation: operationKey,
+        tenantId,
+        success: false,
+        reason: error?.metricReason ?? error?.code ?? error?.status ?? error?.message ?? 'error'
+      });
+      if (error instanceof ZodError) {
+        error.status = 422;
+        error.details = error.errors.map((issue) => issue.message);
+      }
       return next(error);
     }
   }
 
   static async listFreshness(req, res, next) {
     try {
-      const limit = Math.max(1, Math.min(200, Number(req.query.limit ?? 50)));
-      const monitors = await TelemetryFreshnessMonitorModel.listSnapshots({ limit });
+      const { value, error } = freshnessQuerySchema.validate(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      if (error) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+        throw error;
+      }
+
+      const monitors = await TelemetryFreshnessMonitorModel.listSnapshots({ limit: value.limit });
       return res.json({ monitors });
     } catch (error) {
       return next(error);

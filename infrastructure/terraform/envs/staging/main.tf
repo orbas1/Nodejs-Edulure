@@ -30,6 +30,10 @@ module "networking" {
   private_subnet_cidrs  = var.private_subnet_cidrs
   availability_zones    = var.availability_zones
   create_nat_gateway    = var.create_nat_gateway
+  enable_flow_logs      = var.enable_vpc_flow_logs
+  flow_logs_retention_in_days = var.vpc_flow_logs_retention_days
+  flow_logs_traffic_type      = var.vpc_flow_logs_traffic_type
+  flow_logs_log_group_kms_key_arn = var.vpc_flow_logs_kms_key_arn
   tags                  = var.tags
 }
 
@@ -37,6 +41,15 @@ resource "aws_security_group" "alb" {
   name        = "${var.project}-${var.environment}-alb"
   description = "Expose HTTPS to the load balancer"
   vpc_id      = module.networking.vpc_id
+
+  ingress {
+    description      = "Allow HTTP"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
 
   ingress {
     description      = "Allow HTTPS"
@@ -79,6 +92,17 @@ module "backend" {
   healthcheck_interval             = var.healthcheck_interval
   enable_alb_deletion_protection   = var.enable_alb_deletion_protection
   cpu_architecture                 = var.cpu_architecture
+  assign_public_ip                 = var.assign_public_ip
+  certificate_arn                  = var.certificate_arn
+  https_listener_port              = var.https_listener_port
+  https_ssl_policy                 = var.https_ssl_policy
+  load_balancer_idle_timeout       = var.load_balancer_idle_timeout
+  enable_alb_access_logs           = var.enable_alb_access_logs
+  alb_access_logs_bucket           = var.alb_access_logs_bucket
+  alb_access_logs_prefix           = var.alb_access_logs_prefix
+  waf_web_acl_arn                  = var.waf_web_acl_arn
+  enable_deployment_circuit_breaker = var.enable_deployment_circuit_breaker
+  rollback_on_failure              = var.rollback_on_failure
   tags                             = var.tags
 }
 
@@ -98,6 +122,16 @@ module "postgres" {
   skip_final_snapshot        = var.database_skip_final_snapshot
   engine_version             = var.database_engine_version
   instance_class             = var.database_instance_class
+  kms_key_id                 = var.database_kms_key_id
+  deletion_protection        = var.database_deletion_protection
+  storage_type               = var.database_storage_type
+  performance_insights_retention_period = var.database_performance_insights_retention
+  monitoring_interval        = var.database_monitoring_interval
+  parameters                 = var.database_parameters
+  backup_window              = var.database_backup_window
+  maintenance_window         = var.database_maintenance_window
+  cloudwatch_logs_exports    = var.database_cloudwatch_logs_exports
+  auto_minor_version_upgrade = var.database_auto_minor_version_upgrade
   tags                       = var.tags
 }
 

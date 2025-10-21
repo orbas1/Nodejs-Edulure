@@ -18,6 +18,7 @@ class IntegrationWebhookReceiptService {
       throw new Error('Integration webhook receipt requires provider and externalEventId.');
     }
 
+    const normalizedMetadata = metadata && typeof metadata === 'object' ? metadata : {};
     const hash = payloadHash || createHash('sha256').update(rawBody ?? '').digest('hex');
     const recorded = await IntegrationWebhookReceiptModel.recordReceipt({
       provider,
@@ -25,7 +26,7 @@ class IntegrationWebhookReceiptService {
       signature,
       payloadHash: hash,
       receivedAt,
-      metadata
+      metadata: normalizedMetadata
     });
 
     if (!recorded.receipt) {
@@ -63,6 +64,28 @@ class IntegrationWebhookReceiptService {
   static async pruneOlderThan(days = 14) {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     return IntegrationWebhookReceiptModel.pruneOlderThan(cutoff);
+  }
+
+  static async getReceiptSummary(provider, externalEventId) {
+    if (!provider || !externalEventId) {
+      return null;
+    }
+
+    const record = await IntegrationWebhookReceiptModel.findByProviderEvent(provider, externalEventId);
+    if (!record) {
+      return null;
+    }
+
+    return {
+      id: record.id,
+      provider: record.provider,
+      externalEventId: record.externalEventId,
+      status: record.status,
+      receivedAt: record.receivedAt ? record.receivedAt.toISOString() : null,
+      processedAt: record.processedAt ? record.processedAt.toISOString() : null,
+      metadata: record.metadata ?? {},
+      payloadHash: record.payloadHash
+    };
   }
 }
 

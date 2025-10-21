@@ -34,6 +34,26 @@ ProfileStat.propTypes = {
   stat: profileStatPropType.isRequired
 };
 
+function sanitiseImageUrl(url) {
+  if (typeof url !== 'string' || url.trim().length === 0) {
+    return null;
+  }
+  const value = url.trim();
+  if (value.startsWith('data:')) {
+    return value;
+  }
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.edulure.com';
+    const parsed = new URL(value, origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
 function computeInitials(profile) {
   const primaryName = profile?.name ?? '';
   if (primaryName.trim().length > 0) {
@@ -54,9 +74,10 @@ function computeInitials(profile) {
 export default function InstructorProfileSection({ profile, stats }) {
   const displayName = profile?.name ?? 'Instructor';
   const displayTitle = profile?.title ?? 'Cohort architect & facilitator';
-  const avatarUrl = profile?.avatar;
+  const avatarUrl = sanitiseImageUrl(profile?.avatar);
   const initials = computeInitials(profile);
   const verificationStatus = profile?.verification?.status;
+  const safeStats = Array.isArray(stats) ? stats.filter((stat) => stat?.label && stat?.value) : [];
 
   return (
     <section className="dashboard-section space-y-6 lg:col-span-3">
@@ -93,9 +114,9 @@ export default function InstructorProfileSection({ profile, stats }) {
         </p>
       </div>
 
-      {stats.length > 0 ? (
+      {safeStats.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {stats.map((stat) => (
+          {safeStats.map((stat) => (
             <ProfileStat key={stat.label} stat={stat} />
           ))}
         </div>

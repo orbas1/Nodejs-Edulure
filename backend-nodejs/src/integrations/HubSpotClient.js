@@ -1,6 +1,9 @@
+import crypto from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const HUBSPOT_BATCH_LIMIT = 100;
+const DEFAULT_RETRY_BASE_DELAY_MS = 500;
+const DEFAULT_RETRY_MAX_DELAY_MS = 5000;
 
 function normaliseBaseUrl(baseUrl) {
   if (!baseUrl) {
@@ -14,7 +17,19 @@ function buildUserAgent() {
 }
 
 export default class HubSpotClient {
-  constructor({ accessToken, baseUrl, timeoutMs = 10000, maxRetries = 3, logger, fetchImpl, auditLogger } = {}) {
+  constructor({
+    accessToken,
+    baseUrl,
+    timeoutMs = 10000,
+    maxRetries = 3,
+    logger,
+    fetchImpl,
+    auditLogger,
+    sleep = delay,
+    random = Math.random,
+    retryBaseDelayMs = DEFAULT_RETRY_BASE_DELAY_MS,
+    retryMaxDelayMs = DEFAULT_RETRY_MAX_DELAY_MS
+  } = {}) {
     if (!accessToken) {
       throw new Error('HubSpotClient requires a private app access token.');
     }
@@ -25,7 +40,16 @@ export default class HubSpotClient {
     this.maxRetries = maxRetries;
     this.logger = logger ?? console;
     this.fetchImpl = fetchImpl ?? globalThis.fetch.bind(globalThis);
+    this.sleep = typeof sleep === 'function' ? sleep : delay;
+    this.random = typeof random === 'function' ? random : Math.random;
     this.auditLogger = typeof auditLogger === 'function' ? auditLogger : null;
+    this.retryBaseDelayMs = Number.isFinite(retryBaseDelayMs) && retryBaseDelayMs > 0
+      ? retryBaseDelayMs
+      : DEFAULT_RETRY_BASE_DELAY_MS;
+    const normalisedMaxDelay = Number.isFinite(retryMaxDelayMs) && retryMaxDelayMs > 0
+      ? retryMaxDelayMs
+      : DEFAULT_RETRY_MAX_DELAY_MS;
+    this.retryMaxDelayMs = Math.max(this.retryBaseDelayMs, normalisedMaxDelay);
   }
 
   async recordAudit({ requestMethod, requestPath, statusCode, outcome, durationMs, metadata, error }) {
@@ -98,6 +122,57 @@ export default class HubSpotClient {
           queryKeys: Array.from(url.searchParams.keys())
         };
 
+        let outcome = 'success';
+        let auditMetadata = metadata;
+        let retryAfterMs = null;
+        let backoffMs = null;
+        if (response.status === 429 || response.status >= 500) {
+          const errorBody = await this.safeJson(response);
+          const retryAfterSeconds = Number(response.headers.get('Retry-After') ?? 0);
+          retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+            ? retryAfterSeconds * 1000
+            : null;
+          backoffMs = this.computeRetryDelayMs(attempt, { retryAfterMs });
+          outcome = response.status === 429 ? 'degraded' : 'failure';
+          auditMetadata = {
+            ...metadata,
+            retryAfterMs,
+            backoffMs,
+            errorDetails: Array.isArray(errorBody?.errors)
+              ? errorBody.errors.slice(0, 5)
+              : errorBody
+          };
+          lastError = new Error(`HubSpot request failed with status ${response.status}`);
+          lastError.details = errorBody;
+          this.logger.warn(
+            {
+              module: 'hubspot-client',
+              status: response.status,
+              attempt,
+              path: url.pathname,
+              backoffMs
+            },
+            'HubSpot responded with retryable error'
+          );
+
+          await this.recordAudit({
+            requestMethod: method,
+            requestPath: url.pathname,
+            statusCode: response.status,
+            outcome,
+            durationMs,
+            metadata: auditMetadata,
+            error: lastError
+          });
+
+          if (attempt <= this.maxRetries) {
+            await this.sleep(backoffMs);
+            continue;
+          }
+
+          throw lastError;
+        }
+
         if (!response.ok) {
           const errorBody = await this.safeJson(response);
           const error = new Error(`HubSpot request failed with status ${response.status}`);
@@ -121,48 +196,14 @@ export default class HubSpotClient {
           throw error;
         }
 
-        let outcome = 'success';
-        if (response.status === 429) {
-          outcome = 'degraded';
-          metadata.retryAfterSeconds = Number(response.headers.get('Retry-After') ?? 0);
-        } else if (response.status >= 500) {
-          outcome = 'failure';
-        }
-
         await this.recordAudit({
           requestMethod: method,
           requestPath: url.pathname,
           statusCode: response.status,
           outcome,
           durationMs,
-          metadata
+          metadata: auditMetadata
         });
-
-        if (response.status === 429 || response.status >= 500) {
-          const retryAfter = Number(response.headers.get('Retry-After') ?? 0) * 1000;
-          const backoff = Math.min(retryAfter || attempt * 500, 5000);
-          lastError = new Error(`HubSpot request failed with status ${response.status}`);
-          this.logger.warn(
-            {
-              module: 'hubspot-client',
-              status: response.status,
-              attempt,
-              path: url.pathname,
-              backoff
-            },
-            'HubSpot responded with retryable error'
-          );
-
-          if (attempt <= this.maxRetries) {
-            await delay(backoff);
-            continue;
-          }
-        }
-
-        if (!response.ok) {
-          // already handled above
-          throw lastError ?? new Error(`HubSpot request failed with status ${response.status}`);
-        }
 
         return this.safeJson(response);
       } catch (error) {
@@ -178,6 +219,7 @@ export default class HubSpotClient {
         }
 
         const durationMs = Date.now() - attemptStartedAt;
+        const backoffMs = attempt <= this.maxRetries ? this.computeRetryDelayMs(attempt) : null;
         await this.recordAudit({
           requestMethod: method,
           requestPath: url.pathname,
@@ -190,7 +232,8 @@ export default class HubSpotClient {
             hasBody: Boolean(body),
             idempotencyKey: idempotencyKey ?? null,
             queryKeys: Array.from(url.searchParams.keys()),
-            timeout: error.name === 'AbortError'
+            timeout: error.name === 'AbortError',
+            backoffMs
           },
           error
         });
@@ -199,11 +242,49 @@ export default class HubSpotClient {
           throw error;
         }
 
-        await delay(Math.min(attempt * 500, 3000));
+        await this.sleep(backoffMs);
       }
     }
 
     throw lastError ?? new Error('HubSpot request failed without response');
+  }
+
+  computeRetryDelayMs(attempt, { retryAfterMs } = {}) {
+    const safeAttempt = Math.max(1, Number(attempt) || 1);
+    const exponent = Math.min(safeAttempt - 1, 6);
+    const exponential = Math.min(this.retryBaseDelayMs * 2 ** exponent, this.retryMaxDelayMs);
+    const candidate = Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? Math.min(retryAfterMs, this.retryMaxDelayMs)
+      : exponential;
+    const jitterFactor = 0.75 + this.random() * 0.5;
+    const jittered = candidate * jitterFactor;
+    return Math.max(100, Math.round(jittered));
+  }
+
+  ensureContactIdempotency(contact) {
+    if (!contact || typeof contact !== 'object') {
+      return {
+        id: null,
+        email: null,
+        idProperty: 'email',
+        properties: {},
+        idempotencyKey: crypto.randomUUID()
+      };
+    }
+
+    if (contact.idempotencyKey) {
+      return contact;
+    }
+
+    const payload = {
+      id: contact.id ?? null,
+      email: contact.email ?? null,
+      idProperty: contact.idProperty ?? 'email',
+      properties: contact.properties ?? {}
+    };
+
+    const digest = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+    return { ...contact, idempotencyKey: digest };
   }
 
   async safeJson(response) {
@@ -229,8 +310,9 @@ export default class HubSpotClient {
 
     for (let index = 0; index < contacts.length; index += HUBSPOT_BATCH_LIMIT) {
       const batch = contacts.slice(index, index + HUBSPOT_BATCH_LIMIT);
+      const normalisedBatch = batch.map((contact) => this.ensureContactIdempotency(contact));
       const body = {
-        inputs: batch.map((contact) => ({
+        inputs: normalisedBatch.map((contact) => ({
           idProperty: contact.idProperty ?? 'email',
           id: contact.id ?? contact.email,
           properties: contact.properties ?? {}
@@ -241,12 +323,12 @@ export default class HubSpotClient {
         const response = await this.request('crm/v3/objects/contacts/batch/upsert', {
           method: 'POST',
           body,
-          idempotencyKey: batch[0]?.idempotencyKey
+          idempotencyKey: normalisedBatch[0]?.idempotencyKey
         });
 
         const processed = Array.isArray(response?.results) ? response.results : [];
         processed.forEach((item, resultIndex) => {
-          const source = batch[resultIndex];
+          const source = normalisedBatch[resultIndex];
           const status = item.status ?? 'succeeded';
           if (status === 'FAILED') {
             failed += 1;
@@ -263,7 +345,7 @@ export default class HubSpotClient {
       } catch (error) {
         failed += batch.length;
         results.push(
-          ...batch.map((source) => ({
+          ...normalisedBatch.map((source) => ({
             source,
             status: 'FAILED',
             message: error.message,

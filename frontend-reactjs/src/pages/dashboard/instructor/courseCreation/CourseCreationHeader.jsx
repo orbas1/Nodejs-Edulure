@@ -8,6 +8,10 @@ export default function CourseCreationHeader({
   isImporting,
   isSyncing
 }) {
+  const canGenerate = typeof onGenerateOutline === 'function';
+  const canImport = typeof onImportFromNotion === 'function';
+  const canSync = typeof onSyncFromLms === 'function';
+
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -21,8 +25,10 @@ export default function CourseCreationHeader({
           type="button"
           className="dashboard-primary-pill disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onGenerateOutline}
-          disabled={isGenerating}
+          disabled={isGenerating || !canGenerate}
           aria-busy={isGenerating}
+          aria-live="polite"
+          aria-label="Generate AI-assisted course outline"
         >
           {isGenerating ? 'Generating…' : 'Generate outline'}
         </button>
@@ -30,7 +36,7 @@ export default function CourseCreationHeader({
           type="button"
           className="dashboard-pill disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onImportFromNotion}
-          disabled={isImporting}
+          disabled={isImporting || !canImport}
           aria-busy={isImporting}
         >
           {isImporting ? 'Importing…' : 'Import from Notion'}
@@ -39,7 +45,7 @@ export default function CourseCreationHeader({
           type="button"
           className="dashboard-pill disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onSyncFromLms}
-          disabled={isSyncing}
+          disabled={isSyncing || !canSync}
           aria-busy={isSyncing}
         >
           {isSyncing ? 'Syncing…' : 'Sync from LMS'}

@@ -86,6 +86,16 @@ const DEFAULT_SUPPORT_CONTACTS = [
   }
 ];
 
+const DEFAULT_SUPPORT_METRICS = Object.freeze({
+  open: 0,
+  waiting: 0,
+  resolved: 0,
+  closed: 0,
+  awaitingLearner: 0,
+  averageResponseMinutes: 0,
+  latestUpdatedAt: null
+});
+
 const DEFAULT_SYSTEM_SETTINGS = Object.freeze({
   language: 'en',
   region: 'US',
@@ -110,11 +120,142 @@ const DEFAULT_FINANCE_ALERTS = Object.freeze({
   notifyThresholdPercent: 80
 });
 
+const MESSAGE_PERMISSION_CANONICAL = new Map([
+  ['everyone', 'everyone'],
+  ['public', 'everyone'],
+  ['all', 'everyone'],
+  ['followers', 'followers'],
+  ['followers_only', 'followers'],
+  ['friends', 'followers'],
+  ['connections', 'followers'],
+  ['no-one', 'none'],
+  ['no_one', 'none'],
+  ['none', 'none'],
+  ['private', 'none']
+]);
+
+const MESSAGE_PERMISSION_DEFAULT = 'followers';
+
 function getOperatorDashboardService() {
   if (!operatorDashboardService) {
     operatorDashboardService = new OperatorDashboardService();
   }
   return operatorDashboardService;
+}
+
+function toPositiveInteger(value, { round = true } = {}) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return 0;
+  }
+  return round ? Math.round(numeric) : numeric;
+}
+
+function normaliseSupportMetrics(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  const latestUpdatedAtDate = normaliseDate(source.latestUpdatedAt);
+  const averageResponseMinutes = toPositiveInteger(source.averageResponseMinutes);
+  const firstResponseMinutes = toPositiveInteger(
+    source.firstResponseMinutes ?? source.firstResponse ?? averageResponseMinutes
+  );
+
+  return {
+    open: toPositiveInteger(source.open),
+    waiting: toPositiveInteger(source.waiting),
+    resolved: toPositiveInteger(source.resolved),
+    closed: toPositiveInteger(source.closed),
+    awaitingLearner: toPositiveInteger(source.awaitingLearner),
+    averageResponseMinutes,
+    firstResponseMinutes,
+    latestUpdatedAt: latestUpdatedAtDate ? latestUpdatedAtDate.toISOString() : null
+  };
+}
+
+function normaliseSystemPreferences(preferences) {
+  const source = preferences && typeof preferences === 'object' ? preferences : {};
+  const nestedPrefs = source.preferences && typeof source.preferences === 'object' ? source.preferences : {};
+  const updatedAt = normaliseDate(source.updatedAt);
+
+  return {
+    language: typeof source.language === 'string' && source.language ? source.language : DEFAULT_SYSTEM_SETTINGS.language,
+    region: typeof source.region === 'string' && source.region ? source.region : DEFAULT_SYSTEM_SETTINGS.region,
+    timezone:
+      typeof source.timezone === 'string' && source.timezone ? source.timezone : DEFAULT_SYSTEM_SETTINGS.timezone,
+    notificationsEnabled:
+      typeof source.notificationsEnabled === 'boolean'
+        ? source.notificationsEnabled
+        : DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
+    digestEnabled:
+      typeof source.digestEnabled === 'boolean' ? source.digestEnabled : DEFAULT_SYSTEM_SETTINGS.digestEnabled,
+    autoPlayMedia:
+      typeof source.autoPlayMedia === 'boolean' ? source.autoPlayMedia : DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
+    highContrast:
+      typeof source.highContrast === 'boolean' ? source.highContrast : DEFAULT_SYSTEM_SETTINGS.highContrast,
+    reducedMotion:
+      typeof source.reducedMotion === 'boolean' ? source.reducedMotion : DEFAULT_SYSTEM_SETTINGS.reducedMotion,
+    preferences: {
+      interfaceDensity:
+        typeof nestedPrefs.interfaceDensity === 'string' && nestedPrefs.interfaceDensity
+          ? nestedPrefs.interfaceDensity
+          : DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
+      analyticsOptIn:
+        typeof nestedPrefs.analyticsOptIn === 'boolean'
+          ? nestedPrefs.analyticsOptIn
+          : DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
+      subtitleLanguage:
+        typeof nestedPrefs.subtitleLanguage === 'string' && nestedPrefs.subtitleLanguage
+          ? nestedPrefs.subtitleLanguage
+          : typeof source.language === 'string' && source.language
+            ? source.language
+            : DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
+      audioDescription:
+        typeof nestedPrefs.audioDescription === 'boolean'
+          ? nestedPrefs.audioDescription
+          : DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
+    },
+    updatedAt: updatedAt ? updatedAt.toISOString() : null
+  };
+}
+
+function normalisePrivacySettings(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const visibilityRaw = typeof source.profileVisibility === 'string' ? source.profileVisibility.toLowerCase() : '';
+  const visibility = ['public', 'private', 'connections'].includes(visibilityRaw) ? visibilityRaw : 'public';
+
+  const messagePermissionRaw =
+    typeof source.messagePermission === 'string' ? source.messagePermission.toLowerCase() : '';
+  const messagePermission =
+    MESSAGE_PERMISSION_CANONICAL.get(messagePermissionRaw) ?? MESSAGE_PERMISSION_DEFAULT;
+
+  return {
+    visibility,
+    followApprovalRequired: Boolean(source.followApprovalRequired),
+    shareActivity: source.shareActivity !== false,
+    messagePermission
+  };
+}
+
+function normaliseNotifications(notifications) {
+  if (!Array.isArray(notifications)) {
+    return [];
+  }
+
+  return notifications
+    .filter((item) => item && (item.id || item.title))
+    .map((item) => ({
+      id: item.id ?? `notification-${crypto.randomUUID()}`,
+      title: item.title ?? 'Notification',
+      type: item.type ?? 'system',
+      timestamp: (() => {
+        const parsed = normaliseDate(item.timestamp);
+        if (parsed) {
+          return parsed.toISOString();
+        }
+        return item.timestamp ?? null;
+      })(),
+      read: item.read ?? false,
+      cta: item.cta ?? null
+    }));
 }
 
 export function formatCurrency(amountCents, currency = 'USD') {
@@ -366,6 +507,8 @@ export function buildLearnerDashboard({
   ebooks = new Map(),
   invoices = [],
   paymentIntents = [],
+  paymentMethodsRaw = [],
+  billingContactsRaw = [],
   ebookRecommendations = [],
   communityMemberships = [],
   communityEvents = [],
@@ -378,21 +521,74 @@ export function buildLearnerDashboard({
   libraryEntries = [],
   fieldServiceWorkspace = null,
   financialProfile = null,
+  paymentMethods = [],
+  billingContacts = [],
   financePurchases = [],
   financeSubscriptions = [],
-  systemPreferences = null
+  systemPreferences = null,
+  growthInitiatives = [],
+  growthExperimentsByInitiative = new Map(),
+  affiliateChannels = [],
+  affiliatePayouts = [],
+  adCampaigns = [],
+  instructorApplication = null,
+  supportCases = [],
+  supportMetrics = DEFAULT_SUPPORT_METRICS
 } = {}) {
+  const resolvedCommunityEvents = Array.isArray(communityEvents) ? communityEvents : [];
   const hasSignals =
     enrollments.length ||
     tutorBookings.length ||
     ebookProgress.length ||
     invoices.length ||
     liveClassrooms.length ||
-    communityMemberships.length;
+    communityMemberships.length ||
+    resolvedCommunityEvents.length ||
+    (Array.isArray(notifications) ? notifications.length : 0) ||
+    (Array.isArray(supportCases) ? supportCases.length : 0) ||
+    (Array.isArray(financePurchases) ? financePurchases.length : 0) ||
+    (Array.isArray(financeSubscriptions) ? financeSubscriptions.length : 0) ||
+    (Array.isArray(growthInitiatives) ? growthInitiatives.length : 0) ||
+    (Array.isArray(affiliateChannels) ? affiliateChannels.length : 0) ||
+    (Array.isArray(adCampaigns) ? adCampaigns.length : 0) ||
+    (Array.isArray(paymentMethods) ? paymentMethods.length : 0) ||
+    (Array.isArray(billingContacts) ? billingContacts.length : 0);
 
   if (!hasSignals) {
     return null;
   }
+
+  const resolvedPaymentMethods = Array.isArray(paymentMethods)
+    ? paymentMethods
+    : Array.isArray(financialProfile?.paymentMethods)
+      ? financialProfile.paymentMethods
+      : [];
+
+  const resolvedBillingContacts = Array.isArray(billingContacts)
+    ? billingContacts
+    : Array.isArray(financialProfile?.billingContacts)
+      ? financialProfile.billingContacts
+      : [];
+
+  const growthInitiativesList = Array.isArray(growthInitiatives) ? growthInitiatives : [];
+  const growthExperimentsMap =
+    growthExperimentsByInitiative instanceof Map
+      ? growthExperimentsByInitiative
+      : new Map(
+          Object.entries(growthExperimentsByInitiative ?? {}).map(([key, value]) => [
+            key,
+            Array.isArray(value) ? value : []
+          ])
+        );
+  const affiliateChannelsList = Array.isArray(affiliateChannels) ? affiliateChannels : [];
+  const affiliatePayoutsList = Array.isArray(affiliatePayouts) ? affiliatePayouts : [];
+  const adCampaignsList = Array.isArray(adCampaigns) ? adCampaigns : [];
+  const instructorApplicationData = instructorApplication ?? null;
+  const supportCasesList = Array.isArray(supportCases) ? supportCases : [];
+  const supportMetricsSummary = {
+    ...DEFAULT_SUPPORT_METRICS,
+    ...(supportMetrics && typeof supportMetrics === 'object' ? supportMetrics : {})
+  };
 
   const courseMap = new Map();
   const instructorDirectoryMap = ensureMap(instructorDirectory);
@@ -608,7 +804,7 @@ export function buildLearnerDashboard({
     });
   });
 
-  communityEvents
+  resolvedCommunityEvents
     .map((event) => ({ ...event, startAt: normaliseDate(event.startAt) }))
     .filter((event) => event.startAt && event.startAt >= now)
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
@@ -652,7 +848,19 @@ export function buildLearnerDashboard({
       });
     });
 
-  const calendarEvents = learningUpcoming
+  const upcomingUnique = deduplicateByKey(learningUpcoming, (item) =>
+    item.id
+      ? String(item.id)
+      : `${(item.type ?? 'event').toLowerCase()}::${(item.startAt ?? item.date ?? '')}::${
+          item.title ?? ''
+        }`
+  ).sort((a, b) => {
+    const aTime = a.date ? new Date(a.date).getTime() : a.startAt ? new Date(a.startAt).getTime() : Infinity;
+    const bTime = b.date ? new Date(b.date).getTime() : b.startAt ? new Date(b.startAt).getTime() : Infinity;
+    return aTime - bTime;
+  });
+
+  const calendarEvents = upcomingUnique
     .filter((item) => item.startAt)
     .map((item) => ({
       id: `calendar-${item.id}`,
@@ -758,35 +966,35 @@ export function buildLearnerDashboard({
     }
   ];
 
-      const invoiceEntries = normalisedInvoices.map((invoice) => ({
-        id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
-        label: invoice.label ?? 'Invoice',
-        amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
-        status: invoice.status ?? 'open',
-        date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
-      }));
+  const invoiceEntries = normalisedInvoices.map((invoice) => ({
+    id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
+    label: invoice.label ?? 'Invoice',
+    amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
+    status: invoice.status ?? 'open',
+    date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
+  }));
 
-      const paymentMethods = paymentMethodsRaw.map((method) => ({
-        id: method.id,
-        label: method.label,
-        brand: method.brand,
-        last4: method.last4,
-        expiry: method.expiry,
-        primary: Boolean(method.primary)
-      }));
+  const paymentMethodEntries = resolvedPaymentMethods.map((method) => ({
+    id: method.id,
+    label: method.label,
+    brand: method.brand,
+    last4: method.last4,
+    expiry: method.expiry,
+    primary: Boolean(method.primary)
+  }));
 
-      const billingContacts = billingContactsRaw.map((contact) => ({
-        id: contact.id,
-        name: contact.name,
-        email: contact.email,
-        phone: contact.phone,
-        company: contact.company
-      }));
+  const billingContactEntries = resolvedBillingContacts.map((contact) => ({
+    id: contact.id,
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    company: contact.company
+  }));
 
-      const financePreferencesRaw =
-        financialProfile?.preferences && typeof financialProfile.preferences === 'object'
-          ? financialProfile.preferences
-          : {};
+  const financePreferencesRaw =
+    financialProfile?.preferences && typeof financialProfile.preferences === 'object'
+      ? financialProfile.preferences
+      : {};
       const financialPreferences = {
         autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
         reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
@@ -810,8 +1018,8 @@ export function buildLearnerDashboard({
                 enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
                 instructions: financePreferencesRaw.reimbursements.instructions ?? null
           }
-            : { enabled: false, instructions: null }
-      };
+        : { enabled: false, instructions: null }
+  };
 
   const financePurchasesList = Array.isArray(financePurchases)
     ? financePurchases.map((purchase) => ({
@@ -871,35 +1079,9 @@ export function buildLearnerDashboard({
     reimbursements: financialPreferences.reimbursements ?? { enabled: false, instructions: null }
   };
 
-      const systemSettings = {
-        language: systemPreferences?.language ?? DEFAULT_SYSTEM_SETTINGS.language,
-        region: systemPreferences?.region ?? DEFAULT_SYSTEM_SETTINGS.region,
-        timezone: systemPreferences?.timezone ?? DEFAULT_SYSTEM_SETTINGS.timezone,
-        notificationsEnabled:
-          systemPreferences?.notificationsEnabled ?? DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
-        digestEnabled: systemPreferences?.digestEnabled ?? DEFAULT_SYSTEM_SETTINGS.digestEnabled,
-        autoPlayMedia: systemPreferences?.autoPlayMedia ?? DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
-        highContrast: systemPreferences?.highContrast ?? DEFAULT_SYSTEM_SETTINGS.highContrast,
-        reducedMotion: systemPreferences?.reducedMotion ?? DEFAULT_SYSTEM_SETTINGS.reducedMotion,
-        preferences: {
-          interfaceDensity:
-            systemPreferences?.preferences?.interfaceDensity ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
-          analyticsOptIn:
-            systemPreferences?.preferences?.analyticsOptIn ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
-          subtitleLanguage:
-            systemPreferences?.preferences?.subtitleLanguage ??
-            systemPreferences?.language ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
-          audioDescription:
-            systemPreferences?.preferences?.audioDescription ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
-        },
-        updatedAt: systemPreferences?.updatedAt ?? null
-      };
+  const systemSettings = normaliseSystemPreferences(systemPreferences);
 
-  const notificationsList = [...notifications];
+  const notificationsList = Array.isArray(notifications) ? [...notifications] : [];
   activeTutorBookings.forEach((booking) => {
     notificationsList.push({
       id: `notification-booking-${booking.id}`,
@@ -925,225 +1107,228 @@ export function buildLearnerDashboard({
     ? fieldServiceWorkspace.searchIndex.filter((entry) => entry.role === 'learner')
     : [];
 
-      const growthInitiatives = growthInitiativesRaw.map((initiative) => ({
-        id: initiative.id,
-        slug: initiative.slug,
-        title: initiative.title,
-        status: initiative.status,
-        objective: initiative.objective,
-        primaryMetric: initiative.primaryMetric,
-        baselineValue: initiative.baselineValue,
-        targetValue: initiative.targetValue,
-        currentValue: initiative.currentValue,
-        startAt: initiative.startAt,
-        endAt: initiative.endAt,
-        tags: initiative.tags,
-        experiments: (growthExperimentsByInitiative.get(initiative.id) ?? []).map((experiment) => ({
-          id: experiment.id,
-          name: experiment.name,
-          status: experiment.status,
-          hypothesis: experiment.hypothesis,
-          metric: experiment.metric,
-          baselineValue: experiment.baselineValue,
-          targetValue: experiment.targetValue,
-          resultValue: experiment.resultValue,
-          startAt: experiment.startAt,
-          endAt: experiment.endAt,
-          segments: experiment.segments
-        }))
-      }));
+  const growthInitiativesDetailed = growthInitiativesList.map((initiative) => ({
+      id: initiative.id,
+      slug: initiative.slug,
+      title: initiative.title,
+      status: initiative.status,
+      objective: initiative.objective,
+      primaryMetric: initiative.primaryMetric,
+      baselineValue: initiative.baselineValue,
+      targetValue: initiative.targetValue,
+      currentValue: initiative.currentValue,
+      startAt: initiative.startAt,
+      endAt: initiative.endAt,
+      tags: initiative.tags,
+      experiments: (growthExperimentsMap.get(initiative.id) ?? []).map((experiment) => ({
+        id: experiment.id,
+        name: experiment.name,
+        status: experiment.status,
+        hypothesis: experiment.hypothesis,
+        metric: experiment.metric,
+        baselineValue: experiment.baselineValue,
+        targetValue: experiment.targetValue,
+        resultValue: experiment.resultValue,
+        startAt: experiment.startAt,
+        endAt: experiment.endAt,
+        segments: experiment.segments
+      }))
+  }));
 
-      const totalGrowthExperiments = growthInitiatives.reduce(
-        (count, initiative) => count + (initiative.experiments?.length ?? 0),
-        0
-      );
+  const totalGrowthExperiments = growthInitiativesDetailed.reduce(
+    (count, initiative) => count + (initiative.experiments?.length ?? 0),
+    0
+  );
 
-      const growthSection = {
-        initiatives: growthInitiatives,
-        metrics: [
-          { label: 'Active initiatives', value: growthInitiatives.filter((item) => item.status === 'active').length },
-          { label: 'Experiments running', value: totalGrowthExperiments },
-          {
-            label: 'Targets hitting',
-            value: growthInitiatives.filter(
-              (initiative) =>
-                initiative.currentValue != null &&
-                initiative.targetValue != null &&
-                Number(initiative.currentValue) >= Number(initiative.targetValue)
-            ).length
+  const growthSection = {
+    initiatives: growthInitiativesDetailed,
+    metrics: [
+      {
+        label: 'Active initiatives',
+        value: growthInitiativesDetailed.filter((item) => item.status === 'active').length
+      },
+      { label: 'Experiments running', value: totalGrowthExperiments },
+      {
+        label: 'Targets hitting',
+        value: growthInitiativesDetailed.filter(
+          (initiative) =>
+            initiative.currentValue != null &&
+            initiative.targetValue != null &&
+            Number(initiative.currentValue) >= Number(initiative.targetValue)
+        ).length
+      }
+    ]
+  };
+
+  const affiliateChannelsDetailed = affiliateChannelsList.map((channel) => {
+    const payouts = affiliatePayoutsList.filter((payout) => payout.channelId === channel.id);
+    const outstandingCents = Math.max(0, channel.totalEarningsCents - channel.totalPaidCents);
+    const nextPayout = payouts
+      .filter((payout) => payout.status === 'scheduled' || payout.status === 'processing')
+      .sort((a, b) => {
+        const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      })[0];
+    return {
+      id: channel.id,
+      platform: channel.platform,
+      handle: channel.handle,
+      referralCode: channel.referralCode,
+      trackingUrl: channel.trackingUrl,
+      status: channel.status,
+      commissionRateBps: channel.commissionRateBps,
+      totalEarningsFormatted: formatCurrency(channel.totalEarningsCents),
+      totalPaidFormatted: formatCurrency(channel.totalPaidCents),
+      outstandingFormatted: formatCurrency(outstandingCents),
+      notes: channel.notes,
+      performance: channel.performance,
+      nextPayout: nextPayout
+        ? {
+            amount: formatCurrency(nextPayout.amountCents, nextPayout.currency),
+            scheduledAt: nextPayout.scheduledAt,
+            status: nextPayout.status
           }
-        ]
-      };
+        : null
+    };
+  });
 
-      const affiliateChannels = affiliateChannelsRaw.map((channel) => {
-        const payouts = affiliatePayoutsRaw.filter((payout) => payout.channelId === channel.id);
-        const outstandingCents = Math.max(0, channel.totalEarningsCents - channel.totalPaidCents);
-        const nextPayout = payouts
-          .filter((payout) => payout.status === 'scheduled' || payout.status === 'processing')
-          .sort((a, b) => {
-            const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
-            const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
-            return aTime - bTime;
-          })[0];
-        return {
-          id: channel.id,
-          platform: channel.platform,
-          handle: channel.handle,
-          referralCode: channel.referralCode,
-          trackingUrl: channel.trackingUrl,
-          status: channel.status,
-          commissionRateBps: channel.commissionRateBps,
-          totalEarningsFormatted: formatCurrency(channel.totalEarningsCents),
-          totalPaidFormatted: formatCurrency(channel.totalPaidCents),
-          outstandingFormatted: formatCurrency(outstandingCents),
-          notes: channel.notes,
-          performance: channel.performance,
-          nextPayout: nextPayout
-            ? {
-                amount: formatCurrency(nextPayout.amountCents, nextPayout.currency),
-                scheduledAt: nextPayout.scheduledAt,
-                status: nextPayout.status
-              }
-            : null
-        };
-      });
+  const affiliateSection = {
+    channels: affiliateChannelsDetailed,
+    payouts: affiliatePayoutsList.map((payout) => ({
+      id: payout.id,
+      channelId: payout.channelId,
+      amount: formatCurrency(payout.amountCents, payout.currency),
+      status: payout.status,
+      scheduledAt: payout.scheduledAt,
+      processedAt: payout.processedAt,
+      reference: payout.reference
+    })),
+    summary: {
+      totalChannels: affiliateChannelsDetailed.length,
+      activeChannels: affiliateChannelsDetailed.filter((channel) => channel.status === 'active').length,
+      outstanding: formatCurrency(
+        affiliateChannelsList.reduce(
+          (total, channel) => total + Math.max(0, channel.totalEarningsCents - channel.totalPaidCents),
+          0
+        )
+      )
+    }
+  };
 
-      const affiliateSection = {
-        channels: affiliateChannels,
-        payouts: affiliatePayoutsRaw.map((payout) => ({
-          id: payout.id,
-          channelId: payout.channelId,
-          amount: formatCurrency(payout.amountCents, payout.currency),
-          status: payout.status,
-          scheduledAt: payout.scheduledAt,
-          processedAt: payout.processedAt,
-          reference: payout.reference
-        })),
-        summary: {
-          totalChannels: affiliateChannels.length,
-          activeChannels: affiliateChannels.filter((channel) => channel.status === 'active').length,
-          outstanding: formatCurrency(
-            affiliateChannelsRaw.reduce(
-              (total, channel) => total + Math.max(0, channel.totalEarningsCents - channel.totalPaidCents),
-              0
+  const adCampaignsDetailed = adCampaignsList.map((campaign) => {
+    const metrics = campaign.metrics && typeof campaign.metrics === 'object' ? campaign.metrics : {};
+    const targeting = campaign.targeting && typeof campaign.targeting === 'object' ? campaign.targeting : {};
+    return {
+      id: campaign.id,
+      name: campaign.name,
+      status: campaign.status,
+      objective: campaign.objective,
+      dailyBudget: formatCurrency(campaign.dailyBudgetCents),
+      dailyBudgetCents: Number(campaign.dailyBudgetCents ?? 0),
+      totalSpend: formatCurrency(campaign.totalSpendCents),
+      totalSpendCents: Number(campaign.totalSpendCents ?? 0),
+      startAt: campaign.startAt,
+      endAt: campaign.endAt,
+      lastSyncedAt: campaign.lastSyncedAt,
+      metrics: {
+        impressions: Number(metrics.impressions ?? metrics.totals?.impressions ?? 0),
+        clicks: Number(metrics.clicks ?? metrics.totals?.clicks ?? 0),
+        conversions: Number(metrics.conversions ?? metrics.totals?.conversions ?? 0),
+        spendCents: Number(metrics.spendCents ?? metrics.totals?.spendCents ?? 0),
+        revenueCents: Number(metrics.revenueCents ?? metrics.totals?.revenueCents ?? 0),
+        ctr: metrics.ctr ?? metrics.averageCtr ?? null,
+        cpc: metrics.cpc ?? metrics.cpcCents ?? null,
+        cpa: metrics.cpa ?? metrics.cpaCents ?? null,
+        roas: metrics.roas ?? null,
+        lastSyncedAt: metrics.lastSyncedAt ?? campaign.lastSyncedAt ?? null
+      },
+      targeting: {
+        keywords: Array.isArray(targeting.keywords) ? targeting.keywords : [],
+        audiences: Array.isArray(targeting.audiences) ? targeting.audiences : [],
+        locations: Array.isArray(targeting.locations) ? targeting.locations : [],
+        languages: Array.isArray(targeting.languages) ? targeting.languages : [],
+        summary: targeting.summary ?? ''
+      },
+      creative: campaign.creative && typeof campaign.creative === 'object'
+        ? {
+            headline: campaign.creative.headline ?? 'Untitled creative',
+            description: campaign.creative.description ?? '',
+            url: campaign.creative.url ?? null
+          }
+        : { headline: 'Untitled creative', description: '', url: null },
+      placements: Array.isArray(campaign.placements) ? campaign.placements : []
+    };
+  });
+
+  const adsSection = {
+    campaigns: adCampaignsDetailed,
+    summary: {
+      activeCampaigns: adCampaignsDetailed.filter((campaign) => campaign.status === 'active').length,
+      totalSpend: formatCurrency(
+        adCampaignsList.reduce((total, campaign) => total + (campaign.totalSpendCents ?? 0), 0)
+      ),
+      averageDailyBudget: adCampaignsList.length
+        ? formatCurrency(
+            Math.round(
+              adCampaignsList.reduce((total, campaign) => total + (campaign.dailyBudgetCents ?? 0), 0) /
+                adCampaignsList.length
             )
           )
-        }
-      };
+        : formatCurrency(0)
+    }
+  };
 
-      const adCampaigns = adCampaignsRaw.map((campaign) => {
-        const metrics = campaign.metrics && typeof campaign.metrics === 'object' ? campaign.metrics : {};
-        const targeting = campaign.targeting && typeof campaign.targeting === 'object' ? campaign.targeting : {};
-        return {
-          id: campaign.id,
-          name: campaign.name,
-          status: campaign.status,
-          objective: campaign.objective,
-          dailyBudget: formatCurrency(campaign.dailyBudgetCents),
-          dailyBudgetCents: Number(campaign.dailyBudgetCents ?? 0),
-          totalSpend: formatCurrency(campaign.totalSpendCents),
-          totalSpendCents: Number(campaign.totalSpendCents ?? 0),
-          startAt: campaign.startAt,
-          endAt: campaign.endAt,
-          lastSyncedAt: campaign.lastSyncedAt,
-          metrics: {
-            impressions: Number(metrics.impressions ?? metrics.totals?.impressions ?? 0),
-            clicks: Number(metrics.clicks ?? metrics.totals?.clicks ?? 0),
-            conversions: Number(metrics.conversions ?? metrics.totals?.conversions ?? 0),
-            spendCents: Number(metrics.spendCents ?? metrics.totals?.spendCents ?? 0),
-            revenueCents: Number(metrics.revenueCents ?? metrics.totals?.revenueCents ?? 0),
-            ctr: metrics.ctr ?? metrics.averageCtr ?? null,
-            cpc: metrics.cpc ?? metrics.cpcCents ?? null,
-            cpa: metrics.cpa ?? metrics.cpaCents ?? null,
-            roas: metrics.roas ?? null,
-            lastSyncedAt: metrics.lastSyncedAt ?? campaign.lastSyncedAt ?? null
-          },
-          targeting: {
-            keywords: Array.isArray(targeting.keywords) ? targeting.keywords : [],
-            audiences: Array.isArray(targeting.audiences) ? targeting.audiences : [],
-            locations: Array.isArray(targeting.locations) ? targeting.locations : [],
-            languages: Array.isArray(targeting.languages) ? targeting.languages : [],
-            summary: targeting.summary ?? ''
-          },
-          creative: campaign.creative && typeof campaign.creative === 'object'
-            ? {
-                headline: campaign.creative.headline ?? 'Untitled creative',
-                description: campaign.creative.description ?? '',
-                url: campaign.creative.url ?? null
-              }
-            : { headline: 'Untitled creative', description: '', url: null },
-          placements: Array.isArray(campaign.placements) ? campaign.placements : []
-        };
-      });
+  const instructorApplicationDetails = instructorApplicationData
+    ? {
+        id: instructorApplicationData.id,
+        status: instructorApplicationData.status,
+        stage: instructorApplicationData.stage,
+        motivation: instructorApplicationData.motivation,
+        portfolioUrl: instructorApplicationData.portfolioUrl,
+        experienceYears: instructorApplicationData.experienceYears,
+        teachingFocus: instructorApplicationData.teachingFocus,
+        availability: instructorApplicationData.availability,
+        marketingAssets: instructorApplicationData.marketingAssets,
+        submittedAt: instructorApplicationData.submittedAt,
+        reviewedAt: instructorApplicationData.reviewedAt,
+        decisionNote: instructorApplicationData.decisionNote
+      }
+    : null;
 
-      const adsSection = {
-        campaigns: adCampaigns,
-        summary: {
-          activeCampaigns: adCampaigns.filter((campaign) => campaign.status === 'active').length,
-          totalSpend: formatCurrency(
-            adCampaignsRaw.reduce((total, campaign) => total + (campaign.totalSpendCents ?? 0), 0)
-          ),
-          averageDailyBudget: adCampaignsRaw.length
-            ? formatCurrency(
-                Math.round(
-                  adCampaignsRaw.reduce((total, campaign) => total + (campaign.dailyBudgetCents ?? 0), 0) /
-                    adCampaignsRaw.length
-                )
-              )
-            : formatCurrency(0)
-        }
-      };
-
-      const instructorApplication = instructorApplicationRaw
-        ? {
-            id: instructorApplicationRaw.id,
-            status: instructorApplicationRaw.status,
-            stage: instructorApplicationRaw.stage,
-            motivation: instructorApplicationRaw.motivation,
-            portfolioUrl: instructorApplicationRaw.portfolioUrl,
-            experienceYears: instructorApplicationRaw.experienceYears,
-            teachingFocus: instructorApplicationRaw.teachingFocus,
-            availability: instructorApplicationRaw.availability,
-            marketingAssets: instructorApplicationRaw.marketingAssets,
-            submittedAt: instructorApplicationRaw.submittedAt,
-            reviewedAt: instructorApplicationRaw.reviewedAt,
-            decisionNote: instructorApplicationRaw.decisionNote
-          }
-        : null;
-
-      const teachSection = {
-        application: instructorApplication,
-        status: instructorApplication?.status ?? 'draft',
-        nextSteps: (() => {
-          if (!instructorApplication) {
-            return [
-              'Complete your instructor application to access cohort production resources.',
-              'Prepare a portfolio link that highlights flagship teaching moments.'
-            ];
-          }
-          if (instructorApplication.status === 'submitted') {
-            return [
-              'Our partnerships team is reviewing your submission.',
-              'Expect an interview scheduling link within 48 hours.'
-            ];
-          }
-          if (instructorApplication.status === 'interview') {
-            return [
-              'Confirm your cohort launch availability and desired curriculum focus.',
-              'Upload marketing assets to accelerate go-to-market planning.'
-            ];
-          }
-          if (instructorApplication.status === 'approved') {
-            return [
-              'Schedule onboarding workshop with curriculum producers.',
-              'Share campaign creative for Edulure Ads placement.'
-            ];
-          }
-          if (instructorApplication.status === 'rejected') {
-            return [
-              'Review decision notes and request feedback from the instructor partnerships team.'
-            ];
-          }
+  const teachSection = {
+    application: instructorApplicationDetails,
+    status: instructorApplicationDetails?.status ?? 'draft',
+    nextSteps: (() => {
+      if (!instructorApplicationDetails) {
+        return [
+          'Complete your instructor application to access cohort production resources.',
+          'Prepare a portfolio link that highlights flagship teaching moments.'
+        ];
+      }
+      if (instructorApplicationDetails.status === 'submitted') {
+        return [
+          'Our partnerships team is reviewing your submission.',
+          'Expect an interview scheduling link within 48 hours.'
+        ];
+      }
+      if (instructorApplicationDetails.status === 'interview') {
+        return [
+          'Confirm your cohort launch availability and desired curriculum focus.',
+          'Upload marketing assets to accelerate go-to-market planning.'
+        ];
+      }
+      if (instructorApplicationDetails.status === 'approved') {
+        return [
+          'Schedule onboarding workshop with curriculum producers.',
+          'Share campaign creative for Edulure Ads placement.'
+        ];
+      }
+      if (instructorApplicationDetails.status === 'rejected') {
+        return [
+          'Review decision notes and request feedback from the instructor partnerships team.'
+        ];
+      }
           return [
             'Document your teaching motivation and curriculum outcomes.',
             'Add marketing assets to strengthen your application.'
@@ -1151,16 +1336,88 @@ export function buildLearnerDashboard({
         })()
       };
 
-      const privacy = {
-        visibility: privacySettings?.profileVisibility ?? 'public',
-        followApprovalRequired: Boolean(privacySettings?.followApprovalRequired),
-        shareActivity: privacySettings?.shareActivity ?? true,
-    messagePermission: privacySettings?.messagePermission ?? 'followers'
+  const adsSection = {
+    campaigns: adCampaigns,
+    summary: {
+      activeCampaigns: adCampaigns.filter((campaign) => campaign.status === 'active').length,
+      totalSpend: formatCurrency(
+        adCampaignsList.reduce((total, campaign) => total + Number(campaign.totalSpendCents ?? 0), 0),
+        adsCurrency
+      ),
+      averageDailyBudget: adCampaignsList.length
+        ? formatCurrency(
+            Math.round(
+              adCampaignsList.reduce((total, campaign) => total + Number(campaign.dailyBudgetCents ?? 0), 0) /
+                adCampaignsList.length
+            ),
+            adsCurrency
+          )
+        : formatCurrency(0, adsCurrency)
+    }
   };
 
+  const instructorApplication = instructorApplicationRaw
+    ? {
+        id: instructorApplicationRaw.id,
+        status: instructorApplicationRaw.status,
+        stage: instructorApplicationRaw.stage,
+        motivation: instructorApplicationRaw.motivation,
+        portfolioUrl: instructorApplicationRaw.portfolioUrl,
+        experienceYears: instructorApplicationRaw.experienceYears,
+        teachingFocus: instructorApplicationRaw.teachingFocus,
+        availability: instructorApplicationRaw.availability,
+        marketingAssets: instructorApplicationRaw.marketingAssets,
+        submittedAt: instructorApplicationRaw.submittedAt,
+        reviewedAt: instructorApplicationRaw.reviewedAt,
+        decisionNote: instructorApplicationRaw.decisionNote
+      }
+    : null;
+
+  const teachSection = {
+    application: instructorApplication,
+    status: instructorApplication?.status ?? 'draft',
+    nextSteps: (() => {
+      if (!instructorApplication) {
+        return [
+          'Complete your instructor application to access cohort production resources.',
+          'Prepare a portfolio link that highlights flagship teaching moments.'
+        ];
+      }
+      if (instructorApplication.status === 'submitted') {
+        return [
+          'Our partnerships team is reviewing your submission.',
+          'Expect an interview scheduling link within 48 hours.'
+        ];
+      }
+      if (instructorApplication.status === 'interview') {
+        return [
+          'Confirm your cohort launch availability and desired curriculum focus.',
+          'Upload marketing assets to accelerate go-to-market planning.'
+        ];
+      }
+      if (instructorApplication.status === 'approved') {
+        return [
+          'Schedule onboarding workshop with curriculum producers.',
+          'Share campaign creative for Edulure Ads placement.'
+        ];
+      }
+      if (instructorApplication.status === 'rejected') {
+        return [
+          'Review decision notes and request feedback from the instructor partnerships team.'
+        ];
+      }
+      return [
+        'Document your teaching motivation and curriculum outcomes.',
+        'Add marketing assets to strengthen your application.'
+      ];
+    })()
+  };
+
+  const privacy = normalisePrivacySettings(privacySettings);
+
   const messaging = {
-    unreadThreads: messagingSummary?.unreadThreads ?? 0,
-    notificationsEnabled: messagingSummary?.notificationsEnabled ?? true
+    unreadThreads: toPositiveInteger(messagingSummary?.unreadThreads),
+    notificationsEnabled: messagingSummary?.notificationsEnabled !== false
   };
 
   const communityNameMap = new Map();
@@ -1523,7 +1780,7 @@ export function buildLearnerDashboard({
   });
 
   const pipelineEntries = [...communityPipelines];
-  communityEvents
+  resolvedCommunityEvents
     .filter((event) => event.startAt && event.capacity)
     .forEach((event) => {
       const capacity = coercePositiveInteger(event.capacity);
@@ -1757,10 +2014,7 @@ export function buildLearnerDashboard({
       learningPace,
       communityEngagement
     },
-    upcoming: learningUpcoming.sort((a, b) => {
-      if (!a.date || !b.date) return 0;
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    }),
+    upcoming: upcomingUnique,
     communities: {
       managed: managedCommunities,
       pipelines: pipelineEntries
@@ -1782,8 +2036,8 @@ export function buildLearnerDashboard({
     financial: {
       summary: financialSummary,
       invoices: invoiceEntries,
-      paymentMethods,
-      billingContacts,
+      paymentMethods: paymentMethodEntries,
+      billingContacts: billingContactEntries,
       preferences: financialPreferences
     },
     notifications: {
@@ -1799,19 +2053,19 @@ export function buildLearnerDashboard({
     assessments: assessmentsSection,
     liveClassrooms: liveDashboard,
     support: {
-      cases: supportCases,
+      cases: supportCasesList,
       knowledgeBase: DEFAULT_SUPPORT_KB,
       contacts: DEFAULT_SUPPORT_CONTACTS,
       serviceWindow: '24/7 global support',
       metrics: {
-        open: supportMetrics.open,
-        waiting: supportMetrics.waiting,
-        resolved: supportMetrics.resolved,
-        closed: supportMetrics.closed,
-        awaitingLearner: supportMetrics.awaitingLearner,
-        averageResponseMinutes: supportMetrics.averageResponseMinutes,
-        latestUpdatedAt: supportMetrics.latestUpdatedAt,
-        firstResponseMinutes: supportMetrics.averageResponseMinutes || 42
+        open: supportMetricsSummary.open,
+        waiting: supportMetricsSummary.waiting,
+        resolved: supportMetricsSummary.resolved,
+        closed: supportMetricsSummary.closed,
+        awaitingLearner: supportMetricsSummary.awaitingLearner,
+        averageResponseMinutes: supportMetricsSummary.averageResponseMinutes,
+        latestUpdatedAt: supportMetricsSummary.latestUpdatedAt,
+        firstResponseMinutes: supportMetricsSummary.averageResponseMinutes || 42
       }
     },
     followers: followerSection,
@@ -2353,10 +2607,12 @@ export function buildAffiliateOverview({
   const normalizedSettings = parseMonetizationTier(monetizationSettings.affiliate);
 
   const programs = affiliates.map((affiliate) => {
-    const codes = [affiliate.referralCode].filter(Boolean);
+    const codes = resolveAffiliateReferralCodes(affiliate);
+    const codeSet = new Set(codes);
     const intents = paymentIntents.filter((intent) => {
       const metadata = safeJsonParse(intent.metadata, {});
-      return codes.includes(metadata.referralCode);
+      const intentCodes = resolveReferralCodesFromMetadata(metadata);
+      return intentCodes.some((code) => codeSet.has(code));
     });
 
     const totalVolumeCents = intents.reduce(
@@ -2556,6 +2812,24 @@ function ensureMap(value) {
   return new Map(Object.entries(value));
 }
 
+function deduplicateByKey(list, keyFn) {
+  const seen = new Set();
+  return list.filter((item) => {
+    const computed = keyFn(item);
+    const fallback = JSON.stringify({
+      title: item?.title ?? null,
+      date: item?.date ?? item?.startAt ?? null,
+      type: item?.type ?? null
+    });
+    const key = computed ?? fallback;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function resolveAssignmentDueDate(assignment, course) {
   const releaseAt = course?.releaseAt ? new Date(course.releaseAt) : null;
   if (!releaseAt || Number.isNaN(releaseAt.getTime())) {
@@ -2665,6 +2939,74 @@ function normaliseLearnerPayments({ invoices = [], paymentIntents = [], courseMa
   return { orders, invoices: normalisedInvoices };
 }
 
+function normaliseReferralCode(value) {
+  if (!value && value !== 0) return null;
+  const normalised = String(value).trim().toLowerCase();
+  return normalised || null;
+}
+
+function resolveReferralCodesFromMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') return [];
+  const codes = new Set();
+  const add = (value) => {
+    const normalised = normaliseReferralCode(value);
+    if (normalised) codes.add(normalised);
+  };
+
+  [
+    metadata.referralCode,
+    metadata.referral_code,
+    metadata.affiliateCode,
+    metadata.affiliate_code,
+    metadata.trackingCode,
+    metadata.tracking_code,
+    metadata.tracking?.referralCode,
+    metadata.tracking?.referral_code,
+    metadata.attribution?.referralCode,
+    metadata.attribution?.referral_code,
+    metadata.affiliate?.code,
+    metadata.affiliate?.referralCode
+  ].forEach(add);
+
+  if (Array.isArray(metadata.referralCodes)) {
+    metadata.referralCodes.forEach(add);
+  }
+  if (Array.isArray(metadata.referral_codes)) {
+    metadata.referral_codes.forEach(add);
+  }
+  if (Array.isArray(metadata.codes)) {
+    metadata.codes.forEach(add);
+  }
+  if (Array.isArray(metadata.trackingCodes)) {
+    metadata.trackingCodes.forEach(add);
+  }
+
+  return Array.from(codes);
+}
+
+function resolveAffiliateReferralCodes(affiliate) {
+  if (!affiliate) return [];
+  const metadata = safeJsonParse(affiliate.metadata, {});
+  const codes = new Set();
+  const add = (value) => {
+    const normalised = normaliseReferralCode(value);
+    if (normalised) codes.add(normalised);
+  };
+
+  [affiliate.referralCode, affiliate.code, affiliate.slug].forEach(add);
+
+  if (Array.isArray(affiliate.referralCodes)) {
+    affiliate.referralCodes.forEach(add);
+  }
+  if (Array.isArray(affiliate.codes)) {
+    affiliate.codes.forEach(add);
+  }
+
+  resolveReferralCodesFromMetadata(metadata).forEach(add);
+
+  return Array.from(codes);
+}
+
 function resolveNextLesson(lessons = [], stats = {}) {
   if (!lessons.length) return null;
   const completed = Number(stats.completedLessons ?? 0);
@@ -2694,6 +3036,67 @@ function determineRiskLevel(enrollment, stats, now) {
     return 'medium';
   }
   return 'low';
+}
+
+function normaliseEnrollment(enrollment = {}, collaboratorDirectory = new Map()) {
+  const metadata = safeJsonParse(enrollment.metadata, {});
+  const userObject = typeof enrollment.user === 'object' && enrollment.user ? enrollment.user : null;
+  const learnerMeta =
+    (metadata && (metadata.learner ?? metadata.user ?? metadata.profile ?? {})) || {};
+
+  const derivedUserId =
+    enrollment.userId ??
+    userObject?.id ??
+    learnerMeta?.id ??
+    learnerMeta?.userId ??
+    learnerMeta?.learnerId ??
+    metadata.userId ??
+    metadata.learnerId ??
+    null;
+
+  const directoryUser = derivedUserId ? collaboratorDirectory.get?.(derivedUserId) : null;
+
+  const firstName =
+    enrollment.firstName ??
+    learnerMeta?.firstName ??
+    learnerMeta?.givenName ??
+    metadata.firstName ??
+    metadata.givenName ??
+    userObject?.firstName ??
+    directoryUser?.firstName ??
+    null;
+
+  const lastName =
+    enrollment.lastName ??
+    learnerMeta?.lastName ??
+    learnerMeta?.familyName ??
+    metadata.lastName ??
+    metadata.familyName ??
+    userObject?.lastName ??
+    directoryUser?.lastName ??
+    null;
+
+  const email =
+    enrollment.email ??
+    learnerMeta?.email ??
+    learnerMeta?.emailAddress ??
+    metadata.email ??
+    metadata.contactEmail ??
+    userObject?.email ??
+    directoryUser?.email ??
+    null;
+
+  return {
+    ...enrollment,
+    metadata,
+    userId: derivedUserId ?? enrollment.userId ?? null,
+    resolvedLearner: {
+      id: derivedUserId ?? directoryUser?.id ?? null,
+      firstName,
+      lastName,
+      email
+    }
+  };
 }
 
 function buildCourseWorkspace({
@@ -2730,11 +3133,17 @@ function buildCourseWorkspace({
     return workspace;
   }
 
+  const enrollmentRecords = enrollments.map((enrollment) =>
+    normaliseEnrollment(enrollment, collaboratorDirectory)
+  );
+
   const languageLabel = createLanguageDisplay();
   const courseById = new Map();
   courses.forEach((course) => {
     const metadata = safeJsonParse(course.metadata, {});
-    courseById.set(course.id, { ...course, metadata });
+    const releaseAt = normaliseDate(course.releaseAt);
+    const updatedAt = normaliseDate(course.updatedAt);
+    courseById.set(course.id, { ...course, metadata, releaseAt, updatedAt });
   });
 
   const modulesByCourse = new Map();
@@ -2769,9 +3178,9 @@ function buildCourseWorkspace({
   });
 
   const enrollmentsByCourse = new Map();
-  enrollments.forEach((enrollment) => {
+  enrollmentRecords.forEach((enrollment) => {
     const list = enrollmentsByCourse.get(enrollment.courseId) ?? [];
-    list.push({ ...enrollment, metadata: safeJsonParse(enrollment.metadata, {}) });
+    list.push(enrollment);
     enrollmentsByCourse.set(enrollment.courseId, list);
   });
 
@@ -2806,6 +3215,7 @@ function buildCourseWorkspace({
   });
 
   const catalogue = courses.map((course) => {
+    const courseRecord = courseById.get(course.id) ?? { ...course, metadata: safeJsonParse(course.metadata, {}) };
     const modulesForCourse = modulesByCourse.get(course.id) ?? [];
     const lessonsForCourse = lessonsByCourse.get(course.id) ?? [];
     const courseEnrollments = enrollmentsByCourse.get(course.id) ?? [];
@@ -2818,9 +3228,9 @@ function buildCourseWorkspace({
             totalEnrollments
         )
       : 0;
-    const languages = Array.isArray(course.languages) ? course.languages : [];
-    const publishedLocales = Array.isArray(course.metadata?.publishedLocales)
-      ? course.metadata.publishedLocales
+    const languages = Array.isArray(courseRecord.languages) ? courseRecord.languages : [];
+    const publishedLocales = Array.isArray(courseRecord.metadata?.publishedLocales)
+      ? courseRecord.metadata.publishedLocales
       : [];
 
     const languageEntries = languages.map((code) => {
@@ -2834,53 +3244,59 @@ function buildCourseWorkspace({
       };
     });
 
+    const releaseDate = normaliseDate(course.releaseAt);
+    const updatedDate = normaliseDate(course.updatedAt);
+
     return {
-      id: course.publicId ?? `course-${course.id}`,
+      id: courseRecord.publicId ?? `course-${course.id}`,
       courseId: course.id,
-      title: course.title,
-      summary: course.summary,
-      status: course.status,
-      format: course.deliveryFormat ?? course.metadata?.format ?? 'cohort',
+      title: courseRecord.title,
+      summary: courseRecord.summary,
+      status: courseRecord.status,
+      format: courseRecord.deliveryFormat ?? courseRecord.metadata?.format ?? 'cohort',
       languages: languageEntries,
       price: {
-        currency: course.priceCurrency,
-        amountCents: Number(course.priceAmount ?? 0),
-        formatted: formatCurrency(course.priceAmount ?? 0, course.priceCurrency)
+        currency: courseRecord.priceCurrency,
+        amountCents: Number(courseRecord.priceAmount ?? 0),
+        formatted: formatCurrency(courseRecord.priceAmount ?? 0, courseRecord.priceCurrency)
       },
       rating: {
-        average: Number(course.ratingAverage ?? 0),
-        count: Number(course.ratingCount ?? 0)
+        average: Number(courseRecord.ratingAverage ?? 0),
+        count: Number(courseRecord.ratingCount ?? 0)
       },
       learners: {
-        total: Number(course.enrolmentCount ?? totalEnrollments),
+        total: Number(courseRecord.enrolmentCount ?? totalEnrollments),
         active: activeEnrollments.length,
         completed: completedEnrollments.length
       },
       modules: modulesForCourse.length,
       lessons: lessonsForCourse.length,
       averageProgress,
-      releaseAt: course.releaseAt ? course.releaseAt.toISOString() : null,
-      updatedAt: course.updatedAt ? course.updatedAt.toISOString() : null,
+      releaseAt: releaseDate ? releaseDate.toISOString() : null,
+      updatedAt: updatedDate ? updatedDate.toISOString() : null,
       localisation: {
         totalLanguages: languageEntries.length,
         published: languageEntries.filter((entry) => entry.published).length,
         missing: languageEntries.filter((entry) => !entry.published).map((entry) => entry.code)
       },
-      automation: course.metadata?.dripCampaign ?? null,
-      refresherLessons: Array.isArray(course.metadata?.refresherLessons) ? course.metadata.refresherLessons : []
+      automation: courseRecord.metadata?.dripCampaign ?? null,
+      refresherLessons: Array.isArray(courseRecord.metadata?.refresherLessons)
+        ? courseRecord.metadata.refresherLessons
+        : []
     };
   });
 
   workspace.catalogue = catalogue;
 
   const cohortMap = new Map();
-  enrollments.forEach((enrollment) => {
+  enrollmentRecords.forEach((enrollment) => {
     const course = courseById.get(enrollment.courseId);
     if (!course) return;
     const cohortLabel = enrollment.metadata?.cohort ?? 'General';
     const key = `${enrollment.courseId}:${cohortLabel}`;
     let record = cohortMap.get(key);
     if (!record) {
+      const releaseAtDate = normaliseDate(course?.releaseAt);
       record = {
         id: `cohort-${enrollment.courseId}-${cohortLabel}`.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase(),
         courseId: enrollment.courseId,
@@ -2888,14 +3304,15 @@ function buildCourseWorkspace({
         label: cohortLabel,
         enrollments: [],
         firstStartAt: null,
-        releaseAt: course.releaseAt ?? null
+        releaseAt: normaliseDate(course.releaseAt)
       };
       cohortMap.set(key, record);
     }
     record.enrollments.push(enrollment);
-    if (enrollment.startedAt) {
-      if (!record.firstStartAt || enrollment.startedAt < record.firstStartAt) {
-        record.firstStartAt = enrollment.startedAt;
+    const enrollmentStart = normaliseDate(enrollment.startedAt);
+    if (enrollmentStart) {
+      if (!record.firstStartAt || enrollmentStart < record.firstStartAt) {
+        record.firstStartAt = enrollmentStart;
       }
     }
   });
@@ -2912,7 +3329,7 @@ function buildCourseWorkspace({
           cohort.enrollments.reduce((sum, enr) => sum + Number(enr.progressPercent ?? 0), 0) / total
         )
       : 0;
-    const startDate = cohort.firstStartAt ?? cohort.releaseAt;
+    const startDate = normaliseDate(cohort.firstStartAt ?? cohort.releaseAt);
     const stage = completedCount === total && total > 0 ? 'Completed' : activeCount > 0 ? 'In flight' : 'Scheduled';
     pipeline.push({
       id: cohort.id,
@@ -3133,26 +3550,29 @@ function buildCourseWorkspace({
     }
   };
 
-  const roster = enrollments.map((enrollment) => {
+  const roster = enrollmentRecords.map((enrollment) => {
     const stats = progressByEnrollment.get(enrollment.id) ?? { completionRatio: 0, lastCompletedAt: null };
     const course = courseById.get(enrollment.courseId);
-    const user = collaboratorDirectory.get(enrollment.userId);
     const lessonsForCourse = lessonsByCourse.get(enrollment.courseId) ?? [];
+    const enrollmentMetadata =
+      typeof enrollment.metadata === 'string'
+        ? safeJsonParse(enrollment.metadata, {})
+        : enrollment.metadata ?? {};
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
-      learnerId: enrollment.userId,
-      name: user ? resolveName(user.firstName, user.lastName, user.email) : `Learner ${enrollment.userId}`,
+      learnerId: identity.id ?? enrollment.userId ?? directoryUser?.id ?? null,
+      name: displayName,
       courseId: enrollment.courseId,
       courseTitle: course?.title ?? 'Course',
       status: enrollment.status,
       progressPercent: Number.isFinite(Number(enrollment.progressPercent))
         ? Number(enrollment.progressPercent)
         : Math.round((stats.completionRatio ?? 0) * 100),
-      cohort: enrollment.metadata?.cohort ?? 'General',
+      cohort: enrollmentMetadata.cohort ?? 'General',
       lastActivityAt: stats.lastCompletedAt ? stats.lastCompletedAt.toISOString() : null,
       nextLesson: resolveNextLesson(lessonsForCourse, stats),
       riskLevel: determineRiskLevel(enrollment, stats, now),
-      notes: stats.notes ?? [],
+      notes: stats.notes ?? enrollmentMetadata.notes ?? [],
       lastLocation: stats.lastLocation ?? null
     };
   });
@@ -3611,6 +4031,12 @@ export default class DashboardService {
       averageResponseMinutes: 0,
       latestUpdatedAt: null
     };
+    let growthInitiativesRaw = [];
+    let growthExperimentsByInitiative = new Map();
+    let affiliateChannelsRaw = [];
+    let affiliatePayoutsRaw = [];
+    let adCampaignsRaw = [];
+    let instructorApplicationRaw = null;
     try {
       supportCases = await LearnerSupportRepository.listCases(user.id);
       const responseDurations = [];
@@ -4002,10 +4428,10 @@ export default class DashboardService {
         financialProfile,
         financePurchasesRaw,
         systemPreferencesRaw,
-        growthInitiativesRaw,
-        affiliateChannelsRaw,
-        adCampaignsRaw,
-        instructorApplicationRaw
+        growthInitiativesData,
+        affiliateChannelsData,
+        adCampaignsData,
+        instructorApplicationData
       ] = await Promise.all([
         LearnerPaymentMethodModel.listByUserId(user.id),
         LearnerBillingContactModel.listByUserId(user.id),
@@ -4018,12 +4444,17 @@ export default class DashboardService {
         InstructorApplicationModel.findByUserId(user.id)
       ]);
 
+      growthInitiativesRaw = growthInitiativesData;
+      affiliateChannelsRaw = affiliateChannelsData;
+      adCampaignsRaw = adCampaignsData;
+      instructorApplicationRaw = instructorApplicationData;
+
       const affiliateChannelIds = affiliateChannelsRaw.map((channel) => channel.id).filter(Boolean);
-      const affiliatePayoutsRaw = affiliateChannelIds.length
+      affiliatePayoutsRaw = affiliateChannelIds.length
         ? await LearnerAffiliatePayoutModel.listByChannelIds(affiliateChannelIds)
         : [];
 
-      const growthExperimentsByInitiative = new Map();
+      growthExperimentsByInitiative = new Map();
       if (growthInitiativesRaw.length) {
         await Promise.all(
           growthInitiativesRaw.map(async (initiative) => {
@@ -4178,9 +4609,19 @@ export default class DashboardService {
           libraryEntries,
           fieldServiceWorkspace,
           financialProfile,
+          paymentMethods: paymentMethodsRaw,
+          billingContacts: billingContactsRaw,
           financePurchases: financePurchasesRaw,
           financeSubscriptions: financeSubscriptionsDetailed,
-          systemPreferences: systemPreferencesRaw
+          systemPreferences: systemPreferencesRaw,
+          growthInitiatives: growthInitiativesRaw,
+          growthExperimentsByInitiative,
+          affiliateChannels: affiliateChannelsRaw,
+          affiliatePayouts: affiliatePayoutsRaw,
+          adCampaigns: adCampaignsRaw,
+          instructorApplication: instructorApplicationRaw,
+          supportCases,
+          supportMetrics
         }) ?? undefined;
     } catch (error) {
       log.warn({ err: error }, 'Failed to load learner dashboard data');
@@ -4526,9 +4967,19 @@ export default class DashboardService {
           libraryEntries,
           fieldServiceWorkspace: learnerFieldServiceWorkspace,
           financialProfile,
+          paymentMethods: [],
+          billingContacts: [],
           financePurchases: financePurchasesRaw,
           financeSubscriptions: financeSubscriptionsDetailed,
-          systemPreferences: systemPreferencesRaw
+          systemPreferences: systemPreferencesRaw,
+          growthInitiatives: growthInitiativesRaw,
+          growthExperimentsByInitiative,
+          affiliateChannels: affiliateChannelsRaw,
+          affiliatePayouts: affiliatePayoutsRaw,
+          adCampaigns: adCampaignsRaw,
+          instructorApplication: instructorApplicationRaw,
+          supportCases,
+          supportMetrics
         }) ?? undefined;
 
       communitySnapshot =

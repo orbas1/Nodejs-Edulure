@@ -1,7 +1,20 @@
 import AuthCard from '../components/AuthCard.jsx';
 import FormField from '../components/FormField.jsx';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 export default function InstructorRegister() {
+  usePageMetadata({
+    title: 'Instructor onboarding · Edulure',
+    description:
+      'Apply to become an Edulure instructor and unlock course publishing, community leadership, and revenue-sharing programmes.',
+    canonicalPath: '/instructor/register',
+    robots: 'noindex, nofollow',
+    keywords: ['instructor onboarding', 'apply to teach', 'edulure instructor'],
+    analytics: {
+      page_type: 'instructor_register'
+    }
+  });
+
   return (
     <AuthCard
       title="Become an Edulure instructor"

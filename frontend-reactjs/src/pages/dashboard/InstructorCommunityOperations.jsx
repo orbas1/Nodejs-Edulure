@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
+import { useOutletContext } from 'react-router-dom';
 import {
   AdjustmentsHorizontalIcon,
   MegaphoneIcon,
@@ -12,6 +13,7 @@ import {
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { resolveInstructorAccess } from './instructor/instructorAccess.js';
 import {
   fetchCommunities,
   fetchCommunityDetail,
@@ -2479,7 +2481,13 @@ ManagePanel.defaultProps = {
   community: null
 };
 export default function InstructorCommunityOperations() {
-  const { token, user } = useAuth();
+  const outletContext = useOutletContext();
+  const role = outletContext?.role ?? null;
+  const access = resolveInstructorAccess(role);
+  const hasAccess = access.granted;
+  const { session } = useAuth();
+  const token = hasAccess ? session?.tokens?.accessToken ?? null : null;
+  const user = session?.user ?? null;
   const [communities, setCommunities] = useState([]);
   const [activeTab, setActiveTab] = useState('revenue');
   const [selectedCommunityId, setSelectedCommunityId] = useState(null);
@@ -2537,6 +2545,16 @@ export default function InstructorCommunityOperations() {
     },
     [token]
   );
+
+  if (!hasAccess) {
+    return (
+      <DashboardStateMessage
+        variant={access.message.variant}
+        title={access.message.title}
+        description={access.message.description}
+      />
+    );
+  }
 
   const currentCommunityName = selectedCommunity?.name ?? '';
 

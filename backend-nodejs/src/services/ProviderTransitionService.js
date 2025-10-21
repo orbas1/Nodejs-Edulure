@@ -226,6 +226,48 @@ export default class ProviderTransitionService {
     return serializeAcknowledgement(acknowledgement);
   }
 
+  async summariseAcknowledgements(slug, { tenantScope = 'global' } = {}) {
+    const announcement = await ProviderTransitionAnnouncementModel.findBySlug(slug, { connection: db });
+    if (!announcement) {
+      throw Object.assign(new Error('Provider transition announcement not found'), { status: 404 });
+    }
+
+    if (
+      tenantScope &&
+      announcement.tenantScope !== 'global' &&
+      announcement.tenantScope !== tenantScope &&
+      !(Array.isArray(tenantScope) && tenantScope.includes(announcement.tenantScope))
+    ) {
+      throw Object.assign(new Error('Announcement is not available for this tenant'), { status: 404 });
+    }
+
+    const acknowledgements = await ProviderTransitionAcknowledgementModel.listForAnnouncement(
+      announcement.id,
+      { connection: db }
+    );
+
+    const methodCounts = acknowledgements.reduce((acc, ack) => {
+      const method = ack.ackMethod ?? 'portal';
+      acc[method] = (acc[method] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const followUps = acknowledgements.filter((ack) => ack.followUpRequired).map(serializeAcknowledgement);
+
+    return {
+      announcement: serializeAnnouncementForApi(announcement),
+      totals: {
+        acknowledgements: acknowledgements.length,
+        followUps: followUps.length,
+        methods: methodCounts
+      },
+      pending: announcement.ackRequired
+        ? Math.max((announcement.metadata?.expectedAcknowledgements ?? 0) - acknowledgements.length, 0)
+        : 0,
+      followUps
+    };
+  }
+
   async recordStatusUpdate(slug, payload, { tenantScope = 'global' } = {}) {
     const announcement = await ProviderTransitionAnnouncementModel.findBySlug(slug, { connection: db });
     if (!announcement) {

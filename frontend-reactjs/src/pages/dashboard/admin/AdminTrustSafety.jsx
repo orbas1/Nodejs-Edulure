@@ -1206,6 +1206,7 @@ function TimelineFeed({ entries, loading, error, onRefresh }) {
 }
 
 export default function AdminTrustSafety() {
+  const { allowed, explanation } = useRoleGuard(['admin']);
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
   const {
@@ -1253,6 +1254,20 @@ export default function AdminTrustSafety() {
 
   const resourceConfigs = useMemo(() => createAdminControlResourceConfigs(), []);
   const [catalogueTab, setCatalogueTab] = useState('courses');
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Admin privileges required"
+        description={explanation ?? 'You need administrator access to review trust & safety telemetry.'}
+        actionLabel="Return home"
+        onAction={() => {
+          window.location.assign('/dashboard');
+        }}
+      />
+    );
+  }
 
   if (!token) {
     return (

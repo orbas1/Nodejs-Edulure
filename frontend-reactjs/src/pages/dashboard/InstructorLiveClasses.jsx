@@ -10,6 +10,7 @@ import {
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
 function ReadinessBadge({ status }) {
   const base = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide';
@@ -138,7 +139,7 @@ function SessionCard({ session }) {
   );
 }
 
-export default function InstructorLiveClasses() {
+function InstructorLiveClasses() {
   const { dashboard, refresh } = useOutletContext();
   const data = dashboard?.liveClassrooms;
 
@@ -344,3 +345,5 @@ export default function InstructorLiveClasses() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorLiveClasses);

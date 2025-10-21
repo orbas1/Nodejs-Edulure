@@ -11,6 +11,14 @@ export default function EventPlanner({
   onSubmit,
   interactive
 }) {
+  const errorMessage = error
+    ? error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
+      : null
+    : null;
+
   return (
     <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
       <header className="flex items-start justify-between gap-3">
@@ -32,11 +40,14 @@ export default function EventPlanner({
         Schedule sprints, live broadcasts, or voice lounges. Members receive notifications instantly after publishing.
       </p>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-3" aria-live="polite" aria-busy={loading}>
         {loading && events.length === 0 ? (
           <p className="text-xs text-slate-500">Syncing event calendar…</p>
-        ) : error ? (
-          <p className="text-xs text-rose-600">Unable to load events. Refresh to retry.</p>
+        ) : errorMessage ? (
+          <p className="text-xs text-rose-600" role="alert">
+            Unable to load events. Refresh to retry.
+            <span className="mt-1 block text-[11px] text-rose-500">{errorMessage}</span>
+          </p>
         ) : events.length === 0 ? (
           <p className="text-xs text-slate-500">No live events on the schedule. Plan your next activation.</p>
         ) : (

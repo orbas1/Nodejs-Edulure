@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
 const summaryToneStyles = {
   primary: 'border-primary/30 bg-primary/5 text-primary',
@@ -44,7 +45,7 @@ function getBookingToneStyle(status) {
   return bookingToneStyles[status] ?? 'border-slate-200 bg-slate-50 text-slate-600';
 }
 
-export default function InstructorServiceSuite() {
+function InstructorServiceSuite() {
   const { role, dashboard, refresh } = useOutletContext();
 
   if (role !== 'instructor') {
@@ -538,3 +539,5 @@ export default function InstructorServiceSuite() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorServiceSuite);

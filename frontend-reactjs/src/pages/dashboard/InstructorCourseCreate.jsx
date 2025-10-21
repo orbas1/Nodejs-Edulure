@@ -4,6 +4,7 @@ import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 import CourseCreationHeader from './instructor/courseCreation/CourseCreationHeader.jsx';
 import CourseCreationSummaryCards from './instructor/courseCreation/CourseCreationSummaryCards.jsx';
 import CourseBlueprintCard from './instructor/courseCreation/CourseBlueprintCard.jsx';
@@ -19,7 +20,7 @@ const readinessNarrative = (score) => {
   return 'Kick-off required';
 };
 
-export default function InstructorCourseCreate({
+function InstructorCourseCreate({
   onGenerateOutline,
   onImportFromNotion,
   onSyncFromLms
@@ -236,3 +237,5 @@ InstructorCourseCreate.defaultProps = {
   onImportFromNotion: undefined,
   onSyncFromLms: undefined
 };
+
+export default withInstructorDashboardAccess(InstructorCourseCreate);

@@ -4,6 +4,7 @@ import AuthCard from '../components/AuthCard.jsx';
 import FormField from '../components/FormField.jsx';
 import SocialSignOn from '../components/SocialSignOn.jsx';
 import { API_BASE_URL, httpClient } from '../api/httpClient.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const SOCIAL_ROUTES = {
   google: '/auth/oauth/google',
@@ -59,6 +60,17 @@ export default function Register() {
     }
     return twoFactorEnrollment.secret.replace(/(.{4})/g, '$1 ').trim();
   }, [twoFactorEnrollment]);
+
+  usePageMetadata({
+    title: 'Create your Edulure account',
+    description: 'Register to access Edulure courses, communities, live classrooms, and analytics dashboards with built-in security controls.',
+    canonicalPath: '/register',
+    robots: 'noindex, nofollow',
+    analytics: {
+      page_type: 'register',
+      enforced_two_factor_roles: ENFORCED_TWO_FACTOR_ROLES.size
+    }
+  });
 
   const oauthBase = useMemo(() => {
     if (!API_BASE_URL) return '';

@@ -127,4 +127,18 @@ describe('<LearnerEbooks />', () => {
 
     expect(screen.queryByLabelText(/highlight snippet/i)).not.toBeInTheDocument();
   });
+
+  it('renders an access restriction when the viewer is not a learner', () => {
+    useLearnerDashboardSectionMock.mockReturnValueOnce({
+      isLearner: false,
+      section: null,
+      refresh: vi.fn(),
+      loading: false,
+      error: null
+    });
+
+    render(<LearnerEbooks />);
+
+    expect(screen.getByText(/Learner Learnspace required/i)).toBeInTheDocument();
+  });
 });

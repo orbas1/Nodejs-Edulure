@@ -1,174 +1,407 @@
 import { httpClient } from './httpClient.js';
+import {
+  assertId,
+  assertToken,
+  createInvalidationConfig,
+  createListCacheConfig,
+  normaliseListResponse
+} from './apiUtils.js';
+
+const CONTROL_CACHE_TAGS = {
+  communities: 'admin:control:communities',
+  courses: 'admin:control:courses',
+  tutors: 'admin:control:tutors',
+  ebooks: 'admin:control:ebooks',
+  liveStreams: 'admin:control:live-streams',
+  podcasts: 'admin:control:podcasts'
+};
 
 function normaliseList(response) {
-  return {
-    data: response?.data ?? [],
-    meta: response?.meta ?? {}
-  };
+  return normaliseListResponse(response, { defaultData: [], defaultMeta: {} });
 }
 
 function extractData(response) {
-  return response?.data ?? null;
+  return response?.data ?? response ?? null;
 }
 
 export function listCommunities({ token, params, signal } = {}) {
-  return httpClient.get('/admin/control/communities', { token, params, signal }).then(normaliseList);
+  assertToken(token, 'list communities');
+  return httpClient
+    .get('/admin/control/communities', {
+      token,
+      params,
+      signal,
+      cache: createListCacheConfig(CONTROL_CACHE_TAGS.communities)
+    })
+    .then(normaliseList);
 }
 
 export function createCommunity({ token, payload, signal } = {}) {
-  return httpClient.post('/admin/control/communities', payload, { token, signal }).then(extractData);
+  assertToken(token, 'create a community');
+  return httpClient
+    .post('/admin/control/communities', payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig(CONTROL_CACHE_TAGS.communities)
+    })
+    .then(extractData);
 }
 
 export function updateCommunity({ token, id, payload, signal } = {}) {
-  if (!id) {
-    throw new Error('Community id is required');
-  }
-  return httpClient.put(`/admin/control/communities/${id}`, payload, { token, signal }).then(extractData);
+  assertToken(token, 'update a community');
+  assertId(id, 'Community id');
+  return httpClient
+    .put(`/admin/control/communities/${id}`, payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.communities,
+        `admin:control:community:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function deleteCommunity({ token, id, signal } = {}) {
-  if (!id) {
-    throw new Error('Community id is required');
-  }
-  return httpClient.delete(`/admin/control/communities/${id}`, { token, signal }).then(extractData);
+  assertToken(token, 'delete a community');
+  assertId(id, 'Community id');
+  return httpClient
+    .delete(`/admin/control/communities/${id}`, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.communities,
+        `admin:control:community:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function listCourses({ token, params, signal } = {}) {
-  return httpClient.get('/admin/control/courses', { token, params, signal }).then(normaliseList);
+  assertToken(token, 'list courses');
+  return httpClient
+    .get('/admin/control/courses', {
+      token,
+      params,
+      signal,
+      cache: createListCacheConfig(CONTROL_CACHE_TAGS.courses)
+    })
+    .then(normaliseList);
 }
 
 export function createCourse({ token, payload, signal } = {}) {
-  return httpClient.post('/admin/control/courses', payload, { token, signal }).then(extractData);
+  assertToken(token, 'create a course');
+  return httpClient
+    .post('/admin/control/courses', payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig(CONTROL_CACHE_TAGS.courses)
+    })
+    .then(extractData);
 }
 
 export function updateCourse({ token, id, payload, signal } = {}) {
-  if (!id) {
-    throw new Error('Course id is required');
-  }
-  return httpClient.put(`/admin/control/courses/${id}`, payload, { token, signal }).then(extractData);
+  assertToken(token, 'update a course');
+  assertId(id, 'Course id');
+  return httpClient
+    .put(`/admin/control/courses/${id}`, payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.courses,
+        `admin:control:course:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function deleteCourse({ token, id, signal } = {}) {
-  if (!id) {
-    throw new Error('Course id is required');
-  }
-  return httpClient.delete(`/admin/control/courses/${id}`, { token, signal }).then(extractData);
+  assertToken(token, 'delete a course');
+  assertId(id, 'Course id');
+  return httpClient
+    .delete(`/admin/control/courses/${id}`, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.courses,
+        `admin:control:course:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function listTutors({ token, params, signal } = {}) {
-  return httpClient.get('/admin/control/tutors', { token, params, signal }).then(normaliseList);
+  assertToken(token, 'list tutors');
+  return httpClient
+    .get('/admin/control/tutors', {
+      token,
+      params,
+      signal,
+      cache: createListCacheConfig(CONTROL_CACHE_TAGS.tutors)
+    })
+    .then(normaliseList);
 }
 
 export function createTutor({ token, payload, signal } = {}) {
-  return httpClient.post('/admin/control/tutors', payload, { token, signal }).then(extractData);
+  assertToken(token, 'create a tutor');
+  return httpClient
+    .post('/admin/control/tutors', payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig(CONTROL_CACHE_TAGS.tutors)
+    })
+    .then(extractData);
 }
 
 export function updateTutor({ token, id, payload, signal } = {}) {
-  if (!id) {
-    throw new Error('Tutor id is required');
-  }
-  return httpClient.put(`/admin/control/tutors/${id}`, payload, { token, signal }).then(extractData);
+  assertToken(token, 'update a tutor');
+  assertId(id, 'Tutor id');
+  return httpClient
+    .put(`/admin/control/tutors/${id}`, payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.tutors,
+        `admin:control:tutor:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function deleteTutor({ token, id, signal } = {}) {
-  if (!id) {
-    throw new Error('Tutor id is required');
-  }
-  return httpClient.delete(`/admin/control/tutors/${id}`, { token, signal }).then(extractData);
+  assertToken(token, 'delete a tutor');
+  assertId(id, 'Tutor id');
+  return httpClient
+    .delete(`/admin/control/tutors/${id}`, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.tutors,
+        `admin:control:tutor:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function listEbooks({ token, params, signal } = {}) {
-  return httpClient.get('/admin/control/ebooks', { token, params, signal }).then(normaliseList);
+  assertToken(token, 'list e-books');
+  return httpClient
+    .get('/admin/control/ebooks', {
+      token,
+      params,
+      signal,
+      cache: createListCacheConfig(CONTROL_CACHE_TAGS.ebooks)
+    })
+    .then(normaliseList);
 }
 
 export function createEbook({ token, payload, signal } = {}) {
-  return httpClient.post('/admin/control/ebooks', payload, { token, signal }).then(extractData);
+  assertToken(token, 'create an e-book');
+  return httpClient
+    .post('/admin/control/ebooks', payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig(CONTROL_CACHE_TAGS.ebooks)
+    })
+    .then(extractData);
 }
 
 export function updateEbook({ token, id, payload, signal } = {}) {
-  if (!id) {
-    throw new Error('E-book id is required');
-  }
-  return httpClient.put(`/admin/control/ebooks/${id}`, payload, { token, signal }).then(extractData);
+  assertToken(token, 'update an e-book');
+  assertId(id, 'E-book id');
+  return httpClient
+    .put(`/admin/control/ebooks/${id}`, payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.ebooks,
+        `admin:control:ebook:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function deleteEbook({ token, id, signal } = {}) {
-  if (!id) {
-    throw new Error('E-book id is required');
-  }
-  return httpClient.delete(`/admin/control/ebooks/${id}`, { token, signal }).then(extractData);
+  assertToken(token, 'delete an e-book');
+  assertId(id, 'E-book id');
+  return httpClient
+    .delete(`/admin/control/ebooks/${id}`, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.ebooks,
+        `admin:control:ebook:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function listLiveStreams({ token, params, signal } = {}) {
-  return httpClient.get('/admin/control/live-streams', { token, params, signal }).then(normaliseList);
+  assertToken(token, 'list live streams');
+  return httpClient
+    .get('/admin/control/live-streams', {
+      token,
+      params,
+      signal,
+      cache: createListCacheConfig(CONTROL_CACHE_TAGS.liveStreams)
+    })
+    .then(normaliseList);
 }
 
 export function createLiveStream({ token, payload, signal } = {}) {
-  return httpClient.post('/admin/control/live-streams', payload, { token, signal }).then(extractData);
+  assertToken(token, 'create a live stream');
+  return httpClient
+    .post('/admin/control/live-streams', payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig(CONTROL_CACHE_TAGS.liveStreams)
+    })
+    .then(extractData);
 }
 
 export function updateLiveStream({ token, id, payload, signal } = {}) {
-  if (!id) {
-    throw new Error('Live stream id is required');
-  }
-  return httpClient.put(`/admin/control/live-streams/${id}`, payload, { token, signal }).then(extractData);
+  assertToken(token, 'update a live stream');
+  assertId(id, 'Live stream id');
+  return httpClient
+    .put(`/admin/control/live-streams/${id}`, payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.liveStreams,
+        `admin:control:live-stream:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function deleteLiveStream({ token, id, signal } = {}) {
-  if (!id) {
-    throw new Error('Live stream id is required');
-  }
-  return httpClient.delete(`/admin/control/live-streams/${id}`, { token, signal }).then(extractData);
+  assertToken(token, 'delete a live stream');
+  assertId(id, 'Live stream id');
+  return httpClient
+    .delete(`/admin/control/live-streams/${id}`, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.liveStreams,
+        `admin:control:live-stream:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function listPodcastShows({ token, params, signal } = {}) {
-  return httpClient.get('/admin/control/podcasts', { token, params, signal }).then(normaliseList);
+  assertToken(token, 'list podcast shows');
+  return httpClient
+    .get('/admin/control/podcasts', {
+      token,
+      params,
+      signal,
+      cache: createListCacheConfig(CONTROL_CACHE_TAGS.podcasts)
+    })
+    .then(normaliseList);
 }
 
 export function createPodcastShow({ token, payload, signal } = {}) {
-  return httpClient.post('/admin/control/podcasts', payload, { token, signal }).then(extractData);
+  assertToken(token, 'create a podcast show');
+  return httpClient
+    .post('/admin/control/podcasts', payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig(CONTROL_CACHE_TAGS.podcasts)
+    })
+    .then(extractData);
 }
 
 export function updatePodcastShow({ token, id, payload, signal } = {}) {
-  if (!id) {
-    throw new Error('Podcast show id is required');
-  }
-  return httpClient.put(`/admin/control/podcasts/${id}`, payload, { token, signal }).then(extractData);
+  assertToken(token, 'update a podcast show');
+  assertId(id, 'Podcast show id');
+  return httpClient
+    .put(`/admin/control/podcasts/${id}`, payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.podcasts,
+        `admin:control:podcast:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function deletePodcastShow({ token, id, signal } = {}) {
-  if (!id) {
-    throw new Error('Podcast show id is required');
-  }
-  return httpClient.delete(`/admin/control/podcasts/${id}`, { token, signal }).then(extractData);
+  assertToken(token, 'delete a podcast show');
+  assertId(id, 'Podcast show id');
+  return httpClient
+    .delete(`/admin/control/podcasts/${id}`, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.podcasts,
+        `admin:control:podcast:${id}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function listPodcastEpisodes(showId, { token, params, signal } = {}) {
-  if (!showId) {
-    throw new Error('Podcast show id is required');
-  }
-  return httpClient.get(`/admin/control/podcasts/${showId}/episodes`, { token, params, signal }).then(normaliseList);
+  assertToken(token, 'list podcast episodes');
+  assertId(showId, 'Podcast show id');
+  return httpClient
+    .get(`/admin/control/podcasts/${showId}/episodes`, {
+      token,
+      params,
+      signal,
+      cache: createListCacheConfig(`admin:control:podcasts:${showId}:episodes`)
+    })
+    .then(normaliseList);
 }
 
 export function createPodcastEpisode(showId, { token, payload, signal } = {}) {
-  if (!showId) {
-    throw new Error('Podcast show id is required');
-  }
-  return httpClient.post(`/admin/control/podcasts/${showId}/episodes`, payload, { token, signal }).then(extractData);
+  assertToken(token, 'create a podcast episode');
+  assertId(showId, 'Podcast show id');
+  return httpClient
+    .post(`/admin/control/podcasts/${showId}/episodes`, payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.podcasts,
+        `admin:control:podcasts:${showId}:episodes`
+      ])
+    })
+    .then(extractData);
 }
 
 export function updatePodcastEpisode(showId, episodeId, { token, payload, signal } = {}) {
-  if (!showId || !episodeId) {
-    throw new Error('Podcast show id and episode id are required');
-  }
-  return httpClient.put(`/admin/control/podcasts/${showId}/episodes/${episodeId}`, payload, { token, signal }).then(extractData);
+  assertToken(token, 'update a podcast episode');
+  assertId(showId, 'Podcast show id');
+  assertId(episodeId, 'Podcast episode id');
+  return httpClient
+    .put(`/admin/control/podcasts/${showId}/episodes/${episodeId}`, payload, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.podcasts,
+        `admin:control:podcasts:${showId}:episodes`,
+        `admin:control:podcasts:${showId}:episode:${episodeId}`
+      ])
+    })
+    .then(extractData);
 }
 
 export function deletePodcastEpisode(showId, episodeId, { token, signal } = {}) {
-  if (!showId || !episodeId) {
-    throw new Error('Podcast show id and episode id are required');
-  }
-  return httpClient.delete(`/admin/control/podcasts/${showId}/episodes/${episodeId}`, { token, signal }).then(extractData);
+  assertToken(token, 'delete a podcast episode');
+  assertId(showId, 'Podcast show id');
+  assertId(episodeId, 'Podcast episode id');
+  return httpClient
+    .delete(`/admin/control/podcasts/${showId}/episodes/${episodeId}`, {
+      token,
+      signal,
+      cache: createInvalidationConfig([
+        CONTROL_CACHE_TAGS.podcasts,
+        `admin:control:podcasts:${showId}:episodes`,
+        `admin:control:podcasts:${showId}:episode:${episodeId}`
+      ])
+    })
+    .then(extractData);
 }
 
 const adminControlApi = {

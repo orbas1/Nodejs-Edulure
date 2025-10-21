@@ -10,6 +10,19 @@ terraform {
 
 locals {
   service_name = "${var.project}-${var.environment}-api"
+  container_environment = [
+    for key, value in var.environment_variables : {
+      name  = key
+      value = value
+    }
+  ]
+  container_secrets = [
+    for item in var.secret_environment_variables : {
+      name      = item.name
+      valueFrom = item.arn
+    }
+  ]
+  https_enabled = var.certificate_arn != null && trimspace(var.certificate_arn) != ""
 }
 
 resource "aws_security_group" "service" {
@@ -108,8 +121,9 @@ resource "aws_iam_role" "task" {
 }
 
 resource "aws_iam_role_policy" "task_secrets" {
-  name = "${local.service_name}-secrets"
-  role = aws_iam_role.task.id
+  count = length(var.secret_arns) > 0 ? 1 : 0
+  name  = "${local.service_name}-secrets"
+  role  = aws_iam_role.task.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -128,7 +142,16 @@ resource "aws_lb" "this" {
   load_balancer_type = "application"
   security_groups    = [var.load_balancer_security_group_id]
   subnets            = var.public_subnet_ids
+  idle_timeout       = var.load_balancer_idle_timeout
   enable_deletion_protection = var.enable_alb_deletion_protection
+  dynamic "access_logs" {
+    for_each = var.enable_alb_access_logs ? [1] : []
+    content {
+      bucket  = var.alb_access_logs_bucket
+      prefix  = coalesce(var.alb_access_logs_prefix, "${var.project}/${var.environment}")
+      enabled = true
+    }
+  }
   tags = merge(
     {
       Environment = var.environment
@@ -163,10 +186,45 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
 
+  dynamic "default_action" {
+    for_each = local.https_enabled ? [1] : []
+    content {
+      type = "redirect"
+      redirect {
+        port        = tostring(var.https_listener_port)
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = local.https_enabled ? [] : [1]
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.this.arn
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  count             = local.https_enabled ? 1 : 0
+  load_balancer_arn = aws_lb.this.arn
+  port              = var.https_listener_port
+  protocol          = "HTTPS"
+  ssl_policy        = var.https_ssl_policy
+  certificate_arn   = var.certificate_arn
+
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.this.arn
   }
+}
+
+resource "aws_wafv2_web_acl_association" "this" {
+  count        = var.waf_web_acl_arn != null && trimspace(var.waf_web_acl_arn) != "" ? 1 : 0
+  resource_arn = aws_lb.this.arn
+  web_acl_arn  = var.waf_web_acl_arn
 }
 
 resource "aws_ecs_task_definition" "this" {
@@ -179,45 +237,37 @@ resource "aws_ecs_task_definition" "this" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([
-    {
-      name      = "api"
-      image     = var.container_image
-      essential = true
-      portMappings = [
-        {
-          containerPort = var.container_port
-          hostPort      = var.container_port
-          protocol      = "tcp"
+    merge(
+      {
+        name      = "api"
+        image     = var.container_image
+        essential = true
+        portMappings = [
+          {
+            containerPort = var.container_port
+            hostPort      = var.container_port
+            protocol      = "tcp"
+          }
+        ]
+        environment     = local.container_environment
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            awslogs-group         = aws_cloudwatch_log_group.service.name
+            awslogs-region        = var.region
+            awslogs-stream-prefix = "ecs"
+          }
         }
-      ]
-      environment = [
-        for key, value in var.environment_variables : {
-          name  = key
-          value = value
+        healthCheck = {
+          command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}${var.healthcheck_path} || exit 1"]
+          interval    = 30
+          retries     = 3
+          startPeriod = 10
+          timeout     = 5
         }
-      ]
-      secrets = [
-        for item in var.secret_environment_variables : {
-          name      = item.name
-          valueFrom = item.arn
-        }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.service.name
-          awslogs-region        = var.region
-          awslogs-stream-prefix = "ecs"
-        }
-      }
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}${var.healthcheck_path} || exit 1"]
-        interval    = 30
-        retries     = 3
-        startPeriod = 10
-        timeout     = 5
-      }
-    }
+      },
+      length(local.container_secrets) > 0 ? { secrets = local.container_secrets } : {}
+    )
   ])
 
   runtime_platform {
@@ -233,11 +283,12 @@ resource "aws_ecs_service" "this" {
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
   enable_execute_command = true
+  propagate_tags        = "TASK_DEFINITION"
 
   network_configuration {
     security_groups  = [aws_security_group.service.id]
     subnets          = var.private_subnet_ids
-    assign_public_ip = false
+    assign_public_ip = var.assign_public_ip
   }
 
   load_balancer {
@@ -250,12 +301,16 @@ resource "aws_ecs_service" "this" {
     ignore_changes = [desired_count]
   }
 
-  deployment_controller {
-    type = "CODE_DEPLOY"
-  }
-
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
+
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = var.rollback_on_failure
+    }
+  }
 
   tags = var.tags
 }
@@ -316,4 +371,8 @@ output "load_balancer_dns" {
 
 output "security_group_id" {
   value = aws_security_group.service.id
+}
+
+output "load_balancer_arn" {
+  value = aws_lb.this.arn
 }

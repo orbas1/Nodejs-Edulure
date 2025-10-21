@@ -391,4 +391,70 @@ describe('metrics instrumentation toggles', () => {
     const disabledBytes = disabledStore.histograms.get('edulure_storage_transferred_bytes');
     expect(disabledBytes.records).toHaveLength(0);
   });
+
+  it('tracks consent mutation outcomes and exposes error rate metrics', async () => {
+    const { mod: enabledMod, promClientStore: enabledStore } = await importMetrics();
+    const { recordConsentMutationOutcome, metricsRegistry } = enabledMod;
+    metricsRegistry.resetMetrics();
+
+    recordConsentMutationOutcome({
+      operation: 'telemetry.record_consent',
+      tenantId: 'tenant-a',
+      success: true
+    });
+    recordConsentMutationOutcome({
+      operation: 'telemetry.record_consent',
+      tenantId: 'tenant-a',
+      success: false,
+      reason: 'db_error'
+    });
+
+    const attemptsCounter = enabledStore.counters.get('edulure_consent_mutation_attempts_total');
+    expect(attemptsCounter.records).toHaveLength(2);
+    expect(attemptsCounter.records[0]).toMatchObject({
+      labels: { operation: 'telemetry.record_consent', tenant_id: 'tenant-a', outcome: 'success' },
+      value: 1
+    });
+    expect(attemptsCounter.records[1]).toMatchObject({
+      labels: { operation: 'telemetry.record_consent', tenant_id: 'tenant-a', outcome: 'error' },
+      value: 1
+    });
+
+    const errorsCounter = enabledStore.counters.get('edulure_consent_mutation_errors_total');
+    expect(errorsCounter.records).toHaveLength(1);
+    expect(errorsCounter.records[0]).toMatchObject({
+      labels: { operation: 'telemetry.record_consent', tenant_id: 'tenant-a', reason: 'db_error' },
+      value: 1
+    });
+
+    const errorRateGauge = enabledStore.gauges.get('edulure_consent_mutation_error_rate');
+    expect(errorRateGauge.records).toHaveLength(2);
+    expect(errorRateGauge.records[0]).toMatchObject({
+      type: 'set',
+      labels: { operation: 'telemetry.record_consent', tenant_id: 'tenant-a' },
+      value: 0
+    });
+    expect(errorRateGauge.records[1]).toMatchObject({
+      type: 'set',
+      labels: { operation: 'telemetry.record_consent', tenant_id: 'tenant-a' },
+      value: 0.5
+    });
+
+    const { mod: disabledMod, promClientStore: disabledStore } = await importMetrics({
+      observability: { metrics: { enabled: false } }
+    });
+    const { recordConsentMutationOutcome: disabledRecord, metricsRegistry: disabledRegistry } = disabledMod;
+    disabledRegistry.resetMetrics();
+
+    disabledRecord({ operation: 'telemetry.record_consent', tenantId: 'tenant-a', success: false });
+
+    const disabledAttempts = disabledStore.counters.get('edulure_consent_mutation_attempts_total');
+    expect(disabledAttempts.records).toHaveLength(0);
+
+    const disabledErrors = disabledStore.counters.get('edulure_consent_mutation_errors_total');
+    expect(disabledErrors.records).toHaveLength(0);
+
+    const disabledGauge = disabledStore.gauges.get('edulure_consent_mutation_error_rate');
+    expect(disabledGauge.records).toHaveLength(0);
+  });
 });
