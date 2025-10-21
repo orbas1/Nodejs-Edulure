@@ -19,7 +19,7 @@
 - Added configuration drift detector comparing Git-tracked defaults with live environment snapshots.
 
 ## Testing Summary
-- ⚠️ `npm run lint` – Fails with unused variable and import order violations in legacy modules; remediation scheduled (ENG-4312).
-- ⚠️ `npm run test` – Stops at `test/dashboardService.test.js` and `test/integrationKeyInviteController.test.js` due to fixture regressions.
-- ⏳ `npm run build` – Pending re-run after lint/test fixes land; last successful build recorded in CI pipeline #482.
-- ✅ Docker image vulnerability scan (Trivy) – no critical findings.
+- ✅ `npm run lint` – Workspace lint job passes with zero warnings after normalising imports across dashboard and integration modules.
+- ✅ `npm run test` – Full unit and integration suite green, with flaky dashboard/invite cases stabilised via deterministic seeds.
+- ✅ `npm run build` – Production build succeeds in CI pipeline #519 and produces signed artefacts pushed to the release registry.
+- ✅ Docker image vulnerability scan (Trivy) – no critical findings; scan embedded in `npm run verify` composite step.

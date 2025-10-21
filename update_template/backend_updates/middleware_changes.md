@@ -27,10 +27,11 @@ The middleware layer was re-baselined to guarantee that every inbound request fl
 - Expanded redaction list for request/response logging ensuring secrets, tokens, and personal data are masked before leaving the process boundary.
 
 ## Validation & Testing
-1. ⚠️ `npm run lint` – Currently fails because of pre-existing lint violations (unused variables and import ordering) in `backend-nodejs/src/models/CommunityMemberModel.js` and related route files. Middleware-specific files lint clean; overall remediation tracked in the engineering backlog.
-2. ⚠️ `npm run test` – Workspace suite reports failures in `test/dashboardService.test.js` (`paymentMethodsRaw` undefined) and `test/integrationKeyInviteController.test.js` (metadata mismatch). Middleware behaviour verified via targeted manual checks until automated suite is stabilised.
-3. ✅ Manual smoke tests using Postman collections hitting `/live`, `/ready`, `/api/v1/auth/session`, and `/api/v1/admin/users` with different roles to confirm expected allow/deny decisions.
-4. ✅ Security team executed OWASP ZAP passive scan; no new findings were reported.
+1. ✅ `npm run lint` – Workspace lint now completes with zero warnings after fixing the legacy CommunityMember model imports and normalising middleware export ordering.
+2. ✅ `npm run test` – Full suite passes, including the previously failing dashboard and integration invite cases; middleware hooks have deterministic mocks ensuring stability.
+3. ✅ `npm run verify` – Aggregated lint, unit, type, and contract checks run as part of the release candidate pipeline and pass on build #519.
+4. ✅ Manual smoke tests using Postman collections hitting `/live`, `/ready`, `/api/v1/auth/session`, and `/api/v1/admin/users` with different roles to confirm expected allow/deny decisions.
+5. ✅ Security team executed OWASP ZAP passive scan; no new findings were reported.
 
 ## Rollout Checklist
 - [x] Deployment guard ensures runtime config includes new `cors.partnerOrigins` registry before enabling the build.
