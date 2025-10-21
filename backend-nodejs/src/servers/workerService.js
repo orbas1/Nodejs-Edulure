@@ -35,6 +35,23 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'probe-server'
   ]);
 
+  const cleanupTasks = [];
+  const registerCleanup = (name, fn) => {
+    cleanupTasks.push({ name, fn });
+  };
+
+  const stopBackgroundRunners = async () => {
+    for (const { name, fn } of [...cleanupTasks].reverse()) {
+      try {
+        await Promise.resolve(fn());
+        serviceLogger.info({ component: name }, 'Background worker stopped');
+      } catch (error) {
+        serviceLogger.error({ component: name, err: error }, 'Failed to stop background worker cleanly');
+      }
+    }
+    cleanupTasks.length = 0;
+  };
+
   let databaseHandle = null;
   try {
     databaseHandle = await ensureDatabaseConnection({ runMigrations: false, readiness });
@@ -48,6 +65,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('asset-ingestion', 'Starting asset ingestion poller');
   try {
     assetIngestionService.start();
+    registerCleanup('asset-ingestion', () => assetIngestionService.stop());
     if (!env.integrations.cloudConvertApiKey) {
       readiness.markDegraded(
         'asset-ingestion',
@@ -65,6 +83,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('data-retention', 'Starting data retention scheduler');
   try {
     dataRetentionJob.start();
+    registerCleanup('data-retention', () => dataRetentionJob.stop());
     if (!env.retention.enabled) {
       readiness.markDegraded('data-retention', 'Data retention scheduler disabled by configuration');
     } else {
@@ -78,6 +97,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('data-partitioning', 'Starting data partition scheduler');
   try {
     dataPartitionJob.start();
+    registerCleanup('data-partitioning', () => dataPartitionJob.stop());
     if (!env.partitioning.enabled) {
       readiness.markDegraded('data-partitioning', 'Data partition scheduler disabled by configuration');
     } else {
@@ -91,6 +111,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('community-reminder', 'Starting community reminder scheduler');
   try {
     communityReminderJob.start();
+    registerCleanup('community-reminder', () => communityReminderJob.stop());
     if (!env.engagement.reminders.enabled) {
       readiness.markDegraded('community-reminder', 'Community reminders disabled by configuration');
     } else {
@@ -104,6 +125,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('telemetry-warehouse', 'Starting telemetry warehouse scheduler');
   try {
     telemetryWarehouseJob.start();
+    registerCleanup('telemetry-warehouse', () => telemetryWarehouseJob.stop());
     if (!env.telemetry.export.enabled) {
       readiness.markDegraded('telemetry-warehouse', 'Telemetry export scheduler disabled by configuration');
     } else {
@@ -117,6 +139,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('monetization-reconciliation', 'Starting monetization reconciliation scheduler');
   try {
     monetizationReconciliationJob.start();
+    registerCleanup('monetization-reconciliation', () => monetizationReconciliationJob.stop());
     if (!env.monetization.reconciliation.enabled) {
       readiness.markDegraded('monetization-reconciliation', 'Monetization reconciliation disabled by configuration');
     } else {
@@ -130,6 +153,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');
   try {
     integrationOrchestratorService.start();
+    registerCleanup('integration-orchestrator', () => integrationOrchestratorService.stop());
     readiness.markReady('integration-orchestrator', 'Integration orchestrator scheduled');
   } catch (error) {
     readiness.markFailed('integration-orchestrator', error);
@@ -139,6 +163,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('webhook-event-bus', 'Starting webhook dispatcher');
   try {
     webhookEventBusService.start();
+    registerCleanup('webhook-event-bus', () => webhookEventBusService.stop());
     if (!webhookEventBusService.enabled) {
       readiness.markDegraded('webhook-event-bus', 'Webhook dispatcher disabled by configuration');
     } else {
@@ -152,6 +177,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   readiness.markPending('domain-event-dispatcher', 'Starting domain event dispatcher');
   try {
     domainEventDispatcherService.start();
+    registerCleanup('domain-event-dispatcher', () => domainEventDispatcherService.stop());
     if (!domainEventDispatcherService.enabled) {
       readiness.markDegraded(
         'domain-event-dispatcher',
@@ -197,21 +223,13 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     readiness.markPending('probe-server', `Shutting down (${signal})`);
 
     await new Promise((resolve) => {
-    probeServer.close(() => {
-      readiness.markDegraded('probe-server', 'Stopped');
-      resolve();
+      probeServer.close(() => {
+        readiness.markDegraded('probe-server', 'Stopped');
+        resolve();
+      });
     });
-  });
 
-  assetIngestionService.stop();
-  dataRetentionJob.stop();
-  dataPartitionJob.stop();
-  communityReminderJob.stop();
-  telemetryWarehouseJob.stop();
-  monetizationReconciliationJob.stop();
-  integrationOrchestratorService.stop();
-  webhookEventBusService.stop();
-  domainEventDispatcherService.stop();
+    await stopBackgroundRunners();
 
     await infrastructure.stop();
 
