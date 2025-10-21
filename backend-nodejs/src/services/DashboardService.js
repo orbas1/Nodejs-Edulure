@@ -86,6 +86,16 @@ const DEFAULT_SUPPORT_CONTACTS = [
   }
 ];
 
+const DEFAULT_SUPPORT_METRICS = {
+  open: 0,
+  waiting: 0,
+  resolved: 0,
+  closed: 0,
+  awaitingLearner: 0,
+  averageResponseMinutes: 0,
+  latestUpdatedAt: null
+};
+
 const DEFAULT_SYSTEM_SETTINGS = Object.freeze({
   language: 'en',
   region: 'US',
@@ -366,6 +376,8 @@ export function buildLearnerDashboard({
   ebooks = new Map(),
   invoices = [],
   paymentIntents = [],
+  paymentMethodsRaw = [],
+  billingContactsRaw = [],
   ebookRecommendations = [],
   communityMemberships = [],
   communityEvents = [],
@@ -380,7 +392,15 @@ export function buildLearnerDashboard({
   financialProfile = null,
   financePurchases = [],
   financeSubscriptions = [],
-  systemPreferences = null
+  systemPreferences = null,
+  growthInitiativesRaw = [],
+  growthExperimentsByInitiative = new Map(),
+  affiliateChannelsRaw = [],
+  affiliatePayoutsRaw = [],
+  adCampaignsRaw = [],
+  instructorApplicationRaw = null,
+  supportCases = [],
+  supportMetrics = DEFAULT_SUPPORT_METRICS
 } = {}) {
   const hasSignals =
     enrollments.length ||
@@ -758,60 +778,62 @@ export function buildLearnerDashboard({
     }
   ];
 
-      const invoiceEntries = normalisedInvoices.map((invoice) => ({
-        id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
-        label: invoice.label ?? 'Invoice',
-        amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
-        status: invoice.status ?? 'open',
-        date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
-      }));
+  const invoiceEntries = normalisedInvoices.map((invoice) => ({
+    id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
+    label: invoice.label ?? 'Invoice',
+    amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
+    status: invoice.status ?? 'open',
+    date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
+  }));
 
-      const paymentMethods = paymentMethodsRaw.map((method) => ({
+  const paymentMethods = Array.isArray(paymentMethodsRaw)
+    ? paymentMethodsRaw.map((method) => ({
         id: method.id,
-        label: method.label,
-        brand: method.brand,
-        last4: method.last4,
-        expiry: method.expiry,
-        primary: Boolean(method.primary)
-      }));
+        label: method.label ?? method.nickname ?? 'Payment method',
+        brand: method.brand ?? method.cardBrand ?? null,
+        last4: method.last4 ?? method.cardLast4 ?? null,
+        expiry: method.expiry ?? method.cardExpiry ?? null,
+        primary: Boolean(method.primary ?? method.isDefault)
+      }))
+    : [];
 
-      const billingContacts = billingContactsRaw.map((contact) => ({
+  const billingContacts = Array.isArray(billingContactsRaw)
+    ? billingContactsRaw.map((contact) => ({
         id: contact.id,
-        name: contact.name,
-        email: contact.email,
-        phone: contact.phone,
-        company: contact.company
-      }));
+        name: contact.name ?? contact.fullName ?? null,
+        email: contact.email ?? null,
+        phone: contact.phone ?? contact.phoneNumber ?? null,
+        company: contact.company ?? contact.organisation ?? null
+      }))
+    : [];
 
-      const financePreferencesRaw =
-        financialProfile?.preferences && typeof financialProfile.preferences === 'object'
-          ? financialProfile.preferences
-          : {};
-      const financialPreferences = {
-        autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
-        reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
-        reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
-        currency: financePreferencesRaw.currency ?? 'USD',
-        invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
-        payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
-        taxId: financePreferencesRaw.taxId ?? null,
-        alerts: {
-          sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
-          sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
-          escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
-          notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
-        },
-        documents: Array.isArray(financePreferencesRaw.documents)
-          ? financePreferencesRaw.documents
-          : [],
-        reimbursements:
-          financePreferencesRaw.reimbursements && typeof financePreferencesRaw.reimbursements === 'object'
-            ? {
-                enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
-                instructions: financePreferencesRaw.reimbursements.instructions ?? null
+  const financePreferencesRaw =
+    financialProfile?.preferences && typeof financialProfile.preferences === 'object'
+      ? financialProfile.preferences
+      : {};
+  const financialPreferences = {
+    autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
+    reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
+    reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
+    currency: financePreferencesRaw.currency ?? 'USD',
+    invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
+    payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
+    taxId: financePreferencesRaw.taxId ?? null,
+    alerts: {
+      sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
+      sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
+      escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
+      notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
+    },
+    documents: Array.isArray(financePreferencesRaw.documents) ? financePreferencesRaw.documents : [],
+    reimbursements:
+      financePreferencesRaw.reimbursements && typeof financePreferencesRaw.reimbursements === 'object'
+        ? {
+            enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
+            instructions: financePreferencesRaw.reimbursements.instructions ?? null
           }
-            : { enabled: false, instructions: null }
-      };
+        : { enabled: false, instructions: null }
+  };
 
   const financePurchasesList = Array.isArray(financePurchases)
     ? financePurchases.map((purchase) => ({
@@ -924,6 +946,28 @@ export function buildLearnerDashboard({
   const fieldServiceSearchEntries = Array.isArray(fieldServiceWorkspace?.searchIndex)
     ? fieldServiceWorkspace.searchIndex.filter((entry) => entry.role === 'learner')
     : [];
+
+  const supportMetricsSource = supportMetrics && typeof supportMetrics === 'object' ? supportMetrics : {};
+  const normalisedSupportMetrics = {
+    ...DEFAULT_SUPPORT_METRICS,
+    ...supportMetricsSource
+  };
+  const metricsUpdatedAt = normalisedSupportMetrics.latestUpdatedAt
+    ? normaliseDate(normalisedSupportMetrics.latestUpdatedAt)
+    : null;
+  const supportMetricsDisplay = {
+    open: Number(normalisedSupportMetrics.open ?? 0),
+    waiting: Number(normalisedSupportMetrics.waiting ?? 0),
+    resolved: Number(normalisedSupportMetrics.resolved ?? 0),
+    closed: Number(normalisedSupportMetrics.closed ?? 0),
+    awaitingLearner: Number(normalisedSupportMetrics.awaitingLearner ?? 0),
+    averageResponseMinutes: Number(normalisedSupportMetrics.averageResponseMinutes ?? 0),
+    latestUpdatedAt: metricsUpdatedAt ? metricsUpdatedAt.toISOString() : null,
+    firstResponseMinutes:
+      Number(
+        normalisedSupportMetrics.firstResponseMinutes ?? normalisedSupportMetrics.averageResponseMinutes ?? 0
+      ) || 42
+  };
 
       const growthInitiatives = growthInitiativesRaw.map((initiative) => ({
         id: initiative.id,
@@ -1803,16 +1847,7 @@ export function buildLearnerDashboard({
       knowledgeBase: DEFAULT_SUPPORT_KB,
       contacts: DEFAULT_SUPPORT_CONTACTS,
       serviceWindow: '24/7 global support',
-      metrics: {
-        open: supportMetrics.open,
-        waiting: supportMetrics.waiting,
-        resolved: supportMetrics.resolved,
-        closed: supportMetrics.closed,
-        awaitingLearner: supportMetrics.awaitingLearner,
-        averageResponseMinutes: supportMetrics.averageResponseMinutes,
-        latestUpdatedAt: supportMetrics.latestUpdatedAt,
-        firstResponseMinutes: supportMetrics.averageResponseMinutes || 42
-      }
+      metrics: supportMetricsDisplay
     },
     followers: followerSection,
     settings: {
@@ -2696,6 +2731,67 @@ function determineRiskLevel(enrollment, stats, now) {
   return 'low';
 }
 
+function normaliseEnrollment(enrollment = {}, collaboratorDirectory = new Map()) {
+  const metadata = safeJsonParse(enrollment.metadata, {});
+  const userObject = typeof enrollment.user === 'object' && enrollment.user ? enrollment.user : null;
+  const learnerMeta =
+    (metadata && (metadata.learner ?? metadata.user ?? metadata.profile ?? {})) || {};
+
+  const derivedUserId =
+    enrollment.userId ??
+    userObject?.id ??
+    learnerMeta?.id ??
+    learnerMeta?.userId ??
+    learnerMeta?.learnerId ??
+    metadata.userId ??
+    metadata.learnerId ??
+    null;
+
+  const directoryUser = derivedUserId ? collaboratorDirectory.get?.(derivedUserId) : null;
+
+  const firstName =
+    enrollment.firstName ??
+    learnerMeta?.firstName ??
+    learnerMeta?.givenName ??
+    metadata.firstName ??
+    metadata.givenName ??
+    userObject?.firstName ??
+    directoryUser?.firstName ??
+    null;
+
+  const lastName =
+    enrollment.lastName ??
+    learnerMeta?.lastName ??
+    learnerMeta?.familyName ??
+    metadata.lastName ??
+    metadata.familyName ??
+    userObject?.lastName ??
+    directoryUser?.lastName ??
+    null;
+
+  const email =
+    enrollment.email ??
+    learnerMeta?.email ??
+    learnerMeta?.emailAddress ??
+    metadata.email ??
+    metadata.contactEmail ??
+    userObject?.email ??
+    directoryUser?.email ??
+    null;
+
+  return {
+    ...enrollment,
+    metadata,
+    userId: derivedUserId ?? enrollment.userId ?? null,
+    resolvedLearner: {
+      id: derivedUserId ?? directoryUser?.id ?? null,
+      firstName,
+      lastName,
+      email
+    }
+  };
+}
+
 function buildCourseWorkspace({
   courses = [],
   modules = [],
@@ -2730,11 +2826,24 @@ function buildCourseWorkspace({
     return workspace;
   }
 
+  const enrollmentRecords = enrollments.map((enrollment) =>
+    normaliseEnrollment(enrollment, collaboratorDirectory)
+  );
+
   const languageLabel = createLanguageDisplay();
   const courseById = new Map();
   courses.forEach((course) => {
     const metadata = safeJsonParse(course.metadata, {});
-    courseById.set(course.id, { ...course, metadata });
+    const releaseAt = normaliseDate(course.releaseAt);
+    const updatedAt = normaliseDate(course.updatedAt);
+    const createdAt = normaliseDate(course.createdAt);
+    courseById.set(course.id, {
+      ...course,
+      metadata,
+      releaseAt,
+      updatedAt,
+      createdAt
+    });
   });
 
   const modulesByCourse = new Map();
@@ -2769,9 +2878,9 @@ function buildCourseWorkspace({
   });
 
   const enrollmentsByCourse = new Map();
-  enrollments.forEach((enrollment) => {
+  enrollmentRecords.forEach((enrollment) => {
     const list = enrollmentsByCourse.get(enrollment.courseId) ?? [];
-    list.push({ ...enrollment, metadata: safeJsonParse(enrollment.metadata, {}) });
+    list.push(enrollment);
     enrollmentsByCourse.set(enrollment.courseId, list);
   });
 
@@ -2806,6 +2915,7 @@ function buildCourseWorkspace({
   });
 
   const catalogue = courses.map((course) => {
+    const courseRecord = courseById.get(course.id) ?? { ...course, metadata: safeJsonParse(course.metadata, {}) };
     const modulesForCourse = modulesByCourse.get(course.id) ?? [];
     const lessonsForCourse = lessonsByCourse.get(course.id) ?? [];
     const courseEnrollments = enrollmentsByCourse.get(course.id) ?? [];
@@ -2818,9 +2928,9 @@ function buildCourseWorkspace({
             totalEnrollments
         )
       : 0;
-    const languages = Array.isArray(course.languages) ? course.languages : [];
-    const publishedLocales = Array.isArray(course.metadata?.publishedLocales)
-      ? course.metadata.publishedLocales
+    const languages = Array.isArray(courseRecord.languages) ? courseRecord.languages : [];
+    const publishedLocales = Array.isArray(courseRecord.metadata?.publishedLocales)
+      ? courseRecord.metadata.publishedLocales
       : [];
 
     const languageEntries = languages.map((code) => {
@@ -2835,46 +2945,48 @@ function buildCourseWorkspace({
     });
 
     return {
-      id: course.publicId ?? `course-${course.id}`,
+      id: courseRecord.publicId ?? `course-${course.id}`,
       courseId: course.id,
-      title: course.title,
-      summary: course.summary,
-      status: course.status,
-      format: course.deliveryFormat ?? course.metadata?.format ?? 'cohort',
+      title: courseRecord.title,
+      summary: courseRecord.summary,
+      status: courseRecord.status,
+      format: courseRecord.deliveryFormat ?? courseRecord.metadata?.format ?? 'cohort',
       languages: languageEntries,
       price: {
-        currency: course.priceCurrency,
-        amountCents: Number(course.priceAmount ?? 0),
-        formatted: formatCurrency(course.priceAmount ?? 0, course.priceCurrency)
+        currency: courseRecord.priceCurrency,
+        amountCents: Number(courseRecord.priceAmount ?? 0),
+        formatted: formatCurrency(courseRecord.priceAmount ?? 0, courseRecord.priceCurrency)
       },
       rating: {
-        average: Number(course.ratingAverage ?? 0),
-        count: Number(course.ratingCount ?? 0)
+        average: Number(courseRecord.ratingAverage ?? 0),
+        count: Number(courseRecord.ratingCount ?? 0)
       },
       learners: {
-        total: Number(course.enrolmentCount ?? totalEnrollments),
+        total: Number(courseRecord.enrolmentCount ?? totalEnrollments),
         active: activeEnrollments.length,
         completed: completedEnrollments.length
       },
       modules: modulesForCourse.length,
       lessons: lessonsForCourse.length,
       averageProgress,
-      releaseAt: course.releaseAt ? course.releaseAt.toISOString() : null,
-      updatedAt: course.updatedAt ? course.updatedAt.toISOString() : null,
+      releaseAt: courseRecord.releaseAt ? courseRecord.releaseAt.toISOString() : null,
+      updatedAt: courseRecord.updatedAt ? courseRecord.updatedAt.toISOString() : null,
       localisation: {
         totalLanguages: languageEntries.length,
         published: languageEntries.filter((entry) => entry.published).length,
         missing: languageEntries.filter((entry) => !entry.published).map((entry) => entry.code)
       },
-      automation: course.metadata?.dripCampaign ?? null,
-      refresherLessons: Array.isArray(course.metadata?.refresherLessons) ? course.metadata.refresherLessons : []
+      automation: courseRecord.metadata?.dripCampaign ?? null,
+      refresherLessons: Array.isArray(courseRecord.metadata?.refresherLessons)
+        ? courseRecord.metadata.refresherLessons
+        : []
     };
   });
 
   workspace.catalogue = catalogue;
 
   const cohortMap = new Map();
-  enrollments.forEach((enrollment) => {
+  enrollmentRecords.forEach((enrollment) => {
     const course = courseById.get(enrollment.courseId);
     if (!course) return;
     const cohortLabel = enrollment.metadata?.cohort ?? 'General';
@@ -2894,8 +3006,9 @@ function buildCourseWorkspace({
     }
     record.enrollments.push(enrollment);
     if (enrollment.startedAt) {
-      if (!record.firstStartAt || enrollment.startedAt < record.firstStartAt) {
-        record.firstStartAt = enrollment.startedAt;
+      const startedAt = normaliseDate(enrollment.startedAt);
+      if (startedAt && (!record.firstStartAt || startedAt < record.firstStartAt)) {
+        record.firstStartAt = startedAt;
       }
     }
   });
@@ -3133,15 +3246,23 @@ function buildCourseWorkspace({
     }
   };
 
-  const roster = enrollments.map((enrollment) => {
+  const roster = enrollmentRecords.map((enrollment) => {
     const stats = progressByEnrollment.get(enrollment.id) ?? { completionRatio: 0, lastCompletedAt: null };
     const course = courseById.get(enrollment.courseId);
-    const user = collaboratorDirectory.get(enrollment.userId);
     const lessonsForCourse = lessonsByCourse.get(enrollment.courseId) ?? [];
+    const directoryUser = enrollment.userId ? collaboratorDirectory.get?.(enrollment.userId) : null;
+    const identity = enrollment.resolvedLearner ?? {};
+    const fallbackLabel = enrollment.userId ? `Learner ${enrollment.userId}` : 'Learner';
+    const displayName =
+      resolveName(
+        identity.firstName ?? directoryUser?.firstName ?? enrollment.firstName,
+        identity.lastName ?? directoryUser?.lastName ?? enrollment.lastName,
+        identity.email ?? directoryUser?.email ?? enrollment.email ?? fallbackLabel
+      ) ?? fallbackLabel;
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
-      learnerId: enrollment.userId,
-      name: user ? resolveName(user.firstName, user.lastName, user.email) : `Learner ${enrollment.userId}`,
+      learnerId: identity.id ?? enrollment.userId ?? directoryUser?.id ?? null,
+      name: displayName,
       courseId: enrollment.courseId,
       courseTitle: course?.title ?? 'Course',
       status: enrollment.status,
