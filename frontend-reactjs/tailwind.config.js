@@ -8,6 +8,9 @@ export default {
     },
     {
       pattern: /(bg|text|border)-white\/1[0-5]/
+    },
+    {
+      pattern: /(ring|shadow)-(primary|emerald|amber)-(100|200|300|400|500)/
     }
   ],
   theme: {
@@ -43,6 +46,12 @@ export default {
       },
       backgroundImage: {
         'community-gradient': 'linear-gradient(135deg, rgba(45, 98, 255, 0.9), rgba(79, 70, 229, 0.85))'
+      },
+      ringColor: {
+        focus: 'rgba(45, 98, 255, 0.35)'
+      },
+      ringWidth: {
+        3: '3px'
       },
       transitionTimingFunction: {
         'enter-velocity': 'cubic-bezier(0.16, 1, 0.3, 1)',

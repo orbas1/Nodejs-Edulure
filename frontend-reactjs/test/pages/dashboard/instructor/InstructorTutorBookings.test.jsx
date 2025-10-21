@@ -65,4 +65,13 @@ describe('InstructorTutorBookings', () => {
     expect(await screen.findByText('Unable to update tutor routing.')).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('surfaces an empty state when no tutor booking telemetry is available', () => {
+    contextValue.dashboard.bookings = null;
+
+    render(<InstructorTutorBookings />);
+
+    expect(screen.getByText('No tutor booking data')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh/i })).toBeInTheDocument();
+  });
 });

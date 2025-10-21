@@ -64,4 +64,17 @@ describe('InstructorPricing', () => {
     expect(exportButton).not.toBeDisabled();
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('falls back to an empty state when no monetisation signals exist', () => {
+    contextValue.dashboard.pricing.offers = [];
+    contextValue.dashboard.pricing.sessions = [];
+    contextValue.dashboard.pricing.subscriptions = [];
+    contextValue.dashboard.pricing.insights = [];
+    contextValue.dashboard.analytics.revenueStreams = [];
+
+    render(<InstructorPricing />);
+
+    expect(screen.getByText('No monetisation activity')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh/i })).toBeInTheDocument();
+  });
 });

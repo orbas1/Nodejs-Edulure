@@ -141,4 +141,37 @@ describe('Live classrooms public catalogue behaviour', () => {
     expect(checkInToLiveSessionMock).toHaveBeenCalledWith({ token: 'token', sessionId: 'lc-2' });
     expect(await screen.findByText('Check-in recorded. Enjoy the classroom!')).toBeInTheDocument();
   });
+
+  it('books seats when authenticated members join upcoming sessions', async () => {
+    useAuthMock.mockReturnValue({
+      session: {
+        tokens: { accessToken: 'token' },
+        user: { id: 'user-1', email: 'member@example.com' }
+      },
+      isAuthenticated: true
+    });
+    listPublicLiveClassroomsMock.mockResolvedValue({
+      data: [
+        {
+          id: 'lc-3',
+          publicId: 'pub-3',
+          title: 'Scaling roundtable',
+          status: 'scheduled',
+          startAt: '2024-10-01T09:00:00.000Z',
+          capacity: 80,
+          reservedSeats: 40,
+          isTicketed: false
+        }
+      ]
+    });
+    joinLiveSessionMock.mockResolvedValue({ success: true });
+
+    const user = userEvent.setup();
+    render(<LiveClassrooms />);
+
+    await user.click(await screen.findByRole('button', { name: /Join session/i }));
+
+    expect(joinLiveSessionMock).toHaveBeenCalledWith({ token: 'token', sessionId: 'pub-3' });
+    expect(await screen.findByText('Session joined. Check your email for the meeting link.')).toBeInTheDocument();
+  });
 });

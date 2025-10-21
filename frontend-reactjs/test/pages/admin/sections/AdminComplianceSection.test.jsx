@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
+import { vi } from 'vitest';
 
 import AdminComplianceSection from '../../../../src/pages/admin/sections/AdminComplianceSection.jsx';
 
@@ -201,6 +202,18 @@ describe('AdminComplianceSection', () => {
     await waitFor(() => expect(onReview).toHaveBeenCalledTimes(1));
     expect(onReview.mock.calls[0][1]).toMatchObject({ status: 'approved', riskScore: 45.5 });
     expect(await screen.findByText(/Case KYC-1 updated/i)).toBeInTheDocument();
+  });
+
+  it('surfaces service errors when a review submission fails', async () => {
+    const error = new Error('Unable to update case');
+    const onReview = vi.fn().mockRejectedValue(error);
+    const { user } = setup({ onReview });
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /Approve/i }));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to update case');
   });
 });
 

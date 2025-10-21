@@ -96,4 +96,16 @@ describe('AuthoringWorkspaceSection', () => {
 
     expect(screen.getByText('Open in creation studio')).toBeInTheDocument();
   });
+
+  it('shows empty-state messaging when drafts are unavailable', () => {
+    const authoring = {
+      drafts: [],
+      activeSessions: [],
+      localisationCoverage: { totalLanguages: 0, publishedLanguages: 0, missing: [] }
+    };
+
+    render(<AuthoringWorkspaceSection authoring={authoring} />);
+
+    expect(screen.getByText('No draft projects available.')).toBeInTheDocument();
+  });
 });

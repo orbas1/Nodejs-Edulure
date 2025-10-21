@@ -87,4 +87,15 @@ describe('InstructorCourseCreate', () => {
     expect(await screen.findByText('Service offline')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /generate outline/i })).not.toBeDisabled();
   });
+
+  it('surfaces a dashboard message when no blueprints are configured yet', () => {
+    contextValue.dashboard.courses.creationBlueprints = [];
+
+    render(<InstructorCourseCreate />);
+
+    expect(
+      screen.getByText('Create your first course structure to orchestrate lesson beats, assignments, and launch cadences.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh/i })).toBeInTheDocument();
+  });
 });

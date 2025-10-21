@@ -105,4 +105,21 @@ describe('CommunityHero', () => {
     const hubLink = screen.getByRole('link', { name: /visit hub/i });
     expect(hubLink).toHaveAttribute('href', 'https://app.edulure.com/communities/automation-guild');
   });
+
+  it('formats activity insights and hides member controls when unavailable', () => {
+    render(
+      <CommunityHero
+        community={{
+          ...baseCommunity,
+          stats: { members: 12400, resources: 8, posts: 112 },
+          membership: null
+        }}
+      />
+    );
+
+    expect(screen.getByText('12,400')).toBeInTheDocument();
+    expect(screen.getByText('8')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /join community/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /leave community/i })).not.toBeInTheDocument();
+  });
 });

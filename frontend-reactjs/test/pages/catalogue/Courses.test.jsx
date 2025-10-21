@@ -168,4 +168,35 @@ describe('Courses page catalogue fallbacks', () => {
     expect(payload.payload.items[0]).toMatchObject({ name: 'Ops Mastery', metadata: { courseId: 'course-1' } });
     expect(await screen.findByText(/Checkout ready/i)).toBeInTheDocument();
   });
+
+  it('warns authenticated operators when highlights fall back to public inventory', async () => {
+    useAuthMock.mockReturnValue({
+      session: {
+        tokens: { accessToken: 'token-123' },
+        user: { role: 'admin', email: 'ops@edulure.com' }
+      },
+      isAuthenticated: true
+    });
+
+    const authError = Object.assign(new Error('Expired session'), { status: 401 });
+    searchExplorerMock.mockRejectedValue(authError);
+    listPublicCoursesMock.mockResolvedValue({
+      data: [
+        {
+          id: 'public-course',
+          title: 'Fallback Public Course',
+          summary: 'Operator ready',
+          level: 'intermediate',
+          deliveryFormat: 'cohort',
+          priceAmount: 45,
+          priceCurrency: 'USD'
+        }
+      ]
+    });
+
+    render(<Courses />);
+
+    expect(await screen.findByText('Fallback Public Course')).toBeInTheDocument();
+    expect(await screen.findByText(/Limited results shown/i)).toBeInTheDocument();
+  });
 });

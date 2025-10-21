@@ -74,4 +74,15 @@ describe('CommunitySafety', () => {
     });
     expect(screen.getByRole('alert')).toHaveTextContent('You must be signed in to resolve incidents.');
   });
+
+  it('restores the incident when resolution fails upstream', async () => {
+    resolveIncidentMock.mockRejectedValue(new Error('Resolution service offline'));
+
+    render(<CommunitySafety dashboard={dashboard} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Resolve/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Resolution service offline');
+    expect(screen.getByText('Escalated harassment report')).toBeInTheDocument();
+  });
 });

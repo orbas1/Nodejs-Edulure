@@ -84,4 +84,14 @@ describe('InstructorTutorManagement', () => {
     expect(await screen.findByText('Email delivery failed')).toBeInTheDocument();
     expect(inviteButton).not.toBeDisabled();
   });
+
+  it('shows an empty state when no tutors or availability data exist', () => {
+    contextValue.dashboard.tutors.roster = [];
+    contextValue.dashboard.tutors.availability = [];
+
+    render(<InstructorTutorManagement />);
+
+    expect(screen.getByText('No tutor pods configured')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Invite mentor/i })).toBeInTheDocument();
+  });
 });

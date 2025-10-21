@@ -94,4 +94,28 @@ describe('FeedCard', () => {
     expect(screen.queryByRole('button', { name: /suppress/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /remove/i })).not.toBeInTheDocument();
   });
+
+  it('executes removal flows independently from moderation actions', () => {
+    const handleModerate = vi.fn();
+    const handleRemove = vi.fn();
+
+    render(
+      <FeedCard
+        post={{
+          ...basePost,
+          permissions: { canModerate: true, canRemove: true },
+          moderation: { state: 'clean' }
+        }}
+        onModerate={handleModerate}
+        onRemove={handleRemove}
+        actionState={{ isProcessing: false }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /suppress/i }));
+    expect(handleModerate).toHaveBeenCalledWith(expect.objectContaining({ id: basePost.id }), 'suppress');
+
+    fireEvent.click(screen.getByRole('button', { name: /remove/i }));
+    expect(handleRemove).toHaveBeenCalledWith(expect.objectContaining({ id: basePost.id }));
+  });
 });

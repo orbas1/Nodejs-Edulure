@@ -172,4 +172,31 @@ describe('Tutor profile catalogue fallbacks', () => {
     });
     expect(await screen.findByText('Tutor booking request submitted. We will confirm shortly.')).toBeInTheDocument();
   });
+
+  it('notifies authenticated operators when tutor highlights rely on public data', async () => {
+    useAuthMock.mockReturnValue({
+      session: { tokens: { accessToken: 'token' }, user: { role: 'admin' } },
+      isAuthenticated: true
+    });
+
+    const authError = Object.assign(new Error('Session expired'), { status: 403 });
+    searchExplorerMock.mockRejectedValue(authError);
+    listPublicTutorsMock.mockResolvedValue({
+      data: [
+        {
+          id: 'public-tutor',
+          displayName: 'Jordan Rivers',
+          headline: 'Ops mentor',
+          languages: ['en'],
+          hourlyRateAmount: 180,
+          hourlyRateCurrency: 'USD'
+        }
+      ]
+    });
+
+    render(<TutorProfile />);
+
+    expect(await screen.findByText('Jordan Rivers')).toBeInTheDocument();
+    expect(await screen.findByText(/Limited tutor results shown/i)).toBeInTheDocument();
+  });
 });

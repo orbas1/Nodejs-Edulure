@@ -120,4 +120,20 @@ describe('CommunityOperations', () => {
     });
     expect(screen.getByRole('alert')).toHaveTextContent('You must be signed in to publish runbooks.');
   });
+
+  it('requires a community identifier before acknowledging escalations', async () => {
+    const dashboardWithoutCommunities = {
+      operations: { runbooks: [], escalations: [{ id: 'case-2', title: 'Resolve issue', status: 'pending' }] },
+      health: { moderators: [] }
+    };
+
+    render(<CommunityOperations dashboard={dashboardWithoutCommunities} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Acknowledge/i }));
+
+    await waitFor(() => {
+      expect(acknowledgeEscalationMock).not.toHaveBeenCalled();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Community identifier required to acknowledge.');
+  });
 });

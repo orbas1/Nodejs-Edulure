@@ -69,4 +69,13 @@ describe('FeedSponsoredCard', () => {
     );
     expect(screen.getByRole('link', { name: /Visit not-a-url/i })).toHaveAttribute('href', 'not-a-url');
   });
+
+  it('normalises advertiser destinations for brand-safe messaging', () => {
+    render(<FeedSponsoredCard ad={{ ...baseAd, ctaUrl: 'https://www.example.com/offer' }} />);
+
+    expect(screen.getByRole('link', { name: /Visit example.com/i })).toHaveAttribute(
+      'href',
+      'https://www.example.com/offer'
+    );
+  });
 });

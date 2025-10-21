@@ -99,4 +99,11 @@ describe('useAutoDismissMessage', () => {
     unmount();
     expect(clearTimeoutSpy).toHaveBeenCalled();
   });
+
+  it('avoids scheduling work when there is no message to display', () => {
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+    render(<TestHarness initialMessage="" timeout={500} />);
+
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+  });
 });

@@ -85,4 +85,18 @@ describe('CommunityMonetisation', () => {
     });
     expect(screen.getByRole('alert')).toHaveTextContent('You must be signed in to manage tiers.');
   });
+
+  it('recovers gracefully when the update operation fails', async () => {
+    updateTierMock.mockRejectedValue(new Error('Failed to persist change'));
+
+    render(<CommunityMonetisation dashboard={dashboard} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Pause tier/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to persist change');
+    });
+
+    expect(screen.getByRole('button', { name: /Pause tier/i })).toBeInTheDocument();
+  });
 });

@@ -76,4 +76,9 @@ describe('LearnerManagementSection', () => {
     const { container } = render(<LearnerManagementSection learners={{ roster: [], riskAlerts: [] }} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('guards against missing learner telemetry payloads', () => {
+    const { container } = render(<LearnerManagementSection learners={null} />);
+    expect(container).toBeEmptyDOMElement();
+  });
 });

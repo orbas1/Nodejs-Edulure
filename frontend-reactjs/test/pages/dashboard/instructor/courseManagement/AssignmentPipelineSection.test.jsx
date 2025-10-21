@@ -73,4 +73,13 @@ describe('AssignmentPipelineSection', () => {
     expect(screen.getByText('No assignments awaiting manual review.')).toBeInTheDocument();
     expect(screen.getByText('No automation workflows configured yet.')).toBeInTheDocument();
   });
+
+  it('handles missing assignment telemetry gracefully', () => {
+    render(<AssignmentPipelineSection assignments={null} />);
+
+    expect(screen.getByText('Total assignments').parentElement).toHaveTextContent('0');
+    expect(screen.getByText('Due this week').parentElement).toHaveTextContent('0');
+    expect(screen.getByText('Needs review').parentElement).toHaveTextContent('0');
+    expect(screen.getByText('No assignments awaiting manual review.')).toBeInTheDocument();
+  });
 });

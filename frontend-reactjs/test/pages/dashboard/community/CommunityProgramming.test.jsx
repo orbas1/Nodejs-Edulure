@@ -88,4 +88,26 @@ describe('CommunityProgramming', () => {
     });
     expect(screen.getByRole('alert')).toHaveTextContent('You must be signed in to schedule events.');
   });
+
+  it('restores optimistic state when scheduling fails remotely', async () => {
+    const now = new Date().toISOString();
+    const later = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    scheduleEventMock.mockRejectedValue(new Error('Calendar sync unavailable'));
+
+    window.prompt
+      .mockImplementationOnce(() => 'Calendar sync deep dive')
+      .mockImplementationOnce(() => now)
+      .mockImplementationOnce(() => later);
+
+    render(<CommunityProgramming dashboard={dashboard} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Schedule event/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Calendar sync unavailable');
+    });
+
+    expect(screen.queryByText('Calendar sync deep dive')).not.toBeInTheDocument();
+    expect(screen.getByText('Weekly standup')).toBeInTheDocument();
+  });
 });
