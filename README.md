@@ -286,13 +286,14 @@ Each workspace ships its own README with deep configuration details. The section
   - `orders`, `line_items`, `payment_intents`, `subscription_states`, and `invoice_events` drive commerce.
   - `runtime_flags`, `runtime_configs`, and `feature_audit_logs` manage progressive delivery.
   - `telemetry_events`, `telemetry_exports`, `retention_executions`, and `governance_evidence` support analytics and compliance.
-- **Seed coverage:** Seeds create operator-ready admin/instructor/learner accounts, multiple communities, sample content assets, ingestion histories, telemetry events, certification examples, billing scenarios, and refresh session trajectories to exercise retention policies.
+- **Seed coverage:** Seeds create operator-ready admin/instructor/learner accounts, multiple communities with JSON metadata, sample content assets, ingestion histories, telemetry events, certification examples, billing scenarios, and refresh session trajectories to exercise retention policies and release readiness dashboards.
 
 ## Quality gates and automation
 
 - **Linting:** `npm run lint` executes lint rules across any workspace that exposes a lint script. Flat ESLint configurations handle both backend and frontend codebases.
 - **Testing:** `npm run test` aggregates Vitest suites. Workspace-specific release suites (`npm --workspace <pkg> run test:release`) add regression, accessibility, and load coverage.
 - **Security scans:** `npm run audit` orchestrates supply-chain checks (`npm run audit:ci`) for backend/frontend and the SDK.
+- **Observability baselines:** Metrics and burn-rate thresholds driven by `METRICS_*` and `SLO_*` environment values populate the release readiness dashboard and gating automation.
 - **Release readiness:** `npm run release:readiness` runs curated test/lint/audit commands, validates `qa/release/core_release_checklist.json`, and exports a JSON summary to `reports/release/readiness-summary.json`.
 - **License reporting:** `npm run license:report` uses `scripts/security/generate-license-report.mjs` to snapshot third-party license metadata.
 
@@ -310,8 +311,9 @@ Each workspace ships its own README with deep configuration details. The section
 ## Security, governance, and compliance
 
 - **Runtime enforcement:** `scripts/verify-node-version.mjs` blocks dependency installation on unsupported Node.js/npm versions to guarantee parity between local, CI, and production environments.
-- **Authentication:** Backend enforces JWT key rotation (`npm run security:rotate-jwt`), refresh token hashing, MFA role requirements, and configurable token lifetimes.
-- **Data governance:** Automated retention jobs purge or archive data according to policies stored in the database. Execution records are written to immutable audit logs.
+- **Authentication:** Backend enforces JWT key rotation (`npm run security:rotate-jwt`), refresh token hashing, MFA role requirements, configurable token lifetimes, session caching windows (`SESSION_VALIDATION_CACHE_TTL_MS`), and concurrent session ceilings (`MAX_ACTIVE_SESSIONS_PER_USER`).
+- **Audit & encryption:** Immutable audit trails honour `AUDIT_LOG_*` settings while data-at-rest encryption can be enabled with `DATA_ENCRYPTION_PRIMARY_KEY` and rotated via `DATA_ENCRYPTION_ACTIVE_KEY_ID` / `DATA_ENCRYPTION_FALLBACK_KEYS`.
+- **Data governance:** Automated retention and partitioning jobs enforce policy windows while domain event dispatchers and webhook buses deliver downstream notifications with resilient backoff controls.
 - **Telemetry:** Consent-aware ingestion pipeline, freshness monitoring, Prometheus metrics, and manual export triggers keep analytics trustworthy.
 - **Release management:** The checklist in `qa/release/core_release_checklist.json` must be complete before production deployments. Automation surfaces outstanding items in release reports.
 

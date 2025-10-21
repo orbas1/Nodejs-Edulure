@@ -1,11 +1,17 @@
+import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class CommunityEngagementStorage {
-  CommunityEngagementStorage({HiveInterface? hive}) : _hive = hive ?? Hive;
+  CommunityEngagementStorage({
+    HiveInterface? hive,
+    String boxName = _defaultBoxName,
+  })  : _hive = hive ?? Hive,
+        _boxName = boxName;
 
-  static const String _boxName = 'community_engagement';
+  static const String _defaultBoxName = 'community_engagement';
 
   final HiveInterface _hive;
+  final String _boxName;
 
   Future<Box<dynamic>> _ensureBox() async {
     if (!_hive.isBoxOpen(_boxName)) {

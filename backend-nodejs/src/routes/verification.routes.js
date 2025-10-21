@@ -1,5 +1,3 @@
-import { Router } from 'express';
-
 import {
   attachDocument,
   createUploadRequest,
@@ -10,8 +8,9 @@ import {
   submitForReview
 } from '../controllers/IdentityVerificationController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/me', auth(), getOwnVerification);
 router.post('/me/upload-requests', auth(), createUploadRequest);

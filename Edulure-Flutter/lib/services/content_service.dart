@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10,20 +11,36 @@ import 'ebook_reader_backend.dart';
 import 'session_manager.dart';
 
 class ContentService implements EbookReaderBackend {
-  ContentService()
-      : _dio = Dio(
-          BaseOptions(
-            baseUrl: apiBaseUrl,
-            connectTimeout: const Duration(seconds: 12),
-            receiveTimeout: const Duration(seconds: 30),
-          ),
-        );
+  ContentService({
+    Dio? client,
+    String? Function()? tokenProvider,
+    Box<dynamic>? assetsCache,
+    Box<dynamic>? downloadsCache,
+    Box<dynamic>? ebookProgressCache,
+    Box<dynamic>? readerSettingsCache,
+    Future<Directory> Function()? documentsDirectoryProvider,
+  })  : _dio = client ?? ApiConfig.createHttpClient(requiresAuth: true),
+        _tokenProvider = tokenProvider ?? SessionManager.getAccessToken,
+        _assetsCache = assetsCache ?? SessionManager.assetsCache,
+        _downloadsCache = downloadsCache ?? SessionManager.downloadsCache,
+        _ebookProgressCache = ebookProgressCache ?? SessionManager.ebookProgressCache,
+        _readerSettingsCache = readerSettingsCache ?? SessionManager.readerSettingsCache,
+        _documentsDirectoryProvider =
+            documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 
   final Dio _dio;
+  final String? Function() _tokenProvider;
+  final Box<dynamic> _assetsCache;
+  final Box<dynamic> _downloadsCache;
+  final Box<dynamic> _ebookProgressCache;
+  final Box<dynamic> _readerSettingsCache;
+  final Future<Directory> Function() _documentsDirectoryProvider;
 
   Future<List<ContentAsset>> fetchAssets() async {
-    final token = SessionManager.getAccessToken();
-    if (token == null) return loadCachedAssets();
+    final token = _tokenProvider();
+    if (token == null || token.isEmpty) {
+      return loadCachedAssets();
+    }
     try {
       final response = await _dio.get(
         '/content/assets',
@@ -31,11 +48,11 @@ class ContentService implements EbookReaderBackend {
       );
       final data = response.data['data'] as List<dynamic>? ?? [];
       final assets = data.map((json) => ContentAsset.fromJson(json as Map<String, dynamic>)).toList();
-      await SessionManager.assetsCache.put('items', assets.map((asset) => asset.toJson()).toList());
+      await _assetsCache.put('items', assets.map((asset) => asset.toJson()).toList());
       return assets;
     } on DioException catch (error) {
       if (error.response?.statusCode == 403) {
-        await SessionManager.assetsCache.delete('items');
+        await _assetsCache.delete('items');
         throw const ContentAccessDeniedException(
           'Instructor or admin Learnspace required to manage the content library.',
         );
@@ -57,7 +74,7 @@ class ContentService implements EbookReaderBackend {
   }
 
   Future<EbookPurchaseIntent> createEbookPurchaseIntent(String ebookId) async {
-    final token = SessionManager.getAccessToken();
+    final token = _tokenProvider();
     if (token == null) {
       throw Exception('Authentication required');
     }
@@ -70,7 +87,7 @@ class ContentService implements EbookReaderBackend {
   }
 
   List<ContentAsset> loadCachedAssets() {
-    final cached = SessionManager.assetsCache.get('items');
+    final cached = _assetsCache.get('items');
     if (cached is List) {
       return cached.map((item) => ContentAsset.fromJson(Map<String, dynamic>.from(item as Map))).toList();
     }
@@ -79,9 +96,8 @@ class ContentService implements EbookReaderBackend {
 
   Map<String, String> loadCachedDownloads() {
     final entries = <String, String>{};
-    final box = SessionManager.downloadsCache;
-    for (final key in box.keys) {
-      final value = box.get(key);
+    for (final key in _downloadsCache.keys) {
+      final value = _downloadsCache.get(key);
       if (value is String) {
         entries[key.toString()] = value;
       }
@@ -91,9 +107,8 @@ class ContentService implements EbookReaderBackend {
 
   Map<String, EbookProgress> loadCachedEbookProgress() {
     final entries = <String, EbookProgress>{};
-    final box = SessionManager.ebookProgressCache;
-    for (final key in box.keys) {
-      final value = box.get(key);
+    for (final key in _ebookProgressCache.keys) {
+      final value = _ebookProgressCache.get(key);
       if (value is Map) {
         entries[key.toString()] =
             EbookProgress.fromJson(Map<String, dynamic>.from(value as Map));
@@ -104,7 +119,7 @@ class ContentService implements EbookReaderBackend {
 
   @override
   ReaderPreferences loadReaderPreferences() {
-    final data = SessionManager.readerSettingsCache.get('preferences');
+    final data = _readerSettingsCache.get('preferences');
     if (data is Map) {
       return ReaderPreferences.fromJson(
         Map<String, dynamic>.from(data as Map),
@@ -115,7 +130,7 @@ class ContentService implements EbookReaderBackend {
 
   @override
   Future<void> saveReaderPreferences(ReaderPreferences preferences) async {
-    await SessionManager.readerSettingsCache.put(
+    await _readerSettingsCache.put(
       'preferences',
       preferences.toJson(),
     );
@@ -123,14 +138,14 @@ class ContentService implements EbookReaderBackend {
 
   @override
   Future<void> cacheEbookProgress(String assetId, EbookProgress progress) async {
-    await SessionManager.ebookProgressCache.put(
+    await _ebookProgressCache.put(
       assetId,
       progress.toJson(),
     );
   }
 
   Future<ViewerToken> viewerToken(String assetId) async {
-    final token = SessionManager.getAccessToken();
+    final token = _tokenProvider();
     if (token == null) {
       throw Exception('Authentication required');
     }
@@ -142,7 +157,7 @@ class ContentService implements EbookReaderBackend {
   }
 
   Future<String> downloadAsset(ContentAsset asset, ViewerToken token) async {
-    final directory = await getApplicationDocumentsDirectory();
+    final directory = await _documentsDirectoryProvider();
     final contentDir = Directory('${directory.path}/edulure/content');
     if (!await contentDir.exists()) {
       await contentDir.create(recursive: true);
@@ -150,7 +165,7 @@ class ContentService implements EbookReaderBackend {
     final filename = asset.originalFilename;
     final filePath = '${contentDir.path}/$filename';
     await _dio.download(token.url, filePath);
-    await SessionManager.downloadsCache.put(asset.publicId, filePath);
+    await _downloadsCache.put(asset.publicId, filePath);
     return filePath;
   }
 
@@ -160,8 +175,8 @@ class ContentService implements EbookReaderBackend {
 
   @override
   Future<void> updateProgress(String assetId, double progress) async {
-    final token = SessionManager.getAccessToken();
-    if (token == null) return;
+    final token = _tokenProvider();
+    if (token == null || token.isEmpty) return;
     await _dio.post(
       '/content/assets/$assetId/progress',
       data: {
@@ -173,8 +188,8 @@ class ContentService implements EbookReaderBackend {
   }
 
   Future<void> recordDownload(String assetId) async {
-    final token = SessionManager.getAccessToken();
-    if (token == null) return;
+    final token = _tokenProvider();
+    if (token == null || token.isEmpty) return;
     await _dio.post(
       '/content/assets/$assetId/events',
       data: {'eventType': 'download'},
@@ -186,7 +201,7 @@ class ContentService implements EbookReaderBackend {
     String assetId,
     MaterialMetadataUpdate metadata,
   ) async {
-    final token = SessionManager.getAccessToken();
+    final token = _tokenProvider();
     if (token == null) {
       throw Exception('Authentication required');
     }

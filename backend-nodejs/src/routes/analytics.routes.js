@@ -1,10 +1,9 @@
-import { Router } from 'express';
-
 import AnalyticsController from '../controllers/AnalyticsController.js';
 import BusinessIntelligenceController from '../controllers/BusinessIntelligenceController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/explorer/summary', auth('instructor'), AnalyticsController.getExplorerSummary);
 router.get('/explorer/alerts', auth('instructor'), AnalyticsController.getExplorerAlerts);

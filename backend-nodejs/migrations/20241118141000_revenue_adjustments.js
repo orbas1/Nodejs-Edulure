@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasTable = await knex.schema.hasTable('revenue_adjustments');
   if (!hasTable) {
@@ -11,7 +13,10 @@ export async function up(knex) {
       table.bigInteger('amount_cents').notNullable().defaultTo(0);
       table.timestamp('effective_at').notNullable();
       table.text('notes');
-      table.jsonb('metadata').notNullable().defaultTo(knex.raw("'{}'::jsonb"));
+      table
+        .json('metadata')
+        .notNullable()
+        .defaultTo(jsonDefault(knex, {}));
       table
         .integer('created_by')
         .unsigned()

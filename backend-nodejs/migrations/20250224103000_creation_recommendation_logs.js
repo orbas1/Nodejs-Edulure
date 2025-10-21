@@ -1,3 +1,6 @@
+const JSON_EMPTY_OBJECT = JSON.stringify({});
+const JSON_EMPTY_ARRAY = JSON.stringify([]);
+
 export async function up(knex) {
   const hasTable = await knex.schema.hasTable('creation_recommendation_logs');
   if (!hasTable) {
@@ -16,9 +19,9 @@ export async function up(knex) {
       table.string('feature_flag_key', 120).notNullable();
       table.string('feature_flag_state', 32).notNullable();
       table.string('feature_flag_variant', 64);
-      table.json('context').notNullable();
-      table.json('results').notNullable();
-      table.json('explainability').notNullable();
+      table.json('context').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('results').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+      table.json('explainability').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('generated_at').defaultTo(knex.fn.now());
       table.timestamp('expires_at');
       table.timestamp('created_at').defaultTo(knex.fn.now());

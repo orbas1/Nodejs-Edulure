@@ -84,6 +84,7 @@ class _TutorDirectoryScreenState extends ConsumerState<TutorDirectoryScreen> {
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search),
                     hintText: 'Search tutors by name, bio, or language',
+                    labelText: 'Search tutors by name, bio, or language',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   onChanged: (value) => setState(() => _searchTerm = value),

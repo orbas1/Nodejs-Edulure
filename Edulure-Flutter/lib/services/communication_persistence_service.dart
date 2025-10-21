@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../provider/communication/communication_models.dart';
@@ -16,13 +17,18 @@ abstract class CommunicationPersistence {
 }
 
 class CommunicationPersistenceService implements CommunicationPersistence {
-  CommunicationPersistenceService({String boxName = _defaultBox}) : _boxName = boxName;
+  CommunicationPersistenceService({
+    String boxName = _defaultBox,
+    HiveInterface? hive,
+  })  : _boxName = boxName,
+        _hive = hive ?? Hive;
 
   static const _defaultBox = 'communications.cache';
   static const _threadsKey = 'threads';
   static const _ticketsKey = 'tickets';
 
   final String _boxName;
+  final HiveInterface _hive;
   Box<String>? _cachedBox;
 
   Future<Box<String>> _box() async {
@@ -30,7 +36,7 @@ class CommunicationPersistenceService implements CommunicationPersistence {
     if (cached != null && cached.isOpen) {
       return cached;
     }
-    final box = await Hive.openBox<String>(_boxName);
+    final box = await _hive.openBox<String>(_boxName);
     _cachedBox = box;
     return box;
   }

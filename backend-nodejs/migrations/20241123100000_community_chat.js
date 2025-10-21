@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasCommunityMessages = await knex.schema.hasTable('community_messages');
   if (!hasCommunityMessages) {
@@ -29,8 +31,8 @@ export async function up(knex) {
         .notNullable()
         .defaultTo('text');
       table.text('body').notNullable();
-      table.json('attachments').notNullable().defaultTo('[]');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('attachments').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table
         .enum('status', ['visible', 'hidden', 'deleted'])
         .notNullable()
@@ -91,7 +93,7 @@ export async function up(knex) {
         .references('id')
         .inTable('community_messages')
         .onDelete('SET NULL');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -148,7 +150,7 @@ export async function up(knex) {
         .enum('action_type', ['hide', 'restore', 'delete', 'flag'])
         .notNullable();
       table.string('reason', 500);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.index(['message_id']);
       table.index(['action_type']);
@@ -161,7 +163,7 @@ export async function up(knex) {
       table.increments('id').primary();
       table.string('subject', 240);
       table.boolean('is_group').notNullable().defaultTo(false);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('last_message_at');
       table.string('last_message_preview', 280);
       table.timestamp('created_at').defaultTo(knex.fn.now());
@@ -195,8 +197,8 @@ export async function up(knex) {
         .notNullable()
         .defaultTo('text');
       table.text('body').notNullable();
-      table.json('attachments').notNullable().defaultTo('[]');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('attachments').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table
         .enum('status', ['sent', 'delivered', 'read', 'deleted'])
         .notNullable()
@@ -244,7 +246,7 @@ export async function up(knex) {
         .references('id')
         .inTable('direct_messages')
         .onDelete('SET NULL');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -277,7 +279,7 @@ export async function up(knex) {
       table.timestamp('connected_at').defaultTo(knex.fn.now());
       table.timestamp('last_seen_at').defaultTo(knex.fn.now());
       table.timestamp('expires_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['session_id']);
       table.index(['user_id']);
       table.index(['status']);

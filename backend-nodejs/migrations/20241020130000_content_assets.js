@@ -1,3 +1,30 @@
+const DEFAULT_CHARSET = 'utf8mb4';
+const DEFAULT_COLLATION = 'utf8mb4_unicode_ci';
+
+const applyTableDefaults = (table) => {
+  if (typeof table.engine === 'function') {
+    table.engine('InnoDB');
+  }
+
+  if (typeof table.charset === 'function') {
+    table.charset(DEFAULT_CHARSET);
+  }
+
+  if (typeof table.collate === 'function') {
+    table.collate(DEFAULT_COLLATION);
+  }
+};
+
+const ensureJsonColumn = (table, columnName, { nullable = false } = {}) => {
+  const column = table.json(columnName);
+  if (!nullable) {
+    column.notNullable();
+  }
+
+  column.defaultTo('{}');
+  return column;
+};
+
 export async function up(knex) {
   const hasContentAssets = await knex.schema.hasTable('content_assets');
   if (!hasContentAssets) {
@@ -30,14 +57,18 @@ export async function up(knex) {
         .inTable('users')
         .onDelete('SET NULL');
       table.timestamp('published_at');
-      table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      ensureJsonColumn(table, 'metadata');
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.timestamp('deleted_at');
-      table.index(['type', 'status']);
-      table.index(['created_by']);
+      table.index(['type', 'status'], 'idx_content_assets_type_status');
+      table.index(['created_by'], 'idx_content_assets_created_by');
+      table.index(['published_at'], 'idx_content_assets_published_at');
+      table.index(['deleted_at'], 'idx_content_assets_deleted_at');
+      applyTableDefaults(table);
     });
   }
 
@@ -61,14 +92,17 @@ export async function up(knex) {
         .defaultTo('pending');
       table.integer('attempts').unsigned().defaultTo(0);
       table.text('last_error');
-      table.json('result_metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      ensureJsonColumn(table, 'result_metadata');
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.timestamp('started_at');
       table.timestamp('completed_at');
-      table.index(['status', 'created_at']);
+      table.index(['status', 'created_at'], 'idx_asset_ingestion_jobs_status_created_at');
+      table.index(['asset_id', 'job_type'], 'idx_asset_ingestion_jobs_asset_type');
+      applyTableDefaults(table);
     });
   }
 
@@ -88,12 +122,15 @@ export async function up(knex) {
       table.string('storage_bucket', 120).notNullable();
       table.string('checksum', 128);
       table.bigInteger('size_bytes');
-      table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      ensureJsonColumn(table, 'metadata');
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['asset_id', 'format']);
+      table.index(['asset_id'], 'idx_asset_conversion_outputs_asset');
+      applyTableDefaults(table);
     });
   }
 
@@ -118,11 +155,14 @@ export async function up(knex) {
       table.decimal('progress_percent', 5, 2).notNullable().defaultTo(0);
       table.string('last_location', 255);
       table.integer('time_spent_seconds').unsigned().defaultTo(0);
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
-      table.unique(['asset_id', 'user_id']);
+      table.unique(['asset_id', 'user_id'], 'ebook_progress_unique_user_asset');
+      table.index(['asset_id', 'updated_at'], 'idx_ebook_progress_asset_updated');
+      applyTableDefaults(table);
     });
   }
 
@@ -144,9 +184,11 @@ export async function up(knex) {
         .references('id')
         .inTable('users')
         .onDelete('SET NULL');
-      table.json('payload').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table.index(['asset_id', 'event']);
+      ensureJsonColumn(table, 'payload');
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
+      table.index(['asset_id', 'event'], 'idx_content_audit_logs_event');
+      table.index(['created_at'], 'idx_content_audit_logs_created_at');
+      applyTableDefaults(table);
     });
   }
 
@@ -168,10 +210,11 @@ export async function up(knex) {
         .inTable('users')
         .onDelete('SET NULL');
       table.string('event_type', 40).notNullable();
-      table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('occurred_at').defaultTo(knex.fn.now());
-      table.index(['asset_id', 'event_type']);
-      table.index(['occurred_at']);
+      ensureJsonColumn(table, 'metadata');
+      table.timestamp('occurred_at').notNullable().defaultTo(knex.fn.now());
+      table.index(['asset_id', 'event_type'], 'idx_content_asset_events_type');
+      table.index(['occurred_at'], 'idx_content_asset_events_occurred_at');
+      applyTableDefaults(table);
     });
   }
 }

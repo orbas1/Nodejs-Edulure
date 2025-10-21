@@ -7,9 +7,7 @@ import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js'
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
 import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
 import LearnerFinancePurchaseModel from '../models/LearnerFinancePurchaseModel.js';
-import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
 import CommunityModel from '../models/CommunityModel.js';
-import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
 import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
@@ -3801,9 +3799,11 @@ export default class DashboardService {
       log.warn({ err: error }, 'Failed to load collaborator directory for course workspace');
     }
 
-    let learnerSnapshot;
-    let communitySnapshot;
+    learnerSnapshot = undefined;
+    communitySnapshot = undefined;
+    communityMemberships = [];
     let communitySummaries = [];
+    let communityMemberships = [];
     const communityEventsByCommunity = new Map();
     const communityRunbooksByCommunity = new Map();
     const communityPaywallTiersByCommunity = new Map();
@@ -3811,7 +3811,7 @@ export default class DashboardService {
     const communityPendingMembersByCommunity = new Map();
     const communityModeratorsByCommunity = new Map();
     const communicationsByCommunity = new Map();
-    let communityModerationCases = [];
+    const communityModerationCases = [];
     let engagementTotals = { current: {}, previous: {} };
 
     try {
@@ -4152,7 +4152,7 @@ export default class DashboardService {
           : null
       }));
 
-      learnerSnapshot =
+      multiRoleLearnerSnapshot =
         buildLearnerDashboard({
           user,
           now: referenceDate,
@@ -4273,7 +4273,7 @@ export default class DashboardService {
         });
         engagementTotals = { current: currentTotals, previous: previousTotals };
 
-        communitySnapshot =
+      multiRoleCommunitySnapshot =
           buildCommunityDashboard({
             user,
             now: referenceDate,
@@ -4315,7 +4315,6 @@ export default class DashboardService {
 
     let learnerSnapshot;
     let communitySnapshot;
-    let communityMemberships = [];
 
     try {
       const [
@@ -4563,7 +4562,14 @@ export default class DashboardService {
 
     const applySnapshot = (key, snapshot) => {
       if (!snapshot) return;
-      dashboards[key] = snapshot.dashboard;
+      if (snapshot.dashboard && typeof snapshot.dashboard === 'object') {
+        dashboards[key] = {
+          ...(dashboards[key] ?? {}),
+          ...snapshot.dashboard
+        };
+      } else if (dashboards[key] === undefined) {
+        dashboards[key] = snapshot.dashboard ?? null;
+      }
       if (Array.isArray(snapshot.searchIndex)) {
         searchIndex.push(...snapshot.searchIndex);
       }
@@ -4582,7 +4588,9 @@ export default class DashboardService {
       pushRole(snapshot.role);
     };
 
+    applySnapshot('learner', multiRoleLearnerSnapshot);
     applySnapshot('learner', learnerSnapshot);
+    applySnapshot('community', multiRoleCommunitySnapshot);
     applySnapshot('community', communitySnapshot);
     applySnapshot('instructor', instructorSnapshot);
 

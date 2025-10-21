@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import SocialGraphController from '../controllers/SocialGraphController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/followers', auth(), SocialGraphController.listFollowers);
 router.get('/users/:userId/followers', auth(), SocialGraphController.listFollowers);

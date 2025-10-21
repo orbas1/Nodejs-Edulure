@@ -134,7 +134,7 @@ export default class MonetizationRevenueScheduleModel {
   static async listDueForRecognition({ tenantId, asOf = new Date().toISOString(), limit = 200 } = {}, connection = db) {
     const rows = await connection(TABLE)
       .where({ tenant_id: normaliseTenantId(tenantId ?? 'global') })
-      .andWhereIn('status', ['pending', 'in_progress'])
+      .whereIn('status', ['pending', 'in_progress'])
       .andWhere('recognition_end', '<=', asOf)
       .orderBy('recognition_end', 'asc')
       .limit(Math.min(limit, 500));

@@ -1,7 +1,11 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
+#!/usr/bin/env node
+
+import fs from 'node:fs';
+import { promises as fsPromises } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { parseArgs } from 'node:util';
 
 import dotenv from 'dotenv';
 import knexFactory from 'knex';
@@ -19,16 +23,34 @@ if (fs.existsSync(envPath)) {
 
 const knexConfig = require('../knexfile.cjs');
 
-function resolveDomainConfig(domain) {
+function resolveDomainConfig(domain, { outputOverride } = {}) {
   if (domain === 'compliance') {
     return {
       tables: Object.values(COMPLIANCE_TABLES),
-      output: path.resolve(projectRoot, 'database/erd/compliance.puml'),
+      output: outputOverride ?? path.resolve(projectRoot, 'database/erd/compliance.puml'),
       title: 'Compliance & Governance Domain'
     };
   }
 
   throw new Error(`Unsupported domain "${domain}". Supported domains: compliance`);
+}
+
+function assertSupportedClient({ force }) {
+  const client = String(knexConfig.client ?? '').toLowerCase();
+  if (client.includes('mysql')) {
+    return;
+  }
+
+  if (force) {
+    console.warn(
+      `[erd] Warning: knex client "${knexConfig.client}" has not been validated with this script. Proceeding due to --force.`
+    );
+    return;
+  }
+
+  throw new Error(
+    `This ERD generator currently supports MySQL-compatible clients. Detected "${knexConfig.client}"; re-run with --force to override.`
+  );
 }
 
 function formatColumn(column) {
@@ -44,7 +66,10 @@ function formatRelationship(fk) {
 }
 
 async function fetchSchemaMetadata(knex, domainConfig) {
-  const databaseName = knexConfig.connection.database;
+  const databaseName = domainConfig.schemaName ?? knexConfig.connection.database;
+  if (!databaseName) {
+    throw new Error('Unable to determine database/schema name. Set DB_NAME or pass --schema=<name>.');
+  }
   const tables = domainConfig.tables;
 
   const columns = await knex('information_schema.columns')
@@ -113,28 +138,48 @@ function buildPlantUml(domainConfig, metadata) {
   return lines.join('\n');
 }
 
-async function generateDiagram(domain) {
-  const domainConfig = resolveDomainConfig(domain);
+async function ensureOutputDirectory(filePath) {
+  await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
+}
+
+async function generateDiagram(domain, { outputOverride, schemaName } = {}) {
+  const domainConfig = resolveDomainConfig(domain, { outputOverride });
   const knex = knexFactory(knexConfig);
 
   try {
-    const metadata = await fetchSchemaMetadata(knex, domainConfig);
+    const metadata = await fetchSchemaMetadata(knex, { ...domainConfig, schemaName });
     const diagram = buildPlantUml(domainConfig, metadata);
-    await fs.promises.writeFile(domainConfig.output, diagram, 'utf8');
+    await ensureOutputDirectory(domainConfig.output);
+    await fsPromises.writeFile(domainConfig.output, `${diagram}\n`, 'utf8');
     console.log(`ERD generated for domain "${domain}" at ${domainConfig.output}`);
   } finally {
     await knex.destroy();
   }
 }
 
-function parseArgs(argv) {
-  const [, , domain = 'compliance'] = argv;
-  return { domain };
+async function main() {
+  const { values } = parseArgs({
+    options: {
+      domain: { type: 'string', default: 'compliance' },
+      output: { type: 'string' },
+      schema: { type: 'string' },
+      force: { type: 'boolean', default: false }
+    }
+  });
+
+  try {
+    assertSupportedClient({ force: values.force });
+    await generateDiagram(values.domain, {
+      outputOverride: values.output ? path.resolve(process.cwd(), values.output) : undefined,
+      schemaName: values.schema
+    });
+  } catch (error) {
+    console.error('Failed to generate ERD', error);
+    process.exitCode = 1;
+  }
 }
 
-const { domain } = parseArgs(process.argv);
-
-generateDiagram(domain).catch((error) => {
-  console.error('Failed to generate ERD', error);
+main().catch((error) => {
+  console.error('Unexpected ERD generator failure', error);
   process.exitCode = 1;
 });
