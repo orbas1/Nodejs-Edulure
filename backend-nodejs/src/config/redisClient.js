@@ -8,71 +8,66 @@ let client = null;
 let lastErrorLoggedAt = 0;
 const ERROR_LOG_THROTTLE_MS = 30000;
 
-function createRedisClient() {
-  const commonOptions = {
+export function buildRedisOptions(configuration = env.redis) {
+  const retryStrategy = (attempt) => Math.min(attempt * 200, 2000);
+
+  const options = {
     lazyConnect: true,
     enableOfflineQueue: false,
     maxRetriesPerRequest: 1,
-    commandTimeout: env.redis.commandTimeoutMs,
-    retryStrategy: (attempt) => {
-      const delay = Math.min(attempt * 200, 2000);
-      return delay;
-    },
-    reconnectOnError: (error) => {
-      if (!error) {
-        return false;
-      }
-
-      if (error.message?.includes('READONLY')) {
-        return true;
-      }
-
-      return false;
-    }
+    commandTimeout: configuration.commandTimeoutMs,
+    keyPrefix: configuration.keyPrefix ?? undefined,
+    retryStrategy,
+    reconnectOnError: (error) => Boolean(error?.message?.includes('READONLY'))
   };
 
-  let instance;
-  if (env.redis.url) {
-    instance = new Redis(env.redis.url, commonOptions);
-  } else {
-    const tlsOptions = env.redis.tls.enabled
-      ? {
-          rejectUnauthorized: true,
-          ca: env.redis.tls.ca ? [env.redis.tls.ca] : undefined
-        }
-      : undefined;
+  if (!configuration.url) {
+    options.host = configuration.host;
+    options.port = configuration.port;
+    options.username = configuration.username ?? undefined;
+    options.password = configuration.password ?? undefined;
 
-    instance = new Redis({
-      ...commonOptions,
-      host: env.redis.host,
-      port: env.redis.port,
-      username: env.redis.username ?? undefined,
-      password: env.redis.password ?? undefined,
-      tls: tlsOptions
-    });
+    if (configuration.tls?.enabled) {
+      options.tls = {
+        rejectUnauthorized: configuration.tls.ca ? true : false,
+        ca: configuration.tls.ca ? [configuration.tls.ca] : undefined
+      };
+    }
   }
 
+  return options;
+}
+
+export function createRedisClient(configuration = env.redis, log = redisLogger) {
+  const options = buildRedisOptions(configuration);
+  lastErrorLoggedAt = 0;
+  const instance = configuration.url ? new Redis(configuration.url, options) : new Redis(options);
+
   instance.on('connect', () => {
-    redisLogger.debug('Redis connection established');
+    log.debug('Redis connection established');
   });
 
   instance.on('ready', () => {
-    redisLogger.info('Redis client ready for commands');
+    log.info('Redis client ready for commands');
     lastErrorLoggedAt = 0;
   });
 
   instance.on('error', (error) => {
     const now = Date.now();
     if (now - lastErrorLoggedAt > ERROR_LOG_THROTTLE_MS) {
-      redisLogger.error({ err: error }, 'Redis connection error');
+      log.error({ err: error }, 'Redis connection error');
       lastErrorLoggedAt = now;
     } else {
-      redisLogger.debug({ err: error }, 'Redis connection error (suppressed)');
+      log.debug({ err: error }, 'Redis connection error (suppressed)');
     }
   });
 
   instance.on('end', () => {
-    redisLogger.warn('Redis connection closed');
+    log.warn('Redis connection closed');
+  });
+
+  instance.on('reconnecting', (delay) => {
+    log.warn({ delay }, 'Redis reconnecting');
   });
 
   return instance;
