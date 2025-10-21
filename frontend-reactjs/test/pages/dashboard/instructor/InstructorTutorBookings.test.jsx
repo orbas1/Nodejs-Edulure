@@ -52,4 +52,26 @@ describe('InstructorTutorBookings', () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(screen.getByText(/Tutor routing recalibrated/i)).toBeInTheDocument();
   });
+
+  it('handles routing orchestration failures gracefully', async () => {
+    routeTutorRequest.mockRejectedValueOnce(new Error('Automation offline'));
+
+    render(<InstructorTutorBookings />);
+
+    const routingButton = screen.getByRole('button', { name: /Open routing rules/i });
+    fireEvent.click(routingButton);
+
+    await waitFor(() => expect(routeTutorRequest).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('Unable to update tutor routing.')).toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an empty state when no tutor booking telemetry is available', () => {
+    contextValue.dashboard.bookings = null;
+
+    render(<InstructorTutorBookings />);
+
+    expect(screen.getByText('No tutor booking data')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh/i })).toBeInTheDocument();
+  });
 });
