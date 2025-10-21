@@ -106,31 +106,36 @@ function normaliseBlog(blog) {
 }
 
 export default function LearnerOverview({ dashboard, profile, onRefresh }) {
-  const metrics = useMemo(() => normaliseMetrics(dashboard.metrics), [dashboard.metrics]);
+  const metricsSource = dashboard?.metrics;
+  const analytics = dashboard?.analytics ?? {};
+  const notificationsSource = dashboard?.notifications ?? {};
+  const settings = dashboard?.settings ?? {};
+
+  const metrics = useMemo(() => normaliseMetrics(metricsSource), [metricsSource]);
   const learningPace = useMemo(
-    () => normaliseLearningPace(dashboard.analytics?.learningPace),
-    [dashboard.analytics?.learningPace]
+    () => normaliseLearningPace(analytics.learningPace),
+    [analytics.learningPace]
   );
-  const upcoming = useMemo(() => normaliseUpcoming(dashboard.upcoming), [dashboard.upcoming]);
+  const upcoming = useMemo(() => normaliseUpcoming(dashboard?.upcoming), [dashboard?.upcoming]);
   const profileStats = useMemo(() => normaliseMetrics(profile?.stats), [profile?.stats]);
   const feedHighlights = useMemo(
     () => normaliseFeedHighlights(profile?.feedHighlights),
     [profile?.feedHighlights]
   );
   const communityEngagement = useMemo(
-    () => normaliseCommunityEngagement(dashboard.analytics?.communityEngagement),
-    [dashboard.analytics?.communityEngagement]
+    () => normaliseCommunityEngagement(analytics.communityEngagement),
+    [analytics.communityEngagement]
   );
   const notifications = useMemo(
-    () => normaliseNotifications(dashboard.notifications?.items),
-    [dashboard.notifications?.items]
+    () => normaliseNotifications(notificationsSource.items),
+    [notificationsSource.items]
   );
-  const notificationsTotal = dashboard.notifications?.total ?? notifications.length;
-  const blog = useMemo(() => normaliseBlog(dashboard.blog), [dashboard.blog]);
-  const privacySettings = dashboard.settings?.privacy ?? null;
-  const messagingSettings = dashboard.settings?.messaging ?? null;
-  const followerSummary = dashboard.followers ?? null;
-  const unreadMessages = dashboard.notifications?.unreadMessages ?? 0;
+  const notificationsTotal = notificationsSource.total ?? notifications.length;
+  const blog = useMemo(() => normaliseBlog(dashboard?.blog), [dashboard?.blog]);
+  const privacySettings = settings.privacy ?? null;
+  const messagingSettings = settings.messaging ?? null;
+  const followerSummary = dashboard?.followers ?? null;
+  const unreadMessages = notificationsSource.unreadMessages ?? 0;
 
   return (
     <div className="space-y-10">
