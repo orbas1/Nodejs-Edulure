@@ -4031,6 +4031,12 @@ export default class DashboardService {
       averageResponseMinutes: 0,
       latestUpdatedAt: null
     };
+    let growthInitiativesRaw = [];
+    let growthExperimentsByInitiative = new Map();
+    let affiliateChannelsRaw = [];
+    let affiliatePayoutsRaw = [];
+    let adCampaignsRaw = [];
+    let instructorApplicationRaw = null;
     try {
       supportCases = await LearnerSupportRepository.listCases(user.id);
       const responseDurations = [];
@@ -4422,10 +4428,10 @@ export default class DashboardService {
         financialProfile,
         financePurchasesRaw,
         systemPreferencesRaw,
-        growthInitiativesRaw,
-        affiliateChannelsRaw,
-        adCampaignsRaw,
-        instructorApplicationRaw
+        growthInitiativesData,
+        affiliateChannelsData,
+        adCampaignsData,
+        instructorApplicationData
       ] = await Promise.all([
         LearnerPaymentMethodModel.listByUserId(user.id),
         LearnerBillingContactModel.listByUserId(user.id),
@@ -4438,12 +4444,17 @@ export default class DashboardService {
         InstructorApplicationModel.findByUserId(user.id)
       ]);
 
+      growthInitiativesRaw = growthInitiativesData;
+      affiliateChannelsRaw = affiliateChannelsData;
+      adCampaignsRaw = adCampaignsData;
+      instructorApplicationRaw = instructorApplicationData;
+
       const affiliateChannelIds = affiliateChannelsRaw.map((channel) => channel.id).filter(Boolean);
-      const affiliatePayoutsRaw = affiliateChannelIds.length
+      affiliatePayoutsRaw = affiliateChannelIds.length
         ? await LearnerAffiliatePayoutModel.listByChannelIds(affiliateChannelIds)
         : [];
 
-      const growthExperimentsByInitiative = new Map();
+      growthExperimentsByInitiative = new Map();
       if (growthInitiativesRaw.length) {
         await Promise.all(
           growthInitiativesRaw.map(async (initiative) => {
@@ -4961,14 +4972,14 @@ export default class DashboardService {
           financePurchases: financePurchasesRaw,
           financeSubscriptions: financeSubscriptionsDetailed,
           systemPreferences: systemPreferencesRaw,
-          growthInitiatives: [],
-          growthExperimentsByInitiative: new Map(),
-          affiliateChannels: [],
-          affiliatePayouts: [],
-          adCampaigns: [],
-          instructorApplication: null,
-          supportCases: [],
-          supportMetrics: DEFAULT_SUPPORT_METRICS
+          growthInitiatives: growthInitiativesRaw,
+          growthExperimentsByInitiative,
+          affiliateChannels: affiliateChannelsRaw,
+          affiliatePayouts: affiliatePayoutsRaw,
+          adCampaigns: adCampaignsRaw,
+          instructorApplication: instructorApplicationRaw,
+          supportCases,
+          supportMetrics
         }) ?? undefined;
 
       communitySnapshot =
