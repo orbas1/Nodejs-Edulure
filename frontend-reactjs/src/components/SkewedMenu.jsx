@@ -6,19 +6,20 @@ const menuStates = {
   community: ['Community', 'Classroom', 'Calendar', 'Members', 'Map', 'Leaderboards', 'About']
 };
 
-export default function SkewedMenu({ activeState = 'all', onSelect, activeItem }) {
-  const items = menuStates[activeState];
+export default function SkewedMenu({ activeState = 'all', onSelect, activeItem, items }) {
+  const resolvedItems = items?.length ? items : menuStates[activeState] ?? menuStates.all;
 
   return (
     <div className="relative overflow-hidden rounded-3xl bg-white/70">
       <div className="pointer-events-none absolute inset-y-0 left-0 w-1/5 -skew-x-12 bg-primary/10" aria-hidden />
       <nav className="relative flex gap-3 overflow-x-auto py-4" aria-label={`${activeState} navigation`}>
-        {items.map((item) => {
+        {resolvedItems.map((item) => {
           const isActive = activeItem === item;
           return (
             <button
               key={item}
               onClick={() => onSelect?.(item)}
+              aria-pressed={isActive ? 'true' : 'false'}
               className={clsx(
                 'rounded-full px-5 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                 isActive ? 'bg-primary text-white shadow-card' : 'bg-white text-slate-600 border border-slate-200 hover:border-primary hover:text-primary'
@@ -36,5 +37,13 @@ export default function SkewedMenu({ activeState = 'all', onSelect, activeItem }
 SkewedMenu.propTypes = {
   activeState: PropTypes.oneOf(Object.keys(menuStates)),
   onSelect: PropTypes.func,
-  activeItem: PropTypes.string
+  activeItem: PropTypes.string,
+  items: PropTypes.arrayOf(PropTypes.string)
+};
+
+SkewedMenu.defaultProps = {
+  activeState: 'all',
+  onSelect: undefined,
+  activeItem: undefined,
+  items: undefined
 };

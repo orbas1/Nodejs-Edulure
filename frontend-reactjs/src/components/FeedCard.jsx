@@ -1,6 +1,31 @@
+import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 
 const numberFormatter = new Intl.NumberFormat('en-US');
+const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:']);
+
+function normaliseLinkAttachments(attachments) {
+  if (!Array.isArray(attachments)) return [];
+
+  return attachments
+    .filter((attachment) => attachment?.type === 'link' && typeof attachment.url === 'string')
+    .map((attachment) => {
+      try {
+        const parsed = new URL(attachment.url);
+        if (!SAFE_URL_PROTOCOLS.has(parsed.protocol)) {
+          return null;
+        }
+        return {
+          id: attachment.id ?? attachment.url,
+          label: attachment.label ?? parsed.hostname.replace(/^www\./, ''),
+          url: parsed.toString()
+        };
+      } catch (error) {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
 
 function formatRelativeTime(timestamp) {
   if (!timestamp) return 'Just now';
@@ -26,27 +51,58 @@ function formatRelativeTime(timestamp) {
 export default function FeedCard({ post, onModerate, onRemove, actionState }) {
   const publishedLabel = formatRelativeTime(post.publishedAt);
   const communityName = post.community?.name;
-  const tags = Array.isArray(post.tags) ? post.tags : [];
+  const tags = useMemo(() => {
+    if (!Array.isArray(post.tags)) return [];
+    return post.tags
+      .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+      .filter(Boolean)
+      .slice(0, 8);
+  }, [post.tags]);
   const reactions = post.stats?.reactions ?? 0;
   const comments = post.stats?.comments ?? 0;
   const canModerate = Boolean(post.permissions?.canModerate && typeof onModerate === 'function');
   const canRemove = Boolean(post.permissions?.canRemove && typeof onRemove === 'function');
   const isSuppressed = post.moderation?.state === 'suppressed';
+  const moderateAction = isSuppressed ? 'restore' : 'suppress';
   const isProcessing = Boolean(actionState?.isProcessing);
   const actionError = actionState?.error;
+  const [isAvatarBroken, setIsAvatarBroken] = useState(false);
+  const authorName = post.author?.name ?? 'Community member';
+  const authorEmail = post.author?.email ?? '';
+  const authorInitials = useMemo(() => {
+    const source = authorName || authorEmail;
+    return source
+      .split(' ')
+      .map((part) => part.charAt(0))
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'E';
+  }, [authorName, authorEmail]);
+  const bodyCopy = post.body?.trim() || 'No update provided.';
+  const title = post.title?.trim();
+  const avatarUrl = post.author?.avatarUrl;
+  const linkAttachments = normaliseLinkAttachments(post.attachments);
+  const moderationReason = post.moderation?.reason;
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-start gap-4">
-        <img
-          src={post.author?.avatarUrl}
-          alt={post.author?.name}
-          className="h-12 w-12 rounded-full object-cover"
-        />
+        {avatarUrl && !isAvatarBroken ? (
+          <img
+            src={avatarUrl}
+            alt={authorName}
+            className="h-12 w-12 rounded-full object-cover"
+            onError={() => setIsAvatarBroken(true)}
+          />
+        ) : (
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary" aria-hidden="true">
+            {authorInitials}
+          </span>
+        )}
         <div className="flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-base font-semibold text-slate-900">{post.author?.name}</h3>
+              <h3 className="text-base font-semibold text-slate-900">{authorName}</h3>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                 {post.author?.role ?? 'Member'}
                 {communityName && <span className="ml-1 text-slate-300">•</span>}
@@ -60,7 +116,7 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
                   {canModerate && (
                     <button
                       type="button"
-                      onClick={() => onModerate(post, isSuppressed ? 'restore' : 'suppress')}
+                      onClick={() => onModerate(post, moderateAction)}
                       disabled={isProcessing}
                       className="rounded-full border border-primary/40 px-3 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -81,8 +137,27 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
               )}
             </div>
           </div>
-          {post.title && <h4 className="mt-4 break-words text-sm font-semibold text-slate-900">{post.title}</h4>}
-          <p className="mt-3 break-words text-sm leading-6 text-slate-700">{post.body}</p>
+          {title && <h4 className="mt-4 break-words text-sm font-semibold text-slate-900">{title}</h4>}
+          <p className="mt-3 break-words text-sm leading-6 text-slate-700">{bodyCopy}</p>
+          {linkAttachments.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Shared links</p>
+              <ul className="space-y-2">
+                {linkAttachments.map((attachment) => (
+                  <li key={attachment.id}>
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
+                    >
+                      Visit {attachment.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-primary">
               {tags.map((tag) => (
@@ -91,6 +166,18 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
                 </span>
               ))}
             </div>
+          )}
+          {isSuppressed && (
+            <div
+              className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700"
+              role="status"
+              aria-live="polite"
+            >
+              Post is hidden from members
+            </div>
+          )}
+          {moderationReason && (
+            <p className="mt-2 text-xs text-amber-500">Reason: {moderationReason}</p>
           )}
           <div className="mt-6 flex flex-wrap items-center gap-6 text-sm text-slate-500">
             <div className="flex items-center gap-2">
@@ -107,7 +194,7 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
             </div>
           </div>
           {actionError && (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600" role="alert">
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600" role="alert" aria-live="assertive">
               {actionError}
             </div>
           )}
@@ -121,7 +208,7 @@ FeedCard.propTypes = {
   post: PropTypes.shape({
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
     title: PropTypes.string,
-    body: PropTypes.string.isRequired,
+    body: PropTypes.string,
     publishedAt: PropTypes.string,
     tags: PropTypes.arrayOf(PropTypes.string),
     community: PropTypes.shape({
@@ -132,9 +219,10 @@ FeedCard.propTypes = {
     author: PropTypes.shape({
       id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
       name: PropTypes.string,
+      email: PropTypes.string,
       role: PropTypes.string,
       avatarUrl: PropTypes.string
-    }).isRequired,
+    }),
     stats: PropTypes.shape({
       reactions: PropTypes.number,
       comments: PropTypes.number
@@ -142,6 +230,18 @@ FeedCard.propTypes = {
     permissions: PropTypes.shape({
       canModerate: PropTypes.bool,
       canRemove: PropTypes.bool
+    }),
+    attachments: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        type: PropTypes.string,
+        url: PropTypes.string,
+        label: PropTypes.string
+      })
+    ),
+    moderation: PropTypes.shape({
+      state: PropTypes.string,
+      reason: PropTypes.string
     })
   }).isRequired,
   onModerate: PropTypes.func,
