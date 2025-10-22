@@ -112,11 +112,11 @@ export function paginated(
     Object.entries({
       limit: safePagination.limit,
       offset: safePagination.offset,
-      page: safePagination.page,
-      perPage: safePagination.perPage,
-      total: safePagination.total,
-      totalPages: safePagination.totalPages
-    }).filter(([, value]) => value !== undefined && value !== null)
+      page: safePagination.page ?? null,
+      perPage: safePagination.perPage ?? null,
+      total: safePagination.total ?? null,
+      totalPages: safePagination.totalPages ?? null
+    }).filter(([, value]) => value !== undefined)
   );
 
   return success(res, {

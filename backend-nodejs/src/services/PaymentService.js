@@ -1029,6 +1029,7 @@ class PaymentService {
     const charge = paymentIntentPayload.charges?.data?.[0];
 
     await db.transaction(async (trx) => {
+      const financeConnection = resolveFinanceConnection(trx);
       const intent = await PaymentIntentModel.findByProviderIntentId(providerIntentId, trx);
       if (!intent) {
         logger.warn({ providerIntentId }, 'Received success webhook for unknown payment intent');
