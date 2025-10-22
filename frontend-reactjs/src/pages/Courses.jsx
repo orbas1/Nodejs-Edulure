@@ -1525,18 +1525,8 @@ export default function Courses() {
   ]);
 
   return (
-    <div className="bg-slate-100 pb-24">
-      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6 py-16">
-        <header className="space-y-6">
-          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            Course operations
-          </span>
-          <h1 className="text-4xl font-semibold text-slate-900">Courses, fully instrumented</h1>
-          <p className="max-w-3xl text-sm text-slate-600">
-            Build, update and scale every cohort from one surface. The course marketplace, explorer search and production-ready CRUD console live together so your team can ship confidently.
-          </p>
-        </header>
-
+    <div className="bg-slate-100 pb-24 pt-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6">
         <section className="space-y-10">
           <ExplorerSearchSection {...EXPLORER_CONFIG} />
         </section>

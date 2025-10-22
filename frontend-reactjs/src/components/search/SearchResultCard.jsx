@@ -62,19 +62,45 @@ export default function SearchResultCard({ entityType, hit }) {
   const readingTime = formatDuration(hit.metrics?.readingTimeMinutes ?? hit.raw?.readingTimeMinutes);
   const location = hit.geo?.country ?? hit.raw?.country ?? hit.metrics?.location;
   const availability = hit.metrics?.startAt ?? hit.raw?.startAt ?? hit.metrics?.upcomingSession;
+  const imageUrl =
+    hit.imageUrl ??
+    hit.coverImageUrl ??
+    hit.thumbnailUrl ??
+    hit.avatarUrl ??
+    hit.raw?.coverImageUrl ??
+    hit.raw?.thumbnailUrl ??
+    hit.raw?.avatarUrl ??
+    null;
 
   return (
-    <article className="group flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex-1">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+    <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
+      <div className="grid gap-6 lg:grid-cols-[320px,1fr] lg:items-start">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-100 bg-slate-100/80 shadow-inner">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={hit.title ?? hit.name ?? 'Search result'}
+              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/10 via-primary/5 to-primary/20 p-6 text-center text-sm font-semibold text-primary">
+              <Icon className="h-10 w-10" />
+              <span>Visual preview coming soon</span>
+            </div>
+          )}
+          <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary shadow-sm">
             <Icon className="h-4 w-4" /> {entityType.replace('-', ' ')}
           </div>
-          <h3 className="mt-3 text-2xl font-semibold text-slate-900">{hit.title ?? hit.name}</h3>
-          {hit.subtitle ? <p className="text-sm font-medium text-slate-500">{hit.subtitle}</p> : null}
-          {hit.description ? <p className="mt-3 text-sm leading-relaxed text-slate-600">{hit.description}</p> : null}
+        </div>
+        <div className="flex flex-col gap-4">
+          <div>
+            <h3 className="text-2xl font-semibold text-slate-900">{hit.title ?? hit.name}</h3>
+            {hit.subtitle ? <p className="mt-1 text-sm font-medium text-slate-500">{hit.subtitle}</p> : null}
+            {hit.description ? <p className="mt-3 text-sm leading-relaxed text-slate-600">{hit.description}</p> : null}
+          </div>
           {hit.tags?.length ? (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
               {hit.tags.slice(0, 8).map((tag) => (
                 <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                   #{tag}
@@ -82,13 +108,12 @@ export default function SearchResultCard({ entityType, hit }) {
               ))}
             </div>
           ) : null}
-        </div>
-        <div className="grid grid-cols-2 gap-4 text-center text-sm text-slate-600 sm:grid-cols-3">
-          {price ? (
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                <CurrencyDollarIcon className="h-4 w-4" /> Price
-              </p>
+          <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+            {price ? (
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <CurrencyDollarIcon className="h-4 w-4" /> Price
+                </p>
               <p className="mt-2 text-lg font-semibold text-slate-900">{price}</p>
             </div>
           ) : null}
@@ -126,6 +151,7 @@ export default function SearchResultCard({ entityType, hit }) {
               <p className="mt-2 text-sm font-semibold text-emerald-600">{availability}</p>
             </div>
           ) : null}
+          </div>
         </div>
       </div>
       {hit.actions?.length ? (

@@ -613,7 +613,7 @@ export function parseCliArguments(argv = []) {
   }
 
   for (let i = 0; i < args.length; i += 1) {
-    let arg = args[i];
+    const arg = args[i];
 
     if (!arg || typeof arg !== 'string') {
       continue;

@@ -14,6 +14,41 @@ import ExplorerSearchSection from '../components/search/ExplorerSearchSection.js
 import BlogSearchSection from '../components/search/BlogSearchSection.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 
+const CATEGORY_OPTIONS = [
+  { label: 'Automation', value: 'automation' },
+  { label: 'Growth', value: 'growth' },
+  { label: 'Operations', value: 'operations' },
+  { label: 'Design', value: 'design' },
+  { label: 'Revenue', value: 'revenue' },
+  { label: 'Enablement', value: 'enablement' }
+];
+
+const LANGUAGE_OPTIONS = [
+  { label: 'English', value: 'en' },
+  { label: 'Spanish', value: 'es' },
+  { label: 'Portuguese', value: 'pt' },
+  { label: 'French', value: 'fr' },
+  { label: 'Japanese', value: 'ja' }
+];
+
+const COUNTRY_OPTIONS = [
+  { label: 'United States', value: 'US' },
+  { label: 'United Kingdom', value: 'GB' },
+  { label: 'Brazil', value: 'BR' },
+  { label: 'Portugal', value: 'PT' },
+  { label: 'Japan', value: 'JP' },
+  { label: 'India', value: 'IN' }
+];
+
+const TAG_OPTIONS = [
+  { label: 'Automation', value: 'automation' },
+  { label: 'Retention', value: 'retention' },
+  { label: 'Monetisation', value: 'monetisation' },
+  { label: 'Analytics', value: 'analytics' },
+  { label: 'Trust & Safety', value: 'trust' },
+  { label: 'Playbooks', value: 'playbooks' }
+];
+
 const SECTION_CONFIG = [
   {
     entityType: 'communities',
@@ -41,22 +76,25 @@ const SECTION_CONFIG = [
         key: 'category',
         label: 'Category',
         type: 'multi',
-        options: [
-          { label: 'Automation', value: 'automation' },
-          { label: 'Growth', value: 'growth' },
-          { label: 'Operations', value: 'operations' },
-          { label: 'Design', value: 'design' }
-        ]
+        options: CATEGORY_OPTIONS
       },
       {
         key: 'languages',
         label: 'Languages',
         type: 'multi',
-        options: [
-          { label: 'English', value: 'en' },
-          { label: 'Spanish', value: 'es' },
-          { label: 'Portuguese', value: 'pt' }
-        ]
+        options: LANGUAGE_OPTIONS
+      },
+      {
+        key: 'country',
+        label: 'Country',
+        type: 'multi',
+        options: COUNTRY_OPTIONS
+      },
+      {
+        key: 'tags',
+        label: 'Tags',
+        type: 'multi',
+        options: TAG_OPTIONS
       }
     ]
   },
@@ -75,6 +113,12 @@ const SECTION_CONFIG = [
       { label: 'Price: high to low', value: 'priceHigh' }
     ],
     filterDefinitions: [
+      {
+        key: 'category',
+        label: 'Category',
+        type: 'multi',
+        options: CATEGORY_OPTIONS
+      },
       {
         key: 'level',
         label: 'Level',
@@ -99,6 +143,24 @@ const SECTION_CONFIG = [
         key: 'price.amount',
         label: 'Price (USD)',
         type: 'range'
+      },
+      {
+        key: 'languages',
+        label: 'Languages',
+        type: 'multi',
+        options: LANGUAGE_OPTIONS
+      },
+      {
+        key: 'tags',
+        label: 'Tags',
+        type: 'multi',
+        options: TAG_OPTIONS
+      },
+      {
+        key: 'country',
+        label: 'Country',
+        type: 'multi',
+        options: COUNTRY_OPTIONS
       }
     ]
   },
@@ -120,17 +182,24 @@ const SECTION_CONFIG = [
         key: 'categories',
         label: 'Categories',
         type: 'multi',
-        options: [
-          { label: 'Playbooks', value: 'playbook' },
-          { label: 'Operations', value: 'operations' },
-          { label: 'Growth', value: 'growth' },
-          { label: 'Leadership', value: 'leadership' }
-        ]
+        options: CATEGORY_OPTIONS
       },
       {
         key: 'readingTimeMinutes',
         label: 'Reading time (minutes)',
         type: 'range'
+      },
+      {
+        key: 'languages',
+        label: 'Languages',
+        type: 'multi',
+        options: LANGUAGE_OPTIONS
+      },
+      {
+        key: 'tags',
+        label: 'Tags',
+        type: 'multi',
+        options: TAG_OPTIONS
       }
     ]
   },
@@ -158,11 +227,7 @@ const SECTION_CONFIG = [
         key: 'languages',
         label: 'Languages',
         type: 'multi',
-        options: [
-          { label: 'English', value: 'en' },
-          { label: 'Japanese', value: 'ja' },
-          { label: 'Spanish', value: 'es' }
-        ]
+        options: LANGUAGE_OPTIONS
       },
       {
         key: 'skills',
@@ -173,6 +238,12 @@ const SECTION_CONFIG = [
           { label: 'Curriculum design', value: 'curriculum' },
           { label: 'Growth marketing', value: 'growth' }
         ]
+      },
+      {
+        key: 'country',
+        label: 'Country',
+        type: 'multi',
+        options: COUNTRY_OPTIONS
       }
     ]
   },
@@ -203,11 +274,13 @@ const SECTION_CONFIG = [
         key: 'languages',
         label: 'Languages',
         type: 'multi',
-        options: [
-          { label: 'English', value: 'en' },
-          { label: 'French', value: 'fr' },
-          { label: 'Hindi', value: 'hi' }
-        ]
+        options: LANGUAGE_OPTIONS
+      },
+      {
+        key: 'tags',
+        label: 'Tags',
+        type: 'multi',
+        options: TAG_OPTIONS
       }
     ]
   },
@@ -237,6 +310,17 @@ const SECTION_CONFIG = [
         key: 'isTicketed',
         label: 'Ticketed',
         type: 'boolean'
+      },
+      {
+        key: 'timezone',
+        label: 'Timezone',
+        type: 'multi',
+        options: [
+          { label: 'UTC', value: 'UTC' },
+          { label: 'ET', value: 'America/New_York' },
+          { label: 'PT', value: 'America/Los_Angeles' },
+          { label: 'BST', value: 'Europe/London' }
+        ]
       }
     ]
   }
@@ -379,22 +463,13 @@ export default function Explorer() {
   });
 
   return (
-    <div className="bg-slate-100 pb-24">
-      <div className="mx-auto flex max-w-7xl flex-col gap-16 px-6 py-16">
-        <header className="space-y-6 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            Explorer
-          </span>
-          <h1 className="text-4xl font-semibold text-slate-900">Operational discovery, production ready</h1>
-          <p className="mx-auto max-w-3xl text-sm text-slate-600">
-            Orchestrate community scouting, course procurement, live classroom scheduling and content sourcing from one interactive surface. Every search ships with full CRUD, analytics, and community-aware guardrails.
-          </p>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {HIGHLIGHTS.map((item) => (
-              <HighlightCard key={item.title} {...item} />
-            ))}
-          </div>
-        </header>
+    <div className="bg-slate-100 pb-24 pt-10">
+      <div className="mx-auto flex max-w-7xl flex-col gap-16 px-6">
+        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {HIGHLIGHTS.map((item) => (
+            <HighlightCard key={item.title} {...item} />
+          ))}
+        </section>
 
         <CommunityAccessPanel />
 

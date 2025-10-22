@@ -1,4 +1,5 @@
-const JSON_EMPTY_OBJECT = JSON.stringify({});
+import { jsonDefault } from './_helpers/utils.js';
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 
 export async function up(knex) {
   await knex.schema.createTable('integration_webhook_receipts', (table) => {
@@ -7,7 +8,7 @@ export async function up(knex) {
     table.string('external_event_id', 255).notNullable();
     table.string('signature', 255).nullable();
     table.string('payload_hash', 128).notNullable();
-    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
     table.string('status', 32).notNullable().defaultTo('received');
     table.text('error_message').nullable();
     table.timestamp('received_at').notNullable().defaultTo(knex.fn.now());

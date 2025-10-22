@@ -1320,19 +1320,8 @@ export default function Ebooks() {
   ]);
 
   return (
-    <div className="bg-slate-100 pb-24">
-      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6 py-16">
-        <header className="space-y-6">
-          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            Publishing
-          </span>
-          <h1 className="text-4xl font-semibold text-slate-900">E-book marketplace, ready for production</h1>
-          <p className="max-w-3xl text-sm text-slate-600">
-            Curate, publish and monetise your enablement library. The marketplace below is fully live with CRUD workflows,
-            analytics-ready metadata and saved search experiences.
-          </p>
-        </header>
-
+    <div className="bg-slate-100 pb-24 pt-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6">
         <section className="space-y-10">
           <ExplorerSearchSection {...EXPLORER_CONFIG} />
         </section>

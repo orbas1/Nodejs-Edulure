@@ -1,141 +1,198 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
+import db from '../config/database.js';
 import { env } from '../config/env.js';
+import logger from '../config/logger.js';
+import TwoFactorChallengeModel from '../models/TwoFactorChallengeModel.js';
+import PlatformSettingModel from '../models/PlatformSettingModel.js';
+import { MailService } from './MailService.js';
 
-const AES_ALGORITHM = 'aes-256-gcm';
-const ENCRYPTION_KEY = env.security.twoFactor.encryptionKey;
-const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const mailService = new MailService();
+const SECURITY_SETTINGS_KEY = 'security';
+const ALWAYS_ENFORCED_ROLES = new Set(
+  env.security.twoFactor.requiredRoles.map((role) => String(role).trim().toLowerCase()).filter(Boolean)
+);
+if (!ALWAYS_ENFORCED_ROLES.size) {
+  ALWAYS_ENFORCED_ROLES.add('admin');
+}
+const enforcedRoles = new Set(ALWAYS_ENFORCED_ROLES);
+
+function normaliseRole(value) {
+  if (!value) {
+    return '';
+  }
+
+  return String(value).trim().toLowerCase();
+}
+
+function rebuildEnforcedRoles(enforcement = {}) {
+  const nextRoles = new Set(ALWAYS_ENFORCED_ROLES);
+
+  const toggles = [
+    ['instructor', enforcement.requiredForInstructors],
+    ['finance', enforcement.requiredForFinance]
+  ];
+
+  for (const [role, enabled] of toggles) {
+    if (enabled) {
+      nextRoles.add(role);
+    }
+  }
+
+  if (Array.isArray(enforcement.additionalRoles)) {
+    for (const role of enforcement.additionalRoles) {
+      const normalized = normaliseRole(role);
+      if (normalized) {
+        nextRoles.add(normalized);
+      }
+    }
+  }
+
+  enforcedRoles.clear();
+  for (const role of nextRoles) {
+    enforcedRoles.add(role);
+  }
+}
+
+function updateTwoFactorEnforcement(enforcement = {}) {
+  rebuildEnforcedRoles(enforcement);
+}
+
+async function primeEnforcementFromPlatformSettings() {
+  try {
+    const record = await PlatformSettingModel.findByKey(SECURITY_SETTINGS_KEY);
+    const enforcement = record?.value?.enforcement;
+    if (enforcement && typeof enforcement === 'object') {
+      rebuildEnforcedRoles(enforcement);
+    }
+  } catch (error) {
+    logger.warn({ err: error }, 'Failed to hydrate two-factor enforcement policy from platform settings');
+  }
+}
+
+void primeEnforcementFromPlatformSettings();
 
 function coerceBoolean(value) {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-  if (typeof value === 'number') {
-    return value !== 0;
-  }
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase();
-    if (!normalized) {
-      return false;
-    }
-    if (['true', '1', 'yes', 'on'].includes(normalized)) {
-      return true;
-    }
-    if (['false', '0', 'no', 'off'].includes(normalized)) {
-      return false;
-    }
+    if (!normalized) return false;
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off'].includes(normalized)) return false;
     const parsed = Number.parseInt(normalized, 10);
     if (!Number.isNaN(parsed)) {
       return parsed !== 0;
     }
   }
-  if (value == null) {
-    return false;
-  }
+  if (value == null) return false;
   return Boolean(value);
 }
 
-function base32Encode(buffer) {
-  let bits = '';
-  for (const byte of buffer) {
-    bits += byte.toString(2).padStart(8, '0');
+function sanitizeCode(value) {
+  if (!value) {
+    return '';
   }
-  let output = '';
-  for (let i = 0; i < bits.length; i += 5) {
-    const chunk = bits.slice(i, i + 5);
-    const padded = chunk.padEnd(5, '0');
-    const index = parseInt(padded, 2);
-    output += BASE32_ALPHABET[index];
-  }
-  return output;
+  return String(value).replace(/\D+/g, '').slice(0, env.security.twoFactor.digits);
 }
 
-function base32Decode(secret) {
-  const sanitized = String(secret ?? '')
-    .toUpperCase()
-    .replace(/[^A-Z2-7]/g, '');
-  let bits = '';
-  for (const char of sanitized) {
-    const value = BASE32_ALPHABET.indexOf(char);
-    if (value === -1) {
-      throw new Error('Invalid base32 character in two-factor secret.');
+function generateCode() {
+  const digits = env.security.twoFactor.digits;
+  const max = 10 ** digits;
+  const code = crypto.randomInt(0, max);
+  return code.toString().padStart(digits, '0');
+}
+
+function hashCode(code) {
+  return crypto.createHash('sha256').update(code).digest('hex');
+}
+
+function getDisplayName(user) {
+  const parts = [user.firstName ?? user.first_name, user.lastName ?? user.last_name]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter(Boolean);
+  return parts.length ? parts.join(' ') : user.email;
+}
+
+async function issueChallenge(user, context = {}, connection = db) {
+  await TwoFactorChallengeModel.purgeExpired(connection);
+
+  const latest = await TwoFactorChallengeModel.findLatestActive(user.id, connection);
+  const cooldownMs = env.security.twoFactor.resendCooldownSeconds * 1000;
+  if (latest) {
+    const createdAt = latest.created_at ? new Date(latest.created_at) : null;
+    if (createdAt && Date.now() - createdAt.getTime() < cooldownMs) {
+      return {
+        challengeId: latest.id,
+        delivered: false,
+        expiresAt: latest.expires_at,
+        resendAvailableAt: new Date(createdAt.getTime() + cooldownMs)
+      };
     }
-    bits += value.toString(2).padStart(5, '0');
   }
-  const bytes = [];
-  for (let i = 0; i + 8 <= bits.length; i += 8) {
-    const chunk = bits.slice(i, i + 8);
-    bytes.push(parseInt(chunk, 2));
+
+  await TwoFactorChallengeModel.invalidateActive(user.id, connection);
+
+  const code = generateCode();
+  const expiresAt = new Date(Date.now() + env.security.twoFactor.challengeTtlSeconds * 1000);
+  const challenge = await TwoFactorChallengeModel.create(
+    {
+      userId: user.id,
+      tokenHash: hashCode(code),
+      deliveryChannel: 'email',
+      expiresAt
+    },
+    connection
+  );
+
+  try {
+    await mailService.sendTwoFactorCode({
+      to: user.email,
+      name: getDisplayName(user),
+      code,
+      expiresAt,
+      context
+    });
+  } catch (error) {
+    logger.error({ err: error, userId: user.id }, 'Failed to dispatch two-factor OTP');
+    throw error;
   }
-  return Buffer.from(bytes);
+
+  return { challengeId: challenge.id, delivered: true, expiresAt };
 }
 
-function generateSecret(byteLength = 20) {
-  return base32Encode(crypto.randomBytes(byteLength));
-}
-
-function encryptSecret(secret) {
-  if (!secret) {
-    throw new Error('Two-factor secret cannot be empty.');
+async function verifyChallenge(userId, code, connection = db) {
+  const normalized = sanitizeCode(code);
+  if (!normalized) {
+    return { valid: false, reason: 'missing_code' };
   }
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(AES_ALGORITHM, ENCRYPTION_KEY, iv);
-  const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return Buffer.concat([iv, authTag, encrypted]).toString('base64');
-}
 
-function decryptSecret(payload) {
-  if (!payload) {
-    throw new Error('Two-factor secret payload missing.');
+  const tokenHash = hashCode(normalized);
+  const challenge = await TwoFactorChallengeModel.findActiveByHash(userId, tokenHash, connection);
+
+  if (!challenge) {
+    const latest = await TwoFactorChallengeModel.findLatestActive(userId, connection);
+    if (latest) {
+      await TwoFactorChallengeModel.incrementAttempts(latest.id, connection);
+      const attemptLimit = env.security.twoFactor.maxAttemptsPerChallenge;
+      if (attemptLimit > 0 && latest.attempt_count + 1 >= attemptLimit) {
+        await TwoFactorChallengeModel.consume(latest.id, 'max_attempts', connection);
+        return { valid: false, reason: 'max_attempts' };
+      }
+    }
+    return { valid: false, reason: 'not_found' };
   }
-  const buffer = Buffer.from(payload, 'base64');
-  if (buffer.length <= 28) {
-    throw new Error('Stored two-factor secret payload is malformed.');
-  }
-  const iv = buffer.subarray(0, 12);
-  const authTag = buffer.subarray(12, 28);
-  const encrypted = buffer.subarray(28);
-  const decipher = crypto.createDecipheriv(AES_ALGORITHM, ENCRYPTION_KEY, iv);
-  decipher.setAuthTag(authTag);
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-  return decrypted.toString('utf8');
-}
 
-function hotp(secretBuffer, counter, digits) {
-  const counterBuffer = Buffer.alloc(8);
-  counterBuffer.writeBigUInt64BE(BigInt(counter));
-  const digest = crypto.createHmac('sha1', secretBuffer).update(counterBuffer).digest();
-  const offset = digest[digest.length - 1] & 0x0f;
-  const code =
-    ((digest[offset] & 0x7f) << 24) |
-    ((digest[offset + 1] & 0xff) << 16) |
-    ((digest[offset + 2] & 0xff) << 8) |
-    (digest[offset + 3] & 0xff);
-  const modulus = 10 ** digits;
-  return (code % modulus).toString().padStart(digits, '0');
-}
-
-function generateTotp(secret, timestamp = Date.now()) {
-  const decodedSecret = base32Decode(secret);
-  const stepMs = env.security.twoFactor.stepSeconds * 1000;
-  const counter = Math.floor(timestamp / stepMs);
-  return hotp(decodedSecret, counter, env.security.twoFactor.digits);
-}
-
-function generateEnrollment(user) {
-  const secret = generateSecret();
-  const issuer = encodeURIComponent(env.security.twoFactor.issuer);
-  const accountLabel = encodeURIComponent(user.email);
-  const otpauthUrl = `otpauth://totp/${issuer}:${accountLabel}?secret=${secret}&issuer=${issuer}&digits=${env.security.twoFactor.digits}&period=${env.security.twoFactor.stepSeconds}`;
-  return { secret, otpauthUrl };
+  await TwoFactorChallengeModel.consume(challenge.id, 'verified', connection);
+  return { valid: true, challenge };
 }
 
 function shouldEnforceForRole(role) {
-  if (!role) {
+  const normalized = normaliseRole(role);
+  if (!normalized) {
     return false;
   }
-  return env.security.twoFactor.requiredRoles.includes(String(role).toLowerCase());
+  return enforcedRoles.has(normalized);
 }
 
 function shouldEnforceForUser(user) {
@@ -146,32 +203,6 @@ function shouldEnforceForUser(user) {
     return true;
   }
   return shouldEnforceForRole(user.role);
-}
-
-function sanitizeToken(token) {
-  if (!token) {
-    return '';
-  }
-  return String(token).replace(/\s+/g, '');
-}
-
-function verifyToken(encryptedSecret, token) {
-  const normalized = sanitizeToken(token);
-  if (!normalized) {
-    return false;
-  }
-  const secret = decryptSecret(encryptedSecret);
-  const stepMs = env.security.twoFactor.stepSeconds * 1000;
-  const window = env.security.twoFactor.window;
-  const now = Date.now();
-
-  for (let offset = -window; offset <= window; offset += 1) {
-    const timestamp = now + offset * stepMs;
-    if (generateTotp(secret, timestamp) === normalized) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function isTwoFactorEnabled(user) {
@@ -186,11 +217,11 @@ function isTwoFactorEnabled(user) {
 }
 
 export default {
-  encryptSecret,
-  decryptSecret,
-  generateEnrollment,
+  issueChallenge,
+  verifyChallenge,
   shouldEnforceForRole,
   shouldEnforceForUser,
   isTwoFactorEnabled,
-  verifyToken
+  sanitizeCode,
+  updateEnforcementPolicy: updateTwoFactorEnforcement
 };

@@ -25,6 +25,7 @@ import { mountVersionedApi } from './routes/registerApiRoutes.js';
 import { apiRouteRegistry } from './routes/routeRegistry.js';
 import { getServiceSpecDocument, getServiceSpecIndex } from './docs/serviceSpecRegistry.js';
 import { createGraphQLRouter } from './graphql/router.js';
+import { storageDescriptor, storageBuckets, localStorageConfig } from './config/storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const openApiSpec = JSON.parse(readFileSync(path.join(__dirname, 'docs/openapi.json'), 'utf8'));
@@ -152,6 +153,29 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+if (storageDescriptor.driver === 'local' && localStorageConfig?.serveStatic) {
+  const storageRoot = localStorageConfig.root;
+  app.use(
+    '/storage/public',
+    express.static(path.join(storageRoot, storageBuckets.public), {
+      fallthrough: false,
+      setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+      }
+    })
+  );
+  app.use(
+    '/storage/uploads',
+    auth(),
+    express.static(path.join(storageRoot, storageBuckets.uploads), { fallthrough: false })
+  );
+  app.use(
+    '/storage/private',
+    auth(),
+    express.static(path.join(storageRoot, storageBuckets.private), { fallthrough: false })
+  );
+}
 
 app.get('/live', (_req, res) => {
   const payload = {

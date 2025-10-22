@@ -1,4 +1,5 @@
-const JSON_EMPTY_OBJECT = JSON.stringify({});
+import { jsonDefault } from './_helpers/utils.js';
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 
 export async function up(knex) {
   await knex.schema.createTable('integration_api_key_invites', (table) => {
@@ -26,7 +27,7 @@ export async function up(knex) {
     table.string('cancelled_by', 255).nullable();
     table.timestamp('last_sent_at').nullable();
     table.integer('send_count').unsigned().notNullable().defaultTo(1);
-    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     table
       .timestamp('updated_at')

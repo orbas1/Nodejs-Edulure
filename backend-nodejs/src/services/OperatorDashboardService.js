@@ -8,10 +8,14 @@ import ComplianceService from './ComplianceService.js';
 import AuditEventService from './AuditEventService.js';
 import dataPartitionService from './DataPartitionService.js';
 import storageService from './StorageService.js';
-import * as PlatformSettingsModule from './PlatformSettingsService.js';
-
-const PlatformSettingsService =
-  PlatformSettingsModule.default ?? PlatformSettingsModule.PlatformSettingsService ?? PlatformSettingsModule;
+import PlatformSettingsService, {
+  normaliseAdminProfile as exportedNormaliseAdminProfile,
+  normalisePaymentSettings as exportedNormalisePaymentSettings,
+  normaliseEmailSettings as exportedNormaliseEmailSettings,
+  normaliseSecuritySettings as exportedNormaliseSecuritySettings,
+  normaliseFinanceSettings as exportedNormaliseFinanceSettings,
+  normaliseMonetization as exportedNormaliseMonetization
+} from './PlatformSettingsService.js';
 
 const mergeWithDefaults = (defaults, payload) => {
   const base = structuredClone(defaults);
@@ -114,17 +118,29 @@ const DEFAULT_MONETIZATION_SETTINGS_FALLBACK = Object.freeze({
 });
 
 const normaliseAdminProfile =
-  PlatformSettingsModule.normaliseAdminProfile ?? ((payload) => mergeWithDefaults(DEFAULT_ADMIN_PROFILE_FALLBACK, payload));
+  typeof exportedNormaliseAdminProfile === 'function'
+    ? exportedNormaliseAdminProfile
+    : (payload) => mergeWithDefaults(DEFAULT_ADMIN_PROFILE_FALLBACK, payload);
 const normalisePaymentSettings =
-  PlatformSettingsModule.normalisePaymentSettings ?? ((payload) => mergeWithDefaults(DEFAULT_PAYMENT_SETTINGS_FALLBACK, payload));
+  typeof exportedNormalisePaymentSettings === 'function'
+    ? exportedNormalisePaymentSettings
+    : (payload) => mergeWithDefaults(DEFAULT_PAYMENT_SETTINGS_FALLBACK, payload);
 const normaliseEmailSettings =
-  PlatformSettingsModule.normaliseEmailSettings ?? ((payload) => mergeWithDefaults(DEFAULT_EMAIL_SETTINGS_FALLBACK, payload));
+  typeof exportedNormaliseEmailSettings === 'function'
+    ? exportedNormaliseEmailSettings
+    : (payload) => mergeWithDefaults(DEFAULT_EMAIL_SETTINGS_FALLBACK, payload);
 const normaliseSecuritySettings =
-  PlatformSettingsModule.normaliseSecuritySettings ?? ((payload) => mergeWithDefaults(DEFAULT_SECURITY_SETTINGS_FALLBACK, payload));
+  typeof exportedNormaliseSecuritySettings === 'function'
+    ? exportedNormaliseSecuritySettings
+    : (payload) => mergeWithDefaults(DEFAULT_SECURITY_SETTINGS_FALLBACK, payload);
 const normaliseFinanceSettings =
-  PlatformSettingsModule.normaliseFinanceSettings ?? ((payload) => mergeWithDefaults(DEFAULT_FINANCE_SETTINGS_FALLBACK, payload));
+  typeof exportedNormaliseFinanceSettings === 'function'
+    ? exportedNormaliseFinanceSettings
+    : (payload) => mergeWithDefaults(DEFAULT_FINANCE_SETTINGS_FALLBACK, payload);
 const normaliseMonetization =
-  PlatformSettingsModule.normaliseMonetization ?? ((payload) => mergeWithDefaults(DEFAULT_MONETIZATION_SETTINGS_FALLBACK, payload));
+  typeof exportedNormaliseMonetization === 'function'
+    ? exportedNormaliseMonetization
+    : (payload) => mergeWithDefaults(DEFAULT_MONETIZATION_SETTINGS_FALLBACK, payload);
 
 const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 const INCIDENT_SEVERITIES = ['critical', 'high', 'medium', 'low'];

@@ -43,6 +43,7 @@ function buildIndexDefinitions(prefix) {
         'ownerId',
         'country',
         'languages',
+        'coverImageUrl',
         'createdAt',
         'updatedAt'
       ],
@@ -103,7 +104,8 @@ function buildIndexDefinitions(prefix) {
         'releaseAt',
         'updatedAt',
         'instructorId',
-        'instructorName'
+        'instructorName',
+        'thumbnailUrl'
       ],
       rankingRules: [
         'words',
@@ -151,7 +153,8 @@ function buildIndexDefinitions(prefix) {
         'readingTimeMinutes',
         'releaseAt',
         'updatedAt',
-        'watermarkId'
+        'watermarkId',
+        'coverImageUrl'
       ],
       rankingRules: [
         'words',
@@ -209,6 +212,7 @@ function buildIndexDefinitions(prefix) {
         'responseTimeMinutes',
         'availability',
         'isVerified',
+        'avatarUrl',
         'updatedAt'
       ],
       rankingRules: [
@@ -253,6 +257,7 @@ function buildIndexDefinitions(prefix) {
         'role',
         'followerCount',
         'createdAt',
+        'avatarUrl',
         'updatedAt'
       ],
       rankingRules: [
@@ -404,14 +409,6 @@ function buildIndexDefinitions(prefix) {
   }));
 }
 
-function describeNode(node, role) {
-  return {
-    host: node.host,
-    client: node.client,
-    role
-  };
-}
-
 export class SearchClusterService {
   constructor({
     adminNodes,
@@ -424,9 +421,17 @@ export class SearchClusterService {
     this.logger = loggerInstance;
     this.healthcheckIntervalMs = healthcheckIntervalMs;
     this.requestTimeoutMs = requestTimeoutMs;
-    this.adminNodes = adminNodes;
-    this.replicaNodes = replicaNodes;
-    this.readNodes = readNodes;
+    const initialiseNodes = (nodes) =>
+      (Array.isArray(nodes) ? nodes : []).map((node) => ({
+        ...node,
+        health: node.health ?? { status: 'unknown', latencyMs: null }
+      }));
+
+    this.adminNodes = initialiseNodes(adminNodes);
+    this.replicaNodes = initialiseNodes(replicaNodes);
+    this.readNodes = initialiseNodes(readNodes);
+    this.enabled = this.adminNodes.length + this.replicaNodes.length + this.readNodes.length > 0;
+    this.state = 'stopped';
     this.interval = null;
   }
 
@@ -435,15 +440,24 @@ export class SearchClusterService {
   }
 
   async start() {
+    if (!this.enabled) {
+      this.state = 'disabled';
+      this.logger.warn('Meilisearch hosts not configured; search cluster disabled');
+      return { status: 'disabled', message: 'Search cluster disabled – no Meilisearch hosts configured' };
+    }
+
+    this.state = 'starting';
     this.logger.info('Initialising Meilisearch cluster');
     try {
       await this.bootstrap();
       await this.checkClusterHealth();
     } catch (error) {
-      if (env.isDevelopment) {
+      if (!env.isProduction) {
+        this.state = 'degraded';
         this.logger.warn({ err: error }, 'Meilisearch cluster unavailable – continuing in degraded mode');
-        return;
+        return { status: 'degraded', message: 'Meilisearch cluster unavailable – running without search' };
       }
+      this.state = 'failed';
       throw error;
     }
 
@@ -455,6 +469,9 @@ export class SearchClusterService {
       }, this.healthcheckIntervalMs);
       this.interval.unref?.();
     }
+
+    this.state = 'ready';
+    return { status: 'ready', message: 'Search cluster polling active' };
   }
 
   stop() {
@@ -462,9 +479,13 @@ export class SearchClusterService {
       clearInterval(this.interval);
       this.interval = null;
     }
+    this.state = 'stopped';
   }
 
   async bootstrap() {
+    if (!this.enabled) {
+      return;
+    }
     await this.ensureIndexes();
     await this.auditSearchKeyPrivileges();
   }
@@ -574,31 +595,41 @@ export class SearchClusterService {
   }
 
   async checkClusterHealth() {
-    const nodes = [
-      ...this.adminNodes.map((node) => describeNode(node, 'primary')),
-      ...this.replicaNodes.map((node) => describeNode(node, 'replica')),
-      ...this.readNodes.map((node) => describeNode(node, 'read'))
-    ];
+    if (!this.enabled) {
+      return;
+    }
 
     const seen = new Set();
-    await Promise.all(
-      nodes.map(async ({ host, client, role }) => {
-        if (seen.has(`${role}:${host}`)) {
-          return;
-        }
-        seen.add(`${role}:${host}`);
-        try {
-          await recordSearchOperation('healthcheck', () => client.health());
-          updateSearchNodeHealth({ host, role, healthy: true });
-        } catch (error) {
-          updateSearchNodeHealth({ host, role, healthy: false });
-          this.logger.error({ err: error, host, role }, 'Meilisearch node failed healthcheck');
-        }
-      })
-    );
+    const checkNode = async (node, role) => {
+      if (!node?.host || seen.has(`${role}:${node.host}`)) {
+        return;
+      }
+
+      seen.add(`${role}:${node.host}`);
+      const started = Date.now();
+      try {
+        await recordSearchOperation('healthcheck', () => node.client.health());
+        node.health = { status: 'healthy', latencyMs: Date.now() - started };
+        updateSearchNodeHealth({ host: node.host, role, healthy: true });
+      } catch (error) {
+        node.health = { status: 'unreachable', latencyMs: null };
+        updateSearchNodeHealth({ host: node.host, role, healthy: false });
+        this.logger.error({ err: error, host: node.host, role }, 'Meilisearch node failed healthcheck');
+      }
+    };
+
+    await Promise.all([
+      ...this.adminNodes.map((node) => checkNode(node, 'primary')),
+      ...this.replicaNodes.map((node) => checkNode(node, 'replica')),
+      ...this.readNodes.map((node) => checkNode(node, 'read'))
+    ]);
   }
 
   async withAdminClient(operation, handler) {
+    if (!this.enabled) {
+      throw new Error('No Meilisearch administrative hosts configured.');
+    }
+
     if (!this.adminNodes.length && !this.replicaNodes.length) {
       throw new Error('No Meilisearch administrative hosts configured.');
     }

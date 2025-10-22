@@ -1,4 +1,4 @@
-import { jsonDefault } from './_utils.js';
+import { jsonDefault } from './_helpers/utils.js';
 
 export async function up(knex) {
   const hasShows = await knex.schema.hasTable('podcast_shows');

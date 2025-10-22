@@ -6,7 +6,7 @@ import AdsPlacementService from './AdsPlacementService.js';
 
 const ENTITY_CONFIG = {
   communities: {
-    facets: ['visibility', 'category', 'timezone', 'country', 'languages'],
+    facets: ['visibility', 'category', 'timezone', 'country', 'languages', 'tags'],
     sorts: {
       trending: ['desc(trendScore)'],
       members: ['desc(memberCount)'],
@@ -15,7 +15,7 @@ const ENTITY_CONFIG = {
     defaultSort: 'trending'
   },
   courses: {
-    facets: ['category', 'level', 'deliveryFormat', 'languages', 'price.currency'],
+    facets: ['category', 'level', 'deliveryFormat', 'languages', 'price.currency', 'tags'],
     sorts: {
       relevance: [],
       rating: ['desc(rating.average)', 'desc(rating.count)'],
@@ -26,7 +26,7 @@ const ENTITY_CONFIG = {
     defaultSort: 'relevance'
   },
   ebooks: {
-    facets: ['categories', 'languages', 'price.currency'],
+    facets: ['categories', 'languages', 'price.currency', 'tags'],
     sorts: {
       relevance: [],
       rating: ['desc(rating.average)', 'desc(rating.count)'],
@@ -259,6 +259,33 @@ function formatHit(entity, hit) {
     entityType: entity,
     raw: hit
   };
+  const pickImage = (...keys) => {
+    for (const key of keys) {
+      if (!key) continue;
+      const camelValue = hit[key];
+      if (typeof camelValue === 'string' && camelValue) {
+        return camelValue;
+      }
+      const snakeKey = key.replace(/([A-Z])/g, (match) => `_${match.toLowerCase()}`);
+      const snakeValue = hit[snakeKey];
+      if (typeof snakeValue === 'string' && snakeValue) {
+        return snakeValue;
+      }
+      if (hit.raw) {
+        const rawCamel = hit.raw[key];
+        if (typeof rawCamel === 'string' && rawCamel) {
+          return rawCamel;
+        }
+        const rawSnake = hit.raw[snakeKey];
+        if (typeof rawSnake === 'string' && rawSnake) {
+          return rawSnake;
+        }
+      }
+    }
+    return null;
+  };
+
+  base.imageUrl = pickImage('coverImageUrl', 'thumbnailUrl', 'avatarUrl', 'imageUrl');
   switch (entity) {
     case 'communities': {
       base.title = hit.name;

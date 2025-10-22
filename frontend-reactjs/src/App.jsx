@@ -24,6 +24,7 @@ import IntegrationCredentialInvite from './pages/IntegrationCredentialInvite.jsx
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
+import Setup from './pages/Setup.jsx';
 import DashboardHome from './pages/dashboard/DashboardHome.jsx';
 import LearnerCommunities from './pages/dashboard/LearnerCommunities.jsx';
 import LearnerCourses from './pages/dashboard/LearnerCourses.jsx';
@@ -150,6 +151,7 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/integrations/credential-invite/:token" element={<IntegrationCredentialInvite />} />
+        <Route path="/setup" element={<Setup />} />
       </Route>
       <Route path="/dashboard" element={<DashboardEntryRedirect />} />
       <Route

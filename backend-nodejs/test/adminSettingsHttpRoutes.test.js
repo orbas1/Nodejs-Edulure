@@ -87,7 +87,7 @@ beforeEach(() => {
 
   settingsServiceMock.getSecuritySettings.mockResolvedValue({
     enforcement: { requireAllAdmins: true },
-    methods: [{ id: 'totp', type: 'totp', enabled: true }],
+    methods: [{ id: 'email-otp', type: 'email_otp', enabled: true }],
     backup: { allowBypassCodes: true }
   });
   settingsServiceMock.updateSecuritySettings.mockImplementation(async (payload) => ({
@@ -180,7 +180,7 @@ describe('Admin settings HTTP routes', () => {
       .set('Authorization', 'Bearer admin-token');
 
     expect(response.status).toBe(200);
-    expect(response.body.data.methods[0]).toMatchObject({ type: 'totp', enabled: true });
+    expect(response.body.data.methods[0]).toMatchObject({ type: 'email_otp', enabled: true });
     expect(settingsServiceMock.getSecuritySettings).toHaveBeenCalledTimes(1);
   });
 

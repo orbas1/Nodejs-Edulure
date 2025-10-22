@@ -1,4 +1,4 @@
-import { isPostgres, jsonDefault } from './_utils.js';
+import { isPostgres, jsonDefault } from './_helpers/utils.js';
 
 export async function up(knex) {
   const hasFeatureFlagsTable = await knex.schema.hasTable('feature_flags');

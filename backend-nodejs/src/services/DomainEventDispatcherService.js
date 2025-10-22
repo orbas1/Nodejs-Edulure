@@ -137,8 +137,28 @@ export class DomainEventDispatcherService {
       'Domain event dispatcher started'
     );
 
-    this.scheduleTick();
-    this.scheduleRecovery();
+    const runInitialTick = async () => {
+      try {
+        await this.tick();
+      } catch (error) {
+        this.logger.error({ err: error }, 'Initial domain event dispatch tick failed');
+      } finally {
+        this.scheduleTick();
+      }
+    };
+
+    const runInitialRecovery = async () => {
+      try {
+        await this.recover();
+      } catch (error) {
+        this.logger.error({ err: error }, 'Initial domain event dispatcher recovery failed');
+      } finally {
+        this.scheduleRecovery();
+      }
+    };
+
+    runInitialTick();
+    runInitialRecovery();
   }
 
   stop() {

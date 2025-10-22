@@ -186,9 +186,18 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
 
     readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');
     try {
-      integrationOrchestratorService.start();
+      const orchestratorStatus = integrationOrchestratorService.start();
       registerCleanup('integration-orchestrator', () => integrationOrchestratorService.stop());
-      readiness.markReady('integration-orchestrator', 'Integration orchestrator scheduled');
+      const status = orchestratorStatus?.status ?? 'ready';
+      const message =
+        orchestratorStatus?.message ??
+        (status === 'ready' ? 'Integration orchestrator scheduled' : 'Integration orchestrator state updated');
+
+      if (status === 'disabled' || status === 'degraded') {
+        readiness.markDegraded('integration-orchestrator', message);
+      } else {
+        readiness.markReady('integration-orchestrator', message);
+      }
     } catch (error) {
       readiness.markFailed('integration-orchestrator', error);
       serviceLogger.error({ err: error }, 'Failed to start integration orchestrator');

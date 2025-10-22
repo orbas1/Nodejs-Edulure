@@ -189,6 +189,31 @@ npm run test
 npm run audit
 ```
 
+### Guided installation UI
+
+The repository now ships a browser-based installer that writes `.env.local` files, provisions the database, configures
+Meilisearch, and warms the worker + realtime gateways. After installing dependencies:
+
+1. Start the backend API in one terminal so the installer endpoints are available:
+
+   ```bash
+   npm run dev --workspace backend-nodejs
+   ```
+
+2. In a second terminal start the web app:
+
+   ```bash
+   npm run dev --workspace frontend-reactjs
+   ```
+
+3. Visit [http://localhost:5173/setup](http://localhost:5173/setup) and follow the guided steps. Provide local or Cloudflare R2
+   storage credentials, review the generated environment variables, and launch the installer. The UI streams task logs while it
+   writes environment files, applies database migrations + seeds, provisions Meilisearch indexes, lint-checks the backend, and
+   warms worker/realtime services.
+
+You can rerun individual tasks (for example, rebuilding the frontend bundle) by deselecting the steps you wish to skip before
+relaunching the installer.
+
 To spin up the entire stack with Docker:
 
 ```bash

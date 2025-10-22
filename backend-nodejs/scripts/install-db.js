@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 
+import fs from 'node:fs/promises';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { parseArgs } from 'node:util';
 
-import mysql from 'mysql2/promise';
-import knex from 'knex';
-import dotenv from 'dotenv';
+import { loadEnvironmentFiles } from '../src/config/loadEnv.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, '..');
 
-dotenv.config({ path: path.resolve(projectRoot, '.env') });
+const loadedEnvFiles = loadEnvironmentFiles({ includeExample: true });
+
+if (loadedEnvFiles.length === 0) {
+  console.warn('No environment files found. Falling back to existing process environment.');
+}
 
 const requiredEnv = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
 const missingEnv = requiredEnv.filter((key) => !process.env[key]);
@@ -27,7 +30,101 @@ if (!Number.isInteger(dbPort) || dbPort <= 0) {
   process.exit(1);
 }
 
+async function ensureSocketPathAccessible(socketPath) {
+  try {
+    await fs.access(socketPath);
+  } catch (error) {
+    const reason = error?.code === 'ENOENT' ? 'does not exist' : 'is not accessible';
+    throw new Error(`MySQL socket path "${socketPath}" ${reason}. Start the MySQL server or update DB_SOCKET_PATH.`);
+  }
+}
+
+async function ensurePortReachable({ host, port, timeoutMs }) {
+  const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000;
+
+  await new Promise((resolve, reject) => {
+    const socket = net.createConnection({ host, port });
+
+    const onError = (error) => {
+      socket.destroy();
+      reject(error);
+    };
+
+    socket.once('error', onError);
+    socket.once('connect', () => {
+      socket.end();
+      resolve();
+    });
+
+    socket.setTimeout(timeout, () => {
+      socket.destroy();
+      reject(new Error(`Timed out after ${timeout}ms attempting to connect to ${host}:${port}`));
+    });
+  });
+}
+
+async function ensureServerReachable() {
+  if (process.env.DB_SOCKET_PATH) {
+    await ensureSocketPathAccessible(process.env.DB_SOCKET_PATH);
+    return;
+  }
+
+  const host = process.env.DB_HOST;
+  const port = dbPort;
+
+  try {
+    await ensurePortReachable({ host, port, timeoutMs: Number(process.env.DB_CONNECT_TIMEOUT_MS) });
+  } catch (error) {
+    const message =
+      error.code === 'ECONNREFUSED'
+        ? `Unable to reach MySQL at ${host}:${port}. Ensure the database server is running and accepting TCP connections.`
+        : error.message;
+    throw new Error(message);
+  }
+}
+
 const knexConfig = createRequire(import.meta.url)('../knexfile.cjs');
+
+let cachedMysqlClient = null;
+let cachedKnexFactory = null;
+
+async function resolveMysqlClient() {
+  if (cachedMysqlClient) {
+    return cachedMysqlClient;
+  }
+
+  try {
+    const mysqlModule = await import('mysql2/promise');
+    cachedMysqlClient = mysqlModule?.default ?? mysqlModule;
+    return cachedMysqlClient;
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND' || error?.code === 'MODULE_NOT_FOUND') {
+      throw new Error(
+        'The mysql2 driver is not installed. Run "npm install" (or pnpm/yarn install) before executing db:install.'
+      );
+    }
+
+    throw error;
+  }
+}
+
+async function resolveKnexFactory() {
+  if (cachedKnexFactory) {
+    return cachedKnexFactory;
+  }
+
+  try {
+    const knexModule = await import('knex');
+    cachedKnexFactory = knexModule?.default ?? knexModule;
+    return cachedKnexFactory;
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND' || error?.code === 'MODULE_NOT_FOUND') {
+      throw new Error('Knex is not installed. Install project dependencies before running db:install.');
+    }
+
+    throw error;
+  }
+}
 
 function validateIdentifier(value, label, { allowWildcard = false } = {}) {
   const pattern = allowWildcard ? /^[A-Za-z0-9_%.-]+$/ : /^[A-Za-z0-9_-]+$/;
@@ -44,13 +141,21 @@ async function provisionDatabase() {
   const dbName = process.env.DB_NAME;
   validateIdentifier(dbName, 'DB_NAME');
 
-  const rootConnection = await mysql.createConnection({
-    host: process.env.DB_HOST,
-    port: dbPort,
+  const mysql = await resolveMysqlClient();
+  const connectionOptions = {
     user: process.env.DB_ROOT_USER ?? process.env.DB_USER,
     password: process.env.DB_ROOT_PASSWORD ?? process.env.DB_PASSWORD,
     multipleStatements: true
-  });
+  };
+
+  if (process.env.DB_SOCKET_PATH) {
+    connectionOptions.socketPath = process.env.DB_SOCKET_PATH;
+  } else {
+    connectionOptions.host = process.env.DB_HOST;
+    connectionOptions.port = dbPort;
+  }
+
+  const rootConnection = await mysql.createConnection(connectionOptions);
 
   try {
     await rootConnection.query(
@@ -75,7 +180,8 @@ async function provisionDatabase() {
 }
 
 async function runMigrations({ skipMigrate, skipSeed } = {}) {
-  const db = knex(knexConfig);
+  const knexFactory = await resolveKnexFactory();
+  const db = knexFactory(knexConfig);
   try {
     if (!skipMigrate) {
       await db.migrate.latest();
@@ -107,10 +213,16 @@ async function main() {
   }
 
   try {
+    await ensureServerReachable();
     await provisionDatabase();
     await runMigrations({ skipMigrate: values['skip-migrate'], skipSeed: values['skip-seed'] });
   } catch (error) {
-    console.error('Failed to provision database', error);
+    console.error('Failed to provision database', error.message ?? error);
+    if (error?.code === 'ECONNREFUSED') {
+      console.error(
+        'MySQL refused the connection. Start the database service or update DB_HOST/DB_PORT before re-running db:install.'
+      );
+    }
     process.exit(1);
   }
 }

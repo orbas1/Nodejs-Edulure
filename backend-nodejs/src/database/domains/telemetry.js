@@ -33,12 +33,30 @@ function timestampWithAutoUpdate(knex, table, column = 'updated_at') {
   table.timestamp(column).notNullable().defaultTo(knex.fn.now());
 }
 
-function jsonDefault() {
-  return JSON.stringify({});
+function jsonDefault(knex, value = {}) {
+  const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+  const dialect = resolveDialect(knex);
+
+  if (dialect.includes('pg')) {
+    return knex.raw('?::jsonb', [serialized]);
+  }
+
+  if (dialect.includes('mysql')) {
+    const raw = knex.raw('(CAST(? AS JSON))', [serialized]);
+    const wrapper = () => raw.toQuery();
+    Object.assign(wrapper, raw, {
+      isRawInstance: true,
+      toSQL: (...args) => raw.toSQL(...args),
+      toQuery: (...args) => raw.toQuery(...args)
+    });
+    return wrapper;
+  }
+
+  return serialized;
 }
 
-function arrayDefault() {
-  return JSON.stringify([]);
+function arrayDefault(knex) {
+  return jsonDefault(knex, []);
 }
 
 function createConsentLedgerTable(table, knex) {
@@ -66,8 +84,8 @@ function createConsentLedgerTable(table, knex) {
   table.timestamp('expires_at');
   table.timestamp('revoked_at');
   table.string('recorded_by', 120);
-  table.json('evidence').notNullable().defaultTo(jsonDefault());
-  table.json('metadata').notNullable().defaultTo(jsonDefault());
+  table.json('evidence').notNullable().defaultTo(jsonDefault(knex));
+  table.json('metadata').notNullable().defaultTo(jsonDefault(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
 
@@ -100,7 +118,7 @@ function createEventBatchesTable(table, knex) {
   table.string('file_key', 512);
   table.string('checksum', 128);
   table.text('error_message');
-  table.json('metadata').notNullable().defaultTo(jsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefault(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
 
@@ -154,10 +172,10 @@ function createEventsTable(table, knex) {
     .inTable(TABLES.EVENT_BATCHES)
     .onDelete('SET NULL');
   table.string('dedupe_hash', 128).notNullable();
-  table.json('payload').notNullable().defaultTo(jsonDefault());
-  table.json('context').notNullable().defaultTo(jsonDefault());
-  table.json('metadata').notNullable().defaultTo(jsonDefault());
-  table.json('tags').notNullable().defaultTo(arrayDefault());
+  table.json('payload').notNullable().defaultTo(jsonDefault(knex));
+  table.json('context').notNullable().defaultTo(jsonDefault(knex));
+  table.json('metadata').notNullable().defaultTo(jsonDefault(knex));
+  table.json('tags').notNullable().defaultTo(arrayDefault(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
 
@@ -180,7 +198,7 @@ function createFreshnessMonitorsTable(table, knex) {
     .defaultTo('healthy');
   table.integer('threshold_minutes').unsigned().notNullable().defaultTo(15);
   table.integer('lag_seconds').unsigned().notNullable().defaultTo(0);
-  table.json('metadata').notNullable().defaultTo(jsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefault(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
 }
@@ -203,10 +221,10 @@ function createLineageRunsTable(table, knex) {
     .defaultTo('running');
   table.timestamp('started_at').notNullable().defaultTo(knex.fn.now());
   table.timestamp('completed_at');
-  table.json('input').notNullable().defaultTo(jsonDefault());
-  table.json('output').notNullable().defaultTo(jsonDefault());
+  table.json('input').notNullable().defaultTo(jsonDefault(knex));
+  table.json('output').notNullable().defaultTo(jsonDefault(knex));
   table.text('error_message');
-  table.json('metadata').notNullable().defaultTo(jsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefault(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
 

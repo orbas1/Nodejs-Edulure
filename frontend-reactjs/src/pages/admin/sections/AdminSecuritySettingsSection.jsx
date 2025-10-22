@@ -4,7 +4,12 @@ import PropTypes from 'prop-types';
 import { fetchSecuritySettings, updateSecuritySettings } from '../../../api/adminSettingsApi.js';
 import { cloneDeep, isDeepEqual } from '../utils.js';
 
-const METHOD_OPTIONS = ['totp', 'sms', 'webauthn', 'email'];
+const METHOD_OPTIONS = ['email_otp', 'sms', 'webauthn'];
+const METHOD_LABELS = {
+  email_otp: 'Email OTP (SMTP)',
+  sms: 'SMS fallback',
+  webauthn: 'Security keys (WebAuthn)'
+};
 
 function createId(prefix) {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -107,9 +112,9 @@ export default function AdminSecuritySettingsSection({ sectionId, token, setting
       ...items,
       {
         id: createId('method'),
-        type: 'totp',
+        type: 'email_otp',
         enabled: true,
-        description: 'Authenticator apps enforced for admins'
+        description: 'Email one-time codes enforced for admins'
       }
     ]);
   };
@@ -341,12 +346,12 @@ export default function AdminSecuritySettingsSection({ sectionId, token, setting
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <select
                       className="rounded-xl border border-slate-200 px-3 py-2"
-                      value={method.type ?? 'totp'}
+                      value={method.type ?? 'email_otp'}
                       onChange={handleMethodChange(index, 'type')}
                     >
                       {METHOD_OPTIONS.map((option) => (
                         <option key={option} value={option}>
-                          {option.toUpperCase()}
+                          {METHOD_LABELS[option] ?? option.toUpperCase()}
                         </option>
                       ))}
                     </select>

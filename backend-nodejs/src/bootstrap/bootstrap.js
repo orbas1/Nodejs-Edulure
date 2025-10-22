@@ -111,18 +111,40 @@ export async function startCoreInfrastructure({ services = Object.keys(INFRASTRU
     readiness?.markPending(name, 'Initialising');
 
     try {
-      await executeWithRetry(
+      const result = await executeWithRetry(
         `${name} bootstrap`,
-        async () => {
-          await descriptor.start();
-        },
+        async () => descriptor.start(),
         { readiness, component: name }
       );
-      readiness?.markReady(name, descriptor.readyMessage ?? 'Ready');
-      started.push({ name, stop: descriptor.stop });
+
+      const status = result?.status ?? 'ready';
+      const message = result?.message ?? descriptor.readyMessage ?? 'Ready';
+
+      if (status === 'disabled' || status === 'degraded') {
+        readiness?.markDegraded(name, message);
+      } else {
+        readiness?.markReady(name, message);
+      }
+
+      started.push({ name, stop: descriptor.stop, status });
     } catch (error) {
       readiness?.markFailed(name, error);
       bootstrapLogger.error({ err: error, service: name }, 'Infrastructure service failed to start');
+
+      while (started.length) {
+        const entry = started.pop();
+        try {
+          await entry.stop();
+          readiness?.markDegraded(entry.name, 'Stopped after failure');
+        } catch (stopError) {
+          bootstrapLogger.error(
+            { err: stopError, service: entry.name },
+            'Failed to stop infrastructure service during rollback'
+          );
+        }
+      }
+
+      throw error;
     }
   }
 

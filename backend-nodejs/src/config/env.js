@@ -1,15 +1,14 @@
 import fs from 'fs';
-import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import dotenv from 'dotenv';
 import { z } from 'zod';
 
-dotenv.config();
+import { loadEnvironmentFiles, resolveProjectRoot } from './loadEnv.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, '..', '..');
+const projectRoot = resolveProjectRoot();
+
+loadEnvironmentFiles();
 const defaultSchemaBaselinePath = path.resolve(
   projectRoot,
   'database',
@@ -593,7 +592,17 @@ function normalizeHost(value) {
 
 function parseHostList(value, { allowEmpty = false } = {}) {
   const hosts = parseCsv(value ?? '')
-    .map(normalizeHost)
+    .map((entry) => {
+      try {
+        return normalizeHost(entry);
+      } catch (error) {
+        if (allowEmpty) {
+          console.warn('Ignoring invalid Meilisearch host entry', { host: entry, reason: error.message });
+          return null;
+        }
+        throw error;
+      }
+    })
     .filter(Boolean);
 
   if (!hosts.length && !allowEmpty) {
@@ -617,12 +626,16 @@ const envSchema = z
     CORS_ALLOWED_ORIGINS: z.string().optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     JWT_SECRET: z.string().min(32).optional(),
-    TWO_FACTOR_ENCRYPTION_KEY: z.string().min(32).optional(),
     TWO_FACTOR_REQUIRED_ROLES: z.string().optional(),
-    TWO_FACTOR_ISSUER: z.string().optional(),
     TWO_FACTOR_DIGITS: z.coerce.number().int().min(6).max(10).default(6),
-    TWO_FACTOR_STEP_SECONDS: z.coerce.number().int().min(15).max(120).default(30),
-    TWO_FACTOR_WINDOW: z.coerce.number().int().min(0).max(2).default(1),
+    TWO_FACTOR_CHALLENGE_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(300),
+    TWO_FACTOR_RESEND_COOLDOWN_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(15)
+      .max(300)
+      .default(60),
+    TWO_FACTOR_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(5),
     DATA_ENCRYPTION_PRIMARY_KEY: z.string().min(32).optional(),
     DATA_ENCRYPTION_ACTIVE_KEY_ID: z.string().min(2).optional(),
     DATA_ENCRYPTION_FALLBACK_KEYS: z.string().optional(),
@@ -709,14 +722,18 @@ const envSchema = z
     TELEMETRY_FRESHNESS_WAREHOUSE_THRESHOLD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(30),
     TELEMETRY_LINEAGE_TOOL: z.string().default('dbt'),
     TELEMETRY_LINEAGE_AUTO_RECORD: z.coerce.boolean().default(true),
-    R2_ACCOUNT_ID: z.string().min(1),
-    R2_ACCESS_KEY_ID: z.string().min(1),
-    R2_SECRET_ACCESS_KEY: z.string().min(1),
+    ASSET_STORAGE_DRIVER: z.enum(['r2', 'local']).default('r2'),
+    LOCAL_STORAGE_ROOT: z.string().min(1).optional(),
+    LOCAL_STORAGE_PUBLIC_URL: z.string().url().optional(),
+    LOCAL_STORAGE_SERVE_STATIC: z.coerce.boolean().default(true),
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     R2_REGION: z.string().min(1).default('auto'),
-    R2_PUBLIC_BUCKET: z.string().min(1),
-    R2_PRIVATE_BUCKET: z.string().min(1),
-    R2_UPLOADS_BUCKET: z.string().min(1),
-    R2_QUARANTINE_BUCKET: z.string().min(1),
+    R2_PUBLIC_BUCKET: z.string().min(1).optional(),
+    R2_PRIVATE_BUCKET: z.string().min(1).optional(),
+    R2_UPLOADS_BUCKET: z.string().min(1).optional(),
+    R2_QUARANTINE_BUCKET: z.string().min(1).optional(),
     R2_CDN_URL: z.string().url().optional(),
     ANTIVIRUS_ENABLED: z.coerce.boolean().default(true),
     ANTIVIRUS_HOST: z.string().min(1).default('127.0.0.1'),
@@ -1152,16 +1169,28 @@ let meilisearchHosts;
 let meilisearchReplicaHosts;
 let meilisearchSearchHosts;
 
+const allowMissingMeilisearchHosts = raw.NODE_ENV !== 'production';
+
 try {
-  meilisearchHosts = parseHostList(raw.MEILISEARCH_HOSTS);
+  meilisearchHosts = parseHostList(raw.MEILISEARCH_HOSTS, { allowEmpty: allowMissingMeilisearchHosts });
   meilisearchReplicaHosts = parseHostList(raw.MEILISEARCH_REPLICA_HOSTS, { allowEmpty: true });
+  const defaultSearchHosts = [raw.MEILISEARCH_HOSTS, raw.MEILISEARCH_REPLICA_HOSTS]
+    .filter(Boolean)
+    .join(',');
   meilisearchSearchHosts = parseHostList(
-    raw.MEILISEARCH_SEARCH_HOSTS ?? `${raw.MEILISEARCH_HOSTS},${raw.MEILISEARCH_REPLICA_HOSTS ?? ''}`,
-    { allowEmpty: false }
+    raw.MEILISEARCH_SEARCH_HOSTS ?? defaultSearchHosts,
+    { allowEmpty: allowMissingMeilisearchHosts }
   );
 } catch (error) {
-  console.error('Invalid Meilisearch host configuration', error.message);
-  throw error;
+  if (!allowMissingMeilisearchHosts) {
+    console.error('Invalid Meilisearch host configuration', error.message);
+    throw error;
+  }
+
+  console.warn('Disabling Meilisearch integration due to host configuration issues', error.message);
+  meilisearchHosts = [];
+  meilisearchReplicaHosts = meilisearchReplicaHosts ?? [];
+  meilisearchSearchHosts = [];
 }
 
 const defaultCurrency = raw.PAYMENTS_DEFAULT_CURRENCY.toUpperCase();
@@ -1184,10 +1213,15 @@ const metricsAllowedIps = parseCsv(raw.METRICS_ALLOWED_IPS ?? '');
 const redactedFields = parseCsv(raw.LOG_REDACTED_FIELDS ?? '');
 const searchAllowedIps = parseCsv(raw.MEILISEARCH_ALLOWED_IPS ?? '');
 const configuredTwoFactorRoles = parseCsv(raw.TWO_FACTOR_REQUIRED_ROLES ?? '');
-const twoFactorRequiredRoles = (configuredTwoFactorRoles.length > 0
+const normalizedTwoFactorRoles = (configuredTwoFactorRoles.length > 0
   ? configuredTwoFactorRoles
   : ['admin']
-).map((role) => role.toLowerCase());
+)
+  .map((role) => role.trim().toLowerCase())
+  .filter((role) => role === 'admin');
+const twoFactorRequiredRoles = normalizedTwoFactorRoles.length > 0
+  ? normalizedTwoFactorRoles
+  : ['admin'];
 const sloDefaults = {
   targetAvailability: Math.min(0.9999, Math.max(0.001, clampRate(raw.SLO_DEFAULT_AVAILABILITY_TARGET))),
   windowMinutes: Math.max(5, raw.SLO_WINDOW_MINUTES),
@@ -1203,11 +1237,37 @@ const sloConfig = buildSloConfiguration({
   defaults: sloDefaults
 });
 const telemetryAllowedSources = parseCsv(raw.TELEMETRY_ALLOWED_SOURCES ?? '');
-const telemetryExportBucket = raw.TELEMETRY_EXPORT_BUCKET ?? raw.R2_PRIVATE_BUCKET;
+const storageDriver = raw.ASSET_STORAGE_DRIVER ?? 'r2';
+
+const localStorageRoot = path.resolve(
+  projectRoot,
+  raw.LOCAL_STORAGE_ROOT ?? path.join('storage', storageDriver === 'local' ? 'local' : 'r2')
+);
+const localStoragePublicUrl = raw.LOCAL_STORAGE_PUBLIC_URL ?? null;
+const localStorageServeStatic = raw.LOCAL_STORAGE_SERVE_STATIC;
+
+if (storageDriver === 'r2') {
+  const missingR2 = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_PUBLIC_BUCKET', 'R2_PRIVATE_BUCKET', 'R2_UPLOADS_BUCKET', 'R2_QUARANTINE_BUCKET']
+    .filter((key) => !raw[key] || String(raw[key]).trim().length === 0);
+  if (missingR2.length) {
+    throw new Error(
+      `Cloudflare R2 storage selected but missing required configuration keys: ${missingR2.join(', ')}`
+    );
+  }
+}
+
+const storageBuckets = {
+  public: storageDriver === 'local' ? 'public' : raw.R2_PUBLIC_BUCKET,
+  private: storageDriver === 'local' ? 'private' : raw.R2_PRIVATE_BUCKET,
+  uploads: storageDriver === 'local' ? 'uploads' : raw.R2_UPLOADS_BUCKET,
+  quarantine: storageDriver === 'local' ? 'quarantine' : raw.R2_QUARANTINE_BUCKET
+};
+
+const telemetryExportBucket = raw.TELEMETRY_EXPORT_BUCKET ?? storageBuckets.private;
 const telemetryExportPrefix = normalizePrefix(raw.TELEMETRY_EXPORT_PREFIX, 'warehouse/telemetry');
-const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRESH_SECRET;
-const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
-const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
+const twoFactorChallengeTtlSeconds = raw.TWO_FACTOR_CHALLENGE_TTL_SECONDS;
+const twoFactorResendCooldownSeconds = raw.TWO_FACTOR_RESEND_COOLDOWN_SECONDS;
+const twoFactorMaxAttempts = raw.TWO_FACTOR_MAX_ATTEMPTS;
 const databaseUrl = (raw.DB_URL ?? process.env.DATABASE_URL ?? '').trim() || null;
 const readReplicaUrls = Array.from(
   new Set(
@@ -1304,7 +1364,7 @@ const redisFeatureFlagLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_FEATURE
 const redisRuntimeConfigLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_RUNTIME_CONFIG_LOCK_KEY);
 const redisTlsCa = maybeDecodeCertificate(raw.REDIS_TLS_CA);
 const partitionSchema = raw.DATA_PARTITIONING_SCHEMA ?? raw.DB_NAME;
-const partitionArchiveBucket = raw.DATA_PARTITIONING_ARCHIVE_BUCKET ?? raw.R2_PRIVATE_BUCKET;
+const partitionArchiveBucket = raw.DATA_PARTITIONING_ARCHIVE_BUCKET ?? storageBuckets.private;
 const partitionArchivePrefix = normalizePrefix(raw.DATA_PARTITIONING_ARCHIVE_PREFIX, 'archives/compliance');
 const partitionMaxExportBytes = raw.DATA_PARTITIONING_MAX_EXPORT_MB
   ? raw.DATA_PARTITIONING_MAX_EXPORT_MB * 1024 * 1024
@@ -1362,12 +1422,11 @@ export const env = {
       defaultClassification: dataEncryptionDefaultClassification
     },
     twoFactor: {
-      encryptionKey: twoFactorEncryptionKey,
-      issuer: twoFactorIssuer,
       requiredRoles: twoFactorRequiredRoles,
       digits: raw.TWO_FACTOR_DIGITS,
-      stepSeconds: raw.TWO_FACTOR_STEP_SECONDS,
-      window: raw.TWO_FACTOR_WINDOW
+      challengeTtlSeconds: twoFactorChallengeTtlSeconds,
+      resendCooldownSeconds: twoFactorResendCooldownSeconds,
+      maxAttemptsPerChallenge: twoFactorMaxAttempts
     },
     auditLog: {
       tenantId: auditLogTenantId,
@@ -1412,18 +1471,22 @@ export const env = {
     }
   },
   storage: {
-    accountId: raw.R2_ACCOUNT_ID,
-    accessKeyId: raw.R2_ACCESS_KEY_ID,
-    secretAccessKey: raw.R2_SECRET_ACCESS_KEY,
+    driver: storageDriver,
+    accountId: storageDriver === 'local' ? 'local-storage' : raw.R2_ACCOUNT_ID,
+    accessKeyId: raw.R2_ACCESS_KEY_ID ?? null,
+    secretAccessKey: raw.R2_SECRET_ACCESS_KEY ?? null,
     region: raw.R2_REGION,
-    publicBucket: raw.R2_PUBLIC_BUCKET,
-    privateBucket: raw.R2_PRIVATE_BUCKET,
-    uploadsBucket: raw.R2_UPLOADS_BUCKET,
-    quarantineBucket: raw.R2_QUARANTINE_BUCKET,
-    cdnUrl: raw.R2_CDN_URL,
+    publicBucket: storageBuckets.public,
+    privateBucket: storageBuckets.private,
+    uploadsBucket: storageBuckets.uploads,
+    quarantineBucket: storageBuckets.quarantine,
+    cdnUrl: storageDriver === 'local' ? localStoragePublicUrl : raw.R2_CDN_URL,
     uploadTtlMinutes: raw.ASSET_PRESIGN_TTL_MINUTES,
     downloadTtlMinutes: raw.ASSET_DOWNLOAD_TTL_MINUTES,
-    maxUploadBytes: raw.CONTENT_MAX_UPLOAD_MB * 1024 * 1024
+    maxUploadBytes: raw.CONTENT_MAX_UPLOAD_MB * 1024 * 1024,
+    localRoot: localStorageRoot,
+    localPublicUrl: localStoragePublicUrl,
+    serveStatic: localStorageServeStatic
   },
   antivirus: {
     enabled: raw.ANTIVIRUS_ENABLED,

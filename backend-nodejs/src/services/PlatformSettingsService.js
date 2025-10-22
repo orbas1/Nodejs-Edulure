@@ -4,6 +4,7 @@ import PlatformSettingModel from '../models/PlatformSettingModel.js';
 import db from '../config/database.js';
 import { env } from '../config/env.js';
 import deepMerge from '../utils/deepMerge.js';
+import TwoFactorService from './TwoFactorService.js';
 
 const SETTINGS_KEYS = Object.freeze({
   ADMIN_PROFILE: 'admin_profile',
@@ -273,13 +274,13 @@ const DEFAULT_EMAIL_SETTINGS = Object.freeze({
 const DEFAULT_SECURITY_SETTINGS = Object.freeze({
   enforcement: {
     requiredForAdmins: true,
-    requiredForInstructors: true,
-    requiredForFinance: true,
+    requiredForInstructors: false,
+    requiredForFinance: false,
     rememberDeviceDays: 30,
     sessionTimeoutMinutes: 30
   },
   methods: [
-    { id: 'totp', type: 'totp', enabled: true, description: 'Authenticator apps (TOTP)' },
+    { id: 'email-otp', type: 'email_otp', enabled: true, description: 'Email one-time codes (SMTP)' },
     { id: 'sms', type: 'sms', enabled: false, description: 'SMS fallback (restricted markets)' },
     { id: 'webauthn', type: 'webauthn', enabled: true, description: 'Hardware security keys' }
   ],
@@ -990,7 +991,7 @@ function normaliseEmailSettings(rawSettings = {}) {
 
 function normaliseSecuritySettings(rawSettings = {}) {
   const result = deepMergeLimited({}, DEFAULT_SECURITY_SETTINGS);
-  const methodTypes = new Set(['totp', 'sms', 'webauthn', 'email']);
+  const methodTypes = new Set(['email_otp', 'sms', 'webauthn']);
 
   if (rawSettings.enforcement && typeof rawSettings.enforcement === 'object') {
     result.enforcement = {
@@ -1023,7 +1024,7 @@ function normaliseSecuritySettings(rawSettings = {}) {
           const type = String(method?.type ?? '').toLowerCase();
           return {
             id: createStableId('mfa-method', method?.id),
-            type: methodTypes.has(type) ? type : 'totp',
+            type: methodTypes.has(type) ? type : 'email_otp',
             enabled: Boolean(method?.enabled ?? true),
             description: normaliseText(method?.description, { max: 200, fallback: '' })
           };
@@ -1881,7 +1882,9 @@ export default class PlatformSettingsService {
 
   static async getSecuritySettings(connection = db) {
     const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.SECURITY, connection);
-    return normaliseSecuritySettings(record?.value ?? {});
+    const settings = normaliseSecuritySettings(record?.value ?? {});
+    TwoFactorService.updateEnforcementPolicy(settings.enforcement);
+    return settings;
   }
 
   static async updateSecuritySettings(payload, connection = db) {
@@ -1892,6 +1895,7 @@ export default class PlatformSettingsService {
     const current = await this.getSecuritySettings(connection);
     const merged = normaliseSecuritySettings(deepMerge(current, sanitized));
     await PlatformSettingModel.upsert(SETTINGS_KEYS.SECURITY, merged, connection);
+    TwoFactorService.updateEnforcementPolicy(merged.enforcement);
     return merged;
   }
 

@@ -56,7 +56,6 @@ describe('applyComplianceDomainSchema', () => {
     await applyComplianceDomainSchema(db);
 
     for (const tableName of Object.values(COMPLIANCE_TABLES)) {
-      // eslint-disable-next-line no-await-in-loop
       expect(await db.schema.hasTable(tableName)).toBe(true);
     }
 
@@ -84,7 +83,6 @@ describe('applyComplianceDomainSchema', () => {
     await rollbackComplianceDomainSchema(db);
 
     for (const tableName of Object.values(COMPLIANCE_TABLES)) {
-      // eslint-disable-next-line no-await-in-loop
       expect(await db.schema.hasTable(tableName)).toBe(false);
     }
     expect(await db.schema.hasTable('data_partition_policies')).toBe(false);

@@ -58,22 +58,6 @@ const importSettings = {
   'import/core-modules': ['prom-client', 'nodemailer', 'vitest/config']
 };
 
-const importOrderRule = [
-  'warn',
-  {
-    groups: [
-      ['builtin', 'external'],
-      ['internal'],
-      ['parent', 'sibling', 'index']
-    ],
-    'newlines-between': 'always',
-    alphabetize: {
-      order: 'asc',
-      caseInsensitive: true
-    }
-  }
-];
-
 const baseGlobals = {
   Buffer: 'readonly',
   console: 'readonly',
@@ -84,6 +68,13 @@ const baseGlobals = {
   clearTimeout: 'readonly',
   setInterval: 'readonly',
   clearInterval: 'readonly',
+  AbortController: 'readonly',
+  AbortSignal: 'readonly',
+  fetch: 'readonly',
+  queueMicrotask: 'readonly',
+  structuredClone: 'readonly',
+  URL: 'readonly',
+  URLSearchParams: 'readonly',
   ...(globalSets.node ?? {}),
   ...(globalSets.es2021 ?? {}),
   ...(globalSets.es2022 ?? {})
@@ -106,7 +97,9 @@ const testGlobals = {
 const sharedRules = {
   ...recommendedRules,
   ...importRecommendedRules,
-  ...(importPlugin ? { 'import/order': importOrderRule } : {}),
+  'import/order': 'off',
+  'import/no-named-as-default': 'off',
+  'import/no-named-as-default-member': 'off',
   'no-console': ['warn', { allow: ['warn', 'error'] }],
   'no-duplicate-imports': 'error',
   'no-new-wrappers': 'error',
@@ -124,6 +117,8 @@ const sharedRules = {
   'prefer-object-spread': 'error'
 };
 
+const importPlugins = importPlugin ? { import: importPlugin } : {};
+
 const config = [
   {
     ignores: [
@@ -136,14 +131,14 @@ const config = [
     ]
   },
   {
-    files: ['**/*.js', '**/*.mjs', '**/*.cjs'],
+    files: ['**/*.js', '**/*.mjs'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
       globals: baseGlobals
     },
     settings: importSettings,
-    plugins: importPlugin ? { import: importPlugin } : {},
+    plugins: importPlugins,
     rules: sharedRules
   },
   {
@@ -169,10 +164,27 @@ const config = [
       sourceType: 'module',
       globals: baseGlobals
     },
+    plugins: importPlugins,
     rules: {
       ...sharedRules,
       'no-console': 'off'
     }
+  },
+  {
+    files: ['**/*.cjs'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'commonjs',
+      globals: {
+        ...baseGlobals,
+        require: 'readonly',
+        module: 'readonly',
+      __dirname: 'readonly',
+      __filename: 'readonly'
+      }
+    },
+    plugins: importPlugins,
+    rules: sharedRules
   },
   {
     files: ['test/**/*.js', '**/*.test.js', '**/*.spec.js'],
@@ -184,6 +196,7 @@ const config = [
         ...testGlobals
       }
     },
+    plugins: importPlugins,
     rules: {
       ...sharedRules,
       'no-console': 'off',

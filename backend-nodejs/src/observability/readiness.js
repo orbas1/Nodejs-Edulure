@@ -62,7 +62,6 @@ export function createReadinessTracker(serviceName, components = []) {
       try {
         listener(snapshot);
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('readiness listener error', error);
       }
     }

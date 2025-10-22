@@ -45,7 +45,6 @@ describe('telemetry domain schema', () => {
     await applyTelemetryDomainSchema(db);
 
     for (const tableName of Object.values(TELEMETRY_TABLES)) {
-      // eslint-disable-next-line no-await-in-loop
       expect(await db.schema.hasTable(tableName)).toBe(true);
     }
 
@@ -121,7 +120,6 @@ describe('telemetry domain schema', () => {
     await rollbackTelemetryDomainSchema(dbInstance);
 
     for (const tableName of Object.values(TELEMETRY_TABLES)) {
-      // eslint-disable-next-line no-await-in-loop
       expect(await dbInstance.schema.hasTable(tableName)).toBe(false);
     }
 
