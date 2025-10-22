@@ -3,59 +3,59 @@
   "modules": {
     "networking": {
       "path": "infrastructure/terraform/modules/networking",
-      "hash": "4f6fff7cffea7c92537d5a8eca6158155311e49e77d71e63ea0945906ce3a746"
+      "hash": "8d3525ddbaa1dfc0e845331e05bc4c526bc9e3f352b64b497cdf1d14962650be"
     },
     "postgres": {
       "path": "infrastructure/terraform/modules/postgres",
-      "hash": "0c1c8b643256894b572b789b942ae13602e334f5495d69e98f04548aa83f3413"
+      "hash": "6952575aae33fb87bc1ff4930e6f88c6f39985d1f36554bcaa23bb8401739600"
     },
     "backendService": {
       "path": "infrastructure/terraform/modules/backend_service",
-      "hash": "2216846856f730288d1df40b6dc33861a9f618e7dd994bfd49634c90e5da8086"
+      "hash": "34aa9f29f26ae9b78f50916aaa1111daaf1416ce28c03e7be88cd4eff392b593"
     }
   },
   "environments": {
     "dev": {
       "path": "infrastructure/terraform/envs/dev",
-      "hash": "d22ef8188f06f0ce515b09833b1018195a1d658929b6aa4c970cf6fc2727d4ef"
+      "hash": "56535a2195ec5ef93d89b41b29b140d9b8e1ee18dedb87a91495507fde4b2c92"
     },
     "staging": {
       "path": "infrastructure/terraform/envs/staging",
-      "hash": "334a1d99d31a73eb49b7e5fb42b5a7b104e0615b7dc0bd9e2871a71fb45ff696"
+      "hash": "f789d17ebd2277197b928e96115c9a308c3f6a4b960565b6eb373c60a3751594"
     },
     "prod": {
       "path": "infrastructure/terraform/envs/prod",
-      "hash": "56d386e32f9a2a2c25a0d6f25f00cbef77c3b2661beecd833cb9f8752cc335d9"
+      "hash": "0fafb6a506216823f68602eb71a8a4021e5dd88cc24587a635c7265251a575be"
     }
   },
   "docker": {
     "backend": {
       "path": "infrastructure/docker/Dockerfile.backend",
-      "hash": "ec2f686f53944347521171045762aa3187883b956a2de24fc2a7de0afdd63314"
+      "hash": "16a304e1e3cc2855b8bd7f0d1b2e8ed0187b1ce62611d17d781eb3d5fdeb4644"
     },
     "frontend": {
       "path": "infrastructure/docker/Dockerfile.frontend",
-      "hash": "c601c475d4465e0895c483771c341a8e5751749140711860d4fd0543b32592e7"
+      "hash": "b3e4e10545359ce9246063c9f9069c0e235c580ed611600ec18f932273662d59"
     },
     "nginx": {
       "path": "infrastructure/docker/nginx.conf",
-      "hash": "c5899a315acff587d20dd8ab0c9c1201a8c18321cdbee8bd97762373d9506567"
+      "hash": "c785994ca7af98ef2110a032571dad84f33045bc0228bcd3ee5b13d4c891054c"
     }
   },
   "scripts": {
     "bootstrap": {
       "path": "scripts/bootstrap-environment.sh",
-      "hash": "44b228a8c4681df95c35afb806d016bdb2015e60470d5940749fc0517ad0c137"
+      "hash": "3f648de762d6357f2faf579e8cec9fa29d2e98b1a70aa60454ca58d680a530e6"
     },
     "waitForDb": {
       "path": "backend-nodejs/scripts/wait-for-db.js",
-      "hash": "f1743a0cdc312aa6eea27caef9bcf0174d53c632328d78a6e4c4fa6427477599"
+      "hash": "1e1e7181c40444255266742da02d81b6b681e1d3fd0caa9f8d8ed5b757d877b8"
     }
   },
   "root": {
     "docker-compose.yml": {
       "path": "docker-compose.yml",
-      "hash": "e69db59a63ee1d7484874be29290ecaa2dcf361a1866a70b66bdf0e54dfa0fd4"
+      "hash": "edba92c386a5ced24c16c61d0373a5c0a4d28c78f573cd2808810742ba33f8cc"
     }
   }
 }
