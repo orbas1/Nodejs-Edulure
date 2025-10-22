@@ -4,9 +4,73 @@ import db from '../config/database.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 import TwoFactorChallengeModel from '../models/TwoFactorChallengeModel.js';
+import PlatformSettingModel from '../models/PlatformSettingModel.js';
 import { MailService } from './MailService.js';
 
 const mailService = new MailService();
+const SECURITY_SETTINGS_KEY = 'security';
+const ALWAYS_ENFORCED_ROLES = new Set(
+  env.security.twoFactor.requiredRoles.map((role) => String(role).trim().toLowerCase()).filter(Boolean)
+);
+if (!ALWAYS_ENFORCED_ROLES.size) {
+  ALWAYS_ENFORCED_ROLES.add('admin');
+}
+const enforcedRoles = new Set(ALWAYS_ENFORCED_ROLES);
+
+function normaliseRole(value) {
+  if (!value) {
+    return '';
+  }
+
+  return String(value).trim().toLowerCase();
+}
+
+function rebuildEnforcedRoles(enforcement = {}) {
+  const nextRoles = new Set(ALWAYS_ENFORCED_ROLES);
+
+  const toggles = [
+    ['instructor', enforcement.requiredForInstructors],
+    ['finance', enforcement.requiredForFinance]
+  ];
+
+  for (const [role, enabled] of toggles) {
+    if (enabled) {
+      nextRoles.add(role);
+    }
+  }
+
+  if (Array.isArray(enforcement.additionalRoles)) {
+    for (const role of enforcement.additionalRoles) {
+      const normalized = normaliseRole(role);
+      if (normalized) {
+        nextRoles.add(normalized);
+      }
+    }
+  }
+
+  enforcedRoles.clear();
+  for (const role of nextRoles) {
+    enforcedRoles.add(role);
+  }
+}
+
+function updateTwoFactorEnforcement(enforcement = {}) {
+  rebuildEnforcedRoles(enforcement);
+}
+
+async function primeEnforcementFromPlatformSettings() {
+  try {
+    const record = await PlatformSettingModel.findByKey(SECURITY_SETTINGS_KEY);
+    const enforcement = record?.value?.enforcement;
+    if (enforcement && typeof enforcement === 'object') {
+      rebuildEnforcedRoles(enforcement);
+    }
+  } catch (error) {
+    logger.warn({ err: error }, 'Failed to hydrate two-factor enforcement policy from platform settings');
+  }
+}
+
+void primeEnforcementFromPlatformSettings();
 
 function coerceBoolean(value) {
   if (typeof value === 'boolean') return value;
@@ -124,10 +188,11 @@ async function verifyChallenge(userId, code, connection = db) {
 }
 
 function shouldEnforceForRole(role) {
-  if (!role) {
+  const normalized = normaliseRole(role);
+  if (!normalized) {
     return false;
   }
-  return env.security.twoFactor.requiredRoles.includes(String(role).toLowerCase());
+  return enforcedRoles.has(normalized);
 }
 
 function shouldEnforceForUser(user) {
@@ -157,5 +222,6 @@ export default {
   shouldEnforceForRole,
   shouldEnforceForUser,
   isTwoFactorEnabled,
-  sanitizeCode
+  sanitizeCode,
+  updateEnforcementPolicy: updateTwoFactorEnforcement
 };

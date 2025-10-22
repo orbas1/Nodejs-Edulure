@@ -4,6 +4,7 @@ import PlatformSettingModel from '../models/PlatformSettingModel.js';
 import db from '../config/database.js';
 import { env } from '../config/env.js';
 import deepMerge from '../utils/deepMerge.js';
+import TwoFactorService from './TwoFactorService.js';
 
 const SETTINGS_KEYS = Object.freeze({
   ADMIN_PROFILE: 'admin_profile',
@@ -273,8 +274,8 @@ const DEFAULT_EMAIL_SETTINGS = Object.freeze({
 const DEFAULT_SECURITY_SETTINGS = Object.freeze({
   enforcement: {
     requiredForAdmins: true,
-    requiredForInstructors: true,
-    requiredForFinance: true,
+    requiredForInstructors: false,
+    requiredForFinance: false,
     rememberDeviceDays: 30,
     sessionTimeoutMinutes: 30
   },
@@ -1881,7 +1882,9 @@ export default class PlatformSettingsService {
 
   static async getSecuritySettings(connection = db) {
     const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.SECURITY, connection);
-    return normaliseSecuritySettings(record?.value ?? {});
+    const settings = normaliseSecuritySettings(record?.value ?? {});
+    TwoFactorService.updateEnforcementPolicy(settings.enforcement);
+    return settings;
   }
 
   static async updateSecuritySettings(payload, connection = db) {
@@ -1892,6 +1895,7 @@ export default class PlatformSettingsService {
     const current = await this.getSecuritySettings(connection);
     const merged = normaliseSecuritySettings(deepMerge(current, sanitized));
     await PlatformSettingModel.upsert(SETTINGS_KEYS.SECURITY, merged, connection);
+    TwoFactorService.updateEnforcementPolicy(merged.enforcement);
     return merged;
   }
 
