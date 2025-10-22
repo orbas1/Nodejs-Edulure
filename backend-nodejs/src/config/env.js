@@ -1213,10 +1213,15 @@ const metricsAllowedIps = parseCsv(raw.METRICS_ALLOWED_IPS ?? '');
 const redactedFields = parseCsv(raw.LOG_REDACTED_FIELDS ?? '');
 const searchAllowedIps = parseCsv(raw.MEILISEARCH_ALLOWED_IPS ?? '');
 const configuredTwoFactorRoles = parseCsv(raw.TWO_FACTOR_REQUIRED_ROLES ?? '');
-const twoFactorRequiredRoles = (configuredTwoFactorRoles.length > 0
+const normalizedTwoFactorRoles = (configuredTwoFactorRoles.length > 0
   ? configuredTwoFactorRoles
   : ['admin']
-).map((role) => role.toLowerCase());
+)
+  .map((role) => role.trim().toLowerCase())
+  .filter((role) => role === 'admin');
+const twoFactorRequiredRoles = normalizedTwoFactorRoles.length > 0
+  ? normalizedTwoFactorRoles
+  : ['admin'];
 const sloDefaults = {
   targetAvailability: Math.min(0.9999, Math.max(0.001, clampRate(raw.SLO_DEFAULT_AVAILABILITY_TARGET))),
   windowMinutes: Math.max(5, raw.SLO_WINDOW_MINUTES),
