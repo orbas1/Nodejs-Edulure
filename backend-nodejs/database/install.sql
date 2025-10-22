@@ -62,10 +62,32 @@ BEGIN
      WHERE table_schema = DATABASE()
        AND table_name = 'field_service_providers'
   ) THEN
-    ALTER TABLE field_service_providers
-      ADD INDEX IF NOT EXISTS idx_field_service_providers_status (status),
-      ADD INDEX IF NOT EXISTS idx_field_service_providers_user (user_id),
-      ADD INDEX IF NOT EXISTS idx_field_service_providers_location_updated (location_updated_at);
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_providers'
+         AND index_name = 'idx_field_service_providers_status'
+    ) THEN
+      ALTER TABLE field_service_providers ADD INDEX idx_field_service_providers_status (status);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_providers'
+         AND index_name = 'idx_field_service_providers_user'
+    ) THEN
+      ALTER TABLE field_service_providers ADD INDEX idx_field_service_providers_user (user_id);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_providers'
+         AND index_name = 'idx_field_service_providers_location_updated'
+    ) THEN
+      ALTER TABLE field_service_providers ADD INDEX idx_field_service_providers_location_updated (location_updated_at);
+    END IF;
   END IF;
 
   IF NOT EXISTS (
@@ -114,11 +136,41 @@ BEGIN
      WHERE table_schema = DATABASE()
        AND table_name = 'field_service_orders'
   ) THEN
-    ALTER TABLE field_service_orders
-      ADD INDEX IF NOT EXISTS idx_field_service_orders_status (status),
-      ADD INDEX IF NOT EXISTS idx_field_service_orders_customer (customer_user_id),
-      ADD INDEX IF NOT EXISTS idx_field_service_orders_provider (provider_id),
-      ADD INDEX IF NOT EXISTS idx_field_service_orders_scheduled (scheduled_for);
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_orders'
+         AND index_name = 'idx_field_service_orders_status'
+    ) THEN
+      ALTER TABLE field_service_orders ADD INDEX idx_field_service_orders_status (status);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_orders'
+         AND index_name = 'idx_field_service_orders_customer'
+    ) THEN
+      ALTER TABLE field_service_orders ADD INDEX idx_field_service_orders_customer (customer_user_id);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_orders'
+         AND index_name = 'idx_field_service_orders_provider'
+    ) THEN
+      ALTER TABLE field_service_orders ADD INDEX idx_field_service_orders_provider (provider_id);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_orders'
+         AND index_name = 'idx_field_service_orders_scheduled'
+    ) THEN
+      ALTER TABLE field_service_orders ADD INDEX idx_field_service_orders_scheduled (scheduled_for);
+    END IF;
   END IF;
 
   IF NOT EXISTS (
@@ -147,9 +199,23 @@ BEGIN
      WHERE table_schema = DATABASE()
        AND table_name = 'field_service_events'
   ) THEN
-    ALTER TABLE field_service_events
-      ADD INDEX IF NOT EXISTS idx_field_service_events_order (order_id),
-      ADD INDEX IF NOT EXISTS idx_field_service_events_occurred_at (occurred_at);
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_events'
+         AND index_name = 'idx_field_service_events_order'
+    ) THEN
+      ALTER TABLE field_service_events ADD INDEX idx_field_service_events_order (order_id);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'field_service_events'
+         AND index_name = 'idx_field_service_events_occurred_at'
+    ) THEN
+      ALTER TABLE field_service_events ADD INDEX idx_field_service_events_occurred_at (occurred_at);
+    END IF;
   END IF;
 
   IF NOT EXISTS (
@@ -184,9 +250,23 @@ BEGIN
      WHERE table_schema = DATABASE()
        AND table_name = 'learner_support_cases'
   ) THEN
-    ALTER TABLE learner_support_cases
-      ADD INDEX IF NOT EXISTS idx_support_cases_user (user_id),
-      ADD INDEX IF NOT EXISTS idx_support_cases_status (status);
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_cases'
+         AND index_name = 'idx_support_cases_user'
+    ) THEN
+      ALTER TABLE learner_support_cases ADD INDEX idx_support_cases_user (user_id);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_cases'
+         AND index_name = 'idx_support_cases_status'
+    ) THEN
+      ALTER TABLE learner_support_cases ADD INDEX idx_support_cases_status (status);
+    END IF;
   END IF;
 
   IF NOT EXISTS (
@@ -212,9 +292,23 @@ BEGIN
      WHERE table_schema = DATABASE()
        AND table_name = 'learner_support_messages'
   ) THEN
-    ALTER TABLE learner_support_messages
-      ADD INDEX IF NOT EXISTS idx_support_messages_case (case_id),
-      ADD INDEX IF NOT EXISTS idx_support_messages_created_at (created_at);
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_messages'
+         AND index_name = 'idx_support_messages_case'
+    ) THEN
+      ALTER TABLE learner_support_messages ADD INDEX idx_support_messages_case (case_id);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_messages'
+         AND index_name = 'idx_support_messages_created_at'
+    ) THEN
+      ALTER TABLE learner_support_messages ADD INDEX idx_support_messages_created_at (created_at);
+    END IF;
   END IF;
 END $$
 

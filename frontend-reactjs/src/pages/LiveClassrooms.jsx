@@ -844,19 +844,8 @@ export default function LiveClassrooms() {
   ]);
 
   return (
-    <div className="bg-slate-100 pb-24">
-      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6 py-16">
-        <header className="space-y-6">
-          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            Live operations
-          </span>
-          <h1 className="text-4xl font-semibold text-slate-900">Live classrooms, production ready</h1>
-          <p className="max-w-3xl text-sm text-slate-600">
-            Launch, monitor and evolve live classrooms without leaving Edulure. Every workflow below ships with CRUD, audit logs,
-            rich analytics and guard-railed access so your programming stays compliant in real time.
-          </p>
-        </header>
-
+    <div className="bg-slate-100 pb-24 pt-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6">
         <section className="space-y-10">
           <ExplorerSearchSection {...EXPLORER_CONFIG} />
         </section>

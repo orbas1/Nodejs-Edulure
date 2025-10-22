@@ -463,22 +463,13 @@ export default function Explorer() {
   });
 
   return (
-    <div className="bg-slate-100 pb-24">
-      <div className="mx-auto flex max-w-7xl flex-col gap-16 px-6 py-16">
-        <header className="space-y-6 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            Explorer
-          </span>
-          <h1 className="text-4xl font-semibold text-slate-900">Operational discovery, production ready</h1>
-          <p className="mx-auto max-w-3xl text-sm text-slate-600">
-            Orchestrate community scouting, course procurement, live classroom scheduling and content sourcing from one interactive surface. Every search ships with full CRUD, analytics, and community-aware guardrails.
-          </p>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {HIGHLIGHTS.map((item) => (
-              <HighlightCard key={item.title} {...item} />
-            ))}
-          </div>
-        </header>
+    <div className="bg-slate-100 pb-24 pt-10">
+      <div className="mx-auto flex max-w-7xl flex-col gap-16 px-6">
+        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {HIGHLIGHTS.map((item) => (
+            <HighlightCard key={item.title} {...item} />
+          ))}
+        </section>
 
         <CommunityAccessPanel />
 

@@ -142,13 +142,20 @@ async function provisionDatabase() {
   validateIdentifier(dbName, 'DB_NAME');
 
   const mysql = await resolveMysqlClient();
-  const rootConnection = await mysql.createConnection({
-    host: process.env.DB_HOST,
-    port: dbPort,
+  const connectionOptions = {
     user: process.env.DB_ROOT_USER ?? process.env.DB_USER,
     password: process.env.DB_ROOT_PASSWORD ?? process.env.DB_PASSWORD,
     multipleStatements: true
-  });
+  };
+
+  if (process.env.DB_SOCKET_PATH) {
+    connectionOptions.socketPath = process.env.DB_SOCKET_PATH;
+  } else {
+    connectionOptions.host = process.env.DB_HOST;
+    connectionOptions.port = dbPort;
+  }
+
+  const rootConnection = await mysql.createConnection(connectionOptions);
 
   try {
     await rootConnection.query(
