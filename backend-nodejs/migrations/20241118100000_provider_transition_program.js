@@ -1,4 +1,4 @@
-import { jsonDefault } from './_utils.js';
+import { jsonDefault } from './_helpers/utils.js';
 
 const ANNOUNCEMENTS_TABLE = 'provider_transition_announcements';
 const RESOURCES_TABLE = 'provider_transition_resources';

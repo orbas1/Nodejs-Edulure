@@ -33,7 +33,6 @@ describe('applySecurityDomainSchema', () => {
     await applySecurityDomainSchema(db);
 
     for (const tableName of Object.values(SECURITY_TABLES)) {
-      // eslint-disable-next-line no-await-in-loop
       expect(await db.schema.hasTable(tableName)).toBe(true);
     }
 
@@ -71,7 +70,6 @@ describe('applySecurityDomainSchema', () => {
     await rollbackSecurityDomainSchema(db);
 
     for (const tableName of Object.values(SECURITY_TABLES)) {
-      // eslint-disable-next-line no-await-in-loop
       expect(await db.schema.hasTable(tableName)).toBe(false);
     }
   });

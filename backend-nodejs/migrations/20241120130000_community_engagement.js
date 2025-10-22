@@ -1,4 +1,4 @@
-import { jsonDefault } from './_utils.js';
+import { jsonDefault } from './_helpers/utils.js';
 
 const PARTICIPANT_STATUSES = ['going', 'interested', 'waitlisted', 'declined', 'checked_in'];
 const REMINDER_STATUSES = ['pending', 'processing', 'sent', 'failed', 'cancelled'];

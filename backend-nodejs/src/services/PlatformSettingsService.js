@@ -279,7 +279,7 @@ const DEFAULT_SECURITY_SETTINGS = Object.freeze({
     sessionTimeoutMinutes: 30
   },
   methods: [
-    { id: 'totp', type: 'totp', enabled: true, description: 'Authenticator apps (TOTP)' },
+    { id: 'email-otp', type: 'email_otp', enabled: true, description: 'Email one-time codes (SMTP)' },
     { id: 'sms', type: 'sms', enabled: false, description: 'SMS fallback (restricted markets)' },
     { id: 'webauthn', type: 'webauthn', enabled: true, description: 'Hardware security keys' }
   ],
@@ -990,7 +990,7 @@ function normaliseEmailSettings(rawSettings = {}) {
 
 function normaliseSecuritySettings(rawSettings = {}) {
   const result = deepMergeLimited({}, DEFAULT_SECURITY_SETTINGS);
-  const methodTypes = new Set(['totp', 'sms', 'webauthn', 'email']);
+  const methodTypes = new Set(['email_otp', 'sms', 'webauthn']);
 
   if (rawSettings.enforcement && typeof rawSettings.enforcement === 'object') {
     result.enforcement = {
@@ -1023,7 +1023,7 @@ function normaliseSecuritySettings(rawSettings = {}) {
           const type = String(method?.type ?? '').toLowerCase();
           return {
             id: createStableId('mfa-method', method?.id),
-            type: methodTypes.has(type) ? type : 'totp',
+            type: methodTypes.has(type) ? type : 'email_otp',
             enabled: Boolean(method?.enabled ?? true),
             description: normaliseText(method?.description, { max: 200, fallback: '' })
           };

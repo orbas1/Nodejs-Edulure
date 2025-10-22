@@ -6,6 +6,22 @@ function normaliseDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function parseJson(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return null;
+  }
+}
+
 function mapRow(row) {
   if (!row) return null;
   return {
@@ -19,7 +35,7 @@ function mapRow(row) {
     lockedBy: row.locked_by ?? null,
     deliveredAt: normaliseDate(row.delivered_at),
     lastError: row.last_error ?? null,
-    metadata: typeof row.metadata === 'object' ? row.metadata : null,
+    metadata: parseJson(row.metadata),
     createdAt: normaliseDate(row.created_at),
     updatedAt: normaliseDate(row.updated_at)
   };
@@ -99,7 +115,8 @@ export default class DomainEventDispatchModel {
       delivered_at: deliveredAt,
       updated_at: connection.fn.now(),
       locked_at: null,
-      locked_by: null
+      locked_by: null,
+      attempt_count: connection.raw('attempt_count + 1')
     };
 
     if (metadata && Object.keys(metadata).length) {

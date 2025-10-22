@@ -37,7 +37,8 @@ const courseLiveServiceMock = {
   joinCourse: vi.fn(() => ({ participants: [] })),
   leaveCourse: vi.fn(() => ({ participants: [] })),
   postMessage: vi.fn(() => ({ id: 1, body: 'hello' })),
-  getPresence: vi.fn(() => ({ participants: [] }))
+  getPresence: vi.fn(() => ({ participants: [] })),
+  reset: vi.fn()
 };
 
 vi.mock('../src/services/CourseLiveService.js', () => ({

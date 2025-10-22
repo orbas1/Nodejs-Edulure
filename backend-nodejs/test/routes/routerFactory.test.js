@@ -24,7 +24,7 @@ describe('createApiRouter', () => {
     expect(response.headers['cache-control']).toBe(
       'no-store, no-cache, must-revalidate, proxy-revalidate'
     );
-    expect(response.headers['pragma']).toBe('no-cache');
+    expect(response.headers.pragma).toBe('no-cache');
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.headers['x-frame-options']).toBe('SAMEORIGIN');
     expect(response.headers['referrer-policy']).toBe('no-referrer');

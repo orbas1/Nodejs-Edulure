@@ -151,7 +151,7 @@ function toPositiveInteger(value, { round = true } = {}) {
   return round ? Math.round(numeric) : numeric;
 }
 
-function normaliseSupportMetrics(input) {
+function _normaliseSupportMetrics(input) {
   const source = input && typeof input === 'object' ? input : {};
   const latestUpdatedAtDate = normaliseDate(source.latestUpdatedAt);
   const averageResponseMinutes = toPositiveInteger(source.averageResponseMinutes);
@@ -235,7 +235,7 @@ function normalisePrivacySettings(settings) {
   };
 }
 
-function normaliseNotifications(notifications) {
+function _normaliseNotifications(notifications) {
   if (!Array.isArray(notifications)) {
     return [];
   }
@@ -493,22 +493,22 @@ function coercePositiveInteger(value) {
 }
 
 export function buildLearnerDashboard({
-  user,
+  user: _user,
   now = new Date(),
   enrollments = [],
   courses = [],
   courseProgress = [],
   assignments = [],
   tutorBookings = [],
-  tutorAvailability = [],
+  tutorAvailability: _tutorAvailability = [],
   liveClassrooms = [],
   instructorDirectory = new Map(),
   ebookProgress = [],
   ebooks = new Map(),
   invoices = [],
   paymentIntents = [],
-  paymentMethodsRaw = [],
-  billingContactsRaw = [],
+  paymentMethodsRaw: _paymentMethodsRaw = [],
+  billingContactsRaw: _billingContactsRaw = [],
   ebookRecommendations = [],
   communityMemberships = [],
   communityEvents = [],
@@ -626,7 +626,6 @@ export function buildLearnerDashboard({
   const streak = calculateLearningStreak(completionEntries, now);
 
   const activeEnrollments = enrollments.filter((enrollment) => enrollment.status === 'active');
-  const completedEnrollments = enrollments.filter((enrollment) => enrollment.status === 'completed');
   const recentEnrollments = activeEnrollments.filter((enrollment) => {
     const startedAt = normaliseDate(enrollment.startedAt);
     if (!startedAt) return false;
@@ -2132,7 +2131,7 @@ export function buildLearnerDashboard({
 }
 
 export function buildCommunityDashboard({
-  user,
+  user: _user,
   now = new Date(),
   communities = [],
   eventsByCommunity = new Map(),
@@ -2143,7 +2142,7 @@ export function buildCommunityDashboard({
   moderatorsByCommunity = new Map(),
   moderationCases = [],
   communicationsByCommunity = new Map(),
-  engagementTrend = [],
+  engagementTrend: _engagementTrend = [],
   engagementTotals = { current: {}, previous: {} }
 } = {}) {
   const hasSignals =
@@ -2232,7 +2231,7 @@ export function buildCommunityDashboard({
   });
 
   const operationsRunbooks = [];
-  runbooksByCommunity.forEach((runbooks, communityId) => {
+  runbooksByCommunity.forEach((runbooks, _communityId) => {
     runbooks
       ?.slice(0, 10)
       .forEach((runbook) => {
@@ -2261,8 +2260,7 @@ export function buildCommunityDashboard({
     }));
 
   const upcomingEvents = [];
-  eventsByCommunity.forEach((events, communityId) => {
-    const community = communities.find((entry) => entry.id === communityId);
+    eventsByCommunity.forEach((events, _communityId) => {
     events
       ?.filter((event) => event.startAt && normaliseDate(event.startAt) >= now)
       .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
@@ -3240,7 +3238,7 @@ function buildCourseWorkspace({
         label: cohortLabel,
         enrollments: [],
         firstStartAt: null,
-        releaseAt: normaliseDate(course.releaseAt)
+        releaseAt: releaseAtDate
       };
       cohortMap.set(key, record);
     }
@@ -3607,17 +3605,17 @@ export function buildInstructorDashboard({
   tutorAvailability = [],
   tutorBookings = [],
   liveClassrooms = [],
-  assets = [],
-  assetEvents = [],
+  assets: _assets = [],
+  assetEvents: _assetEvents = [],
   communityMemberships = [],
   communityStats = [],
-  communityResources = [],
-  communityPosts = [],
+  communityResources: _communityResources = [],
+  communityPosts: _communityPosts = [],
   adsCampaigns = [],
   adsMetrics = [],
   paywallTiers = [],
   communitySubscriptions = [],
-  ebookRows = [],
+  ebookRows: _ebookRows = [],
   ebookProgressRows = []
 } = {}) {
   const hasSignals =
@@ -4530,6 +4528,26 @@ export default class DashboardService {
           : null
       }));
 
+      learnerFieldServiceWorkspace = null;
+      const fieldServiceOrders = await FieldServiceOrderModel.listForUser(user.id);
+      if (fieldServiceOrders.length) {
+        const fieldServiceOrderIds = fieldServiceOrders.map((order) => order.id).filter(Boolean);
+        const fieldServiceEvents = fieldServiceOrderIds.length
+          ? await FieldServiceEventModel.listByOrderIds(fieldServiceOrderIds)
+          : [];
+        const providerIds = Array.from(new Set(fieldServiceOrders.map((order) => order.providerId).filter(Boolean)));
+        const fieldServiceProviders = providerIds.length
+          ? await FieldServiceProviderModel.listByIds(providerIds)
+          : [];
+        learnerFieldServiceWorkspace = buildFieldServiceWorkspace({
+          now: referenceDate,
+          user,
+          orders: fieldServiceOrders,
+          events: fieldServiceEvents,
+          providers: fieldServiceProviders
+        });
+      }
+
       multiRoleLearnerSnapshot =
         buildLearnerDashboard({
           user,
@@ -4554,7 +4572,7 @@ export default class DashboardService {
           messagingSummary: null,
           notifications: [],
           libraryEntries,
-          fieldServiceWorkspace,
+          fieldServiceWorkspace: learnerFieldServiceWorkspace,
           financialProfile,
           paymentMethods: paymentMethodsRaw,
           billingContacts: billingContactsRaw,
@@ -4703,6 +4721,10 @@ export default class DashboardService {
 
     let learnerSnapshot;
     let communitySnapshot;
+    let multiRoleLearnerSnapshot;
+    let multiRoleCommunitySnapshot;
+    let libraryEntries = [];
+    let learnerFieldServiceWorkspace = null;
 
     try {
       const [
@@ -4758,7 +4780,7 @@ export default class DashboardService {
       ]);
 
       communityMemberships = memberships ?? [];
-      const libraryEntries = await LearnerLibraryEntryModel.listByUserId(user.id);
+      libraryEntries = await LearnerLibraryEntryModel.listByUserId(user.id);
       const courseIds = Array.from(new Set(learnerEnrollments.map((enrollment) => enrollment.courseId).filter(Boolean)));
       const learnerCourses = courseIds.length ? await CourseModel.listByIds(courseIds) : [];
       const learnerAssignments = courseIds.length ? await CourseAssignmentModel.listByCourseIds(courseIds) : [];
@@ -4821,28 +4843,6 @@ export default class DashboardService {
           progress: Number(pipeline.progress ?? pipeline.completion ?? 50)
         }));
       });
-
-      const fieldServiceOrders = await FieldServiceOrderModel.listForUser(user.id);
-      let learnerFieldServiceWorkspace = null;
-      if (fieldServiceOrders.length) {
-        const fieldServiceOrderIds = fieldServiceOrders.map((order) => order.id).filter(Boolean);
-        const fieldServiceEvents = fieldServiceOrderIds.length
-          ? await FieldServiceEventModel.listByOrderIds(fieldServiceOrderIds)
-          : [];
-        const providerIds = Array.from(
-          new Set(fieldServiceOrders.map((order) => order.providerId).filter(Boolean))
-        );
-        const fieldServiceProviders = providerIds.length
-          ? await FieldServiceProviderModel.listByIds(providerIds)
-          : [];
-        learnerFieldServiceWorkspace = buildFieldServiceWorkspace({
-          now: referenceDate,
-          user,
-          orders: fieldServiceOrders,
-          events: fieldServiceEvents,
-          providers: fieldServiceProviders
-        });
-      }
 
       const [financialProfile, financePurchasesRaw, financeSubscriptionsRaw, systemPreferencesRaw] = await Promise.all([
         LearnerFinancialProfileModel.findByUserId(user.id),

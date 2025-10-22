@@ -1,4 +1,5 @@
-const JSON_EMPTY_OBJECT = JSON.stringify({});
+import { jsonDefault } from './_helpers/utils.js';
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 
 export async function up(knex) {
   const hasModerationState = await knex.schema.hasColumn('community_posts', 'moderation_state');
@@ -8,7 +9,7 @@ export async function up(knex) {
         .enum('moderation_state', ['clean', 'pending', 'under_review', 'escalated', 'rejected', 'suppressed'])
         .notNullable()
         .defaultTo('clean');
-      table.json('moderation_metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('moderation_metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('last_moderated_at');
       table.index(['community_id', 'moderation_state'], 'community_posts_moderation_idx');
     });
@@ -59,7 +60,7 @@ export async function up(knex) {
         .defaultTo('user_report');
       table.string('reason', 500).notNullable();
       table.integer('risk_score').unsigned().notNullable().defaultTo(0);
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('escalated_at');
       table.timestamp('resolved_at');
       table
@@ -101,7 +102,7 @@ export async function up(knex) {
         .enum('action', ['flagged', 'updated', 'assigned', 'escalated', 'approved', 'rejected', 'suppressed', 'restored', 'comment'])
         .notNullable();
       table.string('notes', 1000);
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.index(['case_id']);
       table.index(['action']);
@@ -136,7 +137,7 @@ export async function up(knex) {
       table.integer('risk_score').unsigned().notNullable().defaultTo(0);
       table.string('reason', 500).notNullable();
       table.text('description');
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table
         .integer('handled_by')
         .unsigned()
@@ -170,7 +171,7 @@ export async function up(knex) {
       table.string('entity_id', 120).notNullable();
       table.string('event_type', 160).notNullable();
       table.integer('risk_score').unsigned();
-      table.json('metrics').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metrics').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.string('source', 120).notNullable().defaultTo('manual');
       table.timestamp('occurred_at').notNullable().defaultTo(knex.fn.now());
       table.timestamp('ingested_at').notNullable().defaultTo(knex.fn.now());

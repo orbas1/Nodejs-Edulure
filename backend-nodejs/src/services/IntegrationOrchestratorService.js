@@ -194,6 +194,7 @@ export class IntegrationOrchestratorService {
 
     this.hubspotEnabled = Boolean(this.hubspotConfig.enabled && this.hubspotClient);
     this.salesforceEnabled = Boolean(this.salesforceConfig.enabled && this.salesforceClient);
+    this.enabled = this.hubspotEnabled || this.salesforceEnabled;
 
     this.hubspotEnvironment = this.hubspotConfig.environment ?? 'production';
     this.salesforceEnvironment = this.salesforceConfig.environment ?? 'production';
@@ -270,11 +271,25 @@ export class IntegrationOrchestratorService {
 
   start() {
     if (this.started) {
-      return;
+      return {
+        status: this.enabled ? 'ready' : 'disabled',
+        message: this.enabled
+          ? 'Integration orchestrator already running'
+          : 'Integration orchestrator disabled – no CRM integrations enabled'
+      };
+    }
+
+    if (!this.enabled) {
+      this.logger.warn('Integration orchestrator disabled – no CRM integrations enabled');
+      this.started = true;
+      this.tasks = [];
+      return {
+        status: 'disabled',
+        message: 'Integration orchestrator disabled – no CRM integrations enabled'
+      };
     }
 
     const scheduled = [];
-
     const validate = this.scheduler.validate ?? (() => true);
 
     if (this.hubspotEnabled) {
@@ -328,16 +343,24 @@ export class IntegrationOrchestratorService {
     this.tasks = scheduled;
     this.started = true;
 
+    const scheduledCount = scheduled.length;
+    const message = scheduledCount
+      ? `Integration orchestrator scheduled (${scheduledCount} tasks)`
+      : 'Integration orchestrator idle – no schedules active';
+
     this.logger.info(
       {
         hubspotEnabled: this.hubspotEnabled,
         salesforceEnabled: this.salesforceEnabled,
         hubspotCron: this.hubspotCron,
         salesforceCron: this.salesforceCron,
-        reconciliationCron: this.reconciliationCron
+        reconciliationCron: this.reconciliationCron,
+        scheduledTasks: scheduledCount
       },
       'Integration orchestrator scheduled'
     );
+
+    return { status: 'ready', message };
   }
 
   stop() {
@@ -443,33 +466,55 @@ export class IntegrationOrchestratorService {
         windowEndAt: resolvedWindowEnd
       });
 
-      const outboundResults = await this.hubspotClient.upsertContacts(contactsPayload.contacts);
+      const hasContacts = Array.isArray(contactsPayload.contacts) && contactsPayload.contacts.length > 0;
+      let outboundResults = { succeeded: 0, failed: 0, results: [] };
 
-      if (outboundResults.succeeded) {
-        syncRecordCounter.inc({ integration: 'hubspot', direction: 'outbound', outcome: 'succeeded' }, outboundResults.succeeded);
-      }
-      if (outboundResults.failed) {
-        syncRecordCounter.inc({ integration: 'hubspot', direction: 'outbound', outcome: 'failed' }, outboundResults.failed);
+      if (hasContacts) {
+        outboundResults = await this.hubspotClient.upsertContacts(contactsPayload.contacts);
+      } else {
+        this.logger.info(
+          { correlationId, trigger, windowStartAt: resolvedWindowStart?.toISOString?.() },
+          'No HubSpot contacts to sync for window'
+        );
       }
 
-      await this.resultModel.bulkInsert(
-        outboundResults.results.map((result) => ({
-          syncRunId: run.id,
-          integration: 'hubspot',
-          entityType: 'contact',
-          entityId: result.source.email,
-          externalId: result.hubspotId,
-          direction: 'outbound',
-          operation: 'upsert',
-          status: result.status === 'FAILED' ? 'failed' : 'succeeded',
-          message: result.message ?? null,
-          payload: result.source.properties
-        }))
-      );
+      const outboundSucceeded = Number(outboundResults.succeeded ?? 0);
+      const outboundFailed = Number(outboundResults.failed ?? 0);
+      const outboundRecords = Array.isArray(outboundResults.results) ? outboundResults.results : [];
+
+      if (outboundSucceeded) {
+        syncRecordCounter.inc(
+          { integration: 'hubspot', direction: 'outbound', outcome: 'succeeded' },
+          outboundSucceeded
+        );
+      }
+      if (outboundFailed) {
+        syncRecordCounter.inc(
+          { integration: 'hubspot', direction: 'outbound', outcome: 'failed' },
+          outboundFailed
+        );
+      }
+
+      if (outboundRecords.length) {
+        await this.resultModel.bulkInsert(
+          outboundRecords.map((result) => ({
+            syncRunId: run.id,
+            integration: 'hubspot',
+            entityType: 'contact',
+            entityId: result.source.email,
+            externalId: result.hubspotId,
+            direction: 'outbound',
+            operation: 'upsert',
+            status: result.status === 'FAILED' ? 'failed' : 'succeeded',
+            message: result.message ?? null,
+            payload: result.source.properties
+          }))
+        );
+      }
 
       await this.runModel.incrementCounters(run.id, {
-        pushed: outboundResults.succeeded,
-        failed: outboundResults.failed,
+        pushed: outboundSucceeded,
+        failed: outboundFailed,
         metadataPatch: {
           outboundCandidates: contactsPayload.contacts.length,
           outboundSkipped: contactsPayload.skipped
@@ -489,13 +534,13 @@ export class IntegrationOrchestratorService {
         }
       });
 
-      const status = outboundResults.failed > 0 ? 'partial' : 'succeeded';
+      const status = outboundFailed > 0 ? 'partial' : 'succeeded';
       const completedRun = await this.runModel.markCompleted(run.id, {
         status,
         finishedAt: new Date(),
-        recordsPushed: outboundResults.succeeded,
+        recordsPushed: outboundSucceeded,
         recordsPulled: inboundSample.count,
-        recordsFailed: outboundResults.failed,
+        recordsFailed: outboundFailed,
         recordsSkipped: contactsPayload.skipped,
         metadata: {
           outbound: contactsPayload.summary,
@@ -1016,6 +1061,19 @@ export class IntegrationOrchestratorService {
   }
 
   async collectHubSpotInbound({ windowStartAt, runId }) {
+    if (!this.hubspotClient?.searchContacts) {
+      this.logger.warn('HubSpot client does not support contact search; skipping inbound sampling');
+      return {
+        count: 0,
+        nextAfter: null,
+        summary: {
+          pages: 0,
+          sampled: 0,
+          windowStartAt: toIsoOrNull(windowStartAt)
+        }
+      };
+    }
+
     const entries = [];
     let after;
     let pages = 0;

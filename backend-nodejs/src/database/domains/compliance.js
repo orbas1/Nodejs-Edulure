@@ -15,7 +15,16 @@ const DSR_TYPES = ['access', 'erasure', 'rectification', 'portability', 'restric
 const DSR_STATUSES = ['pending', 'in_review', 'awaiting_user', 'completed', 'rejected', 'cancelled'];
 const INCIDENT_CATEGORIES = ['scam', 'fraud', 'account_takeover', 'abuse', 'data_breach', 'other'];
 const INCIDENT_SEVERITIES = ['low', 'medium', 'high', 'critical'];
-const INCIDENT_STATUSES = ['open', 'triaged', 'mitigated', 'resolved', 'false_positive'];
+const INCIDENT_STATUSES = [
+  'new',
+  'open',
+  'triaged',
+  'mitigating',
+  'mitigated',
+  'resolved',
+  'dismissed',
+  'false_positive'
+];
 const CDC_STATUSES = ['pending', 'delivered', 'failed'];
 
 function resolveDialect(knex) {
@@ -51,7 +60,14 @@ function defaultUuid(knex) {
 function addUtcDays(knex, days) {
   const dialect = resolveDialect(knex);
   if (dialect.includes('mysql')) {
-    return knex.raw(`DATE_ADD(UTC_TIMESTAMP(), INTERVAL ${days} DAY)`);
+    const raw = knex.raw(`(UTC_TIMESTAMP() + INTERVAL ${days} DAY)`);
+    const wrapper = () => raw.toQuery();
+    Object.assign(wrapper, raw, {
+      isRawInstance: true,
+      toSQL: (...args) => raw.toSQL(...args),
+      toQuery: (...args) => raw.toQuery(...args)
+    });
+    return wrapper;
   }
   if (dialect.includes('pg')) {
     return knex.raw(`(NOW() AT TIME ZONE 'UTC' + INTERVAL '${days} day')`);
@@ -70,8 +86,26 @@ function addBinaryColumn(table, knex, columnName, length = 4096) {
   return table.specificType(columnName, 'BLOB').nullable();
 }
 
-function createJsonDefault() {
-  return JSON.stringify({});
+function jsonDefaultValue(knex, value = {}) {
+  const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+  const dialect = resolveDialect(knex);
+
+  if (dialect.includes('pg')) {
+    return knex.raw('?::jsonb', [serialized]);
+  }
+
+  if (dialect.includes('mysql')) {
+    const raw = knex.raw('(CAST(? AS JSON))', [serialized]);
+    const wrapper = () => raw.toQuery();
+    Object.assign(wrapper, raw, {
+      isRawInstance: true,
+      toSQL: (...args) => raw.toSQL(...args),
+      toQuery: (...args) => raw.toQuery(...args)
+    });
+    return wrapper;
+  }
+
+  return serialized;
 }
 
 async function ensureTable(knex, tableName, schemaBuilder) {
@@ -103,14 +137,14 @@ function defineAuditEventsTable(table, knex) {
   table.string('event_severity', 32).notNullable().defaultTo('info');
   table.string('entity_type', 120).notNullable();
   table.string('entity_id', 120).notNullable();
-  table.json('payload').notNullable().defaultTo(createJsonDefault());
+  table.json('payload').notNullable().defaultTo(jsonDefaultValue(knex));
   addBinaryColumn(table, knex, 'ip_address_ciphertext', 256);
   table.string('ip_address_hash', 128).nullable();
   table.string('request_id', 64).nullable();
   table.timestamp('occurred_at').notNullable().defaultTo(knex.fn.now());
   table.timestamp('ingested_at').notNullable().defaultTo(knex.fn.now());
   table.string('encryption_key_version', 36).notNullable().defaultTo('v1');
-  table.json('metadata').notNullable().defaultTo(createJsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefaultValue(knex));
   table.index(['tenant_id', 'occurred_at'], 'audit_events_tenant_occurred_idx');
   table.index(['entity_type', 'entity_id', 'occurred_at'], 'audit_events_entity_idx');
   table.index(['event_type', 'event_severity', 'occurred_at'], 'audit_events_event_idx');
@@ -133,9 +167,9 @@ function defineConsentPoliciesTable(table, knex) {
   table.string('supersedes_version', 32);
   table.string('title', 191).notNullable();
   table.text('summary').notNullable();
-  table.json('document_locations').notNullable().defaultTo(createJsonDefault());
+  table.json('document_locations').notNullable().defaultTo(jsonDefaultValue(knex));
   table.string('content_hash', 128).notNullable();
-  table.json('metadata').notNullable().defaultTo(createJsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefaultValue(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
   table.unique(['policy_key', 'version'], 'consent_policies_unique_version');
@@ -188,7 +222,7 @@ function defineConsentRecordsTable(table, knex) {
   addBinaryColumn(table, knex, 'evidence_ciphertext');
   table.string('evidence_checksum', 128).nullable();
   table.string('encryption_key_version', 36).notNullable().defaultTo('v1');
-  table.json('metadata').notNullable().defaultTo(createJsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefaultValue(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
   table.unique(['tenant_id', 'user_id', 'consent_type', 'policy_version'], 'consent_records_user_policy_unique');
@@ -241,7 +275,7 @@ function defineDsrRequestsTable(table, knex) {
   addBinaryColumn(table, knex, 'request_ciphertext');
   addBinaryColumn(table, knex, 'response_ciphertext');
   table.string('encryption_key_version', 36).notNullable().defaultTo('v1');
-  table.json('metadata').notNullable().defaultTo(createJsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefaultValue(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
   table.index(['tenant_id', 'status', 'due_at'], 'dsr_requests_status_due_idx');
@@ -290,18 +324,22 @@ function defineSecurityIncidentsTable(table, knex) {
     })
     .notNullable()
     .defaultTo('open');
+  table.string('source', 120).notNullable().defaultTo('manual');
+  table.string('external_case_id', 64);
   table.string('title', 191).notNullable();
   table.text('description').notNullable();
-  table.json('impact_assessment').notNullable().defaultTo(createJsonDefault());
-  table.json('containment_actions').notNullable().defaultTo(createJsonDefault());
+  table.json('impact_assessment').notNullable().defaultTo(jsonDefaultValue(knex));
+  table.json('containment_actions').notNullable().defaultTo(jsonDefaultValue(knex));
   addBinaryColumn(table, knex, 'evidence_ciphertext');
   table.string('evidence_checksum', 128).nullable();
   table.boolean('requires_notification').notNullable().defaultTo(false);
+  table.timestamp('reported_at').notNullable().defaultTo(knex.fn.now());
   table.timestamp('detected_at').notNullable().defaultTo(knex.fn.now());
+  table.timestamp('triaged_at');
   table.timestamp('acknowledged_at');
   table.timestamp('resolved_at');
   table.timestamp('notified_at');
-  table.json('metadata').notNullable().defaultTo(createJsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefaultValue(knex));
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   timestampWithAutoUpdate(knex, table);
   table.index(['tenant_id', 'severity', 'status'], 'security_incidents_status_idx');
@@ -330,7 +368,7 @@ function defineCdcOutboxTable(table, knex) {
     .defaultTo('pending');
   table.boolean('dry_run').notNullable().defaultTo(false);
   table.string('correlation_id', 64).notNullable();
-  table.json('payload').notNullable().defaultTo(createJsonDefault());
+  table.json('payload').notNullable().defaultTo(jsonDefaultValue(knex));
   table.integer('retry_count').unsigned().notNullable().defaultTo(0);
   table.timestamp('next_attempt_at').defaultTo(knex.fn.now());
   table.timestamp('last_attempt_at');
@@ -357,7 +395,7 @@ function definePartitionArchiveTable(table, knex) {
   table.bigInteger('row_count').unsigned().notNullable().defaultTo(0);
   table.bigInteger('byte_size').unsigned().notNullable().defaultTo(0);
   table.string('checksum', 128);
-  table.json('metadata').notNullable().defaultTo(createJsonDefault());
+  table.json('metadata').notNullable().defaultTo(jsonDefaultValue(knex));
   table.unique(['table_name', 'partition_name'], 'partition_archives_unique_partition');
   table.index(['table_name', 'archived_at'], 'partition_archives_table_archived_idx');
   table.index(['table_name', 'dropped_at'], 'partition_archives_dropped_idx');
@@ -365,7 +403,7 @@ function definePartitionArchiveTable(table, knex) {
 
 async function applyPartitioning(knex, tableName, dateColumn) {
   const dialect = resolveDialect(knex);
-  if (!dialect.includes('mysql')) {
+  if (dialect.includes('mysql')) {
     return;
   }
 
@@ -418,7 +456,7 @@ async function seedPartitionPolicies(knex) {
     table.string('date_column', 64).notNullable();
     table.string('strategy', 64).notNullable();
     table.integer('retention_days').unsigned().notNullable().defaultTo(365);
-    table.json('metadata').notNullable().defaultTo(createJsonDefault());
+    table.json('metadata').notNullable().defaultTo(jsonDefaultValue(knex));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     timestampWithAutoUpdate(knex, table);
   });

@@ -51,15 +51,6 @@ export default function Register() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(ENFORCED_TWO_FACTOR_ROLES.has(defaultRole));
   const [twoFactorLocked, setTwoFactorLocked] = useState(ENFORCED_TWO_FACTOR_ROLES.has(defaultRole));
   const [twoFactorEnrollment, setTwoFactorEnrollment] = useState(null);
-  const [copiedSecret, setCopiedSecret] = useState(false);
-  const isClipboardSupported =
-    typeof navigator !== 'undefined' && Boolean(navigator?.clipboard?.writeText);
-  const formattedTwoFactorSecret = useMemo(() => {
-    if (!twoFactorEnrollment?.secret) {
-      return '';
-    }
-    return twoFactorEnrollment.secret.replace(/(.{4})/g, '$1 ').trim();
-  }, [twoFactorEnrollment]);
 
   usePageMetadata({
     title: 'Create your Edulure account',
@@ -97,7 +88,6 @@ export default function Register() {
       setTwoFactorLocked(enforced);
       setTwoFactorEnabled((prev) => (enforced ? true : prev));
       setTwoFactorEnrollment(null);
-      setCopiedSecret(false);
     }
   };
 
@@ -112,29 +102,11 @@ export default function Register() {
     }));
   };
 
-  const handleCopySecret = useCallback(async () => {
-    if (!twoFactorEnrollment?.secret) {
-      return;
-    }
-    if (typeof navigator === 'undefined' || !navigator?.clipboard?.writeText) {
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(twoFactorEnrollment.secret);
-      setCopiedSecret(true);
-      setTimeout(() => setCopiedSecret(false), 2000);
-    } catch (copyError) {
-      console.error('Failed to copy 2FA secret', copyError);
-      setCopiedSecret(false);
-    }
-  }, [twoFactorEnrollment]);
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
     setSuccess(null);
     setTwoFactorEnrollment(null);
-    setCopiedSecret(false);
 
     if (formState.password !== formState.confirmPassword) {
       setError('Passwords do not match.');
@@ -193,12 +165,10 @@ export default function Register() {
           ? 'Account created. Check your inbox to verify your email before signing in.'
           : 'Account created successfully.';
       const securityMessage = result.twoFactor?.enabled
-        ? ' Finish setting up multi-factor authentication below to complete your first login.'
+        ? ' Email one-time codes are now active and will be sent whenever you sign in.'
         : '';
       setSuccess(`${baseMessage}${securityMessage}`.trim());
-      if (!result.twoFactor?.enabled) {
-        setTimeout(() => navigate('/login'), 1600);
-      }
+      setTimeout(() => navigate('/login'), 1600);
     } catch (err) {
       const message =
         err?.original?.response?.data?.message ?? err?.message ?? 'Unable to create your account right now.';
@@ -349,10 +319,10 @@ export default function Register() {
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-slate-700">Multi-factor authentication</p>
                 <p className="text-xs text-slate-500">
-                  Secure your account with an authenticator challenge.{" "}
+                  Secure your account with email-delivered one-time passcodes.{" "}
                   {twoFactorLocked
                     ? ' This role requires multi-factor authentication on every sign in.'
-                    : ' You can opt in now and receive your setup key immediately.'}
+                    : ' Opt in now to receive sign-in codes by email whenever you log in.'}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -382,53 +352,17 @@ export default function Register() {
             </div>
             {!twoFactorLocked && !twoFactorEnabled ? (
               <p className="text-xs text-slate-400">
-                Turn this on to receive your authenticator setup instructions immediately after registration.
+                Turn this on to have email one-time codes enabled right after registration.
               </p>
             ) : null}
           </div>
           {twoFactorEnrollment?.enabled ? (
             <div className="space-y-4 rounded-3xl border border-primary/30 bg-white/90 px-6 py-6 shadow-card ring-1 ring-primary/10">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-primary">Finish securing your Learnspace</p>
+                <p className="text-sm font-semibold text-primary">Email codes are ready</p>
                 <p className="text-xs text-slate-500">
-                  Add Edulure to your authenticator app using this secret, then return to sign in with your new security code.
+                  We will send a six-digit security code to {formState.email || 'your email'} on every sign in. Check your inbox (and spam folder) when prompted.
                 </p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 px-4 py-3 font-mono text-sm tracking-[0.3em] text-primary">
-                  {formattedTwoFactorSecret}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCopySecret}
-                  disabled={!isClipboardSupported}
-                  className="rounded-full border border-primary px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
-                >
-                  {copiedSecret ? 'Secret copied' : 'Copy secret'}
-                </button>
-              </div>
-              {!isClipboardSupported ? (
-                <p className="text-xs text-amber-500">
-                  Clipboard access is unavailable in this browser. Enter the code manually in your authenticator app.
-                </p>
-              ) : null}
-              <div className="flex flex-col gap-2 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
-                {twoFactorEnrollment.otpauthUrl ? (
-                  <a
-                    href={twoFactorEnrollment.otpauthUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-primary transition hover:text-primary-dark"
-                  >
-                    Open authenticator setup
-                    <span aria-hidden="true">↗</span>
-                  </a>
-                ) : (
-                  <span className="text-slate-400">Use the secret above in your authenticator app.</span>
-                )}
-                <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
-                  Issuer: {twoFactorEnrollment.issuer ?? 'Edulure'}
-                </span>
               </div>
               <button
                 type="button"
@@ -460,14 +394,10 @@ export default function Register() {
           </label>
           <button
             type="submit"
-            disabled={isSubmitting || Boolean(twoFactorEnrollment?.enabled)}
+            disabled={isSubmitting}
             className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-primary/40"
           >
-            {twoFactorEnrollment?.enabled
-              ? 'Learnspace secured'
-              : isSubmitting
-              ? 'Creating account…'
-              : 'Launch Learnspace'}
+            {isSubmitting ? 'Creating account…' : 'Launch Learnspace'}
           </button>
         </form>
         <div className="space-y-4">

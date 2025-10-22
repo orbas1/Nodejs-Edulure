@@ -735,26 +735,58 @@ export default class LearnerDashboardController {
       if ('slug' in body) {
         payload.slug = normaliseSlugField(body.slug, 'Growth initiative slug');
       }
+
       const title = optionalStringField(body.title, 160);
-      if (title !== undefined) payload.title = title;
+      if (title !== undefined) {
+        payload.title = title;
+      }
+
       const status = optionalStringField(body.status, 30);
-      if (status !== undefined) payload.status = status;
-      if ('objective' in body) payload.objective = nullableStringField(body.objective, 500);
-      if ('primaryMetric' in body)
+      if (status !== undefined) {
+        payload.status = status;
+      }
+
+      if ('objective' in body) {
+        payload.objective = nullableStringField(body.objective, 500);
+      }
+
+      if ('primaryMetric' in body) {
         payload.primaryMetric = nullableStringField(body.primaryMetric, 120);
+      }
+
       const baselineValue = optionalNumberField(body.baselineValue, 'baselineValue');
-      if (baselineValue !== undefined) payload.baselineValue = baselineValue;
+      if (baselineValue !== undefined) {
+        payload.baselineValue = baselineValue;
+      }
+
       const targetValue = optionalNumberField(body.targetValue, 'targetValue');
-      if (targetValue !== undefined) payload.targetValue = targetValue;
+      if (targetValue !== undefined) {
+        payload.targetValue = targetValue;
+      }
+
       const currentValue = optionalNumberField(body.currentValue, 'currentValue');
-      if (currentValue !== undefined) payload.currentValue = currentValue;
+      if (currentValue !== undefined) {
+        payload.currentValue = currentValue;
+      }
+
       const startAt = optionalIsoDateField(body.startAt, 'startAt');
-      if (startAt !== undefined) payload.startAt = startAt;
+      if (startAt !== undefined) {
+        payload.startAt = startAt;
+      }
+
       const endAt = optionalIsoDateField(body.endAt, 'endAt');
-      if (endAt !== undefined) payload.endAt = endAt;
+      if (endAt !== undefined) {
+        payload.endAt = endAt;
+      }
+
       const tags = optionalStringArrayField(body.tags, { maxItems: 20, maxLength: 40 });
-      if (tags !== undefined) payload.tags = tags;
-      if ('metadata' in body) payload.metadata = normaliseMetadataField(body.metadata);
+      if (tags !== undefined) {
+        payload.tags = tags;
+      }
+
+      if ('metadata' in body) {
+        payload.metadata = normaliseMetadataField(body.metadata);
+      }
 
       const initiative = await LearnerDashboardService.updateGrowthInitiative(
         req.user.id,

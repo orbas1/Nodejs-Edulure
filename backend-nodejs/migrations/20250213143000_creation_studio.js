@@ -1,5 +1,6 @@
-const JSON_EMPTY_OBJECT = JSON.stringify({});
-const JSON_EMPTY_ARRAY = JSON.stringify([]);
+import { jsonDefault } from './_helpers/utils.js';
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
+const JSON_EMPTY_ARRAY = (knex) => jsonDefault(knex, []);
 
 export async function up(knex) {
   const hasProjects = await knex.schema.hasTable('creation_projects');
@@ -23,11 +24,11 @@ export async function up(knex) {
         .defaultTo('draft');
       table.string('title', 240).notNullable();
       table.text('summary');
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
-      table.json('content_outline').notNullable().defaultTo(JSON_EMPTY_ARRAY);
-      table.json('compliance_notes').notNullable().defaultTo(JSON_EMPTY_ARRAY);
-      table.json('analytics_targets').notNullable().defaultTo(JSON_EMPTY_OBJECT);
-      table.json('publishing_channels').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
+      table.json('content_outline').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
+      table.json('compliance_notes').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
+      table.json('analytics_targets').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
+      table.json('publishing_channels').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
       table.timestamp('review_requested_at');
       table.timestamp('approved_at');
       table.timestamp('published_at');
@@ -65,7 +66,7 @@ export async function up(knex) {
         .enum('role', ['owner', 'editor', 'commenter', 'viewer'])
         .notNullable()
         .defaultTo('editor');
-      table.json('permissions').notNullable().defaultTo(JSON.stringify([]));
+      table.json('permissions').notNullable().defaultTo(jsonDefault(knex, []));
       table.timestamp('added_at').defaultTo(knex.fn.now());
       table.timestamp('removed_at');
       table.unique(['project_id', 'user_id']);
@@ -93,7 +94,7 @@ export async function up(knex) {
         .references('id')
         .inTable('users')
         .onDelete('CASCADE');
-      table.json('governance_tags').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+      table.json('governance_tags').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
       table.timestamp('published_at');
       table.timestamp('retired_at');
       table.timestamp('created_at').defaultTo(knex.fn.now());
@@ -129,8 +130,8 @@ export async function up(knex) {
         .enum('role', ['owner', 'editor', 'commenter', 'viewer'])
         .notNullable()
         .defaultTo('editor');
-      table.json('capabilities').notNullable().defaultTo(JSON_EMPTY_ARRAY);
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('capabilities').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('joined_at').defaultTo(knex.fn.now());
       table.timestamp('last_heartbeat_at').defaultTo(knex.fn.now());
       table.timestamp('left_at');
@@ -161,7 +162,7 @@ export async function up(knex) {
         .inTable('users')
         .onDelete('CASCADE');
       table.json('snapshot').notNullable();
-      table.json('change_summary').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('change_summary').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.unique(['project_id', 'version_number']);
     });

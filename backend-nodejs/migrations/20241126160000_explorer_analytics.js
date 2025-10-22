@@ -1,4 +1,5 @@
-const JSON_EMPTY_OBJECT = JSON.stringify({});
+import { jsonDefault } from './_helpers/utils.js';
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 
 export async function up(knex) {
   const hasEvents = await knex.schema.hasTable('explorer_search_events');
@@ -18,10 +19,10 @@ export async function up(knex) {
       table.integer('result_total').unsigned().notNullable().defaultTo(0);
       table.boolean('is_zero_result').notNullable().defaultTo(false);
       table.integer('latency_ms').unsigned().notNullable().defaultTo(0);
-      table.json('filters').notNullable().defaultTo(JSON_EMPTY_OBJECT);
-      table.json('global_filters').notNullable().defaultTo(JSON_EMPTY_OBJECT);
-      table.json('sort_preferences').notNullable().defaultTo(JSON_EMPTY_OBJECT);
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('filters').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
+      table.json('global_filters').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
+      table.json('sort_preferences').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.unique(['event_uuid']);
       table.index(['created_at']);
@@ -48,7 +49,7 @@ export async function up(knex) {
       table.boolean('is_zero_result').notNullable().defaultTo(false);
       table.integer('click_count').unsigned().notNullable().defaultTo(0);
       table.integer('conversion_count').unsigned().notNullable().defaultTo(0);
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.unique(['event_id', 'entity_type']);
       table.index(['entity_type']);
@@ -71,7 +72,7 @@ export async function up(knex) {
       table.string('result_id', 191).notNullable();
       table.string('interaction_type', 60).notNullable();
       table.integer('position').unsigned().defaultTo(null);
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.index(['event_id']);
       table.index(['entity_type']);
@@ -92,7 +93,7 @@ export async function up(knex) {
       table.bigInteger('clicks').unsigned().notNullable().defaultTo(0);
       table.bigInteger('conversions').unsigned().notNullable().defaultTo(0);
       table.integer('average_latency_ms').unsigned().notNullable().defaultTo(0);
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.unique(['metric_date', 'entity_type']);
       table.index(['metric_date']);
       table.index(['entity_type']);
@@ -106,7 +107,7 @@ export async function up(knex) {
       table.string('alert_code', 120).notNullable();
       table.string('severity', 40).notNullable();
       table.string('message', 500).notNullable();
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('detected_at').defaultTo(knex.fn.now());
       table.timestamp('resolved_at').defaultTo(null);
       table.index(['alert_code']);
@@ -123,7 +124,7 @@ export async function up(knex) {
       table.decimal('metric_value', 14, 4).notNullable();
       table.decimal('lower_bound', 14, 4).notNullable();
       table.decimal('upper_bound', 14, 4).notNullable();
-      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('generated_at').defaultTo(knex.fn.now());
       table.unique(['forecast_code', 'target_date']);
       table.index(['forecast_code']);

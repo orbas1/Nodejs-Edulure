@@ -6,6 +6,7 @@ import { TABLES as TELEMETRY_TABLES } from '../src/database/domains/telemetry.js
 import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
+import { ensureSeedImage } from './_helpers/seedAssets.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -151,6 +152,7 @@ export async function seed(knex) {
     await trx('kyc_verifications').del();
     await trx('user_sessions').del();
     await trx('user_email_verification_tokens').del();
+    await trx('user_profiles').del();
     await trx('communities').del();
     await trx('users').del();
 
@@ -195,6 +197,52 @@ export async function seed(knex) {
     const adminVerificationRef = makeVerificationRef();
     const instructorVerificationRef = makeVerificationRef();
     const learnerVerificationRef = makeVerificationRef();
+
+    const adminAvatar = await ensureSeedImage('profile-amina-diallo', {
+      title: 'Amina Diallo',
+      subtitle: 'Platform operator',
+      badge: 'Admin',
+      colors: ['#14b8a6', '#0f766e']
+    });
+    const instructorAvatar = await ensureSeedImage('profile-kai-watanabe', {
+      title: 'Kai Watanabe',
+      subtitle: 'Automation strategist',
+      badge: 'Instructor',
+      colors: ['#f97316', '#ea580c']
+    });
+    const learnerAvatar = await ensureSeedImage('profile-noemi-carvalho', {
+      title: 'Noemi Carvalho',
+      subtitle: 'Learner community lead',
+      badge: 'Learner',
+      colors: ['#3b82f6', '#1d4ed8']
+    });
+
+    await trx('user_profiles').insert([
+      {
+        user_id: adminId,
+        display_name: 'Amina Diallo',
+        tagline: 'Platform operator',
+        location: 'Dakar, SN',
+        avatar_url: adminAvatar.url,
+        metadata: JSON.stringify({ role: 'admin', pronouns: 'she/her' })
+      },
+      {
+        user_id: instructorId,
+        display_name: 'Kai Watanabe',
+        tagline: 'Automation launch strategist',
+        location: 'Tokyo, JP',
+        avatar_url: instructorAvatar.url,
+        metadata: JSON.stringify({ role: 'instructor', pronouns: 'he/him' })
+      },
+      {
+        user_id: learnerId,
+        display_name: 'Noemi Carvalho',
+        tagline: 'Learner success partner',
+        location: 'Lisbon, PT',
+        avatar_url: learnerAvatar.url,
+        metadata: JSON.stringify({ role: 'learner', pronouns: 'she/her' })
+      }
+    ]);
 
     const [adminVerificationId] = await trx('kyc_verifications').insert({
       user_id: adminId,
@@ -348,6 +396,13 @@ export async function seed(knex) {
       }
     ]);
 
+    const learningOpsCover = await ensureSeedImage('community-learning-ops', {
+      title: 'Learning Ops Guild',
+      subtitle: 'Incident-proof live classrooms',
+      badge: 'Community access',
+      colors: ['#6366f1', '#4338ca']
+    });
+
     const [opsCommunityId] = await trx('communities').insert({
       owner_id: instructorId,
       name: 'Learning Ops Guild',
@@ -355,6 +410,7 @@ export async function seed(knex) {
       description:
         'Operations leaders share classroom launch playbooks, QA scorecards, and tooling automation recipes.',
       visibility: 'public',
+      cover_image_url: learningOpsCover.url,
       metadata: JSON.stringify({
         focus: ['operations', 'automation'],
         timezone: 'UTC',
@@ -366,12 +422,20 @@ export async function seed(knex) {
       })
     });
 
+    const growthLabCover = await ensureSeedImage('community-growth-lab', {
+      title: 'Creator Growth Lab',
+      subtitle: 'Experiment-led monetisation guild',
+      badge: 'Invitation only',
+      colors: ['#f97316', '#fb7185']
+    });
+
     const [growthCommunityId] = await trx('communities').insert({
       owner_id: adminId,
       name: 'Creator Growth Lab',
       slug: 'creator-growth-lab',
       description: 'Creators refine monetisation funnels, ad experiments, and marketplace launches together.',
       visibility: 'private',
+      cover_image_url: growthLabCover.url,
       metadata: JSON.stringify({
         focus: ['growth', 'ads'],
         ndaRequired: true,
@@ -634,6 +698,13 @@ export async function seed(knex) {
       metadata: JSON.stringify({ chapters: 8 })
     });
 
+    const growthPlaybookCover = await ensureSeedImage('ebook-creator-funnel', {
+      title: 'Creator Funnel Intelligence',
+      subtitle: 'Forecast actionable growth signals',
+      badge: 'E-book',
+      colors: ['#a855f7', '#6366f1']
+    });
+
     const [growthStrategiesEbookId] = await trx('ebooks').insert({
       public_id: crypto.randomUUID(),
       asset_id: growthPlaybookEbookAssetId,
@@ -656,6 +727,7 @@ export async function seed(knex) {
       status: 'published',
       is_public: true,
       release_at: trx.fn.now(),
+      cover_image_url: growthPlaybookCover.url,
       metadata: JSON.stringify({ cohort: 'beta-ops', featureFlag: 'explorer-ads-insights' })
     });
 
@@ -794,8 +866,8 @@ export async function seed(knex) {
         metadata: JSON.stringify({ requiresSso: true })
     });
 
-    const upcomingOpsWebinarStartAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-    const followUpOpsWebinarStartAt = new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString();
+    const upcomingOpsWebinarStartAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const followUpOpsWebinarStartAt = new Date(Date.now() + 12 * 24 * 60 * 60 * 1000);
 
     await trx('community_webinars').insert([
       {
@@ -954,6 +1026,13 @@ export async function seed(knex) {
       }
     ]);
 
+    const automationCourseArtwork = await ensureSeedImage('course-automation-masterclass', {
+      title: 'Automation Launch Masterclass',
+      subtitle: 'Incident rehearsal & telemetry playbooks',
+      badge: 'Advanced cohort',
+      colors: ['#0ea5e9', '#2563eb']
+    });
+
     const [opsAutomationCourseId] = await trx('courses').insert({
       public_id: crypto.randomUUID(),
       instructor_id: instructorId,
@@ -968,7 +1047,7 @@ export async function seed(knex) {
       tags: JSON.stringify(['Automation', 'Launch', 'Ops Guild']),
       languages: JSON.stringify(['en']),
       delivery_format: 'cohort',
-      thumbnail_url: 'https://cdn.edulure.test/thumbnails/automation-masterclass.png',
+      thumbnail_url: automationCourseArtwork.url,
       price_currency: 'USD',
       price_amount: 129900,
       rating_average: 4.8,
@@ -1388,6 +1467,10 @@ export async function seed(knex) {
       effective_from: trx.fn.now()
     });
 
+    const subscriptionTimestamp = new Date();
+    const nextYear = new Date(subscriptionTimestamp.getTime());
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+
     const [usageRecordId] = await trx('monetization_usage_records').insert({
       public_id: crypto.randomUUID(),
       tenant_id: 'global',
@@ -1441,10 +1524,6 @@ export async function seed(knex) {
       metadata: JSON.stringify({ seed: true, scheduleId, usageRecordId }),
       created_at: subscriptionTimestamp
     });
-
-    const subscriptionTimestamp = new Date();
-    const nextYear = new Date(subscriptionTimestamp.getTime());
-    nextYear.setFullYear(nextYear.getFullYear() + 1);
 
     const affiliateCommission = Math.floor(205092 * 0.2);
 
@@ -1569,6 +1648,7 @@ export async function seed(knex) {
       completed_sessions: 312,
       response_time_minutes: 18,
       is_verified: true,
+      avatar_url: instructorAvatar.url,
       metadata: JSON.stringify({ onboardingStatus: 'complete', calendlyLink: 'https://meet.edulure.test/kai' })
     });
 
@@ -2672,17 +2752,31 @@ export async function seed(knex) {
         assigned_to: adminId,
         category: 'scam',
         severity: 'high',
-        status: 'mitigating',
-        description_ciphertext: sealSensitive(
-          'Phishing payout update campaign blocked by heuristics before any funds were diverted.'
-        ),
-        notes_ciphertext: sealSensitive(
-          'Monitoring for replays across payout endpoints. Wallet monitoring enabled with on-call watchers.'
-        ),
+        status: 'triaged',
+        title: 'Payout phishing escalation',
+        description: 'Phishing payout update campaign blocked by heuristics before any funds were diverted.',
         source: 'fraud-desk',
         external_case_id: 'OPS-2045',
         reported_at: new Date('2025-02-03T08:45:00Z'),
         triaged_at: new Date('2025-02-03T09:02:00Z'),
+        acknowledged_at: new Date('2025-02-03T09:05:00Z'),
+        detected_at: new Date('2025-02-03T08:45:00Z'),
+        impact_assessment: JSON.stringify({
+          segments: ['Instructors', 'Payout admins'],
+          geos: ['GB', 'NG'],
+          metrics: { flaggedLearners: 32, blockedPayments: 11200 },
+          watchers: 14
+        }),
+        containment_actions: JSON.stringify({
+          summary:
+            'Monitoring for replays across payout endpoints. Wallet monitoring enabled with on-call watchers.',
+          currentOwner: 'Ops Duty Manager',
+          recommendedActions: [
+            'Lock payout profiles for flagged instructors until manual verification completes.',
+            'Publish phishing warning banner across operator dashboard and learner feed.',
+            'Trigger credential rotation advisory for impacted instructors.'
+          ]
+        }),
         metadata: JSON.stringify({
           reference: 'OPS-2045',
           summary:
@@ -2753,16 +2847,31 @@ export async function seed(knex) {
         category: 'account_takeover',
         severity: 'critical',
         status: 'triaged',
-        description_ciphertext: sealSensitive(
-          'Multiple admin MFA prompts originating from Lagos region indicated attempted account takeover of console users.'
-        ),
-        notes_ciphertext: sealSensitive(
-          'Initiated forced credential reset and session revocation. Monitoring elevated login attempts for 24 hours.'
-        ),
+        title: 'Admin account takeover attempt',
+        description:
+          'Multiple admin MFA prompts originating from Lagos region indicated attempted account takeover of console users.',
         source: 'pagerduty',
         external_case_id: 'OPS-2046',
         reported_at: new Date('2025-02-03T06:58:00Z'),
         triaged_at: new Date('2025-02-03T07:06:00Z'),
+        acknowledged_at: new Date('2025-02-03T07:07:00Z'),
+        detected_at: new Date('2025-02-03T06:58:00Z'),
+        impact_assessment: JSON.stringify({
+          segments: ['Admins'],
+          geos: ['NG', 'GB'],
+          metrics: { elevatedSessions: 4, blockedPayments: 0 },
+          watchers: 21
+        }),
+        containment_actions: JSON.stringify({
+          summary:
+            'Initiated forced credential reset and session revocation. Monitoring elevated login attempts for 24 hours.',
+          currentOwner: 'Security On Call',
+          recommendedActions: [
+            'Continue monitoring login anomalies for 24 hours.',
+            'Notify impacted admins to confirm device trust resets.',
+            'Capture indicators for fraud intelligence feeds.'
+          ]
+        }),
         metadata: JSON.stringify({
           reference: 'OPS-2046',
           summary:
@@ -2779,23 +2888,20 @@ export async function seed(knex) {
           resolution: {
             targetAt: '2025-02-03T08:37:00Z',
             resolutionSlaMinutes: 90,
-            resolutionBreached: false
+            resolutionBreached: false,
+            followUp: 'Run credential stuffing drill during next chaos exercise.'
           },
           recommendedActions: [
-            'Force logout on all admin sessions issued before 07:00 UTC.',
-            'Switch operator dashboard to elevated monitoring mode for four hours.',
-            'Issue security alert to leadership with mitigation summary and residual risk.'
+            'Continue monitoring login anomalies for 24 hours.',
+            'Notify impacted admins to confirm device trust resets.',
+            'Capture indicators for fraud intelligence feeds.'
           ],
           playbook: {
             id: 'account-takeover-high',
-            title: 'Account takeover emergency response',
+            title: 'Account takeover response (high severity)',
             url: 'https://runbooks.edulure.test/account-takeover-high'
           },
-          relatedCapabilities: [
-            'operator-dashboard',
-            'identity-authentication',
-            'platform-runtime-config'
-          ],
+          relatedCapabilities: ['identity-authentication', 'operator-dashboard'],
           attachments: [
             {
               type: 'link',
@@ -2836,15 +2942,28 @@ export async function seed(knex) {
         category: 'fraud',
         severity: 'medium',
         status: 'new',
-        description_ciphertext: sealSensitive(
-          'Learner reported suspicious marketplace listing cloning premium course material with fake payout link.'
-        ),
-        notes_ciphertext: sealSensitive(
-          'Waiting on compliance review for takedown and refund guidance. Social moderation notified.'
-        ),
+        title: 'Marketplace listing dispute',
+        description:
+          'Learner reported suspicious marketplace listing cloning premium course material with fake payout link.',
         source: 'support-portal',
         external_case_id: 'OPS-2047',
         reported_at: new Date('2025-02-02T19:22:00Z'),
+        detected_at: new Date('2025-02-02T19:22:00Z'),
+        impact_assessment: JSON.stringify({
+          segments: ['Learners'],
+          geos: ['BR'],
+          metrics: { flaggedLearners: 5, blockedPayments: 0 },
+          watchers: 6
+        }),
+        containment_actions: JSON.stringify({
+          summary: 'Waiting on compliance review for takedown and refund guidance. Social moderation notified.',
+          currentOwner: 'Compliance review queue',
+          recommendedActions: [
+            'Suspend listing until compliance review completes.',
+            'Notify impacted learners via secure messaging.',
+            'Capture evidence for payment dispute with processor.'
+          ]
+        }),
         metadata: JSON.stringify({
           reference: 'OPS-2047',
           summary: 'Marketplace listing flagged as fraudulent reseller attempt. Pending compliance takedown approval.',
@@ -2897,15 +3016,30 @@ export async function seed(knex) {
         category: 'scam',
         severity: 'high',
         status: 'resolved',
-        description_ciphertext: sealSensitive(
-          'Smishing attempt targeted payout administrators with credential harvesting messages.'
-        ),
-        notes_ciphertext: sealSensitive('Telecom takedown executed. No credentials compromised.'),
+        title: 'Smishing campaign against payout admins',
+        description: 'Smishing attempt targeted payout administrators with credential harvesting messages.',
         source: 'fraud-desk',
         external_case_id: 'OPS-2038',
         reported_at: new Date('2025-01-27T14:10:00Z'),
         triaged_at: new Date('2025-01-27T14:18:00Z'),
+        acknowledged_at: new Date('2025-01-27T14:19:00Z'),
+        detected_at: new Date('2025-01-27T14:10:00Z'),
         resolved_at: new Date('2025-01-27T17:42:00Z'),
+        impact_assessment: JSON.stringify({
+          segments: ['Admins'],
+          geos: ['GB'],
+          metrics: { flaggedLearners: 0, blockedPayments: 8200 },
+          watchers: 11
+        }),
+        containment_actions: JSON.stringify({
+          summary: 'Telecom takedown executed. No credentials compromised.',
+          currentOwner: 'Ops Duty Manager',
+          recommendedActions: [
+            'Maintain SMS filtering heuristics with telecom provider.',
+            'Publish post-incident summary for leadership.',
+            'Verify absence of credential reuse across admin accounts.'
+          ]
+        }),
         metadata: JSON.stringify({
           reference: 'OPS-2038',
           summary: 'Resolved smishing incident against payout admins after telecom takedown and credential rotation.',
@@ -2961,13 +3095,30 @@ export async function seed(knex) {
         category: 'abuse',
         severity: 'low',
         status: 'resolved',
-        description_ciphertext: sealSensitive('Community spam bots promoting referral codes across public channels.'),
-        notes_ciphertext: sealSensitive('Bots banned and moderation heuristics updated with new signatures.'),
+        title: 'Community spam bot sweep',
+        description: 'Community spam bots promoting referral codes across public channels.',
         source: 'community-report',
         external_case_id: 'OPS-2035',
         reported_at: new Date('2025-01-18T09:32:00Z'),
         triaged_at: new Date('2025-01-18T09:45:00Z'),
+        acknowledged_at: new Date('2025-01-18T09:46:00Z'),
+        detected_at: new Date('2025-01-18T09:32:00Z'),
         resolved_at: new Date('2025-01-18T10:12:00Z'),
+        impact_assessment: JSON.stringify({
+          segments: ['Community owners'],
+          geos: ['US'],
+          metrics: { flaggedLearners: 0, blockedPayments: 0 },
+          watchers: 5
+        }),
+        containment_actions: JSON.stringify({
+          summary: 'Bots banned and moderation heuristics updated with new signatures.',
+          currentOwner: 'Community Duty Manager',
+          recommendedActions: [
+            'Share updated spam signatures with moderation team.',
+            'Notify affected community owners of resolution.',
+            'Review moderation automation coverage for referral campaigns.'
+          ]
+        }),
         metadata: JSON.stringify({
           reference: 'OPS-2035',
           summary: 'Spam bots removed from communities following rapid moderation response.',
@@ -3615,7 +3766,7 @@ export async function seed(knex) {
         body:
           'Walk executive sponsors through the FY25 security, privacy, and resilience initiatives with clear risk posture updates and request for prioritisation feedback.',
         status: 'scheduled',
-        schedule_at: '2025-04-22T16:00:00.000Z',
+        schedule_at: new Date('2025-04-22T16:00:00Z'),
         sent_at: null,
         owner_email: 'enablement@edulure.com',
         metrics: JSON.stringify({
@@ -3641,7 +3792,7 @@ export async function seed(knex) {
         body:
           'Summarise milestone burn-down, highlight enablement resources, and flag required actions ahead of the May cut-over.',
         status: 'draft',
-        schedule_at: '2025-04-10T12:00:00.000Z',
+        schedule_at: new Date('2025-04-10T12:00:00Z'),
         sent_at: null,
         owner_email: 'partners@edulure.com',
         metrics: JSON.stringify({ targetAudience: 640, delivered: 0, expectedRecipients: 640 }),
@@ -3758,8 +3909,8 @@ export async function seed(knex) {
       scheduled_at: trx.fn.now(),
       started_at: trx.fn.now(),
       completed_at: null,
-      change_window_start: '2025-04-18T18:00:00.000Z',
-      change_window_end: '2025-04-18T19:00:00.000Z',
+      change_window_start: new Date('2025-04-18T18:00:00Z'),
+      change_window_end: new Date('2025-04-18T19:00:00Z'),
       summary_notes: 'Readiness rehearsal for Version 1.00 production cut-over.',
       checklist_snapshot: JSON.stringify(releaseChecklistSnapshot),
       metadata: JSON.stringify(releaseRunMetadata)

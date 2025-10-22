@@ -264,7 +264,7 @@ export default function ExplorerSearchSection({
                 value={queryDraft}
                 onChange={(event) => setQueryDraft(event.target.value)}
                 placeholder={placeholder}
-                className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-full border border-slate-200 bg-white px-6 py-3.5 text-base font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </label>
             <button

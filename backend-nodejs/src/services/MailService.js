@@ -86,6 +86,41 @@ function buildVerificationText({ verificationUrl, expiresAt }) {
   ].join('\n');
 }
 
+function buildTwoFactorHtml({ name, code, expiresAt }) {
+  return `<!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <title>Your Edulure sign-in code</title>
+      <style>
+        body { font-family: 'Inter', Arial, sans-serif; background: #0f172a0f; padding: 32px; color: #0f172a; }
+        .card { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 18px; padding: 32px; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12); }
+        .code { display: inline-flex; gap: 12px; font-size: 28px; font-weight: 700; letter-spacing: 6px; background: #eff6ff; color: #1d4ed8; padding: 18px 24px; border-radius: 9999px; }
+        .meta { color: #475569; font-size: 13px; }
+        p { line-height: 1.6; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>Hello ${name ?? 'there'},</h1>
+        <p>Use the code below to finish signing in to Edulure. This extra step keeps your communities, courses, and creator tools secure.</p>
+        <div class="code" role="presentation">${code.split('').join('&nbsp;')}</div>
+        <p class="meta">The code expires at ${expiresAt.toUTCString()}. If you didn't try to sign in, you can ignore this message.</p>
+      </div>
+    </body>
+  </html>`;
+}
+
+function buildTwoFactorText({ code, expiresAt }) {
+  return [
+    'Your Edulure sign-in code',
+    '',
+    `Code: ${code}`,
+    '',
+    `The code expires at ${expiresAt.toUTCString()}. If you did not try to sign in you can ignore this message.`
+  ].join('\n');
+}
+
 export class MailService {
   constructor(transporter = null) {
     this.transporter = transporter ?? getTransporter();
@@ -152,6 +187,16 @@ export class MailService {
     payload.html = `<pre>${body.replace(/</g, '&lt;')}</pre>`;
 
     return this.sendMail(payload);
+  }
+
+  async sendTwoFactorCode({ to, name, code, expiresAt }) {
+    return this.sendMail({
+      to,
+      subject: 'Your Edulure sign-in code',
+      html: buildTwoFactorHtml({ name, code, expiresAt }),
+      text: buildTwoFactorText({ code, expiresAt }),
+      headers: sanitizeHeaders({ 'X-Edulure-Template': 'two-factor-email-otp' })
+    });
   }
 }
 

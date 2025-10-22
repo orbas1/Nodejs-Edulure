@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BoltIcon, RocketLaunchIcon, MegaphoneIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 
 import {
   fetchCommunities,
@@ -41,6 +42,30 @@ const FEED_RANGE_OPTIONS = [
   { value: '90d', label: 'Last 90 days' },
   { value: '180d', label: 'Last 180 days' },
   { value: '365d', label: 'Last 12 months' }
+];
+
+const QUICK_ACTIONS = [
+  {
+    title: 'Share a win',
+    description: 'Publish a milestone update to your community timeline.',
+    action: 'Open composer',
+    href: '#compose',
+    icon: RocketLaunchIcon
+  },
+  {
+    title: 'Schedule a live session',
+    description: 'Plan your next cohort touchpoint or advisory AMA.',
+    action: 'Plan session',
+    href: '/dashboard/learner/live-classes',
+    icon: BoltIcon
+  },
+  {
+    title: 'Promote a resource',
+    description: 'Boost a course, ebook, or template to the Explorer.',
+    action: 'Launch Explorer',
+    href: '/explorer',
+    icon: MegaphoneIcon
+  }
 ];
 
 const CURATED_HIGHLIGHTS = [
@@ -979,9 +1004,9 @@ export default function Feed() {
               <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
                 Live operating feed
               </span>
-              <h1 className="text-2xl font-semibold text-slate-900">Bring your ecosystem to life with trusted updates, cohort stories, and verified wins.</h1>
+              <h1 className="text-2xl font-semibold text-slate-900">Focus your community energy for today.</h1>
               <p className="text-sm text-slate-600">
-                Follow top communities, spotlight your wins, and unlock curated playbooks across Edulure. Verified instructors surface here when their learners rave.
+                Publish a win, schedule a live moment, or boost a resource—then get back to supporting your operators.
               </p>
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <label className="flex items-center gap-2">
@@ -1007,7 +1032,7 @@ export default function Feed() {
               </div>
               {!isAuthenticated && (
                 <div className="inline-flex flex-wrap items-center gap-3 rounded-full bg-white px-4 py-2 text-xs font-semibold text-primary shadow-sm">
-                  Sign in with SSO or Google Authenticator to personalise this feed.
+                  Sign in with SSO or email one-time codes to personalise this feed.
                 </div>
               )}
             </div>
@@ -1037,6 +1062,30 @@ export default function Feed() {
               ))}
             </div>
           </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {QUICK_ACTIONS.map((item) => {
+            const ActionIcon = item.icon;
+            return (
+              <a
+                key={item.title}
+                href={item.href}
+                className="group flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg"
+              >
+                <div className="flex items-center gap-3 text-primary">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
+                    <ActionIcon className="h-5 w-5" />
+                  </span>
+                  <h2 className="text-sm font-semibold text-slate-900">{item.title}</h2>
+                </div>
+                <p className="mt-3 flex-1 text-sm text-slate-600">{item.description}</p>
+                <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                  {item.action}
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                </span>
+              </a>
+            );
+          })}
         </div>
         {!isAuthenticated && (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm text-slate-600">
@@ -1154,12 +1203,14 @@ export default function Feed() {
               )}
             </div>
             {isAuthenticated && canPostToCommunities && (
-              <FeedComposer
-                communities={composerCommunities}
-                defaultCommunityId={composerDefaultCommunityId}
-                disabled={isLoadingCommunities || !canPostToCommunities}
-                onPostCreated={handlePostCreated}
-              />
+              <div id="compose">
+                <FeedComposer
+                  communities={composerCommunities}
+                  defaultCommunityId={composerDefaultCommunityId}
+                  disabled={isLoadingCommunities || !canPostToCommunities}
+                  onPostCreated={handlePostCreated}
+                />
+              </div>
             )}
             {isAuthenticated && !canPostToCommunities && (
               <div className="rounded-3xl border border-slate-200 bg-white/70 p-6 text-sm text-slate-600">

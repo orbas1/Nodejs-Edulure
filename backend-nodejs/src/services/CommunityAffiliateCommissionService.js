@@ -2,10 +2,7 @@ import db from '../config/database.js';
 import CommunityAffiliateModel from '../models/CommunityAffiliateModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
-import * as PlatformSettingsModule from './PlatformSettingsService.js';
-
-const PlatformSettingsService =
-  PlatformSettingsModule.default ?? PlatformSettingsModule.PlatformSettingsService ?? PlatformSettingsModule;
+import PlatformSettingsService from './PlatformSettingsService.js';
 
 const getMonetizationSettings =
   typeof PlatformSettingsService?.getMonetizationSettings === 'function'

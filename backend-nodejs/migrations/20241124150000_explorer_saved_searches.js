@@ -1,4 +1,4 @@
-import { jsonDefault } from './_utils.js';
+import { jsonDefault } from './_helpers/utils.js';
 
 export async function up(knex) {
   const hasTable = await knex.schema.hasTable('saved_searches');

@@ -50,6 +50,8 @@ class RealtimeService {
       return this.io;
     }
 
+    this.activeConnections.clear();
+
     const corsPolicy = createCorsOriginValidator(env.app.corsOrigins ?? [], {
       allowDevelopmentOrigins: !env.isProduction
     });
@@ -189,6 +191,8 @@ class RealtimeService {
     log.info('Shutting down realtime service');
     this.io.removeAllListeners();
     this.io.close();
+    this.activeConnections.clear();
+    courseLiveService.reset();
     this.io = null;
   }
 

@@ -1,3 +1,5 @@
+import { jsonDefault } from './_helpers/utils.js';
+
 const DEFAULT_CHARSET = 'utf8mb4';
 const DEFAULT_COLLATION = 'utf8mb4_unicode_ci';
 
@@ -15,13 +17,15 @@ const applyTableDefaults = (table) => {
   }
 };
 
-const ensureJsonColumn = (table, columnName, { nullable = false } = {}) => {
-  const column = table.json(columnName);
-  if (!nullable) {
+const ensureJsonColumn = (table, columnName, knex, { nullable = false, defaultValue = {} } = {}) => {
+  const column = table.specificType(columnName, 'json');
+  if (nullable) {
+    column.nullable();
+  } else {
     column.notNullable();
   }
 
-  column.defaultTo('{}');
+  column.defaultTo(jsonDefault(knex, defaultValue));
   return column;
 };
 
@@ -57,7 +61,7 @@ export async function up(knex) {
         .inTable('users')
         .onDelete('SET NULL');
       table.timestamp('published_at');
-      ensureJsonColumn(table, 'metadata');
+      ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -92,7 +96,7 @@ export async function up(knex) {
         .defaultTo('pending');
       table.integer('attempts').unsigned().defaultTo(0);
       table.text('last_error');
-      ensureJsonColumn(table, 'result_metadata');
+      ensureJsonColumn(table, 'result_metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -122,7 +126,7 @@ export async function up(knex) {
       table.string('storage_bucket', 120).notNullable();
       table.string('checksum', 128);
       table.bigInteger('size_bytes');
-      ensureJsonColumn(table, 'metadata');
+      ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -184,7 +188,7 @@ export async function up(knex) {
         .references('id')
         .inTable('users')
         .onDelete('SET NULL');
-      ensureJsonColumn(table, 'payload');
+      ensureJsonColumn(table, 'payload', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table.index(['asset_id', 'event'], 'idx_content_audit_logs_event');
       table.index(['created_at'], 'idx_content_audit_logs_created_at');
@@ -210,7 +214,7 @@ export async function up(knex) {
         .inTable('users')
         .onDelete('SET NULL');
       table.string('event_type', 40).notNullable();
-      ensureJsonColumn(table, 'metadata');
+      ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('occurred_at').notNullable().defaultTo(knex.fn.now());
       table.index(['asset_id', 'event_type'], 'idx_content_asset_events_type');
       table.index(['occurred_at'], 'idx_content_asset_events_occurred_at');

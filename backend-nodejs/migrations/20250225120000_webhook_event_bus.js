@@ -1,5 +1,6 @@
-const JSON_EMPTY_OBJECT = JSON.stringify({});
-const JSON_EMPTY_ARRAY = JSON.stringify([]);
+import { jsonDefault } from './_helpers/utils.js';
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
+const JSON_EMPTY_ARRAY = (knex) => jsonDefault(knex, []);
 
 export async function up(knex) {
   await knex.schema.createTable('integration_webhook_subscriptions', (table) => {
@@ -9,10 +10,10 @@ export async function up(knex) {
       .notNullable()
       .defaultTo(knex.raw('(UUID())'));
     table.string('name', 128).notNullable();
-    table.string('target_url', 2048).notNullable();
+    table.string('target_url', 512).notNullable();
     table.boolean('enabled').notNullable().defaultTo(true);
-    table.json('event_types').notNullable().defaultTo(JSON_EMPTY_ARRAY);
-    table.json('static_headers').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+    table.json('event_types').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
+    table.json('static_headers').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
     table.string('signing_secret', 128).notNullable();
     table
       .integer('delivery_timeout_ms')
@@ -26,7 +27,7 @@ export async function up(knex) {
     table.integer('consecutive_failures').unsigned().notNullable().defaultTo(0);
     table.timestamp('last_failure_at').nullable();
     table.timestamp('circuit_open_until').nullable();
-    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     table
       .timestamp('updated_at')
@@ -52,7 +53,7 @@ export async function up(knex) {
     table.string('source', 64).notNullable();
     table.string('correlation_id', 64).notNullable();
     table.json('payload').notNullable();
-    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
     table.timestamp('first_queued_at').notNullable().defaultTo(knex.fn.now());
     table.timestamp('last_attempt_at').nullable();
     table.timestamp('delivered_at').nullable();
@@ -98,7 +99,7 @@ export async function up(knex) {
     table.text('response_body').nullable();
     table.string('error_code', 64).nullable();
     table.text('error_message').nullable();
-    table.json('delivery_headers').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+    table.json('delivery_headers').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
     table.timestamp('delivered_at').nullable();
     table.timestamp('failed_at').nullable();
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());

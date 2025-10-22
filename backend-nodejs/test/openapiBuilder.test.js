@@ -13,7 +13,6 @@ describe('generateServiceSpecs', () => {
   afterEach(async () => {
     while (tempDirs.length) {
       const dir = tempDirs.pop();
-      // eslint-disable-next-line no-await-in-loop
       await fs.rm(dir, { recursive: true, force: true });
     }
   });

@@ -1,4 +1,5 @@
-const JSON_EMPTY_OBJECT = JSON.stringify({});
+import { jsonDefault } from './_helpers/utils.js';
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 
 export async function up(knex) {
   await knex.schema.createTable('integration_api_keys', (table) => {
@@ -18,7 +19,7 @@ export async function up(knex) {
     table.timestamp('expires_at').nullable();
     table.timestamp('disabled_at').nullable();
     table.string('status', 24).notNullable().defaultTo('active');
-    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
     table.string('created_by', 128).notNullable();
     table.string('updated_by', 128).nullable();
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());

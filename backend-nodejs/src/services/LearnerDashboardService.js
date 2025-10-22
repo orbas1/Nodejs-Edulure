@@ -1427,7 +1427,7 @@ export default class LearnerDashboardService {
       lastKnownUpdate,
       expectedUpdatedAt,
       forceResolve,
-      clientSnapshot, // eslint-disable-line no-unused-vars
+      clientSnapshot: _clientSnapshot,
       ...candidatePayload
     } = payload ?? {};
 
@@ -1517,14 +1517,33 @@ export default class LearnerDashboardService {
     if (updatePayload.status !== undefined) updatePatch.status = nextStatus;
     if (updatePayload.priority !== undefined) updatePatch.priority = nextPriority;
     if (updatePayload.serviceType !== undefined) updatePatch.serviceType = normalisedServiceType;
-    if (updatePayload.summary !== undefined) updatePatch.summary = updatePayload.summary ?? existing.summary;
-    if (updatePayload.providerId !== undefined) updatePatch.providerId = updatePayload.providerId ?? existing.providerId;
-    if (updatePayload.scheduledFor !== undefined)
+    if (updatePayload.summary !== undefined) {
+      updatePatch.summary = updatePayload.summary ?? existing.summary;
+    }
+
+    if (updatePayload.providerId !== undefined) {
+      updatePatch.providerId = updatePayload.providerId ?? existing.providerId;
+    }
+
+    if (updatePayload.scheduledFor !== undefined) {
       updatePatch.scheduledFor = updatePayload.scheduledFor ?? existing.scheduledFor;
-    if (updatePayload.etaMinutes !== undefined) updatePatch.etaMinutes = updatePayload.etaMinutes;
-    if (updatePayload.slaMinutes !== undefined) updatePatch.slaMinutes = updatePayload.slaMinutes;
-    if (updatePayload.distanceKm !== undefined) updatePatch.distanceKm = updatePayload.distanceKm;
-    if (updatePayload.locationLabel !== undefined) updatePatch.locationLabel = updatePayload.locationLabel;
+    }
+
+    if (updatePayload.etaMinutes !== undefined) {
+      updatePatch.etaMinutes = updatePayload.etaMinutes;
+    }
+
+    if (updatePayload.slaMinutes !== undefined) {
+      updatePatch.slaMinutes = updatePayload.slaMinutes;
+    }
+
+    if (updatePayload.distanceKm !== undefined) {
+      updatePatch.distanceKm = updatePayload.distanceKm;
+    }
+
+    if (updatePayload.locationLabel !== undefined) {
+      updatePatch.locationLabel = updatePayload.locationLabel;
+    }
     updatePatch.metadata = metadata;
 
     const mergedOrder = {
@@ -1551,18 +1570,45 @@ export default class LearnerDashboardService {
       const suggestedAssignment = await buildFieldServiceAssignment({ userId, order: mergedOrder });
 
       const suggestedPayload = {};
-      if (updatePayload.status !== undefined) suggestedPayload.status = nextStatus;
-      if (updatePayload.priority !== undefined) suggestedPayload.priority = nextPriority;
-      if (updatePayload.serviceType !== undefined) suggestedPayload.serviceType = normalisedServiceType;
-      if (updatePayload.summary !== undefined) suggestedPayload.summary = updatePayload.summary ?? existing.summary;
-      if (updatePayload.providerId !== undefined)
+      if (updatePayload.status !== undefined) {
+        suggestedPayload.status = nextStatus;
+      }
+
+      if (updatePayload.priority !== undefined) {
+        suggestedPayload.priority = nextPriority;
+      }
+
+      if (updatePayload.serviceType !== undefined) {
+        suggestedPayload.serviceType = normalisedServiceType;
+      }
+
+      if (updatePayload.summary !== undefined) {
+        suggestedPayload.summary = updatePayload.summary ?? existing.summary;
+      }
+
+      if (updatePayload.providerId !== undefined) {
         suggestedPayload.providerId = updatePayload.providerId ?? existing.providerId;
-      if (updatePayload.scheduledFor !== undefined)
+      }
+
+      if (updatePayload.scheduledFor !== undefined) {
         suggestedPayload.scheduledFor = updatePayload.scheduledFor ?? existing.scheduledFor;
-      if (updatePayload.etaMinutes !== undefined) suggestedPayload.etaMinutes = updatePayload.etaMinutes;
-      if (updatePayload.slaMinutes !== undefined) suggestedPayload.slaMinutes = updatePayload.slaMinutes;
-      if (updatePayload.distanceKm !== undefined) suggestedPayload.distanceKm = updatePayload.distanceKm;
-      if (updatePayload.locationLabel !== undefined) suggestedPayload.locationLabel = updatePayload.locationLabel;
+      }
+
+      if (updatePayload.etaMinutes !== undefined) {
+        suggestedPayload.etaMinutes = updatePayload.etaMinutes;
+      }
+
+      if (updatePayload.slaMinutes !== undefined) {
+        suggestedPayload.slaMinutes = updatePayload.slaMinutes;
+      }
+
+      if (updatePayload.distanceKm !== undefined) {
+        suggestedPayload.distanceKm = updatePayload.distanceKm;
+      }
+
+      if (updatePayload.locationLabel !== undefined) {
+        suggestedPayload.locationLabel = updatePayload.locationLabel;
+      }
       if (
         updatePayload.attachments !== undefined ||
         updatePayload.fieldNotes !== undefined ||

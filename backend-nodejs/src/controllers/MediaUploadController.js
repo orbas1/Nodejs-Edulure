@@ -3,6 +3,7 @@ import Joi from 'joi';
 import storageService from '../services/StorageService.js';
 import { env } from '../config/env.js';
 import { success } from '../utils/httpResponse.js';
+import { storageDescriptor, storageBuckets } from '../config/storage.js';
 
 const KIND_CONFIG = {
   image: { prefix: 'media/images', visibility: 'public' },
@@ -87,9 +88,10 @@ export default class MediaUploadController {
         data: {
           upload: {
             url: upload.url,
-            method: 'PUT',
+            method: upload.method ?? 'PUT',
             headers: { 'Content-Type': payload.mimeType },
-            expiresAt: upload.expiresAt
+            expiresAt: upload.expiresAt,
+            token: upload.token ?? null
           },
           file: {
             storageKey: upload.key,
@@ -111,6 +113,51 @@ export default class MediaUploadController {
         error.status = 422;
         error.details = error.details.map((detail) => detail.message);
       }
+      return next(error);
+    }
+  }
+
+  static async completeLocalUpload(req, res, next) {
+    if (storageDescriptor.driver !== 'local') {
+      const error = new Error('Direct upload endpoint is only available in local storage mode');
+      error.status = 404;
+      return next(error);
+    }
+
+    try {
+      const token = req.params.token;
+      if (!token) {
+        const error = new Error('Upload token is required');
+        error.status = 400;
+        throw error;
+      }
+
+      const buffer = req.body;
+      if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+        const error = new Error('Upload payload is required');
+        error.status = 400;
+        throw error;
+      }
+
+      const contentType = req.headers['content-type'] ?? 'application/octet-stream';
+      const result = await storageService.completeDirectUpload(token, buffer, contentType);
+
+      return success(res, {
+        status: 201,
+        message: 'File uploaded',
+        data: {
+          storageKey: result.key,
+          storageBucket: result.bucket,
+          checksum: result.checksum,
+          contentType: result.contentType,
+          size: result.size,
+          publicUrl:
+            result.bucket === storageBuckets.public
+              ? storageService.buildPublicUrl({ bucket: result.bucket, key: result.key })
+              : null
+        }
+      });
+    } catch (error) {
       return next(error);
     }
   }

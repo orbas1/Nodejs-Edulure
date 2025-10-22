@@ -1,5 +1,6 @@
-const JSON_EMPTY_OBJECT = JSON.stringify({});
-const JSON_EMPTY_ARRAY = JSON.stringify([]);
+import { jsonDefault } from './_helpers/utils.js';
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
+const JSON_EMPTY_ARRAY = (knex) => jsonDefault(knex, []);
 
 export async function up(knex) {
   const hasTable = await knex.schema.hasTable('creation_recommendation_logs');
@@ -19,15 +20,15 @@ export async function up(knex) {
       table.string('feature_flag_key', 120).notNullable();
       table.string('feature_flag_state', 32).notNullable();
       table.string('feature_flag_variant', 64);
-      table.json('context').notNullable().defaultTo(JSON_EMPTY_OBJECT);
-      table.json('results').notNullable().defaultTo(JSON_EMPTY_ARRAY);
-      table.json('explainability').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('context').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
+      table.json('results').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
+      table.json('explainability').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('generated_at').defaultTo(knex.fn.now());
       table.timestamp('expires_at');
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.index(['tenant_id', 'recommendation_type']);
       table.index(['user_id', 'recommendation_type']);
-      table.index(['feature_flag_key', 'feature_flag_state']);
+      table.index(['feature_flag_key', 'feature_flag_state'], 'idx_cr_logs_flag_state');
       table.index(['generated_at']);
     });
   }

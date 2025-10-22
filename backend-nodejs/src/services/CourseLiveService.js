@@ -119,6 +119,10 @@ class CourseLiveService {
       }))
     };
   }
+
+  reset() {
+    this.sessions.clear();
+  }
 }
 
 const courseLiveService = new CourseLiveService();

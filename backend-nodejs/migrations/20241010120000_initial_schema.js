@@ -1,3 +1,5 @@
+import { jsonDefault } from './_helpers/utils.js';
+
 const DEFAULT_CHARSET = 'utf8mb4';
 const DEFAULT_COLLATION = 'utf8mb4_unicode_ci';
 
@@ -15,25 +17,20 @@ const applyTableDefaults = (table) => {
   }
 };
 
-const ensureJsonColumn = (table, columnName, { nullable = false } = {}) => {
-  const column = table.json(columnName);
-  if (!nullable) {
+const ensureJsonColumn = (table, columnName, knex, { nullable = false, defaultValue = {} } = {}) => {
+  const column = table.specificType(columnName, 'json');
+  if (nullable) {
+    column.nullable();
+  } else {
     column.notNullable();
   }
 
-  column.defaultTo('{}');
+  column.defaultTo(jsonDefault(knex, defaultValue));
   return column;
 };
 
-const ensureJsonArrayColumn = (table, columnName, { nullable = false } = {}) => {
-  const column = table.json(columnName);
-  if (!nullable) {
-    column.notNullable();
-  }
-
-  column.defaultTo('[]');
-  return column;
-};
+const ensureJsonArrayColumn = (table, columnName, knex, { nullable = false, defaultValue = [] } = {}) =>
+  ensureJsonColumn(table, columnName, knex, { nullable, defaultValue });
 
 export async function up(knex) {
   const hasUsers = await knex.schema.hasTable('users');
@@ -73,7 +70,7 @@ export async function up(knex) {
       table.text('description');
       table.string('cover_image_url', 500);
       table.enum('visibility', ['public', 'private']).notNullable().defaultTo('public');
-      ensureJsonColumn(table, 'metadata');
+      ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -128,7 +125,7 @@ export async function up(knex) {
       table.string('entity_type', 100).notNullable();
       table.string('entity_id', 100).notNullable();
       table.string('event_type', 100).notNullable();
-      ensureJsonColumn(table, 'payload', { nullable: true });
+      ensureJsonColumn(table, 'payload', knex, { nullable: true });
       table
         .integer('performed_by')
         .unsigned()
@@ -160,14 +157,14 @@ export async function up(knex) {
         .enu('status', ['active', 'inactive', 'suspended'])
         .notNullable()
         .defaultTo('active');
-      ensureJsonArrayColumn(table, 'specialties', { nullable: true });
+      ensureJsonArrayColumn(table, 'specialties', knex, { nullable: true });
       table.decimal('rating', 3, 2).notNullable().defaultTo(0);
       table.timestamp('last_check_in_at');
       table.decimal('location_lat', 10, 7);
       table.decimal('location_lng', 10, 7);
       table.string('location_label', 255);
       table.timestamp('location_updated_at');
-      ensureJsonColumn(table, 'metadata');
+      ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -216,7 +213,7 @@ export async function up(knex) {
       table.string('region', 120);
       table.string('postal_code', 24);
       table.string('country', 2).notNullable().defaultTo('GB');
-      ensureJsonColumn(table, 'metadata');
+      ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -246,7 +243,7 @@ export async function up(knex) {
       table.text('notes');
       table.string('author', 160);
       table.timestamp('occurred_at').notNullable();
-      ensureJsonColumn(table, 'metadata', { nullable: true });
+      ensureJsonColumn(table, 'metadata', knex, { nullable: true });
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table.index(['order_id'], 'idx_field_service_events_order');
       table.index(['occurred_at'], 'idx_field_service_events_occurred_at');

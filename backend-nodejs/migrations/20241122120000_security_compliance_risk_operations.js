@@ -1,4 +1,4 @@
-import { jsonDefault } from './_utils.js';
+import { jsonDefault } from './_helpers/utils.js';
 
 const RISK_TABLE = 'security_risk_register';
 const REVIEW_TABLE = 'security_risk_reviews';

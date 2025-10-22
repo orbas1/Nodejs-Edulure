@@ -21,7 +21,14 @@ export function jsonDefault(knex, fallback = '{}') {
   }
 
   if (isMysql(knex)) {
-    return knex.raw('CAST(? AS JSON)', [fallback]);
+    const raw = knex.raw('(CAST(? AS JSON))', [fallback]);
+    const wrapper = () => raw.toQuery();
+    Object.assign(wrapper, raw, {
+      isRawInstance: true,
+      toSQL: (...args) => raw.toSQL(...args),
+      toQuery: (...args) => raw.toQuery(...args)
+    });
+    return wrapper;
   }
 
   return knex.raw('?', [fallback]);

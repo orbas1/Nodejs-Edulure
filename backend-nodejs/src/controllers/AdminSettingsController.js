@@ -306,7 +306,7 @@ const emailUpdateSchema = Joi.object({
 
 const securityMethodSchema = Joi.object({
   id: Joi.string().trim().max(64).optional(),
-  type: Joi.string().valid('totp', 'sms', 'webauthn', 'email').insensitive().required(),
+  type: Joi.string().valid('email_otp', 'sms', 'webauthn').insensitive().required(),
   enabled: Joi.boolean(),
   description: Joi.string().trim().max(200).allow('', null)
 });

@@ -1,3 +1,4 @@
+import { jsonDefault } from './_helpers/utils.js';
 const TABLE_NAME = 'domain_event_dispatch_queue';
 
 const STATUS_ENUM = [
@@ -7,7 +8,7 @@ const STATUS_ENUM = [
   'failed',
   'discarded'
 ];
-const JSON_EMPTY_OBJECT = JSON.stringify({});
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 
 export async function up(knex) {
   const exists = await knex.schema.hasTable(TABLE_NAME);
@@ -50,7 +51,7 @@ export async function up(knex) {
     table.string('last_error', 500);
     table.timestamp('last_error_at');
     table.string('payload_checksum', 128).notNullable();
-    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
     table.boolean('dry_run').notNullable().defaultTo(false);
     table.string('trace_id', 64);
     table.string('correlation_id', 64);

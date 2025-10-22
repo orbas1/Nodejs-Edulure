@@ -3,12 +3,25 @@ const path = require('path');
 const { URL } = require('url');
 const dotenv = require('dotenv');
 
-const envFiles = ['.env.local', '.env'];
-for (const file of envFiles) {
-  const envPath = path.resolve(__dirname, file);
+const nodeEnv = (process.env.NODE_ENV ?? 'development').trim() || 'development';
+
+const envDescriptors = [
+  { filename: '.env', override: false },
+  { filename: `.env.${nodeEnv}`, override: false },
+  { filename: '.env.local', override: true },
+  { filename: `.env.${nodeEnv}.local`, override: true }
+];
+
+for (const descriptor of envDescriptors) {
+  const envPath = path.resolve(__dirname, descriptor.filename);
   if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
+    dotenv.config({ path: envPath, override: descriptor.override });
   }
+}
+
+const examplePath = path.resolve(__dirname, '.env.example');
+if (nodeEnv !== 'production' && !process.env.CI && fs.existsSync(examplePath)) {
+  dotenv.config({ path: examplePath, override: false });
 }
 
 const toInt = (value, fallback) => {
