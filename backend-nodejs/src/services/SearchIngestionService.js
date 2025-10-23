@@ -3,6 +3,7 @@ import logger from '../config/logger.js';
 import { env } from '../config/env.js';
 import { searchClusterService } from './SearchClusterService.js';
 import { recordSearchOperation, recordSearchIngestionRun } from '../observability/metrics.js';
+import SearchDocumentModel from '../models/SearchDocumentModel.js';
 import { ENTITY_CONFIG, SUPPORTED_ENTITIES } from './search/entityConfig.js';
 
 function safeJsonParse(value, fallback) {
@@ -124,14 +125,16 @@ export class SearchIngestionService {
     loggerInstance = logger,
     batchSize = env.search.ingestion.batchSize,
     deleteBeforeReindex = env.search.ingestion.deleteBeforeReindex,
-    loaders = {}
+    loaders = {},
+    documentModel = SearchDocumentModel
   } = {}) {
     this.clusterService = clusterService;
     this.db = dbClient;
     this.logger = loggerInstance;
     this.batchSize = Math.max(25, batchSize);
     this.deleteBeforeReindex = deleteBeforeReindex;
-    this.tableName = 'search_documents';
+    this.documentModel = documentModel;
+    this.tableName = documentModel.tableName;
 
     this.loaders = {
       communities: this.loadCommunities.bind(this),
@@ -180,7 +183,7 @@ export class SearchIngestionService {
 
     try {
       if (deleteBeforeSync) {
-        await this.db(this.tableName).where({ entity_type: indexName }).del();
+        await this.documentModel.deleteByEntity(indexName, this.db);
       }
 
       for await (const records of loader({ since, batchSize: this.batchSize })) {
@@ -355,28 +358,7 @@ export class SearchIngestionService {
       return;
     }
 
-    await this.db.transaction(async (trx) => {
-      for (const document of documents) {
-        const payload = {
-          entity_type: document.entityType,
-          document_id: document.documentId,
-          title: document.title ?? '',
-          slug: document.slug ?? null,
-          summary: document.summary ?? null,
-          body: document.body ?? null,
-          image_url: document.imageUrl ?? null,
-          tags: JSON.stringify(document.tags ?? []),
-          facets: JSON.stringify(document.facets ?? {}),
-          metrics: JSON.stringify(document.metrics ?? {}),
-          document: JSON.stringify(document.document ?? {})
-        };
-
-        await trx(this.tableName)
-          .insert(payload)
-          .onConflict(['entity_type', 'document_id'])
-          .merge({ ...payload, updated_at: trx.fn.now() });
-      }
-    });
+    await this.documentModel.bulkUpsert(documents, this.db);
   }
 
   async *loadCommunities({ since, batchSize }) {

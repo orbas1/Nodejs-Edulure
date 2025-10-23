@@ -1,11 +1,14 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
+import logger from '../src/config/logger.js';
 import { generateConsentPolicyChecksum } from '../src/database/domains/compliance.js';
 import { TABLES as TELEMETRY_TABLES } from '../src/database/domains/telemetry.js';
 import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
+import SearchDocumentModel from '../src/models/SearchDocumentModel.js';
+import { SearchIngestionService } from '../src/services/SearchIngestionService.js';
 import { ensureSeedImage } from './_helpers/seedAssets.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -65,6 +68,7 @@ const buildEncryptedKycDocument = (
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
+    await SearchDocumentModel.truncate(trx);
     await trx('analytics_forecasts').del();
     await trx('analytics_alerts').del();
     await trx('explorer_search_daily_metrics').del();
@@ -4000,4 +4004,23 @@ export async function seed(knex) {
       output: JSON.stringify({ recordsProcessed: 0, checksum: 'seed-init' })
     });
   });
+
+  const hasSearchTable = await knex.schema.hasTable(SearchDocumentModel.tableName);
+  if (hasSearchTable) {
+    const ingestionLogger = typeof logger.child === 'function'
+      ? logger.child({ task: 'seed:search-ingestion' })
+      : logger;
+    const ingestionService = new SearchIngestionService({
+      loggerInstance: ingestionLogger,
+      deleteBeforeReindex: true
+    });
+    await ingestionService.fullReindex();
+  } else if (logger?.warn) {
+    logger.warn(
+      {
+        table: SearchDocumentModel.tableName
+      },
+      'Skipping search ingestion during seed because table is unavailable'
+    );
+  }
 }

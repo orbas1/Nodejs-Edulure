@@ -1,42 +1,7 @@
 import db from '../../config/database.js';
 import logger from '../../config/logger.js';
+import SearchDocumentModel from '../../models/SearchDocumentModel.js';
 import { ENTITY_CONFIG, SUPPORTED_ENTITIES } from './entityConfig.js';
-
-function parseJson(column, fallback) {
-  if (column === null || column === undefined) {
-    return structuredClone(fallback);
-  }
-  if (typeof column === 'object') {
-    return { ...fallback, ...column };
-  }
-  try {
-    const parsed = JSON.parse(column);
-    if (Array.isArray(fallback)) {
-      return Array.isArray(parsed) ? parsed : structuredClone(fallback);
-    }
-    if (typeof parsed === 'object' && parsed !== null) {
-      return { ...fallback, ...parsed };
-    }
-    return structuredClone(fallback);
-  } catch (_error) {
-    return structuredClone(fallback);
-  }
-}
-
-function parseArray(column) {
-  if (column === null || column === undefined) {
-    return [];
-  }
-  if (Array.isArray(column)) {
-    return column;
-  }
-  try {
-    const parsed = JSON.parse(column);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (_error) {
-    return [];
-  }
-}
 
 function toSearchTerm(value) {
   if (!value) {
@@ -123,10 +88,12 @@ function dedupeStrings(values) {
 }
 
 export default class RelationalExplorerSearchProvider {
-  constructor({ dbClient = db, loggerInstance = logger } = {}) {
+  constructor({ dbClient = db, loggerInstance = logger, documentModel = SearchDocumentModel } = {}) {
     this.db = dbClient;
     this.logger = loggerInstance;
     this.maxRowsPerEntity = 750;
+    this.tableName = documentModel.tableName;
+    this.documentModel = documentModel;
   }
 
   ensureEntitySupported(entity) {
@@ -137,7 +104,7 @@ export default class RelationalExplorerSearchProvider {
 
   async fetchRows(entity, query) {
     this.ensureEntitySupported(entity);
-    const builder = this.db('search_documents')
+    const builder = this.db(this.tableName)
       .where('entity_type', entity)
       .orderBy('updated_at', 'desc')
       .limit(this.maxRowsPerEntity);
@@ -155,16 +122,16 @@ export default class RelationalExplorerSearchProvider {
   }
 
   mapRowToDocument(entity, row, query) {
-    const document = parseJson(row.document, {});
-    const facets = parseJson(row.facets, {});
-    const metrics = parseJson(row.metrics, {});
-    const tags = parseArray(row.tags);
+    const base = this.documentModel.deserialize(row) ?? {};
+    const document = base.document ?? {};
+    const facets = base.facets ?? {};
+    const metrics = base.metrics ?? {};
+    const tags = Array.isArray(document.tags) ? document.tags : base.tags ?? [];
 
-    const id = document.id ?? row.document_id ?? row.id;
-    const slug = document.slug ?? row.slug ?? null;
-    const mergedTags = Array.isArray(document.tags) ? document.tags : tags;
-    const summary = document.summary ?? row.summary ?? document.description ?? null;
-    const body = row.body ?? document.description ?? summary ?? '';
+    const id = document.id ?? base.documentId ?? row.document_id ?? row.id;
+    const slug = document.slug ?? base.slug ?? row.slug ?? null;
+    const summary = document.summary ?? base.summary ?? row.summary ?? document.description ?? null;
+    const body = base.body ?? row.body ?? document.description ?? summary ?? '';
 
     let score = 0;
     if (query) {
@@ -180,8 +147,8 @@ export default class RelationalExplorerSearchProvider {
         score += 5;
       }
     }
-    if (row.updated_at) {
-      score += Math.max(0, Date.now() - new Date(row.updated_at).getTime()) / -3600000;
+    if (base.updatedAt ?? row.updated_at) {
+      score += Math.max(0, Date.now() - new Date(base.updatedAt ?? row.updated_at).getTime()) / -3600000;
     }
 
     return {
@@ -191,12 +158,12 @@ export default class RelationalExplorerSearchProvider {
       entityType: entity,
       summary,
       raw: document,
-      tags: mergedTags,
+      tags,
       __facets: facets,
       __metrics: metrics,
       __score: score,
       __body: body,
-      __updatedAt: row.updated_at ?? null
+      __updatedAt: base.updatedAt ?? row.updated_at ?? null
     };
   }
 

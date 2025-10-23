@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SearchClusterService } from '../src/services/SearchClusterService.js';
+import SearchDocumentModel from '../src/models/SearchDocumentModel.js';
 
 describe('SearchClusterService', () => {
   let logger;
@@ -23,7 +24,7 @@ describe('SearchClusterService', () => {
     const service = new SearchClusterService({ dbClient: dbFn, loggerInstance: logger });
 
     await service.start();
-    expect(dbFn.schema.hasTable).toHaveBeenCalledWith('search_documents');
+    expect(dbFn.schema.hasTable).toHaveBeenCalledWith(SearchDocumentModel.tableName);
     expect(logger.info).toHaveBeenCalledWith('Edulure Search provider initialised using relational backend');
     expect(service.searchClient).not.toBeNull();
 
@@ -37,10 +38,12 @@ describe('SearchClusterService', () => {
 
     await service.bootstrap();
     const health = await service.checkClusterHealth();
+    expect(dbFn).toHaveBeenCalledWith(SearchDocumentModel.tableName);
     expect(health).toEqual({ status: 'healthy', documents: 4 });
 
     countSpy.mockResolvedValueOnce([{ total: 7 }]);
     const snapshot = await service.createSnapshot();
+    expect(dbFn).toHaveBeenCalledWith(SearchDocumentModel.tableName);
     expect(snapshot).toEqual(expect.objectContaining({ status: 'noop', documents: 7 }));
   });
 });

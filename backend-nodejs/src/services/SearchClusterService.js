@@ -2,6 +2,7 @@ import db from '../config/database.js';
 import logger from '../config/logger.js';
 import { recordSearchOperation, updateSearchIndexStatus, updateSearchNodeHealth } from '../observability/metrics.js';
 import RelationalExplorerSearchProvider from './search/RelationalExplorerSearchProvider.js';
+import SearchDocumentModel from '../models/SearchDocumentModel.js';
 import { SUPPORTED_ENTITIES } from './search/entityConfig.js';
 
 export class SearchClusterService {
@@ -9,11 +10,12 @@ export class SearchClusterService {
     this.db = dbClient;
     this.logger = loggerInstance;
     this.started = false;
+    this.tableName = SearchDocumentModel.tableName;
     this.provider = new RelationalExplorerSearchProvider({ dbClient: this.db, loggerInstance: this.logger });
   }
 
   async ensureTable() {
-    const exists = await this.db.schema.hasTable('search_documents');
+    const exists = await this.db.schema.hasTable(this.tableName);
     if (!exists) {
       throw new Error('Search documents table not found. Run database migrations to initialise Edulure Search.');
     }
@@ -47,7 +49,7 @@ export class SearchClusterService {
 
   async checkClusterHealth() {
     try {
-      const [{ total }] = await this.db('search_documents').count({ total: '*' });
+      const [{ total }] = await this.db(this.tableName).count({ total: '*' });
       updateSearchNodeHealth({ host: 'database', role: 'primary', healthy: true });
       return {
         status: 'healthy',
@@ -89,7 +91,7 @@ export class SearchClusterService {
 
   async createSnapshot() {
     await this.ensureTable();
-    const [{ total }] = await this.db('search_documents').count({ total: '*' });
+    const [{ total }] = await this.db(this.tableName).count({ total: '*' });
     return {
       status: 'noop',
       documents: Number(total ?? 0),
