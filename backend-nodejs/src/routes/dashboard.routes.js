@@ -105,6 +105,8 @@ router.post(
 router.post('/learner/ads/campaigns', auth(), LearnerDashboardController.createAdCampaign);
 router.patch('/learner/ads/campaigns/:campaignId', auth(), LearnerDashboardController.updateAdCampaign);
 router.delete('/learner/ads/campaigns/:campaignId', auth(), LearnerDashboardController.deleteAdCampaign);
+router.get('/learner/onboarding/draft', auth(), LearnerDashboardController.getOnboardingDraft);
+router.put('/learner/onboarding/bootstrap', auth(), LearnerDashboardController.bootstrapProfile);
 router.get('/learner/teach/application', auth(), LearnerDashboardController.getInstructorApplication);
 router.put('/learner/teach/application', auth(), LearnerDashboardController.saveInstructorApplication);
 router.post('/learner/teach/application/submit', auth(), LearnerDashboardController.submitInstructorApplication);

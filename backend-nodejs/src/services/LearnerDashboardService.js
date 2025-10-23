@@ -90,6 +90,33 @@ function formatDateLabel(value, fallback = 'Not recorded') {
   }
 }
 
+function normaliseStringList(values, { maxItems = 12, maxLength = 120 } = {}) {
+  if (!values) {
+    return [];
+  }
+  const items = Array.isArray(values) ? values : String(values).split(',');
+  const seen = new Set();
+  const result = [];
+  for (const rawItem of items) {
+    if (result.length >= maxItems) {
+      break;
+    }
+    const trimmed = String(rawItem ?? '')
+      .trim()
+      .slice(0, maxLength);
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}
+
 function formatPurchase(purchase) {
   if (!purchase) return null;
   return {
@@ -554,6 +581,79 @@ export default class LearnerDashboardService {
       message: 'System preferences updated',
       meta: { preference: normalised }
     });
+  }
+
+  static async getOnboardingDraft(userId) {
+    const existingPreference = await LearnerSystemPreferenceModel.getForUser(userId);
+    if (!existingPreference?.preferences?.onboardingDraft) {
+      return {
+        persona: null,
+        roleIntent: null,
+        interestTags: [],
+        communityInvites: [],
+        progress: { step: 'welcome', completed: [] },
+        updatedAt: null
+      };
+    }
+    const draft = existingPreference.preferences.onboardingDraft;
+    return {
+      persona: draft.persona ?? null,
+      roleIntent: draft.roleIntent ?? null,
+      interestTags: normaliseStringList(draft.interestTags),
+      communityInvites: normaliseStringList(draft.communityInvites, { maxItems: 24, maxLength: 36 }),
+      progress: {
+        step: draft.progress?.step ?? 'welcome',
+        completed: normaliseStringList(draft.progress?.completed ?? [], { maxItems: 24, maxLength: 64 })
+      },
+      updatedAt: draft.updatedAt ?? null
+    };
+  }
+
+  static async saveOnboardingDraft(userId, draftPayload = {}) {
+    const existingPreference = await LearnerSystemPreferenceModel.getForUser(userId);
+    const base = existingPreference ?? DEFAULT_SYSTEM_PREFERENCES;
+
+    const normalisedDraft = {
+      persona: draftPayload.persona ? String(draftPayload.persona).trim().slice(0, 60) : null,
+      roleIntent: draftPayload.roleIntent ? String(draftPayload.roleIntent).trim().slice(0, 60) : null,
+      interestTags: normaliseStringList(draftPayload.interestTags, { maxItems: 16, maxLength: 60 }),
+      communityInvites: normaliseStringList(draftPayload.communityInvites, { maxItems: 24, maxLength: 40 }),
+      progress: {
+        step: draftPayload.progress?.step
+          ? String(draftPayload.progress.step).trim().slice(0, 60)
+          : existingPreference?.preferences?.onboardingDraft?.progress?.step ?? 'welcome',
+        completed: normaliseStringList(
+          draftPayload.progress?.completed ??
+            existingPreference?.preferences?.onboardingDraft?.progress?.completed ?? [],
+          { maxItems: 32, maxLength: 64 }
+        )
+      },
+      updatedAt: new Date().toISOString()
+    };
+
+    const mergedPreferences = {
+      ...DEFAULT_SYSTEM_PREFERENCES.preferences,
+      ...(existingPreference?.preferences ?? {}),
+      onboardingDraft: {
+        ...(existingPreference?.preferences?.onboardingDraft ?? {}),
+        ...normalisedDraft
+      }
+    };
+
+    await LearnerSystemPreferenceModel.upsertForUser(userId, {
+      language: base.language ?? DEFAULT_SYSTEM_PREFERENCES.language,
+      region: base.region ?? DEFAULT_SYSTEM_PREFERENCES.region,
+      timezone: base.timezone ?? DEFAULT_SYSTEM_PREFERENCES.timezone,
+      notificationsEnabled: base.notificationsEnabled ?? DEFAULT_SYSTEM_PREFERENCES.notificationsEnabled,
+      digestEnabled: base.digestEnabled ?? DEFAULT_SYSTEM_PREFERENCES.digestEnabled,
+      autoPlayMedia: base.autoPlayMedia ?? DEFAULT_SYSTEM_PREFERENCES.autoPlayMedia,
+      highContrast: base.highContrast ?? DEFAULT_SYSTEM_PREFERENCES.highContrast,
+      reducedMotion: base.reducedMotion ?? DEFAULT_SYSTEM_PREFERENCES.reducedMotion,
+      preferences: mergedPreferences
+    });
+
+    log.info({ userId, draft: normalisedDraft }, 'Learner saved onboarding draft');
+    return normalisedDraft;
   }
 
   static async listFinancePurchases(userId) {

@@ -134,6 +134,32 @@ function normaliseBooleanField(value, defaultValue = undefined) {
   return defaultValue;
 }
 
+function normaliseStringArrayInput(value, { maxItems = 24, maxLength = 120 } = {}) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const array = Array.isArray(value) ? value : String(value).split(',');
+  const result = [];
+  const seen = new Set();
+  for (const entry of array) {
+    if (result.length >= maxItems) {
+      break;
+    }
+    const trimmed = normaliseStringInput(entry, maxLength);
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result;
+}
+
 function requireIdentifier(params, name, { maxLength = 120, label } = {}) {
   const resolvedLabel = label ?? name;
   return requireStringField(params?.[name], resolvedLabel, maxLength);
@@ -495,6 +521,51 @@ export default class LearnerDashboardController {
       return success(res, {
         data: acknowledgement.meta?.preference ?? acknowledgement,
         message: acknowledgement.message ?? 'System preferences updated'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
+  static async getOnboardingDraft(req, res, next) {
+    try {
+      const draft = await LearnerDashboardService.getOnboardingDraft(req.user.id);
+      return success(res, {
+        data: draft,
+        message: 'Onboarding draft retrieved'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
+  static async bootstrapProfile(req, res, next) {
+    try {
+      const body = sanitiseBody(req.body ?? {});
+      const persona = body.persona === null ? null : nullableStringField(body.persona, 60);
+      const roleIntent = body.roleIntent === null ? null : nullableStringField(body.roleIntent, 60);
+      const interestTags = normaliseStringArrayInput(body.interestTags, { maxItems: 16, maxLength: 60 }) ?? [];
+      const communityInvites =
+        normaliseStringArrayInput(body.communityInvites, { maxItems: 24, maxLength: 40 }) ?? [];
+      const progressStep = optionalStringField(body.progress?.step, 60);
+      const progressCompleted =
+        normaliseStringArrayInput(body.progress?.completed, { maxItems: 32, maxLength: 64 }) ?? [];
+
+      const draft = await LearnerDashboardService.saveOnboardingDraft(req.user.id, {
+        persona: persona ?? undefined,
+        roleIntent: roleIntent ?? undefined,
+        interestTags,
+        communityInvites,
+        progress: {
+          step: progressStep ?? undefined,
+          completed: progressCompleted
+        }
+      });
+
+      return success(res, {
+        data: draft,
+        message: 'Onboarding draft saved',
+        status: 202
       });
     } catch (error) {
       return next(normaliseServiceError(error));
