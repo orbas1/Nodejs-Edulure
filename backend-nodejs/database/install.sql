@@ -235,6 +235,11 @@ BEGIN
       satisfaction TINYINT NULL,
       owner VARCHAR(160) NULL,
       last_agent VARCHAR(160) NULL,
+      escalation_breadcrumbs JSON NULL,
+      knowledge_suggestions JSON NULL,
+      ai_summary TEXT NULL,
+      follow_up_due_at DATETIME NULL,
+      ai_summary_generated_at DATETIME NULL,
       metadata JSON NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -266,6 +271,51 @@ BEGIN
          AND index_name = 'idx_support_cases_status'
     ) THEN
       ALTER TABLE learner_support_cases ADD INDEX idx_support_cases_status (status);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_cases'
+         AND column_name = 'escalation_breadcrumbs'
+    ) THEN
+      ALTER TABLE learner_support_cases ADD COLUMN escalation_breadcrumbs JSON NULL AFTER last_agent;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_cases'
+         AND column_name = 'knowledge_suggestions'
+    ) THEN
+      ALTER TABLE learner_support_cases ADD COLUMN knowledge_suggestions JSON NULL AFTER escalation_breadcrumbs;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_cases'
+         AND column_name = 'ai_summary'
+    ) THEN
+      ALTER TABLE learner_support_cases ADD COLUMN ai_summary TEXT NULL AFTER knowledge_suggestions;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_cases'
+         AND column_name = 'follow_up_due_at'
+    ) THEN
+      ALTER TABLE learner_support_cases ADD COLUMN follow_up_due_at DATETIME NULL AFTER ai_summary;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_support_cases'
+         AND column_name = 'ai_summary_generated_at'
+    ) THEN
+      ALTER TABLE learner_support_cases ADD COLUMN ai_summary_generated_at DATETIME NULL AFTER follow_up_due_at;
     END IF;
   END IF;
 
@@ -308,6 +358,50 @@ BEGIN
          AND index_name = 'idx_support_messages_created_at'
     ) THEN
       ALTER TABLE learner_support_messages ADD INDEX idx_support_messages_created_at (created_at);
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'support_articles'
+  ) THEN
+    CREATE TABLE support_articles (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      slug VARCHAR(120) NOT NULL UNIQUE,
+      title VARCHAR(255) NOT NULL,
+      summary VARCHAR(512) NOT NULL,
+      category VARCHAR(120) NOT NULL,
+      keywords JSON NULL,
+      url VARCHAR(512) NOT NULL,
+      minutes INT UNSIGNED NOT NULL DEFAULT 3,
+      helpfulness_score DECIMAL(6,2) NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'support_articles'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'support_articles'
+         AND index_name = 'idx_support_articles_category'
+    ) THEN
+      ALTER TABLE support_articles ADD INDEX idx_support_articles_category (category);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'support_articles'
+         AND index_name = 'idx_support_articles_score'
+    ) THEN
+      ALTER TABLE support_articles ADD INDEX idx_support_articles_score (helpfulness_score);
     END IF;
   END IF;
 END $$

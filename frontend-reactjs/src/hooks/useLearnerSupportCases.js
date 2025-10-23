@@ -43,6 +43,73 @@ function toISOString(value) {
   return date ? date.toISOString() : null;
 }
 
+function safeParseJson(value, fallback) {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === 'object') {
+    return value;
+  }
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function normaliseKnowledgeSuggestions(value) {
+  const suggestions = safeParseJson(value, []);
+  if (!Array.isArray(suggestions)) {
+    return [];
+  }
+  return suggestions
+    .map((suggestion, index) => {
+      if (!suggestion) {
+        return null;
+      }
+      const id = suggestion.id ?? suggestion.slug ?? `kb-${index}`;
+      const minutes = Number.isFinite(Number(suggestion.minutes)) ? Number(suggestion.minutes) : 3;
+      return {
+        id,
+        title: suggestion.title ?? 'Support article',
+        excerpt: suggestion.excerpt ?? suggestion.summary ?? suggestion.description ?? '',
+        url: suggestion.url ?? suggestion.href ?? '#',
+        category: suggestion.category ?? suggestion.topic ?? 'General',
+        minutes
+      };
+    })
+    .filter(Boolean);
+}
+
+function normaliseBreadcrumbs(value) {
+  const breadcrumbs = safeParseJson(value, []);
+  if (!Array.isArray(breadcrumbs)) {
+    return [];
+  }
+  return breadcrumbs
+    .map((crumb, index) => {
+      if (!crumb) {
+        return null;
+      }
+      return {
+        id: crumb.id ?? `crumb-${index}`,
+        label: crumb.label ?? crumb.title ?? 'Update',
+        note: crumb.note ?? crumb.description ?? null,
+        actor: crumb.actor ?? crumb.source ?? 'system',
+        at: toISOString(crumb.at ?? crumb.timestamp ?? crumb.occurredAt ?? new Date())
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.at ?? 0) - new Date(b.at ?? 0));
+}
+
 function normaliseMessage(message) {
   if (!message) return null;
   const createdAt = toISOString(message.createdAt ?? message.sentAt ?? new Date());
@@ -93,6 +160,14 @@ function normaliseSupportCase(caseItem) {
       ? caseItem.timeline
       : [];
 
+  const knowledgeSuggestions = normaliseKnowledgeSuggestions(
+    caseItem.knowledgeSuggestions ?? caseItem.knowledge_suggestions ?? []
+  );
+  const escalationBreadcrumbs = normaliseBreadcrumbs(
+    caseItem.escalationBreadcrumbs ?? caseItem.escalation_breadcrumbs ?? []
+  );
+  const metadata = safeParseJson(caseItem.metadata ?? caseItem.meta ?? {}, {});
+
   return {
     id,
     reference: caseItem.reference ?? caseItem.ref ?? null,
@@ -106,6 +181,11 @@ function normaliseSupportCase(caseItem) {
     owner: caseItem.owner ?? caseItem.assignedTo ?? null,
     lastAgent: caseItem.lastAgent ?? caseItem.agent ?? null,
     satisfaction: caseItem.satisfaction ?? null,
+    knowledgeSuggestions,
+    escalationBreadcrumbs,
+    followUpDueAt: toISOString(caseItem.followUpDueAt ?? caseItem.follow_up_due_at ?? caseItem.nextFollowUp),
+    aiSummary: caseItem.aiSummary ?? caseItem.ai_summary ?? null,
+    metadata,
     tags: Array.isArray(caseItem.tags) ? caseItem.tags : [],
     messages: messagesRaw
       .map((message) => normaliseMessage(message))

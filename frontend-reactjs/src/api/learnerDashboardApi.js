@@ -518,6 +518,25 @@ export async function fetchSupportTickets({ token, signal } = {}) {
   });
 }
 
+export async function searchSupportKnowledgeBase({ token, query, category, limit = 5, signal } = {}) {
+  ensureToken(token);
+  const params = new URLSearchParams();
+  if (query) {
+    params.set('q', query);
+  }
+  if (category) {
+    params.set('category', category);
+  }
+  const safeLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(10, Number(limit))) : 5;
+  params.set('limit', String(safeLimit));
+  const search = params.toString();
+  return httpClient.get(`/dashboard/learner/support/knowledge-base${search ? `?${search}` : ''}`, {
+    token,
+    signal,
+    cache: { ttl: 10_000, tags: [`dashboard:learner:${token}:support-knowledge`] }
+  });
+}
+
 export async function updateSupportTicket({ token, ticketId, payload, signal } = {}) {
   ensureToken(token);
   if (!ticketId) {

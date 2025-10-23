@@ -26,6 +26,7 @@ import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js'
 import CommunityModel from '../models/CommunityModel.js';
 import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import LiveClassroomModel from '../models/LiveClassroomModel.js';
+import SupportKnowledgeBaseService from './SupportKnowledgeBaseService.js';
 
 const log = logger.child({ service: 'LearnerDashboardService' });
 
@@ -90,6 +91,28 @@ function formatDateLabel(value, fallback = 'Not recorded') {
   } catch (_error) {
     return fallback;
   }
+}
+
+function buildTicketAiSummary({ subject, description, priority, category }) {
+  const parts = [];
+  if (subject) {
+    parts.push(`Learner reported “${subject}”.`);
+  }
+  if (category) {
+    parts.push(`Category: ${category}.`);
+  }
+  if (priority) {
+    const capitalised = priority.charAt(0).toUpperCase() + priority.slice(1);
+    parts.push(`Priority: ${capitalised}.`);
+  }
+  if (description) {
+    const condensed = description.replace(/\s+/g, ' ').trim();
+    if (condensed) {
+      const snippet = condensed.length > 180 ? `${condensed.slice(0, 177)}…` : condensed;
+      parts.push(`Key details: ${snippet}`);
+    }
+  }
+  return parts.join(' ');
 }
 
 function formatPurchase(purchase) {
@@ -2252,30 +2275,78 @@ export default class LearnerDashboardService {
 
   static async listSupportTickets(userId) {
     const cases = await LearnerSupportRepository.listCases(userId);
-    return cases;
+    if (!cases.length) {
+      return cases;
+    }
+
+    const enriched = await Promise.all(
+      cases.map(async (ticket) => {
+        if (ticket.knowledgeSuggestions?.length) {
+          return ticket;
+        }
+        const learnerNotes = ticket.messages
+          ?.filter((message) => message.author === 'learner')
+          .map((message) => message.body)
+          .join(' ');
+        const suggestions = await SupportKnowledgeBaseService.buildSuggestionsForTicket({
+          subject: ticket.subject,
+          description: learnerNotes,
+          category: ticket.category
+        });
+        if (!suggestions.length) {
+          return ticket;
+        }
+        await LearnerSupportRepository.updateCase(userId, ticket.id, { knowledgeSuggestions: suggestions });
+        return { ...ticket, knowledgeSuggestions: suggestions };
+      })
+    );
+
+    return enriched;
   }
 
   static async createSupportTicket(userId, payload = {}) {
     if (!payload.subject) {
       throw new Error('Subject is required to create a support ticket');
     }
-    const initialMessages = [];
-    if (payload.description) {
-      initialMessages.push({
-        author: 'learner',
-        body: payload.description,
-        attachments: payload.attachments ?? [],
-        createdAt: new Date().toISOString()
-      });
-    }
+    const description = payload.description ?? '';
+    const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+    const knowledgeSuggestions = await SupportKnowledgeBaseService.buildSuggestionsForTicket({
+      subject: payload.subject,
+      description,
+      category: payload.category
+    });
+    const aiSummary = buildTicketAiSummary({
+      subject: payload.subject,
+      description,
+      priority: payload.priority ?? 'normal',
+      category: payload.category ?? 'General'
+    });
+
     const ticket = await LearnerSupportRepository.createCase(userId, {
       subject: payload.subject,
       category: payload.category ?? 'General',
       priority: payload.priority ?? 'normal',
       status: 'open',
       channel: 'Portal',
-      initialMessages,
-      metadata: payload.metadata ?? {}
+      knowledgeSuggestions,
+      aiSummary,
+      messages: description
+        ? [
+            {
+              author: 'learner',
+              body: description,
+              attachments,
+              createdAt: new Date().toISOString()
+            }
+          ]
+        : [],
+      metadata: {
+        ...(payload.metadata ?? {}),
+        intake: {
+          channel: 'portal',
+          attachments: attachments.length
+        }
+      }
     });
     log.info({ userId, ticketId: ticket?.id }, 'Learner created support ticket');
     return ticket;
@@ -2303,6 +2374,23 @@ export default class LearnerDashboardService {
     if (!message) {
       throw new Error('Support ticket not found');
     }
+    if ((payload.author ?? 'learner') === 'learner') {
+      const ticket = await LearnerSupportRepository.findCase(userId, ticketId);
+      if (ticket) {
+        const learnerNotes = ticket.messages
+          .filter((entry) => entry.author === 'learner')
+          .map((entry) => entry.body)
+          .join(' ');
+        const suggestions = await SupportKnowledgeBaseService.buildSuggestionsForTicket({
+          subject: ticket.subject,
+          description: learnerNotes,
+          category: ticket.category
+        });
+        if (suggestions.length) {
+          await LearnerSupportRepository.updateCase(userId, ticketId, { knowledgeSuggestions: suggestions });
+        }
+      }
+    }
     log.info({ userId, ticketId }, 'Learner added support ticket message');
     return message;
   }
@@ -2317,6 +2405,10 @@ export default class LearnerDashboardService {
     }
     log.info({ userId, ticketId }, 'Learner closed support ticket');
     return ticket;
+  }
+
+  static async searchSupportKnowledgeBase(_userId, options = {}) {
+    return SupportKnowledgeBaseService.searchArticles(options);
   }
 
   static async getEngagementOverview(userId) {

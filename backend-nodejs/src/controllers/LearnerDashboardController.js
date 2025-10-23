@@ -1586,6 +1586,29 @@ export default class LearnerDashboardController {
     }
   }
 
+  static async searchSupportKnowledgeBase(req, res, next) {
+    try {
+      const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      const category =
+        typeof req.query.category === 'string' && req.query.category.trim()
+          ? req.query.category.trim()
+          : undefined;
+      const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(10, Math.trunc(limitRaw))) : 5;
+      const articles = await LearnerDashboardService.searchSupportKnowledgeBase(req.user.id, {
+        query,
+        category,
+        limit
+      });
+      return success(res, {
+        data: { articles },
+        message: 'Support knowledge base results loaded'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
   static async createSupportTicket(req, res, next) {
     try {
       const body = sanitiseBody(req.body ?? {});
