@@ -9,7 +9,12 @@ import {
   calculateLearningStreak,
   humanizeRelativeTime
 } from '../src/services/DashboardService.js';
-import { buildComplianceRiskHeatmap, buildScamSummary, summariseIncidentQueue } from '../src/services/OperatorDashboardService.js';
+import {
+  buildComplianceRiskHeatmap,
+  buildOverviewHelperText,
+  buildScamSummary,
+  summariseIncidentQueue
+} from '../src/services/OperatorDashboardService.js';
 import { normaliseMonetization, resolveDefaultMonetization } from '../src/services/PlatformSettingsService.js';
 
 describe('DashboardService helpers', () => {
@@ -50,6 +55,41 @@ describe('DashboardService helpers', () => {
 
     expect(sameHour).toBe('45m ago');
     expect(daysAgo).toBe('5d ago');
+  });
+});
+
+describe('buildOverviewHelperText', () => {
+  it('highlights critical operator priorities when incidents and compliance queues are active', () => {
+    const text = buildOverviewHelperText({
+      queueSummary: {
+        totalOpen: 6,
+        severityCounts: { critical: 2, high: 1, medium: 2, low: 1 }
+      },
+      complianceSnapshot: {
+        queue: new Array(4).fill({}),
+        attestations: { totals: { outstanding: 3 } }
+      },
+      integrationStats: { critical: 1, degraded: 0 },
+      serviceHealth: { summary: { impactedServices: 0 } }
+    });
+
+    expect(text).toContain('clearing 2 critical incidents');
+    expect(text).toContain('collecting 3 policy attestations');
+    expect(text).toContain('stabilising 1 critical integration');
+    expect(text).toContain('operations handbook');
+  });
+
+  it('returns a steady-state helper message when no priorities exist', () => {
+    const text = buildOverviewHelperText({
+      queueSummary: { totalOpen: 0, severityCounts: {} },
+      complianceSnapshot: { queue: [], attestations: { totals: { outstanding: 0 } } },
+      integrationStats: { critical: 0, degraded: 0 },
+      serviceHealth: { summary: { impactedServices: 0 } },
+      storageUsage: { usedPercentage: 40 }
+    });
+
+    expect(text).toContain('All systems operational');
+    expect(text).toContain('saved revenue views');
   });
 });
 

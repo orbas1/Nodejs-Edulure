@@ -764,6 +764,96 @@ function buildProfileBio(queueSummary, scamSummary, healthSummary, complianceSna
   return base;
 }
 
+function formatPriorityList(items) {
+  if (items.length === 0) {
+    return '';
+  }
+  if (items.length === 1) {
+    return items[0];
+  }
+  if (items.length === 2) {
+    return `${items[0]} and ${items[1]}`;
+  }
+  return `${items[0]}, ${items[1]}, and ${items[2]}`;
+}
+
+function formatQuantity(value, singular, plural = `${singular}s`) {
+  const count = Number(value ?? 0);
+  const label = count === 1 ? singular : plural;
+  return `${count} ${label}`;
+}
+
+export function buildOverviewHelperText({
+  queueSummary = {},
+  complianceSnapshot = {},
+  integrationStats = {},
+  serviceHealth = {},
+  storageUsage = {}
+} = {}) {
+  const tasks = [];
+
+  const severityCounts = queueSummary?.severityCounts ?? {};
+  const criticalIncidents = Number(severityCounts.critical ?? 0);
+  const totalOpenIncidents = Number(queueSummary?.totalOpen ?? 0);
+
+  if (criticalIncidents > 0) {
+    tasks.push(`clearing ${formatQuantity(criticalIncidents, 'critical incident')}`);
+  } else if (totalOpenIncidents > 0) {
+    tasks.push(`working ${formatQuantity(totalOpenIncidents, 'open incident')}`);
+  }
+
+  const outstandingAttestations = Number(
+    complianceSnapshot?.attestations?.totals?.outstanding ?? 0
+  );
+  const manualReviewQueue = Array.isArray(complianceSnapshot?.queue)
+    ? complianceSnapshot.queue.length
+    : Number(complianceSnapshot?.manualReviewQueue ?? 0);
+
+  if (outstandingAttestations > 0) {
+    tasks.push(`collecting ${formatQuantity(outstandingAttestations, 'policy attestation')}`);
+  }
+
+  if (manualReviewQueue > 0) {
+    tasks.push(`reviewing ${formatQuantity(manualReviewQueue, 'KYC case')}`);
+  }
+
+  const criticalIntegrations = Number(integrationStats?.critical ?? 0);
+  const degradedIntegrations = Number(integrationStats?.degraded ?? 0);
+
+  if (criticalIntegrations > 0) {
+    tasks.push(`stabilising ${formatQuantity(criticalIntegrations, 'critical integration')}`);
+  } else if (degradedIntegrations > 0) {
+    tasks.push(`checking ${formatQuantity(degradedIntegrations, 'degraded integration')}`);
+  }
+
+  const impactedServices = Number(serviceHealth?.summary?.impactedServices ?? 0);
+  if (impactedServices > 0) {
+    tasks.push(`investigating ${formatQuantity(impactedServices, 'impacted service')}`);
+  }
+
+  const storageUsagePercentage = Number(storageUsage?.usedPercentage ?? 0);
+  if (storageUsagePercentage >= 85) {
+    tasks.push('freeing evidence storage capacity');
+  }
+
+  const uniqueTasks = [];
+  tasks.forEach((task) => {
+    if (!task || uniqueTasks.includes(task)) {
+      return;
+    }
+    uniqueTasks.push(task);
+  });
+
+  const priorities = uniqueTasks.slice(0, 3);
+  if (priorities.length === 0) {
+    return 'All systems operational — export saved revenue views for finance checks and use the operations handbook links when incidents arise.';
+  }
+
+  const prioritiesText = formatPriorityList(priorities);
+
+  return `Prioritise ${prioritiesText}. Use saved revenue views for finance spot-checks and follow the operations handbook links for detailed runbooks.`;
+}
+
 export default class OperatorDashboardService {
   constructor({
     manifestService = new CapabilityManifestService(),
@@ -1114,13 +1204,22 @@ export default class OperatorDashboardService {
       storageUsage
     });
 
+    const helperText = buildOverviewHelperText({
+      queueSummary,
+      complianceSnapshot,
+      integrationStats,
+      serviceHealth,
+      storageUsage
+    });
+
     return {
       dashboard: {
         meta: {
           generatedAt: now.toISOString(),
           tenantId,
           manifestGeneratedAt: serviceHealth.summary.manifestGeneratedAt,
-          operationalScore
+          operationalScore,
+          helperText
         },
         metrics: {
           serviceHealth: serviceHealth.summary,
