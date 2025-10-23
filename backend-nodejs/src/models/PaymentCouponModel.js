@@ -151,11 +151,12 @@ export default class PaymentCouponModel {
       .update({ updated_at: connection.fn.now() });
   }
 
-  static async recordRedemption({ couponId, paymentIntentId, userId }, connection = db) {
+  static async recordRedemption({ couponId, paymentIntentId, userId, metadata }, connection = db) {
     await connection(REDEMPTIONS_TABLE).insert({
       coupon_id: couponId,
       payment_intent_id: paymentIntentId,
-      user_id: userId ?? null
+      user_id: userId ?? null,
+      metadata: JSON.stringify(metadata ?? {})
     });
     await this.incrementTimesRedeemed(couponId, connection);
   }

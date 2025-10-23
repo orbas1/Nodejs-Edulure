@@ -290,12 +290,7 @@ class PaymentService {
       throw error;
     }
 
-    const normalizedCurrency = currency ? this.normalizeCurrency(currency) : null;
-    if (!normalizedCurrency) {
-      const error = new Error('Currency is required to validate coupons.');
-      error.status = 422;
-      throw error;
-    }
+    const normalizedCurrency = this.normalizeCurrency(currency ?? env.payments.defaultCurrency);
 
     const coupon = await PaymentCouponModel.findActiveForRedemption(
       normalizedCode,
@@ -1060,7 +1055,12 @@ class PaymentService {
       {
         couponId: coupon.id,
         paymentIntentId: intent.id,
-        userId: intent.userId
+        userId: intent.userId,
+        metadata: {
+          entityType: intent.entityType,
+          entityId: intent.entityId,
+          paymentPublicId: intent.publicId
+        }
       },
       connection
     );

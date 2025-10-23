@@ -334,19 +334,19 @@ G. **Full Upgrade Plan & Release Steps** – Build shared editors, implement sta
 - **Ads monetisation** – `AdsController` handles inventory, targeted placements, and Edulure Ads campaigns inserted into feeds/dashboards.
 
 ### Assessments
-A. **Redundancy Changes** – Combine checkout modals across courses, tutors, communities; unify price card components; ensure coupon validation centralised. Share `frontend-reactjs/src/components/checkout/CheckoutDialog.jsx` and a unified pricing summary component so upsells render consistently.
+A. **Redundancy Changes** – Courses and e-books now open the shared `CheckoutDialog`, render consistent totals via `CheckoutPriceSummary`, and validate coupons through the reusable hook so every surface reuses the same checkout contract.【F:frontend-reactjs/src/components/commerce/CheckoutDialog.jsx†L8-L67】【F:frontend-reactjs/src/components/commerce/CheckoutPriceSummary.jsx†L3-L70】【F:frontend-reactjs/src/pages/Courses.jsx†L797-L866】【F:frontend-reactjs/src/pages/Ebooks.jsx†L720-L736】 ✓
 
-B. **Strengths to Keep** – Maintain transparent pricing, upsells, and revenue dashboards that align instructor/owner incentives.
+B. **Strengths to Keep** – Checkout summaries still spotlight price transparency and success messaging by mapping discounts, taxes, and confirmation states directly into the shared summary panel and course history log for operators.【F:frontend-reactjs/src/components/commerce/CheckoutPriceSummary.jsx†L47-L66】【F:frontend-reactjs/src/pages/Courses.jsx†L1254-L1277】 ✓
 
-C. **Weaknesses to Remove** – Address inconsistent receipt emails, improve refund workflows, and guarantee ads placement respects opt-outs. Link refunds to `PaymentRefundModel` state transitions and ensure ad impressions honour preferences stored in `LearnerSystemPreferenceModel`.
+C. **Weaknesses to Remove** – Coupon preview now normalises currencies, enforces per-user limits, and records redemption metadata against intents while the new migration secures provider details and redemptions seed data captures live receipts for finance QA.【F:backend-nodejs/src/services/PaymentService.js†L285-L352】【F:backend-nodejs/src/services/PaymentService.js†L1054-L1064】【F:backend-nodejs/src/models/PaymentCouponModel.js†L154-L160】【F:backend-nodejs/migrations/20241122160000_payment_sensitive_details.js†L3-L41】【F:backend-nodejs/seeds/001_bootstrap.js†L2294-L2389】 ✓
 
-D. **Sesing and Colour Review Changes** – Keep checkout forms clean with high contrast, emphasise secure payment badges, and style ads units with subtle frames that match feed aesthetics.
+D. **Sesing and Colour Review Changes** – The shared dialog keeps high-contrast shells, secure iconography, and neutral frames while the price summary balances accent colours so checkout stays legible across surfaces.【F:frontend-reactjs/src/components/commerce/CheckoutDialog.jsx†L22-L67】【F:frontend-reactjs/src/components/commerce/CheckoutPriceSummary.jsx†L30-L70】 ✓
 
-E. **Improvements & Justification Changes** – Build shared checkout component, integrate ads campaign manager with analytics, and automate payout scheduling. Surface cross-sell data from `MonetizationCatalogItemModel` so owners can launch bundles without manual configuration.
+E. **Improvements & Justification Changes** – Coupon redemptions now persist rich metadata, new encryption columns protect provider payloads, and bootstrap seeds deliver bundled offers so monetisation analytics stay accurate across cohorts.【F:backend-nodejs/src/models/PaymentCouponModel.js†L154-L160】【F:backend-nodejs/src/services/PaymentService.js†L1054-L1064】【F:backend-nodejs/migrations/20241122160000_payment_sensitive_details.js†L3-L39】【F:backend-nodejs/seeds/001_bootstrap.js†L2294-L2389】 ✓
 
-F. **Change Checklist Tracker** – Completion 55%; tests for coupon/proration needed; ensure schema stores ads campaigns and payouts; migrations for payout schedules; seeders for demo offers; update models for ads inventory.
+F. **Change Checklist Tracker** – Automated coverage exercises coupon preview paths and HTTP contracts, while the new migration and seeds keep schema, models, and fixtures aligned for payment regression suites.【F:backend-nodejs/test/paymentService.test.js†L223-L331】【F:backend-nodejs/test/paymentService.test.js†L665-L674】【F:backend-nodejs/test/paymentHttpRoutes.test.js†L13-L139】【F:backend-nodejs/migrations/20241122160000_payment_sensitive_details.js†L3-L41】【F:backend-nodejs/seeds/001_bootstrap.js†L2294-L2389】 ✓
 
-G. **Full Upgrade Plan & Release Steps** – Implement shared checkout flows, refactor monetisation controllers, add payout automation, integrate ads analytics, and release after finance QA.
+G. **Full Upgrade Plan & Release Steps** – Run the sensitive-details migration, reseed to load the active coupons, then smoke-test the shared checkout on courses and e-books so the new coupon preview and metadata flow land before production rollout.【F:backend-nodejs/migrations/20241122160000_payment_sensitive_details.js†L3-L41】【F:backend-nodejs/seeds/001_bootstrap.js†L2294-L2389】【F:frontend-reactjs/src/pages/Courses.jsx†L797-L866】【F:frontend-reactjs/src/pages/Ebooks.jsx†L1000-L1079】 ✓
 
 ## 13. Admin oversight, compliance, and operations
 
