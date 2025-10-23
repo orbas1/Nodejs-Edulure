@@ -132,6 +132,15 @@ function sanitisePerPage(value, fallback = 10) {
   return Math.min(50, Math.floor(numeric));
 }
 
+function getClientName(builder) {
+  return builder?.client?.config?.client ?? builder?.client?.config?.dialect ?? null;
+}
+
+function isSqliteClient(builder) {
+  const client = getClientName(builder);
+  return client === 'sqlite3' || client === 'better-sqlite3';
+}
+
 function applyQueryFilter(queryBuilder, searchTerm) {
   if (!searchTerm || typeof searchTerm !== 'string') {
     return;
@@ -142,13 +151,23 @@ function applyQueryFilter(queryBuilder, searchTerm) {
   }
   const likeTerm = `%${trimmed.toLowerCase()}%`;
   const jsonPattern = `%${trimmed}%`;
+  const sqlite = isSqliteClient(queryBuilder);
   queryBuilder.andWhere((builder) => {
     builder
       .whereRaw('LOWER(title) LIKE ?', [likeTerm])
       .orWhereRaw('LOWER(subtitle) LIKE ?', [likeTerm])
       .orWhereRaw('LOWER(description) LIKE ?', [likeTerm])
       .orWhereRaw('LOWER(slug) LIKE ?', [likeTerm])
-      .orWhereRaw('LOWER(entity_id) LIKE ?', [likeTerm])
+      .orWhereRaw('LOWER(entity_id) LIKE ?', [likeTerm]);
+
+    if (sqlite) {
+      builder
+        .orWhereRaw('LOWER(keywords) LIKE ?', [likeTerm])
+        .orWhereRaw('LOWER(metadata) LIKE ?', [likeTerm]);
+      return;
+    }
+
+    builder
       .orWhereRaw("JSON_SEARCH(keywords, 'one', ?, NULL, '$[*]') IS NOT NULL", [jsonPattern])
       .orWhereRaw("JSON_SEARCH(metadata, 'one', ?, NULL, '$') IS NOT NULL", [jsonPattern]);
   });
@@ -186,10 +205,15 @@ function applyTokenFilter(builder, column, rawValue) {
   if (!values.length) {
     return;
   }
+  const sqlite = isSqliteClient(builder);
   builder.andWhere((inner) => {
     values.forEach((value, index) => {
       const method = index === 0 ? 'whereRaw' : 'orWhereRaw';
-      inner[method](`FIND_IN_SET(?, ${column}) > 0`, [value]);
+      if (sqlite) {
+        inner[method](`LOWER(${column}) LIKE ?`, [`%${value}%`]);
+      } else {
+        inner[method](`FIND_IN_SET(?, ${column}) > 0`, [value]);
+      }
     });
   });
 }
@@ -237,10 +261,16 @@ function applyMetadataEqualityFilter(builder, path, rawValue) {
   if (!values.length) {
     return;
   }
+  const sqlite = isSqliteClient(builder);
   builder.andWhere((inner) => {
     values.forEach((value, index) => {
       const method = index === 0 ? 'whereRaw' : 'orWhereRaw';
-      inner[method]('JSON_UNQUOTE(JSON_EXTRACT(metadata, ?)) = ?', [path, value]);
+      if (sqlite) {
+        const normalised = typeof value === 'string' ? value.trim().toLowerCase() : String(value);
+        inner[method]('LOWER(json_extract(metadata, ?)) = ?', [path, normalised]);
+      } else {
+        inner[method]('JSON_UNQUOTE(JSON_EXTRACT(metadata, ?)) = ?', [path, value]);
+      }
     });
   });
 }
@@ -252,10 +282,20 @@ function applyMetadataArrayFilter(builder, path, rawValue) {
   if (!values.length) {
     return;
   }
+  const sqlite = isSqliteClient(builder);
+  const arrayPath = sqlite ? path.replace(/\[\*]$/, '') : path;
   builder.andWhere((inner) => {
     values.forEach((value, index) => {
       const method = index === 0 ? 'whereRaw' : 'orWhereRaw';
-      inner[method](`JSON_SEARCH(metadata, 'one', ?, NULL, ?) IS NOT NULL`, [value, path]);
+      if (sqlite) {
+        const normalised = typeof value === 'string' ? value.trim().toLowerCase() : String(value);
+        inner[method](
+          'EXISTS (SELECT 1 FROM json_each(json_extract(metadata, ?)) WHERE LOWER(value) = ?)',
+          [arrayPath, normalised]
+        );
+      } else {
+        inner[method](`JSON_SEARCH(metadata, 'one', ?, NULL, ?) IS NOT NULL`, [value, path]);
+      }
     });
   });
 }

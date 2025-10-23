@@ -71,6 +71,8 @@ export async function seed(knex) {
     await trx('explorer_search_event_interactions').del();
     await trx('explorer_search_event_entities').del();
     await trx('explorer_search_events').del();
+    await trx('search_document_refresh_queue').del();
+    await trx('search_documents').del();
     await trx('ads_campaign_metrics_daily').del();
     await trx('ads_campaigns').del();
     await trx('podcast_episodes').del();
@@ -3179,6 +3181,141 @@ export async function seed(knex) {
       }
     ]);
 
+    const automationCourseRecord = await trx('courses').where({ id: opsAutomationCourseId }).first();
+    const tutorProfileRecord = await trx('tutor_profiles').where({ id: opsTutorProfileId }).first();
+    const ebookRecord = await trx('ebooks').where({ id: growthStrategiesEbookId }).first();
+
+    const [opsMemberCountRow] = await trx('community_members')
+      .where({ community_id: opsCommunityId })
+      .count({ total: '*' });
+    const [opsPostCountRow] = await trx('community_posts')
+      .where({ community_id: opsCommunityId })
+      .count({ total: '*' });
+    const [growthMemberCountRow] = await trx('community_members')
+      .where({ community_id: growthCommunityId })
+      .count({ total: '*' });
+    const [growthPostCountRow] = await trx('community_posts')
+      .where({ community_id: growthCommunityId })
+      .count({ total: '*' });
+
+    const opsMemberCount = Number(opsMemberCountRow?.total ?? 0);
+    const opsPostCount = Number(opsPostCountRow?.total ?? 0);
+    const growthMemberCount = Number(growthMemberCountRow?.total ?? 0);
+    const growthPostCount = Number(growthPostCountRow?.total ?? 0);
+
+    const parseStringArray = (value) => {
+      if (!value) {
+        return [];
+      }
+      if (Array.isArray(value)) {
+        return value;
+      }
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    };
+
+    const toSlug = (value) =>
+      String(value ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+    const previewCapturedAt = new Date().toISOString();
+
+    const coursePreviewDigest = {
+      entityId: 'automation-launch-masterclass',
+      entityType: 'courses',
+      previewUrl: 'https://cdn.edulure.test/video/automation-launch-masterclass-preview.mp4',
+      previewType: 'video',
+      thumbnailUrl: automationCourseArtwork.url,
+      title: 'Automation Launch Masterclass',
+      subtitle: 'Advanced cohort · Incident rehearsal drills',
+      metrics: {
+        watchRate: 0.64,
+        completionRate: 0.52,
+        enrolments: Number(automationCourseRecord?.enrolment_count ?? 0)
+      },
+      capturedAt: previewCapturedAt,
+      source: 'seed'
+    };
+
+    const communityPreviewDigest = {
+      entityId: 'learning-ops-guild',
+      entityType: 'communities',
+      previewUrl: 'https://cdn.edulure.test/communities/learning-ops-guild/preview.mp4',
+      previewType: 'video',
+      thumbnailUrl: learningOpsCover.url,
+      title: 'Learning Ops Guild',
+      subtitle: 'Public · Automation launch guild',
+      metrics: {
+        members: opsMemberCount,
+        posts: opsPostCount
+      },
+      capturedAt: previewCapturedAt,
+      source: 'seed'
+    };
+
+    const tutorPreviewDigest = {
+      entityId: 'kai-watanabe',
+      entityType: 'tutors',
+      previewUrl: null,
+      previewType: 'image',
+      thumbnailUrl: instructorAvatar.url,
+      title: tutorProfileRecord?.display_name ?? 'Kai Watanabe',
+      subtitle: 'Automation launch strategist',
+      metrics: {
+        completedSessions: Number(tutorProfileRecord?.completed_sessions ?? 0),
+        rating: Number(tutorProfileRecord?.rating_average ?? 0)
+      },
+      capturedAt: previewCapturedAt,
+      source: 'seed'
+    };
+
+    const ebookPreviewDigest = {
+      entityId: 'creator-funnel-intelligence-playbook',
+      entityType: 'ebooks',
+      previewUrl: 'https://cdn.edulure.test/ebooks/creator-funnel-intelligence/preview.png',
+      previewType: 'image',
+      thumbnailUrl: growthPlaybookCover.url,
+      title: 'Creator Funnel Intelligence Playbook',
+      subtitle: 'Forecasting CPM & retention',
+      metrics: {
+        readingTimeMinutes: Number(ebookRecord?.reading_time_minutes ?? 0),
+        rating: Number(ebookRecord?.rating_average ?? 0)
+      },
+      capturedAt: previewCapturedAt,
+      source: 'seed'
+    };
+
+    const aggregatedPreviewDigest = [
+      coursePreviewDigest,
+      communityPreviewDigest,
+      tutorPreviewDigest,
+      ebookPreviewDigest
+    ];
+
+    const entityPreviewDigests = {
+      all: aggregatedPreviewDigest,
+      communities: [communityPreviewDigest],
+      courses: [coursePreviewDigest],
+      tutors: [tutorPreviewDigest],
+      ebooks: [ebookPreviewDigest]
+    };
+
+    const serialiseMetricMetadata = (base = {}, previews = []) => {
+      const payload = { ...base };
+      if (previews.length) {
+        payload.previews = previews;
+        payload.lastDigestAt = previewCapturedAt;
+      }
+      return JSON.stringify(payload);
+    };
+
     await trx('explorer_search_daily_metrics').insert([
       {
         metric_date: analyticsTwoDaysAgo,
@@ -3190,7 +3327,7 @@ export async function seed(knex) {
         clicks: 205,
         conversions: 58,
         average_latency_ms: 198,
-        metadata: JSON.stringify({ cohort: 'operations' })
+        metadata: serialiseMetricMetadata({ cohort: 'operations' }, entityPreviewDigests.all)
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -3202,7 +3339,7 @@ export async function seed(knex) {
         clicks: 68,
         conversions: 14,
         average_latency_ms: 182,
-        metadata: JSON.stringify({ category: 'operations' })
+        metadata: serialiseMetricMetadata({ category: 'operations' }, entityPreviewDigests.communities)
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -3214,7 +3351,19 @@ export async function seed(knex) {
         clicks: 92,
         conversions: 33,
         average_latency_ms: 166,
-        metadata: JSON.stringify({ track: 'automation' })
+        metadata: serialiseMetricMetadata({ track: 'automation' }, entityPreviewDigests.courses)
+      },
+      {
+        metric_date: analyticsTwoDaysAgo,
+        entity_type: 'ebooks',
+        searches: 48,
+        zero_results: 6,
+        displayed_results: 186,
+        total_results: 860,
+        clicks: 28,
+        conversions: 9,
+        average_latency_ms: 144,
+        metadata: serialiseMetricMetadata({ category: 'growth-handbook' }, entityPreviewDigests.ebooks)
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -3226,7 +3375,7 @@ export async function seed(knex) {
         clicks: 45,
         conversions: 11,
         average_latency_ms: 132,
-        metadata: JSON.stringify({ locale: 'global' })
+        metadata: serialiseMetricMetadata({ locale: 'global' }, entityPreviewDigests.tutors)
       },
       {
         metric_date: analyticsYesterday,
@@ -3238,7 +3387,7 @@ export async function seed(knex) {
         clicks: 248,
         conversions: 66,
         average_latency_ms: 187,
-        metadata: JSON.stringify({ cohort: 'growth' })
+        metadata: serialiseMetricMetadata({ cohort: 'growth' }, entityPreviewDigests.all)
       },
       {
         metric_date: analyticsYesterday,
@@ -3250,7 +3399,7 @@ export async function seed(knex) {
         clicks: 84,
         conversions: 19,
         average_latency_ms: 170,
-        metadata: JSON.stringify({ category: 'growth' })
+        metadata: serialiseMetricMetadata({ category: 'growth' }, entityPreviewDigests.communities)
       },
       {
         metric_date: analyticsYesterday,
@@ -3262,7 +3411,19 @@ export async function seed(knex) {
         clicks: 118,
         conversions: 35,
         average_latency_ms: 158,
-        metadata: JSON.stringify({ track: 'commerce' })
+        metadata: serialiseMetricMetadata({ track: 'commerce' }, entityPreviewDigests.courses)
+      },
+      {
+        metric_date: analyticsYesterday,
+        entity_type: 'ebooks',
+        searches: 52,
+        zero_results: 5,
+        displayed_results: 204,
+        total_results: 905,
+        clicks: 34,
+        conversions: 11,
+        average_latency_ms: 139,
+        metadata: serialiseMetricMetadata({ category: 'analytics' }, entityPreviewDigests.ebooks)
       },
       {
         metric_date: analyticsYesterday,
@@ -3274,7 +3435,7 @@ export async function seed(knex) {
         clicks: 46,
         conversions: 12,
         average_latency_ms: 128,
-        metadata: JSON.stringify({ locale: 'emea' })
+        metadata: serialiseMetricMetadata({ locale: 'emea' }, entityPreviewDigests.tutors)
       },
       {
         metric_date: analyticsToday,
@@ -3286,7 +3447,7 @@ export async function seed(knex) {
         clicks: 261,
         conversions: 74,
         average_latency_ms: 176,
-        metadata: JSON.stringify({ cohort: 'live-classroom' })
+        metadata: serialiseMetricMetadata({ cohort: 'live-classroom' }, entityPreviewDigests.all)
       },
       {
         metric_date: analyticsToday,
@@ -3298,7 +3459,7 @@ export async function seed(knex) {
         clicks: 88,
         conversions: 22,
         average_latency_ms: 164,
-        metadata: JSON.stringify({ category: 'live' })
+        metadata: serialiseMetricMetadata({ category: 'live' }, entityPreviewDigests.communities)
       },
       {
         metric_date: analyticsToday,
@@ -3310,7 +3471,19 @@ export async function seed(knex) {
         clicks: 128,
         conversions: 38,
         average_latency_ms: 152,
-        metadata: JSON.stringify({ track: 'delivery' })
+        metadata: serialiseMetricMetadata({ track: 'delivery' }, entityPreviewDigests.courses)
+      },
+      {
+        metric_date: analyticsToday,
+        entity_type: 'ebooks',
+        searches: 58,
+        zero_results: 4,
+        displayed_results: 218,
+        total_results: 948,
+        clicks: 38,
+        conversions: 12,
+        average_latency_ms: 135,
+        metadata: serialiseMetricMetadata({ category: 'intelligence' }, entityPreviewDigests.ebooks)
       },
       {
         metric_date: analyticsToday,
@@ -3322,7 +3495,322 @@ export async function seed(knex) {
         clicks: 45,
         conversions: 14,
         average_latency_ms: 121,
-        metadata: JSON.stringify({ locale: 'amer' })
+        metadata: serialiseMetricMetadata({ locale: 'amer' }, entityPreviewDigests.tutors)
+      }
+    ]);
+
+    const courseLanguages = parseStringArray(automationCourseRecord?.languages).map((entry) =>
+      String(entry).toLowerCase()
+    );
+    const courseTags = parseStringArray(automationCourseRecord?.tags);
+    const courseSkills = parseStringArray(automationCourseRecord?.skills);
+    const courseMetadataRaw = automationCourseRecord?.metadata
+      ? JSON.parse(automationCourseRecord.metadata)
+      : {};
+    const tutorMetadataRaw = tutorProfileRecord?.metadata
+      ? JSON.parse(tutorProfileRecord.metadata)
+      : {};
+    const ebookTags = parseStringArray(ebookRecord?.tags);
+    const ebookCategories = parseStringArray(ebookRecord?.categories);
+    const ebookLanguages = parseStringArray(ebookRecord?.languages).map((entry) =>
+      String(entry).toLowerCase()
+    );
+
+    const makePreviewForDocument = (preview) => ({
+      type:
+        preview.previewType ??
+        preview.type ??
+        (preview.previewUrl && preview.previewUrl.endsWith('.mp4') ? 'video' : 'image'),
+      url: preview.previewUrl ?? preview.url ?? null,
+      posterUrl: preview.thumbnailUrl ?? preview.posterUrl ?? preview.url ?? null,
+      capturedAt: preview.capturedAt ?? previewCapturedAt,
+      source: preview.source ?? 'seed'
+    });
+
+    const growthCommunityPreview = {
+      entityId: 'creator-growth-lab',
+      entityType: 'communities',
+      previewUrl: 'https://cdn.edulure.test/communities/creator-growth-lab/preview.mp4',
+      previewType: 'video',
+      thumbnailUrl: growthLabCover.url,
+      title: 'Creator Growth Lab',
+      subtitle: 'Private · Monetisation experiments',
+      metrics: {
+        members: growthMemberCount,
+        posts: growthPostCount
+      },
+      capturedAt: previewCapturedAt,
+      source: 'seed'
+    };
+
+    aggregatedPreviewDigest.push(growthCommunityPreview);
+    entityPreviewDigests.communities.push(growthCommunityPreview);
+    entityPreviewDigests.all = [...aggregatedPreviewDigest];
+
+    const searchDocuments = [
+      {
+        entity_type: 'communities',
+        entity_id: 'learning-ops-guild',
+        entity_public_id: null,
+        slug: 'learning-ops-guild',
+        title: 'Learning Ops Guild',
+        subtitle: 'Public · Automation launch guild',
+        description:
+          'Operations leaders share classroom launch playbooks, QA scorecards, and tooling automation recipes.',
+        thumbnail_url: learningOpsCover.url,
+        keywords: JSON.stringify([
+          'learning ops',
+          'automation',
+          'incident response',
+          'community'
+        ]),
+        metadata: JSON.stringify({
+          summary:
+            'Operations leaders share classroom launch playbooks, QA scorecards, and tooling automation recipes.',
+          visibility: 'public',
+          focus: learningOpsMetadata.focus,
+          languages: learningOpsMetadata.languages,
+          analyticsKey: learningOpsMetadata.analyticsKey,
+          preview: makePreviewForDocument(entityPreviewDigests.communities[0]),
+          metrics: entityPreviewDigests.communities[0].metrics,
+          ratings: learningOpsMetadata.ratings
+        }),
+        category: 'operations',
+        level: null,
+        country: learningOpsMetadata.country,
+        language_codes: parseStringArray(learningOpsMetadata.languages)
+          .map((entry) => String(entry).toLowerCase())
+          .join(','),
+        tag_slugs: parseStringArray(learningOpsMetadata.focus)
+          .map(toSlug)
+          .join(','),
+        price_currency: 'USD',
+        price_amount_minor: 0,
+        rating_average: Number(learningOpsMetadata.ratings?.average ?? 0),
+        rating_count: Number(learningOpsMetadata.ratings?.totalReviews ?? 0),
+        member_count: opsMemberCount,
+        post_count: opsPostCount,
+        completed_sessions: 0,
+        response_time_minutes: 0,
+        is_verified: 1,
+        popularity_score: 84.2,
+        freshness_score: 78.5,
+        is_active: 1,
+        published_at: analyticsTwoDaysAgo,
+        indexed_at: analyticsToday,
+        refreshed_at: previewCapturedAt
+      },
+      {
+        entity_type: 'communities',
+        entity_id: 'creator-growth-lab',
+        entity_public_id: null,
+        slug: 'creator-growth-lab',
+        title: 'Creator Growth Lab',
+        subtitle: 'Private · Monetisation experiments',
+        description:
+          'Creators refine monetisation funnels, ad experiments, and marketplace launches together.',
+        thumbnail_url: growthLabCover.url,
+        keywords: JSON.stringify(['growth', 'ads', 'experiments', 'community']),
+        metadata: JSON.stringify({
+          summary: 'Experiment-led monetisation guild with weekly campaign retrospectives and labs.',
+          visibility: 'private',
+          focus: growthLabMetadata.focus,
+          languages: growthLabMetadata.languages,
+          analyticsKey: growthLabMetadata.analyticsKey,
+          ndaRequired: growthLabMetadata.ndaRequired,
+          preview: makePreviewForDocument(growthCommunityPreview),
+          metrics: growthCommunityPreview.metrics,
+          ratings: growthLabMetadata.ratings
+        }),
+        category: 'growth',
+        level: null,
+        country: growthLabMetadata.country,
+        language_codes: parseStringArray(growthLabMetadata.languages)
+          .map((entry) => String(entry).toLowerCase())
+          .join(','),
+        tag_slugs: parseStringArray(growthLabMetadata.focus)
+          .map(toSlug)
+          .join(','),
+        price_currency: 'USD',
+        price_amount_minor: 0,
+        rating_average: Number(growthLabMetadata.ratings?.average ?? 0),
+        rating_count: Number(growthLabMetadata.ratings?.totalReviews ?? 0),
+        member_count: growthMemberCount,
+        post_count: growthPostCount,
+        completed_sessions: 0,
+        response_time_minutes: 0,
+        is_verified: 1,
+        popularity_score: 88.4,
+        freshness_score: 82.1,
+        is_active: 1,
+        published_at: analyticsYesterday,
+        indexed_at: analyticsToday,
+        refreshed_at: previewCapturedAt
+      },
+      {
+        entity_type: 'courses',
+        entity_id: automationCourseRecord?.slug ?? 'automation-launch-masterclass',
+        entity_public_id: automationCourseRecord?.public_id ?? null,
+        slug: automationCourseRecord?.slug ?? 'automation-launch-masterclass',
+        title: automationCourseRecord?.title ?? 'Automation Launch Masterclass',
+        subtitle: 'Advanced · $1,299 · 4.8★',
+        description: automationCourseRecord?.summary ?? null,
+        thumbnail_url: automationCourseArtwork.url,
+        keywords: JSON.stringify(
+          Array.from(
+            new Set([
+              ...(courseTags || []),
+              ...(courseSkills || []),
+              'automation',
+              'cohort',
+              'launch'
+            ])
+          )
+        ),
+        metadata: JSON.stringify({
+          summary: automationCourseRecord?.description ?? null,
+          tags: courseTags,
+          skills: courseSkills,
+          deliveryFormat: automationCourseRecord?.delivery_format ?? null,
+          analyticsKey: courseMetadataRaw.analyticsKey ?? courseMetadataRaw.analytics_key ?? null,
+          enrolmentCount: Number(automationCourseRecord?.enrolment_count ?? 0),
+          certificate: courseMetadataRaw.certificateTemplate ?? null,
+          preview: makePreviewForDocument(entityPreviewDigests.courses[0])
+        }),
+        category: automationCourseRecord?.category ?? 'operations',
+        level: automationCourseRecord?.level ?? null,
+        country: courseMetadataRaw.country ?? null,
+        language_codes: courseLanguages.join(','),
+        tag_slugs: courseTags.map(toSlug).join(','),
+        price_currency: automationCourseRecord?.price_currency ?? 'USD',
+        price_amount_minor: Number(automationCourseRecord?.price_amount ?? 0),
+        rating_average: Number(automationCourseRecord?.rating_average ?? 0),
+        rating_count: Number(automationCourseRecord?.rating_count ?? 0),
+        member_count: Number(automationCourseRecord?.enrolment_count ?? 0),
+        post_count: 0,
+        completed_sessions: 0,
+        response_time_minutes: 0,
+        is_verified: 1,
+        popularity_score: 92.1,
+        freshness_score: 88.3,
+        is_active: automationCourseRecord?.is_published ? 1 : 0,
+        published_at: automationCourseRecord?.release_at ?? analyticsTwoDaysAgo,
+        indexed_at: analyticsToday,
+        refreshed_at: previewCapturedAt
+      },
+      {
+        entity_type: 'tutors',
+        entity_id: 'kai-watanabe',
+        entity_public_id: tutorProfileRecord?.public_id ?? null,
+        slug: 'kai-watanabe',
+        title: tutorProfileRecord?.display_name ?? 'Kai Watanabe',
+        subtitle: `${tutorProfileRecord?.headline ?? 'Automation strategist'} · $${(
+          Number(tutorProfileRecord?.hourly_rate_amount ?? 0) / 100
+        ).toFixed(0)} · ${Number(tutorProfileRecord?.rating_average ?? 0).toFixed(1)}★`,
+        description: tutorProfileRecord?.bio ?? null,
+        thumbnail_url: instructorAvatar.url,
+        keywords: JSON.stringify(
+          Array.from(
+            new Set([
+              ...(parseStringArray(tutorProfileRecord?.skills) || []),
+              'automation',
+              'tutor'
+            ])
+          )
+        ),
+        metadata: JSON.stringify({
+          displayName: tutorProfileRecord?.display_name ?? null,
+          headline: tutorProfileRecord?.headline ?? null,
+          bio: tutorProfileRecord?.bio ?? null,
+          skills: parseStringArray(tutorProfileRecord?.skills),
+          languages: parseStringArray(tutorProfileRecord?.languages),
+          calendly: tutorMetadataRaw.calendlyLink ?? null,
+          preview: makePreviewForDocument(entityPreviewDigests.tutors[0])
+        }),
+        category: 'coaching',
+        level: null,
+        country: tutorProfileRecord?.country ?? null,
+        language_codes: parseStringArray(tutorProfileRecord?.languages)
+          .map((entry) => String(entry).toLowerCase())
+          .join(','),
+        tag_slugs: parseStringArray(tutorProfileRecord?.skills)
+          .map(toSlug)
+          .join(','),
+        price_currency: tutorProfileRecord?.hourly_rate_currency ?? 'USD',
+        price_amount_minor: Number(tutorProfileRecord?.hourly_rate_amount ?? 0),
+        rating_average: Number(tutorProfileRecord?.rating_average ?? 0),
+        rating_count: Number(tutorProfileRecord?.rating_count ?? 0),
+        member_count: 0,
+        post_count: 0,
+        completed_sessions: Number(tutorProfileRecord?.completed_sessions ?? 0),
+        response_time_minutes: Number(tutorProfileRecord?.response_time_minutes ?? 0),
+        is_verified: tutorProfileRecord?.is_verified ? 1 : 0,
+        popularity_score: 86.7,
+        freshness_score: 72.4,
+        is_active: 1,
+        published_at: analyticsTwoDaysAgo,
+        indexed_at: analyticsToday,
+        refreshed_at: previewCapturedAt
+      },
+      {
+        entity_type: 'ebooks',
+        entity_id: ebookRecord?.slug ?? 'creator-funnel-intelligence-playbook',
+        entity_public_id: ebookRecord?.public_id ?? null,
+        slug: ebookRecord?.slug ?? 'creator-funnel-intelligence-playbook',
+        title: ebookRecord?.title ?? 'Creator Funnel Intelligence Playbook',
+        subtitle: ebookRecord?.subtitle ?? null,
+        description: ebookRecord?.description ?? null,
+        thumbnail_url: growthPlaybookCover.url,
+        keywords: JSON.stringify(
+          Array.from(new Set([...(ebookTags || []), ...(ebookCategories || []), 'ebook', 'playbook']))
+        ),
+        metadata: JSON.stringify({
+          tags: ebookTags,
+          categories: ebookCategories,
+          languages: ebookLanguages,
+          readingTimeMinutes: Number(ebookRecord?.reading_time_minutes ?? 0),
+          isbn: ebookRecord?.isbn ?? null,
+          preview: makePreviewForDocument(entityPreviewDigests.ebooks[0])
+        }),
+        category: ebookCategories[0] ?? null,
+        level: null,
+        country: null,
+        language_codes: ebookLanguages.join(','),
+        tag_slugs: ebookTags.map(toSlug).join(','),
+        price_currency: ebookRecord?.price_currency ?? 'USD',
+        price_amount_minor: Number(ebookRecord?.price_amount ?? 0),
+        rating_average: Number(ebookRecord?.rating_average ?? 0),
+        rating_count: Number(ebookRecord?.rating_count ?? 0),
+        member_count: 0,
+        post_count: 0,
+        completed_sessions: 0,
+        response_time_minutes: 0,
+        is_verified: 1,
+        popularity_score: 74.3,
+        freshness_score: 81.6,
+        is_active: ebookRecord?.status === 'published' ? 1 : 0,
+        published_at: ebookRecord?.release_at ?? analyticsYesterday,
+        indexed_at: analyticsToday,
+        refreshed_at: previewCapturedAt
+      }
+    ];
+
+    await trx('search_documents').insert(searchDocuments);
+
+    await trx('search_document_refresh_queue').insert([
+      {
+        entity_type: 'communities',
+        entity_id: 'learning-ops-guild',
+        priority: 'high',
+        reason: 'seed-refresh',
+        run_at: new Date(Date.now() + 5 * 60 * 1000)
+      },
+      {
+        entity_type: 'tutors',
+        entity_id: 'kai-watanabe',
+        priority: 'normal',
+        reason: 'profile-sync',
+        run_at: new Date(Date.now() + 15 * 60 * 1000)
       }
     ]);
 
