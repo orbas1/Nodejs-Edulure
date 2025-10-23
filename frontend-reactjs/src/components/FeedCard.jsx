@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 
 const numberFormatter = new Intl.NumberFormat('en-US');
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:']);
+const MAX_MEDIA_PREVIEW = 4;
 
 function normaliseLinkAttachments(attachments) {
   if (!Array.isArray(attachments)) return [];
@@ -25,6 +26,75 @@ function normaliseLinkAttachments(attachments) {
       }
     })
     .filter(Boolean);
+}
+
+function normaliseMediaAttachments(post) {
+  const entries = [];
+  const seen = new Set();
+
+  const addEntry = (item, fallbackIndex) => {
+    if (!item) return;
+    const url = item.previewUrl || item.thumbnailUrl || item.url;
+    if (!url) return;
+    const id = item.id ?? url ?? `media-${fallbackIndex}`;
+    if (seen.has(id)) return;
+    seen.add(id);
+    entries.push({
+      id,
+      url,
+      alt: item.alt || item.label || item.caption || 'Community media preview',
+      caption: item.caption || item.description || null
+    });
+  };
+
+  if (Array.isArray(post.media)) {
+    post.media.forEach((item, index) => addEntry(item, index));
+  }
+
+  if (Array.isArray(post.attachments)) {
+    post.attachments
+      .filter((attachment) => attachment?.type === 'image' || attachment?.mimeType?.startsWith('image/'))
+      .forEach((attachment, index) => addEntry(attachment, `attachment-${index}`));
+  }
+
+  const total = entries.length;
+  return entries.slice(0, MAX_MEDIA_PREVIEW).map((entry, index) => ({
+    ...entry,
+    index,
+    total,
+    showOverlay: index === MAX_MEDIA_PREVIEW - 1 && total > MAX_MEDIA_PREVIEW
+  }));
+}
+
+function normalisePoll(poll) {
+  if (!poll || typeof poll !== 'object') return null;
+  const options = Array.isArray(poll.options) ? poll.options : [];
+  const totalVotes = options.reduce(
+    (sum, option) => sum + (Number(option?.votes ?? option?.count ?? 0) || 0),
+    0
+  );
+
+  const resolvedOptions = options.map((option, index) => {
+    const votes = Number(option?.votes ?? option?.count ?? 0) || 0;
+    const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+    return {
+      id: option?.id ?? `poll-option-${index}`,
+      label: option?.label ?? option?.text ?? `Option ${index + 1}`,
+      votes,
+      percentage
+    };
+  });
+
+  const imageUrl = poll.imageUrl || poll.media?.previewUrl || poll.previewImageUrl || null;
+
+  return {
+    id: poll.id ?? 'poll',
+    title: poll.title ?? poll.question ?? 'Community poll',
+    description: poll.description ?? poll.subtitle ?? '',
+    imageUrl,
+    options: resolvedOptions,
+    totalVotes
+  };
 }
 
 function formatRelativeTime(timestamp) {
@@ -83,6 +153,8 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
   const avatarUrl = post.author?.avatarUrl;
   const linkAttachments = normaliseLinkAttachments(post.attachments);
   const moderationReason = post.moderation?.reason;
+  const mediaAttachments = normaliseMediaAttachments(post);
+  const poll = normalisePoll(post.poll);
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -158,8 +230,77 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
               </ul>
             </div>
           )}
+          {mediaAttachments.length > 0 && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {mediaAttachments.map((media) => (
+                <figure
+                  key={media.id}
+                  className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50"
+                >
+                  <img
+                    src={media.url}
+                    alt={media.alt}
+                    className="h-48 w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+                    loading="lazy"
+                  />
+                  {media.caption ? (
+                    <figcaption className="absolute inset-x-0 bottom-0 bg-slate-900/60 px-3 py-2 text-[11px] font-medium text-white">
+                      {media.caption}
+                    </figcaption>
+                  ) : null}
+                  {media.showOverlay ? (
+                    <span className="absolute inset-0 flex items-center justify-center bg-slate-950/50 text-sm font-semibold text-white">
+                      +{media.total - MAX_MEDIA_PREVIEW + 1} more assets
+                    </span>
+                  ) : null}
+                </figure>
+              ))}
+            </div>
+          )}
+          {poll && (
+            <div className="mt-4 rounded-3xl border border-indigo-200 bg-indigo-50 p-4">
+              <div className="flex flex-col gap-4 sm:flex-row">
+                {poll.imageUrl ? (
+                  <img
+                    src={poll.imageUrl}
+                    alt="Poll preview"
+                    className="h-32 w-full rounded-2xl object-cover sm:h-40 sm:w-40"
+                    loading="lazy"
+                  />
+                ) : null}
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-900">{poll.title}</p>
+                    {poll.description ? (
+                      <p className="mt-1 text-xs text-indigo-700">{poll.description}</p>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
+                    {poll.options.map((option) => (
+                      <div key={option.id} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-semibold text-indigo-700">
+                          <span>{option.label}</span>
+                          <span>{option.percentage}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-indigo-100">
+                          <div
+                            className="h-full rounded-full bg-indigo-500"
+                            style={{ width: `${option.percentage}%` }}
+                            aria-hidden="true"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">
+                    {numberFormatter.format(poll.totalVotes)} {poll.totalVotes === 1 ? 'vote' : 'votes'} tallied
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {tags.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-primary">
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium leading-5 text-primary">
               {tags.map((tag) => (
                 <span key={tag} className="rounded-full bg-primary/10 px-3 py-1">
                   #{tag}
@@ -239,6 +380,31 @@ FeedCard.propTypes = {
         label: PropTypes.string
       })
     ),
+    media: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        url: PropTypes.string,
+        previewUrl: PropTypes.string,
+        thumbnailUrl: PropTypes.string,
+        alt: PropTypes.string,
+        caption: PropTypes.string
+      })
+    ),
+    poll: PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      title: PropTypes.string,
+      description: PropTypes.string,
+      imageUrl: PropTypes.string,
+      options: PropTypes.arrayOf(
+        PropTypes.shape({
+          id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+          label: PropTypes.string,
+          votes: PropTypes.number,
+          percentage: PropTypes.number
+        })
+      ),
+      totalVotes: PropTypes.number
+    }),
     moderation: PropTypes.shape({
       state: PropTypes.string,
       reason: PropTypes.string

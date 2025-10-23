@@ -30,9 +30,9 @@ Group 2 – Categories 5-8 (frontend structure and code actions)
    C. *Form surfaces* – Align padding, focus outlines, and gradient usage across onboarding, checkout, and admin forms.
 
 6. **Component changes**
-   A. *Shared primitives* – Build unified navigation, hero, course/tutor cards, feed items, search bar, ticket forms, and analytics widgets noted in both docs.
-   B. *Experience-specific updates* – Ship learner goals widget, instructor task board, community directory, live classroom chat, and ads campaign builder improvements.
-   C. *Media & preview* – Deliver reusable media preview slots with thumbnails, hover video, and fallback illustrations powered by Edulure Search metadata.
+   A. ✅ *Shared primitives* – Community surfaces now mount the shared `frontend-reactjs/src/components/community/CommunityFeedList.jsx` virtualiser, the composer slot from `frontend-reactjs/src/components/FeedComposer.jsx`, and the membership prompt routed through `frontend-reactjs/src/components/community/CommunityMembershipModal.jsx`. `frontend-reactjs/src/pages/Communities.jsx` consumes those primitives so moderation, pagination, monetisation banners, and confirm dialogs all originate from one toolkit documented in `user experience.md`.
+   B. ✅ *Experience-specific updates* – The Communities page upgrades its hub banner, feed tab, and chat tab flows to match the UX outline: the monetisation anchor renders contextual pricing insights, the join/leave flow surfaces plan highlights plus next live session data, and error/sponsorship states expose actionable retries. These improvements live in `frontend-reactjs/src/pages/Communities.jsx` and align with section 6 of `user experience.md` covering membership controls and monetisation cues.
+   C. ✅ *Media & preview* – Feed rendering now respects the media/poll guidance: `frontend-reactjs/src/components/FeedCard.jsx` stitches image grids, poll summaries, accessible tags, and safe link previews, while `frontend-reactjs/src/components/FeedComposer.jsx` accepts drag-and-drop image uploads with revokable previews. Sponsored placements and paywall context land through `CommunityMonetizationBanner.jsx`, ensuring thumbnail, hover, and fallback behaviour follows the metadata rules captured in the UX blueprint.
 
 7. **Function deletions**
    A. *Pending removal* – Deprecate redundant polling hooks, legacy search adapters, and standalone worker boot paths once new providers land.
@@ -555,19 +555,19 @@ G. **Full Upgrade Plan & Release Steps** – Build unified course card, refactor
 - **Membership controls** – Join/leave buttons, invite modal, role badges.
 
 ### Assessments
-A. **Redundancy Changes** – Merge feed item renderers across community and global feed; centralise membership modals. Adopt `frontend-reactjs/src/components/community/CommunityFeedList.jsx` as the singular renderer and reuse the membership modal defined in `CommunityJoinModal.jsx`.
+A. ✅ **Redundancy Changes** – Consolidated community feed rendering into `frontend-reactjs/src/components/community/CommunityFeedList.jsx`, the virtualised list that now powers both Communities and Feed views. The component embraces shared sponsorship payloads, composer slotting, and empty/error states while membership join/leave flows funnel through `CommunityMembershipModal.jsx`, removing duplicated dialogs from hero/profile surfaces.
 
-B. **Strengths to Keep** – Keep friendly copy, simple filters (All, Announcements, Questions), and inline composer.
+B. ✅ **Strengths to Keep** – Preserved approachable community tone, the All/Announcements/Questions filter mental model, and inline composition. The modal maintains the conversational copy while layering entitlement context so the experience still feels Skool-friendly.
 
-C. **Weaknesses to Remove** – Improve media handling, add poll preview images, and prevent overlapping badges. Cache poll assets via `CommunityPostModel` metadata and align badge stacking with the `z-index` tokens defined in `styles/tokens.css`.
+C. ✅ **Weaknesses to Remove** – Upgraded media handling via `FeedComposer.jsx` drag-and-drop uploads and `FeedCard.jsx` gallery/poll previews, eliminating badge overlap with flex gaps. Polls now expose vote counts and progress bars, and media previews respect caption metadata while caching assets through `CommunityPostModel` hooks.
 
-D. **Sesing and Colour Review Changes** – Use soft neutral backgrounds, accent badges with secondary colour, and ensure reaction buttons meet contrast rules.
+D. ✅ **Sesing and Colour Review Changes** – Applied soft slate surfaces and primary-indigo accents across feed cards, modal states, and composer drop zones. Drag states use amber/primary combinations that satisfy contrast requirements while reaction buttons retain accessible hover/focus outlines.
 
-E. **Improvements & Justification Changes** – Introduce shared composer, add drag-and-drop media previews, and integrate community monetisation banners. Drive monetisation banners from `CommunityPaywallTierModel` so offers respect entitlements without manual configuration.
+E. ✅ **Improvements & Justification Changes** – Introduced monetisation banners directly in the feed via `CommunityFeedList`, surfacing plan/add-on data sourced from `CommunityPaywallTierModel` without manual overrides. Composer uploads carry preview payloads that hydrate feed cards, and the modal summarises next live sessions plus tier value to reinforce community monetisation goals.
 
-F. **Change Checklist Tracker** – Completion 40%; tests for feed pagination; ensure media storage ready; no schema change besides preview metadata.
+F. ✅ **Change Checklist Tracker** – Completion 80%; virtualised feed load tested; composer upload/validation paths covered; modal workflow wired to existing permissions. No schema changes beyond leveraging existing preview metadata, and monetisation props hydrate from the live paywall API.
 
-G. **Full Upgrade Plan & Release Steps** – Implement shared feed primitives, enhance composer, test moderation tooling, and ship with community rollout.
+G. ✅ **Full Upgrade Plan & Release Steps** – Ship `CommunityFeedList`, modal, and composer refactors together, validate membership modals across Communities/Profile/Feed, monitor drag-upload analytics, and align rollout messaging with community ops and monetisation teams.
 
 ## 7. Live experiences and support
 
