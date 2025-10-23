@@ -3,6 +3,8 @@ process.env.PORT = process.env.PORT ?? '4100';
 process.env.APP_URL = process.env.APP_URL ?? 'https://app.local';
 process.env.CORS_ALLOWED_ORIGINS = process.env.CORS_ALLOWED_ORIGINS ?? 'https://app.local,https://studio.local';
 process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'error';
+process.env.SERVICE_PRESET = process.env.SERVICE_PRESET ?? 'lite';
+process.env.SERVICE_JOB_GROUPS = process.env.SERVICE_JOB_GROUPS ?? 'core,search';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret-test-secret-test-secret-123';
 process.env.JWT_REFRESH_SECRET =
   process.env.JWT_REFRESH_SECRET ?? 'refresh-secret-refresh-secret-refresh-secret-456';

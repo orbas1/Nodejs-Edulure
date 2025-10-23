@@ -6,87 +6,13 @@ import { startRealtimeServer } from './servers/realtimeServer.js';
 import { createProcessSignalRegistry } from './servers/processSignalRegistry.js';
 import { startWebServer } from './servers/webServer.js';
 import { startWorkerService } from './servers/workerService.js';
+import { resolveServiceTargets } from './servers/runtimeOptions.js';
 
 const SERVICE_STARTERS = new Map([
   ['web', startWebServer],
   ['worker', startWorkerService],
   ['realtime', startRealtimeServer]
 ]);
-
-const DEFAULT_SERVICE_ORDER = Array.from(SERVICE_STARTERS.keys());
-
-function normaliseTokens(rawTargets = []) {
-  const entries = Array.isArray(rawTargets) ? rawTargets : String(rawTargets).split(',');
-  const seen = new Set();
-  const orderedTargets = [];
-
-  const append = (target) => {
-    if (!seen.has(target)) {
-      seen.add(target);
-      orderedTargets.push(target);
-    }
-  };
-
-  entries
-    .map((token) => String(token).trim().toLowerCase())
-    .filter(Boolean)
-    .forEach((token) => {
-      if (token === 'all') {
-        DEFAULT_SERVICE_ORDER.forEach((service) => append(service));
-        return;
-      }
-
-      if (!SERVICE_STARTERS.has(token)) {
-        throw new Error(`Unknown service target "${token}". Supported targets: ${DEFAULT_SERVICE_ORDER.join(', ')}`);
-      }
-
-      append(token);
-    });
-
-  if (!orderedTargets.length) {
-    throw new Error('At least one service target must be specified.');
-  }
-
-  return orderedTargets;
-}
-
-function resolveTargets({ explicitTargets, argv = [], env = process.env } = {}) {
-  if (explicitTargets && explicitTargets.length) {
-    return normaliseTokens(explicitTargets);
-  }
-
-  const cliTokens = [];
-
-  argv.forEach((arg) => {
-    if (!arg) {
-      return;
-    }
-
-    if (arg.startsWith('--')) {
-      const [flag, value] = arg.split('=', 2);
-      if (!value) {
-        return;
-      }
-
-      if (['--service', '--services', '--target', '--targets'].includes(flag)) {
-        value.split(',').forEach((entry) => cliTokens.push(entry));
-      }
-      return;
-    }
-
-    cliTokens.push(arg);
-  });
-
-  if (cliTokens.length) {
-    return normaliseTokens(cliTokens);
-  }
-
-  if (env.SERVICE_TARGET) {
-    return normaliseTokens(String(env.SERVICE_TARGET).split(','));
-  }
-
-  return normaliseTokens(['web']);
-}
 
 async function stopServices(services, loggerInstance, signal) {
   const context = { signal, count: services.length };
@@ -123,7 +49,36 @@ export async function bootstrapServices({
   loggerInstance = logger,
   withSignalHandlers = true
 } = {}) {
-  const resolvedTargets = resolveTargets({ explicitTargets: targets, argv, env });
+  const { targets: resolvedTargets } = resolveServiceTargets({
+    explicitTargets: targets?.length ? targets : undefined,
+    envSource: {
+      ...env,
+      SERVICE_TARGET: (() => {
+        if (targets && targets.length) {
+          return targets.join(',');
+        }
+        const cliTokens = [];
+        argv.forEach((arg) => {
+          if (!arg) {
+            return;
+          }
+          if (arg.startsWith('--')) {
+            const [flag, value] = arg.split('=', 2);
+            if (!value) {
+              return;
+            }
+            if (['--service', '--services', '--target', '--targets'].includes(flag)) {
+              value.split(',').forEach((entry) => cliTokens.push(entry));
+            }
+            return;
+          }
+          cliTokens.push(arg);
+        });
+        return cliTokens.length ? cliTokens.join(',') : env.SERVICE_TARGET;
+      })()
+    },
+    availableTargets: Array.from(SERVICE_STARTERS.keys())
+  });
   const startedServices = [];
   let shuttingDown = false;
   const registry = createProcessSignalRegistry();

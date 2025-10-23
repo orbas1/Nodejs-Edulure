@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { recordSearchIngestionRun } from '../observability/metrics.js';
 import searchDocumentsRepository from '../repositories/searchDocumentsRepository.js';
 import { SUPPORTED_ENTITIES } from './search/entityConfig.js';
+import { schedulerCheckpointModel } from '../models/SchedulerCheckpointModel.js';
 
 function safeJsonParse(value, fallback) {
   if (!value) {
@@ -97,7 +98,8 @@ export class SearchIngestionService {
     batchSize = env.search.ingestion.batchSize,
     concurrency = env.search.ingestion.concurrency,
     deleteBeforeReindex = env.search.ingestion.deleteBeforeReindex,
-    loaders = {}
+    loaders = {},
+    checkpointStore = schedulerCheckpointModel
   } = {}) {
     this.db = dbClient;
     this.repository = repository;
@@ -116,6 +118,10 @@ export class SearchIngestionService {
       events: this.loadEvents.bind(this),
       ...loaders
     };
+    this.checkpoints =
+      typeof checkpointStore?.withConnection === 'function'
+        ? checkpointStore.withConnection(dbClient)
+        : checkpointStore;
   }
 
   async fullReindex({ since = null, indexes = this.entities } = {}) {
@@ -128,6 +134,7 @@ export class SearchIngestionService {
     });
 
     const queue = [...uniqueIndexes];
+    const results = [];
     const workers = Array.from({ length: Math.min(this.concurrency, queue.length || 1) }).map(() =>
       (async () => {
         while (queue.length) {
@@ -135,12 +142,14 @@ export class SearchIngestionService {
           if (!entity) {
             return;
           }
-          await this.reindexEntity(entity, { since: sinceDate });
+          const outcome = await this.reindexEntity(entity, { since: sinceDate });
+          results.push(outcome);
         }
       })()
     );
 
     await Promise.all(workers);
+    return results;
   }
 
   async reindexEntity(entity, { since = null } = {}) {
@@ -151,6 +160,8 @@ export class SearchIngestionService {
 
     const startTime = Date.now();
     let processed = 0;
+    const checkpointKey = `search.ingestion.${entity}`;
+    const sinceIso = since ? normaliseDate(since)?.toISOString?.() ?? null : null;
 
     if (!since && this.deleteBeforeReindex) {
       await this.repository.deleteByEntity(entity);
@@ -172,7 +183,18 @@ export class SearchIngestionService {
         durationSeconds,
         status: 'success'
       });
+      await this.checkpoints.recordRun(checkpointKey, {
+        status: 'success',
+        ranAt: new Date(),
+        metadata: {
+          entity,
+          documentCount: processed,
+          since: sinceIso,
+          durationSeconds
+        }
+      });
       this.logger.info({ entity, processed, durationSeconds }, 'Search documents synchronised');
+      return { entity, documentCount: processed, durationSeconds };
     } catch (error) {
       const durationSeconds = (Date.now() - startTime) / 1000;
       recordSearchIngestionRun({
@@ -181,6 +203,17 @@ export class SearchIngestionService {
         durationSeconds,
         status: 'error',
         error
+      });
+      await this.checkpoints.recordRun(checkpointKey, {
+        status: 'error',
+        ranAt: new Date(),
+        metadata: {
+          entity,
+          documentCount: processed,
+          since: sinceIso,
+          durationSeconds
+        },
+        errorMessage: error.message ?? String(error)
       });
       this.logger.error({ err: error, entity }, 'Search ingestion failed');
       throw error;

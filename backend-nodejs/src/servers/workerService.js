@@ -15,6 +15,11 @@ import {
   setSchedulerActive,
   observeSchedulerDuration
 } from '../observability/metrics.js';
+import { formatLog, jobGroupEnabled, resolveRuntimeOptions } from './runtimeOptions.js';
+
+const STATUS_READY = 'status:ready';
+const STATUS_DEGRADED = 'status:degraded';
+const STATUS_DISABLED = 'status:disabled';
 
 function instrumentScheduledJob(job, name) {
   if (!job || typeof job.runCycle !== 'function') {
@@ -39,6 +44,7 @@ function instrumentScheduledJob(job, name) {
 }
 
 export async function startWorkerService({ withSignalHandlers = true } = {}) {
+  const runtimeOptions = resolveRuntimeOptions();
   const readinessKeys = [
     'database',
     'feature-flags',
@@ -64,6 +70,16 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   });
 
   const { readiness, registerCleanup, logger: runtimeLogger } = runtime;
+  const jobsLogPrefix = runtimeOptions.logPrefixes?.jobs;
+  const annotate = (message) => formatLog(jobsLogPrefix, message);
+
+  runtimeLogger.info(
+    {
+      preset: runtimeOptions.preset,
+      jobGroups: Array.from(runtimeOptions.jobGroups)
+    },
+    annotate('Worker runtime initialised')
+  );
 
   readiness.markPending('asset-ingestion', 'Starting asset ingestion poller');
   try {
@@ -72,58 +88,88 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     if (!env.integrations.cloudConvertApiKey) {
       readiness.markDegraded(
         'asset-ingestion',
-        'Running without CloudConvert – PowerPoint conversions will queue until configured'
+        `${STATUS_DEGRADED} Running without CloudConvert – PowerPoint conversions will queue until configured`
       );
-      runtimeLogger.warn('Asset ingestion running without CloudConvert API key; conversions will be retried later.');
+      runtimeLogger.warn(
+        annotate('Asset ingestion running without CloudConvert API key; conversions will be retried later.')
+      );
     } else {
-      readiness.markReady('asset-ingestion', 'Asset ingestion poller active');
+      readiness.markReady('asset-ingestion', `${STATUS_READY} Asset ingestion poller active`);
     }
   } catch (error) {
     readiness.markFailed('asset-ingestion', error);
-    runtimeLogger.error({ err: error }, 'Failed to start asset ingestion service');
+    runtimeLogger.error({ err: error }, annotate('Failed to start asset ingestion service'));
     throw error;
   }
 
-  const scheduleJob = (key, job, { enabled, disabledMessage }) => {
+  const scheduleJob = (key, job, { enabled, disabledMessage, group, defaultEnabled = false }) => {
+    const groupEnabled = jobGroupEnabled(runtimeOptions.jobGroups, group ?? 'core', {
+      defaultEnabled
+    });
+    const finalEnabled = enabled !== false && groupEnabled;
     readiness.markPending(key, `Starting ${key}`);
     try {
-      instrumentScheduledJob(job, key).start();
-      registerCleanup(key, () => job.stop());
+      if (!finalEnabled) {
+        readiness.markDegraded(
+          key,
+          `${STATUS_DISABLED} ${disabledMessage ?? `${key} disabled by configuration`}`
+        );
+        runtimeLogger.warn(
+          annotate(
+            `Skipped scheduler "${key}" because group "${group ?? 'core'}" is disabled or configuration turned it off.`
+          )
+        );
+        return;
+      }
+
+      const instrumented = instrumentScheduledJob(job, key);
+      instrumented.start();
+      registerCleanup(key, () => instrumented.stop());
       if (enabled === false) {
-        readiness.markDegraded(key, disabledMessage ?? `${key} disabled by configuration`);
+        readiness.markDegraded(
+          key,
+          `${STATUS_DEGRADED} ${disabledMessage ?? `${key} disabled by configuration`}`
+        );
       } else {
-        readiness.markReady(key, `${key} active`);
+        readiness.markReady(key, `${STATUS_READY} ${key} active`);
       }
     } catch (error) {
       readiness.markFailed(key, error);
-      runtimeLogger.error({ err: error }, `Failed to start ${key}`);
+      runtimeLogger.error({ err: error }, annotate(`Failed to start ${key}`));
       throw error;
     }
   };
 
   scheduleJob('data-retention', dataRetentionJob, {
     enabled: env.retention.enabled,
-    disabledMessage: 'Data retention scheduler disabled by configuration'
+    disabledMessage: 'Data retention scheduler disabled by configuration',
+    group: 'core',
+    defaultEnabled: true
   });
 
   scheduleJob('data-partitioning', dataPartitionJob, {
     enabled: env.partitioning.enabled,
-    disabledMessage: 'Data partition scheduler disabled by configuration'
+    disabledMessage: 'Data partition scheduler disabled by configuration',
+    group: 'core',
+    defaultEnabled: true
   });
 
   scheduleJob('community-reminder', communityReminderJob, {
     enabled: env.engagement.reminders.enabled,
-    disabledMessage: 'Community reminders disabled by configuration'
+    disabledMessage: 'Community reminders disabled by configuration',
+    group: 'engagement'
   });
 
   scheduleJob('telemetry-warehouse', telemetryWarehouseJob, {
     enabled: env.telemetry.export.enabled,
-    disabledMessage: 'Telemetry export scheduler disabled by configuration'
+    disabledMessage: 'Telemetry export scheduler disabled by configuration',
+    group: 'telemetry'
   });
 
   scheduleJob('monetization-reconciliation', monetizationReconciliationJob, {
     enabled: env.monetization.reconciliation.enabled,
-    disabledMessage: 'Monetization reconciliation disabled by configuration'
+    disabledMessage: 'Monetization reconciliation disabled by configuration',
+    group: 'monetization'
   });
 
   readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');
@@ -136,13 +182,13 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
       (status === 'ready' ? 'Integration orchestrator scheduled' : 'Integration orchestrator state updated');
 
     if (status === 'disabled' || status === 'degraded') {
-      readiness.markDegraded('integration-orchestrator', message);
+      readiness.markDegraded('integration-orchestrator', `${STATUS_DEGRADED} ${message}`);
     } else {
-      readiness.markReady('integration-orchestrator', message);
+      readiness.markReady('integration-orchestrator', `${STATUS_READY} ${message}`);
     }
   } catch (error) {
     readiness.markFailed('integration-orchestrator', error);
-    runtimeLogger.error({ err: error }, 'Failed to start integration orchestrator');
+    runtimeLogger.error({ err: error }, annotate('Failed to start integration orchestrator'));
     throw error;
   }
 
@@ -151,13 +197,16 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     webhookEventBusService.start();
     registerCleanup('webhook-event-bus', () => webhookEventBusService.stop());
     if (!webhookEventBusService.enabled) {
-      readiness.markDegraded('webhook-event-bus', 'Webhook dispatcher disabled by configuration');
+      readiness.markDegraded(
+        'webhook-event-bus',
+        `${STATUS_DEGRADED} Webhook dispatcher disabled by configuration`
+      );
     } else {
-      readiness.markReady('webhook-event-bus', 'Webhook dispatcher active');
+      readiness.markReady('webhook-event-bus', `${STATUS_READY} Webhook dispatcher active`);
     }
   } catch (error) {
     readiness.markFailed('webhook-event-bus', error);
-    runtimeLogger.error({ err: error }, 'Failed to start webhook dispatcher');
+    runtimeLogger.error({ err: error }, annotate('Failed to start webhook dispatcher'));
     throw error;
   }
 
@@ -166,20 +215,30 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     domainEventDispatcherService.start();
     registerCleanup('domain-event-dispatcher', () => domainEventDispatcherService.stop());
     if (!domainEventDispatcherService.enabled) {
-      readiness.markDegraded('domain-event-dispatcher', 'Domain event dispatcher disabled by configuration');
+      readiness.markDegraded(
+        'domain-event-dispatcher',
+        `${STATUS_DEGRADED} Domain event dispatcher disabled by configuration`
+      );
     } else {
-      readiness.markReady('domain-event-dispatcher', 'Domain event dispatcher active');
+      readiness.markReady('domain-event-dispatcher', `${STATUS_READY} Domain event dispatcher active`);
     }
   } catch (error) {
     readiness.markFailed('domain-event-dispatcher', error);
-    runtimeLogger.error({ err: error }, 'Failed to start domain event dispatcher');
+    runtimeLogger.error({ err: error }, annotate('Failed to start domain event dispatcher'));
     throw error;
   }
 
-  scheduleJob('search-refresh', refreshSearchDocumentsJob, { enabled: true });
+  scheduleJob('search-refresh', refreshSearchDocumentsJob, {
+    enabled: true,
+    group: 'search',
+    defaultEnabled: true
+  });
 
   await runtime.startProbeServer(env.services.worker.probePort);
-  runtimeLogger.info({ port: env.services.worker.probePort }, 'Worker probe server listening');
+  runtimeLogger.info(
+    { port: env.services.worker.probePort },
+    annotate('Worker probe server listening')
+  );
 
   return {
     async stop() {

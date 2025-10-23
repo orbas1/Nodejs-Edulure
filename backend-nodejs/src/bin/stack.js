@@ -1,19 +1,18 @@
 import logger from '../config/logger.js';
 import { bootstrapServices } from '../server.js';
+import { resolveServiceTargets, resolveRuntimeOptions } from '../servers/runtimeOptions.js';
 
-const preset = process.env.SERVICE_PRESET ?? 'lite';
+const { preset, targets } = resolveServiceTargets({ envSource: process.env });
 const hasCustomTargets = Boolean(process.env.SERVICE_TARGET);
 
 if (!hasCustomTargets) {
-  if (preset === 'full' || preset === 'analytics') {
-    process.env.SERVICE_TARGET = 'web,worker,realtime';
-  } else {
-    process.env.SERVICE_TARGET = 'web';
-  }
+  process.env.SERVICE_TARGET = targets.join(',');
 }
 
-if (preset === 'lite') {
-  process.env.SERVICE_JOB_GROUPS = process.env.SERVICE_JOB_GROUPS ?? 'core';
+const runtimeOptions = resolveRuntimeOptions({ envSource: process.env });
+
+if (!process.env.SERVICE_JOB_GROUPS) {
+  process.env.SERVICE_JOB_GROUPS = Array.from(runtimeOptions.jobGroups).join(',');
 }
 
 bootstrapServices()

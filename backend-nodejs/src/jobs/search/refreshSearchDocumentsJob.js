@@ -4,7 +4,11 @@ import { env } from '../../config/env.js';
 import logger from '../../config/logger.js';
 import searchIngestionService from '../../services/SearchIngestionService.js';
 import { recordSearchIngestionRun } from '../../observability/metrics.js';
+import { schedulerCheckpointModel } from '../../models/SchedulerCheckpointModel.js';
+import { LOG_PREFIXES } from '../../servers/runtimeOptions.js';
 
+const JOB_PREFIX = LOG_PREFIXES.jobs;
+const annotate = (message) => (JOB_PREFIX ? `${JOB_PREFIX} ${message}` : message);
 const jobLogger = logger.child({ job: 'search-documents-refresh' });
 
 function resolveSchedule() {
@@ -18,7 +22,8 @@ export class RefreshSearchDocumentsJob {
     enabled = true,
     ingestionService = searchIngestionService,
     scheduler = cron,
-    loggerInstance = jobLogger
+    loggerInstance = jobLogger,
+    checkpointStore = schedulerCheckpointModel
   } = {}) {
     this.enabled = enabled;
     this.ingestionService = ingestionService;
@@ -26,11 +31,12 @@ export class RefreshSearchDocumentsJob {
     this.logger = loggerInstance;
     this.task = null;
     this.running = false;
+    this.checkpoints = checkpointStore;
   }
 
   start() {
     if (!this.enabled) {
-      this.logger.warn('Search documents refresh job disabled');
+      this.logger.warn(annotate('Search documents refresh job disabled'));
       return;
     }
 
@@ -58,17 +64,17 @@ export class RefreshSearchDocumentsJob {
       this.task.start();
     }
 
-    this.logger.info({ schedule, timezone }, 'Search documents refresh job scheduled');
+    this.logger.info({ schedule, timezone }, annotate('Search documents refresh job scheduled'));
   }
 
   async runCycle(trigger = 'manual') {
     if (!this.enabled) {
-      this.logger.warn({ trigger }, 'Search documents refresh invoked while disabled');
+      this.logger.warn({ trigger }, annotate('Search documents refresh invoked while disabled'));
       return;
     }
 
     if (this.running) {
-      this.logger.warn({ trigger }, 'Search documents refresh already running');
+      this.logger.warn({ trigger }, annotate('Search documents refresh already running'));
       return;
     }
 
@@ -76,14 +82,37 @@ export class RefreshSearchDocumentsJob {
     const start = Date.now();
 
     try {
-      await this.ingestionService.fullReindex();
+      const results = await this.ingestionService.fullReindex();
+      const documentCount = Array.isArray(results)
+        ? results.reduce((total, entry) => total + Number(entry?.documentCount ?? 0), 0)
+        : 0;
+      const entities = Array.isArray(results) ? results.map((entry) => entry.entity).filter(Boolean) : [];
       const durationSeconds = (Date.now() - start) / 1000;
       recordSearchIngestionRun({ index: 'all', documentCount: 0, durationSeconds, status: 'success' });
-      this.logger.info({ trigger, durationSeconds }, 'Search documents refresh completed');
+      await this.checkpoints.recordRun('search.refresh', {
+        status: 'success',
+        ranAt: new Date(),
+        metadata: {
+          trigger,
+          durationSeconds,
+          documentCount,
+          entities
+        }
+      });
+      this.logger.info({ trigger, durationSeconds, documentCount }, annotate('Search documents refresh completed'));
     } catch (error) {
       const durationSeconds = (Date.now() - start) / 1000;
       recordSearchIngestionRun({ index: 'all', documentCount: 0, durationSeconds, status: 'error', error });
-      this.logger.error({ err: error, trigger }, 'Search documents refresh failed');
+      await this.checkpoints.recordRun('search.refresh', {
+        status: 'error',
+        ranAt: new Date(),
+        metadata: {
+          trigger,
+          durationSeconds
+        },
+        errorMessage: error.message ?? String(error)
+      });
+      this.logger.error({ err: error, trigger }, annotate('Search documents refresh failed'));
       throw error;
     } finally {
       this.running = false;
@@ -99,7 +128,7 @@ export class RefreshSearchDocumentsJob {
         this.task.destroy();
       }
       this.task = null;
-      this.logger.info('Search documents refresh job stopped');
+      this.logger.info(annotate('Search documents refresh job stopped'));
     }
   }
 }

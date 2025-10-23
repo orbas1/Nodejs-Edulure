@@ -7,6 +7,11 @@ import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
 import { ensureSeedImage } from './_helpers/seedAssets.js';
+import logger from '../src/config/logger.js';
+import { SearchIngestionService } from '../src/services/SearchIngestionService.js';
+import { SearchDocumentsRepository } from '../src/repositories/searchDocumentsRepository.js';
+import SearchDocumentModel from '../src/models/SearchDocumentModel.js';
+import { schedulerCheckpointModel } from '../src/models/SchedulerCheckpointModel.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -65,6 +70,8 @@ const buildEncryptedKycDocument = (
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
+    await trx('scheduler_checkpoints').del();
+    await trx('search_documents').del();
     await trx('analytics_forecasts').del();
     await trx('analytics_alerts').del();
     await trx('explorer_search_daily_metrics').del();
@@ -3989,6 +3996,41 @@ export async function seed(knex) {
         last_evaluated_at: trx.fn.now()
       }
     ]);
+
+    const searchIngestionLogger = logger.child({ module: 'seed-search-ingestion' });
+    const scopedSearchModel = new SearchDocumentModel({ dbClient: trx, loggerInstance: searchIngestionLogger });
+    const searchRepo = new SearchDocumentsRepository({
+      dbClient: trx,
+      loggerInstance: searchIngestionLogger,
+      model: scopedSearchModel
+    });
+    const checkpointStore = schedulerCheckpointModel.withConnection(trx);
+    const ingestionService = new SearchIngestionService({
+      dbClient: trx,
+      repository: searchRepo,
+      loggerInstance: searchIngestionLogger,
+      concurrency: 1,
+      batchSize: 100,
+      deleteBeforeReindex: true,
+      checkpointStore
+    });
+
+    const ingestionResults = await ingestionService.fullReindex();
+    const seededDocumentCountRow = await trx('search_documents').count({ total: '*' }).first();
+    const seededDocumentCount = Number(seededDocumentCountRow?.total ?? 0);
+
+    await checkpointStore.recordRun('search.refresh', {
+      status: 'success',
+      ranAt: new Date(),
+      metadata: {
+        trigger: 'seed',
+        durationSeconds: 0,
+        documentCount: seededDocumentCount,
+        entities: Array.isArray(ingestionResults)
+          ? ingestionResults.map((entry) => entry.entity).filter(Boolean)
+          : []
+      }
+    });
 
     await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
       tool: 'dbt',

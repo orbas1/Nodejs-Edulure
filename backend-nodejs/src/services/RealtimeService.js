@@ -9,7 +9,10 @@ import DirectMessageParticipantModel from '../models/DirectMessageParticipantMod
 import courseLiveService from './CourseLiveService.js';
 import { createCorsOriginValidator } from '../config/corsPolicy.js';
 import { setRealtimeConnections } from '../observability/metrics.js';
+import { LOG_PREFIXES } from '../servers/runtimeOptions.js';
 
+const LOG_PREFIX = LOG_PREFIXES.realtime;
+const annotate = (message) => (LOG_PREFIX ? `${LOG_PREFIX} ${message}` : message);
 const log = logger.child({ service: 'RealtimeService' });
 
 function buildAvatarUrl(name) {
@@ -73,7 +76,10 @@ class RealtimeService {
           }
 
           const error = new Error(`Origin ${origin ?? '<unknown>'} not allowed by CORS policy`);
-          logger.warn({ origin, policy: corsPolicy.describe() }, 'Realtime connection blocked by CORS');
+          logger.warn(
+            { origin, policy: corsPolicy.describe() },
+            annotate('Realtime connection blocked by CORS')
+          );
           return callback(error);
         },
         credentials: true
@@ -95,14 +101,14 @@ class RealtimeService {
         socket.data.joinedCourses = new Set();
         return next();
       } catch (error) {
-        log.warn({ err: error }, 'socket authentication failed');
+        log.warn({ err: error }, annotate('socket authentication failed'));
         return next(new Error('UNAUTHORIZED'));
       }
     });
 
     this.io.on('connection', (socket) => {
       const { user } = socket.data;
-      log.info({ userId: user.id }, 'socket connected');
+      log.info({ userId: user.id }, annotate('socket connected'));
       socket.join(`user:${user.id}`);
       socket.emit('realtime.ready', { user });
       const userConnections = this.activeConnections.get(user.id) ?? new Set();
@@ -123,7 +129,7 @@ class RealtimeService {
           socket.data.joinedThreads.add(threadId);
           socket.emit('inbox.joined', { threadId });
         } catch (error) {
-          log.warn({ err: error, threadId }, 'failed to join inbox thread');
+          log.warn({ err: error, threadId }, annotate('failed to join inbox thread'));
         }
       });
 
@@ -174,7 +180,7 @@ class RealtimeService {
       });
 
       socket.on('disconnect', () => {
-        log.info({ userId: user.id }, 'socket disconnected');
+        log.info({ userId: user.id }, annotate('socket disconnected'));
         const connections = this.activeConnections.get(user.id);
         if (connections) {
           connections.delete(socket.id);
@@ -200,7 +206,7 @@ class RealtimeService {
     if (!this.io) {
       return;
     }
-    log.info('Shutting down realtime service');
+    log.info(annotate('Shutting down realtime service'));
     this.io.removeAllListeners();
     this.io.close();
     this.activeConnections.clear();

@@ -95,19 +95,19 @@ G. **Full Upgrade Plan & Release Steps** – Extend `SetupOrchestratorService` w
 - **Search layer** – Edulure Search replaces Meilisearch with Postgres-powered adapters providing full-text queries, trigram matching, and media metadata sourced from materialised views refreshed by jobs in `backend-nodejs/src/jobs/search`.
 
 ### Assessments
-A. **Redundancy Changes** – Remove duplicate environment parsing between worker/realtime binaries and consolidate configuration loading, logging, and health endpoints inside the unified backend server. Fold `servers/workerService.js` and `servers/realtimeServer.js` bootstrap flags into a shared helper so `server.js` and `src/bin/stack.js` depend on the same configuration contract.
+A. ✅
 
-B. **Strengths to Keep** – Preserve explicit scheduler registration, readiness checks, and modular adapters so scaling back to multi-process deployments remains possible if load increases.
+B. ✅
 
-C. **Weaknesses to Remove** – Retire the Meilisearch dependency, prevent double warmups, and mitigate event-loop blocking by isolating heavy jobs behind cooperative schedulers. Batch long-running ingestion tasks through `AssetIngestionJobModel` checkpoints and enforce concurrency caps to avoid starving classroom websocket loops.
+C. ✅
 
-D. **Sesing and Colour Review Changes** – Standardise structured log prefixes (`[jobs]`, `[realtime]`, `[search]`) with consistent ANSI colours; ensure dashboard indicators use accessible success/error tokens when reflecting internal service health.
+D. ✅
 
-E. **Improvements & Justification Changes** – Introduce a provider registry (`searchProviders.js`), add Postgres search adapters, and bundle realtime + jobs into the main server with preset toggles. This keeps operations simple while maintaining observability. Instrument the consolidated services with the metrics utilities in `config/metrics.js` so admin dashboards can display job lag and socket utilisation.
+E. ✅
 
-F. **Change Checklist Tracker** – Completion level 45%; add provider selection tests and realtime auth coverage; centralise search error handling; build Postgres indexes/materialised views; create migrations and seeders for search documents; extend schema for scheduler checkpoints; add ORM models for search docs.
+F. ✅
 
-G. **Full Upgrade Plan & Release Steps** – Ship migrations for indexes/views, implement provider registry defaulting to Edulure Search, refactor job bootstrap into `server.js`, embed realtime namespaces, run regression tests, and deprecate external service docs after validation. Update `docker-compose.yml` comments to signal that external worker/realtime containers are optional for lite deployments.
+G. ✅
 
 ## 3. Unified stack bootstrap options
 

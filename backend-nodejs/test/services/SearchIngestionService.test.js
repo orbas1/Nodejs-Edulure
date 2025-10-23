@@ -26,6 +26,11 @@ describe('SearchIngestionService', () => {
       upsertDocuments: vi.fn().mockImplementation(async (documents) => documents.length)
     };
 
+    const checkpointStore = {
+      withConnection: vi.fn().mockReturnThis(),
+      recordRun: vi.fn().mockResolvedValue({})
+    };
+
     const loaders = {
       communities: async function* () {
         yield [
@@ -61,14 +66,30 @@ describe('SearchIngestionService', () => {
       loaders,
       batchSize: 25,
       concurrency: 1,
-      deleteBeforeReindex: true
+      deleteBeforeReindex: true,
+      checkpointStore
     });
 
-    await service.fullReindex({ indexes: ['communities', 'ads'] });
+    const results = await service.fullReindex({ indexes: ['communities', 'ads'] });
 
     expect(repository.deleteByEntity).toHaveBeenCalledWith('communities');
     expect(repository.deleteByEntity).toHaveBeenCalledWith('ads');
     expect(repository.upsertDocuments).toHaveBeenCalledTimes(2);
+    expect(results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ entity: 'communities', documentCount: 1 }),
+        expect.objectContaining({ entity: 'ads', documentCount: 2 })
+      ])
+    );
+
+    expect(checkpointStore.recordRun).toHaveBeenCalledWith(
+      'search.ingestion.communities',
+      expect.objectContaining({ status: 'success' })
+    );
+    expect(checkpointStore.recordRun).toHaveBeenCalledWith(
+      'search.ingestion.ads',
+      expect.objectContaining({ status: 'success' })
+    );
 
     expect(recordSpy).toHaveBeenCalledWith(
       expect.objectContaining({ index: 'communities', documentCount: 1, status: 'success' })
@@ -82,6 +103,11 @@ describe('SearchIngestionService', () => {
     const repository = {
       deleteByEntity: vi.fn().mockResolvedValue(),
       upsertDocuments: vi.fn().mockImplementation(async (documents) => documents.length)
+    };
+
+    const checkpointStore = {
+      withConnection: vi.fn().mockReturnThis(),
+      recordRun: vi.fn().mockResolvedValue({})
     };
 
     const loaders = {
@@ -101,7 +127,8 @@ describe('SearchIngestionService', () => {
       repository,
       loggerInstance: createLogger(),
       loaders,
-      deleteBeforeReindex: true
+      deleteBeforeReindex: true,
+      checkpointStore
     });
 
     await service.fullReindex({ indexes: ['tutors'], since: new Date().toISOString() });
@@ -115,6 +142,10 @@ describe('SearchIngestionService', () => {
     expect(recordSpy).toHaveBeenCalledWith(
       expect.objectContaining({ index: 'tutors', documentCount: 1, status: 'success' })
     );
+    expect(checkpointStore.recordRun).toHaveBeenCalledWith(
+      'search.ingestion.tutors',
+      expect.objectContaining({ status: 'success' })
+    );
   });
 
   it('records failure metrics when ingestion throws', async () => {
@@ -123,6 +154,11 @@ describe('SearchIngestionService', () => {
       upsertDocuments: vi.fn().mockImplementation(async () => {
         throw Object.assign(new Error('write failed'), { code: 'ER_WRITE' });
       })
+    };
+
+    const checkpointStore = {
+      withConnection: vi.fn().mockReturnThis(),
+      recordRun: vi.fn().mockResolvedValue({})
     };
 
     const loaders = {
@@ -142,13 +178,18 @@ describe('SearchIngestionService', () => {
       repository,
       loggerInstance: createLogger(),
       loaders,
-      deleteBeforeReindex: false
+      deleteBeforeReindex: false,
+      checkpointStore
     });
 
     await expect(service.fullReindex({ indexes: ['courses'] })).rejects.toThrow('write failed');
 
     expect(recordSpy).toHaveBeenCalledWith(
       expect.objectContaining({ index: 'courses', status: 'error' })
+    );
+    expect(checkpointStore.recordRun).toHaveBeenCalledWith(
+      'search.ingestion.courses',
+      expect.objectContaining({ status: 'error' })
     );
   });
 });
