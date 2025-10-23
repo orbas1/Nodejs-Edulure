@@ -29,11 +29,20 @@ function serialisePreview(preview, entityType) {
   if (!preview) {
     return null;
   }
+  const id =
+    preview.id ??
+    preview.entityId ??
+    preview.entity_id ??
+    preview.entityPublicId ??
+    preview.entity_public_id ??
+    preview.slug ??
+    null;
   const title = preview.title ?? preview.label ?? null;
   if (!title) {
     return null;
   }
   return {
+    id: id != null ? String(id) : null,
     title,
     subtitle: preview.subtitle ?? null,
     thumbnailUrl: preview.thumbnailUrl ?? preview.previewImageUrl ?? null,
