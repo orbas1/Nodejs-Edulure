@@ -1,51 +1,26 @@
 import http from 'node:http';
 
-import { ensureDatabaseConnection, startCoreInfrastructure } from '../bootstrap/bootstrap.js';
 import { env } from '../config/env.js';
 import { healthcheck } from '../config/database.js';
-import logger from '../config/logger.js';
 import { createProbeApp } from '../observability/probes.js';
-import { createReadinessTracker } from '../observability/readiness.js';
-import realtimeService from '../services/RealtimeService.js';
-import { createProcessSignalRegistry } from './processSignalRegistry.js';
-
-const serviceLogger = logger.child({ service: 'realtime-service' });
+import { createServiceRuntime } from './runtimeEnvironment.js';
+import attachRealtimeGateway from './realtimeGateway.js';
 
 export async function startRealtimeServer({ withSignalHandlers = true } = {}) {
-  const readiness = createReadinessTracker('realtime-service', [
-    'database',
-    'feature-flags',
-    'runtime-config',
-    'search-cluster',
-    'socket-gateway'
-  ]);
+  const runtime = await createServiceRuntime({
+    serviceName: 'realtime-service',
+    readinessTargets: [
+      'database',
+      'feature-flags',
+      'runtime-config',
+      'search-cluster',
+      'socket-gateway',
+      'probe-server'
+    ],
+    runMigrations: false
+  });
 
-  const registry = createProcessSignalRegistry();
-  let databaseHandle = null;
-  try {
-    databaseHandle = await ensureDatabaseConnection({ runMigrations: false, readiness });
-  } catch (error) {
-    serviceLogger.error({ err: error }, 'Failed to connect to database');
-    readiness.markFailed('database', error);
-    registry.cleanup();
-    throw error;
-  }
-
-  let infrastructure;
-  try {
-    infrastructure = await startCoreInfrastructure({ readiness });
-  } catch (error) {
-    serviceLogger.error({ err: error }, 'Failed to start core infrastructure services');
-    if (databaseHandle) {
-      try {
-        await databaseHandle.close();
-      } catch (closeError) {
-        serviceLogger.error({ err: closeError }, 'Error closing database connection after infrastructure failure');
-      }
-    }
-    registry.cleanup();
-    throw error;
-  }
+  const { readiness, registry, logger: serviceLogger } = runtime;
 
   const probeApp = createProbeApp({
     service: 'realtime-service',
@@ -68,14 +43,12 @@ export async function startRealtimeServer({ withSignalHandlers = true } = {}) {
   const httpServer = http.createServer(probeApp);
 
   let socketGatewayPending = false;
-  let realtimeStarted = false;
+  let realtimeAttachment;
+
   readiness.markPending('socket-gateway', 'Initialising realtime gateway');
   socketGatewayPending = true;
-
   try {
-    await realtimeService.start(httpServer);
-    realtimeStarted = true;
-
+    realtimeAttachment = await attachRealtimeGateway({ httpServer, readiness, logger: serviceLogger });
     await new Promise((resolve, reject) => {
       httpServer.once('error', (error) => {
         readiness.markFailed('socket-gateway', error);
@@ -83,8 +56,7 @@ export async function startRealtimeServer({ withSignalHandlers = true } = {}) {
       });
 
       httpServer.listen(env.services.realtime.port, () => {
-        readiness.markReady('socket-gateway', `Listening on port ${env.services.realtime.port}`);
-        serviceLogger.info({ port: env.services.realtime.port }, 'Realtime service listening');
+        realtimeAttachment.markListening(env.services.realtime.port);
         socketGatewayPending = false;
         resolve();
       });
@@ -96,27 +68,11 @@ export async function startRealtimeServer({ withSignalHandlers = true } = {}) {
 
     serviceLogger.error({ err: error }, 'Failed to start realtime service');
 
-    if (realtimeStarted) {
-      await Promise.resolve()
-        .then(() => realtimeService.stop())
-        .catch((stopError) => {
-          serviceLogger.error({ err: stopError }, 'Error stopping realtime service after failure');
-        });
+    if (realtimeAttachment) {
+      await realtimeAttachment.stop('startup-failure');
     }
 
-    if (infrastructure) {
-      await infrastructure.stop().catch((infraError) => {
-        serviceLogger.error({ err: infraError }, 'Error stopping infrastructure after realtime failure');
-      });
-    }
-
-    if (databaseHandle) {
-      await databaseHandle.close().catch((closeError) => {
-        serviceLogger.error({ err: closeError }, 'Error closing database connection after realtime failure');
-      });
-    }
-
-    registry.cleanup();
+    await runtime.dispose({ reason: 'startup-failure' });
     throw error;
   }
 
@@ -128,7 +84,6 @@ export async function startRealtimeServer({ withSignalHandlers = true } = {}) {
     }
 
     isShuttingDown = true;
-    registry.cleanup();
     readiness.markPending('socket-gateway', `Shutting down (${signal})`);
 
     await new Promise((resolve) => {
@@ -138,29 +93,11 @@ export async function startRealtimeServer({ withSignalHandlers = true } = {}) {
       });
     });
 
-    try {
-      await Promise.resolve(realtimeService.stop());
-    } catch (error) {
-      serviceLogger.error({ err: error }, 'Error stopping realtime service');
+    if (realtimeAttachment) {
+      await realtimeAttachment.stop(signal);
     }
 
-    try {
-      await infrastructure.stop();
-    } catch (error) {
-      serviceLogger.error({ err: error }, 'Error stopping core infrastructure');
-    }
-
-    if (databaseHandle) {
-      try {
-        await databaseHandle.close();
-      } catch (error) {
-        serviceLogger.error({ err: error }, 'Error closing database connection');
-      }
-    }
-
-    if (exitProcess) {
-      process.exit(exitCode);
-    }
+    await runtime.dispose({ reason: signal, exitProcess, exitCode });
   }
 
   if (withSignalHandlers) {

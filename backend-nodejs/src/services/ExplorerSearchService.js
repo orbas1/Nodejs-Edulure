@@ -1,7 +1,8 @@
 import logger from '../config/logger.js';
 import { buildBounds, resolveCountryCoordinates } from '../utils/geo.js';
 import AdsPlacementService from './AdsPlacementService.js';
-import SearchDocumentModel, { SUPPORTED_ENTITIES as MODEL_SUPPORTED_ENTITIES } from '../models/SearchDocumentModel.js';
+import { SUPPORTED_ENTITIES as MODEL_SUPPORTED_ENTITIES } from '../models/SearchDocumentModel.js';
+import { resolveSearchProvider } from './searchProviders.js';
 
 const ENTITY_CONFIG = {
   communities: {
@@ -191,27 +192,30 @@ function formatDocument(entity, hit) {
 
 export class ExplorerSearchService {
   constructor({
-    documentModel = SearchDocumentModel,
+    provider = resolveSearchProvider(),
     adsService = AdsPlacementService,
     loggerInstance = logger
   } = {}) {
-    this.model = documentModel;
+    this.provider = provider;
     this.adsService = adsService;
     this.logger = loggerInstance;
+    this.supportedEntities = Array.isArray(this.provider.getSupportedEntities?.())
+      ? this.provider.getSupportedEntities()
+      : MODEL_SUPPORTED_ENTITIES;
   }
 
   getSupportedEntities() {
-    return this.model.getSupportedEntities();
+    return this.supportedEntities;
   }
 
   normaliseEntityTypes(entities) {
     if (!Array.isArray(entities) || !entities.length) {
-      return MODEL_SUPPORTED_ENTITIES;
+      return this.supportedEntities;
     }
     const filtered = entities
       .map((entry) => (typeof entry === 'string' ? entry.trim().toLowerCase() : null))
-      .filter((entry) => entry && MODEL_SUPPORTED_ENTITIES.includes(entry));
-    return filtered.length ? filtered : MODEL_SUPPORTED_ENTITIES;
+      .filter((entry) => entry && this.supportedEntities.includes(entry));
+    return filtered.length ? filtered : this.supportedEntities;
   }
 
   buildFilters(entity, filters = {}, globalFilters = {}) {
@@ -245,7 +249,7 @@ export class ExplorerSearchService {
   async searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }) {
     const effectiveFilters = this.buildFilters(entity, filters, globalFilters);
     const sortDirective = this.resolveSort(entity, sort);
-    const result = await this.model.search(entity, {
+    const result = await this.provider.search(entity, {
       query,
       filters: effectiveFilters,
       sort: sortDirective,
