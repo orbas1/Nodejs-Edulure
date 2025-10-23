@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 
 const numberFormatter = new Intl.NumberFormat('en-US');
 
+import MediaPreviewSlot from '../shared/MediaPreviewSlot.jsx';
+
 function formatRelativeTime(timestamp) {
   if (!timestamp) return 'Just now';
   const date = new Date(timestamp);
@@ -47,6 +49,153 @@ function normaliseLinkAttachments(attachments) {
     .filter(Boolean);
 }
 
+const pollPalette = ['#4f46e5', '#0ea5e9', '#10b981', '#f97316', '#ec4899'];
+
+function clampPercentage(value) {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+}
+
+function formatPollCloseLabel(timestamp) {
+  if (!timestamp) return null;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+  const diff = date.getTime() - Date.now();
+  if (diff <= 0) {
+    return 'Poll closed';
+  }
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 60) {
+    return `Closing in ${minutes} min`;
+  }
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) {
+    return `Closing in ${hours} hour${hours === 1 ? '' : 's'}`;
+  }
+  const days = Math.round(hours / 24);
+  if (days <= 7) {
+    return `Closing in ${days} day${days === 1 ? '' : 's'}`;
+  }
+  return `Closes ${date.toLocaleDateString()}`;
+}
+
+function normalisePollMetadata(poll) {
+  if (!poll) return null;
+  const totalVotes = Number.isFinite(Number(poll.totalVotes)) ? Number(poll.totalVotes) : null;
+  const choices = Array.isArray(poll.choices)
+    ? poll.choices
+        .map((choice, index) => {
+          if (!choice) return null;
+          const votes = Number.isFinite(Number(choice.votes)) ? Number(choice.votes) : 0;
+          const providedPercentage = Number.isFinite(Number(choice.percentage))
+            ? Number(choice.percentage)
+            : null;
+          const resolvedPercentage = totalVotes
+            ? clampPercentage((votes / totalVotes) * 100)
+            : providedPercentage !== null
+              ? clampPercentage(providedPercentage)
+              : 0;
+          const colour = choice.color ?? pollPalette[index % pollPalette.length];
+          const previewImage =
+            choice.previewImageUrl ??
+            choice.imageUrl ??
+            choice.preview?.thumbnailUrl ??
+            choice.metadata?.thumbnailUrl ??
+            null;
+          return {
+            id: choice.id ?? index,
+            label: choice.label || `Option ${index + 1}`,
+            votes,
+            percentage: Math.round(resolvedPercentage),
+            color: colour,
+            imageUrl: typeof previewImage === 'string' ? previewImage : null
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  if (choices.length === 0) {
+    return null;
+  }
+
+  const computedTotalVotes = totalVotes ?? choices.reduce((sum, choice) => sum + choice.votes, 0);
+  const closeLabel = formatPollCloseLabel(poll.closesAt ?? poll.endsAt ?? poll.expiresAt);
+
+  return {
+    question: poll.question || 'Community poll',
+    choices,
+    totalVotes: computedTotalVotes,
+    closeLabel
+  };
+}
+
+function PollPreview({ poll }) {
+  const leadingVotes = poll.choices.reduce((max, choice) => Math.max(max, choice.votes), 0);
+
+  return (
+    <section className="poll-preview p-4" aria-label="Poll preview">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Community poll</p>
+          <h5 className="mt-1 text-sm font-semibold text-slate-900">{poll.question}</h5>
+        </div>
+        <span className="badge-layer badge-layer--floating inline-flex items-center gap-2 rounded-full bg-slate-900/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+          {numberFormatter.format(poll.totalVotes)} votes
+        </span>
+      </div>
+      {poll.closeLabel ? <p className="mt-2 text-xs text-slate-500">{poll.closeLabel}</p> : null}
+      <ul className="mt-4 space-y-4">
+        {poll.choices.map((choice) => {
+          const isLeading = leadingVotes > 0 && choice.votes === leadingVotes;
+          return (
+            <li key={choice.id} className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-sm font-medium text-slate-700">{choice.label}</span>
+                <span className={`text-xs font-semibold uppercase tracking-wide ${isLeading ? 'text-primary' : 'text-slate-500'}`}>
+                  {choice.percentage}%
+                </span>
+              </div>
+              <div className="poll-preview__bar" role="presentation">
+                <span className="poll-preview__fill" style={{ width: `${choice.percentage}%`, background: choice.color }} />
+              </div>
+              {choice.imageUrl ? (
+                <div className="poll-preview__choice-image">
+                  <img
+                    src={choice.imageUrl}
+                    alt={`${choice.label} preview`}
+                    loading="lazy"
+                    className="h-32 w-full object-cover"
+                  />
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+PollPreview.propTypes = {
+  poll: PropTypes.shape({
+    question: PropTypes.string.isRequired,
+    closeLabel: PropTypes.string,
+    totalVotes: PropTypes.number.isRequired,
+    choices: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+        label: PropTypes.string.isRequired,
+        votes: PropTypes.number.isRequired,
+        percentage: PropTypes.number.isRequired,
+        color: PropTypes.string.isRequired,
+        imageUrl: PropTypes.string
+      })
+    ).isRequired
+  }).isRequired
+};
+
 export default function FeedItemCard({ post, onModerate, onRemove, actionState, onReact }) {
   const publishedLabel = formatRelativeTime(post.publishedAt ?? post.createdAt);
   const communityName = post.community?.name;
@@ -90,22 +239,12 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
   const defaultReactionKey = 'appreciate';
   const hasReacted = viewerReactions.includes(defaultReactionKey);
   const resolvedReactionCount = Number.isFinite(Number(reactions)) ? Number(reactions) : 0;
-  const resolvedAspectRatio = useMemo(() => {
-    if (!previewAspectRatio || typeof previewAspectRatio !== 'string') {
-      return 16 / 9;
-    }
-    const [w, h] = previewAspectRatio.split(':').map((value) => Number(value));
-    if (Number.isFinite(w) && Number.isFinite(h) && h > 0) {
-      return w / h;
-    }
-    return 16 / 9;
-  }, [previewAspectRatio]);
-
   const handleReact = (reaction) => {
     if (typeof onReact === 'function') {
       onReact(post, reaction);
     }
   };
+  const poll = useMemo(() => normalisePollMetadata(post.metadata?.poll), [post.metadata]);
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:shadow-md">
@@ -131,7 +270,7 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-semibold text-slate-900">{authorName}</h3>
                 {post.isPinned ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                  <span className="badge-layer badge-layer--floating inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
                     Pinned
                   </span>
                 ) : null}
@@ -139,7 +278,7 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-400">
                 <span>{post.author?.role ?? 'Member'}</span>
                 {communityName ? (
-                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                  <span className="badge-layer inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
                     {communityName}
                   </span>
                 ) : null}
@@ -177,10 +316,18 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
           <p className="mt-3 break-words text-sm leading-6 text-slate-700">{bodyCopy}</p>
 
           {previewUrl ? (
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-              <div className="relative w-full" style={{ aspectRatio: resolvedAspectRatio }}>
-                <img src={previewUrl} alt={post.title ?? 'Post preview'} className="h-full w-full object-cover" loading="lazy" />
-              </div>
+            <div className="mt-4">
+              <MediaPreviewSlot
+                thumbnailUrl={previewUrl}
+                label={post.title ?? 'Post preview'}
+                aspectRatio={previewAspectRatio}
+              />
+            </div>
+          ) : null}
+
+          {poll ? (
+            <div className="mt-4">
+              <PollPreview poll={poll} />
             </div>
           ) : null}
 
@@ -294,7 +441,36 @@ FeedItemCard.propTypes = {
       context: PropTypes.string,
       reviewContext: PropTypes.string
     }),
-    metadata: PropTypes.object,
+    metadata: PropTypes.shape({
+      attachments: PropTypes.arrayOf(
+        PropTypes.shape({
+          id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+          type: PropTypes.string,
+          url: PropTypes.string,
+          label: PropTypes.string
+        })
+      ),
+      poll: PropTypes.shape({
+        question: PropTypes.string,
+        closesAt: PropTypes.string,
+        endsAt: PropTypes.string,
+        expiresAt: PropTypes.string,
+        totalVotes: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+        choices: PropTypes.arrayOf(
+          PropTypes.shape({
+            id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            label: PropTypes.string,
+            votes: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+            percentage: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+            color: PropTypes.string,
+            imageUrl: PropTypes.string,
+            previewImageUrl: PropTypes.string,
+            preview: PropTypes.shape({ thumbnailUrl: PropTypes.string }),
+            metadata: PropTypes.shape({ thumbnailUrl: PropTypes.string })
+          })
+        )
+      })
+    }),
     media: PropTypes.shape({
       preview: PropTypes.shape({
         thumbnailUrl: PropTypes.string,

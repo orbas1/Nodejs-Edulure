@@ -18,6 +18,7 @@ import { listPublicLiveClassrooms } from '../api/catalogueApi.js';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
+import LiveClassroomChatPanel from '../components/shared/LiveClassroomChatPanel.jsx';
 
 const EXPLORER_CONFIG = {
   entityType: 'events',
@@ -843,6 +844,33 @@ export default function LiveClassrooms() {
     error
   ]);
 
+  const chatPreviewClassroom = useMemo(() => liveClassrooms[0] ?? null, [liveClassrooms]);
+  const chatPreviewMessages = useMemo(() => {
+    if (!chatPreviewClassroom) {
+      return [];
+    }
+    const previewMessages = chatPreviewClassroom.chatPreview?.messages ?? chatPreviewClassroom.chatPreview ?? [];
+    if (!Array.isArray(previewMessages)) {
+      return [];
+    }
+    return previewMessages
+      .filter(Boolean)
+      .map((message, index) => ({
+        id: message.id ?? `chat-preview-${index}`,
+        author: message.author ?? message.displayName ?? 'Participant',
+        role: message.role ?? 'Learner',
+        body: message.body ?? message.text ?? 'Join the classroom conversation to unlock realtime facilitation.',
+        timestamp: message.timestamp ?? message.createdAt ?? new Date().toISOString()
+      }));
+  }, [chatPreviewClassroom]);
+
+  const handleChatPreviewSend = useCallback(
+    () => {
+      setSuccessMessage('Message queued for facilitators');
+    },
+    [setSuccessMessage]
+  );
+
   return (
     <div className="bg-slate-100 pb-24 pt-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6">
@@ -876,6 +904,13 @@ export default function LiveClassrooms() {
             ) : null}
             {loading ? <p className="text-sm text-slate-500">Loading live classrooms…</p> : null}
           </div>
+          {chatPreviewClassroom ? (
+            <LiveClassroomChatPanel
+              classroom={chatPreviewClassroom}
+              messages={chatPreviewMessages}
+              onSend={handleChatPreviewSend}
+            />
+          ) : null}
         </section>
 
         <section>{adminPanel}</section>

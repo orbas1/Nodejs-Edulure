@@ -31,3 +31,11 @@ export function trackNotificationPreferenceChange(groupId, enabled) {
   trackEvent('notification:preference_change', { groupId, enabled });
 }
 
+export function trackSearch(query, metadata = {}) {
+  trackEvent('search:submit', { query, ...metadata });
+}
+
+export function trackAnalyticsWidgetView(label, metadata = {}) {
+  trackEvent('analytics:widget_view', { label, ...metadata });
+}
+

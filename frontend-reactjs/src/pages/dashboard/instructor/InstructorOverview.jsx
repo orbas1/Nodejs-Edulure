@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 import VerificationStatusCard from '../../../components/dashboard/VerificationStatusCard.jsx';
@@ -7,6 +7,7 @@ import InstructorPipelineSection from './sections/InstructorPipelineSection.jsx'
 import InstructorProductionSection from './sections/InstructorProductionSection.jsx';
 import InstructorProfileSection from './sections/InstructorProfileSection.jsx';
 import InstructorRevenueSection from './sections/InstructorRevenueSection.jsx';
+import InstructorTaskBoard from '../../../components/dashboard/InstructorTaskBoard.jsx';
 
 function normaliseNumber(value) {
   const numeric = Number.parseFloat(value);
@@ -107,6 +108,88 @@ export default function InstructorOverview({ dashboard, profile, onRefresh }) {
     };
   }, [pipeline, production, revenueSlices]);
 
+  const taskSources = useMemo(() => {
+    const sources = [];
+    if (Array.isArray(dashboard.tasks)) {
+      sources.push(...dashboard.tasks);
+    }
+    if (Array.isArray(dashboard.tasks?.items)) {
+      sources.push(...dashboard.tasks.items);
+    }
+    if (Array.isArray(dashboard.alerts?.tasks)) {
+      sources.push(...dashboard.alerts.tasks);
+    }
+    if (Array.isArray(dashboard.courses?.production)) {
+      sources.push(
+        ...dashboard.courses.production.map((item) => ({
+          id: item.id ?? item.asset,
+          title: item.asset ?? item.title ?? 'Production asset',
+          description: item.description ?? item.summary,
+          status: item.status ?? (item.complete ? 'completed' : 'in-progress'),
+          dueAt: item.dueAt ?? item.deadline ?? null,
+          category: 'Production',
+          impact: item.impact ?? null
+        }))
+      );
+    }
+    return sources;
+  }, [dashboard.tasks, dashboard.alerts?.tasks, dashboard.courses?.production]);
+
+  const taskBoardTasks = useMemo(() => {
+    if (!Array.isArray(taskSources) || taskSources.length === 0) return [];
+    return taskSources
+      .map((task, index) => ({
+        id: task.id ?? task.slug ?? `task-${index}`,
+        title: task.title ?? task.name ?? 'Task',
+        description: task.description ?? task.summary ?? '',
+        status: task.status ?? (task.completed ? 'completed' : 'pending'),
+        dueAt: task.dueAt ?? task.dueDate ?? task.deadline ?? null,
+        category: task.category ?? task.type ?? 'General',
+        impact: task.impact ?? task.importance ?? null,
+        link: task.href ?? task.link ?? null
+      }))
+      .slice(0, 8);
+  }, [taskSources]);
+
+  const taskBoardMetrics = useMemo(() => {
+    if (taskBoardTasks.length === 0) {
+      return [];
+    }
+    const total = taskBoardTasks.length;
+    const completed = taskBoardTasks.filter((task) => String(task.status).toLowerCase().includes('complete')).length;
+    const pending = total - completed;
+    const scheduled = taskBoardTasks.filter((task) => task.dueAt).length;
+    return [
+      {
+        label: 'Tasks open',
+        value: pending,
+        change: `${total} total`,
+        trend: pending > completed ? 'up' : 'down'
+      },
+      {
+        label: 'Completed',
+        value: completed,
+        change: pending ? `${pending} remaining` : 'All clear',
+        trend: 'up'
+      },
+      {
+        label: 'Scheduled work',
+        value: scheduled,
+        change: 'Linked to deadlines',
+        trend: 'up'
+      }
+    ];
+  }, [taskBoardTasks]);
+
+  const handleTaskSelect = useCallback(
+    (task) => {
+      if (task?.link) {
+        window.open(task.link, '_blank', 'noopener,noreferrer');
+      }
+    },
+    []
+  );
+
   return (
     <div className="space-y-10">
       {metrics.length > 0 ? (
@@ -134,6 +217,8 @@ export default function InstructorOverview({ dashboard, profile, onRefresh }) {
       </section>
 
       <VerificationStatusCard verification={safeProfile.verification} onRefresh={onRefresh} />
+
+      <InstructorTaskBoard tasks={taskBoardTasks} metrics={taskBoardMetrics} onTaskSelect={handleTaskSelect} />
 
       {alerts.length > 0 ? (
         <section className="dashboard-section">

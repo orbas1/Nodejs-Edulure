@@ -1,24 +1,25 @@
 import PropTypes from 'prop-types';
 
+import AnalyticsStat from '../shared/AnalyticsStat.jsx';
+
 export default function MetricCard({ metric }) {
   return (
-    <div className="dashboard-section">
-      <p className="dashboard-kicker">{metric.label}</p>
-      <p className="mt-2 text-2xl font-semibold text-slate-900">{metric.value}</p>
-      {metric.change ? (
-        <p className={`mt-1 text-sm font-medium ${metric.trend === 'down' ? 'text-rose-500' : 'text-emerald-500'}`}>
-          {metric.change}
-        </p>
-      ) : null}
-    </div>
+    <AnalyticsStat
+      label={metric.label}
+      value={metric.value}
+      change={metric.change}
+      trend={metric.trend}
+      description={metric.description}
+    />
   );
 }
 
 MetricCard.propTypes = {
   metric: PropTypes.shape({
     label: PropTypes.string.isRequired,
-    value: PropTypes.string.isRequired,
-    change: PropTypes.string,
-    trend: PropTypes.oneOf(['up', 'down'])
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    change: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    trend: PropTypes.oneOf(['up', 'down']),
+    description: PropTypes.string
   }).isRequired
 };

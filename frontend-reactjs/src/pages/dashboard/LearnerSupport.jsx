@@ -26,7 +26,7 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx';
 import useLearnerSupportCases from '../../hooks/useLearnerSupportCases.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
-import TicketForm from '../../components/support/TicketForm.jsx';
+import UnifiedTicketForm from '../../components/shared/UnifiedTicketForm.jsx';
 
 const PRIORITY_BADGES = {
   urgent: 'bg-rose-100 text-rose-700',
@@ -576,7 +576,7 @@ export default function LearnerSupport() {
 
   return (
     <div className="space-y-10">
-      <TicketForm
+      <UnifiedTicketForm
         open={ticketFormOpen}
         onClose={() => setTicketFormOpen(false)}
         onSubmit={handleTicketSubmit}

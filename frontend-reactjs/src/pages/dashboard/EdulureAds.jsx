@@ -6,6 +6,7 @@ import { useOutletContext } from 'react-router-dom';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import AnalyticsStat from '../../components/shared/AnalyticsStat.jsx';
 import {
   createAdsCampaign,
   listAdsCampaigns,
@@ -941,6 +942,55 @@ export default function EdulureAds() {
   const targeting = ads.targeting ?? { keywords: [], audiences: [], locations: [], languages: [], summary: '' };
   const tags = ads.tags ?? [];
 
+  const performanceMetrics = useMemo(() => {
+    if (campaigns.length === 0 && (!summary || Object.keys(summary).length === 0)) {
+      return [];
+    }
+
+    const aggregate = (selector) =>
+      campaigns.reduce((total, campaign) => total + (selector(campaign) ?? 0), 0);
+
+    const totalImpressions = summary.totalImpressions ?? aggregate((campaign) => Number(campaign.metrics?.impressions) || 0);
+    const totalClicks = summary.totalClicks ?? aggregate((campaign) => Number(campaign.metrics?.clicks) || 0);
+    const totalConversions = summary.totalConversions ?? aggregate((campaign) => Number(campaign.metrics?.conversions) || 0);
+    const totalSpendCents = summary.totalSpendCents ?? aggregate((campaign) => Number(campaign.metrics?.spendCents) || 0);
+    const totalRevenueCents = summary.totalRevenueCents ?? aggregate((campaign) => Number(campaign.metrics?.revenueCents) || 0);
+
+    const metrics = [];
+
+    if (totalImpressions > 0) {
+      metrics.push({
+        label: 'Impressions served',
+        value: formatInteger(totalImpressions),
+        change: `${formatInteger(totalClicks)} clicks`,
+        trend: 'up'
+      });
+    }
+
+    if (totalSpendCents > 0 || totalRevenueCents > 0) {
+      const spend = totalSpendCents / 100;
+      const revenue = totalRevenueCents / 100;
+      const roas = spend > 0 ? (revenue / spend).toFixed(2) : null;
+      metrics.push({
+        label: 'Spend to date',
+        value: currencyFormatter.format(spend),
+        change: roas ? `ROAS ${roas}x` : undefined,
+        trend: roas && Number(roas) >= 1 ? 'up' : 'down'
+      });
+    }
+
+    if (totalConversions > 0) {
+      metrics.push({
+        label: 'Conversions',
+        value: formatInteger(totalConversions),
+        change: totalRevenueCents ? currencyFormatter.format(totalRevenueCents / 100) : undefined,
+        trend: 'up'
+      });
+    }
+
+    return metrics;
+  }, [campaigns, summary]);
+
   return (
     <div className="space-y-8">
       <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
@@ -976,6 +1026,20 @@ export default function EdulureAds() {
         >
           {statusMessage.message}
         </div>
+      ) : null}
+
+      {performanceMetrics.length ? (
+        <section className="grid gap-4 md:grid-cols-3">
+          {performanceMetrics.map((metric) => (
+            <AnalyticsStat
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              change={metric.change}
+              trend={metric.trend}
+            />
+          ))}
+        </section>
       ) : null}
 
       {showTelemetryNotice ? (

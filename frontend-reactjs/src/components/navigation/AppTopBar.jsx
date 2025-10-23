@@ -10,7 +10,7 @@ import {
   RectangleStackIcon
 } from '@heroicons/react/24/outline';
 
-import SearchBar from '../SearchBar.jsx';
+import OmniSearchBar from '../shared/OmniSearchBar.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
 import UserMenu from './UserMenu.jsx';
 import { buildFocusOrder } from '../../navigation/routes.js';
@@ -128,13 +128,12 @@ export default function AppTopBar({
         </nav>
         {showSearch ? (
           <div className="hidden flex-1 lg:block">
-            <SearchBar
+            <OmniSearchBar
               value={searchValue}
               onChange={onSearchChange}
-              onSubmit={(event, value) => onSearchSubmit?.(value ?? event?.target?.value ?? '')}
-              placeholder="Search courses, tutors, communities…"
+              onSubmit={(value) => onSearchSubmit?.(value)}
               loading={searchLoading}
-              ariaLabel="Search across Edulure"
+              surface="app-shell"
             />
           </div>
         ) : null}

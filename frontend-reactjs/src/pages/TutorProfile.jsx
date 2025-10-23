@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GlobeAltIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { UserGroupIcon } from '@heroicons/react/24/outline';
 
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
 import FormStepper from '../components/forms/FormStepper.jsx';
@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
+import EntityCard from '../components/shared/EntityCard.jsx';
 
 const EXPLORER_CONFIG = {
   entityType: 'tutors',
@@ -145,60 +146,44 @@ function formatDateTime(value) {
 }
 
 function TutorCard({ tutor, onRequest }) {
-  return (
-    <article className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            <UserGroupIcon className="h-4 w-4" /> Tutor
-          </div>
-          <h3 className="text-2xl font-semibold text-slate-900">{tutor.displayName}</h3>
-          {tutor.headline ? <p className="text-sm font-medium text-slate-500">{tutor.headline}</p> : null}
-          {tutor.bio ? <p className="text-sm leading-relaxed text-slate-600">{tutor.bio}</p> : null}
-          <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {tutor.languages?.length ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-                {tutor.languages.join(', ')}
-              </span>
-            ) : null}
-            {tutor.timezones?.length ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-emerald-600">
-                {tutor.timezones.join(', ')}
-              </span>
-            ) : null}
-            {tutor.country ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-primary">
-                {tutor.country}
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <GlobeAltIcon className="h-4 w-4" /> Hourly rate
-          </p>
-          <p className="mt-2 text-lg font-semibold text-slate-900">{tutor.hourlyRate}</p>
-          <p className="text-xs text-slate-500">{tutor.isVerified ? 'Verified expert' : 'Pending verification'}</p>
-        </div>
-      </div>
-      {tutor.skills?.length ? (
-        <div className="flex flex-wrap gap-2">
-          {tutor.skills.map((skill) => (
-            <span key={skill} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              #{skill}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      <button
-        type="button"
-        onClick={onRequest}
-        className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark"
-      >
-        Request session
-      </button>
-    </article>
-  );
+  const entity = {
+    id: tutor.id,
+    title: tutor.displayName,
+    subtitle: tutor.headline,
+    description: tutor.bio,
+    badges: [
+      {
+        id: 'tutor-badge',
+        label: tutor.isVerified ? 'Verified tutor' : 'Tutor',
+        icon: UserGroupIcon
+      }
+    ],
+    tags: Array.isArray(tutor.skills) ? tutor.skills : [],
+    metrics: [
+      { id: 'rate', label: 'Hourly rate', value: tutor.hourlyRate, tone: 'success' },
+      {
+        id: 'languages',
+        label: 'Languages',
+        value: Array.isArray(tutor.languages) ? tutor.languages.join(', ') : tutor.languages
+      },
+      {
+        id: 'timezone',
+        label: 'Timezones',
+        value: Array.isArray(tutor.timezones) ? tutor.timezones.join(', ') : tutor.timezones
+      },
+      { id: 'country', label: 'Country', value: tutor.country }
+    ].filter((metric) => metric.value),
+    media: {
+      thumbnailUrl: tutor.avatarUrl,
+      label: tutor.displayName,
+      aspectRatio: '1:1'
+    },
+    actions: tutor.actions
+  };
+
+  const primaryAction = onRequest ? { label: 'Request session', onClick: onRequest, variant: 'primary' } : null;
+
+  return <EntityCard entity={entity} onPrimaryAction={primaryAction} />;
 }
 
 function mapCatalogueTutor(tutor) {

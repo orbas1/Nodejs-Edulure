@@ -24,6 +24,19 @@ export function preloadImage(url) {
   return promise;
 }
 
+export function preloadImages(urls) {
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return Promise.resolve([]);
+  }
+
+  return Promise.all(
+    urls
+      .map((url) => (typeof url === 'string' ? url.trim() : ''))
+      .filter((url) => url.length > 0)
+      .map((url) => preloadImage(url))
+  );
+}
+
 export function hasImage(url) {
   if (!url) return false;
   return imageCache.has(url.trim());

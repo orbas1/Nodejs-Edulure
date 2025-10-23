@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { SparklesIcon, UserGroupIcon, UsersIcon } from '@heroicons/react/24/solid';
 import { ArrowPathIcon, ChevronRightIcon, MapIcon, PlayCircleIcon } from '@heroicons/react/24/outline';
@@ -18,6 +18,7 @@ import {
 import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import FeedList from '../components/feed/FeedList.jsx';
+import CommunityMonetizationBanner from '../components/community/CommunityMonetizationBanner.jsx';
 import CommunityInteractiveSuite from '../components/community/CommunityInteractiveSuite.jsx';
 import CommunityCrudManager from '../components/community/CommunityCrudManager.jsx';
 import CommunityChatModule from '../components/community/CommunityChatModule.jsx';
@@ -31,7 +32,7 @@ import { useAuthorization } from '../hooks/useAuthorization.js';
 import useFeedInteractions from '../hooks/useFeedInteractions.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
-import { preloadImage } from '../utils/mediaCache.js';
+import { preloadImage, preloadImages } from '../utils/mediaCache.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -529,6 +530,8 @@ export default function Communities() {
   const [subscriptionError, setSubscriptionError] = useState(null);
   const [subscriptionCheckouts, setSubscriptionCheckouts] = useState([]);
 
+  const subscriptionPanelRef = useRef(null);
+
   const selectedCommunityId = selectedCommunity?.id ?? null;
 
   const activeCommunity = useMemo(() => {
@@ -743,6 +746,30 @@ export default function Communities() {
               preloadImage(candidateUrl);
             }
           });
+        }
+        const pollPreviewUrls = nextItems
+          .map((entry) => {
+            if (!entry) return null;
+            const post = entry.kind === 'post' ? entry.post : entry.post ?? entry;
+            const pollChoices = post?.metadata?.poll?.choices;
+            if (!Array.isArray(pollChoices)) return null;
+            return pollChoices
+              .map((choice) => {
+                if (!choice) return null;
+                return (
+                  choice.previewImageUrl ??
+                  choice.imageUrl ??
+                  choice.preview?.thumbnailUrl ??
+                  choice.metadata?.thumbnailUrl ??
+                  null
+                );
+              })
+              .filter((url) => typeof url === 'string' && url.trim().length > 0);
+          })
+          .filter(Boolean)
+          .flat();
+        if (pollPreviewUrls.length) {
+          preloadImages(pollPreviewUrls);
         }
       } catch (error) {
         setFeedItems([]);
@@ -994,11 +1021,29 @@ export default function Communities() {
     return Number(selectedPlan.priceCents ?? 0) + addonTotal;
   }, [selectedPlan, selectedAddons, subscriptionAddons]);
 
+  const hasActiveSubscription = useMemo(
+    () => mySubscriptions.some((subscription) => subscription?.status === 'active'),
+    [mySubscriptions]
+  );
+
   const totalSubscriptionCostDisplay = formatCurrency(totalSubscriptionCostCents / 100, subscriptionCurrency);
 
   const handleAddOnToggle = (addonId) => {
     setSelectedAddons((prev) => (prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]));
   };
+
+  const handleHighlightSubscription = useCallback(
+    (planId) => {
+      if (planId) {
+        setSelectedPlanId(String(planId));
+      }
+      setSubscriptionStatus(null);
+      if (subscriptionPanelRef.current) {
+        subscriptionPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    },
+    [setSelectedPlanId]
+  );
 
   const loadPaywallTiers = useCallback(
     async ({ signal } = {}) => {
@@ -1304,6 +1349,8 @@ export default function Communities() {
     }
   };
 
+  const membershipStatus = communityDetail?.membership?.status ?? resolvedDetail.membership?.status ?? 'non-member';
+
   const experienceModules = useMemo(
     () => [
       {
@@ -1371,14 +1418,24 @@ export default function Communities() {
             {feedError ? (
               <p className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{feedError}</p>
             ) : (
-              <FeedList
-                items={feedItems}
-                loading={isLoadingFeed}
-                emptyState={<p className="text-sm text-slate-500">No live updates published yet.</p>}
-                actionStates={feedActionStates}
-                hasMore={false}
-                onReact={handleReactToPost}
-              />
+              <>
+                {subscriptionPlans.length > 0 ? (
+                  <CommunityMonetizationBanner
+                    plans={subscriptionPlans}
+                    onSelectPlan={handleHighlightSubscription}
+                    hasActiveSubscription={hasActiveSubscription}
+                    membershipStatus={membershipStatus}
+                  />
+                ) : null}
+                <FeedList
+                  items={feedItems}
+                  loading={isLoadingFeed}
+                  emptyState={<p className="text-sm text-slate-500">No live updates published yet.</p>}
+                  actionStates={feedActionStates}
+                  hasMore={false}
+                  onReact={handleReactToPost}
+                />
+              </>
             )}
           </div>
         )
@@ -1408,7 +1465,18 @@ export default function Communities() {
         )
       }
     ],
-    [resolvedDetail.classrooms, canAccessCommunityFeed, feedItems, feedError, isLoadingFeed]
+    [
+      resolvedDetail.classrooms,
+      canAccessCommunityFeed,
+      feedItems,
+      feedError,
+      isLoadingFeed,
+      subscriptionPlans,
+      handleReactToPost,
+      handleHighlightSubscription,
+      hasActiveSubscription,
+      membershipStatus
+    ]
   );
 
   const ratingsBreakdown = useMemo(() => Object.entries(resolvedDetail.ratings.breakdown), [resolvedDetail.ratings.breakdown]);
@@ -1485,7 +1553,11 @@ export default function Communities() {
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),380px]">
             <div className="space-y-6">
-              <div className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl">
+              <div
+                ref={subscriptionPanelRef}
+                id="community-subscription-panel"
+                className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl"
+              >
                 <div className="flex flex-col gap-6 lg:flex-row">
                   <div className="lg:w-1/2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-primary">Ratings & reviews</p>

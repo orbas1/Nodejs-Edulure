@@ -86,6 +86,12 @@
   --shadow-focus-ring: 0 0 0 3px rgba(45, 98, 255, 0.35);
   --overlay-backdrop: rgba(15, 23, 42, 0.6);
 
+  /* Layering */
+  --z-base: 1;
+  --z-badge: 8;
+  --z-badge-floating: 12;
+  --z-media-overlay: 20;
+
   /* Grid system */
   --grid-min-column: 18rem;
   --grid-gap: var(--space-6);
