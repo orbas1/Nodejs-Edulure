@@ -1,8 +1,9 @@
 import db from '../config/database.js';
 import logger from '../config/logger.js';
 import { env } from '../config/env.js';
-import { INDEX_DEFINITIONS, searchClusterService } from './SearchClusterService.js';
+import { searchClusterService } from './SearchClusterService.js';
 import { recordSearchOperation, recordSearchIngestionRun } from '../observability/metrics.js';
+import { ENTITY_CONFIG, SUPPORTED_ENTITIES } from './search/entityConfig.js';
 
 function safeJsonParse(value, fallback) {
   if (!value) {
@@ -87,7 +88,34 @@ function normalizeDateInput(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-const INDEX_NAMES = INDEX_DEFINITIONS.map((definition) => definition.name);
+function resolveField(source, path) {
+  if (!source || !path) {
+    return undefined;
+  }
+  return path.split('.').reduce((acc, key) => {
+    if (acc === null || acc === undefined) {
+      return undefined;
+    }
+    if (typeof acc === 'object') {
+      return acc[key];
+    }
+    return undefined;
+  }, source);
+}
+
+function buildBodyText(parts) {
+  return parts
+    .map((part) => {
+      if (Array.isArray(part)) {
+        return part.filter(Boolean).join(' ');
+      }
+      return part ?? '';
+    })
+    .filter((part) => typeof part === 'string' && part.trim().length)
+    .join('\n');
+}
+
+const INDEX_NAMES = [...SUPPORTED_ENTITIES];
 
 export class SearchIngestionService {
   constructor({
@@ -95,7 +123,6 @@ export class SearchIngestionService {
     dbClient = db,
     loggerInstance = logger,
     batchSize = env.search.ingestion.batchSize,
-    concurrency = env.search.ingestion.concurrency,
     deleteBeforeReindex = env.search.ingestion.deleteBeforeReindex,
     loaders = {}
   } = {}) {
@@ -103,8 +130,8 @@ export class SearchIngestionService {
     this.db = dbClient;
     this.logger = loggerInstance;
     this.batchSize = Math.max(25, batchSize);
-    this.concurrency = Math.max(1, concurrency);
     this.deleteBeforeReindex = deleteBeforeReindex;
+    this.tableName = 'search_documents';
 
     this.loaders = {
       communities: this.loadCommunities.bind(this),
@@ -120,38 +147,22 @@ export class SearchIngestionService {
 
   async fullReindex({ since = null, indexes = INDEX_NAMES } = {}) {
     const sinceDate = normalizeDateInput(since);
-    const uniqueIndexes = indexes.filter((name, index, array) => array.indexOf(name) === index);
-    uniqueIndexes.forEach((indexName) => {
+    const uniqueIndexes = indexes
+      .filter((name) => typeof name === 'string')
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .filter((name, index, array) => array.indexOf(name) === index);
+
+    if (!uniqueIndexes.length) {
+      throw new Error('No search indexes specified for reindexing');
+    }
+
+    for (const indexName of uniqueIndexes) {
       if (!this.loaders[indexName]) {
         throw new Error(`Search ingestion loader not defined for index "${indexName}"`);
       }
-    });
-
-    const queue = [...uniqueIndexes];
-    const workers = Array.from({ length: Math.min(this.concurrency, queue.length || 1) }).map(() =>
-      (async () => {
-        while (queue.length) {
-          const indexName = queue.shift();
-          if (!indexName) {
-            return;
-          }
-          try {
-            await this.reindexIndex(indexName, { since: sinceDate });
-          } catch (error) {
-            recordSearchIngestionRun({
-              index: this.resolveIndexUid(indexName),
-              documentCount: 0,
-              durationSeconds: 0,
-              status: 'error',
-              error
-            });
-            throw error;
-          }
-        }
-      })()
-    );
-
-    await Promise.all(workers);
+      await this.reindexIndex(indexName, { since: sinceDate });
+    }
   }
 
   async reindexIndex(indexName, { since = null } = {}) {
@@ -159,60 +170,213 @@ export class SearchIngestionService {
     if (!loader) {
       throw new Error(`Search ingestion loader not defined for index "${indexName}"`);
     }
+    if (this.clusterService && typeof this.clusterService.start === 'function') {
+      await this.clusterService.start();
+    }
 
-    const indexUid = this.resolveIndexUid(indexName);
     const startTime = Date.now();
     let processed = 0;
     const deleteBeforeSync = this.deleteBeforeReindex && !since;
 
-    await this.clusterService.withAdminClient(`ingest:${indexUid}`, async (client, host) => {
+    try {
       if (deleteBeforeSync) {
-        const deleteTask = await recordSearchOperation('delete_all_documents', () => client.deleteAllDocuments());
-        if (deleteTask?.taskUid) {
-          await recordSearchOperation('wait_for_task', () =>
-            client.waitForTask(deleteTask.taskUid, {
-              timeoutMs: this.clusterService.requestTimeoutMs,
-              intervalMs: 100
-            })
-          );
-        }
+        await this.db(this.tableName).where({ entity_type: indexName }).del();
       }
 
-      for await (const documents of loader({ since, batchSize: this.batchSize })) {
-        if (!Array.isArray(documents) || documents.length === 0) {
+      for await (const records of loader({ since, batchSize: this.batchSize })) {
+        if (!Array.isArray(records) || records.length === 0) {
           continue;
         }
 
-        const index = client.index(indexUid);
-        const task = await recordSearchOperation('index_documents', () => index.addDocuments(documents));
-        if (task?.taskUid) {
-          await recordSearchOperation('wait_for_task', () =>
-            client.waitForTask(task.taskUid, {
-              timeoutMs: this.clusterService.requestTimeoutMs,
-              intervalMs: 100
-            })
-          );
+        const documents = records
+          .map((record) => this.buildDocument(indexName, record))
+          .filter((document) => document !== null);
+
+        if (!documents.length) {
+          continue;
         }
 
+        await this.upsertDocuments(documents);
         processed += documents.length;
-        this.logger.debug(
-          { index: indexUid, host, batchSize: documents.length, processed },
-          'Indexed search documents batch'
-        );
+        this.logger.debug({ index: indexName, batchSize: documents.length, processed }, 'Indexed search documents batch');
       }
-    });
 
-    const durationSeconds = (Date.now() - startTime) / 1000;
-    recordSearchIngestionRun({ index: indexUid, documentCount: processed, durationSeconds, status: 'success' });
-    this.logger.info({ index: indexUid, processed, durationSeconds }, 'Search ingestion completed');
+      const durationSeconds = (Date.now() - startTime) / 1000;
+      recordSearchIngestionRun({ index: indexName, documentCount: processed, durationSeconds, status: 'success' });
+      this.logger.info({ index: indexName, processed, durationSeconds }, 'Search ingestion completed');
+    } catch (error) {
+      const durationSeconds = (Date.now() - startTime) / 1000;
+      recordSearchIngestionRun({ index: indexName, documentCount: processed, durationSeconds, status: 'error', error });
+      this.logger.error({ err: error, index: indexName }, 'Search ingestion failed');
+      throw error;
+    }
   }
 
-  resolveIndexUid(indexName) {
-    const definition = INDEX_DEFINITIONS.find((item) => item.name === indexName);
-    if (!definition) {
-      throw new Error(`Unknown search index "${indexName}"`);
+  buildTags(record) {
+    const pools = [];
+    if (Array.isArray(record.tags)) pools.push(record.tags);
+    if (Array.isArray(record.topics)) pools.push(record.topics);
+    if (Array.isArray(record.skills)) pools.push(record.skills);
+    if (Array.isArray(record.languages)) pools.push(record.languages);
+    if (Array.isArray(record.categories)) pools.push(record.categories);
+    if (Array.isArray(record.authors)) pools.push(record.authors);
+    if (Array.isArray(record.communities)) pools.push(record.communities);
+
+    const flattened = pools.flat().filter((value) => value !== null && value !== undefined);
+    return dedupeStrings(flattened.map((value) => (typeof value === 'string' ? value : String(value))));
+  }
+
+  buildFacets(entity, record) {
+    const config = ENTITY_CONFIG[entity];
+    if (!config?.facets?.length) {
+      return {};
     }
-    return definition.uid;
+
+    return config.facets.reduce((acc, facet) => {
+      const value = resolveField(record, facet);
+      if (value === null || value === undefined || value === '') {
+        return acc;
+      }
+      if (Array.isArray(value)) {
+        const entries = dedupeStrings(value.map((entry) => (typeof entry === 'string' ? entry : String(entry))));
+        if (entries.length) {
+          acc[facet] = entries;
+        }
+        return acc;
+      }
+      if (typeof value === 'boolean') {
+        acc[facet] = [value ? 'true' : 'false'];
+        return acc;
+      }
+      acc[facet] = [value];
+      return acc;
+    }, {});
+  }
+
+  buildMetrics(entity, record) {
+    switch (entity) {
+      case 'communities':
+        return {
+          trendScore: normalizeNumber(record.trendScore, 0),
+          memberCount: normalizeNumber(record.memberCount, 0),
+          createdAt: record.createdAt ?? null,
+          updatedAt: record.updatedAt ?? null
+        };
+      case 'courses':
+        return {
+          'rating.average': normalizeNumber(record.rating?.average ?? record.ratingAverage, 0),
+          'rating.count': normalizeNumber(record.rating?.count ?? record.ratingCount, 0),
+          'price.amount': normalizeNumber(record.price?.amount ?? record.priceAmount, 0),
+          enrolmentCount: normalizeNumber(record.enrolmentCount, 0),
+          releaseAt: record.releaseAt ?? null,
+          updatedAt: record.updatedAt ?? null
+        };
+      case 'ebooks':
+        return {
+          'rating.average': normalizeNumber(record.rating?.average ?? record.ratingAverage, 0),
+          'rating.count': normalizeNumber(record.rating?.count ?? record.ratingCount, 0),
+          'price.amount': normalizeNumber(record.price?.amount ?? record.priceAmount, 0),
+          readingTimeMinutes: normalizeNumber(record.readingTimeMinutes, 0),
+          releaseAt: record.releaseAt ?? null,
+          updatedAt: record.updatedAt ?? null
+        };
+      case 'tutors':
+        return {
+          'rating.average': normalizeNumber(record.rating?.average ?? record.ratingAverage, 0),
+          'rating.count': normalizeNumber(record.rating?.count ?? record.ratingCount, 0),
+          'hourlyRate.amount': normalizeNumber(record.hourlyRate?.amount ?? record.hourlyRateAmount, 0),
+          responseTimeMinutes: normalizeNumber(record.responseTimeMinutes, 0),
+          completedSessions: normalizeNumber(record.completedSessions, 0),
+          updatedAt: record.updatedAt ?? null
+        };
+      case 'profiles':
+        return {
+          followerCount: normalizeNumber(record.followerCount, 0),
+          createdAt: record.createdAt ?? null,
+          updatedAt: record.updatedAt ?? null
+        };
+      case 'ads':
+        return {
+          performanceScore: normalizeNumber(record.performanceScore, 0),
+          ctr: normalizeNumber(record.ctr, 0),
+          'spend.total': normalizeNumber(record.spend?.total ?? record.spendTotalCents, 0),
+          createdAt: record.createdAt ?? null,
+          updatedAt: record.updatedAt ?? null
+        };
+      case 'events':
+        return {
+          startAt: record.startAt ?? null,
+          endAt: record.endAt ?? null,
+          'price.amount': normalizeNumber(record.price?.amount, 0),
+          updatedAt: record.updatedAt ?? null
+        };
+      default:
+        return {};
+    }
+  }
+
+  buildDocument(entity, record) {
+    if (!record || record.id === undefined || record.id === null) {
+      return null;
+    }
+
+    const title = record.title ?? record.name ?? `Result ${record.id}`;
+    const summary =
+      record.summary ??
+      record.tagline ??
+      (typeof record.description === 'string' ? record.description.slice(0, 240) : null);
+    const body = buildBodyText([
+      record.description,
+      record.bio,
+      record.summary,
+      record.tagline,
+      Array.isArray(record.topics) ? record.topics : null,
+      Array.isArray(record.skills) ? record.skills : null,
+      Array.isArray(record.tags) ? record.tags : null
+    ]);
+
+    return {
+      entityType: entity,
+      documentId: String(record.id),
+      title,
+      slug: record.slug ?? null,
+      summary,
+      body,
+      imageUrl: record.thumbnailUrl ?? record.coverImageUrl ?? record.avatarUrl ?? record.imageUrl ?? null,
+      tags: this.buildTags(record),
+      facets: this.buildFacets(entity, record),
+      metrics: this.buildMetrics(entity, record),
+      document: record
+    };
+  }
+
+  async upsertDocuments(documents) {
+    if (!documents.length) {
+      return;
+    }
+
+    await this.db.transaction(async (trx) => {
+      for (const document of documents) {
+        const payload = {
+          entity_type: document.entityType,
+          document_id: document.documentId,
+          title: document.title ?? '',
+          slug: document.slug ?? null,
+          summary: document.summary ?? null,
+          body: document.body ?? null,
+          image_url: document.imageUrl ?? null,
+          tags: JSON.stringify(document.tags ?? []),
+          facets: JSON.stringify(document.facets ?? {}),
+          metrics: JSON.stringify(document.metrics ?? {}),
+          document: JSON.stringify(document.document ?? {})
+        };
+
+        await trx(this.tableName)
+          .insert(payload)
+          .onConflict(['entity_type', 'document_id'])
+          .merge({ ...payload, updated_at: trx.fn.now() });
+      }
+    });
   }
 
   async *loadCommunities({ since, batchSize }) {

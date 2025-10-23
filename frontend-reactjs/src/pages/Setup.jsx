@@ -48,10 +48,30 @@ const BACKEND_FIELD_GROUPS = [
   },
   {
     title: 'Search',
-    description: 'Meilisearch cluster configuration for explorer and mail search.',
+    description: 'Edulure Search (relational) configuration for explorer and mail search.',
     fields: [
-      { key: 'MEILISEARCH_HOSTS', label: 'Hosts', placeholder: 'http://127.0.0.1:7700' },
-      { key: 'MEILISEARCH_API_KEY', label: 'API key', placeholder: 'masterKey' }
+      { key: 'SEARCH_TABLE_NAME', label: 'Table name', placeholder: 'search_documents' },
+      {
+        key: 'SEARCH_HEARTBEAT_INTERVAL_MS',
+        label: 'Heartbeat interval (ms)',
+        placeholder: '30000'
+      },
+      { key: 'SEARCH_INDEX_PREFIX', label: 'Index prefix', placeholder: 'edulure' },
+      {
+        key: 'SEARCH_INGESTION_BATCH_SIZE',
+        label: 'Ingestion batch size',
+        placeholder: '500'
+      },
+      {
+        key: 'SEARCH_INGESTION_CONCURRENCY',
+        label: 'Ingestion concurrency',
+        placeholder: '2'
+      },
+      {
+        key: 'SEARCH_INGESTION_DELETE_BEFORE_REINDEX',
+        label: 'Delete before reindex',
+        placeholder: 'true'
+      }
     ]
   }
 ];
@@ -263,7 +283,7 @@ export default function Setup() {
           </div>
           <h1 className="mt-4 text-4xl font-semibold text-slate-900">Install the Edulure platform</h1>
           <p className="mt-3 max-w-3xl text-base text-slate-600">
-            Configure environment secrets, provision databases, initialise Meilisearch, and warm background services without
+            Configure environment secrets, provision databases, initialise the search documents store, and warm background services without
             leaving your browser. The installer writes local <code>.env.local</code> files and verifies each component.
           </p>
         </header>
@@ -512,7 +532,7 @@ export default function Setup() {
               <ul className="mt-3 space-y-3 text-sm leading-relaxed">
                 <li className="flex items-start gap-2">
                   <CheckCircleIcon className="mt-1 h-5 w-5 text-emerald-400" />
-                  Ensure MySQL, Redis, and Meilisearch are running locally or reachable from this machine before launching the
+                  Ensure MySQL, Redis, and the search documents table are available locally or reachable from this machine before launching the
                   installer.
                 </li>
                 <li className="flex items-start gap-2">

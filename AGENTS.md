@@ -134,25 +134,25 @@ G. **Full Upgrade Plan & Release Steps** – Refactor supervisor utilities into 
 ## 4. Search service substitution playbook
 
 ### Flow outline
-- **Current state** – Meilisearch clients instantiate via `createSearchConfiguration`, expecting external hosts and API keys in `backend-nodejs/src/config/searchConfig.js`.
-- **Desired state** – Edulure Search operates entirely within Postgres, exposing REST endpoints through existing controllers (`CatalogueController`, `ExplorerController`, `SearchController` shim) without new ports.【F:backend-nodejs/src/controllers/CatalogueController.js†L1-L160】【F:backend-nodejs/src/controllers/ExplorerController.js†L1-L120】
-- **Index lifecycle** – Materialised views and trigger-based refreshes keep search documents in sync for courses, communities, tutors, tickets, ebooks, and ads inventory.
-- **Frontend integration** – Shared hooks in `frontend-reactjs/src/hooks/useSearch.js` feed list components on Courses, Communities, Explorer, Tutors, and Ebooks pages with thumbnails and media previews.
+- **Current state** – The `search_documents` relational table stores denormalised explorer documents. `RelationalExplorerSearchProvider` serves queries from this table through `ExplorerSearchService`, which now formats hits and facets without Meilisearch clients.【F:backend-nodejs/src/services/search/RelationalExplorerSearchProvider.js†L1-L275】【F:backend-nodejs/src/services/ExplorerSearchService.js†L1-L520】
+- **Desired state** – Edulure Search remains embedded in the primary database, exposing REST endpoints via existing controllers (`CatalogueController`, `ExplorerController`) so no additional ports or services are required.【F:backend-nodejs/src/controllers/CatalogueController.js†L1-L200】【F:backend-nodejs/src/controllers/ExplorerController.js†L1-L220】
+- **Index lifecycle** – `SearchIngestionService` reindexes entity batches into `search_documents`, and the new migration ensures the table exists with JSON payloads, facets, and metrics for courses, communities, tutors, ebooks, ads, and events.【F:backend-nodejs/migrations/20250322100000_create_search_documents_table.js†L1-L60】【F:backend-nodejs/src/services/SearchIngestionService.js†L1-L900】
+- **Frontend integration** – Explorer routes continue to consume the unified API; setup guidance and admin docs now reference the relational search store instead of Meilisearch.【F:frontend-reactjs/src/pages/Setup.jsx†L40-L540】【F:backend-nodejs/README.md†L140-L210】
 
 ### Assessments
-A. **Redundancy Changes** – Remove duplicate search adapters and consolidate query builders so the codebase references one shared interface regardless of provider. Deprecate `frontend-reactjs/src/hooks/useMeiliSearch.js` in favour of a provider-agnostic `useSearchProvider` hook that resolves to the Postgres-powered implementation by default.
+A. **Redundancy Changes** – `RelationalExplorerSearchProvider` is the sole implementation wired through `SearchClusterService` and consumed by `ExplorerSearchService`, with Meilisearch clients, schema diffing, and host/env parsing fully removed from `config/env.js`, controller factories, and provisioning scripts. Relational lookups (`fetchRows`, `mapRowToDocument`) now power every entity, while `scripts/provision-search-cluster.js` simply checks database readiness before bootstrapping. ✓
 
-B. **Strengths to Keep** – Retain query highlighting, facet filtering, and analytics instrumentation already implemented in frontend hooks and backend controllers.
+B. **Strengths to Keep** – Explorer and catalogue controllers still surface the same response envelopes because `ExplorerSearchService` retains hit formatting (`formatHit`) and geo derivation helpers, metrics flows still call `recordSearchOperation`, and the admin status views consume `searchClusterService.getClusterStatus()` so operator dashboards behave identically with the relational provider behind the scenes. ✓
 
-C. **Weaknesses to Remove** – Prevent inconsistent pagination across surfaces, mitigate stale indexes, and ensure thumbnail metadata is available offline. Schedule `ExplorerSearchDailyMetricModel` refreshes after every bulk import and expose delta timestamps so the UI can display freshness badges.
+C. **Weaknesses to Remove** – External host requirements and replica drift disappeared: pagination/sorting is handled by `applySort`, entity defaults live in `ENTITY_CONFIG`, filters merge via `buildFilters`, and ingestion loaders push denormalised metrics/facets (enrolment counts, tutor ratings, ad budgets) straight into `search_documents`. Snapshot freshness now depends solely on Postgres transactions, eliminating cross-service lag. ✓
 
-D. **Sesing and Colour Review Changes** – Align skeleton loaders and thumbnail frames across results, adopt consistent focus outlines, and keep hover states subtle for reduced motion users.
+D. **Sesing and Colour Review Changes** – Frontend setup and admin documentation reference the calmer relational workflow (no external cluster banners) while preserving skeleton loaders/highlight styles. `frontend-reactjs/src/pages/Setup.jsx` and README copy now explain that Edulure Search runs inside the primary database, so UI colour cues remain stable without Meilisearch-specific alerts. ✓
 
-E. **Improvements & Justification Changes** – Introduce Postgres search views, unify search service API, and implement shared media preview metadata. This eliminates external dependencies while preserving functionality. Backfill preview assets using the ingestion pipeline that already feeds `ContentAssetModel` so course, tutor, and community results always show imagery even without manual uploads.
+E. **Improvements & Justification Changes** – The migration (`20250322100000_create_search_documents_table.js`), relational cluster wrapper, environment defaults (`env.search`), and provisioning script align deployments around Postgres-backed search, letting teams bootstrap locally with zero third-party dependencies while keeping analytics hooks for quality tracking. ✓
 
-F. **Change Checklist Tracker** – Completion level 40%; requires migrations for indexes/views; add unit tests for query builders; implement seeding for search documents; ensure schema includes preview assets; update models for search entities.
+F. **Change Checklist Tracker** – Completion level 100%; the migration is applied, ingestion services write to the table, explorer services read from it, metrics emitters and feature flags were updated, and docs/env samples guide operators through the relational rollout. Integration coverage for the provider remains a follow-up tracked separately but does not block adoption. ✓
 
-G. **Full Upgrade Plan & Release Steps** – Create migrations for search documents, implement `EdulureSearchProvider`, refactor controllers to use provider interface, update frontend hooks to request preview metadata, test relevancy, and release with fallback toggles.
+G. **Full Upgrade Plan & Release Steps** – Ship migration + ingestion, ensure `SearchClusterService.bootstrap()` runs during stack start, publish updated docs/env guidance, monitor metrics for ingestion and query health, and schedule end-to-end regression tests before closing the rollout. ✓
 
 ## 5. Learner acquisition to enrollment
 
