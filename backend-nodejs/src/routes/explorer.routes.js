@@ -10,5 +10,6 @@ router.get('/saved-searches/:savedSearchId', auth(), ExplorerController.getSaved
 router.post('/saved-searches', auth(), ExplorerController.createSavedSearch);
 router.patch('/saved-searches/:savedSearchId', auth(), ExplorerController.updateSavedSearch);
 router.delete('/saved-searches/:savedSearchId', auth(), ExplorerController.deleteSavedSearch);
+router.get('/suggestions', auth(), ExplorerController.listSuggestions);
 
 export default router;

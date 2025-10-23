@@ -95,7 +95,8 @@ export class ExplorerAnalyticsService {
     globalFilters,
     sort,
     latencyMs,
-    metadata = {}
+    metadata = {},
+    previewDigests = []
   }) {
     const eventUuid = randomUUID();
     const entityRecords = entitySummaries.map(({ entityType, result }) =>
@@ -105,6 +106,14 @@ export class ExplorerAnalyticsService {
     const totalDisplayed = sum(entityRecords.map((record) => record.displayedHits));
     const overallLatency = Number(latencyMs ?? 0);
     const isZeroResult = entityRecords.every((record) => record.totalHits === 0);
+
+    const previewDigestMap = new Map();
+    for (const digest of previewDigests ?? []) {
+      if (!digest?.entityType || !Array.isArray(digest?.previews)) {
+        continue;
+      }
+      previewDigestMap.set(digest.entityType, digest.previews);
+    }
 
     const event = await db.transaction(async (trx) => {
       const created = await ExplorerSearchEventModel.create(
@@ -120,7 +129,7 @@ export class ExplorerAnalyticsService {
           filters,
           globalFilters,
           sortPreferences: sort,
-          metadata
+          metadata: { ...metadata, previewDigests }
         },
         trx
       );
@@ -143,6 +152,18 @@ export class ExplorerAnalyticsService {
         trx
       );
 
+      const aggregatePreviews = previewDigestMap.get('all');
+      if (aggregatePreviews?.length) {
+        await ExplorerSearchDailyMetricModel.appendPreviewDigests(
+          {
+            metricDate: created.createdAt,
+            entityType: 'all',
+            previews: aggregatePreviews
+          },
+          trx
+        );
+      }
+
       for (const record of entityRecords) {
         await ExplorerSearchDailyMetricModel.incrementForEvent(
           {
@@ -155,6 +176,18 @@ export class ExplorerAnalyticsService {
           },
           trx
         );
+
+        const previews = previewDigestMap.get(record.entityType);
+        if (previews?.length) {
+          await ExplorerSearchDailyMetricModel.appendPreviewDigests(
+            {
+              metricDate: created.createdAt,
+              entityType: record.entityType,
+              previews
+            },
+            trx
+          );
+        }
       }
 
       return { event: created, entities };

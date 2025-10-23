@@ -163,6 +163,30 @@ export default function DashboardLayout() {
     [navigate, basePath]
   );
 
+  const handleSuggestionSelect = useCallback(
+    (suggestion) => {
+      if (!suggestion) {
+        return false;
+      }
+      trackNavigationSelect('dashboard-search-suggestion', {
+        origin: resolvedRole,
+        type: suggestion.type,
+        label: suggestion.label
+      });
+      if (suggestion.target?.entityType && suggestion.target?.entityId) {
+        navigate(
+          `${basePath}/search?entity=${encodeURIComponent(suggestion.target.entityType)}&highlight=${encodeURIComponent(suggestion.target.entityId)}`
+        );
+        return false;
+      }
+      if (suggestion.query) {
+        handleSearchSubmit(suggestion.query);
+      }
+      return false;
+    },
+    [basePath, handleSearchSubmit, navigate, resolvedRole]
+  );
+
   const handleOpenNotifications = useCallback(() => {
     setNotificationsOpen(true);
     notifications.forEach((notification) => {
@@ -197,6 +221,7 @@ export default function DashboardLayout() {
         searchValue={searchTerm}
         onSearchChange={(value) => setSearchTerm(value)}
         onSearchSubmit={handleSearchSubmit}
+        onSuggestionSelect={handleSuggestionSelect}
         notificationCount={notificationCount}
         presence={presence}
         showQuickCreate

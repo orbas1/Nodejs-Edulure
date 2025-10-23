@@ -3,6 +3,7 @@ import Joi from 'joi';
 import explorerSearchService from '../services/ExplorerSearchService.js';
 import explorerAnalyticsService from '../services/ExplorerAnalyticsService.js';
 import savedSearchService from '../services/SavedSearchService.js';
+import searchSuggestionService from '../services/SearchSuggestionService.js';
 import { success } from '../utils/httpResponse.js';
 
 const SUPPORTED_ENTITIES = explorerSearchService.getSupportedEntities();
@@ -249,6 +250,43 @@ export default class ExplorerController {
         includeFacets: payload.includeFacets
       });
 
+      const previewDigests = [];
+      const aggregatePreviews = [];
+      for (const [entityType, summary] of Object.entries(result?.results ?? {})) {
+        if (!summary) {
+          continue;
+        }
+        const hits = Array.isArray(summary.hits) ? summary.hits : [];
+        if (!hits.length) {
+          continue;
+        }
+        const previews = hits.slice(0, 4).map((hit) => ({
+          entityType,
+          entityId: hit.entityId ?? hit.entityPublicId ?? hit.id ?? hit.slug ?? null,
+          title: hit.title ?? hit.name ?? null,
+          subtitle: hit.subtitle ?? hit.previewSummary ?? hit.description ?? null,
+          previewImageUrl:
+            hit.previewImageUrl ??
+            hit.thumbnailUrl ??
+            hit.metadata?.thumbnailUrl ??
+            hit.metadata?.coverImageUrl ??
+            null,
+          badges: Array.isArray(hit.badges) ? hit.badges : [],
+          rating: hit.rating ?? hit.metrics?.rating ?? null,
+          metrics: hit.metrics ?? {},
+          price: hit.price ?? hit.metrics?.price ?? null,
+          monetisationTag: hit.monetisationTag ?? null
+        }));
+        if (previews.length) {
+          previewDigests.push({ entityType, previews });
+          aggregatePreviews.push(...previews.slice(0, 2));
+        }
+      }
+
+      if (aggregatePreviews.length) {
+        previewDigests.push({ entityType: 'all', previews: aggregatePreviews.slice(0, 6) });
+      }
+
       if (req.user && payload.savedSearchId) {
         await savedSearchService.touchUsage(req.user.id, payload.savedSearchId).catch((error) => {
           req.log?.warn({ err: error, savedSearchId: payload.savedSearchId }, 'Failed to update saved search usage timestamp');
@@ -282,7 +320,8 @@ export default class ExplorerController {
             ip: req.ip,
             userAgent: req.get('user-agent'),
             savedSearchId: payload.savedSearchId ?? null
-          }
+          },
+          previewDigests
         });
       } catch (analyticsError) {
         req.log?.warn({ err: analyticsError }, 'Failed to record explorer analytics event');
@@ -384,6 +423,24 @@ export default class ExplorerController {
       return success(res, {
         data: null,
         message: 'Saved search deleted'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async listSuggestions(req, res, next) {
+    try {
+      const limit = Number(req.query.limit ?? 12);
+      const sinceDays = Number(req.query.sinceDays ?? 14);
+      const suggestions = await searchSuggestionService.getSuggestions({
+        userId: req.user?.id ?? null,
+        limit: Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), 30) : 12,
+        sinceDays: Number.isFinite(sinceDays) && sinceDays >= 0 ? sinceDays : 14
+      });
+      return success(res, {
+        data: suggestions,
+        message: 'Explorer suggestions fetched'
       });
     } catch (error) {
       return next(error);

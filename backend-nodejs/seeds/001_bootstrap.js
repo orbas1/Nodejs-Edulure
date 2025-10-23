@@ -3504,6 +3504,76 @@ export async function seed(knex) {
       }
     ]);
 
+    const previewDigestUpdatedAt = nowIso;
+    const previewDigestCourses = [
+      {
+        id: String(opsAutomationCourseId),
+        entityType: 'courses',
+        title: 'Automation Launch Masterclass',
+        subtitle: 'Production blueprint for running live classroom automation squads.',
+        thumbnailUrl: automationCourseArtwork.url,
+        ratingAverage: 4.8,
+        ratingCount: 187,
+        priceCurrency: 'USD',
+        priceAmountMinor: 129900,
+        monetisationTag: 'Premium course',
+        badges: [
+          { label: 'Advanced', tone: 'indigo' },
+          { label: 'Cohort', tone: 'amber' }
+        ],
+        updatedAt: previewDigestUpdatedAt
+      }
+    ];
+    const previewDigestCommunities = [
+      {
+        id: String(opsCommunityId),
+        entityType: 'communities',
+        title: 'Learning Ops Guild',
+        subtitle: 'Operations leaders share classroom launch playbooks and tooling recipes.',
+        thumbnailUrl: learningOpsCover.url,
+        ratingAverage: 4.88,
+        ratingCount: 168,
+        priceCurrency: null,
+        priceAmountMinor: null,
+        monetisationTag: 'Open community',
+        badges: [
+          { label: 'Public', tone: 'emerald' },
+          { label: 'Operations', tone: 'slate' }
+        ],
+        updatedAt: previewDigestUpdatedAt
+      }
+    ];
+    const previewDigestTutors = [
+      {
+        id: String(opsTutorProfileId),
+        entityType: 'tutors',
+        title: 'Kai Watanabe',
+        subtitle: 'Automation launch strategist & Agora live operations lead',
+        thumbnailUrl: instructorAvatar.url,
+        ratingAverage: 4.9,
+        ratingCount: 86,
+        priceCurrency: 'USD',
+        priceAmountMinor: 18000,
+        monetisationTag: 'Verified tutor',
+        badges: [
+          { label: 'Verified', tone: 'emerald' },
+          { label: 'Automation', tone: 'indigo' }
+        ],
+        updatedAt: previewDigestUpdatedAt
+      }
+    ];
+    const previewDigestsAll = [
+      ...previewDigestCourses.slice(0, 1),
+      ...previewDigestCommunities.slice(0, 1),
+      ...previewDigestTutors.slice(0, 1)
+    ];
+    const previewDigestsByEntity = {
+      all: previewDigestsAll,
+      courses: previewDigestCourses,
+      communities: previewDigestCommunities,
+      tutors: previewDigestTutors
+    };
+
     await trx('explorer_search_daily_metrics').insert([
       {
         metric_date: analyticsTwoDaysAgo,
@@ -3515,7 +3585,7 @@ export async function seed(knex) {
         clicks: 205,
         conversions: 58,
         average_latency_ms: 198,
-        metadata: JSON.stringify({ cohort: 'operations' })
+        metadata: JSON.stringify({ cohort: 'operations', previewDigests: previewDigestsByEntity.all })
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -3527,7 +3597,7 @@ export async function seed(knex) {
         clicks: 68,
         conversions: 14,
         average_latency_ms: 182,
-        metadata: JSON.stringify({ category: 'operations' })
+        metadata: JSON.stringify({ category: 'operations', previewDigests: previewDigestsByEntity.communities })
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -3539,7 +3609,7 @@ export async function seed(knex) {
         clicks: 92,
         conversions: 33,
         average_latency_ms: 166,
-        metadata: JSON.stringify({ track: 'automation' })
+        metadata: JSON.stringify({ track: 'automation', previewDigests: previewDigestsByEntity.courses })
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -3551,7 +3621,7 @@ export async function seed(knex) {
         clicks: 45,
         conversions: 11,
         average_latency_ms: 132,
-        metadata: JSON.stringify({ locale: 'global' })
+        metadata: JSON.stringify({ locale: 'global', previewDigests: previewDigestsByEntity.tutors })
       },
       {
         metric_date: analyticsYesterday,
@@ -3563,7 +3633,7 @@ export async function seed(knex) {
         clicks: 248,
         conversions: 66,
         average_latency_ms: 187,
-        metadata: JSON.stringify({ cohort: 'growth' })
+        metadata: JSON.stringify({ cohort: 'growth', previewDigests: previewDigestsByEntity.all })
       },
       {
         metric_date: analyticsYesterday,
@@ -3575,7 +3645,7 @@ export async function seed(knex) {
         clicks: 84,
         conversions: 19,
         average_latency_ms: 170,
-        metadata: JSON.stringify({ category: 'growth' })
+        metadata: JSON.stringify({ category: 'growth', previewDigests: previewDigestsByEntity.communities })
       },
       {
         metric_date: analyticsYesterday,
@@ -3587,7 +3657,7 @@ export async function seed(knex) {
         clicks: 118,
         conversions: 35,
         average_latency_ms: 158,
-        metadata: JSON.stringify({ track: 'commerce' })
+        metadata: JSON.stringify({ track: 'commerce', previewDigests: previewDigestsByEntity.courses })
       },
       {
         metric_date: analyticsYesterday,
@@ -3599,7 +3669,7 @@ export async function seed(knex) {
         clicks: 46,
         conversions: 12,
         average_latency_ms: 128,
-        metadata: JSON.stringify({ locale: 'emea' })
+        metadata: JSON.stringify({ locale: 'emea', previewDigests: previewDigestsByEntity.tutors })
       },
       {
         metric_date: analyticsToday,
@@ -3611,7 +3681,7 @@ export async function seed(knex) {
         clicks: 261,
         conversions: 74,
         average_latency_ms: 176,
-        metadata: JSON.stringify({ cohort: 'live-classroom' })
+        metadata: JSON.stringify({ cohort: 'live-classroom', previewDigests: previewDigestsByEntity.all })
       },
       {
         metric_date: analyticsToday,
@@ -3623,7 +3693,7 @@ export async function seed(knex) {
         clicks: 88,
         conversions: 22,
         average_latency_ms: 164,
-        metadata: JSON.stringify({ category: 'live' })
+        metadata: JSON.stringify({ category: 'live', previewDigests: previewDigestsByEntity.communities })
       },
       {
         metric_date: analyticsToday,
@@ -3635,7 +3705,7 @@ export async function seed(knex) {
         clicks: 128,
         conversions: 38,
         average_latency_ms: 152,
-        metadata: JSON.stringify({ track: 'delivery' })
+        metadata: JSON.stringify({ track: 'delivery', previewDigests: previewDigestsByEntity.courses })
       },
       {
         metric_date: analyticsToday,
@@ -3647,7 +3717,7 @@ export async function seed(knex) {
         clicks: 45,
         conversions: 14,
         average_latency_ms: 121,
-        metadata: JSON.stringify({ locale: 'amer' })
+        metadata: JSON.stringify({ locale: 'amer', previewDigests: previewDigestsByEntity.tutors })
       }
     ]);
 
