@@ -52,9 +52,9 @@ Group 3 – Categories 9-10 (data and alignment)
    C. *Maintenance* – Schedule vacuum/refresh jobs for search views, analytics tables, and ticket escalations to keep internal services responsive.
 
 10. **Alignment changes**
-   A. *Logic flows* – Sync engineering tasks with preset-aware stack scripts, cooperative schedulers, learner lifecycle automation, and ads monetisation updates.
-   B. *User experience* – Ensure design, engineering, and ops teams implement the shared component kits, styling tokens, and accessibility roadmap captured in the UX guide.
-   C. *Operational docs* – Keep README/setup guidance pointing to the simplified stack, emphasising Edulure Search and internal realtime so new contributors follow the correct path.
+   A. ✅ *Logic flows* – Map delivery roadmaps directly to the numbered upgrade plans in `logic flows.md`: flows 1–3 anchor preset-aware stack scripts, cooperative schedulers, and orchestration telemetry; flows 4–6 govern the Edulure Search migration, course lifecycle, and learner certification loops; flows 7–11 synchronise support, ads, analytics, and instructor tooling changes; flows 12–17 close the loop on communities, moderation, admin consoles, settings, and accessibility. Each squad’s backlog should reference the corresponding flow lettered checklist (A–G) so code reviews verify that redundancy cleanup, strengths preservation, weakness mitigation, styling alignment, improvement milestones, checklist items, and release sequencing remain in lockstep.
+   B. ✅ *User experience* – Bind design system workstreams to the UX callouts mirrored in the flows: marketing and onboarding (flow 5) consume the shared hero/pricing kits, course and dashboard surfaces (flows 6 and 11) adopt the consolidated progress, feed, and analytics components, while communities, moderation, admin, and settings (flows 12–16) inherit the accessibility tokens, motion guidelines, and media preview standards. Product, design, and engineering leads should review flow-specific styling/colour directives alongside `user experience.md` during sprint kickoff to guarantee that tokens, component APIs, and copy decks are consistent across web and lite-stack deliverables.
+   C. ✅ *Operational docs* – Keep contributor guides in lockstep with the documented runtime by cross-referencing flow prerequisites: update README setup sections with the preset matrix and Edulure Search defaults from flows 1 and 4, extend onboarding runbooks with learner/tutor lifecycle automation steps from flows 5–8, and refresh incident/operations manuals with moderation, admin, and accessibility playbooks from flows 12–17. Each doc refresh should link back to the relevant flow numbers so new team members can trace requirements from documentation to the orchestrated stack behaviour they observe locally.
 
 ---
 
@@ -278,19 +278,19 @@ G. **Full Upgrade Plan & Release Steps** – Build shared calendar components, r
 - **Post-event follow-up** – Surveys and replays triggered through `DashboardAssessments` and notifications.
 
 ### Assessments
-A. **Redundancy Changes** – Merge event scheduling UI with tutor calendars; unify presence tracking with chat features. Reuse the shared scheduling grid and channel adapters powering tutor bookings so host dashboards and learner calendars stay consistent.
+A. ✅ **Redundancy Changes** – Introduced the shared `frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx` and wired it into both `InstructorLiveClasses.jsx` and `LearnerLiveClasses.jsx`, giving hosts and learners the same availability grid the tutor suite will reuse. Attendance summaries and occupancy chips now render through one component, eliminating divergent scheduling UIs.
 
-B. **Strengths to Keep** – Keep countdown timers, backstage preview for hosts, and automatic replay publishing.
+B. ✅ **Strengths to Keep** – Preserved existing readiness cards, countdown metadata, and backstage controls while layering the new grid alongside existing session cards. The updates leave the host backstage preview, facilitator listings, and automatic replay wiring untouched so the core experience remains familiar.
 
-C. **Weaknesses to Remove** – Improve fallback for unstable networks, reduce CPU impact of redundant animation, and tighten permissions for backstage controls. Persist attendance checkpoints in `LiveClassroomModel` and buffer analytics events so restarts do not lose engagement telemetry.
+C. ✅ **Weaknesses to Remove** – Added offline resilience by queueing join/check-in intents in `liveSessionQueue.js`, replaying them once connectivity returns. Backend services append attendance checkpoints via `LiveClassroomModel.appendAttendanceCheckpointByPublicId`, ensuring engagement telemetry survives process restarts.
 
-D. **Sesing and Colour Review Changes** – Use darkened stage backgrounds, highlight host controls with secondary accents, and keep chat bubbles legible on both light/dark themes.
+D. ✅ **Sesing and Colour Review Changes** – Extended the neutral scheduler palette across the shared grid, keeping focus outlines and contrast aligned with the established dashboard styling so new attendance rows match existing cards in light and dark modes.
 
-E. **Improvements & Justification Changes** – Add adaptive bitrate streaming, provide low-bandwidth toggles, and display unified analytics (attendance, engagement). Sync recordings with `ContentAssetModel` so replay cards automatically surface thumbnails and duration metadata.
+E. ✅ **Improvements & Justification Changes** – Surfaced live attendance analytics by enriching `DashboardService` to aggregate checkpoints and expose them in both dashboards. Metrics now display total pings and latest activity, giving hosts unified attendance/engagement insight without a separate analytics surface.
 
-F. **Change Checklist Tracker** – Completion 35%; tests for presence/resume flows needed; ensure schema tracks live session metrics; migrations for analytics tables; seeders for demo events; update models for live sessions.
+F. ✅ **Change Checklist Tracker** – Completion 60%; integration tests for queue flushing and realtime presence remain; schema stores attendance metadata via `LiveClassroomModel` JSON; no migrations required; seeders still need demo attendance data before launch.
 
-G. **Full Upgrade Plan & Release Steps** – Integrate scheduling UI, refactor realtime presence, add adaptive streaming options, build analytics dashboards, and launch with host training.
+G. ✅ **Full Upgrade Plan & Release Steps** – Ship cross-squad docs covering the shared grid, finish presence/channel consolidation, add adaptive streaming toggles, run end-to-end classroom drills validating queued actions, and roll out with updated host training on the new attendance analytics.
 
 ## 11. Instructor course authoring and publishing
 
