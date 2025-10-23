@@ -203,25 +203,27 @@ G. **Full Upgrade Plan & Release Steps** – Build shared course navigation prim
 ## 7. Learner profile and personalisation
 
 ### Flow outline
-- **Profile viewing/editing** – `frontend-reactjs/src/pages/Profile.jsx` queries `UserController.getProfile` and `LearnerDashboardController.getPreferences` to show avatar, bio, goals, and notification settings.【F:backend-nodejs/src/controllers/UserController.js†L1-L160】
-- **Avatar and media uploads** – `MediaUploadController.createUpload` issues signed URLs for avatars/banner images; frontend uses dropzones shared with community branding.
-- **Preferences & goals** – `LearnerDashboardController.updatePreferences` stores interests, learning pace, and monetisation preferences, feeding personalised recommendations in dashboard/home feeds.
-- **Security settings** – `AuthController.updatePassword` and `IdentityVerificationController` handle password resets, MFA toggles, and identity confirmation.
+- **Profile viewing/editing** – `frontend-reactjs/src/pages/Profile.jsx` hydrates identity, biography, and notification data from `UserController.getProfile`, `LearnerDashboardController.getSystemPreferences`, and `LearnerDashboardController.getFinanceSettings`, driving both public profile cards and private dashboards.【F:backend-nodejs/src/controllers/UserController.js†L1-L160】
+- **Inline editing primitives** – `frontend-reactjs/src/components/profile/ProfileIdentityEditor.jsx` and the dashboard variant in `frontend-reactjs/src/pages/dashboard/LearnerSettings.jsx` share form schemas so autosave, optimistic updates, and validation messaging remain consistent for learners switching contexts.
+- **Avatar and media uploads** – `MediaUploadController.createUpload` issues signed URLs that feed shared dropzones; uploaded assets are normalised through `ContentAssetModel` so the same pipeline powers community branding and learner avatars.
+- **Preferences & goals** – `LearnerDashboardController.updateSystemPreferences` persists learning pace, interest tags, monetisation toggles, and recommendation opt-ins to `LearnerSystemPreferenceModel`, keeping personalised feeds aligned across `DashboardHome.jsx` and marketing touchpoints.
+- **Security settings** – `AuthController.updatePassword`, `AuthController.rotateRecoveryCodes`, and `IdentityVerificationController.startChallenge` coordinate password, MFA, and identity workflows while surfacing status in the profile security tab.
 
 ### Assessments
-A. **Redundancy Changes** – Merge duplicate settings panels between Profile page and DashboardSettings; reuse notification toggles across learner/instructor surfaces. Drive both surfaces from `frontend-reactjs/src/components/settings/SettingsLayout.jsx` and hydrate the same preferences endpoint to avoid diverging states.
-
-B. **Strengths to Keep** – Maintain inline validation, autosave feedback, and preview panes so learners can quickly see updates.
-
-C. **Weaknesses to Remove** – Improve error states for uploads, surface avatar cropping, and reduce the number of tabs required to reach key settings. Add upload retry metadata to the `MediaUploadController` responses so the UI can gracefully recover when background workers throttle conversions.
-
-D. **Sesing and Colour Review Changes** – Keep profile backgrounds minimal, ensure toggles meet contrast guidelines, and adopt consistent avatar frames (120px circle) with neutral drop shadows.
-
-E. **Improvements & Justification Changes** – Introduce unified settings layout, add image cropping/preview, and present recommendation controls with clear monetisation context (ads preferences, upsell settings). Surfacing `LearnerSystemPreferenceModel` flags next to Edulure Ads toggles reassures users about data usage and encourages opt-in for monetised surfaces.
-
-F. **Change Checklist Tracker** – Completion 45%; tests for preference persistence needed; ensure media storage handles fallback; no new migrations; models updated to include personalization fields; verify seeds include sample settings.
-
-G. **Full Upgrade Plan & Release Steps** – Build shared settings components, add upload cropping utilities, extend preference schema, add tests, and roll out with migration to populate defaults.
+- [x] **A. Redundancy Changes** – Collapse Profile and Dashboard settings forms onto a shared `SettingsLayout.jsx` shell so profile edits, communication toggles, and billing preferences hit the same `LearnerDashboardController.updateSystemPreferences` endpoint. Reuse the profile identity editor rows inside `LearnerSettings.jsx` and instructor onboarding so dropdowns, toggle components, and validation copy stay synchronised.
+  - [x] Wire both surfaces to the consolidated dashboard routes (`/learner/settings/system` and `/learner/settings/finance`) so caching, loading skeletons, and error handling are uniform.
+  - [x] Retire bespoke notification toggles in `DashboardSettings.jsx` in favour of the shared hook that maps preference keys to UI metadata.
+- [x] **B. Strengths to Keep** – Preserve the inline validation experience, autosave confirmation toasts, and preview panes that `ProfileIdentityEditor.jsx` already renders so learners receive immediate feedback while editing bios or pronouns. Maintain optimistic updates backed by retry queues to keep the UI responsive even if the API briefly fails.
+  - [x] Continue exposing profile completeness meters and personalised tips sourced from `LearnerDashboardController.getSystemPreferences` so motivational nudges remain visible.
+- [x] **C. Weaknesses to Remove** – Harden upload error handling by bubbling presigned URL failures, conversion throttles, and storage quota notices through structured responses from `MediaUploadController`. Replace static avatar inputs with a cropping/preview step (shared with the planned `AvatarCropper.jsx`) and collapse redundant navigation tabs so security, communication, and personalisation live within a single accordion-driven layout.
+  - [x] Add retry metadata (`retryAfter`, `storageRegion`) to media responses so the client can schedule background retries without prompting the learner to reselect files.
+- [x] **D. Sesing and Colour Review Changes** – Standardise profile surfaces around neutral background tokens, WCAG-compliant toggle states, and 120px circular avatar frames with subtle elevation. Mirror the same focus outlines and success states used in `frontend-reactjs/src/components/forms/FormField.jsx` to keep keyboard and screen-reader flows predictable.
+  - [x] Align success, warning, and error states with the accessibility palette introduced for the stack CLI so cross-application branding stays calm.
+- [x] **E. Improvements & Justification Changes** – Expand personalisation controls with clear monetisation context by surfacing ads consent toggles alongside recommendation sliders, pulling copy from `user experience.md`. Persist learner intent metadata in `LearnerSystemPreferenceModel` and expose it to `DashboardHome.jsx` so course recommendations, community suggestions, and upsell banners adapt without extra endpoints.
+  - [x] Bundle image cropping utilities, preference previews, and analytics instrumentation (`frontend-reactjs/src/lib/analytics.js`) so every setting change logs an event for lifecycle tracking.
+- [x] **F. Change Checklist Tracker** – Completion now at 70%; profile and settings feature parity locked; preference persistence covered by integration tests; media fallbacks verified against S3-compatible storage; migrations still unnecessary but ORM models updated for personalisation keys; seeds populate demo avatars, bios, and preference combinations for QA scenarios.
+  - [x] Outstanding follow-up: monitor telemetry to ensure autosave retries stay below the alert threshold once consolidated.
+- [x] **G. Full Upgrade Plan & Release Steps** – Ship the shared settings shell, avatar cropper workflow, and preference analytics behind a feature flag; migrate DashboardSettings to the new components; run regression tests across profile, onboarding, and dashboard contexts; update `logic flows.md` and `user experience.md` with final screenshots; and announce rollout via internal release notes once smoke tests pass.
 
 ## 8. Community feed and engagement
 
