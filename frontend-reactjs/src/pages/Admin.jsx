@@ -1,12 +1,16 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { fetchRevenueSavedViews } from '../api/analyticsApi.js';
 import { reviewVerificationCase } from '../api/verificationApi.js';
 import AdminStats from '../components/AdminStats.jsx';
+import AdminHelpLinks from '../components/admin/AdminHelpLinks.jsx';
+import AdminTaskList from '../components/admin/AdminTaskList.jsx';
 import DashboardStateMessage from '../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
+import AdminShell from '../layouts/AdminShell.jsx';
 import AdminApprovalsSection from './admin/sections/AdminApprovalsSection.jsx';
 import AdminComplianceSection from './admin/sections/AdminComplianceSection.jsx';
 import AdminMonetizationSettingsSection from './admin/sections/AdminMonetizationSettingsSection.jsx';
@@ -30,37 +34,94 @@ import AdminBookingsSection from './admin/sections/AdminBookingsSection.jsx';
 import AdminGrowthSection from './admin/sections/AdminGrowthSection.jsx';
 import AdminRevenueManagementSection from './admin/sections/AdminRevenueManagementSection.jsx';
 import AdminAdsManagementSection from './admin/sections/AdminAdsManagementSection.jsx';
-import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
+import { ensureArray, formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
 
 const EMPTY_OBJECT = Object.freeze({});
 const EMPTY_ARRAY = Object.freeze([]);
 
-const SECTION_NAVIGATION = Object.freeze([
-  { id: 'overview', label: 'Overview' },
-  { id: 'approvals', label: 'Approvals' },
-  { id: 'revenue', label: 'Revenue' },
-  { id: 'courses', label: 'Courses' },
-  { id: 'ebooks', label: 'E-books' },
-  { id: 'calendar', label: 'Calendar' },
-  { id: 'bookings', label: 'Bookings' },
-  { id: 'growth', label: 'Growth' },
-  { id: 'revenue-management', label: 'Revenue Ops' },
-  { id: 'ads-management', label: 'Ads' },
-  { id: 'monetization', label: 'Monetization' },
-  { id: 'profile-settings', label: 'Admin profile' },
-  { id: 'payment-settings', label: 'Payments' },
-  { id: 'email-settings', label: 'Emails' },
-  { id: 'security-settings', label: '2FA' },
-  { id: 'finance-settings', label: 'Finance' },
-  { id: 'communities', label: 'Communities' },
-  { id: 'tools', label: 'Tools' },
-  { id: 'operations', label: 'Operations' },
-  { id: 'blog', label: 'Blog' },
-  { id: 'compliance', label: 'Compliance' },
-  { id: 'policies', label: 'Policies' },
-  { id: 'launches', label: 'Launches' },
-  { id: 'activity', label: 'Activity' }
+const NAV_GROUP_TEMPLATE = Object.freeze([
+  {
+    label: 'Control centre',
+    items: [
+      { id: 'overview', label: 'Overview', helperKey: 'overview' },
+      { id: 'approvals', label: 'Approvals', helperKey: 'approvals' },
+      { id: 'operations', label: 'Operations', helperKey: 'operations' },
+      { id: 'activity', label: 'Activity', helperKey: 'activity' }
+    ]
+  },
+  {
+    label: 'Revenue & monetisation',
+    items: [
+      { id: 'revenue', label: 'Revenue', helperKey: 'revenue' },
+      { id: 'revenue-management', label: 'Revenue Ops', helperKey: 'revenue-management' },
+      { id: 'ads-management', label: 'Ads', helperKey: 'ads-management' },
+      { id: 'monetization', label: 'Monetization', helperKey: 'monetization' }
+    ]
+  },
+  {
+    label: 'Learning surfaces',
+    items: [
+      { id: 'courses', label: 'Courses', helperKey: 'courses' },
+      { id: 'ebooks', label: 'E-books', helperKey: 'ebooks' },
+      { id: 'communities', label: 'Communities', helperKey: 'communities' },
+      { id: 'growth', label: 'Growth', helperKey: 'growth' }
+    ]
+  },
+  {
+    label: 'Scheduling & launches',
+    items: [
+      { id: 'calendar', label: 'Calendar', helperKey: 'calendar' },
+      { id: 'bookings', label: 'Bookings', helperKey: 'bookings' },
+      { id: 'launches', label: 'Launches', helperKey: 'launches' }
+    ]
+  },
+  {
+    label: 'Settings & compliance',
+    items: [
+      { id: 'profile-settings', label: 'Admin profile', helperKey: 'profile-settings' },
+      { id: 'payment-settings', label: 'Payments', helperKey: 'payment-settings' },
+      { id: 'email-settings', label: 'Emails', helperKey: 'email-settings' },
+      { id: 'security-settings', label: '2FA', helperKey: 'security-settings' },
+      { id: 'finance-settings', label: 'Finance', helperKey: 'finance-settings' },
+      { id: 'compliance', label: 'Compliance', helperKey: 'compliance' },
+      { id: 'policies', label: 'Policies', helperKey: 'policies' }
+    ]
+  },
+  {
+    label: 'Content & tooling',
+    items: [
+      { id: 'blog', label: 'Blog', helperKey: 'blog' },
+      { id: 'tools', label: 'Tools', helperKey: 'tools' }
+    ]
+  }
 ]);
+
+const SECTION_HELP_FALLBACK = Object.freeze({
+  overview: 'Control dashboard metrics and quick health checks.',
+  approvals: 'Review pending instructor and community onboarding requests.',
+  revenue: 'Track net revenue, ARR, and payment health signals.',
+  'revenue-management': 'Operationalise billing workflows and payouts.',
+  'ads-management': 'Monitor ad pacing and sponsorship inventory.',
+  monetization: 'Configure pricing, bundles, and monetisation toggles.',
+  courses: 'Curate course catalogue performance and QA new launches.',
+  ebooks: 'Manage ebook releases, pricing, and inventory.',
+  calendar: 'Oversee live sessions, workshops, and office hours.',
+  bookings: 'Coordinate concierge and coaching bookings.',
+  growth: 'Inspect acquisition experiments and growth drivers.',
+  'profile-settings': 'Maintain organisation profile and leadership contacts.',
+  'payment-settings': 'Manage processors, settlement accounts, and tax IDs.',
+  'email-settings': 'Configure transactional and marketing email cadences.',
+  'security-settings': 'Administer MFA, session policies, and security posture.',
+  'finance-settings': 'Govern finance alerts, commission rules, and escalation.',
+  communities: 'Analyse community revenue performance and member health.',
+  tools: 'Access admin tools, integrations, and automation.',
+  operations: 'Track support workload, risk, and platform metrics.',
+  blog: 'Publish platform updates and announcement copy.',
+  compliance: 'Monitor compliance queues, audits, and frameworks.',
+  policies: 'Review policy status, owners, and SLA commitments.',
+  launches: 'Coordinate upcoming launches and release train readiness.',
+  activity: 'Audit alerts and operational events to spot anomalies.'
+});
 
 function normaliseSlaHours(value) {
   const numeric = Number.parseInt(value, 10);
@@ -162,6 +223,11 @@ export default function Admin() {
   const isAdminUser = session?.user?.role === 'admin';
   const token = session?.tokens?.accessToken ?? null;
 
+  const [savedViews, setSavedViews] = useState([]);
+  const [selectedSavedViewId, setSelectedSavedViewId] = useState(null);
+  const [savedViewsLoading, setSavedViewsLoading] = useState(false);
+  const [savedViewsError, setSavedViewsError] = useState(null);
+
   const adminMetrics = adminData.metrics ?? EMPTY_ARRAY;
 
   const approvals = adminData.approvals ?? EMPTY_OBJECT;
@@ -187,6 +253,51 @@ export default function Admin() {
   const upcomingLaunches = operations.upcomingLaunches ?? EMPTY_ARRAY;
   const tools = adminData.tools ?? EMPTY_OBJECT;
 
+  useEffect(() => {
+    if (!token || !isAdminUser) {
+      setSavedViews([]);
+      setSelectedSavedViewId(null);
+      return undefined;
+    }
+
+    if (!dashboards.admin) {
+      return undefined;
+    }
+
+    let active = true;
+    setSavedViewsLoading(true);
+    setSavedViewsError(null);
+
+    fetchRevenueSavedViews({ range: '30d', token })
+      .then((payload) => {
+        if (!active) return;
+        const data = payload?.data ?? payload;
+        const views = ensureArray(data?.views);
+        setSavedViews(views);
+        setSelectedSavedViewId((prev) => {
+          if (prev && views.some((view) => view.id === prev)) {
+            return prev;
+          }
+          return views[0]?.id ?? null;
+        });
+      })
+      .catch((error) => {
+        if (!active) return;
+        setSavedViewsError(error);
+        setSavedViews([]);
+        setSelectedSavedViewId(null);
+      })
+      .finally(() => {
+        if (active) {
+          setSavedViewsLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token, isAdminUser, dashboards.admin]);
+
   const compliance = adminData.compliance ?? EMPTY_OBJECT;
   const complianceMetrics = compliance.metrics ?? EMPTY_ARRAY;
   const complianceQueue = compliance.queue ?? EMPTY_ARRAY;
@@ -203,6 +314,136 @@ export default function Admin() {
   const activity = adminData.activity ?? EMPTY_OBJECT;
   const alerts = activity.alerts ?? EMPTY_ARRAY;
   const events = activity.events ?? EMPTY_ARRAY;
+
+  const sectionHelperOverrides = useMemo(() => {
+    const helpers =
+      adminData?.metadata?.sectionHelpers ??
+      adminData?.meta?.sectionHelpers ??
+      adminData?.copy?.sectionHelpers ??
+      adminData?.sectionHelpers ??
+      {};
+    return helpers || {};
+  }, [adminData]);
+
+  const navGroups = useMemo(
+    () =>
+      NAV_GROUP_TEMPLATE.map((group) => ({
+        label: group.label,
+        items: group.items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          helper:
+            sectionHelperOverrides[item.helperKey ?? item.id] ??
+            sectionHelperOverrides[item.id] ??
+            SECTION_HELP_FALLBACK[item.helperKey ?? item.id] ??
+            null
+        }))
+      })),
+    [sectionHelperOverrides]
+  );
+
+  const adminTasks = useMemo(() => {
+    const tasks = [];
+    if (pendingApprovals > 0) {
+      tasks.push({
+        id: 'task-approvals',
+        label: `Review ${formatNumber(pendingApprovals)} pending approvals`,
+        helper: 'Keep instructors and community requests moving quickly.',
+        sectionId: 'approvals',
+        severity: 'warning'
+      });
+    }
+
+    const requiresAction = Number(paymentHealth?.requiresAction ?? 0);
+    if (requiresAction > 0) {
+      tasks.push({
+        id: 'task-payment-retries',
+        label: `Follow up on ${formatNumber(requiresAction)} payments requiring action`,
+        helper: 'Escalate billing issues before retries expire.',
+        sectionId: 'revenue',
+        severity: 'warning'
+      });
+    }
+
+    const openAlerts = Number(risk.alertsOpen ?? 0);
+    if (openAlerts > 0) {
+      tasks.push({
+        id: 'task-risk-alerts',
+        label: `Investigate ${formatNumber(openAlerts)} open risk alerts`,
+        helper: 'Review trust & safety telemetry to prevent incidents.',
+        sectionId: 'operations',
+        severity: 'danger'
+      });
+    }
+
+    if (complianceSlaBreaches > 0) {
+      tasks.push({
+        id: 'task-compliance-breaches',
+        label: `Resolve ${formatNumber(complianceSlaBreaches)} compliance SLA breaches`,
+        helper: 'Prioritise DSAR and KYC escalations to stay audit ready.',
+        sectionId: 'compliance',
+        severity: 'danger'
+      });
+    }
+
+    const launchCandidates = ensureArray(upcomingLaunches);
+    const nextLaunch =
+      launchCandidates.find((launch) => launch?.startAt || launch?.windowStart || launch?.scheduledFor) ??
+      launchCandidates[0];
+    if (nextLaunch) {
+      const startAt = nextLaunch.startAt ?? nextLaunch.windowStart ?? nextLaunch.scheduledFor ?? null;
+      tasks.push({
+        id: 'task-next-launch',
+        label: `Prepare launch ${nextLaunch.title ?? nextLaunch.name ?? 'rollout'}`,
+        helper: startAt ? `Kick-off ${formatDateTime(startAt)}` : 'Review readiness checklist.',
+        sectionId: 'launches',
+        severity: 'info'
+      });
+    }
+
+    return tasks.slice(0, 5);
+  }, [
+    pendingApprovals,
+    paymentHealth?.requiresAction,
+    risk.alertsOpen,
+    complianceSlaBreaches,
+    upcomingLaunches
+  ]);
+
+  const helpLinks = useMemo(() => {
+    const links = ensureArray(
+      adminData?.helpLinks ?? adminData?.documentation?.operations ?? adminData?.operations?.helpLinks
+    );
+    if (links.length > 0) {
+      return links.map((link, index) => ({
+        id: link.id ?? `help-${index}`,
+        title: link.title ?? link.name ?? 'Operations guide',
+        description: link.description ?? link.summary ?? null,
+        href: link.href ?? link.url ?? '#'
+      }));
+    }
+
+    return [
+      {
+        id: 'incidents',
+        title: 'Incident escalation runbook',
+        description: 'Triage, escalate, and resolve incidents with clear SLAs.',
+        href: '/docs/operations/incident-escalation.md'
+      },
+      {
+        id: 'revenue-reconciliation',
+        title: 'Revenue reconciliation checklist',
+        description: 'Reconcile payouts, invoices, and refunds before finance close.',
+        href: '/docs/operations/revenue-reconciliation.md'
+      },
+      {
+        id: 'integrations',
+        title: 'Integrations hub guide',
+        description: 'Manage API keys, webhooks, and partner apps safely.',
+        href: '/docs/operations/integrations-hub.md'
+      }
+    ];
+  }, [adminData]);
 
   const policyLastReviewed = useMemo(() => {
     if (!policyLastReviewedRaw) {
@@ -371,8 +612,65 @@ export default function Admin() {
 
   const handleOpenAnalytics = useCallback(() => navigate('/analytics'), [navigate]);
 
-  const sectionNavigation = useMemo(() => SECTION_NAVIGATION, []);
   const toolsData = useMemo(() => tools, [tools]);
+
+  const handleNavSelect = useCallback((sectionId) => {
+    if (!sectionId) return;
+    const target = document.getElementById(sectionId);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  const shellSubtitle = useMemo(
+    () =>
+      `Monitor revenue, approvals, policy cadences, and platform health. Escalate incidents via ${escalationChannel}.`,
+    [escalationChannel]
+  );
+
+  const headerActions = useMemo(
+    () => (
+      <>
+        <button
+          type="button"
+          onClick={refresh}
+          className="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+        >
+          Refresh data
+        </button>
+        <button
+          type="button"
+          onClick={handleInviteAdmin}
+          className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+        >
+          Invite admin
+        </button>
+      </>
+    ),
+    [handleInviteAdmin, refresh]
+  );
+
+  const asideFooter = useMemo(
+    () => (
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={handleSwitchToInstructor}
+          className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary/40 hover:text-primary"
+        >
+          Switch to instructor view
+        </button>
+        <button
+          type="button"
+          onClick={handleInviteAdmin}
+          className="w-full rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+        >
+          Invite admin
+        </button>
+      </div>
+    ),
+    [handleInviteAdmin, handleSwitchToInstructor]
+  );
 
   if (!adminConsoleEnabled && !overallLoading) {
     return (
@@ -434,209 +732,160 @@ export default function Admin() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50/70">
-      <aside className="hidden w-72 flex-col border-r border-slate-200 bg-white/80 backdrop-blur lg:flex">
-        <div className="border-b border-slate-200 px-6 py-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Edulure</p>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900">Admin console</h2>
-          <p className="mt-2 text-xs text-slate-500">
-            Operational controls for administrators. Escalate incidents via
-            <span className="font-semibold text-primary"> {escalationChannel}</span>.
+    <AdminShell
+      title="Admin control center"
+      subtitle={shellSubtitle}
+      navGroups={navGroups}
+      headerActions={headerActions}
+      asideFooter={asideFooter}
+      onNavSelect={handleNavSelect}
+    >
+      <section id="overview" className="space-y-6 rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Monitor revenue, approvals, policy cadences, and platform health in one Learnspace. Escalate incidents via
+            <span className="font-semibold text-primary"> {escalationChannel}</span> or invite additional operators for
+            dedicated access.
           </p>
-        </div>
-        <nav className="flex-1 space-y-1 px-3 py-6">
-          {sectionNavigation.map((item) => (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              className="flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-primary/10 hover:text-primary"
+          <AdminStats metrics={adminMetrics} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <AdminTaskList tasks={adminTasks} onNavigate={handleNavSelect} />
+            <AdminHelpLinks links={helpLinks} />
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+            Need deeper telemetry?{' '}
+            <button
+              type="button"
+              onClick={handleOpenAnalytics}
+              className="font-semibold text-primary underline-offset-4 transition hover:underline"
             >
-              <span>{item.label}</span>
-              <span className="text-xs uppercase tracking-wide text-slate-400">Go</span>
-            </a>
-          ))}
-        </nav>
-        <div className="space-y-3 border-t border-slate-200 px-6 py-6">
-          <button
-            type="button"
-            onClick={handleSwitchToInstructor}
-            className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary/40 hover:text-primary"
-          >
-            Switch to instructor view
-          </button>
-          <button
-            type="button"
-            onClick={handleInviteAdmin}
-            className="w-full rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
-          >
-            Invite admin
-          </button>
-        </div>
-      </aside>
-      <section className="flex-1 py-16">
-        <div className="mx-auto w-full max-w-6xl px-6">
-          <nav className="mb-8 flex gap-2 overflow-x-auto rounded-full border border-slate-200 bg-white/80 p-2 text-xs font-semibold uppercase tracking-wide text-slate-500 shadow-sm lg:hidden">
-            {sectionNavigation.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className="rounded-full px-4 py-2 text-slate-600 transition hover:bg-primary/10 hover:text-primary"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-          <div className="flex flex-col gap-10">
-            <div className="space-y-6 rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-sm">
-              <section id="overview" className="space-y-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                  <div className="space-y-2">
-                    <h1 className="text-3xl font-semibold text-slate-900">Admin control center</h1>
-                    <p className="text-sm text-slate-600">
-                      Monitor revenue, approvals, policy cadences, and platform health in one Learnspace. Escalate
-                      incidents via
-                      <span className="font-semibold text-primary"> {escalationChannel}</span>.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={refresh}
-                      className="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
-                    >
-                      Refresh data
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleInviteAdmin}
-                      className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
-                    >
-                      Invite admin
-                    </button>
-                  </div>
-                </div>
-                <AdminStats metrics={adminMetrics} />
-              </section>
-            </div>
-
-            <AdminApprovalsSection
-              pendingCount={pendingApprovals}
-              items={approvalItems}
-              formatNumber={formatNumber}
-              onRefresh={refresh}
-            />
-
-            <AdminRevenueSection
-              revenueCards={revenueCards}
-              paymentHealthBreakdown={paymentHealthBreakdown}
-              onExport={handleRevenueExport}
-            />
-
-            <AdminCoursesSection sectionId="courses" token={token} />
-
-            <AdminEbooksSection sectionId="ebooks" token={token} />
-
-            <AdminCalendarSection sectionId="calendar" token={token} />
-
-            <AdminBookingsSection sectionId="bookings" token={token} />
-
-            <AdminGrowthSection sectionId="growth" token={token} />
-
-            <AdminRevenueManagementSection sectionId="revenue-management" token={token} />
-
-            <AdminAdsManagementSection sectionId="ads-management" token={token} />
-
-            <AdminMonetizationSettingsSection
-              sectionId="monetization"
-              settings={monetizationSettings}
-              token={token}
-              onSettingsUpdated={refresh}
-            />
-
-            <AdminProfileSettingsSection
-              sectionId="profile-settings"
-              token={token}
-              settings={adminProfileSettings}
-              onSettingsUpdated={refresh}
-            />
-
-            <AdminPaymentSettingsSection
-              sectionId="payment-settings"
-              token={token}
-              settings={paymentSettings}
-              onSettingsUpdated={refresh}
-            />
-
-            <AdminEmailSettingsSection
-              sectionId="email-settings"
-              token={token}
-              settings={emailSettings}
-              onSettingsUpdated={refresh}
-            />
-
-            <AdminSecuritySettingsSection
-              sectionId="security-settings"
-              token={token}
-              settings={securitySettings}
-              onSettingsUpdated={refresh}
-            />
-
-            <AdminFinanceCommissionSection
-              sectionId="finance-settings"
-              token={token}
-              settings={financeSettings}
-              onSettingsUpdated={refresh}
-            />
-
-            <AdminTopCommunitiesSection
-              sectionId="communities"
-              communities={topCommunities}
-              formatNumber={formatNumber}
-            />
-
-            <AdminToolsSection sectionId="tools" tools={toolsData} />
-
-            <AdminOperationsSection
-              sectionId="operations"
-              supportStats={supportStats}
-              riskStats={riskStats}
-              platformStats={platformStats}
-            />
-
-            <AdminBlogSection sectionId="blog" blog={blog} token={token} onPostCreated={refresh} />
-
-            <AdminComplianceSection
-              sectionId="compliance"
-              metrics={complianceMetrics}
-              queue={complianceQueue}
-              slaBreaches={complianceSlaBreaches}
-              manualReviewQueue={complianceManualReview}
-              gdprProfile={complianceGdprProfile}
-              audits={complianceAudits}
-              attestations={complianceAttestations}
-              frameworks={complianceFrameworks}
-              risk={complianceRisk}
-              incidentResponse={complianceIncidentResponse}
-              evidence={complianceEvidence}
-              onReview={handleVerificationReview}
-            />
-
-            <AdminPolicyHubSection
-              sectionId="policies"
-              status={policyStatus}
-              owner={policyOwner}
-              contact={policyContact}
-              lastReviewed={policyLastReviewed}
-              slaHours={policySlaHours}
-              policyHubUrl={policyHubUrl}
-            />
-
-            <AdminUpcomingLaunchesSection sectionId="launches" launches={upcomingLaunches} />
-
-            <AdminActivitySection alerts={alerts} events={events} onOpenAnalytics={handleOpenAnalytics} />
+              Open analytics overview
+            </button>
+            .
           </div>
         </div>
       </section>
-    </div>
+
+      <AdminApprovalsSection
+        pendingCount={pendingApprovals}
+        items={approvalItems}
+        formatNumber={formatNumber}
+        onRefresh={refresh}
+      />
+
+      <AdminRevenueSection
+        revenueCards={revenueCards}
+        paymentHealthBreakdown={paymentHealthBreakdown}
+        savedViews={savedViews}
+        selectedSavedViewId={selectedSavedViewId}
+        onSelectSavedView={setSelectedSavedViewId}
+        savedViewsLoading={savedViewsLoading}
+        savedViewsError={savedViewsError}
+        onExport={handleRevenueExport}
+      />
+
+      <AdminCoursesSection sectionId="courses" token={token} />
+
+      <AdminEbooksSection sectionId="ebooks" token={token} />
+
+      <AdminCalendarSection sectionId="calendar" token={token} />
+
+      <AdminBookingsSection sectionId="bookings" token={token} />
+
+      <AdminGrowthSection sectionId="growth" token={token} />
+
+      <AdminRevenueManagementSection sectionId="revenue-management" token={token} />
+
+      <AdminAdsManagementSection sectionId="ads-management" token={token} />
+
+      <AdminMonetizationSettingsSection
+        sectionId="monetization"
+        settings={monetizationSettings}
+        token={token}
+        onSettingsUpdated={refresh}
+      />
+
+      <AdminProfileSettingsSection
+        sectionId="profile-settings"
+        token={token}
+        settings={adminProfileSettings}
+        onSettingsUpdated={refresh}
+      />
+
+      <AdminPaymentSettingsSection
+        sectionId="payment-settings"
+        token={token}
+        settings={paymentSettings}
+        onSettingsUpdated={refresh}
+      />
+
+      <AdminEmailSettingsSection
+        sectionId="email-settings"
+        token={token}
+        settings={emailSettings}
+        onSettingsUpdated={refresh}
+      />
+
+      <AdminSecuritySettingsSection
+        sectionId="security-settings"
+        token={token}
+        settings={securitySettings}
+        onSettingsUpdated={refresh}
+      />
+
+      <AdminFinanceCommissionSection
+        sectionId="finance-settings"
+        token={token}
+        settings={financeSettings}
+        onSettingsUpdated={refresh}
+      />
+
+      <AdminTopCommunitiesSection
+        sectionId="communities"
+        communities={topCommunities}
+        formatNumber={formatNumber}
+      />
+
+      <AdminToolsSection sectionId="tools" tools={toolsData} />
+
+      <AdminOperationsSection
+        sectionId="operations"
+        supportStats={supportStats}
+        riskStats={riskStats}
+        platformStats={platformStats}
+      />
+
+      <AdminBlogSection sectionId="blog" blog={blog} token={token} onPostCreated={refresh} />
+
+      <AdminComplianceSection
+        sectionId="compliance"
+        metrics={complianceMetrics}
+        queue={complianceQueue}
+        slaBreaches={complianceSlaBreaches}
+        manualReviewQueue={complianceManualReview}
+        gdprProfile={complianceGdprProfile}
+        audits={complianceAudits}
+        attestations={complianceAttestations}
+        frameworks={complianceFrameworks}
+        risk={complianceRisk}
+        incidentResponse={complianceIncidentResponse}
+        evidence={complianceEvidence}
+        onReview={handleVerificationReview}
+      />
+
+      <AdminPolicyHubSection
+        sectionId="policies"
+        status={policyStatus}
+        owner={policyOwner}
+        contact={policyContact}
+        lastReviewed={policyLastReviewed}
+        slaHours={policySlaHours}
+        policyHubUrl={policyHubUrl}
+      />
+
+      <AdminUpcomingLaunchesSection sectionId="launches" launches={upcomingLaunches} />
+
+      <AdminActivitySection alerts={alerts} events={events} onOpenAnalytics={handleOpenAnalytics} />
+    </AdminShell>
   );
 }

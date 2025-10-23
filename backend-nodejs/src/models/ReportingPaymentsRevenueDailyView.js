@@ -23,13 +23,13 @@ function toDateRange({ start, end }) {
 const TABLE = 'reporting_payments_revenue_daily';
 
 export default class ReportingPaymentsRevenueDailyView {
-  static async fetchDailySummaries({ start, end }, connection = db) {
+  static async fetchDailySummaries({ start, end, currency }, connection = db) {
     const [startDate, endDate] = toDateRange({ start, end });
     if (!startDate || !endDate) {
       return [];
     }
 
-    const rows = await connection(TABLE)
+    const query = connection(TABLE)
       .select([
         'reporting_date as date',
         'currency',
@@ -41,9 +41,13 @@ export default class ReportingPaymentsRevenueDailyView {
         connection.raw('SUM(refunded_cents) as refunded_cents'),
         connection.raw('SUM(recognised_volume_cents) as recognised_volume_cents')
       ])
-      .whereBetween('reporting_date', [startDate, endDate])
-      .groupBy('reporting_date', 'currency')
-      .orderBy('reporting_date', 'asc');
+      .whereBetween('reporting_date', [startDate, endDate]);
+
+    if (currency) {
+      query.andWhere('currency', currency.toUpperCase());
+    }
+
+    const rows = await query.groupBy('reporting_date', 'currency').orderBy('reporting_date', 'asc');
 
     return rows.map((row) => ({
       date: normaliseDate(row.date),
@@ -58,7 +62,7 @@ export default class ReportingPaymentsRevenueDailyView {
     }));
   }
 
-  static async fetchTotals({ start, end }, connection = db) {
+  static async fetchTotals({ start, end, currency }, connection = db) {
     const [startDate, endDate] = toDateRange({ start, end });
     if (!startDate || !endDate) {
       return {
@@ -72,7 +76,7 @@ export default class ReportingPaymentsRevenueDailyView {
       };
     }
 
-    const row = await connection(TABLE)
+    const query = connection(TABLE)
       .select([
         connection.raw('SUM(gross_volume_cents) as gross_volume_cents'),
         connection.raw('SUM(recognised_volume_cents) as recognised_volume_cents'),
@@ -82,8 +86,13 @@ export default class ReportingPaymentsRevenueDailyView {
         connection.raw('SUM(total_intents) as total_intents'),
         connection.raw('SUM(succeeded_intents) as succeeded_intents')
       ])
-      .whereBetween('reporting_date', [startDate, endDate])
-      .first();
+      .whereBetween('reporting_date', [startDate, endDate]);
+
+    if (currency) {
+      query.andWhere('currency', currency.toUpperCase());
+    }
+
+    const row = await query.first();
 
     return {
       grossVolumeCents: normaliseNumber(row?.gross_volume_cents),
