@@ -197,6 +197,7 @@ export default function ExplorerSearchSection({
     appending,
     error,
     analytics,
+    refreshSummary,
     savedSearches,
     savedSearchError,
     savedSearchLoading,
@@ -216,6 +217,10 @@ export default function ExplorerSearchSection({
   const activeFilters = filterChips.length;
   const sentinelRef = useRef(null);
   const totalDisplay = total || results.length;
+  const entityRefresh = refreshSummary?.[entityType] ?? null;
+  const refreshLabel = entityRefresh?.label ?? null;
+  const refreshDate = entityRefresh?.refreshedAt ? new Date(entityRefresh.refreshedAt) : null;
+  const refreshExactLabel = refreshDate && !Number.isNaN(refreshDate.valueOf()) ? refreshDate.toLocaleString() : null;
 
   const facetEntries = useMemo(() => {
     if (!analytics?.facets) return [];
@@ -358,7 +363,21 @@ export default function ExplorerSearchSection({
       <header className="flex flex-col gap-6 border-b border-slate-100 pb-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">{title}</h2>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">{description}</p>
+          {description ? <p className="mt-2 max-w-3xl text-sm text-slate-600">{description}</p> : null}
+          {refreshLabel ? (
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Index {refreshLabel.toLowerCase()}
+              {refreshExactLabel ? (
+                <time
+                  dateTime={entityRefresh?.refreshedAt}
+                  className="ml-2 text-[10px] font-normal uppercase tracking-normal text-slate-300"
+                  title={refreshExactLabel}
+                >
+                  {refreshExactLabel}
+                </time>
+              ) : null}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-center">

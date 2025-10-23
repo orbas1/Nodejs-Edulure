@@ -15,16 +15,20 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
   const imageUrl = extractImageUrl(hit);
   const { price, rating, enrolments, readingTime, location, availability } = extractMetrics(hit);
   const badgeLabels = buildBadgeLabels(hit);
+  const refreshedAtDate =
+    hit.freshness?.refreshedAt ? new Date(hit.freshness.refreshedAt) : null;
+  const refreshedAtLabel =
+    refreshedAtDate && !Number.isNaN(refreshedAtDate.valueOf()) ? refreshedAtDate.toLocaleString() : null;
 
   return (
-    <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
+    <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition-transform transition-colors hover:-translate-y-0.5 hover:shadow-xl focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20">
       <div className="grid gap-6 lg:grid-cols-[320px,1fr] lg:items-start">
         <div className="relative overflow-hidden rounded-3xl border border-slate-100 bg-slate-100/80 shadow-inner">
           {imageUrl ? (
             <img
               src={imageUrl}
               alt={hit.title ?? hit.name ?? 'Search result'}
-              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+              className="h-full w-full object-cover transition duration-300 motion-reduce:transform-none motion-reduce:transition-none motion-safe:group-hover:scale-[1.02]"
               loading="lazy"
             />
           ) : (
@@ -61,6 +65,20 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
               <h3 className="text-2xl font-semibold text-slate-900">{hit.title ?? hit.name}</h3>
               {hit.subtitle ? <p className="mt-1 text-sm font-medium text-slate-500">{hit.subtitle}</p> : null}
               {hit.description ? <p className="mt-3 text-sm leading-relaxed text-slate-600">{hit.description}</p> : null}
+              {hit.freshness?.label ? (
+                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  {hit.freshness.label}
+                  {refreshedAtLabel ? (
+                    <time
+                      dateTime={hit.freshness.refreshedAt}
+                      className="ml-2 text-[10px] font-normal uppercase tracking-normal text-slate-300"
+                      title={refreshedAtLabel}
+                    >
+                      {refreshedAtLabel}
+                    </time>
+                  ) : null}
+                </p>
+              ) : null}
             </div>
             {onPreview ? (
               <button
@@ -176,9 +194,15 @@ SearchResultCard.propTypes = {
     badges: PropTypes.arrayOf(
       PropTypes.shape({
         type: PropTypes.string,
-        label: PropTypes.string
+        label: PropTypes.string,
+        tone: PropTypes.string
       })
     ),
+    freshness: PropTypes.shape({
+      label: PropTypes.string,
+      refreshedAt: PropTypes.string,
+      deltaSeconds: PropTypes.number
+    }),
     highlights: PropTypes.arrayOf(PropTypes.string),
     actions: PropTypes.arrayOf(
       PropTypes.shape({

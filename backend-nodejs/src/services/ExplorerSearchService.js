@@ -242,6 +242,53 @@ function buildHighlights(...sources) {
   return highlights;
 }
 
+function resolveThumbnail(hit = {}) {
+  return (
+    hit.thumbnailUrl ??
+    hit.previewImageUrl ??
+    hit.metadata?.preview?.imageUrl ??
+    hit.metadata?.preview?.media?.[0]?.url ??
+    hit.metadata?.thumbnailUrl ??
+    hit.metadata?.coverImageUrl ??
+    hit.metadata?.media?.[0]?.url ??
+    hit.metadata?.assets?.[0]?.url ??
+    null
+  );
+}
+
+function describeFreshness(refreshedAt) {
+  if (!refreshedAt) {
+    return null;
+  }
+
+  const reference = refreshedAt instanceof Date ? refreshedAt : new Date(refreshedAt);
+  if (Number.isNaN(reference.getTime())) {
+    return null;
+  }
+
+  const deltaSeconds = Math.max(0, Math.round((Date.now() - reference.getTime()) / 1000));
+  let label;
+
+  if (deltaSeconds < 60) {
+    label = 'Refreshed moments ago';
+  } else if (deltaSeconds < 3_600) {
+    const minutes = Math.round(deltaSeconds / 60);
+    label = `Refreshed ${minutes}m ago`;
+  } else if (deltaSeconds < 86_400) {
+    const hours = Math.round(deltaSeconds / 3_600);
+    label = `Refreshed ${hours}h ago`;
+  } else {
+    const days = Math.round(deltaSeconds / 86_400);
+    label = `Refreshed ${days}d ago`;
+  }
+
+  return {
+    refreshedAt: reference.toISOString(),
+    deltaSeconds,
+    label
+  };
+}
+
 function formatDocument(entity, hit) {
   const base = {
     id: hit.entityId,
@@ -250,7 +297,7 @@ function formatDocument(entity, hit) {
     title: hit.title ?? hit.metadata?.title ?? null,
     subtitle: hit.subtitle ?? null,
     description: hit.description ?? null,
-    thumbnailUrl: hit.thumbnailUrl ?? hit.metadata?.thumbnailUrl ?? null,
+    thumbnailUrl: resolveThumbnail(hit),
     keywords: hit.keywords ?? [],
     metadata: hit.metadata ?? {},
     popularityScore: hit.popularityScore,
@@ -269,6 +316,13 @@ function formatDocument(entity, hit) {
   let defaultBadges = [];
   let fallbackHighlights = [];
   let monetisationTag = hit.monetisationTag ?? hit.metadata?.monetisation?.tag ?? null;
+  const badgeExtras = [];
+  const freshness = describeFreshness(hit.refreshedAt ?? hit.metadata?.refreshedAt ?? hit.updatedAt);
+
+  if (freshness) {
+    base.freshness = freshness;
+    badgeExtras.push({ type: 'freshness', label: freshness.label, tone: 'indigo' });
+  }
 
   switch (entity) {
     case 'communities': {
@@ -424,7 +478,8 @@ function formatDocument(entity, hit) {
     hit.preview?.badges,
     hit.metadata?.badges,
     hit.metadata?.preview?.badges,
-    defaultBadges
+    defaultBadges,
+    badgeExtras
   );
 
   base.monetisationTag = monetisationTag ?? null;
@@ -539,6 +594,37 @@ export class ExplorerSearchService {
     const markerList = results.flatMap((result) => result.markers);
     const bounds = buildBounds(markerList);
 
+    const refreshSummary = resolvedEntities.reduce((acc, entity) => {
+      const entityResult = byEntity[entity];
+      if (!entityResult?.hits?.length) {
+        return acc;
+      }
+
+      const freshest = entityResult.hits.reduce((current, hit) => {
+        const refreshedAt = hit.freshness?.refreshedAt ?? null;
+        if (!refreshedAt) {
+          return current;
+        }
+
+        const timestamp = new Date(refreshedAt).getTime();
+        if (!Number.isFinite(timestamp)) {
+          return current;
+        }
+
+        if (!current || timestamp > current.timestamp) {
+          return { timestamp, summary: { ...hit.freshness, entityType: entity } };
+        }
+
+        return current;
+      }, null);
+
+      if (freshest?.summary) {
+        acc[entity] = freshest.summary;
+      }
+
+      return acc;
+    }, {});
+
     let adsPlacements = null;
     try {
       adsPlacements = await this.adsService.placementsForSearch({ query, entities: resolvedEntities });
@@ -556,6 +642,7 @@ export class ExplorerSearchService {
         acc[entity] = byEntity[entity]?.totalHits ?? 0;
         return acc;
       }, {}),
+      refreshSummary,
       markers: {
         items: markerList,
         bounds

@@ -62,6 +62,7 @@ export function extractImageUrl(hit = {}) {
     hit.coverImageUrl ??
     hit.thumbnailUrl ??
     hit.avatarUrl ??
+    hit.preview?.imageUrl ??
     hit.previewImage ??
     hit.preview?.image ??
     hit.media?.[0]?.url ??
@@ -96,7 +97,7 @@ export function buildBadgeLabels(hit = {}) {
       .filter((badge) => badge.type !== 'featured' && badge.type !== 'sponsored')
       .slice(0, 3)
       .forEach((badge) => {
-        labels.push({ label: badge.label ?? badge.type, tone: 'slate' });
+        labels.push({ label: badge.label ?? badge.type, tone: badge.tone ?? 'slate' });
       });
   }
 

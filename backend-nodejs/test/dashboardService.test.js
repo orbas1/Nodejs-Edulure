@@ -270,6 +270,22 @@ describe('buildLearnerDashboard', () => {
       'Upload assignment'
     ]);
 
+    expect(snapshot.dashboard.courses.promotions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          headline: expect.stringContaining('Design Foundations'),
+          actionHref: '/dashboard/learner/growth'
+        })
+      ])
+    );
+
+    const primaryCourse = snapshot.dashboard.courses.active[0];
+    expect(primaryCourse.revenueOpportunity).toMatchObject({
+      headline: expect.stringContaining('Design Foundations'),
+      actionLabel: 'Share invite link',
+      actionHref: '/dashboard/learner/growth'
+    });
+
     const resumeAction = snapshot.dashboard.quickActions.find((action) => action.label === 'Resume course');
     expect(resumeAction.href).toBe('/dashboard/learner/courses?courseId=101');
 
