@@ -376,6 +376,38 @@ function mapCatalogueCourse(course) {
   };
 }
 
+function formatRetryAdvice(retry) {
+  if (!retry || typeof retry !== 'object') {
+    return null;
+  }
+
+  const delayMs = Number(retry.recommendedDelayMs ?? retry.baseDelayMs ?? 0);
+  const attempts = Number(retry.maxAttempts ?? retry.maxRetryAttempts ?? 0);
+  const strategy = typeof retry.strategy === 'string' ? retry.strategy.replace(/[_-]+/g, ' ') : null;
+
+  if (!delayMs && !attempts) {
+    return null;
+  }
+
+  const delaySeconds = delayMs ? Math.max(1, Math.round(delayMs / 1000)) : null;
+  const parts = [];
+  if (delaySeconds) {
+    parts.push(`we'll retry in about ${delaySeconds} second${delaySeconds === 1 ? '' : 's'}`);
+  }
+  if (attempts) {
+    parts.push(`up to ${attempts} time${attempts === 1 ? '' : 's'}`);
+  }
+
+  const retrySummary = parts.length ? parts.join(' and ') : null;
+  const strategySuffix = strategy ? ` using ${strategy} backoff` : '';
+
+  if (!retrySummary) {
+    return null;
+  }
+
+  return `If processing stalls ${retrySummary}${strategySuffix}.`;
+}
+
 function CourseForm({
   form,
   onChange,
@@ -650,6 +682,9 @@ function CourseForm({
             {thumbnailUpload.error ? (
               <p className="text-xs font-semibold text-rose-600">{thumbnailUpload.error}</p>
             ) : null}
+            {thumbnailUpload.retryAdvice ? (
+              <p className="text-xs font-medium text-slate-500">{thumbnailUpload.retryAdvice}</p>
+            ) : null}
             {form.thumbnailUrl ? (
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
                 <a
@@ -689,6 +724,9 @@ function CourseForm({
             ) : null}
             {heroUpload.error ? (
               <p className="text-xs font-semibold text-rose-600">{heroUpload.error}</p>
+            ) : null}
+            {heroUpload.retryAdvice ? (
+              <p className="text-xs font-medium text-slate-500">{heroUpload.retryAdvice}</p>
             ) : null}
             {form.heroImageUrl ? (
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
@@ -730,6 +768,9 @@ function CourseForm({
             {trailerUpload.error ? (
               <p className="text-xs font-semibold text-rose-600">{trailerUpload.error}</p>
             ) : null}
+            {trailerUpload.retryAdvice ? (
+              <p className="text-xs font-medium text-slate-500">{trailerUpload.retryAdvice}</p>
+            ) : null}
             {form.trailerUrl ? (
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
                 <a
@@ -770,6 +811,9 @@ function CourseForm({
             {promoUpload.error ? (
               <p className="text-xs font-semibold text-rose-600">{promoUpload.error}</p>
             ) : null}
+            {promoUpload.retryAdvice ? (
+              <p className="text-xs font-medium text-slate-500">{promoUpload.retryAdvice}</p>
+            ) : null}
             {form.promoVideoUrl ? (
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
                 <a
@@ -809,6 +853,9 @@ function CourseForm({
             ) : null}
             {syllabusUpload.error ? (
               <p className="text-xs font-semibold text-rose-600">{syllabusUpload.error}</p>
+            ) : null}
+            {syllabusUpload.retryAdvice ? (
+              <p className="text-xs font-medium text-slate-500">{syllabusUpload.retryAdvice}</p>
             ) : null}
             {form.syllabusUrl ? (
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
@@ -976,12 +1023,15 @@ export default function Courses() {
       updateUploadState(field, {
         status: 'uploading',
         error: null,
-        filename: file.name
+        filename: file.name,
+        retry: null,
+        retryAdvice: null
       });
 
+      let instruction;
       try {
         const checksum = await computeFileChecksum(file);
-        const instruction = await requestMediaUpload({
+        instruction = await requestMediaUpload({
           token,
           payload: {
             kind,
@@ -1009,6 +1059,8 @@ export default function Courses() {
         const uploadedUrl = instruction.file?.publicUrl ?? null;
         const storageKey = instruction.file?.storageKey ?? null;
         const resolvedValue = uploadedUrl ?? storageKey ?? '';
+        const retryMetadata = instruction.upload?.retry ?? instruction.retry ?? null;
+        const retryAdvice = formatRetryAdvice(retryMetadata);
 
         setForm((current) => ({
           ...current,
@@ -1021,13 +1073,19 @@ export default function Courses() {
           url: uploadedUrl,
           filename: file.name,
           storageKey,
-          visibility: instruction.file?.visibility ?? null
+          visibility: instruction.file?.visibility ?? null,
+          retry: retryMetadata,
+          retryAdvice
         });
       } catch (uploadError) {
         const message = uploadError?.message ?? 'Failed to upload file.';
+        const retryMetadata = instruction?.upload?.retry ?? instruction?.retry ?? null;
+        const retryAdvice = formatRetryAdvice(retryMetadata);
         updateUploadState(field, {
           status: 'error',
-          error: message
+          error: message,
+          retry: retryMetadata,
+          retryAdvice
         });
       }
     },
@@ -1045,7 +1103,10 @@ export default function Courses() {
         error: null,
         url: null,
         filename: null,
-        storageKey: null
+        storageKey: null,
+        visibility: null,
+        retry: null,
+        retryAdvice: null
       });
     },
     [updateUploadState, setForm]

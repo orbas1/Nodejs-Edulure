@@ -750,6 +750,10 @@ const envSchema = z
     ANTIVIRUS_SKIP_TAG: z.string().min(1).default('edulure-skip-scan'),
     ASSET_PRESIGN_TTL_MINUTES: z.coerce.number().int().min(5).max(60).default(15),
     ASSET_DOWNLOAD_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
+    ASSET_UPLOAD_RETRY_BASE_DELAY_MS: z.coerce.number().int().min(100).max(60000).default(2000),
+    ASSET_UPLOAD_RETRY_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(4),
+    ASSET_UPLOAD_RETRY_BACKOFF_MULTIPLIER: z.coerce.number().min(1).max(5).default(2),
+    ASSET_UPLOAD_RETRY_JITTER_RATIO: z.coerce.number().min(0).max(1).default(0.2),
     CONTENT_MAX_UPLOAD_MB: z.coerce.number().int().min(10).max(2048).default(512),
     CLOUDCONVERT_API_KEY: z.string().min(1).optional(),
     CLOUDCONVERT_SANDBOX_API_KEY: z.string().min(1).optional(),
@@ -1490,7 +1494,13 @@ export const env = {
     maxUploadBytes: raw.CONTENT_MAX_UPLOAD_MB * 1024 * 1024,
     localRoot: localStorageRoot,
     localPublicUrl: localStoragePublicUrl,
-    serveStatic: localStorageServeStatic
+    serveStatic: localStorageServeStatic,
+    uploadRetry: {
+      baseDelayMs: raw.ASSET_UPLOAD_RETRY_BASE_DELAY_MS,
+      maxAttempts: raw.ASSET_UPLOAD_RETRY_MAX_ATTEMPTS,
+      backoffMultiplier: raw.ASSET_UPLOAD_RETRY_BACKOFF_MULTIPLIER,
+      jitterRatio: raw.ASSET_UPLOAD_RETRY_JITTER_RATIO
+    }
   },
   antivirus: {
     enabled: raw.ANTIVIRUS_ENABLED,

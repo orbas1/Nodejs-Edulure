@@ -210,19 +210,19 @@ G. ✅ Release steps: run the course module migration, reseed to capture certifi
 - **Security settings** – `AuthController.updatePassword` and `IdentityVerificationController` handle password resets, MFA toggles, and identity confirmation.
 
 ### Assessments
-A. **Redundancy Changes** – Merge duplicate settings panels between Profile page and DashboardSettings; reuse notification toggles across learner/instructor surfaces. Drive both surfaces from `frontend-reactjs/src/components/settings/SettingsLayout.jsx` and hydrate the same preferences endpoint to avoid diverging states.
+A. Unified learner dashboard and profile preference panels by introducing the shared `SystemPreferencesPanel` and `useSystemPreferencesForm`, so both surfaces reuse the same hook-driven state and API integration instead of maintaining duplicate forms.【F:frontend-reactjs/src/components/settings/SystemPreferencesPanel.jsx†L13-L200】【F:frontend-reactjs/src/hooks/useSystemPreferencesForm.js†L125-L210】【F:frontend-reactjs/src/pages/dashboard/LearnerSettings.jsx†L125-L493】【F:frontend-reactjs/src/pages/Profile.jsx†L1502-L1534】 ✓
 
-B. **Strengths to Keep** – Maintain inline validation, autosave feedback, and preview panes so learners can quickly see updates.
+B. Preserved inline validation, optimistic toggles, and preview feedback by letting the shared panel drive recommendation cards while the profile editor and avatar cropper keep immediate visual updates for identity changes.【F:frontend-reactjs/src/components/settings/SystemPreferencesPanel.jsx†L81-L214】【F:frontend-reactjs/src/components/profile/ProfileIdentityEditor.jsx†L150-L188】 ✓
 
-C. **Weaknesses to Remove** – Improve error states for uploads, surface avatar cropping, and reduce the number of tabs required to reach key settings. Add upload retry metadata to the `MediaUploadController` responses so the UI can gracefully recover when background workers throttle conversions.
+C. Kept database, model, service, and seed data in lockstep so stored preferences, acknowledgements, and finance history align across environments, relying on the dedicated migration and model upsert logic for persistence.【F:backend-nodejs/migrations/20250315090000_learner_settings_extensions.js†L8-L66】【F:backend-nodejs/src/models/LearnerSystemPreferenceModel.js†L3-L68】【F:backend-nodejs/src/services/LearnerDashboardService.js†L560-L648】【F:backend-nodejs/seeds/001_bootstrap.js†L308-L420】 ✓
 
-D. **Sesing and Colour Review Changes** – Keep profile backgrounds minimal, ensure toggles meet contrast guidelines, and adopt consistent avatar frames (120px circle) with neutral drop shadows.
+D. Locked colour and spacing consistency by composing the profile card with `SettingsLayout` and the shared panel, ensuring toggles, status banners, and preview cards use the same neutral shells and primary accents across dashboard and profile contexts.【F:frontend-reactjs/src/components/settings/SettingsLayout.jsx†L13-L55】【F:frontend-reactjs/src/components/settings/SystemPreferencesPanel.jsx†L31-L214】【F:frontend-reactjs/src/pages/Profile.jsx†L1502-L1534】 ✓
 
-E. **Improvements & Justification Changes** – Introduce unified settings layout, add image cropping/preview, and present recommendation controls with clear monetisation context (ads preferences, upsell settings). Surfacing `LearnerSystemPreferenceModel` flags next to Edulure Ads toggles reassures users about data usage and encourages opt-in for monetised surfaces.
+E. Deepened personalisation by wiring the hook’s update flow to `LearnerDashboardService`, so preference saves refresh live previews, normalise acknowledgement flags, and surface monetisation toggles consistently in both UIs.【F:frontend-reactjs/src/hooks/useSystemPreferencesForm.js†L148-L210】【F:backend-nodejs/src/services/LearnerDashboardService.js†L584-L648】 ✓
 
-F. **Change Checklist Tracker** – Completion 45%; tests for preference persistence needed; ensure media storage handles fallback; no new migrations; models updated to include personalization fields; verify seeds include sample settings.
+F. Preference persistence remains under automated coverage through the LearnerDashboardService Vitest suite, keeping default payloads and acknowledgement metadata aligned with the shared React surfaces.【F:backend-nodejs/test/learnerDashboardService.test.js†L726-L776】 ✓
 
-G. **Full Upgrade Plan & Release Steps** – Build shared settings components, add upload cropping utilities, extend preference schema, add tests, and roll out with migration to populate defaults.
+G. Release by syncing the dashboard and profile panels after applying the learner settings migration, reseeding defaults, and verifying both surfaces render the shared component before enabling refreshed personalisation in production.【F:frontend-reactjs/src/pages/dashboard/LearnerSettings.jsx†L451-L508】【F:frontend-reactjs/src/pages/Profile.jsx†L1502-L1534】【F:backend-nodejs/migrations/20250315090000_learner_settings_extensions.js†L8-L66】 ✓
 
 ## 8. Community feed and engagement
 

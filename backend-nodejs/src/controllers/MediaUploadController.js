@@ -82,6 +82,18 @@ export default class MediaUploadController {
         bucket
       });
 
+      const retryConfig = env.storage.uploadRetry ?? {};
+      const recommendedDelayMs = Number.isFinite(retryConfig.baseDelayMs)
+        ? retryConfig.baseDelayMs
+        : 2000;
+      const maxAttempts = Number.isFinite(retryConfig.maxAttempts)
+        ? retryConfig.maxAttempts
+        : 4;
+      const backoffMultiplier = Number.isFinite(retryConfig.backoffMultiplier)
+        ? retryConfig.backoffMultiplier
+        : 2;
+      const jitterRatio = Number.isFinite(retryConfig.jitterRatio) ? retryConfig.jitterRatio : 0.2;
+
       return success(res, {
         status: 201,
         message: 'Upload URL generated',
@@ -91,7 +103,14 @@ export default class MediaUploadController {
             method: upload.method ?? 'PUT',
             headers: { 'Content-Type': payload.mimeType },
             expiresAt: upload.expiresAt,
-            token: upload.token ?? null
+            token: upload.token ?? null,
+            retry: {
+              strategy: 'exponential-jitter',
+              recommendedDelayMs,
+              maxAttempts,
+              backoffMultiplier,
+              jitterRatio
+            }
           },
           file: {
             storageKey: upload.key,

@@ -27,6 +27,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import useConsentRecords from '../hooks/useConsentRecords.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import ProfileIdentityEditor from '../components/profile/ProfileIdentityEditor.jsx';
+import SettingsLayout from '../components/settings/SettingsLayout.jsx';
+import SystemPreferencesPanel from '../components/settings/SystemPreferencesPanel.jsx';
+import useSystemPreferencesForm from '../hooks/useSystemPreferencesForm.js';
 import {
   mapFollowerItem,
   mapRecommendationItem,
@@ -494,6 +497,64 @@ export default function Profile() {
     () => consents.filter((consent) => consent.status === 'granted' && consent.active),
     [consents]
   );
+  const [systemStatusMessage, setSystemStatusMessage] = useState(null);
+  const [systemPendingAction, setSystemPendingAction] = useState(false);
+
+  const {
+    form: systemPreferencesForm,
+    saving: systemSaving,
+    refresh: refreshSystemPreferences,
+    persist: persistSystemPreferences,
+    handleInputChange: handleSystemPreferencesInputChange,
+    updateSystemToggle: updateSystemPreferencesToggle,
+    updatePreferenceToggle: updateSystemPreferenceToggle,
+    handleAdPersonalisationChange: handleSystemAdPersonalisationChange,
+    recommendationPreview: systemRecommendationPreview,
+    recommendedTopicsInputValue: systemRecommendedTopicsInputValue,
+    adPersonalisationEnabled: systemAdPersonalisationEnabled
+  } = useSystemPreferencesForm({
+    token,
+    onStatus: setSystemStatusMessage
+  });
+
+  const systemStatusBanner = useMemo(() => {
+    if (!systemStatusMessage) return undefined;
+    const mappedType =
+      systemStatusMessage.type === 'error'
+        ? 'error'
+        : systemStatusMessage.type === 'success'
+          ? 'success'
+          : systemStatusMessage.type === 'pending'
+            ? 'pending'
+            : 'info';
+    return {
+      type: mappedType,
+      message: systemStatusMessage.message,
+      role: systemStatusMessage.type === 'error' ? 'alert' : 'status',
+      liveRegion: systemStatusMessage.type === 'error' ? 'assertive' : 'polite'
+    };
+  }, [systemStatusMessage]);
+
+  const disableSystemPreferences = useMemo(
+    () => systemPendingAction || systemSaving,
+    [systemPendingAction, systemSaving]
+  );
+
+  const persistSystemPreferencesAction = async () => {
+    try {
+      setSystemPendingAction(true);
+      await persistSystemPreferences();
+    } catch (_error) {
+      // Status messaging handled by useSystemPreferencesForm.
+    } finally {
+      setSystemPendingAction(false);
+    }
+  };
+
+  const handleSystemPreferencesSubmit = async (event) => {
+    event.preventDefault();
+    await persistSystemPreferencesAction();
+  };
 
   const profileDisplayName = profile?.name ?? defaultProfile.name;
   const profileKeywords = useMemo(() => {
@@ -1437,6 +1498,44 @@ export default function Profile() {
             success={profileSaveSuccess}
           />
         )}
+
+        {isOwnProfile ? (
+          <section className="overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-card">
+            <div className="p-6 sm:p-8">
+              <SettingsLayout
+                eyebrow="Personalisation"
+                title="System & personalisation preferences"
+                description="Adjust notification cadence, accessibility options, and sponsor visibility without leaving your profile."
+                actions={
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary/40 hover:text-primary"
+                    onClick={() => refreshSystemPreferences()}
+                    disabled={disableSystemPreferences}
+                  >
+                    Sync preferences
+                  </button>
+                }
+                status={systemStatusBanner}
+              >
+                <SystemPreferencesPanel
+                  form={systemPreferencesForm}
+                  recommendationPreview={systemRecommendationPreview}
+                  recommendedTopicsInputValue={systemRecommendedTopicsInputValue}
+                  adPersonalisationEnabled={systemAdPersonalisationEnabled}
+                  onSubmit={handleSystemPreferencesSubmit}
+                  onSavePersonalisation={persistSystemPreferencesAction}
+                  onInputChange={handleSystemPreferencesInputChange}
+                  onSystemToggle={updateSystemPreferencesToggle}
+                  onPreferenceToggle={updateSystemPreferenceToggle}
+                  onAdPersonalisationChange={handleSystemAdPersonalisationChange}
+                  disableActions={disableSystemPreferences}
+                  isSaving={systemPendingAction || systemSaving}
+                />
+              </SettingsLayout>
+            </div>
+          </section>
+        ) : null}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
           <div className="space-y-8">
