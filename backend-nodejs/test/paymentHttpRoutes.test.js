@@ -15,21 +15,13 @@ const paymentServiceMock = {
   capturePayPalOrder: vi.fn(),
   issueRefund: vi.fn(),
   getFinanceSummary: vi.fn(),
-  handleStripeWebhook: vi.fn()
-};
-
-const couponModelMock = {
-  findByCode: vi.fn()
+  handleStripeWebhook: vi.fn(),
+  previewCoupon: vi.fn()
 };
 
 vi.mock('../src/services/PaymentService.js', () => ({
   __esModule: true,
   default: paymentServiceMock
-}));
-
-vi.mock('../src/models/PaymentCouponModel.js', () => ({
-  __esModule: true,
-  default: couponModelMock
 }));
 
 let app;
@@ -60,10 +52,16 @@ describe('Payment HTTP routes', () => {
     paymentServiceMock.capturePayPalOrder.mockResolvedValue({ status: 'captured' });
     paymentServiceMock.issueRefund.mockResolvedValue({ refundId: 're_123', status: 'succeeded' });
     paymentServiceMock.getFinanceSummary.mockResolvedValue({ grossVolume: 10_000, currency: 'USD' });
-    couponModelMock.findByCode.mockResolvedValue({
-      code: 'SUMMER10',
-      name: 'Summer Special',
-      description: '10% off'
+    paymentServiceMock.previewCoupon.mockResolvedValue({
+      coupon: {
+        code: 'SUMMER10',
+        name: 'Summer Special',
+        description: '10% off',
+        discountType: 'percentage',
+        discountValue: 1000,
+        currency: 'USD'
+      },
+      redemption: { userRedemptions: 0, remainingForUser: 2, remainingOverall: 199 }
     });
   });
 
@@ -119,21 +117,25 @@ describe('Payment HTTP routes', () => {
   it('returns coupon metadata when found', async () => {
     const response = await request(app)
       .get('/api/v1/payments/coupons/summer10')
-      .set('Authorization', 'Bearer token');
+      .set('Authorization', 'Bearer token')
+      .query({ currency: 'USD' });
 
     expect(response.status).toBe(200);
-    expect(response.body.data.code).toBe('SUMMER10');
-    expect(couponModelMock.findByCode).toHaveBeenCalledWith('SUMMER10');
+    expect(response.body.data.coupon.code).toBe('SUMMER10');
+    expect(paymentServiceMock.previewCoupon).toHaveBeenCalledWith({ code: 'SUMMER10', currency: 'USD', userId: 77 });
   });
 
   it('returns 404 when coupon is not found', async () => {
-    couponModelMock.findByCode.mockResolvedValueOnce(null);
+    const error = new Error('Coupon missing');
+    error.status = 404;
+    paymentServiceMock.previewCoupon.mockRejectedValueOnce(error);
 
     const response = await request(app)
       .get('/api/v1/payments/coupons/missing')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(404);
+    expect(paymentServiceMock.previewCoupon).toHaveBeenCalledWith({ code: 'MISSING', currency: undefined, userId: 77 });
   });
 });
 

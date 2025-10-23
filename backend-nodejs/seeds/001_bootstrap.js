@@ -2546,9 +2546,44 @@ export async function seed(knex) {
       approved_at: trx.fn.now()
     });
 
+    const now = new Date();
     const subscriptionPublicId = crypto.randomUUID();
     const providerIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
     const providerChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
+
+    const [insidersCouponId] = await trx('payment_coupons').insert({
+      code: 'INSIDER20',
+      name: 'Growth Insiders launch',
+      description: '20% off the first annual Growth Insiders subscription.',
+      discount_type: 'percentage',
+      discount_value: 2000,
+      currency: 'USD',
+      max_redemptions: 500,
+      per_user_limit: 2,
+      times_redeemed: 1,
+      is_stackable: false,
+      status: 'active',
+      valid_from: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      valid_until: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+      metadata: JSON.stringify({ campaign: 'growth-insiders', createdBy: 'seed' })
+    });
+
+    await trx('payment_coupons').insert({
+      code: 'BUNDLE50',
+      name: 'Course + ebook bundle',
+      description: 'Save $50 when bundling flagship course and companion ebook.',
+      discount_type: 'fixed_amount',
+      discount_value: 5000,
+      currency: 'USD',
+      max_redemptions: 250,
+      per_user_limit: 1,
+      times_redeemed: 0,
+      is_stackable: false,
+      status: 'active',
+      valid_from: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+      valid_until: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+      metadata: JSON.stringify({ campaign: 'bundle-promo', createdBy: 'seed' })
+    });
 
     const subscriptionPayment = await PaymentIntentModel.create(
       {
@@ -2560,9 +2595,9 @@ export async function seed(knex) {
         status: 'succeeded',
         currency: 'USD',
         amountSubtotal: 189900,
-        amountDiscount: 0,
+        amountDiscount: 37980,
         amountTax: 15192,
-        amountTotal: 205092,
+        amountTotal: 167112,
         amountRefunded: 0,
         taxBreakdown: { jurisdiction: 'US-CA', rate: 0.08 },
         metadata: {
@@ -2575,18 +2610,18 @@ export async function seed(knex) {
               name: 'Growth Insiders Annual',
               unitAmount: 189900,
               quantity: 1,
-              discount: 0,
+              discount: 37980,
               tax: 15192,
-              total: 205092
+              total: 167112
             }
           ],
           taxableSubtotal: 189900,
-          taxableAfterDiscount: 189900,
-          couponCode: null,
-          couponId: null,
+          taxableAfterDiscount: 151920,
+          couponCode: 'INSIDER20',
+          couponId: insidersCouponId,
           referralCode: affiliateReferralCode
         },
-        couponId: null,
+        couponId: insidersCouponId,
         entityType: 'community_subscription',
         entityId: subscriptionPublicId,
         receiptEmail: 'noemi.carvalho@edulure.test',
@@ -2596,10 +2631,17 @@ export async function seed(knex) {
     );
     const subscriptionPaymentId = subscriptionPayment.id;
 
+    await trx('payment_coupon_redemptions').insert({
+      coupon_id: insidersCouponId,
+      payment_intent_id: subscriptionPaymentId,
+      user_id: learnerId,
+      metadata: JSON.stringify({ source: 'seed', context: 'growth-insiders' })
+    });
+
     await trx('payment_ledger_entries').insert({
       payment_intent_id: subscriptionPaymentId,
       entry_type: 'charge',
-      amount: 205092,
+      amount: 167112,
       currency: 'USD',
       details: JSON.stringify({
         provider: 'stripe',

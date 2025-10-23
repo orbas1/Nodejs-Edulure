@@ -1,6 +1,5 @@
 import Joi from 'joi';
 
-import PaymentCouponModel from '../models/PaymentCouponModel.js';
 import PaymentService from '../services/PaymentService.js';
 import { success } from '../utils/httpResponse.js';
 
@@ -190,35 +189,25 @@ export default class PaymentController {
   static async getCoupon(req, res, next) {
     try {
       const schema = Joi.object({
-        code: Joi.string().trim().uppercase().required()
+        code: Joi.string().trim().uppercase().required(),
+        currency: Joi.string().trim().uppercase().length(3).optional()
       });
-      const { code } = await schema.validateAsync(req.params, {
-        abortEarly: false,
-        stripUnknown: true
-      });
+      const { code, currency } = await schema.validateAsync(
+        { ...req.params, ...req.query },
+        {
+          abortEarly: false,
+          stripUnknown: true
+        }
+      );
 
-      const coupon = await PaymentCouponModel.findByCode(code);
-      if (!coupon) {
-        const error = new Error('Coupon not found');
-        error.status = 404;
-        throw error;
-      }
+      const preview = await PaymentService.previewCoupon({
+        code,
+        currency: currency ?? undefined,
+        userId: req.user?.id ?? null
+      });
 
       return success(res, {
-        data: {
-          code: coupon.code,
-          name: coupon.name,
-          description: coupon.description,
-          discountType: coupon.discountType,
-          discountValue: coupon.discountValue,
-          currency: coupon.currency,
-          status: coupon.status,
-          validFrom: coupon.validFrom,
-          validUntil: coupon.validUntil,
-          maxRedemptions: coupon.maxRedemptions,
-          perUserLimit: coupon.perUserLimit,
-          timesRedeemed: coupon.timesRedeemed
-        },
+        data: preview,
         message: 'Coupon fetched'
       });
     } catch (error) {

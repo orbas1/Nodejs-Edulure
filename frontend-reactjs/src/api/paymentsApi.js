@@ -100,11 +100,32 @@ export async function listPaymentIntents({ token, params, signal } = {}) {
   return response?.data ?? response;
 }
 
+export async function previewCoupon({ token, code, currency, signal } = {}) {
+  ensureToken(token);
+  if (!code) {
+    throw new Error('Coupon code is required to validate coupons');
+  }
+
+  const response = await httpClient.get(`/payments/coupons/${encodeURIComponent(code)}`, {
+    token,
+    signal,
+    params: currency ? { currency } : undefined,
+    cache: {
+      ttl: 15_000,
+      tags: [`payments:coupon:${code.toUpperCase()}:${currency ?? 'default'}`],
+      varyByToken: true
+    }
+  });
+
+  return response?.data ?? response ?? null;
+}
+
 export const paymentsApi = {
   createPaymentIntent,
   capturePayPalOrder,
   refundPayment,
-  listPaymentIntents
+  listPaymentIntents,
+  previewCoupon
 };
 
 export default paymentsApi;

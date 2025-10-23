@@ -7,6 +7,7 @@ import PaymentCouponModel from '../models/PaymentCouponModel.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
 import PaymentLedgerEntryModel from '../models/PaymentLedgerEntryModel.js';
 import PaymentRefundModel from '../models/PaymentRefundModel.js';
+import UserModel from '../models/UserModel.js';
 import { trackPaymentCaptureMetrics, trackPaymentRefundMetrics } from '../observability/metrics.js';
 import {
   onPaymentSucceeded as handleCommunityPaymentSucceeded,
@@ -51,6 +52,34 @@ function currencyStringToCents(value) {
     return 0;
   }
   return Math.round(parsed * 100);
+}
+
+function normaliseEmail(value) {
+  if (!value) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.toLowerCase();
+}
+
+async function resolveReceiptEmail(candidate, userId) {
+  const direct = normaliseEmail(candidate);
+  if (direct) {
+    return direct;
+  }
+  if (!userId) {
+    return null;
+  }
+  try {
+    const user = await UserModel.findById(userId);
+    return normaliseEmail(user?.email ?? null);
+  } catch (error) {
+    logger.warn({ err: error, userId }, 'Failed to resolve receipt email from user record');
+    return null;
+  }
 }
 
 function buildPaymentEventPayload(intent, extra = {}) {
@@ -251,6 +280,76 @@ class PaymentService {
       this.paypalGateway = IntegrationProviderService.getPayPalGateway();
     }
     return this.paypalGateway;
+  }
+
+  static async previewCoupon({ code, currency, userId } = {}) {
+    const normalizedCode = typeof code === 'string' ? code.trim().toUpperCase() : '';
+    if (!normalizedCode) {
+      const error = new Error('Coupon code is required.');
+      error.status = 422;
+      throw error;
+    }
+
+    const normalizedCurrency = this.normalizeCurrency(currency ?? env.payments.defaultCurrency);
+
+    const coupon = await PaymentCouponModel.findActiveForRedemption(
+      normalizedCode,
+      normalizedCurrency,
+      db,
+      new Date(),
+      { lock: false }
+    );
+
+    if (!coupon) {
+      const error = new Error(`Coupon ${normalizedCode} is invalid or no longer active.`);
+      error.status = 404;
+      throw error;
+    }
+
+    let userRedemptions = 0;
+    if (coupon.perUserLimit && userId) {
+      userRedemptions = await PaymentCouponModel.countUserRedemptions(coupon.id, userId);
+      if (userRedemptions >= coupon.perUserLimit) {
+        const error = new Error(
+          `Coupon ${normalizedCode} has already been used the maximum number of times for this account.`
+        );
+        error.status = 409;
+        throw error;
+      }
+    }
+
+    const remainingOverall =
+      coupon.maxRedemptions === null
+        ? null
+        : Math.max(0, Number(coupon.maxRedemptions ?? 0) - Number(coupon.timesRedeemed ?? 0));
+
+    return {
+      coupon: {
+        id: coupon.id,
+        code: coupon.code,
+        name: coupon.name,
+        description: coupon.description,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        currency: coupon.currency ?? normalizedCurrency,
+        isStackable: Boolean(coupon.isStackable),
+        status: coupon.status,
+        validFrom: coupon.validFrom,
+        validUntil: coupon.validUntil,
+        maxRedemptions: coupon.maxRedemptions,
+        perUserLimit: coupon.perUserLimit,
+        timesRedeemed: coupon.timesRedeemed,
+        metadata: coupon.metadata ?? {}
+      },
+      redemption: {
+        userRedemptions,
+        remainingForUser:
+          coupon.perUserLimit === null
+            ? null
+            : Math.max(0, Number(coupon.perUserLimit ?? 0) - userRedemptions),
+        remainingOverall
+      }
+    };
   }
 
   static toApiIntent(intent) {
@@ -493,27 +592,15 @@ class PaymentService {
 
     let coupon = null;
     if (couponCode) {
-      coupon = await PaymentCouponModel.findActiveForRedemption(
-        couponCode,
-        normalizedCurrency,
-        db,
-        new Date(),
-        { lock: false }
-      );
-      if (!coupon) {
-        const error = new Error(`Coupon ${couponCode} is invalid or no longer active.`);
-        error.status = 404;
-        throw error;
-      }
-      if (coupon.perUserLimit) {
-        const userRedemptions = await PaymentCouponModel.countUserRedemptions(coupon.id, userId);
-        if (userRedemptions >= coupon.perUserLimit) {
-          const error = new Error(`Coupon ${couponCode} has already been used the maximum number of times for this account.`);
-          error.status = 409;
-          throw error;
-        }
-      }
+      const preview = await this.previewCoupon({
+        code: couponCode,
+        currency: normalizedCurrency,
+        userId
+      });
+      coupon = preview?.coupon ?? null;
     }
+
+    const resolvedReceiptEmail = await resolveReceiptEmail(receiptEmail, userId);
 
     const totals = this.calculateTotals({ items, coupon, taxRegion: tax, currency: normalizedCurrency });
     const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
@@ -613,7 +700,7 @@ class PaymentService {
         couponId: coupon?.id ?? null,
         entityType: entity?.type ?? 'commerce-item',
         entityId: entity?.id ?? publicId,
-        receiptEmail
+        receiptEmail: resolvedReceiptEmail
       });
 
       return {
@@ -654,7 +741,7 @@ class PaymentService {
               ...baseMetadata
             },
             description: entity?.description ?? entity?.name ?? 'Edulure purchase',
-            receipt_email: receiptEmail ?? undefined,
+            receipt_email: resolvedReceiptEmail ?? undefined,
             statement_descriptor: env.payments.stripe.statementDescriptor,
             statement_descriptor_suffix: (entity?.name ?? 'Edulure').slice(0, 20)
           },
@@ -683,7 +770,7 @@ class PaymentService {
         couponId: coupon?.id ?? null,
         entityType: entity?.type ?? 'commerce-item',
         entityId: entity?.id ?? publicId,
-        receiptEmail
+        receiptEmail: resolvedReceiptEmail
       });
 
       return {
@@ -793,7 +880,7 @@ class PaymentService {
         couponId: coupon?.id ?? null,
         entityType: entity?.type ?? 'commerce-item',
         entityId: entity?.id ?? publicId,
-        receiptEmail
+        receiptEmail: resolvedReceiptEmail
       });
 
       return {
@@ -968,7 +1055,12 @@ class PaymentService {
       {
         couponId: coupon.id,
         paymentIntentId: intent.id,
-        userId: intent.userId
+        userId: intent.userId,
+        metadata: {
+          entityType: intent.entityType,
+          entityId: intent.entityId,
+          paymentPublicId: intent.publicId
+        }
       },
       connection
     );
@@ -1163,6 +1255,22 @@ class PaymentService {
       for (const refund of refunds) {
         const existing = await PaymentRefundModel.findByProviderRefundId(refund.id, trx);
         if (existing) {
+          const processedAt = refund.created
+            ? new Date(refund.created * 1000).toISOString()
+            : existing.processedAt ?? new Date().toISOString();
+          await PaymentRefundModel.updateById(
+            existing.id,
+            {
+              status: refund.status ?? existing.status,
+              amount: Number(refund.amount ?? refund.amount_refunded ?? existing.amount ?? 0),
+              reason: refund.reason ?? existing.reason ?? null,
+              processedAt,
+              providerRefundId: refund.id,
+              failureCode: refund.failure_code ?? existing.failureCode ?? null,
+              failureMessage: refund.failure_message ?? existing.failureMessage ?? null
+            },
+            trx
+          );
           continue;
         }
         const refundAmount = Number(refund.amount ?? refund.amount_refunded ?? 0);

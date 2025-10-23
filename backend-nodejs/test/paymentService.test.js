@@ -154,6 +154,7 @@ const {
 describe('PaymentService', () => {
   const originalTaxConfig = { ...env.payments.tax };
   const originalAllowedCurrencies = [...env.payments.allowedCurrencies];
+  const originalDefaultCurrency = env.payments.defaultCurrency;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -207,6 +208,7 @@ describe('PaymentService', () => {
     communityLifecycleMock.onPaymentRefunded.mockResolvedValue();
     webhookEventBusMock.publish.mockResolvedValue();
     env.payments.allowedCurrencies.splice(0, env.payments.allowedCurrencies.length, ...originalAllowedCurrencies);
+    env.payments.defaultCurrency = originalDefaultCurrency;
     env.payments.tax.inclusive = originalTaxConfig.inclusive;
     env.payments.tax.minimumRate = originalTaxConfig.minimumRate;
     env.payments.tax.table = { ...originalTaxConfig.table };
@@ -216,6 +218,117 @@ describe('PaymentService', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('previewCoupon', () => {
+    it('normalises coupon data and redemption counters', async () => {
+      paymentCouponModel.findActiveForRedemption.mockResolvedValue({
+        id: 11,
+        code: 'INSIDER20',
+        name: 'Insider 20',
+        description: '20% off annual plan',
+        discountType: 'percentage',
+        discountValue: 2000,
+        currency: 'USD',
+        maxRedemptions: 200,
+        perUserLimit: 3,
+        timesRedeemed: 5,
+        isStackable: false,
+        status: 'active',
+        validFrom: '2025-01-01T00:00:00Z',
+        validUntil: '2025-12-31T23:59:59Z',
+        metadata: { campaign: 'launch' }
+      });
+      paymentCouponModel.countUserRedemptions.mockResolvedValue(1);
+
+      const preview = await PaymentService.previewCoupon({ code: 'insider20', currency: 'usd', userId: 44 });
+
+      expect(paymentCouponModel.findActiveForRedemption).toHaveBeenCalledWith(
+        'INSIDER20',
+        'USD',
+        expect.anything(),
+        expect.any(Date),
+        { lock: false }
+      );
+      expect(paymentCouponModel.countUserRedemptions).toHaveBeenCalledWith(11, 44);
+      expect(preview.coupon).toMatchObject({
+        id: 11,
+        code: 'INSIDER20',
+        discountType: 'percentage',
+        discountValue: 2000,
+        currency: 'USD'
+      });
+      expect(preview.redemption).toEqual({
+        userRedemptions: 1,
+        remainingForUser: 2,
+        remainingOverall: 195
+      });
+    });
+
+    it('throws when coupon not found', async () => {
+      paymentCouponModel.findActiveForRedemption.mockResolvedValue(null);
+
+      await expect(PaymentService.previewCoupon({ code: 'missing', currency: 'usd', userId: 7 })).rejects.toMatchObject({
+        status: 404
+      });
+    });
+
+    it('enforces per-user redemption limits', async () => {
+      paymentCouponModel.findActiveForRedemption.mockResolvedValue({
+        id: 12,
+        code: 'LIMIT1',
+        name: 'Limited',
+        discountType: 'percentage',
+        discountValue: 1000,
+        currency: 'USD',
+        maxRedemptions: 100,
+        perUserLimit: 1,
+        timesRedeemed: 4,
+        isStackable: false,
+        status: 'active',
+        validFrom: '2025-01-01T00:00:00Z',
+        validUntil: '2025-12-31T23:59:59Z',
+        metadata: {}
+      });
+      paymentCouponModel.countUserRedemptions.mockResolvedValue(1);
+
+      await expect(PaymentService.previewCoupon({ code: 'limit1', currency: 'usd', userId: 77 })).rejects.toMatchObject({
+        status: 409
+      });
+    });
+
+    it('falls back to default currency when none is provided', async () => {
+      env.payments.defaultCurrency = 'GBP';
+      if (!env.payments.allowedCurrencies.includes('GBP')) {
+        env.payments.allowedCurrencies.push('GBP');
+      }
+      paymentCouponModel.findActiveForRedemption.mockResolvedValue({
+        id: 13,
+        code: 'TEACH10',
+        name: 'Teacher',
+        discountType: 'percentage',
+        discountValue: 1000,
+        currency: 'GBP',
+        maxRedemptions: null,
+        perUserLimit: null,
+        timesRedeemed: 0,
+        isStackable: true,
+        status: 'active',
+        validFrom: null,
+        validUntil: null,
+        metadata: {}
+      });
+
+      await PaymentService.previewCoupon({ code: 'teach10', userId: 11 });
+
+      expect(paymentCouponModel.findActiveForRedemption).toHaveBeenCalledWith(
+        'TEACH10',
+        'GBP',
+        expect.anything(),
+        expect.any(Date),
+        { lock: false }
+      );
+    });
   });
 
   it('calculates inclusive tax and discounts across line items', () => {
@@ -463,6 +576,8 @@ describe('PaymentService', () => {
       metadata: {},
       couponId: 75,
       userId: 'user-22',
+      entityType: 'course',
+      entityId: 'course-101',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -548,7 +663,12 @@ describe('PaymentService', () => {
       expect.objectContaining({ provider: 'paypal', amountTotal: 1590, currency: 'USD', status: 'succeeded' })
     );
     expect(paymentCouponModel.recordRedemption).toHaveBeenCalledWith(
-      { couponId: 75, paymentIntentId: 50, userId: 'user-22' },
+      {
+        couponId: 75,
+        paymentIntentId: 50,
+        userId: 'user-22',
+        metadata: expect.objectContaining({ entityType: 'course', paymentPublicId: 'pay-123' })
+      },
       expect.anything()
     );
     expect(result).toMatchObject({ status: 'succeeded', amountTotal: 1590, provider: 'paypal' });

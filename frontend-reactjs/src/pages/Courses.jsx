@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AcademicCapIcon, CheckCircleIcon, CreditCardIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { AcademicCapIcon } from '@heroicons/react/24/outline';
+import clsx from 'clsx';
 
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
 import FormStepper from '../components/forms/FormStepper.jsx';
@@ -10,9 +11,12 @@ import { createPaymentIntent } from '../api/paymentsApi.js';
 import { requestMediaUpload } from '../api/mediaApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import useCouponValidation from '../hooks/useCouponValidation.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 import { computeFileChecksum } from '../utils/uploads.js';
+import CheckoutDialog from '../components/commerce/CheckoutDialog.jsx';
+import CheckoutPriceSummary from '../components/commerce/CheckoutPriceSummary.jsx';
 
 const EXPLORER_CONFIG = {
   entityType: 'courses',
@@ -198,153 +202,6 @@ function CourseHighlightCard({ course, onPurchase }) {
         ) : null}
       </div>
     </article>
-  );
-}
-
-function CourseCheckoutDrawer({ course, open, onClose, form, onChange, onSubmit, status, pending }) {
-  if (!open || !course) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-end bg-slate-900/40 px-4 py-6">
-      <div className="relative w-full max-w-xl rounded-4xl border border-slate-200 bg-white/95 p-6 shadow-2xl">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-rose-200 hover:text-rose-500"
-        >
-          <XMarkIcon className="h-5 w-5" />
-          <span className="sr-only">Close checkout</span>
-        </button>
-        <div className="flex items-start gap-3">
-          <div className="rounded-full bg-primary/10 p-2 text-primary">
-            <CreditCardIcon className="h-6 w-6" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary">Checkout</p>
-            <h3 className="text-xl font-semibold text-slate-900">Secure cohort purchase</h3>
-            <p className="text-xs text-slate-500">{course.title}</p>
-          </div>
-        </div>
-
-        <form className="mt-6 space-y-5" onSubmit={onSubmit}>
-          <div className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Provider</span>
-            <div className="grid grid-cols-2 gap-2">
-              {['stripe', 'paypal'].map((provider) => (
-                <button
-                  key={provider}
-                  type="button"
-                  onClick={() => onChange({ ...form, provider })}
-                  className={`rounded-3xl border px-4 py-3 text-sm font-semibold capitalize transition ${
-                    form.provider === provider
-                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                      : 'border-slate-200 text-slate-600 hover:border-primary hover:text-primary'
-                  }`}
-                >
-                  {provider}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Seats</span>
-            <input
-              type="number"
-              min="1"
-              max="500"
-              value={form.quantity}
-              onChange={(event) => onChange({ ...form, quantity: Number(event.target.value) || 1 })}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              required
-            />
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Receipt email</span>
-            <input
-              type="email"
-              value={form.receiptEmail}
-              onChange={(event) => onChange({ ...form, receiptEmail: event.target.value })}
-              placeholder="ap@company.com"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Coupon code</span>
-            <input
-              type="text"
-              value={form.couponCode}
-              onChange={(event) => onChange({ ...form, couponCode: event.target.value.toUpperCase() })}
-              placeholder="OPS50"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tax country</span>
-              <input
-                type="text"
-                maxLength={2}
-                value={form.taxCountry}
-                onChange={(event) => onChange({ ...form, taxCountry: event.target.value.toUpperCase() })}
-                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="US"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Region</span>
-              <input
-                type="text"
-                maxLength={3}
-                value={form.taxRegion}
-                onChange={(event) => onChange({ ...form, taxRegion: event.target.value.toUpperCase() })}
-                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="NY"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Postal code</span>
-              <input
-                type="text"
-                maxLength={12}
-                value={form.taxPostalCode}
-                onChange={(event) => onChange({ ...form, taxPostalCode: event.target.value })}
-                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="10001"
-              />
-            </label>
-          </div>
-
-          <button
-            type="submit"
-            disabled={pending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark disabled:opacity-60"
-          >
-            {pending ? 'Creating payment intent…' : 'Generate payment intent'}
-          </button>
-        </form>
-
-        {status ? (
-          <div
-            className={`mt-4 rounded-3xl border px-4 py-3 text-sm ${
-              status.type === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : status.type === 'error'
-                  ? 'border-rose-200 bg-rose-50 text-rose-700'
-                  : 'border-primary/30 bg-primary/10 text-primary'
-            }`}
-          >
-            {status.type === 'success' ? <CheckCircleIcon className="mr-2 inline h-4 w-4" /> : null}
-            {status.message}
-          </div>
-        ) : null}
-      </div>
-    </div>
   );
 }
 
@@ -952,6 +809,61 @@ export default function Courses() {
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
   const [uploadState, setUploadState] = useState({});
+
+  const checkoutCurrency = checkoutCourse?.priceCurrency ?? 'USD';
+  const couponValidation = useCouponValidation({
+    code: checkoutForm.couponCode,
+    currency: checkoutCurrency,
+    enabled: checkoutOpen
+  });
+
+  const checkoutPriceSummary = useMemo(() => {
+    if (!checkoutCourse) {
+      return null;
+    }
+    const quantity = Math.max(1, Number(checkoutForm.quantity ?? 1));
+    const baseAmountCents = Number(checkoutCourse.priceAmountCents ?? 0) * quantity;
+    let discountCents = 0;
+    if (couponValidation.coupon) {
+      if (couponValidation.coupon.discountType === 'percentage') {
+        const basisPoints = Number(couponValidation.coupon.discountValue ?? 0);
+        discountCents = Math.floor((baseAmountCents * basisPoints) / 10000);
+      } else if (couponValidation.coupon.discountType === 'fixed_amount') {
+        discountCents = Number(couponValidation.coupon.discountValue ?? 0);
+      }
+    }
+    if (discountCents > baseAmountCents) {
+      discountCents = baseAmountCents;
+    }
+    const currency = checkoutCourse.priceCurrency ?? 'USD';
+    const lineItems = [
+      {
+        id: checkoutCourse.id ?? checkoutCourse.slug ?? 'course',
+        label: `${checkoutCourse.title} × ${quantity}`,
+        amountCents: baseAmountCents,
+        currency
+      }
+    ];
+    const discount =
+      discountCents > 0
+        ? {
+            label: couponValidation.coupon?.code
+              ? `${couponValidation.coupon.code} discount`
+              : 'Discount',
+            amountCents: discountCents,
+            currency
+          }
+        : null;
+    return (
+      <CheckoutPriceSummary
+        currency={currency}
+        lineItems={lineItems}
+        discount={discount}
+        totalCents={Math.max(0, baseAmountCents - discountCents)}
+        note="Taxes calculated at payment."
+      />
+    );
+  }, [checkoutCourse, checkoutForm.quantity, couponValidation.coupon]);
 
   const featuredCourse = useMemo(() => highlightCourses[0] ?? null, [highlightCourses]);
   const courseKeywords = useMemo(() => {
@@ -1705,16 +1617,173 @@ export default function Courses() {
 
         <section>{adminPanel}</section>
       </div>
-      <CourseCheckoutDrawer
-        course={checkoutCourse}
-        open={checkoutOpen}
+      <CheckoutDialog
+        open={checkoutOpen && Boolean(checkoutCourse)}
         onClose={closeCheckout}
-        form={checkoutForm}
-        onChange={setCheckoutForm}
-        onSubmit={handleCheckoutSubmit}
+        product={{
+          title: 'Secure cohort purchase',
+          subtitle: checkoutCourse?.title ?? null
+        }}
         status={checkoutStatus}
         pending={checkoutPending}
-      />
+        onSubmit={handleCheckoutSubmit}
+        priceSummary={checkoutPriceSummary}
+      >
+        {({ pending }) => (
+          <>
+            <div className="space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Provider</span>
+              <div className="grid grid-cols-2 gap-2">
+                {['stripe', 'paypal'].map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    onClick={() =>
+                      setCheckoutForm((current) => ({
+                        ...current,
+                        provider
+                      }))
+                    }
+                    className={clsx(
+                      'rounded-3xl border px-4 py-3 text-sm font-semibold capitalize transition',
+                      checkoutForm.provider === provider
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                        : 'border-slate-200 text-slate-600 hover:border-primary hover:text-primary'
+                    )}
+                  >
+                    {provider}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="block space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Seats</span>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={checkoutForm.quantity}
+                onChange={(event) =>
+                  setCheckoutForm((current) => ({
+                    ...current,
+                    quantity: Number(event.target.value) > 0 ? Number(event.target.value) : 1
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                required
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Receipt email</span>
+              <input
+                type="email"
+                value={checkoutForm.receiptEmail}
+                onChange={(event) =>
+                  setCheckoutForm((current) => ({
+                    ...current,
+                    receiptEmail: event.target.value
+                  }))
+                }
+                placeholder="ap@company.com"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Coupon code</span>
+              <input
+                type="text"
+                value={checkoutForm.couponCode}
+                onChange={(event) =>
+                  setCheckoutForm((current) => ({
+                    ...current,
+                    couponCode: event.target.value.toUpperCase()
+                  }))
+                }
+                placeholder="OPS50"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              {couponValidation.validating ? (
+                <p className="text-xs text-slate-500">Validating coupon…</p>
+              ) : null}
+              {couponValidation.status === 'valid' ? (
+                <p className="text-xs text-emerald-600">
+                  Coupon applied{couponValidation.redemption?.remainingForUser !== null
+                    ? ` · ${couponValidation.redemption.remainingForUser} uses remaining`
+                    : ''}
+                </p>
+              ) : null}
+              {couponValidation.status === 'invalid' ? (
+                <p className="text-xs text-rose-600">Coupon not valid for this checkout.</p>
+              ) : null}
+              {couponValidation.status === 'error' ? (
+                <p className="text-xs text-amber-600">Unable to verify coupon. Try again later.</p>
+              ) : null}
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tax country</span>
+                <input
+                  type="text"
+                  maxLength={2}
+                  value={checkoutForm.taxCountry}
+                  onChange={(event) =>
+                    setCheckoutForm((current) => ({
+                      ...current,
+                      taxCountry: event.target.value.toUpperCase()
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="US"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Region</span>
+                <input
+                  type="text"
+                  maxLength={3}
+                  value={checkoutForm.taxRegion}
+                  onChange={(event) =>
+                    setCheckoutForm((current) => ({
+                      ...current,
+                      taxRegion: event.target.value.toUpperCase()
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="NY"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Postal code</span>
+                <input
+                  type="text"
+                  maxLength={12}
+                  value={checkoutForm.taxPostalCode}
+                  onChange={(event) =>
+                    setCheckoutForm((current) => ({
+                      ...current,
+                      taxPostalCode: event.target.value
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="10001"
+                />
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={pending}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark disabled:opacity-60"
+            >
+              {pending ? 'Creating payment intent…' : 'Generate payment intent'}
+            </button>
+          </>
+        )}
+      </CheckoutDialog>
     </div>
   );
 }
