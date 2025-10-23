@@ -51,9 +51,14 @@ export function useExplorerEntitySearch({
   const [page, setPage] = useState(1);
   const [results, setResults] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [facets, setFacets] = useState({});
+  const [preloadImageUrls, setPreloadImageUrls] = useState([]);
+  const [adsPlacements, setAdsPlacements] = useState([]);
 
   const [savedSearches, setSavedSearches] = useState([]);
   const [savedSearchError, setSavedSearchError] = useState(null);
@@ -74,7 +79,13 @@ export function useExplorerEntitySearch({
       }
       const controller = new AbortController();
       abortRef.current = controller;
-      setLoading(true);
+      const nextPage = overrides.page ?? page;
+      const append = overrides.append ?? nextPage > 1;
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       try {
         const payload = {
@@ -83,7 +94,7 @@ export function useExplorerEntitySearch({
           filters: cleanedFilters && Object.keys(cleanedFilters).length ? { [entityType]: cleanedFilters } : {},
           globalFilters: {},
           sort: sort ? { [entityType]: sort } : {},
-          page: overrides.page ?? page,
+          page: nextPage,
           perPage: pageSize
         };
         const response = await searchExplorer(payload, { token, signal: controller.signal });
@@ -91,8 +102,16 @@ export function useExplorerEntitySearch({
           throw new Error(response?.message ?? 'Search failed');
         }
         const entityResult = response.data?.results?.[entityType];
-        setResults(entityResult?.hits ?? []);
-        setTotal(response.data?.totals?.[entityType] ?? 0);
+        const hits = entityResult?.hits ?? [];
+        setResults((prev) => (append ? [...prev, ...hits] : hits));
+        const totalCount = response.data?.totals?.[entityType] ?? hits.length;
+        setTotal(totalCount);
+        const computedTotalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+        setTotalPages(computedTotalPages);
+        setPage(nextPage);
+        setFacets(entityResult?.facets ?? {});
+        setPreloadImageUrls(entityResult?.preloadImageUrls ?? []);
+        setAdsPlacements(response.data?.adsPlacements ?? []);
         setAnalytics(response.data?.analytics ?? null);
       } catch (err) {
         if (err.name === 'CanceledError' || err.name === 'AbortError') {
@@ -101,7 +120,11 @@ export function useExplorerEntitySearch({
         setError(err.message ?? 'Unable to fetch explorer results');
         setAnalytics(null);
       } finally {
-        setLoading(false);
+        if (append) {
+          setLoadingMore(false);
+        } else {
+          setLoading(false);
+        }
       }
     },
     [cleanedFilters, entityType, page, pageSize, query, sort, token]
@@ -109,7 +132,13 @@ export function useExplorerEntitySearch({
 
   useEffect(() => {
     setPage(1);
-    executeSearch({ page: 1 });
+    setResults([]);
+    setTotal(0);
+    setTotalPages(1);
+    setFacets({});
+    setPreloadImageUrls([]);
+    setAdsPlacements([]);
+    executeSearch({ page: 1, append: false });
     return () => {
       if (abortRef.current) {
         abortRef.current.abort();
@@ -254,13 +283,25 @@ export function useExplorerEntitySearch({
 
   const goToPage = useCallback(
     (nextPage) => {
-      setPage(nextPage);
-      executeSearch({ page: nextPage });
+      const target = Math.max(1, nextPage);
+      setPage(target);
+      executeSearch({ page: target, append: false });
     },
     [executeSearch]
   );
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const hasMore = page < totalPages;
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore) {
+      return;
+    }
+    if (!hasMore) {
+      return;
+    }
+    const nextPage = page + 1;
+    executeSearch({ page: nextPage, append: true });
+  }, [executeSearch, hasMore, loading, loadingMore, page]);
 
   return {
     query,
@@ -277,9 +318,15 @@ export function useExplorerEntitySearch({
     goToPage,
     results,
     loading,
+    loadingMore,
     error,
     analytics,
-    refresh: () => executeSearch({ page }),
+    facets,
+    preloadImageUrls,
+    adsPlacements,
+    hasMore,
+    loadMore,
+    refresh: () => executeSearch({ page, append: false }),
     savedSearches,
     savedSearchError,
     savedSearchLoading,

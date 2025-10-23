@@ -75,7 +75,8 @@ function serialiseEntityRecord(entityType, entityResult) {
       facets: entityResult.facets ?? {},
       page: entityResult.page ?? 1,
       perPage: entityResult.perPage ?? displayedHits,
-      markers: entityResult.markers ?? []
+      markers: entityResult.markers ?? [],
+      previewImages: entityResult.preloadImageUrls ?? []
     }
   };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   AdjustmentsHorizontalIcon,
@@ -11,6 +11,8 @@ import {
 } from '@heroicons/react/24/outline';
 
 import SearchResultCard from './SearchResultCard.jsx';
+import FilterChips from './FilterChips.jsx';
+import SponsoredPlacementCard from './SponsoredPlacementCard.jsx';
 import { useExplorerEntitySearch } from '../../hooks/useExplorerEntitySearch.js';
 
 function classNames(...classes) {
@@ -162,6 +164,7 @@ export default function ExplorerSearchSection({
   const [editingSearchId, setEditingSearchId] = useState(null);
   const [editingName, setEditingName] = useState('');
   const [updating, setUpdating] = useState(false);
+  const sentinelRef = useRef(null);
 
   const {
     query,
@@ -172,13 +175,15 @@ export default function ExplorerSearchSection({
     clearFilters,
     sort,
     setSort,
-    page,
-    total,
-    totalPages,
-    goToPage,
     results,
     loading,
+    loadingMore,
     error,
+    facets,
+    preloadImageUrls,
+    adsPlacements,
+    hasMore,
+    loadMore,
     savedSearches,
     savedSearchError,
     savedSearchLoading,
@@ -194,6 +199,76 @@ export default function ExplorerSearchSection({
   }, [query]);
 
   const filtersByKey = filters ?? {};
+
+  const facetGroups = useMemo(() => {
+    if (!filterDefinitions?.length) return [];
+    return filterDefinitions
+      .filter((definition) => definition.type === 'multi' || definition.type === 'select')
+      .map((definition) => {
+        const facetValues = facets?.[definition.key];
+        if (!facetValues) {
+          return null;
+        }
+        const options = Object.entries(facetValues).map(([value, count]) => {
+          const resolvedOption = definition.options?.find((option) => option.value === value);
+          const activeValue = filtersByKey[definition.key];
+          const isActive = Array.isArray(activeValue)
+            ? activeValue.includes(value)
+            : activeValue === value;
+          return {
+            value,
+            label: resolvedOption?.label ?? String(value),
+            count: Number(count ?? 0),
+            active: isActive
+          };
+        });
+        if (!options.length) {
+          return null;
+        }
+        return {
+          key: definition.key,
+          label: definition.label,
+          options
+        };
+      })
+      .filter(Boolean);
+  }, [facets, filterDefinitions, filtersByKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    if (!preloadImageUrls?.length) {
+      return undefined;
+    }
+    const images = [];
+    for (const url of preloadImageUrls) {
+      if (!url) continue;
+      const image = new Image();
+      image.src = url;
+      images.push(image);
+    }
+    return () => {
+      images.forEach((image) => {
+        image.src = '';
+      });
+    };
+  }, [preloadImageUrls]);
+
+  useEffect(() => {
+    if (!hasMore) return undefined;
+    if (!sentinelRef.current) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMore();
+        }
+      },
+      { rootMargin: '320px' }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -247,6 +322,20 @@ export default function ExplorerSearchSection({
   };
 
   const activeFilters = useMemo(() => Object.keys(filtersByKey).length, [filtersByKey]);
+
+  const handleChipToggle = (key, value) => {
+    const definition = filterDefinitions.find((item) => item.key === key);
+    if (!definition) return;
+    if (definition.type === 'multi') {
+      toggleMultiFilter(key, value);
+      return;
+    }
+    if (definition.type === 'select') {
+      setFilterValue(key, filtersByKey[key] === value ? null : value);
+      return;
+    }
+    setFilterValue(key, value);
+  };
 
   return (
     <section className="rounded-4xl bg-white/80 p-8 shadow-xl ring-1 ring-slate-100">
@@ -302,6 +391,22 @@ export default function ExplorerSearchSection({
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[3fr,1fr] lg:gap-10">
         <div className="space-y-6">
+          {facetGroups.length ? (
+            <div className="rounded-3xl border border-slate-100 bg-white/70 p-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  <FunnelIcon className="mr-2 inline-block h-4 w-4" /> Popular filters
+                </h3>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary">
+                  {facetGroups.reduce((count, group) => count + group.options.length, 0)} options
+                </span>
+              </div>
+              <div className="mt-4">
+                <FilterChips groups={facetGroups} onToggle={handleChipToggle} />
+              </div>
+            </div>
+          ) : null}
+
           <div className="rounded-3xl border border-slate-100 bg-slate-50/60 p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -355,30 +460,33 @@ export default function ExplorerSearchSection({
               <SearchResultCard key={`${entityType}-${hit.id ?? hit.documentId ?? hit.slug}`} entityType={entityType} hit={hit} />
             ))}
           </div>
+          {adsPlacements?.length ? (
+            <div className="space-y-4">
+              {adsPlacements.map((placement) => (
+                <SponsoredPlacementCard
+                  key={
+                    placement.placementId ?? placement.campaignId ?? placement.slot ?? `sponsored-${placement.position}`
+                  }
+                  placement={placement}
+                />
+              ))}
+            </div>
+          ) : null}
 
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600">
-              <span>
-                Showing page {page} of {totalPages} · {total} results
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => goToPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  className="rounded-full border border-slate-200 px-4 py-2 transition disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary hover:text-primary"
+          <div ref={sentinelRef} aria-hidden className="h-px w-full" />
+
+          {loadingMore ? (
+            <div className="space-y-4">
+              {[...Array(2)].map((_, index) => (
+                <div
+                  key={`loading-${index}`}
+                  className="animate-pulse rounded-3xl border border-slate-100 bg-white/80 p-6"
                 >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() => goToPage(Math.min(totalPages, page + 1))}
-                  disabled={page === totalPages}
-                  className="rounded-full border border-slate-200 px-4 py-2 transition disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary hover:text-primary"
-                >
-                  Next
-                </button>
-              </div>
+                  <div className="h-4 w-24 rounded bg-slate-200" />
+                  <div className="mt-3 h-5 w-48 rounded bg-slate-200" />
+                  <div className="mt-3 h-3 w-full rounded bg-slate-100" />
+                </div>
+              ))}
             </div>
           ) : null}
         </div>
