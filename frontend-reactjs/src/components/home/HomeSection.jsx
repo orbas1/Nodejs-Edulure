@@ -10,13 +10,22 @@ const SIZE_CLASSES = {
 };
 
 const PAD_CLASSES = {
-  default: 'py-16 sm:py-24',
-  cozy: 'py-14 sm:py-20',
-  tight: 'py-12 sm:py-16',
-  balanced: 'py-16 sm:py-28',
-  relaxed: 'py-20 sm:py-28',
-  loose: 'py-24 sm:py-32',
+  default: 'py-section-default',
+  cozy: 'py-section-cozy',
+  tight: 'py-section-tight',
+  balanced: 'py-section-balanced',
+  relaxed: 'py-section-loose',
+  loose: 'py-section-loose',
   none: 'py-0'
+};
+
+const EDGE_CLASSES = {
+  default: 'px-responsive-edge',
+  edge: 'px-responsive-edge',
+  snug: 'px-responsive-edge',
+  wide: 'px-responsive-edge',
+  flush: 'px-0',
+  none: 'px-0'
 };
 
 export default function HomeSection({
@@ -25,15 +34,16 @@ export default function HomeSection({
   className,
   pad = 'default',
   size = 'default',
-  px = 'px-4 sm:px-6 lg:px-10',
+  px = 'edge',
   ...props
 }) {
   const resolvedSize = SIZE_CLASSES[size] ?? size;
   const resolvedPad = PAD_CLASSES[pad] ?? pad;
+  const resolvedPx = EDGE_CLASSES[px] ?? px;
 
   return (
     <Component
-      className={clsx('mx-auto', px, resolvedSize, resolvedPad, className)}
+      className={clsx('mx-auto', resolvedPx, resolvedSize, resolvedPad, className)}
       {...props}
     >
       {children}
