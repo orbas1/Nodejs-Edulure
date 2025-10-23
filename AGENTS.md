@@ -805,7 +805,7 @@ C. **Weaknesses to Remove** – Closed the gap between stored learner settings a
 
 D. **Sesing and Colour Review Changes** – Expanded tokens with density primitives and updated `frontend-reactjs/src/styles.css` so `body[data-density]` compresses gutters and card radii in compact mode while high-contrast theming keeps WCAG-compliant colours. ✅
 
-E. **Improvements & Justification Changes** – Added integration tests around the provider, documented personalised states in `docs/design-system/README.md`, and synced backend seeds so `learner_system_preferences` and `learner_finance_purchases` showcase the experience immediately after a migration. ✅
+E. **Improvements & Justification Changes** – Added integration tests around the provider, documented personalised states in `docs/design-system/README.md`, and synced backend seeds so `learner_system_preferences` and `learner_finance_purchases` showcase the experience immediately after a migration. Offline caching now rehydrates preferences from per-user storage before API responses land, eliminating flicker on refresh. ✅
 
 F. **Change Checklist Tracker** – Completion 100%; migrations stay untouched, seeds align with models, accessibility tests cover the provider, density tokens ship, and no outstanding follow-up remains. ✅
 

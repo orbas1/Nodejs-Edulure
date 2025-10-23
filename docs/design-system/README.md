@@ -57,10 +57,13 @@ behaviour:
 learner’s saved preferences and mirrors them onto `body` attributes. This
 provider coordinates with the `MainLayout` media-query observers so a user’s
 `reducedMotion`, `highContrast`, and interface density settings always win over
-system defaults while remaining responsive to OS changes. The accompanying CSS
-in `frontend-reactjs/src/styles.css` reacts to `data-density` to compress or
-expand spacing, letting compact dashboards and spacious marketing pages share
-the same primitives.
+system defaults while remaining responsive to OS changes. The provider now
+rehydrates the latest preference snapshot from `localStorage` (keyed per user)
+before the API call resolves, preventing perceptible flicker on sign-in or
+refresh and honouring the “offline-friendly caching” goal in the experience
+outline. The accompanying CSS in `frontend-reactjs/src/styles.css` reacts to
+`data-density` to compress or expand spacing, letting compact dashboards and
+spacious marketing pages share the same primitives.
 
 Seed data in `backend-nodejs/seeds/001_bootstrap.js` provisions
 `learner_system_preferences` and `learner_finance_purchases` rows so demo

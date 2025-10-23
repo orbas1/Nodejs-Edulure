@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { fetchSystemPreferences } from '../api/learnerDashboardApi.js';
 import { useAuth } from './AuthContext.jsx';
@@ -20,6 +20,45 @@ const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
     audioDescription: false
   }
 });
+
+const STORAGE_PREFIX = 'edulure:system-preferences';
+
+function canUseStorage() {
+  try {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  } catch (_error) {
+    return false;
+  }
+}
+
+function readStoredPreferences(key) {
+  if (!key || !canUseStorage()) {
+    return null;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(key);
+    if (!storedValue) {
+      return null;
+    }
+    const parsed = JSON.parse(storedValue);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeStoredPreferences(key, value) {
+  if (!key || !canUseStorage()) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (_error) {
+    // Ignore storage write errors – preferences still apply for the active session.
+  }
+}
 
 const SystemPreferencesContext = createContext({
   preferences: DEFAULT_SYSTEM_PREFERENCES,
@@ -50,9 +89,12 @@ function withDocument(callback) {
 export function SystemPreferencesProvider({ children }) {
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const userId = session?.user?.id ?? null;
+  const storageKey = userId ? `${STORAGE_PREFIX}:${userId}` : null;
   const [preferences, setPreferencesState] = useState(DEFAULT_SYSTEM_PREFERENCES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const storageKeyRef = useRef(storageKey);
 
   const applyDocumentAttributes = useCallback((prefs) => {
     if (!prefs) return;
@@ -80,19 +122,31 @@ export function SystemPreferencesProvider({ children }) {
     });
   }, []);
 
-  const setPreferences = useCallback(
-    (nextPreferences) => {
+  const applyPreferences = useCallback(
+    (nextPreferences, { persist = true } = {}) => {
       const normalised = normalisePreferences(nextPreferences);
       setPreferencesState(normalised);
       applyDocumentAttributes(normalised);
       setError(null);
+      if (persist) {
+        const key = storageKeyRef.current;
+        if (key) {
+          writeStoredPreferences(key, normalised);
+        }
+      }
       return normalised;
     },
     [applyDocumentAttributes]
   );
 
+  const setPreferences = useCallback(
+    (nextPreferences) => applyPreferences(nextPreferences),
+    [applyPreferences]
+  );
+
   const refresh = useCallback(async () => {
     if (!isAuthenticated || !token) {
+      storageKeyRef.current = null;
       setPreferencesState(DEFAULT_SYSTEM_PREFERENCES);
       clearDocumentAttributes();
       return DEFAULT_SYSTEM_PREFERENCES;
@@ -102,7 +156,7 @@ export function SystemPreferencesProvider({ children }) {
     try {
       const response = await fetchSystemPreferences({ token });
       const payload = response?.data ?? DEFAULT_SYSTEM_PREFERENCES;
-      return setPreferences(payload);
+      return applyPreferences(payload);
     } catch (refreshError) {
       const normalisedError =
         refreshError instanceof Error
@@ -116,13 +170,31 @@ export function SystemPreferencesProvider({ children }) {
   }, [clearDocumentAttributes, isAuthenticated, setPreferences, token]);
 
   useEffect(() => {
-    let cancelled = false;
+    storageKeyRef.current = storageKey;
+  }, [storageKey]);
 
+  useEffect(() => {
     if (!isAuthenticated || !token) {
+      storageKeyRef.current = null;
       setPreferencesState(DEFAULT_SYSTEM_PREFERENCES);
       clearDocumentAttributes();
       setLoading(false);
       setError(null);
+      return;
+    }
+
+    if (storageKey) {
+      const stored = readStoredPreferences(storageKey);
+      if (stored) {
+        applyPreferences(stored, { persist: false });
+      }
+    }
+  }, [isAuthenticated, token, storageKey, applyPreferences, clearDocumentAttributes]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isAuthenticated || !token) {
       return () => {
         cancelled = true;
       };
@@ -134,7 +206,7 @@ export function SystemPreferencesProvider({ children }) {
         const response = await fetchSystemPreferences({ token });
         if (cancelled) return;
         const payload = response?.data ?? DEFAULT_SYSTEM_PREFERENCES;
-        setPreferences(payload);
+        applyPreferences(payload);
       } catch (initialError) {
         if (cancelled) return;
         const normalisedError =
@@ -152,7 +224,7 @@ export function SystemPreferencesProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, token, setPreferences, clearDocumentAttributes]);
+  }, [isAuthenticated, token, applyPreferences]);
 
   const value = useMemo(
     () => ({

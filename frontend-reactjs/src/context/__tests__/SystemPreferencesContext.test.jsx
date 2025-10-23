@@ -2,7 +2,11 @@ import { render, waitFor } from '@testing-library/react';
 import PropTypes from 'prop-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SystemPreferencesProvider, useSystemPreferences } from '../SystemPreferencesContext.jsx';
+import {
+  DEFAULT_SYSTEM_PREFERENCES,
+  SystemPreferencesProvider,
+  useSystemPreferences
+} from '../SystemPreferencesContext.jsx';
 
 const useAuthMock = vi.hoisted(() => vi.fn());
 const fetchSystemPreferencesMock = vi.hoisted(() => vi.fn());
@@ -28,8 +32,9 @@ TestConsumer.propTypes = {
 describe('SystemPreferencesProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     useAuthMock.mockReturnValue({
-      session: { tokens: { accessToken: 'token-abc' } },
+      session: { tokens: { accessToken: 'token-abc' }, user: { id: 42 } },
       isAuthenticated: true
     });
     fetchSystemPreferencesMock.mockResolvedValue({
@@ -72,6 +77,9 @@ describe('SystemPreferencesProvider', () => {
     expect(document.body.getAttribute('data-contrast')).toBe('high');
     expect(document.body.getAttribute('data-motion')).toBe('reduce');
     expect(document.body.getAttribute('data-density')).toBe('compact');
+    const stored = JSON.parse(window.localStorage.getItem('edulure:system-preferences:42'));
+    expect(stored.highContrast).toBe(true);
+    expect(stored.preferences.interfaceDensity).toBe('compact');
   });
 
   it('clears document attributes when the session ends', async () => {
@@ -100,5 +108,36 @@ describe('SystemPreferencesProvider', () => {
       expect(document.body.getAttribute('data-density')).toBeNull();
     });
     expect(fetchSystemPreferencesMock).not.toHaveBeenCalled();
+  });
+
+  it('rehydrates stored preferences before awaiting remote fetch', async () => {
+    window.localStorage.setItem(
+      'edulure:system-preferences:42',
+      JSON.stringify({
+        ...DEFAULT_SYSTEM_PREFERENCES,
+        highContrast: true,
+        reducedMotion: true,
+        preferences: { ...DEFAULT_SYSTEM_PREFERENCES.preferences, interfaceDensity: 'compact' }
+      })
+    );
+
+    fetchSystemPreferencesMock.mockImplementation(() => new Promise(() => {}));
+
+    const renderSpy = vi.fn();
+
+    render(
+      <SystemPreferencesProvider>
+        <TestConsumer onRender={renderSpy} />
+      </SystemPreferencesProvider>
+    );
+
+    await waitFor(() => {
+      expect(document.body.getAttribute('data-contrast')).toBe('high');
+      expect(document.body.getAttribute('data-density')).toBe('compact');
+    });
+
+    const latestContext = renderSpy.mock.calls.at(-1)?.[0];
+    expect(latestContext?.preferences?.highContrast).toBe(true);
+    expect(fetchSystemPreferencesMock).toHaveBeenCalled();
   });
 });
