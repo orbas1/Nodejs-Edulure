@@ -2,8 +2,11 @@ import PropTypes from 'prop-types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
+import ModerationQueue from '../../../components/moderation/ModerationQueue.jsx';
+import ModerationWorkspace from '../../../components/moderation/ModerationWorkspace.jsx';
 import { resolveCommunityIncident } from '../../../api/communityApi.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import useModerationCases from '../../../hooks/useModerationCases.js';
 import useRoleGuard from '../../../hooks/useRoleGuard.js';
 
 export default function CommunitySafety({ dashboard, onRefresh }) {
@@ -25,6 +28,37 @@ export default function CommunitySafety({ dashboard, onRefresh }) {
   const [incidents, setIncidents] = useState(initialIncidents);
   const [backlog, setBacklog] = useState(initialBacklog);
   const [error, setError] = useState(null);
+
+  const derivedCommunityId = useMemo(() => {
+    if (dashboard?.safety?.targetCommunityId) {
+      return dashboard.safety.targetCommunityId;
+    }
+    if (dashboard?.communityId) {
+      return dashboard.communityId;
+    }
+    if (dashboard?.safety?.communityId) {
+      return dashboard.safety.communityId;
+    }
+    if (incidents[0]?.communityId) {
+      return incidents[0].communityId;
+    }
+    if (backlog[0]?.communityId) {
+      return backlog[0].communityId;
+    }
+    return null;
+  }, [backlog, dashboard?.communityId, dashboard?.safety?.communityId, dashboard?.safety?.targetCommunityId, incidents]);
+
+  const {
+    cases: moderationCasesList,
+    loading: casesLoading,
+    selectedCaseId,
+    setSelectedCaseId,
+    selectedCase,
+    selectedCaseActions,
+    performAction,
+    undoLastAction,
+    lastAction
+  } = useModerationCases({ communityId: derivedCommunityId, pollIntervalMs: 90_000 });
 
   useEffect(() => {
     setIncidents(initialIncidents);
@@ -70,6 +104,91 @@ export default function CommunitySafety({ dashboard, onRefresh }) {
     [backlog, incidents, token]
   );
 
+  const caseIdSet = useMemo(
+    () => new Set(moderationCasesList.map((item) => item.publicId)),
+    [moderationCasesList]
+  );
+
+  const queueItems = useMemo(
+    () =>
+      moderationCasesList.map((item) => ({
+        id: item.publicId,
+        subject: item.post?.title ?? `Post ${item.post?.id ?? item.publicId}`,
+        summary: item.reason ?? item.metadata?.summary ?? 'Awaiting triage summary.',
+        reporter: item.reporter ?? null,
+        severity: item.severity,
+        status: item.status?.toUpperCase(),
+        updatedAt: item.updatedAt ? new Date(item.updatedAt).toLocaleString() : null,
+        createdAt: item.createdAt ? new Date(item.createdAt).toLocaleString() : null,
+        tags: [
+          item.flaggedSource,
+          ...(Array.isArray(item.metadata?.flags)
+            ? item.metadata.flags
+                .map((flag) => flag.reason ?? flag.flaggedSource ?? null)
+                .filter(Boolean)
+            : [])
+        ].filter(Boolean),
+        quickActions: [
+          { id: 'approve', label: 'Approve', variant: 'primary' },
+          { id: 'reject', label: 'Reject', variant: 'default' },
+          { id: 'suppress', label: 'Suppress', variant: 'default' }
+        ]
+      })),
+    [moderationCasesList]
+  );
+
+  const fallbackQueue = useMemo(() => {
+    if (!incidents?.length) {
+      return [];
+    }
+    return incidents.map((incident) => ({
+      id: incident.id,
+      subject: incident.summary,
+      summary: incident.communityName,
+      reporter: { name: incident.owner },
+      severity: incident.severity,
+      status: 'ESCALATION',
+      updatedAt: incident.openedAt ? new Date(incident.openedAt).toLocaleString() : '—',
+      tags: ['incident'],
+      quickActions: [{ id: 'resolve', label: 'Resolve', variant: 'default' }],
+      rawIncident: incident
+    }));
+  }, [incidents]);
+
+  const displayQueue = queueItems.length > 0 ? queueItems : fallbackQueue;
+
+  const handleQueueSelect = useCallback(
+    (item) => {
+      if (!item?.id) {
+        return;
+      }
+      if (caseIdSet.has(item.id)) {
+        setSelectedCaseId(item.id);
+      }
+    },
+    [caseIdSet, setSelectedCaseId]
+  );
+
+  const handleQuickAction = useCallback(
+    (actionId, item) => {
+      if (actionId === 'resolve' && item?.rawIncident) {
+        handleResolve(item.rawIncident);
+        return;
+      }
+      if (!item?.id || !caseIdSet.has(item.id)) {
+        return;
+      }
+      const actionMap = {
+        approve: 'approve',
+        reject: 'reject',
+        suppress: 'suppress'
+      };
+      const action = actionMap[actionId] ?? actionId;
+      performAction({ caseId: item.id, action });
+    },
+    [caseIdSet, performAction]
+  );
+
   if (!allowed) {
     return (
       <DashboardStateMessage
@@ -105,42 +224,25 @@ export default function CommunitySafety({ dashboard, onRefresh }) {
         </button>
       </header>
 
-      <section className="dashboard-section space-y-4">
-        <div>
-          <p className="dashboard-kicker">Active incidents</p>
-          <h2 className="text-lg font-semibold text-slate-900">Escalations requiring attention</h2>
-        </div>
-        <ul className="space-y-4">
-          {incidents.map((incident) => (
-            <li key={incident.id} className="rounded-2xl border border-rose-200 bg-rose-50/60 p-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-base font-semibold text-rose-900">{incident.summary}</p>
-                  <p className="mt-1 text-xs uppercase tracking-wide text-rose-600">{incident.communityName}</p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-rose-600">
-                  <span className="dashboard-pill border-rose-200 px-3 py-1">Severity: {incident.severity}</span>
-                  <span className="dashboard-pill border-rose-200 px-3 py-1">Owner: {incident.owner}</span>
-                  <button
-                    type="button"
-                    className="dashboard-pill border-rose-300 px-3 py-1 text-rose-700"
-                    onClick={() => handleResolve(incident)}
-                  >
-                    Resolve
-                  </button>
-                </div>
-              </div>
-              <p className="mt-2 text-xs text-rose-600">Opened {incident.openedAt ? new Date(incident.openedAt).toLocaleString() : 'Recently'}</p>
-            </li>
-          ))}
-        </ul>
-        {incidents.length === 0 ? (
-          <DashboardStateMessage
-            title="No incidents logged"
-            description="Once members flag conversations or moderators escalate issues, we will surface them here."
-          />
-        ) : null}
-      </section>
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+        <ModerationQueue
+          title="Moderation queue"
+          items={displayQueue}
+          selectedId={selectedCaseId}
+          onSelect={handleQueueSelect}
+          onQuickAction={handleQuickAction}
+          loading={casesLoading}
+          emptyState="No moderation cases waiting for review."
+        />
+        <ModerationWorkspace
+          caseData={selectedCase}
+          actions={selectedCaseActions}
+          onPerformAction={performAction}
+          onUndo={undoLastAction}
+          undoDisabled={!lastAction}
+          lastAction={lastAction}
+        />
+      </div>
 
       <section className="dashboard-section space-y-4">
         <div>

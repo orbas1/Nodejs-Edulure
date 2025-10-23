@@ -47,7 +47,10 @@ const caseActionSchema = Joi.object({
   riskScore: Joi.number().integer().min(0).max(100).optional(),
   assignedTo: Joi.number().integer().min(1).optional(),
   archivePost: Joi.boolean().optional(),
-  restoreStatus: Joi.string().valid('draft', 'scheduled', 'published', 'archived').optional()
+  restoreStatus: Joi.string().valid('draft', 'scheduled', 'published', 'archived').optional(),
+  followUpAt: Joi.date().iso().optional(),
+  followUpReason: Joi.string().max(255).allow('', null),
+  acknowledgeSuggestion: Joi.string().max(120).optional()
 });
 
 const scamReportSchema = Joi.object({
