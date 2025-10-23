@@ -208,7 +208,7 @@ export default class CommunityController {
         data: result.items,
         pagination: result.pagination,
         message: 'Community feed fetched',
-        meta: { ads: result.ads }
+        meta: { ads: result.ads, prefetch: result.prefetch ?? {} }
       });
     } catch (error) {
       if (error.isJoi) {
@@ -229,7 +229,7 @@ export default class CommunityController {
         data: result.items,
         pagination: result.pagination,
         message: 'Personalised feed fetched',
-        meta: { ads: result.ads }
+        meta: { ads: result.ads, prefetch: result.prefetch ?? {} }
       });
     } catch (error) {
       if (error.isJoi) {

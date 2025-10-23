@@ -108,10 +108,27 @@ export async function fetchFeedPlacements({ token, context = 'global_feed', limi
   return normaliseResponse(response);
 }
 
+export async function toggleFeedReaction({ token, postId, reaction, metadata }) {
+  if (!token) {
+    throw new Error('Authentication token is required to toggle feed reactions');
+  }
+  if (!postId) {
+    throw new Error('A post identifier is required to toggle reactions');
+  }
+
+  const response = await httpClient.post(`/feed/${postId}/reactions`, {
+    token,
+    data: { reaction, metadata }
+  });
+
+  return normaliseResponse(response);
+}
+
 export const feedApi = {
   fetchLiveFeed,
   fetchFeedAnalytics,
-  fetchFeedPlacements
+  fetchFeedPlacements,
+  toggleFeedReaction
 };
 
 export default feedApi;

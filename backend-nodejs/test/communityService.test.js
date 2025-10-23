@@ -33,7 +33,15 @@ const communityPostModelMock = vi.hoisted(() => ({
   paginateForUser: vi.fn(),
   findById: vi.fn(),
   updateModerationState: vi.fn(),
-  archive: vi.fn()
+  archive: vi.fn(),
+  updateReactionSummary: vi.fn(),
+  listPinnedMedia: vi.fn()
+}));
+
+const communityPostReactionModelMock = vi.hoisted(() => ({
+  toggle: vi.fn(),
+  summarise: vi.fn(),
+  listForPosts: vi.fn()
 }));
 
 const communityResourceModelMock = vi.hoisted(() => ({
@@ -109,6 +117,9 @@ vi.mock('../src/models/CommunityChannelModel.js', () => ({
 vi.mock('../src/models/CommunityPostModel.js', () => ({
   default: communityPostModelMock
 }));
+vi.mock('../src/models/CommunityPostReactionModel.js', () => ({
+  default: communityPostReactionModelMock
+}));
 vi.mock('../src/models/CommunityResourceModel.js', () => ({
   default: communityResourceModelMock
 }));
@@ -166,6 +177,7 @@ const resetMocks = () => {
     communityMemberModelMock,
     communityChannelModelMock,
     communityPostModelMock,
+    communityPostReactionModelMock,
     communityResourceModelMock,
     communityMemberPointModelMock,
     communityWebinarModelMock,
@@ -197,6 +209,11 @@ describe('CommunityService', () => {
     communityPaywallTierModelMock.listByCommunity.mockResolvedValue([]);
     communitySubscriptionModelMock.listByCommunity.mockResolvedValue([]);
     communityRoleDefinitionModelMock.listByCommunity.mockResolvedValue([]);
+    communityPostModelMock.listPinnedMedia.mockResolvedValue([]);
+    communityPostModelMock.updateReactionSummary.mockResolvedValue(null);
+    communityPostReactionModelMock.toggle.mockResolvedValue({ active: true, reaction: 'appreciate' });
+    communityPostReactionModelMock.summarise.mockResolvedValue({});
+    communityPostReactionModelMock.listForPosts.mockResolvedValue(new Map());
   });
 
   it('serialises community summaries with stats and metadata', async () => {
@@ -542,6 +559,72 @@ describe('CommunityService', () => {
       expect.any(Object)
     );
     expect(response).toEqual(expect.objectContaining({ id: 222, status: 'archived' }));
+  });
+
+  it('toggles post reactions and returns updated viewer state', async () => {
+    const postDomain = {
+      id: 501,
+      communityId: baseCommunity.id,
+      communityName: baseCommunity.name,
+      communitySlug: baseCommunity.slug,
+      authorId: 11,
+      authorRole: 'moderator',
+      postType: 'update',
+      title: 'Ops update',
+      body: 'Status update',
+      tags: ['ops'],
+      status: 'published',
+      visibility: 'members',
+      reactionSummary: { appreciate: 2, total: 2 },
+      metadata: {},
+      moderationMetadata: {},
+      previewMetadata: {},
+      commentCount: 3,
+      moderationState: 'clean',
+      createdAt: new Date().toISOString()
+    };
+
+    communityPostModelMock.findById.mockResolvedValue(postDomain);
+    communityMemberModelMock.findMembership.mockResolvedValue({ role: 'member', status: 'active' });
+    communityPostReactionModelMock.toggle.mockResolvedValue({ active: true, reaction: 'appreciate' });
+    communityPostReactionModelMock.summarise.mockResolvedValue({ appreciate: 3 });
+    communityPostReactionModelMock.listForPosts.mockResolvedValue(
+      new Map([[postDomain.id, new Set(['appreciate'])]])
+    );
+    const updatedPost = { ...postDomain, reactionSummary: { appreciate: 3, total: 3 } };
+    communityPostModelMock.updateReactionSummary.mockResolvedValue(updatedPost);
+
+    const result = await CommunityService.togglePostReaction(postDomain.id, 7, 'appreciate', { actorRole: 'member' });
+
+    expect(communityPostModelMock.findById).toHaveBeenCalledWith(postDomain.id, expect.any(Object));
+    expect(communityPostReactionModelMock.toggle).toHaveBeenCalledWith(
+      { postId: postDomain.id, userId: 7, reaction: 'appreciate', metadata: undefined },
+      expect.any(Object)
+    );
+    expect(communityPostModelMock.updateReactionSummary).toHaveBeenCalledWith(
+      postDomain.id,
+      { appreciate: 3 },
+      expect.any(Object)
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        reaction: 'appreciate',
+        active: true,
+        post: expect.objectContaining({
+          id: postDomain.id,
+          stats: expect.objectContaining({ reactions: 3 }),
+          viewer: expect.objectContaining({ hasReacted: true, reactions: expect.arrayContaining(['appreciate']) })
+        })
+      })
+    );
+    expect(domainEventModelMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: 'community_post',
+        entityId: postDomain.id,
+        eventType: 'community.post.reaction.added'
+      }),
+      expect.any(Object)
+    );
   });
 
   it('updates a community resource and records events', async () => {

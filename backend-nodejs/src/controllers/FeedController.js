@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
 import LiveFeedService from '../services/LiveFeedService.js';
+import CommunityService from '../services/CommunityService.js';
 import { success } from '../utils/httpResponse.js';
 
 const contextEnum = ['global', 'community'];
@@ -41,6 +42,14 @@ const analyticsQuerySchema = Joi.object({
     .default('30d'),
   search: Joi.string().max(200).allow('', null),
   postType: Joi.string().max(64).allow('', null)
+});
+
+const reactionPayloadSchema = Joi.object({
+  reaction: Joi.string().trim().min(1).max(32).required(),
+  metadata: Joi.object({
+    context: Joi.string().valid('global', 'community').optional(),
+    communityId: Joi.number().integer().min(1).optional()
+  }).optional()
 });
 
 function buildActor(req) {
@@ -145,6 +154,47 @@ export default class FeedController {
       return success(res, {
         data: placements,
         message: 'Eligible placements generated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async toggleReaction(req, res, next) {
+    try {
+      const { postId } = req.params ?? {};
+      const numericPostId = Number(postId);
+      if (!Number.isFinite(numericPostId)) {
+        const error = new Error('Valid post identifier is required');
+        error.status = 422;
+        throw error;
+      }
+
+      const payload = await reactionPayloadSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const actor = buildActor(req);
+      const metadata = {
+        source: 'feed',
+        ip: req.ip,
+        userAgent: req.get('user-agent') ?? undefined,
+        ...payload.metadata,
+        postId: numericPostId
+      };
+      const result = await CommunityService.togglePostReaction(numericPostId, actor.id, payload.reaction, {
+        actorRole: actor.role,
+        metadata
+      });
+
+      return success(res, {
+        data: result,
+        message: result.active ? 'Reaction recorded' : 'Reaction removed'
       });
     } catch (error) {
       if (error.isJoi) {
