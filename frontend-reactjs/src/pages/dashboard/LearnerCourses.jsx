@@ -1,12 +1,154 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PlayCircleIcon, QueueListIcon } from '@heroicons/react/24/outline';
 
+import CourseCard from '../../components/courses/CourseCard.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import usePersistentCollection from '../../hooks/usePersistentCollection.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useMountedRef from '../../hooks/useMountedRef.js';
+import {
+  normalizeCourseDownloads,
+  normalizeCoursePreview,
+  normalizeCourseProgress,
+  normalizeCourseRating,
+  normalizeCourseTags,
+  normalizeUpsellBadges,
+  parseCourseMetadata
+} from '../../utils/courseResources.js';
+
+function formatCoursePrice(value, currency = 'USD') {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'object' && value !== null) {
+    const amount = Number(value.amount ?? value.value);
+    const code = value.currency ?? currency;
+    if (Number.isFinite(amount)) {
+      try {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(amount);
+      } catch (_error) {
+        return `${code} ${amount}`;
+      }
+    }
+    return null;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(numeric);
+  } catch (_error) {
+    return `${currency} ${numeric}`;
+  }
+}
+
+function normalizeActiveCourseCard(course, index = 0) {
+  const metadata = parseCourseMetadata(course?.metadata);
+  const preview = normalizeCoursePreview(metadata, {
+    previewUrl: course?.previewUrl ?? course?.promoVideoUrl ?? course?.trailerUrl ?? null,
+    previewThumbnailUrl: course?.previewThumbnailUrl ?? course?.thumbnailUrl ?? null,
+    nextLesson: course?.nextLesson ?? metadata.nextLesson ?? null,
+    previewDuration: course?.previewDuration,
+    previewAction: course?.previewAction
+  });
+  const downloads = normalizeCourseDownloads(metadata, {
+    downloads: course?.downloads ?? course?.resources ?? metadata.downloads,
+    attachments: course?.attachments,
+    syllabusUrl: course?.syllabusUrl ?? metadata.syllabusUrl
+  });
+  const upsellBadges = normalizeUpsellBadges(metadata, course ?? {});
+  const tags = normalizeCourseTags(metadata, course ?? {});
+  const { rating, ratingCount } = normalizeCourseRating(course ?? {}, metadata);
+  const progress = normalizeCourseProgress(course ?? {}, metadata);
+  const price = formatCoursePrice(course?.price ?? metadata.price, metadata.priceCurrency ?? course?.priceCurrency ?? 'USD');
+
+  return {
+    id: course?.id ?? course?.slug ?? course?.publicId ?? `active-course-${index}`,
+    title: course?.title ?? metadata.title ?? 'Course',
+    subtitle: course?.instructor ? `With ${course.instructor}` : metadata.subtitle ?? course?.category ?? null,
+    description: course?.summary ?? metadata.description ?? '',
+    status: course?.status ?? metadata.status ?? 'Active',
+    level: course?.level ?? metadata.level ?? null,
+    deliveryFormat: course?.deliveryFormat ?? metadata.deliveryFormat ?? null,
+    price,
+    priceCurrency: metadata.priceCurrency ?? course?.priceCurrency ?? 'USD',
+    progress,
+    nextLesson: course?.nextLesson ?? metadata.nextLesson ?? preview.title ?? null,
+    goalStatus: course?.goalStatus ?? metadata.goalStatus ?? null,
+    goalReference: course?.goalReference ?? metadata.goalReference ?? null,
+    rating: rating ?? course?.rating ?? null,
+    ratingCount: ratingCount ?? course?.ratingCount ?? null,
+    thumbnailUrl: course?.thumbnailUrl ?? metadata.thumbnailUrl ?? preview.thumbnailUrl ?? null,
+    previewThumbnailUrl: preview.thumbnailUrl,
+    previewTitle: preview.title,
+    previewUrl: preview.url,
+    previewDuration: preview.duration,
+    previewAction: preview.action,
+    downloads,
+    upsellBadges,
+    tags,
+    skills: Array.isArray(course?.skills) ? course.skills : metadata.skills ?? [],
+    slug: course?.slug ?? metadata.slug ?? null,
+    raw: course ?? {}
+  };
+}
+
+function normalizeRecommendationCourse(course, index = 0) {
+  const metadata = parseCourseMetadata(course?.metadata);
+  const preview = normalizeCoursePreview(metadata, {
+    previewUrl: course?.previewUrl ?? course?.promoVideoUrl ?? course?.trailerUrl ?? null,
+    previewThumbnailUrl: course?.previewThumbnailUrl ?? course?.thumbnailUrl ?? null,
+    nextLesson: metadata.nextLesson ?? course?.nextSession ?? null,
+    previewDuration: course?.previewDuration,
+    previewAction: course?.previewAction
+  });
+  const downloads = normalizeCourseDownloads(metadata, {
+    downloads: course?.downloads ?? metadata.downloads,
+    attachments: course?.attachments ?? metadata.attachments,
+    syllabusUrl: course?.syllabusUrl ?? metadata.syllabusUrl
+  });
+  const upsellBadges = normalizeUpsellBadges(metadata, course ?? {});
+  const tags = normalizeCourseTags(metadata, course ?? {});
+  const { rating, ratingCount } = normalizeCourseRating(course ?? {}, metadata);
+  const price = formatCoursePrice(
+    course?.price ?? course?.priceAmount ?? metadata.price,
+    metadata.priceCurrency ?? course?.priceCurrency ?? 'USD'
+  );
+
+  return {
+    id: course?.id ?? course?.slug ?? course?.publicId ?? `recommendation-${index}`,
+    title: course?.title ?? metadata.title ?? 'Recommended course',
+    subtitle: course?.subtitle ?? metadata.subtitle ?? course?.category ?? null,
+    description: course?.summary ?? metadata.description ?? '',
+    status: course?.status ?? metadata.status ?? 'Recommended',
+    level: course?.level ?? metadata.level ?? null,
+    deliveryFormat: course?.deliveryFormat ?? metadata.deliveryFormat ?? null,
+    price,
+    priceCurrency: metadata.priceCurrency ?? course?.priceCurrency ?? 'USD',
+    rating: course?.rating ?? rating ?? null,
+    ratingCount: course?.ratingCount ?? ratingCount ?? null,
+    thumbnailUrl: course?.thumbnailUrl ?? metadata.thumbnailUrl ?? preview.thumbnailUrl ?? null,
+    previewThumbnailUrl: preview.thumbnailUrl,
+    previewTitle: preview.title,
+    previewUrl: preview.url,
+    previewDuration: preview.duration,
+    previewAction: preview.action,
+    downloads,
+    upsellBadges,
+    tags,
+    skills: Array.isArray(course?.skills) ? course.skills : metadata.skills ?? [],
+    nextLesson: course?.nextSession ?? metadata.nextLesson ?? null,
+    slug: course?.slug ?? metadata.slug ?? null,
+    raw: course ?? {}
+  };
+}
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -52,6 +194,15 @@ export default function LearnerCourses() {
     setActiveCourses(Array.isArray(data?.active) ? data.active : []);
     setRecommendations(Array.isArray(data?.recommendations) ? data.recommendations : []);
   }, [data]);
+
+  const normalizedActiveCourses = useMemo(
+    () => activeCourses.map((course, index) => normalizeActiveCourseCard(course, index)),
+    [activeCourses]
+  );
+  const normalizedRecommendations = useMemo(
+    () => recommendations.map((course, index) => normalizeRecommendationCourse(course, index)),
+    [recommendations]
+  );
 
   useEffect(() => {
     if (!Array.isArray(data?.orders) || data.orders.length === 0) {
@@ -201,53 +352,60 @@ export default function LearnerCourses() {
     resetOrderForm();
   }, [resetOrders, resetOrderForm]);
 
-  const handleCreateGoal = useCallback(async () => {
-    if (!token) {
-      setStatusMessage({ type: 'error', message: 'Sign in again to create a new learning goal.' });
-      return;
-    }
+  const handleCreateGoal = useCallback(
+    async (targetCourse) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to create a new learning goal.' });
+        return;
+      }
 
-    const [primaryCourse] = activeCourses;
-    if (!primaryCourse) {
-      setStatusMessage({ type: 'error', message: 'Enroll in a course to create a learning goal.' });
-      return;
-    }
+      const [fallbackCourse] = activeCourses;
+      const courseTarget = targetCourse ?? fallbackCourse;
+      if (!courseTarget) {
+        setStatusMessage({ type: 'error', message: 'Enroll in a course to create a learning goal.' });
+        return;
+      }
 
-    setPendingAction('goal');
-    setStatusMessage({ type: 'pending', message: 'Creating learning goal…' });
-    try {
-      const response = await createCourseGoal({
-        token,
-        courseId: primaryCourse.id ?? primaryCourse.slug ?? 'course',
-        payload: { target: 'Complete next module', dueDate: new Date().toISOString() }
+      setPendingAction('goal');
+      setStatusMessage({
+        type: 'pending',
+        message: `Creating learning goal for ${courseTarget.title ?? 'your course'}…`
       });
-      if (mounted.current) {
-        setStatusMessage({
-          type: 'success',
-          message: response?.message ?? 'Learning goal created.'
+      try {
+        const response = await createCourseGoal({
+          token,
+          courseId: courseTarget.id ?? courseTarget.slug ?? 'course',
+          payload: { target: 'Complete next module', dueDate: new Date().toISOString() }
         });
-        setActiveCourses((current) =>
-          current.map((course) =>
-            course.id === primaryCourse.id
-              ? { ...course, goalStatus: 'In progress', goalReference: response?.data?.reference }
-              : course
-          )
-        );
+        if (mounted.current) {
+          setStatusMessage({
+            type: 'success',
+            message: response?.message ?? 'Learning goal created.'
+          });
+          setActiveCourses((current) =>
+            current.map((course) =>
+              course.id === courseTarget.id
+                ? { ...course, goalStatus: 'In progress', goalReference: response?.data?.reference }
+                : course
+            )
+          );
+        }
+      } catch (goalError) {
+        if (mounted.current) {
+          setStatusMessage({
+            type: 'error',
+            message:
+              goalError instanceof Error ? goalError.message : 'We were unable to create your learning goal.'
+          });
+        }
+      } finally {
+        if (mounted.current) {
+          setPendingAction(null);
+        }
       }
-    } catch (goalError) {
-      if (mounted.current) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            goalError instanceof Error ? goalError.message : 'We were unable to create your learning goal.'
-        });
-      }
-    } finally {
-      if (mounted.current) {
-        setPendingAction(null);
-      }
-    }
-  }, [activeCourses, mounted, setActiveCourses, token]);
+    },
+    [activeCourses, mounted, setActiveCourses, token]
+  );
 
   const handleSyncCalendar = useCallback(async () => {
     if (!token) {
@@ -281,6 +439,71 @@ export default function LearnerCourses() {
     }
   }, [mounted, token]);
 
+  const handleResumeCourseCard = useCallback(
+    (course) => {
+      const target = course?.raw ?? course;
+      const courseId = target?.id ?? target?.slug ?? target?.publicId;
+      if (!courseId) {
+        return;
+      }
+      navigate(String(courseId));
+    },
+    [navigate]
+  );
+
+  const handlePreviewCourseCard = useCallback(
+    (course) => {
+      if (course?.previewAction) {
+        course.previewAction(course.raw ?? course);
+        return;
+      }
+      if (course?.previewUrl) {
+        window.open(course.previewUrl, '_blank', 'noopener,noreferrer');
+        setStatusMessage({
+          type: 'success',
+          message: `Opening preview for ${course.title ?? 'course'} in a new tab.`
+        });
+        return;
+      }
+      setStatusMessage({
+        type: 'pending',
+        message: 'Preview not available yet. We will notify you once it is ready.'
+      });
+    },
+    [setStatusMessage]
+  );
+
+  const handleGoalAction = useCallback(
+    (course) => {
+      if (course.goalReference) {
+        setStatusMessage({
+          type: 'success',
+          message: `Goal ${course.goalReference} is already tracking. Keep going!`
+        });
+        return;
+      }
+      if (course.goalStatus) {
+        setStatusMessage({
+          type: 'pending',
+          message: `Current goal status: ${course.goalStatus}. Update it from the course workspace to keep momentum.`
+        });
+        return;
+      }
+      handleCreateGoal(course.raw ?? course);
+    },
+    [handleCreateGoal, setStatusMessage]
+  );
+
+  const handleAddRecommendation = useCallback(
+    (course) => {
+      setStatusMessage({
+        type: 'success',
+        message: `${course.title ?? 'Course'} has been added to your queue. We will remind you when enrolment opens.`
+      });
+    },
+    [setStatusMessage]
+  );
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -313,39 +536,42 @@ export default function LearnerCourses() {
       <section className="dashboard-section">
         <h2 className="text-lg font-semibold text-slate-900">Active programs</h2>
         <div className="mt-5 space-y-4">
-          {activeCourses.map((course) => (
-            <button
+          {normalizedActiveCourses.map((course) => (
+            <CourseCard
               key={course.id}
-              type="button"
-              onClick={() => navigate(`${course.id}`)}
-              className="w-full text-left"
-            >
-              <div className="dashboard-card-muted p-5 transition hover:border-primary/40 hover:bg-primary/5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="dashboard-kicker">{course.status}</p>
-                    <p className="mt-1 text-lg font-semibold text-slate-900">{course.title}</p>
-                    <p className="text-xs text-slate-600">With {course.instructor}</p>
-                    {course.goalStatus ? (
-                      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                        Goal · {course.goalStatus}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="text-right text-sm text-slate-600">
-                    <p>{course.progress}% complete</p>
-                    <p className="text-xs text-slate-500">Next: {course.nextLesson}</p>
-                  </div>
-                </div>
-                <div className="mt-4 h-2 rounded-full bg-slate-200">
-                  <div
-                    className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
-                    style={{ width: `${course.progress}%` }}
-                  />
-                </div>
-              </div>
-            </button>
+              course={course}
+              variant="dashboard"
+              onSelect={() => handleResumeCourseCard(course)}
+              primaryAction={{
+                label: 'Resume course',
+                icon: PlayCircleIcon,
+                onClick: () => handleResumeCourseCard(course)
+              }}
+              secondaryActions={[
+                course.previewUrl || course.previewAction
+                  ? {
+                      label: 'Preview next lesson',
+                      icon: PlayCircleIcon,
+                      onClick: () => handlePreviewCourseCard(course)
+                    }
+                  : null,
+                course.goalStatus || course.goalReference
+                  ? {
+                      label: course.goalStatus ? `Goal · ${course.goalStatus}` : 'View goal',
+                      onClick: () => handleGoalAction(course)
+                    }
+                  : {
+                      label: 'Create goal',
+                      onClick: () => handleGoalAction(course)
+                    }
+              ].filter(Boolean)}
+            />
           ))}
+          {normalizedActiveCourses.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              You do not have any active programs yet. Explore the recommendations below to begin your next journey.
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -360,21 +586,36 @@ export default function LearnerCourses() {
           </button>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {recommendations.map((rec) => (
-            <div key={rec.id} className="dashboard-card-muted p-5">
-              <p className="dashboard-kicker">Rating {rec.rating}</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{rec.title}</p>
-              <p className="mt-2 text-sm text-slate-600">{rec.summary}</p>
-              <div className="mt-5 flex items-center gap-3 text-xs text-slate-600">
-                <button type="button" className="dashboard-pill px-3 py-1">
-                  Preview syllabus
-                </button>
-                <button type="button" className="dashboard-pill px-3 py-1">
-                  Add to queue
-                </button>
-              </div>
-            </div>
+          {normalizedRecommendations.map((course) => (
+            <CourseCard
+              key={course.id}
+              course={course}
+              variant="recommendation"
+              onSelect={() => handlePreviewCourseCard(course)}
+              primaryAction={{
+                label: 'Add to queue',
+                icon: QueueListIcon,
+                onClick: () => handleAddRecommendation(course)
+              }}
+              secondaryActions={[
+                course.previewUrl || course.previewAction
+                  ? {
+                      label: 'Preview syllabus',
+                      icon: PlayCircleIcon,
+                      onClick: () => handlePreviewCourseCard(course)
+                    }
+                  : null,
+                course.slug
+                  ? { label: 'View details', href: `/courses/${course.slug}` }
+                  : null
+              ].filter(Boolean)}
+            />
           ))}
+          {normalizedRecommendations.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No personalised recommendations yet. Engage with communities and tutoring to unlock new suggestions.
+            </p>
+          ) : null}
         </div>
       </section>
 

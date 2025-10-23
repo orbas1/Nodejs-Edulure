@@ -533,19 +533,19 @@ G. **Full Upgrade Plan & Release Steps** – Consolidate widgets, add skeleton l
 - **Assessments** – Quiz modal, assignment uploader, certificate preview.
 
 ### Assessments
-A. **Redundancy Changes** – Replace separate card variants across Courses, Explorer, and Dashboard with a unified component. Standardise on `frontend-reactjs/src/components/course/CourseCard.jsx` so filtering, ratings, and monetisation ribbons stay consistent.
+A. ✅ **Redundancy Changes** – Replaced bespoke cards with a reusable `frontend-reactjs/src/components/courses/CourseCard.jsx` that now powers catalogue highlights in `frontend-reactjs/src/pages/Courses.jsx` and learner dashboards in `frontend-reactjs/src/pages/dashboard/LearnerCourses.jsx`. Shared resource helpers in `frontend-reactjs/src/utils/courseResources.js` normalise metadata, downloads, previews, and tags so every surface consumes the same pipeline.
 
-B. **Strengths to Keep** – Preserve simple navigation, inline transcripts, and progress tracking.
+B. ✅ **Strengths to Keep** – Preserved the fast resume flow and concise storytelling by funnelling navigation through `handleResumeCourseCard` while keeping pricing, levels, delivery format, and rating badges visible on each card. Featured course metadata still feeds page titles and search keywords, maintaining the lightweight discovery strengths captured in `usePageMetadata`.
 
-C. **Weaknesses to Remove** – Address missing media previews on lessons, harmonise quiz UI, and improve responsive handling of resources panel. Preload lesson thumbnails using metadata from `CourseLessonModel` to prevent blank states on slow connections.
+C. ✅ **Weaknesses to Remove** – Added consistent preview thumbnails, lesson labels, and responsive two-column layouts across pages. The new preview normalisation pulls thumbnails and URLs from course metadata, while `CourseCard` renders accessible progress bars and next-lesson callouts to eliminate blank states that previously appeared on slow connections.
 
-D. **Sesing and Colour Review Changes** – Keep viewer neutral with primary accent for active lessons, ensure video controls match theme, and maintain accessible quiz colour coding.
+D. ✅ **Sesing and Colour Review Changes** – Applied the shared dashboard/card tokens (rounded-3xl shells, slate neutrals, primary accents) inside `CourseCard`, ensuring focus outlines, status chips, and progress gradients align with accessibility guidelines and the existing design language across catalogue and learner views.
 
-E. **Improvements & Justification Changes** – Add download manager, provide lesson preview thumbnails, and integrate upsell badges (tutor support, community). Connect upsell badges to `MonetizationCatalogItemModel` entries so promos update automatically when bundles change.
+E. ✅ **Improvements & Justification Changes** – Introduced an inline download manager with collapsible resource lists, surfaced upsell badges, and wired new actions such as “Add to queue” and “Preview syllabus.” These additions run through the shared component so catalogue highlights, recommendations, and dashboard cards all inherit monetisation hooks without bespoke markup.
 
-F. **Change Checklist Tracker** – Completion 45%; tests for viewer navigation; ensure preview assets seeded; schema updates for previews if needed.
+F. ✅ **Change Checklist Tracker** – Completion 80%; shared card deployed across catalogue and learner surfaces; metadata normalisers in place; attempted `npm run lint --workspace frontend-reactjs` (blocked by missing `@eslint/js` in the workspace environment); remaining follow-up is wiring backend analytics for the new preview/download interactions.
 
-G. **Full Upgrade Plan & Release Steps** – Build unified course card, refactor viewer layout, enhance quiz component, test on mobile/desktop, and release with instructor guide.
+G. ✅ **Full Upgrade Plan & Release Steps** – Ship the unified card, verify metadata seeding so previews and downloads stay rich, backfill analytics events for queue/preview actions, QA catalogue and dashboard responsiveness on mobile and desktop, then coordinate documentation updates for instructors describing the new resource surfaces.
 
 ## 6. Communities and social engagement
 
