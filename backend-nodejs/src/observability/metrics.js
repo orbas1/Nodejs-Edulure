@@ -225,20 +225,20 @@ const governanceCommunicationStatusGauge = new promClient.Gauge({
 
 const searchOperationDurationSeconds = new promClient.Histogram({
   name: 'edulure_search_operation_duration_seconds',
-  help: 'Duration histogram for Meilisearch administrative operations',
+  help: 'Duration histogram for Edulure Search operations',
   labelNames: ['operation', 'status'],
   buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5]
 });
 
 const searchNodeHealthGauge = new promClient.Gauge({
   name: 'edulure_search_node_health',
-  help: 'Health state of Meilisearch nodes (1 healthy, 0 unhealthy)',
+  help: 'Health state of the search store connection (1 healthy, 0 unhealthy)',
   labelNames: ['host', 'role']
 });
 
 const searchNodeLastCheckGauge = new promClient.Gauge({
   name: 'edulure_search_node_last_check_timestamp',
-  help: 'Unix timestamp of the last successful Meilisearch healthcheck per node',
+  help: 'Unix timestamp of the last successful search store healthcheck',
   labelNames: ['host', 'role']
 });
 

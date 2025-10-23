@@ -17,19 +17,19 @@ async function run() {
 
     if (!values['skip-health']) {
       await searchClusterService.checkClusterHealth();
-      logger.info('Meilisearch explorer indexes verified and healthy');
+      logger.info('Edulure search documents verified and healthy');
     } else {
-      logger.warn('Skipping Meilisearch health checks as requested');
+      logger.warn('Skipping search health checks as requested');
     }
 
     if (values.snapshot) {
-      const task = await searchClusterService.createSnapshot();
-      logger.info({ taskUid: task?.taskUid }, 'Meilisearch snapshot request completed');
+      const snapshot = await searchClusterService.createSnapshot();
+      logger.info({ documents: snapshot?.documents ?? 0 }, 'Search snapshot state captured');
     }
 
-    logger.info('Search cluster provisioning completed successfully');
+    logger.info('Search service provisioning completed successfully');
   } catch (error) {
-    logger.error({ err: error }, 'Failed to provision Meilisearch cluster');
+    logger.error({ err: error }, 'Failed to provision Edulure search service');
     process.exitCode = 1;
   } finally {
     searchClusterService.stop();

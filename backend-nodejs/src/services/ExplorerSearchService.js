@@ -1,81 +1,9 @@
 import logger from '../config/logger.js';
 import { recordSearchOperation } from '../observability/metrics.js';
-import { INDEX_DEFINITIONS, searchClusterService } from './SearchClusterService.js';
+import { searchClusterService } from './SearchClusterService.js';
 import { buildBounds, resolveCountryCoordinates } from '../utils/geo.js';
 import AdsPlacementService from './AdsPlacementService.js';
-
-const ENTITY_CONFIG = {
-  communities: {
-    facets: ['visibility', 'category', 'timezone', 'country', 'languages', 'tags'],
-    sorts: {
-      trending: ['desc(trendScore)'],
-      members: ['desc(memberCount)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'trending'
-  },
-  courses: {
-    facets: ['category', 'level', 'deliveryFormat', 'languages', 'price.currency', 'tags'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      newest: ['desc(releaseAt)'],
-      priceLow: ['asc(price.amount)'],
-      priceHigh: ['desc(price.amount)']
-    },
-    defaultSort: 'relevance'
-  },
-  ebooks: {
-    facets: ['categories', 'languages', 'price.currency', 'tags'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      newest: ['desc(releaseAt)'],
-      readingTime: ['asc(readingTimeMinutes)']
-    },
-    defaultSort: 'relevance'
-  },
-  tutors: {
-    facets: ['languages', 'skills', 'country', 'isVerified'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      priceLow: ['asc(hourlyRate.amount)'],
-      priceHigh: ['desc(hourlyRate.amount)'],
-      responseTime: ['asc(responseTimeMinutes)']
-    },
-    defaultSort: 'relevance'
-  },
-  profiles: {
-    facets: ['role', 'languages', 'country', 'communities', 'badges'],
-    sorts: {
-      relevance: [],
-      followers: ['desc(followerCount)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'relevance'
-  },
-  ads: {
-    facets: ['status', 'objective', 'targeting.audiences', 'targeting.locations'],
-    sorts: {
-      performance: ['desc(performanceScore)', 'desc(ctr)'],
-      spend: ['desc(spend.total)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'performance'
-  },
-  events: {
-    facets: ['type', 'status', 'timezone', 'isTicketed', 'price.currency'],
-    sorts: {
-      upcoming: ['asc(startAt)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'upcoming'
-  }
-};
-
-const SUPPORTED_ENTITIES = Object.keys(ENTITY_CONFIG);
-const INDEX_UIDS = new Map(INDEX_DEFINITIONS.map((definition) => [definition.name, definition.uid]));
+import { ENTITY_CONFIG, SUPPORTED_ENTITIES } from './search/entityConfig.js';
 
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
@@ -130,83 +58,6 @@ function mergeFilterValue(baseValue, overrideValue) {
     return { ...baseValue, ...overrideValue };
   }
   return overrideValue;
-}
-
-function encodeValue(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'true' : 'false';
-  }
-  if (value instanceof Date) {
-    return `"${value.toISOString()}"`;
-  }
-  return `"${String(value).replace(/"/g, '\\"')}"`;
-}
-
-function buildFilterClauses(filters) {
-  if (!filters || typeof filters !== 'object') {
-    return null;
-  }
-  const clauses = [];
-  for (const [attribute, rawValue] of Object.entries(filters)) {
-    if (rawValue === null || rawValue === undefined || rawValue === '') {
-      continue;
-    }
-    if (Array.isArray(rawValue)) {
-      const values = sanitiseArray(rawValue);
-      if (!values.length) {
-        continue;
-      }
-      const encoded = values.map((value) => encodeValue(value)).filter((value) => value !== null);
-      if (!encoded.length) {
-        continue;
-      }
-      clauses.push(`${attribute} IN [${encoded.join(', ')}]`);
-      continue;
-    }
-    if (typeof rawValue === 'object') {
-      const { min, max, equals, not } = rawValue;
-      if (min !== undefined && min !== null) {
-        const encodedMin = encodeValue(min);
-        if (encodedMin !== null) {
-          clauses.push(`${attribute} >= ${encodedMin}`);
-        }
-      }
-      if (max !== undefined && max !== null) {
-        const encodedMax = encodeValue(max);
-        if (encodedMax !== null) {
-          clauses.push(`${attribute} <= ${encodedMax}`);
-        }
-      }
-      if (equals !== undefined && equals !== null) {
-        const encodedEquals = encodeValue(equals);
-        if (encodedEquals !== null) {
-          clauses.push(`${attribute} = ${encodedEquals}`);
-        }
-      }
-      if (not !== undefined && not !== null) {
-        const encodedNot = encodeValue(not);
-        if (encodedNot !== null) {
-          clauses.push(`${attribute} != ${encodedNot}`);
-        }
-      }
-      continue;
-    }
-    if (typeof rawValue === 'boolean') {
-      clauses.push(`${attribute} = ${rawValue ? 'true' : 'false'}`);
-      continue;
-    }
-    const encoded = encodeValue(rawValue);
-    if (encoded !== null) {
-      clauses.push(`${attribute} = ${encoded}`);
-    }
-  }
-  return clauses.length ? clauses : null;
 }
 
 function deriveGeo(entity, hit) {
@@ -452,10 +303,6 @@ export class ExplorerSearchService {
   }
 
   async searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }) {
-    const indexUid = INDEX_UIDS.get(entity);
-    if (!indexUid) {
-      throw new Error(`Explorer search index missing for entity "${entity}"`);
-    }
     const client = this.clusterService.searchClient;
     if (!client) {
       const error = new Error('Search cluster is not initialised');
@@ -463,36 +310,37 @@ export class ExplorerSearchService {
       throw error;
     }
 
-    const index = client.index(indexUid);
     const effectiveFilters = this.buildFilters(entity, filters, globalFilters);
-    const meiliFilters = buildFilterClauses(effectiveFilters);
-    const sortDirectives = this.buildSort(entity, sort?.[entity] ?? sort);
-    const facets = includeFacets ? ENTITY_CONFIG[entity].facets : undefined;
+    const response = await recordSearchOperation('explorer_query', () =>
+      client.search({
+        entity,
+        query,
+        page,
+        perPage,
+        filters,
+        globalFilters,
+        sort,
+        includeFacets
+      })
+    );
 
-    const searchOptions = {
-      offset: (page - 1) * perPage,
-      limit: perPage,
-      filter: meiliFilters ?? undefined,
-      facets,
-      sort: sortDirectives && sortDirectives.length ? sortDirectives : undefined
-    };
-
-    const result = await recordSearchOperation('explorer_query', () => index.search(query ?? '', searchOptions));
-
-    const hits = Array.isArray(result.hits) ? result.hits.map((hit) => formatHit(entity, hit)) : [];
+    const hits = Array.isArray(response.hits)
+      ? response.hits.map((hit) => formatHit(entity, hit))
+      : [];
     const markers = hits.map((hit) => hit.geo).filter(Boolean);
+
     return {
       entity,
       hits,
-      rawHits: result.hits,
-      totalHits: result.estimatedTotalHits ?? hits.length,
-      processingTimeMs: result.processingTimeMs ?? 0,
-      query: result.query,
+      rawHits: response.rawHits ?? response.hits ?? [],
+      totalHits: response.totalHits ?? hits.length,
+      processingTimeMs: response.processingTimeMs ?? 0,
+      query: response.query ?? query,
       page,
       perPage,
-      sort: sortDirectives,
-      filter: meiliFilters,
-      facets: result.facetDistribution ?? {},
+      sort: response.sortDirectives ?? this.buildSort(entity, sort?.[entity] ?? sort),
+      filter: effectiveFilters,
+      facets: includeFacets ? response.facets ?? {} : {},
       markers
     };
   }

@@ -3,10 +3,11 @@ import { parseArgs } from 'node:util';
 
 import '../src/config/env.js';
 import logger from '../src/config/logger.js';
-import { INDEX_DEFINITIONS, searchClusterService } from '../src/services/SearchClusterService.js';
+import { searchClusterService } from '../src/services/SearchClusterService.js';
 import { SearchIngestionService } from '../src/services/SearchIngestionService.js';
+import { SUPPORTED_ENTITIES } from '../src/services/search/entityConfig.js';
 
-const KNOWN_INDEXES = INDEX_DEFINITIONS.map((definition) => definition.name);
+const KNOWN_INDEXES = [...SUPPORTED_ENTITIES];
 
 function parseCliArguments(argv) {
   const { values } = parseArgs({

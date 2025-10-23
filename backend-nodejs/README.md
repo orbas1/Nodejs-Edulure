@@ -148,32 +148,24 @@ Set `MONETIZATION_RECONCILIATION_TENANTS` to a comma-separated allow list when o
 
 ### Explorer search environment
 
-The explorer, recommendation, and ads surfaces rely on a hardened Meilisearch cluster. Configure the following variables to
-provision the cluster and secure API access:
+Explorer, recommendation, and ads surfaces now index directly into the relational table `search_documents`. No external search
+cluster is required; instead configure the following environment variables to tune behaviour:
 
-- `MEILISEARCH_HOSTS` – comma-separated list of primary/admin hosts (include protocol and port).
-- `MEILISEARCH_REPLICA_HOSTS` – optional replica nodes for failover during write operations.
-- `MEILISEARCH_SEARCH_HOSTS` – read endpoints consumed by web/mobile clients. Defaults to the union of primary + replica hosts.
-- `MEILISEARCH_ADMIN_API_KEY` – admin/master API key used for index provisioning and security audits. Store in a secret manager.
-- `MEILISEARCH_SEARCH_API_KEY` – read-only key distributed to clients. The backend will refuse to start if this key has write
-  permissions.
-- `MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS` – cadence for cluster health monitoring and Prometheus reporting.
-- `MEILISEARCH_REQUEST_TIMEOUT_MS` – timeout for administrative calls (index bootstrap, health checks, snapshots).
-- `MEILISEARCH_INDEX_PREFIX` – isolates indexes per environment/tenant (`edulure`, `edulure-staging`, etc.).
-- `MEILISEARCH_ALLOWED_IPS` – IP/CIDR list exposed to operations for allow-listing reverse proxies hitting the cluster.
+- `SEARCH_TABLE_NAME` – override the table name if you maintain multiple logical document sets (defaults to `search_documents`).
+- `SEARCH_HEARTBEAT_INTERVAL_MS` – cadence for relational health checks and Prometheus updates (default `30000`).
+- `SEARCH_INDEX_PREFIX` – optional string stamped onto analytics events to distinguish environments (`edulure`, `edulure-staging`, etc.).
 
-Bootstrap or audit the cluster at any time with:
+Provision or audit the search store at any time with:
 
 ```bash
 npm run search:provision
-# Append --snapshot to trigger a Meilisearch snapshot once indexes are synchronised
+# Append --snapshot to record document counts for backup auditing
 npm run search:provision -- --snapshot
 ```
 
-The command ensures explorer indexes exist with production settings, verifies API key privileges, runs live health checks across
-primary/replica/read nodes, and (optionally) requests a snapshot for off-site backups. Prometheus now exposes
-`edulure_search_operation_duration_seconds`, `edulure_search_node_health`, and `edulure_search_index_ready` so alerting can
-detect unhealthy nodes or drifted index definitions.
+The command verifies that `search_documents` exists, reports document counts, and (optionally) records a lightweight snapshot
+summary that downstream backup tooling can persist. Prometheus metrics `edulure_search_operation_duration_seconds`,
+`edulure_search_node_health`, and `edulure_search_index_ready` now reflect the relational store health rather than external nodes.
 
 Explorer ingestion is orchestrated by `SearchIngestionService`. Configure the following to tune throughput and retention:
 
