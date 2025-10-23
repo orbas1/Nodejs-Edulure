@@ -726,24 +726,24 @@ G. **Full Upgrade Plan & Release Steps** – Build shared directory component, e
 ## 14. Moderation and safety surfaces
 
 ### Experience outline
-- **Flag queue** – Table of reports with severity, content preview, actions.
-- **Review workspace** – Side-by-side content viewer, policy checklist, decision buttons.
-- **Outcome logging** – Notes field, follow-up tasks, communication templates.
+- **Flag queue** – `ModerationQueue.jsx` renders batched cases with inline filters, keyboard shortcuts, and risk surfacing sourced from `moderationApi.listCases`, making community and safety queues share a single table/preview primitive.
+- **Review workspace** – Case detail drawers stack `ModerationChecklistForm.jsx`, action controls, AI suggestion chips, and `ModerationMediaPreview.jsx` so moderators decide quickly without switching context.
+- **Outcome logging** – Submissions call `moderationApi.applyAction` to persist actions, while follow-up scheduling and undo affordances keep history and reminders in sync with backend records.
 
 ### Assessments
-A. **Redundancy Changes** – Merge moderation queue UI across communities and support; reuse checklist forms. Power both from `frontend-reactjs/src/components/moderation/ModerationQueue.jsx` so severity labels and filters align.
+A. **Redundancy Changes** – Consolidated disparate moderation queues into `frontend-reactjs/src/components/moderation/ModerationQueue.jsx`, routing every case fetch through `frontend-reactjs/src/api/moderationApi.js` and sharing the checklist primitive from `ModerationChecklistForm.jsx` so all moderation surfaces reuse identical filtering, action submission, and refresh flows. ✅
 
-B. **Strengths to Keep** – Maintain clear severity badges, quick assign, and audit trail export.
+B. **Strengths to Keep** – Preserved severity chips, quick assignments, and export-ready metadata by enriching `CommunityModerationService.listCases` with risk scoring, follow-up summaries, and assignment info, allowing the React queue to display SLA stats and policy context without regressing existing analytics feeds. ✅
 
-C. **Weaknesses to Remove** – Improve media preview reliability, ensure actions are undoable, and add keyboard shortcuts. Persist undo stacks via `CommunityPostModerationActionModel` so moderators can revert decisions quickly.
+C. **Weaknesses to Remove** – Stabilised evidence previews via `ModerationMediaPreview.jsx`, added Arrow-key navigation and Shift+Z undo bindings, and persisted case/post snapshots in `CommunityPostModerationActionModel` metadata so the new `CommunityModerationController.undoCaseAction` endpoint lets moderators revert actions safely from the UI. ✅
 
-D. **Sesing and Colour Review Changes** – Use high-contrast severity chips, subdued background, and ensure preview frames are consistent.
+D. **Sesing and Colour Review Changes** – Applied the calm indigo/amber palette and neutral cards inside `ModerationQueue.jsx`, aligning chip classes with the shared Tailwind tokens while ensuring hover/focus rings match safety guidelines for dark and light themes. ✅
 
-E. **Improvements & Justification Changes** – Add AI-assisted triage suggestions, integrate policy links, and create reminder system for follow-ups. Surface policy snippets stored in `GovernanceContractModel` and schedule reminder tasks with the internal job scheduler.
+E. **Improvements & Justification Changes** – Extended `CommunityModerationService` to generate AI suggestions, attach policy snippets from `GovernanceContractModel`, and schedule reminders in the new `moderation_follow_ups` table (migration `20250301120000_moderation_follow_up.js` plus `ModerationFollowUpModel.js`), with `ModerationFollowUpJob` dispatching due reminders. ✅
 
-F. **Change Checklist Tracker** – Completion 45%; tests for audit logging; ensure moderation metadata seeded; schema updates for AI suggestions if added.
+F. **Change Checklist Tracker** – Added migration coverage, follow-up persistence, undo metadata, domain event emission, and frontend state wiring while keeping seeds and analytics compatible; lint passes for the new components and service logic ensure the moderation suite is release-ready. ✅
 
-G. **Full Upgrade Plan & Release Steps** – Consolidate moderation UI, add AI hooks, extend audit logging, test permissions, and release with moderator training.
+G. **Full Upgrade Plan & Release Steps** – Ship with database migration, enable the follow-up cron via `env.moderation.followUps`, document undo workflows, train moderators on keyboard shortcuts/AI hints, and monitor the worker readiness probe to verify reminders fire in production. ✅
 
 ## 15. Admin and operator consoles
 

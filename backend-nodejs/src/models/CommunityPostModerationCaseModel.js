@@ -109,6 +109,18 @@ export default class CommunityPostModerationCaseModel {
     return mapRow(row);
   }
 
+  static async findById(id, connection = db) {
+    const row = await connection('community_post_moderation_cases as cpmc')
+      .leftJoin('community_posts as cp', 'cpmc.post_id', 'cp.id')
+      .leftJoin('users as reporter', 'cpmc.reporter_id', 'reporter.id')
+      .leftJoin('users as assignee', 'cpmc.assigned_to', 'assignee.id')
+      .leftJoin('users as resolver', 'cpmc.resolved_by', 'resolver.id')
+      .select(this.columns(connection))
+      .where('cpmc.id', id)
+      .first();
+    return mapRow(row);
+  }
+
   static async findOpenByPost(postId, connection = db) {
     const row = await connection('community_post_moderation_cases')
       .where({ post_id: postId })

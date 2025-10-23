@@ -21,6 +21,7 @@ import { useAuth } from '../../../context/AuthContext.jsx';
 import useSupportDashboard from '../../../hooks/useSupportDashboard.js';
 import useExecutiveDashboard from '../../../hooks/useExecutiveDashboard.js';
 import useTrustSafetyDashboard from '../../../hooks/useTrustSafetyDashboard.js';
+import ModerationQueue from '../../../components/moderation/ModerationQueue.jsx';
 import { createAdminControlResourceConfigs } from './adminControlConfig.jsx';
 
 const verificationReviewOptions = [
@@ -1216,6 +1217,19 @@ export default function AdminTrustSafety() {
     verificationActionState,
     refreshVerification,
     handleVerificationReview,
+    moderationCases,
+    moderationCasesLoading,
+    moderationCasesError,
+    moderationCasesPagination,
+    moderationCaseFilters,
+    setModerationCaseFilters,
+    refreshModerationCases,
+    selectModerationCase,
+    selectedModerationCaseId,
+    selectedModerationCase,
+    applyModerationCaseAction,
+    undoModerationCaseAction,
+    moderationCasesLastUpdated,
     scamReports,
     scamLoading,
     scamError,
@@ -1296,6 +1310,7 @@ export default function AdminTrustSafety() {
               type="button"
               onClick={() => {
                 refreshVerification();
+                refreshModerationCases();
                 refreshScamReports();
                 refreshNetwork();
                 refreshSupport();
@@ -1316,11 +1331,47 @@ export default function AdminTrustSafety() {
             <source src="https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4" type="video/mp4" />
             Your browser does not support embedded training videos. Download the runbook to review.
           </video>
-          <div className="border-t border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
-            Trust &amp; Safety playbook walkthrough · 02:48
-          </div>
+      <div className="border-t border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+        Trust &amp; Safety playbook walkthrough · 02:48
+      </div>
+    </div>
+  </header>
+
+      <section className="space-y-4">
+        <div>
+          <p className="dashboard-kicker">Moderation queue</p>
+          <h2 className="text-lg font-semibold text-slate-900">Community safety review</h2>
+          <p className="text-sm text-slate-600">
+            Review flagged posts, apply guided actions, and rely on AI prompts and policy snippets to maintain a safe community.
+          </p>
         </div>
-      </header>
+        <ModerationQueue
+          cases={moderationCases}
+          loading={moderationCasesLoading}
+          error={moderationCasesError}
+          pagination={moderationCasesPagination}
+          filters={moderationCaseFilters}
+          onFiltersChange={setModerationCaseFilters}
+          onRefresh={refreshModerationCases}
+          onSelectCase={selectModerationCase}
+          selectedCaseId={selectedModerationCaseId}
+          selectedCase={selectedModerationCase}
+          onApplyAction={({ caseId, action, notes, followUpInMinutes, followUpReason, followUpAssignee }) =>
+            applyModerationCaseAction({
+              caseId,
+              payload: {
+                action,
+                notes,
+                followUpInMinutes,
+                followUpReason,
+                followUpAssignee
+              }
+            })
+          }
+          onUndoAction={undoModerationCaseAction}
+          lastUpdated={moderationCasesLastUpdated}
+        />
+      </section>
 
       {feedback ? (
         <div

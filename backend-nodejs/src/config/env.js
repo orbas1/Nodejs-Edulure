@@ -981,6 +981,10 @@ const envSchema = z
     COMMUNITY_REMINDER_TIMEZONE: z.string().default('Etc/UTC'),
     COMMUNITY_REMINDER_LOOKAHEAD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(30),
     COMMUNITY_REMINDER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(100),
+    MODERATION_FOLLOW_UP_ENABLED: z.coerce.boolean().default(true),
+    MODERATION_FOLLOW_UP_CRON: z.string().default('*/10 * * * *'),
+    MODERATION_FOLLOW_UP_TIMEZONE: z.string().default('Etc/UTC'),
+    MODERATION_FOLLOW_UP_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(50),
     CHAT_PRESENCE_DEFAULT_TTL_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(5),
     CHAT_PRESENCE_MAX_TTL_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(60),
     CHAT_MESSAGE_DEFAULT_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(50),
@@ -1798,6 +1802,14 @@ export const env = {
       timezone: raw.COMMUNITY_REMINDER_TIMEZONE,
       lookaheadMinutes: raw.COMMUNITY_REMINDER_LOOKAHEAD_MINUTES,
       batchSize: raw.COMMUNITY_REMINDER_BATCH_SIZE
+    }
+  },
+  moderation: {
+    followUps: {
+      enabled: raw.MODERATION_FOLLOW_UP_ENABLED,
+      cronExpression: raw.MODERATION_FOLLOW_UP_CRON,
+      timezone: raw.MODERATION_FOLLOW_UP_TIMEZONE,
+      batchSize: raw.MODERATION_FOLLOW_UP_BATCH_SIZE
     }
   },
   search: {

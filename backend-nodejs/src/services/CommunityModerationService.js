@@ -7,6 +7,8 @@ import CommunityPostModerationActionModel from '../models/CommunityPostModeratio
 import ModerationAnalyticsEventModel from '../models/ModerationAnalyticsEventModel.js';
 import ScamReportModel from '../models/ScamReportModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import GovernanceContractModel from '../models/GovernanceContractModel.js';
+import ModerationFollowUpModel from '../models/ModerationFollowUpModel.js';
 
 const log = logger.child({ service: 'CommunityModerationService' });
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
@@ -68,6 +70,243 @@ function mergeModerationMetadata(currentMetadata = {}, additions = {}) {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function cloneJson(value, fallback = null) {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_error) {
+    return fallback ?? value;
+  }
+}
+
+function snapshotCaseState(moderationCase) {
+  if (!moderationCase) {
+    return null;
+  }
+  return {
+    status: moderationCase.status,
+    severity: moderationCase.severity,
+    riskScore: moderationCase.riskScore ?? 0,
+    assignedTo: moderationCase.assignedTo ?? null,
+    escalatedAt: moderationCase.escalatedAt ?? null,
+    resolvedAt: moderationCase.resolvedAt ?? null,
+    resolvedBy: moderationCase.resolvedBy ?? null,
+    metadata: cloneJson(moderationCase.metadata ?? {}, {})
+  };
+}
+
+function snapshotPostState(post) {
+  if (!post) {
+    return null;
+  }
+  return {
+    moderationState: post.moderationState,
+    status: post.status,
+    lastModeratedAt: post.lastModeratedAt ?? null,
+    moderationMetadata: cloneJson(post.moderationMetadata ?? {}, {}),
+    metadata: cloneJson(post.metadata ?? {}, {})
+  };
+}
+
+function deriveAiSuggestions(moderationCase, post) {
+  if (!moderationCase) {
+    return [];
+  }
+
+  const suggestions = [];
+  const severity = moderationCase.severity ?? 'low';
+  const status = moderationCase.status ?? 'pending';
+  const flags = Array.isArray(moderationCase.metadata?.flags)
+    ? moderationCase.metadata.flags
+    : [];
+  const latestFlag = flags.length ? flags[flags.length - 1] : null;
+
+  if (severity === 'critical' || moderationCase.flaggedSource === 'automated_detection') {
+    suggestions.push({
+      type: 'escalate',
+      message: 'Escalate to security operations and freeze member access until the incident is resolved.'
+    });
+  }
+
+  if (status === 'pending') {
+    suggestions.push({
+      type: 'assign',
+      message: 'Assign this case to an available moderator to unblock review velocity.'
+    });
+  }
+
+  if (post?.metadata?.attachments?.length || post?.moderationMetadata?.attachments?.length) {
+    suggestions.push({
+      type: 'media_review',
+      message:
+        'Open the resilient media viewer to review attachments with fallback rendering in case previews fail.'
+    });
+  }
+
+  if (latestFlag?.tags?.includes('policy:ads')) {
+    suggestions.push({
+      type: 'policy_reference',
+      message: 'Reference the advertising disclosure policy to confirm sponsored content labelling.'
+    });
+  }
+
+  return suggestions;
+}
+
+function normaliseTagList(value) {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry).toLowerCase()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(/[,\s]+/)
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+async function fetchPolicyLibrary(connection = db) {
+  const rows = await GovernanceContractModel.buildBaseQuery(connection)
+    .whereIn('contract_type', ['policy', 'code_of_conduct', 'guideline'])
+    .whereIn('status', ['active', 'draft'])
+    .orderBy('risk_tier', 'desc')
+    .limit(25);
+
+  return rows.map((row) => GovernanceContractModel.deserialize(row));
+}
+
+function computePolicyRelevance({ metadata = {}, summary, riskTier }, { tags, reason, severity }) {
+  let score = 0;
+  const snippetTags = normaliseTagList(metadata?.tags ?? []);
+
+  if (snippetTags.length && tags.some((tag) => snippetTags.includes(tag))) {
+    score += 3;
+  }
+
+  if (reason && (summary ?? '').toLowerCase().includes(reason)) {
+    score += 1.5;
+  }
+
+  if (severity === 'critical' && riskTier === 'high') {
+    score += 1;
+  }
+
+  return score;
+}
+
+function buildPolicySnippetsForCase(library, moderationCase, limit = 3) {
+  if (!Array.isArray(library) || !moderationCase) {
+    return [];
+  }
+
+  const tags = normaliseTagList(
+    moderationCase.metadata?.policyTags ?? moderationCase.metadata?.tags ?? []
+  );
+  const reason = (moderationCase.reason ?? '').toLowerCase();
+  const severity = moderationCase.severity ?? 'low';
+
+  const ranked = library
+    .map((contract) => {
+      const summary =
+        contract.metadata?.summary ??
+        (Array.isArray(contract.obligations) && contract.obligations.length
+          ? contract.obligations[0]?.summary ?? null
+          : null);
+      const summary =
+        contract.metadata?.summary ??
+        (Array.isArray(contract.obligations) && contract.obligations.length
+          ? contract.obligations[0]?.summary ?? null
+          : null);
+
+      return {
+        id: contract.publicId,
+        title:
+          contract.metadata?.title ??
+          contract.vendorName ??
+          contract.contractType ??
+          'Policy reference',
+        summary,
+        url: contract.metadata?.policyUrl ?? contract.metadata?.url ?? null,
+        riskTier: contract.riskTier ?? 'medium',
+        metadata: contract.metadata ?? {},
+        relevance: computePolicyRelevance(
+          { metadata: contract.metadata ?? {}, summary, riskTier: contract.riskTier ?? 'medium' },
+          { tags, reason, severity }
+        )
+      };
+    })
+    .filter((entry) => Boolean(entry.title))
+    .sort((a, b) => {
+      if (b.relevance === a.relevance) {
+        return (b.riskTier ?? '').localeCompare(a.riskTier ?? '');
+      }
+      return b.relevance - a.relevance;
+    })
+    .slice(0, limit)
+    .map(({ metadata, relevance, ...snippet }) => ({ ...snippet }));
+
+  return ranked;
+}
+
+function resolveFollowUpRequest({ action, payload = {}, actor, updatedCase, now }) {
+  const explicitMinutes = (() => {
+    if (payload.followUpInMinutes !== undefined) {
+      return Number(payload.followUpInMinutes);
+    }
+    if (payload.followUpInHours !== undefined) {
+      return Number(payload.followUpInHours) * 60;
+    }
+    if (payload.followUpInDays !== undefined) {
+      return Number(payload.followUpInDays) * 1440;
+    }
+    return null;
+  })();
+
+  const defaults = {
+    escalate: 360,
+    suppress: 1440,
+    reject: 720
+  };
+
+  const minutes = Number.isFinite(explicitMinutes) ? explicitMinutes : defaults[action] ?? null;
+
+  let dueAt = null;
+  if (payload.followUpAt) {
+    const parsed = new Date(payload.followUpAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      dueAt = parsed;
+    }
+  }
+
+  if (!dueAt && Number.isFinite(minutes) && minutes > 0) {
+    dueAt = new Date(now.getTime() + minutes * 60 * 1000);
+  }
+
+  if (!dueAt) {
+    return null;
+  }
+
+  const metadata = {
+    reason: payload.followUpReason ?? `Review ${action} outcome`,
+    requestedBy: actor.id,
+    createdAt: now.toISOString(),
+    action
+  };
+
+  return {
+    dueAt,
+    metadata,
+    assignedTo: payload.followUpAssignee ?? updatedCase.assignedTo ?? actor.id ?? null
+  };
 }
 
 function ensureActionAllowed(action) {
@@ -291,7 +530,30 @@ export default class CommunityModerationService {
       await ensureModerator(filters.communityId, actor, db);
     }
 
-    return CommunityPostModerationCaseModel.list(filters, pagination, db);
+    const result = await CommunityPostModerationCaseModel.list(filters, pagination, db);
+    const caseIds = result.items.map((item) => item.id);
+
+    const [followUps, policyLibrary] = await Promise.all([
+      ModerationFollowUpModel.listForCases(caseIds, db),
+      fetchPolicyLibrary(db)
+    ]);
+
+    const followUpsByCaseId = followUps.reduce((acc, followUp) => {
+      if (!acc.has(followUp.caseId)) {
+        acc.set(followUp.caseId, []);
+      }
+      acc.get(followUp.caseId).push(followUp);
+      return acc;
+    }, new Map());
+
+    const enrichedItems = result.items.map((item) => ({
+      ...item,
+      followUps: followUpsByCaseId.get(item.id) ?? [],
+      policySnippets: buildPolicySnippetsForCase(policyLibrary, item),
+      aiSuggestions: deriveAiSuggestions(item, item.post)
+    }));
+
+    return { ...result, items: enrichedItems };
   }
 
   static async getCase(actor, casePublicId) {
@@ -303,10 +565,21 @@ export default class CommunityModerationService {
     }
 
     await ensureModerator(moderationCase.communityId, actor, db);
-    const actions = await CommunityPostModerationActionModel.listForCase(moderationCase.id, db);
+    const [actions, followUps, policyLibrary] = await Promise.all([
+      CommunityPostModerationActionModel.listForCase(moderationCase.id, db),
+      ModerationFollowUpModel.listForCase(moderationCase.id, db),
+      fetchPolicyLibrary(db)
+    ]);
+
+    const enrichedCase = {
+      ...moderationCase,
+      followUps,
+      policySnippets: buildPolicySnippetsForCase(policyLibrary, moderationCase),
+      aiSuggestions: deriveAiSuggestions(moderationCase, moderationCase.post)
+    };
 
     return {
-      case: moderationCase,
+      case: enrichedCase,
       actions
     };
   }
@@ -342,8 +615,11 @@ export default class CommunityModerationService {
         throw error;
       }
 
-      const now = nowIso();
+      const nowDate = new Date();
+      const now = nowDate.toISOString();
       const updates = {};
+      const previousCaseSnapshot = snapshotCaseState(moderationCase);
+      const previousPostSnapshot = snapshotPostState(post);
       const caseMetadata = mergeModerationMetadata(moderationCase.metadata ?? {}, {
         notes: payload.notes
           ? [{ message: payload.notes, authorId: actor.id, createdAt: now, action: payload.action }]
@@ -357,7 +633,7 @@ export default class CommunityModerationService {
       const severity = deriveSeverity(riskScore);
 
       let newPostState = post.moderationState;
-      let newPostStatus;
+      let newPostStatus = post.status;
 
       switch (payload.action) {
         case 'assign': {
@@ -446,7 +722,10 @@ export default class CommunityModerationService {
         trx
       );
 
-      await CommunityPostModerationActionModel.record(
+      const nextCaseSnapshot = snapshotCaseState(updatedCase);
+      const nextPostSnapshot = snapshotPostState(updatedPost);
+
+      const actionRecord = await CommunityPostModerationActionModel.record(
         {
           caseId: updatedCase.id,
           actorId: actor.id,
@@ -457,11 +736,45 @@ export default class CommunityModerationService {
             severity,
             assignedTo: updates.assignedTo ?? updatedCase.assignedTo ?? null,
             archivePost: payload.archivePost ?? undefined,
-            restoreStatus: payload.restoreStatus ?? undefined
+            restoreStatus: payload.restoreStatus ?? undefined,
+            previous: { case: previousCaseSnapshot, post: previousPostSnapshot },
+            next: { case: nextCaseSnapshot, post: nextPostSnapshot }
           }
         },
         trx
       );
+
+      let scheduledFollowUp = null;
+      const followUpRequest = resolveFollowUpRequest({
+        action: payload.action,
+        payload,
+        actor,
+        updatedCase,
+        now: nowDate
+      });
+
+      if (followUpRequest) {
+        scheduledFollowUp = await ModerationFollowUpModel.schedule(
+          {
+            caseId: updatedCase.id,
+            actionId: actionRecord.id,
+            assignedTo: followUpRequest.assignedTo ?? null,
+            dueAt: followUpRequest.dueAt,
+            metadata: followUpRequest.metadata
+          },
+          trx
+        );
+        actionRecord.metadata = {
+          ...actionRecord.metadata,
+          followUpId: scheduledFollowUp.id,
+          followUpDueAt: scheduledFollowUp.dueAt
+        };
+        await CommunityPostModerationActionModel.updateMetadata(
+          actionRecord.id,
+          actionRecord.metadata,
+          trx
+        );
+      }
 
       await DomainEventModel.record(
         {
@@ -474,7 +787,8 @@ export default class CommunityModerationService {
             status: updatedCase.status,
             severity: updatedCase.severity,
             riskScore,
-            postModerationState: updatedPost.moderationState
+            postModerationState: updatedPost.moderationState,
+            followUpDueAt: scheduledFollowUp?.dueAt ?? null
           },
           performedBy: actor.id
         },
@@ -491,7 +805,8 @@ export default class CommunityModerationService {
           metrics: {
             severity: updatedCase.severity,
             status: updatedCase.status,
-            moderatorId: actor.id
+            moderatorId: actor.id,
+            followUpDueAt: scheduledFollowUp?.dueAt ?? null
           },
           source: 'moderator',
           occurredAt: now
@@ -510,9 +825,153 @@ export default class CommunityModerationService {
         'Moderation action applied'
       );
 
+      const [followUps, policyLibrary] = await Promise.all([
+        ModerationFollowUpModel.listForCase(updatedCase.id, trx),
+        fetchPolicyLibrary(trx)
+      ]);
+
+      const enrichedCase = {
+        ...updatedCase,
+        followUps,
+        policySnippets: buildPolicySnippetsForCase(policyLibrary, updatedCase),
+        aiSuggestions: deriveAiSuggestions(updatedCase, updatedPost)
+      };
+
       return {
-        case: updatedCase,
-        post: updatedPost
+        case: enrichedCase,
+        post: updatedPost,
+        action: actionRecord,
+        followUp: scheduledFollowUp
+      };
+    });
+  }
+
+  static async undoCaseAction(casePublicId, actor, actionId) {
+    if (!actionId) {
+      const error = new Error('An action identifier is required to undo a moderation step');
+      error.status = 400;
+      throw error;
+    }
+
+    return db.transaction(async (trx) => {
+      const moderationCase = await CommunityPostModerationCaseModel.findByPublicId(casePublicId, trx);
+      if (!moderationCase) {
+        const error = new Error('Moderation case not found');
+        error.status = 404;
+        throw error;
+      }
+
+      await ensureModerator(moderationCase.communityId, actor, trx);
+
+      const action = await CommunityPostModerationActionModel.findById(actionId, trx);
+      if (!action || action.caseId !== moderationCase.id) {
+        const error = new Error('Moderation action not found for this case');
+        error.status = 404;
+        throw error;
+      }
+
+      const previousSnapshot = action.metadata?.previous;
+      if (!previousSnapshot?.case || !previousSnapshot?.post) {
+        const error = new Error('This moderation action cannot be undone');
+        error.status = 422;
+        throw error;
+      }
+
+      const post = await CommunityPostModel.findById(moderationCase.postId, trx);
+      if (!post) {
+        const error = new Error('Post not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const now = new Date();
+      const caseUpdates = {
+        status: previousSnapshot.case.status ?? moderationCase.status,
+        severity: previousSnapshot.case.severity ?? moderationCase.severity,
+        riskScore: previousSnapshot.case.riskScore ?? moderationCase.riskScore ?? 0,
+        assignedTo: previousSnapshot.case.assignedTo ?? null,
+        metadata: previousSnapshot.case.metadata ?? moderationCase.metadata ?? {}
+      };
+
+      if (Object.prototype.hasOwnProperty.call(previousSnapshot.case, 'escalatedAt')) {
+        caseUpdates.escalatedAt = previousSnapshot.case.escalatedAt ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(previousSnapshot.case, 'resolvedAt')) {
+        caseUpdates.resolvedAt = previousSnapshot.case.resolvedAt ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(previousSnapshot.case, 'resolvedBy')) {
+        caseUpdates.resolvedBy = previousSnapshot.case.resolvedBy ?? null;
+      }
+
+      const restoredCase = await CommunityPostModerationCaseModel.updateById(
+        moderationCase.id,
+        caseUpdates,
+        trx
+      );
+
+      const postUpdates = {
+        state: previousSnapshot.post.moderationState ?? post.moderationState,
+        metadata: previousSnapshot.post.moderationMetadata ?? post.moderationMetadata ?? {},
+        status: previousSnapshot.post.status ?? post.status,
+        lastModeratedAt: now.toISOString()
+      };
+
+      const restoredPost = await CommunityPostModel.updateModerationState(post.id, postUpdates, trx);
+
+      await ModerationFollowUpModel.cancelByActionId(actionId, trx);
+      await CommunityPostModerationActionModel.markUndone(actionId, { undoneBy: actor.id }, trx);
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_post',
+          entityId: restoredCase.postId,
+          eventType: 'community.moderation.case.undo',
+          payload: {
+            caseId: restoredCase.publicId,
+            undoneActionId: actionId,
+            status: restoredCase.status,
+            severity: restoredCase.severity,
+            postModerationState: restoredPost.moderationState
+          },
+          performedBy: actor.id
+        },
+        trx
+      );
+
+      await ModerationAnalyticsEventModel.record(
+        {
+          communityId: restoredCase.communityId,
+          entityType: 'community_post',
+          entityId: String(restoredCase.postId),
+          eventType: 'case_undo',
+          riskScore: restoredCase.riskScore ?? null,
+          metrics: {
+            severity: restoredCase.severity,
+            status: restoredCase.status,
+            moderatorId: actor.id,
+            undoneActionId: actionId
+          },
+          source: 'moderator',
+          occurredAt: now.toISOString()
+        },
+        trx
+      );
+
+      const [followUps, policyLibrary] = await Promise.all([
+        ModerationFollowUpModel.listForCase(restoredCase.id, trx),
+        fetchPolicyLibrary(trx)
+      ]);
+
+      const enrichedCase = {
+        ...restoredCase,
+        followUps,
+        policySnippets: buildPolicySnippetsForCase(policyLibrary, restoredCase),
+        aiSuggestions: deriveAiSuggestions(restoredCase, restoredPost)
+      };
+
+      return {
+        case: enrichedCase,
+        post: restoredPost
       };
     });
   }

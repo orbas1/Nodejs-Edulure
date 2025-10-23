@@ -245,6 +245,24 @@ export default class CommunityModerationController {
     }
   }
 
+  static async undoCaseAction(req, res, next) {
+    try {
+      const { actionId } = req.params;
+      const result = await CommunityModerationService.undoCaseAction(
+        req.params.caseId,
+        { id: req.user.id, role: req.user.role },
+        actionId
+      );
+
+      return success(res, {
+        data: result,
+        message: 'Moderation action reverted'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async submitScamReport(req, res, next) {
     try {
       const payload = await scamReportSchema.validateAsync(req.body, {

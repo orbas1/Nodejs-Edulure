@@ -5,7 +5,11 @@ import {
   reviewVerificationCase
 } from '../api/verificationApi.js';
 import {
+  applyCaseAction,
+  getCase,
+  listCases,
   listScamReports,
+  undoCaseAction,
   updateScamReport
 } from '../api/moderationApi.js';
 import {
@@ -20,6 +24,7 @@ import {
 import { useAuth } from '../context/AuthContext.jsx';
 
 const DEFAULT_SCAM_FILTERS = Object.freeze({ status: 'pending', page: 1, perPage: 20 });
+const DEFAULT_CASE_FILTERS = Object.freeze({ status: ['pending', 'in_review'], page: 1, perPage: 20 });
 
 function mapFollowerList(response) {
   return Array.isArray(response?.data) ? response.data : [];
@@ -53,6 +58,18 @@ export default function useTrustSafetyDashboard() {
   });
 
   const [feedback, setFeedback] = useState(null);
+  const defaultCommunityId = session?.context?.communityId ?? session?.user?.communityId ?? 1;
+
+  const [casesState, setCasesState] = useState({
+    loading: false,
+    error: null,
+    items: [],
+    pagination: { page: 1, perPage: 20, total: 0, pageCount: 0 },
+    filters: { ...DEFAULT_CASE_FILTERS, communityId: defaultCommunityId },
+    selectedCaseId: null,
+    selectedCase: null,
+    lastUpdated: null
+  });
 
   const refreshVerification = useCallback(async () => {
     if (!token) {
@@ -148,6 +165,124 @@ export default function useTrustSafetyDashboard() {
   useEffect(() => {
     refreshScamReports();
   }, [refreshScamReports]);
+
+  const refreshCases = useCallback(
+    async (overrides = {}) => {
+      if (!token) {
+        setCasesState((prev) => ({
+          ...prev,
+          loading: false,
+          error: new Error('Authentication required to load moderation cases.'),
+          items: []
+        }));
+        return;
+      }
+
+      const filters = { ...casesState.filters, ...overrides };
+      const { communityId, ...queryParams } = filters;
+
+      setCasesState((prev) => ({ ...prev, loading: true, error: null, filters }));
+      try {
+        const response = await listCases({
+          token,
+          communityId,
+          params: queryParams
+        });
+        setCasesState((prev) => ({
+          ...prev,
+          loading: false,
+          error: null,
+          items: response.items,
+          pagination: response.pagination,
+          filters,
+          lastUpdated: new Date().toISOString()
+        }));
+      } catch (error) {
+        setCasesState((prev) => ({ ...prev, loading: false, error, filters }));
+      }
+    },
+    [casesState.filters, token]
+  );
+
+  useEffect(() => {
+    refreshCases();
+  }, [refreshCases]);
+
+  const selectCase = useCallback(
+    async (caseId) => {
+      if (!token || !caseId) {
+        setCasesState((prev) => ({ ...prev, selectedCaseId: caseId ?? null, selectedCase: null }));
+        return;
+      }
+
+      const { communityId } = casesState.filters;
+      try {
+        const result = await getCase({ token, communityId, caseId });
+        setCasesState((prev) => ({
+          ...prev,
+          selectedCaseId: caseId,
+          selectedCase: result?.case
+            ? { ...result.case, actions: Array.isArray(result.actions) ? result.actions : [] }
+            : null
+        }));
+      } catch (error) {
+        setCasesState((prev) => ({
+          ...prev,
+          selectedCaseId: caseId,
+          selectedCase: null,
+          error
+        }));
+      }
+    },
+    [casesState.filters, token]
+  );
+
+  const handleCaseAction = useCallback(
+    async ({ caseId, payload }) => {
+      if (!token) {
+        setFeedback({ tone: 'error', message: 'Authentication required to update moderation cases.' });
+        return false;
+      }
+      const { communityId } = casesState.filters;
+      try {
+        const result = await applyCaseAction({
+          token,
+          communityId,
+          caseId,
+          payload
+        });
+        setFeedback({ tone: 'success', message: 'Moderation action applied.' });
+        refreshCases();
+        selectCase(caseId);
+        return result;
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to apply moderation action.' });
+        return false;
+      }
+    },
+    [casesState.filters, refreshCases, selectCase, token]
+  );
+
+  const handleCaseUndo = useCallback(
+    async ({ caseId, actionId }) => {
+      if (!token) {
+        setFeedback({ tone: 'error', message: 'Authentication required to undo moderation actions.' });
+        return false;
+      }
+      const { communityId } = casesState.filters;
+      try {
+        await undoCaseAction({ token, communityId, caseId, actionId });
+        setFeedback({ tone: 'success', message: 'Moderation action reverted.' });
+        refreshCases();
+        selectCase(caseId);
+        return true;
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to undo moderation action.' });
+        return false;
+      }
+    },
+    [casesState.filters, refreshCases, selectCase, token]
+  );
 
   const handleScamReportUpdate = useCallback(
     async ({ reportId, updates }) => {
@@ -381,6 +516,23 @@ export default function useTrustSafetyDashboard() {
     handleRemoveFollower,
     handleFollowUser,
     handleUnfollowUser,
+    moderationCases: casesState.items,
+    moderationCasesLoading: casesState.loading,
+    moderationCasesError: casesState.error,
+    moderationCasesPagination: casesState.pagination,
+    moderationCaseFilters: casesState.filters,
+    setModerationCaseFilters: (filters) =>
+      setCasesState((prev) => ({
+        ...prev,
+        filters: { ...prev.filters, ...filters }
+      })),
+    refreshModerationCases: refreshCases,
+    selectModerationCase: selectCase,
+    selectedModerationCaseId: casesState.selectedCaseId,
+    selectedModerationCase: casesState.selectedCase,
+    applyModerationCaseAction: handleCaseAction,
+    undoModerationCaseAction: handleCaseUndo,
+    moderationCasesLastUpdated: casesState.lastUpdated,
     feedback,
     setFeedback,
     outstandingRequests,
