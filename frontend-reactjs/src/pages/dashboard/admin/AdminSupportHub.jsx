@@ -27,6 +27,7 @@ import {
   updateSupportNotificationPolicy
 } from '../../../api/operatorDashboardApi.js';
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
+import ModerationQueue from '../../../components/moderation/ModerationQueue.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import useSupportDashboard from '../../../hooks/useSupportDashboard.js';
 import useRoleGuard from '../../../hooks/useRoleGuard.js';
@@ -432,6 +433,24 @@ export default function AdminSupportHub() {
   const scheduledAnnouncements = data?.communications?.scheduled ?? [];
   const recentAnnouncements = data?.communications?.recent ?? [];
   const knowledgeArticles = data?.knowledgeBase?.flaggedArticles ?? [];
+  const knowledgeQueueItems = useMemo(
+    () =>
+      knowledgeArticles.slice(0, 5).map((article) => ({
+        id: article.id,
+        subject: article.title ?? 'Untitled article',
+        summary: article.category ?? 'Knowledge base',
+        reporter: { name: article.owner ?? article.author ?? 'Automation' },
+        severity: article.severity ?? 'medium',
+        status: 'FLAGGED',
+        updatedAt: article.lastUpdated ? formatDate(article.lastUpdated) : null,
+        tags: Array.isArray(article.flaggedIssues)
+          ? article.flaggedIssues.map((issue) => issue.summary).filter(Boolean)
+          : [],
+        quickActions: [],
+        rawArticle: article
+      })),
+    [knowledgeArticles]
+  );
   const notificationPolicies = data?.settings?.notificationPolicies ?? [];
   const onboardingChecklists = data?.onboarding?.checklists ?? [];
 
@@ -952,33 +971,11 @@ export default function AdminSupportHub() {
                 <DocumentMagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />
                 Knowledge base governance
               </div>
-              {knowledgeArticles.length === 0 ? (
-                <DashboardStateMessage
-                  title="No flagged articles"
-                  description="All published knowledge base content is current."
-                />
-              ) : (
-                <ul className="flex flex-col gap-3 text-sm text-slate-600">
-                  {knowledgeArticles.slice(0, 5).map((article) => (
-                    <li key={article.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-slate-900">{article.title}</p>
-                          <p className="text-xs text-slate-500">{article.category ?? 'Uncategorised'}</p>
-                        </div>
-                        <span className="text-xs text-slate-500">Last reviewed {formatDate(article.lastUpdated)}</span>
-                      </div>
-                      {article.flaggedIssues?.length ? (
-                        <ul className="mt-2 list-disc pl-5 text-xs text-slate-500">
-                          {article.flaggedIssues.map((issue) => (
-                            <li key={issue.id}>{issue.summary}</li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ModerationQueue
+                title="Flagged knowledge articles"
+                items={knowledgeQueueItems}
+                emptyState="All published knowledge base content is current."
+              />
               <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-500">
                 <p>
                   Knowledge base reviews are due every 90 days. Articles with compliance impact should be reviewed alongside legal and marketing partners before publication.

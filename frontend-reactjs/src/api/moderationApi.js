@@ -37,6 +37,98 @@ export async function listScamReports({ token, params, signal } = {}) {
   return mapPaginatedResponse(response);
 }
 
+function ensureCommunityIdentifier(communityId) {
+  return ensureIdentifier(communityId, 'A community identifier is required for moderation operations');
+}
+
+function ensureCaseIdentifier(caseId) {
+  return ensureIdentifier(caseId, 'A moderation case identifier is required');
+}
+
+export async function listModerationCases({ token, communityId, params, signal } = {}) {
+  ensureToken(token);
+  const safeCommunityId = ensureCommunityIdentifier(communityId);
+
+  const response = await httpClient.get(`/community-moderation/communities/${safeCommunityId}/cases`, {
+    token,
+    params,
+    signal,
+    cache: {
+      ttl: 10_000,
+      tags: [`moderation:cases:${safeCommunityId}`],
+      varyByToken: true
+    }
+  });
+  return mapPaginatedResponse(response);
+}
+
+export async function getModerationCase({ token, communityId, caseId, signal } = {}) {
+  ensureToken(token);
+  const safeCommunityId = ensureCommunityIdentifier(communityId);
+  const safeCaseId = ensureCaseIdentifier(caseId);
+
+  const response = await httpClient.get(
+    `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}`,
+    {
+      token,
+      signal,
+      cache: {
+        ttl: 10_000,
+        tags: [`moderation:case:${safeCaseId}`],
+        varyByToken: true
+      }
+    }
+  );
+  return response?.data ?? response;
+}
+
+export async function listModerationCaseActions({ token, communityId, caseId, signal } = {}) {
+  ensureToken(token);
+  const safeCommunityId = ensureCommunityIdentifier(communityId);
+  const safeCaseId = ensureCaseIdentifier(caseId);
+
+  const response = await httpClient.get(
+    `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}/actions`,
+    {
+      token,
+      signal,
+      cache: {
+        ttl: 5_000,
+        tags: [`moderation:case-actions:${safeCaseId}`],
+        varyByToken: true
+      }
+    }
+  );
+  return Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+}
+
+export async function applyModerationCaseAction({
+  token,
+  communityId,
+  caseId,
+  payload,
+  signal
+} = {}) {
+  ensureToken(token);
+  const safeCommunityId = ensureCommunityIdentifier(communityId);
+  const safeCaseId = ensureCaseIdentifier(caseId);
+
+  const response = await httpClient.post(
+    `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}/actions`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      invalidateTags: [
+        `moderation:cases:${safeCommunityId}`,
+        `moderation:case:${safeCaseId}`,
+        `moderation:case-actions:${safeCaseId}`
+      ]
+    }
+  );
+  return response?.data ?? response;
+}
+
 export async function updateScamReport({ token, reportId, payload, signal } = {}) {
   ensureToken(token);
 
@@ -96,6 +188,10 @@ export async function resolveContentAppeal({ token, appealId, payload, signal } 
 }
 
 export const moderationApi = {
+  listModerationCases,
+  getModerationCase,
+  listModerationCaseActions,
+  applyModerationCaseAction,
   listScamReports,
   updateScamReport,
   escalateScamReport,

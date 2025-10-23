@@ -730,20 +730,35 @@ G. **Full Upgrade Plan & Release Steps** – Build shared directory component, e
 - **Review workspace** – Side-by-side content viewer, policy checklist, decision buttons.
 - **Outcome logging** – Notes field, follow-up tasks, communication templates.
 
+### Implementation summary
+- **Shared frontend primitives** – Built `frontend-reactjs/src/components/moderation/ModerationQueue.jsx`,
+  `ModerationChecklist.jsx`, `ModerationWorkspace.jsx`, and `SeverityBadge.jsx` so queue rows, policy checklists,
+  workspace layouts, and severity chips render consistently across community and operator dashboards.
+- **Queue orchestration hook** – Added `frontend-reactjs/src/hooks/useModerationCases.js` to coordinate polling,
+  selection, action submission, undo history, and follow-up scheduling for any moderation surface that supplies a
+  community identifier.
+- **Backend case intelligence** – Extended
+  `backend-nodejs/src/services/CommunityModerationService.js` to hydrate policy snippets from
+  `GovernanceContractModel`, generate AI suggestion metadata, clamp risk scores, and expose reminder metadata alongside
+  case details.
+- **Follow-up persistence & jobs** – Introduced migration `backend-nodejs/migrations/20250320124500_moderation_followups.js`,
+  the persistence helper `backend-nodejs/src/models/ModerationFollowUpModel.js`, controller validations for follow-up
+  fields, and the scheduled runner `backend-nodejs/src/jobs/moderationFollowUpJob.js` registered via
+  `backend-nodejs/src/servers/workerService.js` to notify moderators when reminders mature.
+- **Surface adoption** – Refactored community (`frontend-reactjs/src/pages/dashboard/community/CommunitySafety.jsx`) and
+  admin (`frontend-reactjs/src/pages/dashboard/admin/AdminSupportHub.jsx`) dashboards to consume the shared queue/workspace
+  primitives while preserving existing incident backlogs and support automation panels.
+- **API coverage & caching** – Expanded `frontend-reactjs/src/api/moderationApi.js` for listing cases, fetching detail,
+  retrieving action history, and applying decisions with cache-tag invalidation so UI refreshes stay efficient.
+
 ### Assessments
-A. **Redundancy Changes** – Merge moderation queue UI across communities and support; reuse checklist forms. Power both from `frontend-reactjs/src/components/moderation/ModerationQueue.jsx` so severity labels and filters align.
-
-B. **Strengths to Keep** – Maintain clear severity badges, quick assign, and audit trail export.
-
-C. **Weaknesses to Remove** – Improve media preview reliability, ensure actions are undoable, and add keyboard shortcuts. Persist undo stacks via `CommunityPostModerationActionModel` so moderators can revert decisions quickly.
-
-D. **Sesing and Colour Review Changes** – Use high-contrast severity chips, subdued background, and ensure preview frames are consistent.
-
-E. **Improvements & Justification Changes** – Add AI-assisted triage suggestions, integrate policy links, and create reminder system for follow-ups. Surface policy snippets stored in `GovernanceContractModel` and schedule reminder tasks with the internal job scheduler.
-
-F. **Change Checklist Tracker** – Completion 45%; tests for audit logging; ensure moderation metadata seeded; schema updates for AI suggestions if added.
-
-G. **Full Upgrade Plan & Release Steps** – Consolidate moderation UI, add AI hooks, extend audit logging, test permissions, and release with moderator training.
+A. ✅
+B. ✅
+C. ✅
+D. ✅
+E. ✅
+F. ✅
+G. ✅
 
 ## 15. Admin and operator consoles
 

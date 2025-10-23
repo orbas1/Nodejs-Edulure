@@ -8,6 +8,7 @@ import { createReadinessTracker } from '../observability/readiness.js';
 import assetIngestionService from '../services/AssetIngestionService.js';
 import dataRetentionJob from '../jobs/dataRetentionJob.js';
 import communityReminderJob from '../jobs/communityReminderJob.js';
+import moderationFollowUpJob from '../jobs/moderationFollowUpJob.js';
 import dataPartitionJob from '../jobs/dataPartitionJob.js';
 import telemetryWarehouseJob from '../jobs/telemetryWarehouseJob.js';
 import monetizationReconciliationJob from '../jobs/monetizationReconciliationJob.js';
@@ -28,6 +29,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'data-retention',
     'community-reminder',
     'data-partitioning',
+    'moderation-follow-up',
     'integration-orchestrator',
     'telemetry-warehouse',
     'monetization-reconciliation',
@@ -151,6 +153,17 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     } catch (error) {
       readiness.markFailed('community-reminder', error);
       serviceLogger.error({ err: error }, 'Failed to start community reminder job');
+      throw error;
+    }
+
+    readiness.markPending('moderation-follow-up', 'Starting moderation follow-up scheduler');
+    try {
+      moderationFollowUpJob.start();
+      registerCleanup('moderation-follow-up', () => moderationFollowUpJob.stop());
+      readiness.markReady('moderation-follow-up', 'Moderation follow-up scheduler active');
+    } catch (error) {
+      readiness.markFailed('moderation-follow-up', error);
+      serviceLogger.error({ err: error }, 'Failed to start moderation follow-up job');
       throw error;
     }
 

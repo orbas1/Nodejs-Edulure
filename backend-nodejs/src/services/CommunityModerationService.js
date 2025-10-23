@@ -7,6 +7,8 @@ import CommunityPostModerationActionModel from '../models/CommunityPostModeratio
 import ModerationAnalyticsEventModel from '../models/ModerationAnalyticsEventModel.js';
 import ScamReportModel from '../models/ScamReportModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import GovernanceContractModel from '../models/GovernanceContractModel.js';
+import ModerationFollowUpModel from '../models/ModerationFollowUpModel.js';
 
 const log = logger.child({ service: 'CommunityModerationService' });
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
@@ -49,6 +51,27 @@ function appendLimited(existing = [], additions = [], limit = 50) {
   return list;
 }
 
+function mergeUnique(existing = [], additions = [], key = 'id', limit = 20) {
+  const base = Array.isArray(existing) ? [...existing] : [];
+  const toMerge = Array.isArray(additions) ? additions : [additions];
+  for (const entry of toMerge) {
+    if (!entry) continue;
+    const identifier = key && entry[key] ? String(entry[key]) : null;
+    const existingIndex = identifier
+      ? base.findIndex((item) => String(item?.[key]) === identifier)
+      : -1;
+    if (existingIndex >= 0) {
+      base[existingIndex] = { ...base[existingIndex], ...entry };
+    } else {
+      base.push(entry);
+    }
+  }
+  if (limit && base.length > limit) {
+    return base.slice(base.length - limit);
+  }
+  return base;
+}
+
 function mergeModerationMetadata(currentMetadata = {}, additions = {}) {
   const metadata = { ...currentMetadata };
   if (additions.flags) {
@@ -63,11 +86,26 @@ function mergeModerationMetadata(currentMetadata = {}, additions = {}) {
   if (additions.summary) {
     metadata.summary = additions.summary;
   }
+  if (additions.policySnippets) {
+    metadata.policySnippets = mergeUnique(metadata.policySnippets, additions.policySnippets, 'id', 30);
+  }
+  if (additions.aiSuggestions) {
+    metadata.aiSuggestions = mergeUnique(metadata.aiSuggestions, additions.aiSuggestions, 'id', 30);
+  }
+  if (additions.reminders) {
+    metadata.reminders = mergeUnique(metadata.reminders, additions.reminders, 'id', 100);
+  }
   return metadata;
 }
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function parseIsoDate(input) {
+  if (!input) return null;
+  const date = new Date(input);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function ensureActionAllowed(action) {
@@ -85,6 +123,125 @@ function ensureActionAllowed(action) {
     error.status = 422;
     throw error;
   }
+}
+
+function normaliseTags(tags = []) {
+  return Array.isArray(tags)
+    ? tags
+        .map((tag) => (typeof tag === 'string' ? tag.trim().toLowerCase() : ''))
+        .filter(Boolean)
+    : [];
+}
+
+async function findPolicySnippets(tags = [], connection = db, limit = 5) {
+  const loweredTags = new Set(normaliseTags(tags));
+  const { items } = await GovernanceContractModel.list(
+    { status: ['active', 'pending_renewal'] },
+    { limit: 50 },
+    connection
+  );
+
+  const snippets = [];
+
+  for (const contract of items) {
+    const obligations = Array.isArray(contract.obligations) ? contract.obligations : [];
+    for (const obligation of obligations) {
+      const obligationTags = normaliseTags(obligation.tags ?? obligation.keywords ?? []);
+      const matches =
+        loweredTags.size === 0
+          ? obligationTags.includes('moderation') || obligationTags.includes('safety')
+          : obligationTags.some((tag) => loweredTags.has(tag));
+      if (!matches) {
+        continue;
+      }
+
+      const snippetId = obligation.id ?? `${contract.publicId}-${obligationTags.join('-')}`;
+      const title =
+        obligation.title ??
+        obligation.label ??
+        (obligation.description ? obligation.description.slice(0, 80) : 'Policy guideline');
+      const summary = obligation.description ?? obligation.summary ?? 'Review contract obligation.';
+
+      snippets.push({
+        id: snippetId,
+        contractPublicId: contract.publicId,
+        title,
+        summary,
+        url:
+          obligation.url ??
+          obligation.link ??
+          contract.metadata?.policyUrl ??
+          contract.metadata?.handbookUrl ??
+          null,
+        tags: obligationTags,
+        owner: obligation.owner ?? contract.ownerEmail ?? null,
+        riskTier: contract.riskTier
+      });
+
+      if (snippets.length >= limit) {
+        return snippets;
+      }
+    }
+  }
+
+  return snippets;
+}
+
+function generateAiSuggestions({
+  riskScore,
+  reason,
+  flaggedSource,
+  policySnippets
+}) {
+  const suggestions = [];
+
+  if (riskScore >= 80) {
+    suggestions.push({
+      id: 'ai-escalate-critical',
+      message: 'Escalate to trust & safety leadership for immediate review.',
+      severity: 'critical'
+    });
+  } else if (riskScore >= 60) {
+    suggestions.push({
+      id: 'ai-secondary-review',
+      message: 'Queue a secondary moderator to double-check evidence before closing.',
+      severity: 'high'
+    });
+  } else {
+    suggestions.push({
+      id: 'ai-acknowledge',
+      message: 'Acknowledge the report and update the reporter within 24 hours.',
+      severity: 'medium'
+    });
+  }
+
+  if (flaggedSource === 'ai_assistant') {
+    suggestions.push({
+      id: 'ai-validate-detection',
+      message: 'Validate the automated detection sample before taking enforcement action.',
+      severity: 'medium'
+    });
+  }
+
+  if (typeof reason === 'string' && reason.toLowerCase().includes('harass')) {
+    suggestions.push({
+      id: 'ai-harassment-policy',
+      message: 'Cross-check the harassment zero tolerance clause to confirm response scope.',
+      severity: 'high'
+    });
+  }
+
+  const primaryPolicy = Array.isArray(policySnippets) ? policySnippets[0] : null;
+  if (primaryPolicy) {
+    suggestions.push({
+      id: `ai-policy-${primaryPolicy.id}`,
+      message: `Reference policy “${primaryPolicy.title}” before finalising the decision.`,
+      severity: primaryPolicy.riskTier === 'high' ? 'high' : 'medium',
+      policyId: primaryPolicy.id
+    });
+  }
+
+  return suggestions;
 }
 
 async function ensureCommunityMembership(communityId, actor, connection) {
@@ -167,6 +324,19 @@ export default class CommunityModerationService {
         riskHistory: [{ riskScore, at: nowIso() }]
       });
 
+      const policySnippets = await findPolicySnippets(payload.tags ?? [], trx, 5);
+      const aiSuggestions = generateAiSuggestions({
+        riskScore,
+        reason: payload.reason,
+        flaggedSource,
+        policySnippets
+      });
+
+      const enrichedCaseMetadata = mergeModerationMetadata(mergedCaseMetadata, {
+        policySnippets,
+        aiSuggestions
+      });
+
       let persistedCase;
       if (moderationCase) {
         persistedCase = await CommunityPostModerationCaseModel.updateById(
@@ -174,7 +344,7 @@ export default class CommunityModerationService {
           {
             riskScore: Math.max(riskScore, moderationCase.riskScore ?? 0),
             severity: deriveSeverity(Math.max(riskScore, moderationCase.riskScore ?? 0)),
-            metadata: mergedCaseMetadata,
+            metadata: enrichedCaseMetadata,
             status: moderationCase.status === 'approved' ? 'pending' : moderationCase.status,
             reporterId: moderationCase.reporterId ?? actor.id
           },
@@ -190,7 +360,7 @@ export default class CommunityModerationService {
             riskScore,
             severity,
             flaggedSource,
-            metadata: mergedCaseMetadata
+            metadata: enrichedCaseMetadata
           },
           trx
         );
@@ -344,7 +514,7 @@ export default class CommunityModerationService {
 
       const now = nowIso();
       const updates = {};
-      const caseMetadata = mergeModerationMetadata(moderationCase.metadata ?? {}, {
+      let caseMetadata = mergeModerationMetadata(moderationCase.metadata ?? {}, {
         notes: payload.notes
           ? [{ message: payload.notes, authorId: actor.id, createdAt: now, action: payload.action }]
           : []
@@ -358,6 +528,54 @@ export default class CommunityModerationService {
 
       let newPostState = post.moderationState;
       let newPostStatus;
+
+      if (payload.acknowledgeSuggestion) {
+        const suggestionId = String(payload.acknowledgeSuggestion);
+        const suggestions = Array.isArray(caseMetadata.aiSuggestions) ? caseMetadata.aiSuggestions : [];
+        caseMetadata = {
+          ...caseMetadata,
+          aiSuggestions: suggestions.map((suggestion) =>
+            String(suggestion?.id) === suggestionId
+              ? { ...suggestion, acknowledgedAt: now }
+              : suggestion
+          )
+        };
+      }
+
+      if (payload.followUpAt) {
+        const followUpDate = parseIsoDate(payload.followUpAt);
+        if (!followUpDate) {
+          const error = new Error('Invalid follow-up timestamp');
+          error.status = 422;
+          throw error;
+        }
+
+        const followUp = await ModerationFollowUpModel.create(
+          {
+            caseId: moderationCase.id,
+            remindAt: followUpDate,
+            reason: payload.followUpReason ?? null,
+            metadata: {
+              requestedBy: actor.id,
+              casePublicId: moderationCase.publicId,
+              lastAction: payload.action
+            }
+          },
+          trx
+        );
+
+        caseMetadata = mergeModerationMetadata(caseMetadata, {
+          reminders: [
+            {
+              id: followUp.publicId,
+              remindAt: followUp.remindAt,
+              status: followUp.status,
+              reason: followUp.reason ?? undefined,
+              requestedBy: actor.id
+            }
+          ]
+        });
+      }
 
       switch (payload.action) {
         case 'assign': {
