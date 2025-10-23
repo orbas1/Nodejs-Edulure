@@ -39,4 +39,26 @@ export default class SocialAuditLogModel {
     const record = await connection('social_audit_logs').where({ id }).first();
     return mapRecord(record);
   }
+
+  static async listRecent({ limit = 25 } = {}, connection = db) {
+    const safeLimit = Math.max(1, Math.min(200, Number.parseInt(limit, 10) || 25));
+    const rows = await connection('social_audit_logs')
+      .select([
+        'id',
+        'user_id as userId',
+        'target_user_id as targetUserId',
+        'action',
+        'source',
+        'ip_address as ipAddress',
+        'metadata',
+        'created_at as createdAt'
+      ])
+      .orderBy('created_at', 'desc')
+      .limit(safeLimit);
+
+    return rows.map((row) => ({
+      ...row,
+      metadata: parseJson(row.metadata, {})
+    }));
+  }
 }

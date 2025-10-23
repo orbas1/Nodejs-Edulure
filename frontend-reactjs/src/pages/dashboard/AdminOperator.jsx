@@ -15,6 +15,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useDashboard } from '../../context/DashboardContext.jsx';
 import { useServiceHealth } from '../../context/ServiceHealthContext.jsx';
+import AdminShell from '../../layouts/AdminShell.jsx';
+import useAdminOperationsInsights from '../../hooks/useAdminOperationsInsights.js';
 import {
   fetchRiskRegister,
   createRiskRegisterEntry,
@@ -141,10 +143,16 @@ export default function AdminOperator() {
   const resolvedRole = typeof session?.user?.role === 'string' && session.user.role.length > 0;
   const isAdmin = resolvedRole && session.user.role.toLowerCase() === 'admin';
   const { dashboards, loading, error } = useDashboard();
-  const { alerts, loading: healthLoading } = useServiceHealth();
+  const { alerts: healthAlerts, loading: healthLoading } = useServiceHealth();
   const operatorDashboard = dashboards?.admin?.operator;
   const numberFormatter = useMemo(() => new Intl.NumberFormat('en-US'), []);
   const token = session?.tokens?.accessToken ?? null;
+  const {
+    insights,
+    loading: insightsLoading,
+    error: insightsError,
+    refresh: refreshInsights
+  } = useAdminOperationsInsights({ token: isAdmin ? token : null });
 
   const [riskRecords, setRiskRecords] = useState([]);
   const [riskSummary, setRiskSummary] = useState(() => normalizeRiskSummary());
@@ -171,6 +179,63 @@ export default function AdminOperator() {
     if (!lastRiskUpdated) return null;
     return formatRelativeTime(lastRiskUpdated) ?? lastRiskUpdated.toLocaleTimeString();
   }, [lastRiskUpdated]);
+
+  const statusBlocks = useMemo(() => {
+    if (!isAdmin) {
+      return [];
+    }
+
+    const releaseScore = insights.release?.readiness?.score ?? null;
+    const releaseTone = releaseScore === null ? 'info' : releaseScore >= 80 ? 'success' : releaseScore >= 60 ? 'info' : 'warning';
+    const auditEvents = insights.analytics?.totals?.events ?? 0;
+    const warnings = insights.analytics?.countsBySeverity?.warning ?? 0;
+    const activeAlerts = healthAlerts?.length ?? 0;
+
+    return [
+      {
+        id: 'service-alerts',
+        title: 'Service alerts',
+        value: activeAlerts,
+        helper: activeAlerts ? 'Investigate live service incidents' : 'All monitored services nominal',
+        tone: activeAlerts ? 'warning' : 'success'
+      },
+      {
+        id: 'active-risks',
+        title: 'Active risks',
+        value: activeRiskTotal,
+        helper: riskUpdatedLabel ? `Last update ${riskUpdatedLabel}` : 'Awaiting recent review',
+        tone: activeRiskTotal > 5 ? 'danger' : activeRiskTotal > 0 ? 'warning' : 'success'
+      },
+      {
+        id: 'release-readiness',
+        title: 'Release readiness',
+        value: releaseScore === null ? '—' : `${releaseScore}%`,
+        helper: insights.release?.readiness?.nextGate?.title ?? 'Checklist momentum',
+        tone: releaseTone
+      },
+      {
+        id: 'audit-events',
+        title: 'Audit events (24h)',
+        value: auditEvents,
+        helper: `${warnings} warnings`,
+        tone: auditEvents > 150 ? 'warning' : 'info'
+      }
+    ];
+  }, [isAdmin, healthAlerts, activeRiskTotal, riskUpdatedLabel, insights]);
+
+  const layoutAlerts = useMemo(() => {
+    if (!insightsError || !isAdmin) {
+      return [];
+    }
+    return [
+      {
+        id: 'insights-error',
+        tone: 'warning',
+        title: 'Unified audit feed unavailable',
+        description: insightsError.message
+      }
+    ];
+  }, [insightsError, isAdmin]);
 
   if (!isAdmin) {
     return (
@@ -482,6 +547,7 @@ export default function AdminOperator() {
   }, [numberFormatter, operatorDashboard?.metrics]);
 
   const serviceHealth = operatorDashboard?.serviceHealth;
+  const serviceHealthAlerts = serviceHealth?.alerts ?? [];
   const incidentQueue = operatorDashboard?.incidents?.active ?? [];
   const resolvedIncidents = operatorDashboard?.incidents?.recentResolved ?? [];
   const scamSummary = operatorDashboard?.metrics?.scams;
@@ -548,12 +614,24 @@ export default function AdminOperator() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map((card) => (
-          <StatCard key={card.id} {...card} />
-        ))}
-      </div>
+    <AdminShell
+      title="Risk operations &amp; continuity"
+      description="Steer incidents, risk mitigation, and continuity exercises from a unified workspace."
+      statusBlocks={statusBlocks}
+      alerts={layoutAlerts}
+      quickLinks={insights.quickLinks}
+      auditTrail={insights.timeline}
+      auditLoading={insightsLoading}
+      onRefreshInsights={refreshInsights}
+      analytics={insights.analytics}
+      featureFlags={insights.featureFlags}
+    >
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {summaryCards.map((card) => (
+            <StatCard key={card.id} {...card} />
+          ))}
+        </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
         <section className="dashboard-section xl:col-span-2">
@@ -634,11 +712,11 @@ export default function AdminOperator() {
                 </div>
               ) : null}
 
-              {alerts.length ? (
+              {serviceHealthAlerts.length ? (
                 <div>
                   <h3 className="text-sm font-semibold text-slate-700">Live alerts</h3>
                   <ul className="mt-2 space-y-2 text-xs text-slate-600">
-                    {alerts.map((alert) => (
+                    {serviceHealthAlerts.map((alert) => (
                       <li key={alert.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
                         <span className="font-semibold">{alert.title}</span>
                         <span className="text-slate-500">{alert.level}</span>
@@ -1302,6 +1380,7 @@ export default function AdminOperator() {
           <EmptyState title="No timeline entries" message="Timeline events will appear as incident updates are recorded." />
         )}
       </section>
-    </div>
+      </div>
+    </AdminShell>
   );
 }

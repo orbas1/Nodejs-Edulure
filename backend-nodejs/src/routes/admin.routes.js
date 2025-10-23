@@ -8,6 +8,7 @@ import AdminSettingsController from '../controllers/AdminSettingsController.js';
 import AdminMonetizationController from '../controllers/AdminMonetizationController.js';
 import AdminGrowthController from '../controllers/AdminGrowthController.js';
 import AdminRevenueManagementController from '../controllers/AdminRevenueManagementController.js';
+import AuditLogController from '../controllers/AuditLogController.js';
 import auth from '../middleware/auth.js';
 import { createApiRouter } from './routerFactory.js';
 
@@ -119,6 +120,8 @@ router.delete(
   auth('admin'),
   AdminFeatureFlagController.removeOverride
 );
+
+router.get('/audit/logs/unified', auth('admin'), AuditLogController.listUnified);
 
 router.get('/control/communities', auth('admin'), AdminControlController.listCommunities);
 router.post('/control/communities', auth('admin'), AdminControlController.createCommunity);

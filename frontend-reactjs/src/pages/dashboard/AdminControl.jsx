@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import clsx from 'clsx';
 
 import adminControlApi from '../../api/adminControlApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import AdminCrudResource from '../../components/dashboard/admin/AdminCrudResource.jsx';
 import AdminPodcastManager from '../../components/dashboard/admin/AdminPodcastManager.jsx';
+import AdminShell from '../../layouts/AdminShell.jsx';
+import useAdminOperationsInsights from '../../hooks/useAdminOperationsInsights.js';
 import {
   ADMIN_CONTROL_TABS,
   createAdminControlResourceConfigs
@@ -21,6 +22,75 @@ export default function AdminControl() {
     [resourceConfigs]
   );
   const [activeTab, setActiveTab] = useState(() => tabOrder[0]?.id ?? ADMIN_CONTROL_TABS[0].id);
+
+  const {
+    insights,
+    loading: insightsLoading,
+    error: insightsError,
+    refresh: refreshInsights
+  } = useAdminOperationsInsights({ token: isAdmin ? token : null });
+
+  const statusBlocks = useMemo(() => {
+    if (!isAdmin) {
+      return [];
+    }
+
+    const totals = insights.analytics?.totals ?? {};
+    const counts = insights.analytics?.countsBySeverity ?? {};
+    const releaseScore = insights.release?.readiness?.score ?? null;
+    const readinessTone = releaseScore === null
+      ? 'info'
+      : releaseScore >= 80
+        ? 'success'
+        : releaseScore >= 60
+          ? 'info'
+          : 'warning';
+
+    return [
+      {
+        id: 'audit-events',
+        title: 'Audit events (24h)',
+        value: totals.events ?? 0,
+        helper: `${counts.warning ?? 0} warnings · ${counts.error ?? 0} errors`,
+        tone: totals.events > 120 ? 'warning' : 'info'
+      },
+      {
+        id: 'release-readiness',
+        title: 'Release readiness',
+        value: releaseScore === null ? '—' : `${releaseScore}%`,
+        helper: insights.release?.readiness?.nextGate?.title ?? 'Checklist progress',
+        tone: readinessTone
+      },
+      {
+        id: 'flag-overrides',
+        title: 'Flag overrides',
+        value: insights.featureFlags?.summary?.overridden ?? 0,
+        helper: 'Tenant-specific experiments',
+        tone: (insights.featureFlags?.summary?.overridden ?? 0) > 0 ? 'warning' : 'neutral'
+      },
+      {
+        id: 'governance-reviews',
+        title: 'Upcoming governance reviews',
+        value: insights.compliance?.contracts?.length ?? 0,
+        helper: 'Contracts requiring operator attention',
+        tone: (insights.compliance?.contracts?.length ?? 0) > 2 ? 'warning' : 'info'
+      }
+    ];
+  }, [insights, isAdmin]);
+
+  const alerts = useMemo(() => {
+    if (!insightsError || !isAdmin) {
+      return [];
+    }
+    return [
+      {
+        id: 'insights-error',
+        tone: 'warning',
+        title: 'Operational insights temporarily unavailable',
+        description: insightsError.message
+      }
+    ];
+  }, [insightsError, isAdmin]);
 
   useEffect(() => {
     if (!tabOrder.some((tab) => tab.id === activeTab)) {
@@ -63,35 +133,21 @@ export default function AdminControl() {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Operational control centre</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Activate, iterate, and retire platform programmes across communities, courses, tutors, live experiences, and media.
-          </p>
-        </div>
-        <nav className="flex flex-wrap gap-2">
-          {tabOrder.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange(tab.id)}
-              className={clsx(
-                'rounded-full border px-4 py-2 text-xs font-semibold transition',
-                activeTab === tab.id
-                  ? 'border-primary bg-primary text-white shadow'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary'
-              )}
-              aria-pressed={activeTab === tab.id}
-              aria-current={activeTab === tab.id ? 'page' : undefined}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </header>
-
+    <AdminShell
+      title="Operational control centre"
+      description="Activate, iterate, and retire platform programmes across communities, courses, tutors, live experiences, and media."
+      navigation={tabOrder}
+      activeNavigation={activeTab}
+      onNavigate={handleTabChange}
+      statusBlocks={statusBlocks}
+      alerts={alerts}
+      quickLinks={insights.quickLinks}
+      auditTrail={insights.timeline}
+      auditLoading={insightsLoading}
+      onRefreshInsights={refreshInsights}
+      analytics={insights.analytics}
+      featureFlags={insights.featureFlags}
+    >
       {activeTab === 'podcasts' ? (
         <AdminPodcastManager token={token} api={adminControlApi} />
       ) : (
@@ -118,6 +174,6 @@ export default function AdminControl() {
           searchPlaceholder={`Search ${config.entityName}s`}
         />
       )}
-    </div>
+    </AdminShell>
   );
 }
