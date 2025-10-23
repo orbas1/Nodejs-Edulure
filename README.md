@@ -216,6 +216,9 @@ When the launcher runs it:
 3. Enables the Edulure Search provider (Postgres-backed) and exposes health/readiness probes before starting the frontend.
 4. Streams prefixed logs (`[web]`, `[jobs]`, `[search]`, `[realtime]`) so you can differentiate subsystems quickly and see remediation hints if environment variables are missing.
 
+- Pass `--log-format=ndjson` to emit newline-delimited JSON logs that can be piped into `jq` or forwarded to observability tooling. Pretty printing remains the default for interactive terminals.
+- While the launcher is running you can type commands into the terminal: `:list` prints active child processes, `:restart <label>` gracefully restarts either the backend or frontend watcher, `:help` shows the available commands, and `:quit` exits after shutting down child processes cleanly.
+
 ### Guided installation UI
 
 The browser-based installer remains available for teams that prefer a graphical setup walkthrough. It writes `.env.local` files, provisions the database, seeds Edulure Search metadata (Postgres materialised views), and warms the internalised job/realtime subsystems. After installing dependencies:

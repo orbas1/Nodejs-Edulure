@@ -15,6 +15,7 @@ import communitiesPreview from '../assets/home/preview/communities.svg';
 import coursesPreview from '../assets/home/preview/courses.svg';
 import liveEventsPreview from '../assets/home/preview/live-events.svg';
 import libraryPreview from '../assets/home/preview/library.svg';
+import { trackEvent } from '../lib/analytics.js';
 
 const HERO_CHIP_KEYS = [
   { key: 'home.hero.chips.communities', fallback: 'Communities' },
@@ -252,6 +253,39 @@ export default function Home() {
     };
   });
 
+  const heroPrimaryAction = {
+    to: '/register',
+    label: heroData.primaryLabel,
+    onClick: () =>
+      trackEvent('marketing:cta_click', {
+        surface: 'home.hero',
+        slot: 'primary',
+        destination: '/register'
+      })
+  };
+
+  const heroSecondaryAction = {
+    to: '/feed',
+    label: heroData.secondaryLabel,
+    onClick: () =>
+      trackEvent('marketing:cta_click', {
+        surface: 'home.hero',
+        slot: 'secondary',
+        destination: '/feed'
+      })
+  };
+
+  const heroTertiaryAction = {
+    href: '#instructor',
+    label: heroData.instructorLabel,
+    onClick: () =>
+      trackEvent('marketing:cta_click', {
+        surface: 'home.hero',
+        slot: 'tertiary',
+        destination: '#instructor'
+      })
+  };
+
   return (
     <div className="bg-slate-50 text-slate-900">
       <MarketingHero
@@ -264,9 +298,9 @@ export default function Home() {
         chips={heroChips}
         headline={heroData.headline}
         subheadline={heroData.subheadline}
-        primaryAction={{ to: '/register', label: heroData.primaryLabel }}
-        secondaryAction={{ to: '/feed', label: heroData.secondaryLabel }}
-        tertiaryAction={{ href: '#instructor', label: heroData.instructorLabel }}
+        primaryAction={heroPrimaryAction}
+        secondaryAction={heroSecondaryAction}
+        tertiaryAction={heroTertiaryAction}
         rightPanel={<HeroPreviewPanel t={t} />}
       />
       <CommunitySpotlight />
