@@ -40,9 +40,9 @@ Group 2 – Categories 5-8 (frontend structure and code actions)
    C. *Documentation alignment* – No runtime removals occur until feature parity is achieved; docs capture deprecation intent only.
 
 8. **Component deletions**
-   A. *Targeted consolidation* – Remove extra hero banners, dashboard cards, and marketing sliders after shared kits go live.
-   B. *Search/UI overlap* – Eliminate parallel explorer grids and tutor cards once the new unified components replace them.
-   C. *Performance tuning* – Sunset heavy carousel variants and duplicated chat widgets when virtualised lists and shared chat land.
+   A. ✅ *Targeted consolidation* – Removed the bespoke `HomeHero.jsx` and `MembershipSnapshot.jsx` implementations in favour of the new shared `marketing/MarketingHero.jsx` and `marketing/PlanHighlights.jsx`, wiring `Home.jsx` to the shared kits so the landing experience now renders through reusable building blocks.
+   B. ✅ *Search/UI overlap* – Replaced the bespoke `InsidePreviewTabs.jsx` showcase with the shared `marketing/ProductPreviewTabs.jsx`, collapsing the parallel explorer marketing grid so Home now consumes the same preview contract that other search-driven surfaces will reuse.
+   C. ✅ *Performance tuning* – Deleted the heavy marketing slider variants and reimplemented the preview rail with a lean tabbed `ProductPreviewTabs` component, reducing bespoke carousel code paths ahead of the shared virtualised feed and chat primitives landing.
 
 Group 3 – Categories 9-10 (data and alignment)
 
