@@ -155,6 +155,43 @@ export class FeatureFlagAuditModel {
       createdAt: row.created_at
     }));
   }
+
+  static async listRecent({ limit = 25, since } = {}, connection = db) {
+    const resolvedLimit = Math.max(1, Math.min(100, Number.parseInt(limit ?? 25, 10) || 25));
+    const query = connection('feature_flag_audits as ffa')
+      .leftJoin('feature_flags as ff', 'ff.id', 'ffa.flag_id')
+      .select([
+        'ffa.id',
+        'ffa.flag_id as flagId',
+        'ffa.change_type as changeType',
+        'ffa.payload',
+        'ffa.changed_by as changedBy',
+        'ffa.created_at as createdAt',
+        'ff.key as flagKey',
+        'ff.name as flagName'
+      ])
+      .orderBy('ffa.created_at', 'desc')
+      .limit(resolvedLimit);
+
+    if (since) {
+      const sinceDate = new Date(since);
+      if (!Number.isNaN(sinceDate.getTime())) {
+        query.where('ffa.created_at', '>=', sinceDate);
+      }
+    }
+
+    const rows = await query;
+    return rows.map((row) => ({
+      id: row.id,
+      flagId: row.flagId,
+      flagKey: row.flagKey ?? null,
+      flagName: row.flagName ?? null,
+      changeType: row.changeType,
+      changedBy: row.changedBy ?? null,
+      payload: parseJsonColumn(row.payload, {}),
+      createdAt: row.createdAt
+    }));
+  }
 }
 
 export class FeatureFlagTenantStateModel {
