@@ -2204,7 +2204,7 @@ export async function seed(knex) {
         conversions: 214,
         spend_cents: 36500,
         revenue_cents: 98200,
-        metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
+        metadata: JSON.stringify({ source: 'search-documents', funnel: 'creator-growth' })
       },
       {
         campaign_id: growthAdsCampaignId,
@@ -2214,7 +2214,7 @@ export async function seed(knex) {
         conversions: 238,
         spend_cents: 41200,
         revenue_cents: 109500,
-        metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
+        metadata: JSON.stringify({ source: 'search-documents', funnel: 'creator-growth' })
       }
     ]);
 
@@ -4000,4 +4000,11 @@ export async function seed(knex) {
       output: JSON.stringify({ recordsProcessed: 0, checksum: 'seed-init' })
     });
   });
+
+  const client = knex?.client?.config?.client ?? '';
+  if (typeof client === 'string' && client.toLowerCase().includes('pg')) {
+    await knex
+      .raw('SELECT search.refresh_all_documents()')
+      .catch((error) => console.warn('Search document refresh skipped', error.message));
+  }
 }

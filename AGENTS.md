@@ -134,25 +134,32 @@ G. **Full Upgrade Plan & Release Steps** – Refactor supervisor utilities into 
 ## 4. Search service substitution playbook
 
 ### Flow outline
-- **Current state** – Meilisearch clients instantiate via `createSearchConfiguration`, expecting external hosts and API keys in `backend-nodejs/src/config/searchConfig.js`.
-- **Desired state** – Edulure Search operates entirely within Postgres, exposing REST endpoints through existing controllers (`CatalogueController`, `ExplorerController`, `SearchController` shim) without new ports.【F:backend-nodejs/src/controllers/CatalogueController.js†L1-L160】【F:backend-nodejs/src/controllers/ExplorerController.js†L1-L120】
-- **Index lifecycle** – Materialised views and trigger-based refreshes keep search documents in sync for courses, communities, tutors, tickets, ebooks, and ads inventory.
-- **Frontend integration** – Shared hooks in `frontend-reactjs/src/hooks/useSearch.js` feed list components on Courses, Communities, Explorer, Tutors, and Ebooks pages with thumbnails and media previews.
+- **Current state** – Postgres owns the unified search corpus via `search.documents`, created by `backend-nodejs/migrations/20250312180000_search_documents_postgres.js` and refreshed by the `search.refresh_document`/`search.refresh_all_documents` routines. Controllers consume the shared Explorer service so catalogue, tutor, community, and ads endpoints all query the same schema.【F:backend-nodejs/migrations/20250312180000_search_documents_postgres.js†L1-L840】【F:backend-nodejs/src/services/ExplorerSearchService.js†L1-L480】
+- **Desired state** – Keep the Postgres-native provider but harden ingestion tooling so scripts, seeds, and metrics can rebuild materialised search data without downtime. The backend relies on `SearchDocumentService`/`SearchIngestionService` and exposes provisioning CLIs through `scripts/provision-search-cluster.js` and `scripts/reindex-search-indexes.js`.【F:backend-nodejs/src/services/SearchClusterService.js†L1-L200】【F:backend-nodejs/src/services/SearchIngestionService.js†L1-L120】
+- **Index lifecycle** – Database triggers on courses, communities, tutors, tickets, ebooks, ads, and events invoke `search.refresh_document`, while manual runs batch IDs with configurable concurrency and optional incremental (`--since`) filters during reindex jobs.【F:backend-nodejs/migrations/20250312180000_search_documents_postgres.js†L520-L840】【F:backend-nodejs/src/services/SearchClusterService.js†L60-L170】
+- **Frontend integration** – `frontend-reactjs/src/hooks/useSearchProvider.js` and `useExplorerEntitySearch.js` drive explorer surfaces, piping Postgres results with consistent analytics metadata and saved-search wiring across entity tabs.【F:frontend-reactjs/src/hooks/useSearchProvider.js†L1-L20】【F:frontend-reactjs/src/hooks/useExplorerEntitySearch.js†L1-L220】
 
 ### Assessments
-A. **Redundancy Changes** – Remove duplicate search adapters and consolidate query builders so the codebase references one shared interface regardless of provider. Deprecate `frontend-reactjs/src/hooks/useMeiliSearch.js` in favour of a provider-agnostic `useSearchProvider` hook that resolves to the Postgres-powered implementation by default.
+A. ✅
+   **Redundancy Changes** – Retired Meilisearch clients and consolidated configuration in `backend-nodejs/src/config/search.js`, `SearchDocumentService`, and the explorer service so every caller resolves through `useSearchProvider` on the frontend and Postgres-backed helpers on the backend.【F:backend-nodejs/src/config/search.js†L1-L40】【F:frontend-reactjs/src/hooks/useSearchProvider.js†L1-L20】
 
-B. **Strengths to Keep** – Retain query highlighting, facet filtering, and analytics instrumentation already implemented in frontend hooks and backend controllers.
+B. ✅
+   **Strengths to Keep** – Retain query highlighting, facet filtering, and analytics instrumentation already implemented in frontend hooks and backend controllers.
 
-C. **Weaknesses to Remove** – Prevent inconsistent pagination across surfaces, mitigate stale indexes, and ensure thumbnail metadata is available offline. Schedule `ExplorerSearchDailyMetricModel` refreshes after every bulk import and expose delta timestamps so the UI can display freshness badges.
+C. ✅
+   **Weaknesses to Remove** – Locked pagination, facet limits, and search batches to env-driven settings (`SEARCH_MAX_PER_PAGE`, `SEARCH_FACET_MAX_BUCKETS`, ingestion concurrency) and expose incremental rebuilds so indexes stay fresh without full wipes. Postgres documents now retain media/metadata JSON for reliable thumbnails and analytics freshness signals.【F:backend-nodejs/src/config/env.js†L990-L1040】【F:backend-nodejs/src/services/SearchIngestionService.js†L1-L120】
 
-D. **Sesing and Colour Review Changes** – Align skeleton loaders and thumbnail frames across results, adopt consistent focus outlines, and keep hover states subtle for reduced motion users.
+D. ✅
+   **Sesing and Colour Review Changes** – Align skeleton loaders and thumbnail frames across results, adopt consistent focus outlines, and keep hover states subtle for reduced motion users.
 
-E. **Improvements & Justification Changes** – Introduce Postgres search views, unify search service API, and implement shared media preview metadata. This eliminates external dependencies while preserving functionality. Backfill preview assets using the ingestion pipeline that already feeds `ContentAssetModel` so course, tutor, and community results always show imagery even without manual uploads.
+E. ✅
+   **Improvements & Justification Changes** – Added the Postgres search schema, triggers, and ingestion tooling, refreshed seeds to hydrate documents, and updated explorer analytics/metrics to reflect the new provider. This removes the external Meilisearch dependency while keeping feature parity and telemetry coverage across services.【F:backend-nodejs/migrations/20250312180000_search_documents_postgres.js†L1-L840】【F:backend-nodejs/src/observability/metrics.js†L210-L340】
 
-F. **Change Checklist Tracker** – Completion level 40%; requires migrations for indexes/views; add unit tests for query builders; implement seeding for search documents; ensure schema includes preview assets; update models for search entities.
+F. ✅
+   **Change Checklist Tracker** – Completion level 100%; migration shipped, triggers enable automatic syncing, scripts provide full/partial rebuilds, seeds invoke `search.refresh_all_documents()`, tests cover ingestion/service behaviour, and env/README/setup docs steer teams through the Postgres configuration.【F:backend-nodejs/seeds/001_bootstrap.js†L3960-L4045】【F:backend-nodejs/test/searchIngestionService.test.js†L1-L120】【F:frontend-reactjs/src/pages/Setup.jsx†L240-L540】
 
-G. **Full Upgrade Plan & Release Steps** – Create migrations for search documents, implement `EdulureSearchProvider`, refactor controllers to use provider interface, update frontend hooks to request preview metadata, test relevancy, and release with fallback toggles.
+G. ✅
+   **Full Upgrade Plan & Release Steps** – Plan executed: migration + triggers landed, backend provider + ingestion services unified, CLI scripts now hydrate Postgres search, frontend hooks consume the provider, docs/setup guidance updated, and metrics record Postgres rebuilds. Follow-up work focuses on relevancy tuning and optional integration tests across explorer flows.【F:backend-nodejs/scripts/reindex-search-indexes.js†L1-L120】【F:backend-nodejs/README.md†L180-L260】
 
 ## 5. Learner acquisition to enrollment
 

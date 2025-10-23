@@ -86,9 +86,10 @@ const requiredEnv = {
   SMTP_FROM_EMAIL: 'noreply@test.com',
   SMTP_FROM_NAME: 'Test Sender',
   EMAIL_VERIFICATION_URL: 'https://verify.test',
-  MEILISEARCH_HOSTS: 'https://search.test',
-  MEILISEARCH_ADMIN_API_KEY: 'search-admin-key',
-  MEILISEARCH_SEARCH_API_KEY: 'search-public-key'
+  SEARCH_SCHEMA: 'search',
+  SEARCH_DICTIONARY: 'simple',
+  SEARCH_MAX_PER_PAGE: '50',
+  SEARCH_FACET_MAX_BUCKETS: '25'
 };
 
 for (const [key, value] of Object.entries(requiredEnv)) {

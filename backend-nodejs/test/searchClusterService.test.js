@@ -1,96 +1,91 @@
-import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { env } from '../src/config/env.js';
-import { SearchClusterService } from '../src/services/SearchClusterService.js';
+import { SearchDocumentService } from '../src/services/SearchClusterService.js';
 
-vi.mock('meilisearch', () => ({
-  MeiliSearch: vi.fn()
-}));
+function createQuery(rows) {
+  const query = {
+    rows,
+    orderBy: vi.fn(() => query),
+    where: vi.fn(() => query),
+    then: (onFulfilled, onRejected) => Promise.resolve(rows).then(onFulfilled, onRejected),
+    catch: (onRejected) => Promise.resolve(rows).catch(onRejected),
+    finally: (onFinally) => Promise.resolve().finally(onFinally)
+  };
+  return query;
+}
 
-describe('SearchClusterService', () => {
-  let adminClient;
-  let readClient;
-  let logger;
+function createDbMock(rows = [{ id: 1 }, { id: 2 }]) {
+  const raw = vi.fn();
+  const query = createQuery(rows);
+
+  const select = vi.fn(() => ({
+    from: vi.fn(() => query)
+  }));
+
+  const documentsWhere = vi.fn(() => ({
+    del: vi.fn().mockResolvedValue(undefined)
+  }));
+
+  const withSchema = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: documentsWhere,
+      del: vi.fn().mockResolvedValue(undefined),
+      count: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([{ total: 0 }]) })
+    }))
+  }));
+
+  const transaction = vi.fn(async (handler) => {
+    await handler({
+      select,
+      raw
+    });
+  });
+
+  return { raw, withSchema, transaction, query, documentsWhere };
+}
+
+describe('SearchDocumentService', () => {
+  let db;
+  let service;
 
   beforeEach(() => {
-    vi.useFakeTimers();
-    const updateSettings = vi.fn().mockResolvedValue({ taskUid: 2 });
-
-    adminClient = {
-      getIndex: vi.fn().mockRejectedValue(Object.assign(new Error('missing'), { code: 'index_not_found' })),
-      createIndex: vi.fn().mockResolvedValue({ taskUid: 1 }),
-      waitForTask: vi.fn().mockResolvedValue({ status: 'succeeded' }),
-      index: vi.fn(() => ({ updateSettings })),
-      getKeys: vi.fn().mockResolvedValue({
-        results: [
-          {
-            key: env.search.searchApiKey,
-            actions: ['search'],
-            indexes: [`${env.search.indexPrefix}_communities`],
-            uid: 'search-key'
-          }
-        ]
-      }),
-      health: vi.fn().mockResolvedValue({ status: 'available' }),
-      createSnapshot: vi.fn().mockResolvedValue({ taskUid: 3 })
-    };
-
-    readClient = {
-      health: vi.fn().mockResolvedValue({ status: 'available' })
-    };
-
-    logger = {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn()
-    };
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('provisions explorer indexes, audits keys, and exposes health metrics', async () => {
-    const service = new SearchClusterService({
-      adminNodes: [{ host: 'https://primary.local:7700', client: adminClient }],
-      replicaNodes: [],
-      readNodes: [{ host: 'https://reader.local:7700', client: readClient }],
-      healthcheckIntervalMs: 5000,
-      requestTimeoutMs: 2000,
-      loggerInstance: logger
+    db = createDbMock();
+    service = new SearchDocumentService({
+      dbClient: db,
+      loggerInstance: { child: () => ({ info: vi.fn(), error: vi.fn(), debug: vi.fn() }) }
     });
+  });
 
+  it('refreshes the entire search corpus when start succeeds', async () => {
+    db.raw.mockResolvedValueOnce([{ exists: true }]);
     await service.start();
-    service.stop();
-
-    expect(adminClient.createIndex).toHaveBeenCalledWith({
-      uid: `${env.search.indexPrefix}_communities`,
-      primaryKey: 'id'
-    });
-    expect(adminClient.index).toHaveBeenCalledWith(`${env.search.indexPrefix}_courses`);
-    expect(adminClient.waitForTask).toHaveBeenCalledWith(1, expect.any(Object));
-    expect(logger.info).toHaveBeenCalledWith(
-      expect.objectContaining({ index: `${env.search.indexPrefix}_communities`, host: 'https://primary.local:7700' }),
-      'Meilisearch index synchronised'
-    );
-    expect(adminClient.getKeys).toHaveBeenCalled();
-    expect(readClient.health).toHaveBeenCalled();
+    expect(db.withSchema).toHaveBeenCalledWith('search');
+    expect(db.raw).toHaveBeenCalledWith('SELECT search.refresh_all_documents()');
   });
 
-  it('creates snapshots for backups when requested', async () => {
-    const service = new SearchClusterService({
-      adminNodes: [{ host: 'https://primary.local:7700', client: adminClient }],
-      replicaNodes: [],
-      readNodes: [{ host: 'https://reader.local:7700', client: readClient }],
-      healthcheckIntervalMs: 0,
-      requestTimeoutMs: 2000,
-      loggerInstance: logger
-    });
+  it('refreshes a single entity by id', async () => {
+    db.raw.mockResolvedValue();
+    const processed = await service.refreshEntity('courses', { id: 42 });
+    expect(db.raw).toHaveBeenCalledWith('SELECT search.refresh_document(?, ?)', ['courses', 42]);
+    expect(processed).toBe(1);
+  });
 
-    await service.bootstrap();
-    await service.createSnapshot();
+  it('throws for unsupported entities', async () => {
+    await expect(service.refreshEntity('unknown')).rejects.toThrow('Unsupported search entity');
+  });
 
-    expect(adminClient.createSnapshot).toHaveBeenCalled();
-    expect(adminClient.waitForTask).toHaveBeenCalledWith(3, expect.any(Object));
+  it('applies since filters and batch processing when refreshing entities', async () => {
+    const since = new Date('2024-11-01T00:00:00Z');
+    db.query.rows = [{ id: 3 }, { id: 4 }, { id: 5 }];
+    const processed = await service.refreshEntity('courses', { since });
+    expect(db.query.orderBy).toHaveBeenCalledWith('id');
+    expect(db.query.where).toHaveBeenCalledWith('updated_at', '>=', since);
+    expect(processed).toBe(3);
+  });
+
+  it('clears entity documents when requested', async () => {
+    await service.clearEntityDocuments('courses');
+    expect(db.withSchema).toHaveBeenCalledWith('search');
+    expect(db.documentsWhere).toHaveBeenCalledWith('entity_type', 'courses');
   });
 });

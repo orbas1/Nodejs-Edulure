@@ -1,81 +1,140 @@
+import db from '../config/database.js';
 import logger from '../config/logger.js';
-import { recordSearchOperation } from '../observability/metrics.js';
-import { INDEX_DEFINITIONS, searchClusterService } from './SearchClusterService.js';
+import searchConfiguration from '../config/search.js';
 import { buildBounds, resolveCountryCoordinates } from '../utils/geo.js';
 import AdsPlacementService from './AdsPlacementService.js';
 
 const ENTITY_CONFIG = {
   communities: {
-    facets: ['visibility', 'category', 'timezone', 'country', 'languages', 'tags'],
+    facets: ['visibility', 'category', 'languages', 'country', 'tags'],
+    filters: {
+      visibility: { path: 'visibility', type: 'string' },
+      category: { path: 'category', type: 'string' },
+      timezone: { path: 'timezone', type: 'string' },
+      languages: { path: 'languages', type: 'array' },
+      country: { path: 'country', type: 'string' },
+      tags: { path: 'tags', type: 'array' }
+    },
     sorts: {
-      trending: ['desc(trendScore)'],
-      members: ['desc(memberCount)'],
-      newest: ['desc(createdAt)']
+      trending: { expression: "(d.metadata->>'trendScore')::numeric", direction: 'desc', nulls: 'last' },
+      members: { expression: "(d.metadata->>'memberCount')::numeric", direction: 'desc', nulls: 'last' },
+      newest: { expression: 'd.updated_at', direction: 'desc' }
     },
     defaultSort: 'trending'
   },
   courses: {
-    facets: ['category', 'level', 'deliveryFormat', 'languages', 'price.currency', 'tags'],
+    facets: ['category', 'level', 'deliveryFormat', 'languages', 'tags'],
+    filters: {
+      level: { path: 'level', type: 'string' },
+      category: { path: 'category', type: 'string' },
+      deliveryFormat: { path: 'deliveryFormat', type: 'string' },
+      languages: { path: 'languages', type: 'array' },
+      skills: { path: 'skills', type: 'array' },
+      tags: { path: 'tags', type: 'array' },
+      'price.currency': { path: 'price.currency', type: 'string' },
+      'price.amount': { path: 'price.amount', type: 'range' }
+    },
     sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      newest: ['desc(releaseAt)'],
-      priceLow: ['asc(price.amount)'],
-      priceHigh: ['desc(price.amount)']
+      relevance: { type: 'rank' },
+      rating: { expression: "(d.metadata->'rating'->>'average')::numeric", direction: 'desc', nulls: 'last' },
+      newest: {
+        expression: "COALESCE((d.metadata->>'releaseAt')::timestamptz, d.updated_at)",
+        direction: 'desc',
+        nulls: 'last'
+      },
+      priceLow: { expression: "(d.filters->>'price.amount')::numeric", direction: 'asc', nulls: 'last' },
+      priceHigh: { expression: "(d.filters->>'price.amount')::numeric", direction: 'desc', nulls: 'last' }
     },
     defaultSort: 'relevance'
   },
   ebooks: {
-    facets: ['categories', 'languages', 'price.currency', 'tags'],
+    facets: ['categories', 'languages', 'tags'],
+    filters: {
+      categories: { path: 'categories', type: 'array' },
+      languages: { path: 'languages', type: 'array' },
+      tags: { path: 'tags', type: 'array' }
+    },
     sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      newest: ['desc(releaseAt)'],
-      readingTime: ['asc(readingTimeMinutes)']
+      relevance: { type: 'rank' },
+      rating: { expression: "(d.metadata->'rating'->>'average')::numeric", direction: 'desc', nulls: 'last' },
+      newest: { expression: 'd.updated_at', direction: 'desc' },
+      readingTime: { expression: "(d.metadata->>'readingTimeMinutes')::numeric", direction: 'asc', nulls: 'last' }
     },
     defaultSort: 'relevance'
   },
   tutors: {
     facets: ['languages', 'skills', 'country', 'isVerified'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      priceLow: ['asc(hourlyRate.amount)'],
-      priceHigh: ['desc(hourlyRate.amount)'],
-      responseTime: ['asc(responseTimeMinutes)']
+    filters: {
+      languages: { path: 'languages', type: 'array' },
+      skills: { path: 'skills', type: 'array' },
+      country: { path: 'country', type: 'string' },
+      isVerified: { path: 'isVerified', type: 'boolean' },
+      'hourlyRate.amount': { path: 'hourlyRate.amount', type: 'range' }
     },
-    defaultSort: 'relevance'
-  },
-  profiles: {
-    facets: ['role', 'languages', 'country', 'communities', 'badges'],
     sorts: {
-      relevance: [],
-      followers: ['desc(followerCount)'],
-      newest: ['desc(createdAt)']
+      relevance: { type: 'rank' },
+      rating: { expression: "(d.metadata->'rating'->>'average')::numeric", direction: 'desc', nulls: 'last' },
+      priceLow: { expression: "(d.filters->>'hourlyRate.amount')::numeric", direction: 'asc', nulls: 'last' },
+      priceHigh: { expression: "(d.filters->>'hourlyRate.amount')::numeric", direction: 'desc', nulls: 'last' },
+      responseTime: { expression: "(d.metadata->>'responseTimeMinutes')::numeric", direction: 'asc', nulls: 'last' }
     },
     defaultSort: 'relevance'
   },
   ads: {
-    facets: ['status', 'objective', 'targeting.audiences', 'targeting.locations'],
+    facets: ['objective', 'status'],
+    filters: {
+      objective: { path: 'objective', type: 'string' },
+      status: { path: 'status', type: 'string' }
+    },
     sorts: {
-      performance: ['desc(performanceScore)', 'desc(ctr)'],
-      spend: ['desc(spend.total)'],
-      newest: ['desc(createdAt)']
+      performance: { expression: "(d.metadata->>'performanceScore')::numeric", direction: 'desc', nulls: 'last' },
+      spend: { expression: "(d.metadata->'spend'->>'amount')::numeric", direction: 'desc', nulls: 'last' },
+      newest: { expression: 'd.updated_at', direction: 'desc' }
     },
     defaultSort: 'performance'
   },
   events: {
-    facets: ['type', 'status', 'timezone', 'isTicketed', 'price.currency'],
+    facets: ['status', 'visibility', 'timezone'],
+    filters: {
+      status: { path: 'status', type: 'string' },
+      visibility: { path: 'visibility', type: 'string' },
+      timezone: { path: 'timezone', type: 'string' }
+    },
     sorts: {
-      upcoming: ['asc(startAt)'],
-      newest: ['desc(createdAt)']
+      upcoming: {
+        expression: "COALESCE((d.metadata->>'startAt')::timestamptz, d.updated_at)",
+        direction: 'asc',
+        nulls: 'last'
+      },
+      newest: { expression: 'd.updated_at', direction: 'desc' }
     },
     defaultSort: 'upcoming'
+  },
+  tickets: {
+    facets: ['category', 'priority', 'status', 'channel'],
+    filters: {
+      category: { path: 'category', type: 'string' },
+      priority: { path: 'priority', type: 'string' },
+      status: { path: 'status', type: 'string' },
+      channel: { path: 'channel', type: 'string' }
+    },
+    sorts: {
+      newest: { expression: 'd.updated_at', direction: 'desc' }
+    },
+    defaultSort: 'newest'
   }
 };
 
 const SUPPORTED_ENTITIES = Object.keys(ENTITY_CONFIG);
-const INDEX_UIDS = new Map(INDEX_DEFINITIONS.map((definition) => [definition.name, definition.uid]));
+
+function sanitiseArray(values) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return values
+    .map((value) => (typeof value === 'string' ? value.trim() : value))
+    .filter((value) => typeof value === 'string' && value.length > 0);
+}
 
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
@@ -86,12 +145,17 @@ function formatCurrency(value) {
     return null;
   }
   const currency = value.currency ?? 'USD';
-  const amount = value.amount >= 100 ? value.amount / 100 : value.amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0
-  }).format(amount);
+  const amount = Number(value.amount);
+  const normalised = amount >= 100 ? amount / 100 : amount;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: normalised >= 100 ? 0 : 2
+    }).format(normalised);
+  } catch (_error) {
+    return `${currency} ${normalised}`;
+  }
 }
 
 function formatNumber(value) {
@@ -105,141 +169,62 @@ function formatRating(rating) {
   if (!rating || !isFiniteNumber(rating.average)) {
     return null;
   }
-  const average = rating.average.toFixed(1);
-  const count = rating.count ? ` · ${formatNumber(rating.count)} ratings` : '';
+  const average = Number(rating.average).toFixed(1);
+  const count = rating.count ? ` · ${formatNumber(Number(rating.count))} ratings` : '';
   return `${average}★${count}`;
-}
-
-function sanitiseArray(values) {
-  if (!Array.isArray(values)) {
-    return [];
-  }
-  return values
-    .map((value) => (typeof value === 'string' ? value.trim() : value))
-    .filter((value) => value !== null && value !== undefined && value !== '');
-}
-
-function mergeFilterValue(baseValue, overrideValue) {
-  if (overrideValue === undefined || overrideValue === null) {
-    return baseValue;
-  }
-  if (Array.isArray(baseValue) && Array.isArray(overrideValue)) {
-    return overrideValue.length ? overrideValue : baseValue;
-  }
-  if (typeof baseValue === 'object' && typeof overrideValue === 'object' && !Array.isArray(baseValue)) {
-    return { ...baseValue, ...overrideValue };
-  }
-  return overrideValue;
-}
-
-function encodeValue(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'true' : 'false';
-  }
-  if (value instanceof Date) {
-    return `"${value.toISOString()}"`;
-  }
-  return `"${String(value).replace(/"/g, '\\"')}"`;
-}
-
-function buildFilterClauses(filters) {
-  if (!filters || typeof filters !== 'object') {
-    return null;
-  }
-  const clauses = [];
-  for (const [attribute, rawValue] of Object.entries(filters)) {
-    if (rawValue === null || rawValue === undefined || rawValue === '') {
-      continue;
-    }
-    if (Array.isArray(rawValue)) {
-      const values = sanitiseArray(rawValue);
-      if (!values.length) {
-        continue;
-      }
-      const encoded = values.map((value) => encodeValue(value)).filter((value) => value !== null);
-      if (!encoded.length) {
-        continue;
-      }
-      clauses.push(`${attribute} IN [${encoded.join(', ')}]`);
-      continue;
-    }
-    if (typeof rawValue === 'object') {
-      const { min, max, equals, not } = rawValue;
-      if (min !== undefined && min !== null) {
-        const encodedMin = encodeValue(min);
-        if (encodedMin !== null) {
-          clauses.push(`${attribute} >= ${encodedMin}`);
-        }
-      }
-      if (max !== undefined && max !== null) {
-        const encodedMax = encodeValue(max);
-        if (encodedMax !== null) {
-          clauses.push(`${attribute} <= ${encodedMax}`);
-        }
-      }
-      if (equals !== undefined && equals !== null) {
-        const encodedEquals = encodeValue(equals);
-        if (encodedEquals !== null) {
-          clauses.push(`${attribute} = ${encodedEquals}`);
-        }
-      }
-      if (not !== undefined && not !== null) {
-        const encodedNot = encodeValue(not);
-        if (encodedNot !== null) {
-          clauses.push(`${attribute} != ${encodedNot}`);
-        }
-      }
-      continue;
-    }
-    if (typeof rawValue === 'boolean') {
-      clauses.push(`${attribute} = ${rawValue ? 'true' : 'false'}`);
-      continue;
-    }
-    const encoded = encodeValue(rawValue);
-    if (encoded !== null) {
-      clauses.push(`${attribute} = ${encoded}`);
-    }
-  }
-  return clauses.length ? clauses : null;
 }
 
 function deriveGeo(entity, hit) {
   if (!hit) {
     return null;
   }
+  const meta = hit.metadata ?? {};
+  const filters = hit.filters ?? {};
+
+  const resolveCountry = () => {
+    if (typeof meta.country === 'string' && meta.country) return meta.country;
+    const filterCountry = filters.country;
+    if (typeof filterCountry === 'string' && filterCountry) return filterCountry;
+    if (Array.isArray(filterCountry) && filterCountry.length > 0) {
+      return filterCountry[0];
+    }
+    if (typeof meta.communityCountry === 'string' && meta.communityCountry) {
+      return meta.communityCountry;
+    }
+    return null;
+  };
+
   if (entity === 'communities') {
-    const country = hit.country ?? hit.metadata?.country ?? null;
+    const country = resolveCountry();
     const resolved = resolveCountryCoordinates(country);
     if (resolved) {
       return {
         latitude: resolved.latitude,
         longitude: resolved.longitude,
-        label: hit.name,
+        label: hit.title,
         country: resolved.code,
         context: 'community'
       };
     }
   }
+
   if (entity === 'tutors') {
-    const resolved = resolveCountryCoordinates(hit.country ?? hit.metadata?.country ?? null);
+    const country = resolveCountry();
+    const resolved = resolveCountryCoordinates(country);
     if (resolved) {
       return {
         latitude: resolved.latitude,
         longitude: resolved.longitude,
-        label: hit.displayName,
+        label: hit.title,
         country: resolved.code,
         context: 'tutor'
       };
     }
   }
+
   if (entity === 'events') {
-    const resolved = resolveCountryCoordinates(hit.country ?? hit.communityCountry ?? null);
+    const country = meta.communityCountry ?? resolveCountry();
+    const resolved = resolveCountryCoordinates(country);
     if (resolved) {
       return {
         latitude: resolved.latitude,
@@ -250,153 +235,163 @@ function deriveGeo(entity, hit) {
       };
     }
   }
+
   return null;
 }
 
 function formatHit(entity, hit) {
+  const meta = hit.metadata ?? {};
+  const media = hit.media ?? {};
+  const filters = hit.filters ?? {};
+  const tags = Array.isArray(hit.tags) ? hit.tags : [];
+  const geoSource = { ...hit, metadata: meta, filters };
+
   const base = {
     id: hit.id,
     entityType: entity,
     raw: hit
   };
+
   const pickImage = (...keys) => {
     for (const key of keys) {
       if (!key) continue;
-      const camelValue = hit[key];
-      if (typeof camelValue === 'string' && camelValue) {
-        return camelValue;
+      if (typeof media[key] === 'string' && media[key]) {
+        return media[key];
       }
-      const snakeKey = key.replace(/([A-Z])/g, (match) => `_${match.toLowerCase()}`);
-      const snakeValue = hit[snakeKey];
-      if (typeof snakeValue === 'string' && snakeValue) {
-        return snakeValue;
+      if (typeof meta[key] === 'string' && meta[key]) {
+        return meta[key];
       }
-      if (hit.raw) {
-        const rawCamel = hit.raw[key];
-        if (typeof rawCamel === 'string' && rawCamel) {
-          return rawCamel;
-        }
-        const rawSnake = hit.raw[snakeKey];
-        if (typeof rawSnake === 'string' && rawSnake) {
-          return rawSnake;
-        }
+      if (typeof hit[key] === 'string' && hit[key]) {
+        return hit[key];
       }
     }
     return null;
   };
 
-  base.imageUrl = pickImage('coverImageUrl', 'thumbnailUrl', 'avatarUrl', 'imageUrl');
+  base.imageUrl = pickImage('coverImageUrl', 'thumbnailUrl', 'heroImageUrl', 'avatarUrl');
+
   switch (entity) {
     case 'communities': {
-      base.title = hit.name;
-      base.subtitle = hit.tagline ?? hit.description?.slice(0, 140) ?? null;
-      base.description = hit.description;
-      base.tags = sanitiseArray([hit.category, ...(hit.topics ?? [])]);
+      base.title = hit.title;
+      base.subtitle = hit.subtitle ?? meta.tagline ?? null;
+      base.description = hit.summary ?? hit.description ?? null;
+      const communityTags = sanitiseArray(tags);
+      base.tags = communityTags;
       base.metrics = {
-        members: formatNumber(hit.memberCount),
-        trendScore: hit.trendScore
+        members: meta.memberCount ? formatNumber(Number(meta.memberCount)) : null,
+        trendScore: meta.trendScore ? Number(meta.trendScore) : null
       };
-      base.actions = [{ label: 'View community', href: `/communities/${hit.slug}` }];
-      base.geo = deriveGeo(entity, hit);
+      base.actions = [{ label: 'View community', href: `/communities/${hit.slug ?? hit.id}` }];
+      base.geo = deriveGeo(entity, geoSource);
       return base;
     }
     case 'courses': {
+      const price = meta.price ?? { amount: filters['price.amount'], currency: filters['price.currency'] };
       base.title = hit.title;
-      base.subtitle = [hit.level, formatCurrency(hit.price), formatRating(hit.rating)]
+      base.subtitle = [meta.level, formatCurrency(price), formatRating(meta.rating)]
         .filter(Boolean)
         .join(' · ');
-      base.description = hit.summary ?? hit.description?.slice(0, 140) ?? null;
-      base.tags = sanitiseArray(hit.skills ?? []);
+      base.description = hit.summary ?? hit.description ?? null;
+      const skills = sanitiseArray(meta.skills ?? tags);
+      base.tags = skills;
       base.metrics = {
-        enrolments: formatNumber(hit.enrolmentCount),
-        releaseAt: hit.releaseAt
+        enrolments: meta.enrolmentCount ? formatNumber(Number(meta.enrolmentCount)) : null,
+        releaseAt: meta.releaseAt ?? null
       };
-      base.actions = [{ label: 'View course', href: `/courses/${hit.slug}` }];
+      base.actions = [{ label: 'View course', href: `/courses/${hit.slug ?? hit.id}` }];
       base.geo = null;
       return base;
     }
     case 'ebooks': {
       base.title = hit.title;
-      base.subtitle = [formatCurrency(hit.price), formatRating(hit.rating)]
+      base.subtitle = [formatCurrency(meta.price), formatRating(meta.rating)]
         .filter(Boolean)
         .join(' · ');
-      base.description = hit.description?.slice(0, 160) ?? null;
-      base.tags = sanitiseArray(hit.tags ?? []);
+      base.description = hit.summary ?? hit.description ?? null;
+      base.tags = sanitiseArray(tags);
       base.metrics = {
-        readingTimeMinutes: hit.readingTimeMinutes
+        readingTimeMinutes: meta.readingTimeMinutes ? Number(meta.readingTimeMinutes) : null
       };
-      base.actions = [{ label: 'Open ebook', href: `/ebooks/${hit.slug}` }];
+      base.actions = [{ label: 'Open ebook', href: `/ebooks/${hit.slug ?? hit.id}` }];
       base.geo = null;
       return base;
     }
     case 'tutors': {
-      base.title = hit.displayName;
-      base.subtitle = [hit.headline, formatCurrency(hit.hourlyRate), formatRating(hit.rating)]
+      const hourly = meta.hourlyRate ?? {
+        amount: filters['hourlyRate.amount'],
+        currency: filters['hourlyRate.currency']
+      };
+      base.title = hit.title;
+      base.subtitle = [hit.subtitle, formatCurrency(hourly), formatRating(meta.rating)]
         .filter(Boolean)
         .join(' · ');
-      base.description = hit.bio?.slice(0, 160) ?? null;
-      base.tags = sanitiseArray(hit.skills ?? []);
+      base.description = hit.summary ?? hit.description ?? null;
+      base.tags = sanitiseArray(filters.skills ?? tags);
       base.metrics = {
-        completedSessions: formatNumber(hit.completedSessions),
-        responseTimeMinutes: hit.responseTimeMinutes
+        completedSessions: meta.completedSessions ? formatNumber(Number(meta.completedSessions)) : null,
+        responseTimeMinutes: meta.responseTimeMinutes ? Number(meta.responseTimeMinutes) : null
       };
       base.actions = [{ label: 'Hire tutor', href: `/tutors/${hit.id}` }];
-      base.geo = deriveGeo(entity, hit);
-      return base;
-    }
-    case 'profiles': {
-      base.title = hit.displayName;
-      base.subtitle = [hit.headline, hit.role, formatNumber(hit.followerCount) && `${formatNumber(hit.followerCount)} followers`]
-        .filter(Boolean)
-        .join(' · ');
-      base.description = hit.bio?.slice(0, 160) ?? null;
-      base.tags = sanitiseArray(hit.skills ?? []);
-      base.metrics = {
-        followers: formatNumber(hit.followerCount)
-      };
-      base.actions = [{ label: 'View profile', href: `/profiles/${hit.id}` }];
-      base.geo = deriveGeo(entity, hit);
+      base.geo = deriveGeo(entity, geoSource);
       return base;
     }
     case 'ads': {
-      base.title = hit.name;
-      base.subtitle = [hit.objective, formatCurrency(hit.budget), `${hit.ctr ? hit.ctr.toFixed(2) : '0.00'}% CTR`]
+      base.title = hit.title;
+      base.subtitle = [hit.subtitle, `${meta.ctr ? Number(meta.ctr).toFixed(2) : '0.00'}% CTR`]
         .filter(Boolean)
         .join(' · ');
-      base.description = hit.creative?.description ?? null;
-      base.tags = sanitiseArray(hit.targeting?.keywords ?? []);
+      base.description = hit.summary ?? hit.description ?? null;
+      base.tags = sanitiseArray(tags);
       base.metrics = {
-        performanceScore: hit.performanceScore,
-        spendTotal: formatCurrency(hit.spend)
+        performanceScore: meta.performanceScore ? Number(meta.performanceScore) : null,
+        spendTotal: meta.spend ? formatCurrency({ currency: meta.spend.currency, amount: meta.spend.amount }) : null
       };
-      base.actions = [{ label: 'Open campaign', href: `/ads/${hit.id}` }];
+      base.actions = [{ label: 'Open campaign', href: `/ads/${hit.slug ?? hit.id}` }];
       base.geo = null;
       return base;
     }
     case 'events': {
       base.title = hit.title;
-      base.subtitle = [hit.communityName, hit.type, hit.timezone]
-        .filter(Boolean)
-        .join(' · ');
-      base.description = hit.description?.slice(0, 160) ?? null;
-      base.tags = sanitiseArray(hit.topics ?? []);
+      base.subtitle = [hit.subtitle, meta.status, meta.timezone].filter(Boolean).join(' · ');
+      base.description = hit.summary ?? hit.description ?? null;
+      base.tags = sanitiseArray(tags);
       base.metrics = {
-        startAt: hit.startAt,
-        isTicketed: hit.isTicketed
+        startAt: meta.startAt ?? null,
+        attendance: meta.attendance ?? null
       };
       base.actions = [{ label: 'View event', href: `/events/${hit.slug ?? hit.id}` }];
-      base.geo = deriveGeo(entity, hit);
+      base.geo = deriveGeo(entity, geoSource);
+      return base;
+    }
+    case 'tickets': {
+      base.title = hit.title;
+      base.subtitle = [filters.priority, filters.status].filter(Boolean).join(' · ');
+      base.description = hit.summary ?? hit.description ?? null;
+      base.tags = sanitiseArray(tags);
+      base.metrics = {
+        channel: filters.channel ?? null
+      };
+      base.actions = [{ label: 'View ticket', href: `/support/tickets/${hit.slug ?? hit.id}` }];
+      base.geo = null;
       return base;
     }
     default:
-      return { ...base, title: hit.title ?? hit.name ?? `Result ${hit.id}` };
+      base.title = hit.title ?? `Result ${hit.id}`;
+      base.description = hit.summary ?? hit.description ?? null;
+      base.tags = sanitiseArray(tags);
+      base.geo = null;
+      return base;
   }
 }
 
 export class ExplorerSearchService {
-  constructor({ clusterService = searchClusterService, loggerInstance = logger } = {}) {
-    this.clusterService = clusterService;
-    this.logger = loggerInstance;
+  constructor({ dbClient = db, loggerInstance = logger, configuration = searchConfiguration } = {}) {
+    this.db = dbClient;
+    this.logger = loggerInstance.child({ module: 'explorer-search' });
+    this.schema = configuration.schema ?? 'search';
+    this.dictionary = configuration.dictionary ?? 'simple';
+    this.maxPerPage = configuration.maxPerPage ?? 50;
+    this.facetMaxBuckets = configuration.facetMaxBuckets ?? 25;
   }
 
   getSupportedEntities() {
@@ -404,7 +399,7 @@ export class ExplorerSearchService {
   }
 
   normaliseEntityTypes(entities) {
-    if (!entities || !Array.isArray(entities) || !entities.length) {
+    if (!entities || !Array.isArray(entities) || entities.length === 0) {
       return SUPPORTED_ENTITIES;
     }
     const filtered = entities
@@ -413,86 +408,230 @@ export class ExplorerSearchService {
     return filtered.length ? filtered : SUPPORTED_ENTITIES;
   }
 
-  buildSort(entity, sortPreference) {
-    const config = ENTITY_CONFIG[entity];
-    if (!config) {
-      return undefined;
-    }
-    if (!sortPreference || (Array.isArray(sortPreference) && sortPreference.length === 0)) {
-      const defaultKey = config.defaultSort;
-      const defaultSort = config.sorts[defaultKey];
-      return defaultSort && defaultSort.length ? defaultSort : undefined;
-    }
-    if (typeof sortPreference === 'string') {
-      if (config.sorts[sortPreference]) {
-        const candidate = config.sorts[sortPreference];
-        return candidate && candidate.length ? candidate : undefined;
-      }
-      if (sortPreference.includes(':')) {
-        return [sortPreference];
-      }
-    }
-    if (Array.isArray(sortPreference)) {
-      return sortPreference;
-    }
-    if (typeof sortPreference === 'object' && sortPreference.field) {
-      const direction = sortPreference.direction ?? 'asc';
-      return [`${sortPreference.field}:${direction}`];
-    }
-    return undefined;
+  createBaseQuery(entity) {
+    return this.db.withSchema(this.schema).from({ d: 'documents' }).where('d.entity_type', entity);
   }
 
-  buildFilters(entity, filters = {}, globalFilters = {}) {
-    const merged = { ...globalFilters };
-    const entityFilters = filters?.[entity] ?? filters ?? {};
-    for (const [key, value] of Object.entries(entityFilters)) {
-      merged[key] = mergeFilterValue(merged[key], value);
+  applySearchTerm(query, searchTerm, { includeRank = true } = {}) {
+    const term = typeof searchTerm === 'string' ? searchTerm.trim() : '';
+    if (!term) {
+      if (includeRank) {
+        query.select(this.db.raw('1.0 as rank'));
+      }
+      return false;
     }
-    return merged;
+    query.whereRaw('d.search_vector @@ websearch_to_tsquery(?, ?)', [this.dictionary, term]);
+    if (includeRank) {
+      query.select(
+        this.db.raw('ts_rank_cd(d.search_vector, websearch_to_tsquery(?, ?)) as rank', [this.dictionary, term])
+      );
+    }
+    return true;
+  }
+
+  resolveFilters(entity, filters = {}, globalFilters = {}) {
+    const entityFilters = typeof filters === 'object' && !Array.isArray(filters) ? filters[entity] ?? filters : {};
+    const global = typeof globalFilters === 'object' && !Array.isArray(globalFilters)
+      ? globalFilters[entity] ?? globalFilters
+      : {};
+    return { ...global, ...entityFilters };
+  }
+
+  applyFilters(query, entity, filters = {}, globalFilters = {}) {
+    const config = ENTITY_CONFIG[entity];
+    if (!config) {
+      return;
+    }
+
+    const resolved = this.resolveFilters(entity, filters, globalFilters);
+    for (const [rawKey, rawValue] of Object.entries(resolved)) {
+      if (rawValue === null || rawValue === undefined || rawValue === '' || rawValue === false) {
+        continue;
+      }
+      const definition = config.filters?.[rawKey] ?? { path: rawKey };
+      this.applyFilterCondition(query, definition.path ?? rawKey, rawValue, definition.type ?? 'string');
+    }
+  }
+
+  applyFilterCondition(query, path, value, type) {
+    if (Array.isArray(value) || type === 'array') {
+      const values = Array.isArray(value) ? value : [value];
+      const cleaned = sanitiseArray(values);
+      if (!cleaned.length) {
+        return;
+      }
+      query.whereRaw(
+        `EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(d.filters -> ?, '[]'::jsonb)) AS f(value) WHERE f.value = ANY(?::text[]))`,
+        [path, cleaned]
+      );
+      return;
+    }
+
+    if (type === 'range' && typeof value === 'object') {
+      const { min, max } = value;
+      if (min !== null && min !== undefined) {
+        query.whereRaw("(d.filters ->> ?)::numeric >= ?", [path, min]);
+      }
+      if (max !== null && max !== undefined) {
+        query.whereRaw("(d.filters ->> ?)::numeric <= ?", [path, max]);
+      }
+      return;
+    }
+
+    if (type === 'boolean') {
+      const boolValue = typeof value === 'boolean' ? value : value === 'true' || value === '1';
+      query.whereRaw('(d.filters ->> ?)::boolean = ?', [path, boolValue]);
+      return;
+    }
+
+    query.whereRaw('d.filters ->> ? = ?', [path, value]);
+  }
+
+  applySort(query, entity, sortPreference, hasQuery) {
+    const config = ENTITY_CONFIG[entity];
+    if (!config) {
+      query.orderBy('d.updated_at', 'desc');
+      return;
+    }
+
+    let sortKey = null;
+    if (typeof sortPreference === 'string' && config.sorts?.[sortPreference]) {
+      sortKey = sortPreference;
+    } else if (typeof sortPreference === 'object' && sortPreference?.[entity]) {
+      sortKey = sortPreference[entity];
+    }
+
+    if (!sortKey || !config.sorts?.[sortKey]) {
+      sortKey = config.defaultSort;
+    }
+
+    const descriptor = config.sorts?.[sortKey];
+    if (descriptor?.type === 'rank') {
+      query.orderByRaw('rank DESC');
+    } else if (descriptor?.expression) {
+      const direction = (descriptor.direction ?? 'asc').toUpperCase();
+      const nulls = descriptor.nulls ? ` NULLS ${descriptor.nulls.toUpperCase()}` : '';
+      query.orderByRaw(`${descriptor.expression} ${direction}${nulls}`);
+      if (hasQuery) {
+        query.orderByRaw('rank DESC');
+      }
+    }
+
+    query.orderBy('d.updated_at', 'desc');
+  }
+
+  async computeFacets(baseQuery, entity, facets) {
+    if (!facets || facets.length === 0) {
+      return {};
+    }
+
+    const sql = baseQuery.clone().clearSelect().clearOrder().select('d.filters').toSQL();
+    const facetResults = {};
+
+    for (const facet of facets) {
+      const rows = await this.db
+        .with('base', this.db.raw(sql.sql, sql.bindings))
+        .select(this.db.raw('value, COUNT(*)::int as count'))
+        .from(
+          this.db.raw(
+            `SELECT CASE
+               WHEN jsonb_typeof(filters -> ?) = 'array'
+                 THEN jsonb_array_elements_text(filters -> ?)
+               ELSE filters ->> ?
+             END AS value
+             FROM base`,
+            [facet, facet, facet]
+          )
+        )
+        .whereNotNull('value')
+        .andWhereRaw("value <> ''")
+        .groupBy('value')
+        .orderBy('count', 'desc')
+        .limit(this.facetMaxBuckets);
+
+      facetResults[facet] = Object.fromEntries(rows.map((row) => [row.value, Number(row.count)]));
+    }
+
+    return facetResults;
   }
 
   async searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }) {
-    const indexUid = INDEX_UIDS.get(entity);
-    if (!indexUid) {
-      throw new Error(`Explorer search index missing for entity "${entity}"`);
-    }
-    const client = this.clusterService.searchClient;
-    if (!client) {
-      const error = new Error('Search cluster is not initialised');
-      error.status = 503;
-      throw error;
+    const config = ENTITY_CONFIG[entity];
+    if (!config) {
+      throw new Error(`Explorer search entity "${entity}" is not configured`);
     }
 
-    const index = client.index(indexUid);
-    const effectiveFilters = this.buildFilters(entity, filters, globalFilters);
-    const meiliFilters = buildFilterClauses(effectiveFilters);
-    const sortDirectives = this.buildSort(entity, sort?.[entity] ?? sort);
-    const facets = includeFacets ? ENTITY_CONFIG[entity].facets : undefined;
+    const effectivePerPage = Math.min(Math.max(perPage, 1), this.maxPerPage);
+    const offset = (page - 1) * effectivePerPage;
 
-    const searchOptions = {
-      offset: (page - 1) * perPage,
-      limit: perPage,
-      filter: meiliFilters ?? undefined,
-      facets,
-      sort: sortDirectives && sortDirectives.length ? sortDirectives : undefined
-    };
+    const dataQuery = this.createBaseQuery(entity);
+    const countQuery = this.createBaseQuery(entity);
+    const facetsQuery = this.createBaseQuery(entity);
 
-    const result = await recordSearchOperation('explorer_query', () => index.search(query ?? '', searchOptions));
+    const hasQuery = this.applySearchTerm(dataQuery, query);
+    this.applySearchTerm(countQuery, query, { includeRank: false });
+    this.applySearchTerm(facetsQuery, query, { includeRank: false });
 
-    const hits = Array.isArray(result.hits) ? result.hits.map((hit) => formatHit(entity, hit)) : [];
+    this.applyFilters(dataQuery, entity, filters, globalFilters);
+    this.applyFilters(countQuery, entity, filters, globalFilters);
+    this.applyFilters(facetsQuery, entity, filters, globalFilters);
+
+    this.applySort(dataQuery, entity, sort, hasQuery);
+
+    dataQuery
+      .select({
+        id: 'd.entity_id',
+        slug: 'd.slug',
+        title: 'd.title',
+        subtitle: 'd.subtitle',
+        summary: 'd.summary',
+        description: 'd.description',
+        tags: 'd.tags',
+        filters: 'd.filters',
+        metadata: 'd.metadata',
+        media: 'd.media',
+        updatedAt: 'd.updated_at'
+      })
+      .offset(offset)
+      .limit(effectivePerPage);
+
+    const [rows, countResult, facets] = await Promise.all([
+      dataQuery,
+      countQuery.clearSelect().clearOrder().count({ total: '*' }).first(),
+      includeFacets ? this.computeFacets(facetsQuery, entity, config.facets) : Promise.resolve({})
+    ]);
+
+    const totalHits = Number(countResult?.total ?? 0);
+
+    const mappedRows = rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      subtitle: row.subtitle,
+      summary: row.summary,
+      description: row.description,
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      filters: row.filters ?? {},
+      metadata: row.metadata ?? {},
+      media: row.media ?? {},
+      updatedAt: row.updatedAt ?? row.updated_at ?? null,
+      rank: row.rank ?? null
+    }));
+
+    const hits = mappedRows.map((row) => formatHit(entity, row));
     const markers = hits.map((hit) => hit.geo).filter(Boolean);
+
     return {
       entity,
       hits,
-      rawHits: result.hits,
-      totalHits: result.estimatedTotalHits ?? hits.length,
-      processingTimeMs: result.processingTimeMs ?? 0,
-      query: result.query,
+      rawHits: mappedRows,
+      totalHits,
+      processingTimeMs: 0,
+      query,
       page,
-      perPage,
-      sort: sortDirectives,
-      filter: meiliFilters,
-      facets: result.facetDistribution ?? {},
+      perPage: effectivePerPage,
+      sort,
+      facets,
       markers
     };
   }

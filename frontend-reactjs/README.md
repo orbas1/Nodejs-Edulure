@@ -19,7 +19,7 @@ The development server runs on http://localhost:5173. Use Node.js 20.12.2+ and n
 - `/instructor` – Become an instructor onboarding
 - `/feed` – Live community feed with menu states, composer, and community profile sidebar
 - `/profile` – User profile overview for members & instructors
-- `/search` – Meilisearch-powered search interface mock
+- `/search` – Postgres search interface mock wired to explorer APIs
 - `/admin` – Admin control center with stats and approvals queue
 
 All imagery uses remote assets to keep the repository lightweight.

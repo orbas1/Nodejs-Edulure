@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  createSavedSearch,
-  deleteSavedSearch,
-  listSavedSearches,
-  searchExplorer,
-  updateSavedSearch
-} from '../api/explorerApi.js';
+import { createSavedSearch, deleteSavedSearch, listSavedSearches, updateSavedSearch } from '../api/explorerApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useSearchProvider } from './useSearchProvider.js';
 
 function sanitiseFilters(filters = {}) {
   return Object.entries(filters).reduce((acc, [key, value]) => {
@@ -44,6 +39,7 @@ export function useExplorerEntitySearch({
 }) {
   const { isAuthenticated, session } = useAuth();
   const token = session?.tokens?.accessToken;
+  const { search: executeProviderSearch } = useSearchProvider();
 
   const [query, setQuery] = useState(initialQuery);
   const [filters, setFilters] = useState(initialFilters);
@@ -86,7 +82,7 @@ export function useExplorerEntitySearch({
           page: overrides.page ?? page,
           perPage: pageSize
         };
-        const response = await searchExplorer(payload, { token, signal: controller.signal });
+        const response = await executeProviderSearch(payload, { signal: controller.signal });
         if (!response?.success) {
           throw new Error(response?.message ?? 'Search failed');
         }
@@ -104,7 +100,7 @@ export function useExplorerEntitySearch({
         setLoading(false);
       }
     },
-    [cleanedFilters, entityType, page, pageSize, query, sort, token]
+    [cleanedFilters, entityType, executeProviderSearch, page, pageSize, query, sort]
   );
 
   useEffect(() => {

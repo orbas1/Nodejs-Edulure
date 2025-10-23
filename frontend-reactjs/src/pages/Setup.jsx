@@ -48,10 +48,12 @@ const BACKEND_FIELD_GROUPS = [
   },
   {
     title: 'Search',
-    description: 'Meilisearch cluster configuration for explorer and mail search.',
+    description: 'Postgres search configuration for explorer and monetisation surfaces.',
     fields: [
-      { key: 'MEILISEARCH_HOSTS', label: 'Hosts', placeholder: 'http://127.0.0.1:7700' },
-      { key: 'MEILISEARCH_API_KEY', label: 'API key', placeholder: 'masterKey' }
+      { key: 'SEARCH_SCHEMA', label: 'Schema', placeholder: 'search' },
+      { key: 'SEARCH_DICTIONARY', label: 'Dictionary', placeholder: 'simple' },
+      { key: 'SEARCH_MAX_PER_PAGE', label: 'Max results per page', placeholder: '50' },
+      { key: 'SEARCH_FACET_MAX_BUCKETS', label: 'Facet bucket limit', placeholder: '25' }
     ]
   }
 ];
@@ -263,8 +265,9 @@ export default function Setup() {
           </div>
           <h1 className="mt-4 text-4xl font-semibold text-slate-900">Install the Edulure platform</h1>
           <p className="mt-3 max-w-3xl text-base text-slate-600">
-            Configure environment secrets, provision databases, initialise Meilisearch, and warm background services without
-            leaving your browser. The installer writes local <code>.env.local</code> files and verifies each component.
+            Configure environment secrets, provision databases, hydrate the Postgres-backed search documents, and warm
+            background services without leaving your browser. The installer writes local <code>.env.local</code> files and
+            verifies each component.
           </p>
         </header>
 
@@ -512,7 +515,7 @@ export default function Setup() {
               <ul className="mt-3 space-y-3 text-sm leading-relaxed">
                 <li className="flex items-start gap-2">
                   <CheckCircleIcon className="mt-1 h-5 w-5 text-emerald-400" />
-                  Ensure MySQL, Redis, and Meilisearch are running locally or reachable from this machine before launching the
+                  Ensure MySQL, Redis, and the Postgres search schema are running locally or reachable from this machine before launching the
                   installer.
                 </li>
                 <li className="flex items-start gap-2">

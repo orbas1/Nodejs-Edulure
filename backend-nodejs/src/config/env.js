@@ -577,41 +577,6 @@ function normalizeStatementDescriptor(descriptor) {
   return sanitized ? sanitized.toUpperCase() : null;
 }
 
-function normalizeHost(value) {
-  if (!value) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!/^https?:\/\//i.test(trimmed)) {
-    throw new Error(`Invalid Meilisearch host "${value}" – hosts must include http(s):// prefix.`);
-  }
-
-  return trimmed.replace(/\/+$/, '');
-}
-
-function parseHostList(value, { allowEmpty = false } = {}) {
-  const hosts = parseCsv(value ?? '')
-    .map((entry) => {
-      try {
-        return normalizeHost(entry);
-      } catch (error) {
-        if (allowEmpty) {
-          console.warn('Ignoring invalid Meilisearch host entry', { host: entry, reason: error.message });
-          return null;
-        }
-        throw error;
-      }
-    })
-    .filter(Boolean);
-
-  if (!hosts.length && !allowEmpty) {
-    throw new Error('At least one Meilisearch host must be configured.');
-  }
-
-  return Array.from(new Set(hosts));
-}
-
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -994,23 +959,14 @@ const envSchema = z
     SOCIAL_RECOMMENDATION_MAX_RESULTS: z.coerce.number().int().min(1).max(100).default(12),
     SOCIAL_RECOMMENDATION_REFRESH_MINUTES: z.coerce.number().int().min(5).max(24 * 60 * 7).default(360),
     SOCIAL_MUTE_DEFAULT_DURATION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
-    MEILISEARCH_HOSTS: z.string().min(1),
-    MEILISEARCH_REPLICA_HOSTS: z.string().optional(),
-    MEILISEARCH_SEARCH_HOSTS: z.string().optional(),
-    MEILISEARCH_ADMIN_API_KEY: z.string().min(16),
-    MEILISEARCH_SEARCH_API_KEY: z.string().min(16),
-    MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS: z.coerce
-      .number()
-      .int()
-      .min(10)
-      .max(3600)
-      .default(30),
-    MEILISEARCH_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(500).max(60000).default(5000),
-    MEILISEARCH_INDEX_PREFIX: z
+    SEARCH_SCHEMA: z
       .string()
-      .regex(/^[a-z0-9_-]+$/i, 'MEILISEARCH_INDEX_PREFIX may only contain letters, numbers, underscores, and dashes.')
-      .optional(),
-    MEILISEARCH_ALLOWED_IPS: z.string().optional(),
+      .min(3)
+      .regex(/^[a-zA-Z0-9_]+$/, 'SEARCH_SCHEMA may only include alphanumeric characters and underscores.')
+      .default('search'),
+    SEARCH_DICTIONARY: z.string().min(2).default('simple'),
+    SEARCH_MAX_PER_PAGE: z.coerce.number().int().min(10).max(100).default(50),
+    SEARCH_FACET_MAX_BUCKETS: z.coerce.number().int().min(5).max(200).default(25),
     TWILIO_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
     TWILIO_ACCOUNT_SID: z.string().min(10).optional(),
     TWILIO_AUTH_TOKEN: z.string().min(10).optional(),
@@ -1147,13 +1103,6 @@ const envSchema = z
       });
     }
 
-    if (value.MEILISEARCH_ADMIN_API_KEY === value.MEILISEARCH_SEARCH_API_KEY) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['MEILISEARCH_SEARCH_API_KEY'],
-        message: 'MEILISEARCH_SEARCH_API_KEY must be different from the admin API key.'
-      });
-    }
   });
 
 const parsed = envSchema.safeParse(process.env);
@@ -1165,33 +1114,10 @@ if (!parsed.success) {
 
 const raw = parsed.data;
 
-let meilisearchHosts;
-let meilisearchReplicaHosts;
-let meilisearchSearchHosts;
-
-const allowMissingMeilisearchHosts = raw.NODE_ENV !== 'production';
-
-try {
-  meilisearchHosts = parseHostList(raw.MEILISEARCH_HOSTS, { allowEmpty: allowMissingMeilisearchHosts });
-  meilisearchReplicaHosts = parseHostList(raw.MEILISEARCH_REPLICA_HOSTS, { allowEmpty: true });
-  const defaultSearchHosts = [raw.MEILISEARCH_HOSTS, raw.MEILISEARCH_REPLICA_HOSTS]
-    .filter(Boolean)
-    .join(',');
-  meilisearchSearchHosts = parseHostList(
-    raw.MEILISEARCH_SEARCH_HOSTS ?? defaultSearchHosts,
-    { allowEmpty: allowMissingMeilisearchHosts }
-  );
-} catch (error) {
-  if (!allowMissingMeilisearchHosts) {
-    console.error('Invalid Meilisearch host configuration', error.message);
-    throw error;
-  }
-
-  console.warn('Disabling Meilisearch integration due to host configuration issues', error.message);
-  meilisearchHosts = [];
-  meilisearchReplicaHosts = meilisearchReplicaHosts ?? [];
-  meilisearchSearchHosts = [];
-}
+const searchSchema = raw.SEARCH_SCHEMA;
+const searchDictionary = raw.SEARCH_DICTIONARY;
+const searchMaxPerPage = raw.SEARCH_MAX_PER_PAGE;
+const searchFacetMaxBuckets = raw.SEARCH_FACET_MAX_BUCKETS;
 
 const defaultCurrency = raw.PAYMENTS_DEFAULT_CURRENCY.toUpperCase();
 const allowedCurrencies = Array.from(
@@ -1211,7 +1137,6 @@ const corsOrigins = parseOriginList(raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL);
 
 const metricsAllowedIps = parseCsv(raw.METRICS_ALLOWED_IPS ?? '');
 const redactedFields = parseCsv(raw.LOG_REDACTED_FIELDS ?? '');
-const searchAllowedIps = parseCsv(raw.MEILISEARCH_ALLOWED_IPS ?? '');
 const configuredTwoFactorRoles = parseCsv(raw.TWO_FACTOR_REQUIRED_ROLES ?? '');
 const normalizedTwoFactorRoles = (configuredTwoFactorRoles.length > 0
   ? configuredTwoFactorRoles
@@ -1801,15 +1726,10 @@ export const env = {
     }
   },
   search: {
-    adminHosts: meilisearchHosts,
-    replicaHosts: meilisearchReplicaHosts,
-    searchHosts: meilisearchSearchHosts,
-    adminApiKey: raw.MEILISEARCH_ADMIN_API_KEY,
-    searchApiKey: raw.MEILISEARCH_SEARCH_API_KEY,
-    healthcheckIntervalMs: raw.MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS * 1000,
-    requestTimeoutMs: raw.MEILISEARCH_REQUEST_TIMEOUT_MS,
-    indexPrefix: raw.MEILISEARCH_INDEX_PREFIX ?? 'edulure',
-    allowedIps: searchAllowedIps,
+    schema: searchSchema,
+    dictionary: searchDictionary,
+    maxPerPage: searchMaxPerPage,
+    facetMaxBuckets: searchFacetMaxBuckets,
     ingestion: {
       batchSize: raw.SEARCH_INGESTION_BATCH_SIZE,
       concurrency: raw.SEARCH_INGESTION_CONCURRENCY,

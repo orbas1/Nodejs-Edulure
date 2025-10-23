@@ -1,42 +1,28 @@
 #!/usr/bin/env node
-import { parseArgs } from 'node:util';
+import '../src/config/env.js';
 
 import logger from '../src/config/logger.js';
 import { searchClusterService } from '../src/services/SearchClusterService.js';
 
 async function run() {
-  const { values } = parseArgs({
-    options: {
-      snapshot: { type: 'boolean', default: false },
-      'skip-health': { type: 'boolean', default: false }
-    }
-  });
-
   try {
-    await searchClusterService.bootstrap();
-
-    if (!values['skip-health']) {
-      await searchClusterService.checkClusterHealth();
-      logger.info('Meilisearch explorer indexes verified and healthy');
-    } else {
-      logger.warn('Skipping Meilisearch health checks as requested');
+    const start = Date.now();
+    const status = await searchClusterService.start();
+    if (status?.status === 'degraded') {
+      throw new Error(status.message ?? 'Search provider initialisation failed');
     }
-
-    if (values.snapshot) {
-      const task = await searchClusterService.createSnapshot();
-      logger.info({ taskUid: task?.taskUid }, 'Meilisearch snapshot request completed');
-    }
-
-    logger.info('Search cluster provisioning completed successfully');
+    await searchClusterService.refreshAll({ reason: 'provision-script' });
+    const durationSeconds = (Date.now() - start) / 1000;
+    logger.info({ durationSeconds }, 'Postgres search documents refreshed successfully');
   } catch (error) {
-    logger.error({ err: error }, 'Failed to provision Meilisearch cluster');
+    logger.error({ err: error }, 'Failed to prepare Postgres search provider');
     process.exitCode = 1;
   } finally {
-    searchClusterService.stop();
+    await searchClusterService.stop();
   }
 }
 
 run().catch((error) => {
-  logger.error({ err: error }, 'Unexpected search cluster provisioning failure');
+  logger.error({ err: error }, 'Unexpected search provisioning failure');
   process.exitCode = 1;
 });

@@ -61,7 +61,6 @@
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "marked": "^16.4.1",
-    "meilisearch": "^0.37.0",
     "mime-types": "^2.1.35",
     "mysql2": "^3.9.7",
     "node-cron": "^3.0.3",
