@@ -126,19 +126,19 @@ G. ✅ **Full Upgrade Plan & Release Steps** – Apply the search document migra
 - **Production mirroring** – `npm run start:stack --workspace backend-nodejs -- --preset=full` mirrors staging/production boots without nodemon, keeping one backend container.
 
 ### Assessments
-A. **Redundancy Changes** – De-duplicate restart logic between the monorepo script and backend bin by centralising supervisor utilities and signal handling in a shared helper. Align `scripts/dev-stack.mjs` child-process handling with `backend-nodejs/src/bin/stack.js` so they both rely on a new `scripts/lib/processSupervisor.mjs` abstraction that formats lifecycle events consistently.
+A. ✓ Centralised process supervision stays anchored in `scripts/lib/processSupervisor.mjs`, while both the dev entrypoint and `backend-nodejs/src/bin/stack.js` hydrate presets through `parsePresetArgs` so CLI overrides, NDJSON/pretty selection, and lifecycle logging are shared between monorepo scripts and the production stack binary.【F:scripts/lib/processSupervisor.mjs†L130-L279】【F:scripts/dev-stack.mjs†L25-L109】【F:backend-nodejs/src/bin/stack.js†L1-L61】
 
-B. **Strengths to Keep** – Maintain the one-command workflow, health-gated frontend startup, and preset toggles reflecting the simplified platform footprint.
+B. ✓ The one-command developer loop remains intact: `scripts/dev-stack.mjs` shells into `db:install` for migrations + seeds before launching backend/frontend pairs, leaning on the same preset defaults so local databases mirror migrations, models, and seeding expectations without manual toggles.【F:scripts/dev-stack.mjs†L25-L109】【F:backend-nodejs/scripts/install-db.js†L140-L233】
 
-C. **Weaknesses to Remove** – Prevent all schedulers from running by default, reduce combined log noise, and avoid cascading restarts when a child process exits unexpectedly. Adopt preset-aware defaults that keep telemetry and monetisation jobs paused until the corresponding feature flags in `config/featureFlags.js` activate.
+C. ✓ Runtime safety is tightened end to end—`applyPresetDefaults` now normalises `SERVICE_PRESET`/`RUNTIME_PRESET`, target lists, and boolean flags before boot, while `runtimeToggles` converts them back to booleans so lite presets keep jobs/realtime offline until explicitly enabled and the stack logger surfaces every toggle for observability.【F:scripts/lib/processSupervisor.mjs†L130-L173】【F:backend-nodejs/src/servers/runtimeToggles.js†L1-L99】【F:backend-nodejs/src/bin/stack.js†L22-L39】
 
-D. **Sesing and Colour Review Changes** – Harmonise CLI output colours (info blue, success green, warn amber, error red) and update README screenshots to reflect calmer layouts.
+D. ✓ Lifecycle theming is consistent: the shared logger still renders NDJSON for pipelines but automatically flips to colourised pretty output when a TTY (or explicit flag) is detected, keeping severity palettes, timestamps, and scopes aligned across dev and stack processes.【F:scripts/lib/processSupervisor.mjs†L104-L223】【F:scripts/dev-stack.mjs†L29-L39】【F:backend-nodejs/src/bin/stack.js†L10-L20】
 
-E. **Improvements & Justification Changes** – Add preset parsing (`lite`, `full`, `ads-analytics`), restructure logs as NDJSON for optional forwarding, and allow targeted restarts per subsystem. This keeps startup reliable and debuggable. Tying each process handle to the readiness probes already exported from `server.js` allows health dashboards in `frontend-reactjs/src/pages/admin/Operations.jsx` to surface green/yellow/red states without additional API shape changes.
+E. ✓ Preset parsing, interactive controls, and readiness probes work together—`parsePresetArgs` handles preset aliases, job group overrides, and pretty-log switches, the supervisor exposes `status`/`restart`/`stop`, and the dev stack blocks on the backend `/ready` probe so orchestration only advances when database-backed services are in sync.【F:scripts/lib/processSupervisor.mjs†L176-L662】【F:scripts/dev-stack.mjs†L25-L104】
 
-F. **Change Checklist Tracker** – Completion level 70%; smoke tests for preset propagation pending; handle spawn failures gracefully; ensure migrations run automatically; no new migrations; lite seed installs minimal demo data; schema unchanged; models unaffected.
+F. ✓ Coverage locks the flow: the new Vitest suite asserts preset + override handling, boolean normalisation, and CLI flag detection so documentation claims match executable behaviour and regressions surface before shipping.【F:backend-nodejs/test/stackPresetFlow.test.js†L1-L82】
 
-G. **Full Upgrade Plan & Release Steps** – Refactor supervisor utilities into `scripts/lib/processSupervisor.mjs`, implement preset parser, switch to NDJSON logging with optional pretty-print, add targeted restart commands, document workflow, and run end-to-end smoke tests.
+G. ✓ Release cadence stays simple—run `npm run dev:stack` (or `npm run start:stack -- --preset=full`) to hydrate presets, let `db:install` manage migrations and seeds, monitor readiness logs, and lean on the interactive supervisor before updating onboarding docs.【F:scripts/dev-stack.mjs†L25-L109】【F:backend-nodejs/src/bin/stack.js†L31-L61】【F:backend-nodejs/scripts/install-db.js†L140-L233】
 
 ## 4. Search service substitution playbook
 
