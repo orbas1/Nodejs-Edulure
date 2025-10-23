@@ -3,108 +3,85 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchIngestionService } from '../src/services/SearchIngestionService.js';
 import * as metricsModule from '../src/observability/metrics.js';
 
-const indexPrefix = process.env.MEILISEARCH_INDEX_PREFIX ?? 'edulure';
+function createLogger() {
+  const logger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn()
+  };
+  logger.child = vi.fn().mockReturnValue(logger);
+  return logger;
+}
 
 describe('SearchIngestionService', () => {
+  let documentModel;
+  let logger;
+
   beforeEach(() => {
     vi.restoreAllMocks();
+    documentModel = {
+      deleteByEntityTypes: vi.fn().mockResolvedValue(0),
+      upsertMany: vi.fn().mockResolvedValue(0)
+    };
+    logger = createLogger();
   });
 
-  it('reindexes the requested indexes and records metrics', async () => {
-    const deleteAllDocuments = vi.fn().mockResolvedValue({ taskUid: 1 });
-    const addDocuments = vi.fn().mockResolvedValue({ taskUid: 2 });
-    const waitForTask = vi.fn().mockResolvedValue({ status: 'succeeded' });
-    const index = { addDocuments };
-    const client = {
-      deleteAllDocuments,
-      waitForTask,
-      index: vi.fn(() => index)
-    };
-    const clusterService = {
-      requestTimeoutMs: 5000,
-      withAdminClient: vi.fn(async (_operation, handler) => handler(client, 'http://localhost:7700'))
-    };
-
+  it('reindexes all supported entities and records metrics', async () => {
     const loaders = {
       communities: async function* () {
         yield [
-          { id: 1, name: 'Ops Guild' },
-          { id: 2, name: 'Growth Lab' }
+          { entityType: 'communities', entityId: '1', title: 'Ops Guild', searchTerms: 'ops guild' },
+          { entityType: 'communities', entityId: '2', title: 'Growth Lab', searchTerms: 'growth lab' }
         ];
       },
       ads: async function* () {
-        yield [{ id: 5, name: 'Creator Funnel Boost' }];
+        yield [{ entityType: 'ads', entityId: '9', title: 'Creator Booster', searchTerms: 'creator booster' }];
       }
     };
 
-    const recordSpy = vi.spyOn(metricsModule, 'recordSearchOperation').mockImplementation((_operation, handler) => handler());
-    const ingestionSpy = vi.spyOn(metricsModule, 'recordSearchIngestionRun');
+    const recordSpy = vi.spyOn(metricsModule, 'recordSearchIngestionRun').mockImplementation(() => {});
 
     const service = new SearchIngestionService({
-      clusterService,
-      loggerInstance: { info: vi.fn(), debug: vi.fn(), error: vi.fn() },
-      batchSize: 50,
-      concurrency: 2,
-      loaders
+      documentModel,
+      loaders,
+      loggerInstance: logger,
+      batchSize: 25
     });
 
     await service.fullReindex({ indexes: ['communities', 'ads'] });
 
-    expect(clusterService.withAdminClient).toHaveBeenCalledTimes(2);
-    expect(deleteAllDocuments).toHaveBeenCalledTimes(2);
-    expect(addDocuments).toHaveBeenCalledTimes(2);
-    expect(waitForTask).toHaveBeenCalledTimes(4);
-
-    expect(ingestionSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ index: `${indexPrefix}_communities`, documentCount: 2, status: 'success' })
+    expect(documentModel.deleteByEntityTypes).toHaveBeenCalledWith(['communities'], expect.anything());
+    expect(documentModel.deleteByEntityTypes).toHaveBeenCalledWith(['ads'], expect.anything());
+    expect(documentModel.upsertMany).toHaveBeenCalledTimes(2);
+    expect(recordSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ index: 'communities', status: 'success', documentCount: 2 })
     );
-    expect(ingestionSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ index: `${indexPrefix}_ads`, documentCount: 1, status: 'success' })
+    expect(recordSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ index: 'ads', status: 'success', documentCount: 1 })
     );
-    expect(ingestionSpy).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'error' }));
-
-    recordSpy.mockRestore();
   });
 
-  it('skips destructive delete when running an incremental sync', async () => {
-    const deleteAllDocuments = vi.fn();
-    const addDocuments = vi.fn().mockResolvedValue({ taskUid: 1 });
-    const waitForTask = vi.fn().mockResolvedValue({ status: 'succeeded' });
-    const client = {
-      deleteAllDocuments,
-      waitForTask,
-      index: vi.fn(() => ({ addDocuments }))
-    };
-    const clusterService = {
-      requestTimeoutMs: 5000,
-      withAdminClient: vi.fn(async (_operation, handler) => handler(client, 'http://localhost:7700'))
-    };
-
+  it('skips destructive delete when performing incremental updates', async () => {
     const loaders = {
-      tutors: async function* () {
-        yield [{ id: 9, displayName: 'Kai Watanabe' }];
+      courses: async function* () {
+        yield [{ entityType: 'courses', entityId: '101', title: 'Automation Playbook', searchTerms: 'automation playbook' }];
       }
     };
 
-    const recordSpy = vi.spyOn(metricsModule, 'recordSearchOperation').mockImplementation((_operation, handler) => handler());
-    const ingestionSpy = vi.spyOn(metricsModule, 'recordSearchIngestionRun');
-
     const service = new SearchIngestionService({
-      clusterService,
-      loggerInstance: { info: vi.fn(), debug: vi.fn(), error: vi.fn() },
-      deleteBeforeReindex: true,
-      loaders
+      documentModel,
+      loaders,
+      loggerInstance: logger
     });
 
-    await service.fullReindex({ indexes: ['tutors'], since: new Date().toISOString() });
+    await service.fullReindex({ since: new Date().toISOString(), indexes: ['courses'] });
 
-    expect(deleteAllDocuments).not.toHaveBeenCalled();
-    expect(addDocuments).toHaveBeenCalledTimes(1);
-
-    expect(ingestionSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ index: `${indexPrefix}_tutors`, documentCount: 1, status: 'success' })
+    expect(documentModel.deleteByEntityTypes).not.toHaveBeenCalled();
+    expect(documentModel.upsertMany).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ entityType: 'courses', entityId: '101', title: 'Automation Playbook' })
+      ],
+      expect.anything()
     );
-
-    recordSpy.mockRestore();
   });
 });

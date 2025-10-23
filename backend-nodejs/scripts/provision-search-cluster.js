@@ -16,20 +16,20 @@ async function run() {
     await searchClusterService.bootstrap();
 
     if (!values['skip-health']) {
-      await searchClusterService.checkClusterHealth();
-      logger.info('Meilisearch explorer indexes verified and healthy');
+      const counts = await searchClusterService.checkClusterHealth();
+      logger.info({ counts }, 'Explorer search documents verified');
     } else {
-      logger.warn('Skipping Meilisearch health checks as requested');
+      logger.warn('Skipping explorer search document health checks as requested');
     }
 
     if (values.snapshot) {
       const task = await searchClusterService.createSnapshot();
-      logger.info({ taskUid: task?.taskUid }, 'Meilisearch snapshot request completed');
+      logger.info({ taskUid: task?.taskUid }, 'Explorer search document snapshot generated');
     }
 
-    logger.info('Search cluster provisioning completed successfully');
+    logger.info('Explorer search provisioning completed successfully');
   } catch (error) {
-    logger.error({ err: error }, 'Failed to provision Meilisearch cluster');
+    logger.error({ err: error }, 'Failed to provision explorer search documents');
     process.exitCode = 1;
   } finally {
     searchClusterService.stop();
@@ -37,6 +37,6 @@ async function run() {
 }
 
 run().catch((error) => {
-  logger.error({ err: error }, 'Unexpected search cluster provisioning failure');
+  logger.error({ err: error }, 'Unexpected explorer search provisioning failure');
   process.exitCode = 1;
 });

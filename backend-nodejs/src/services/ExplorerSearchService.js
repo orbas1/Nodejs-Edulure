@@ -1,499 +1,522 @@
 import logger from '../config/logger.js';
-import { recordSearchOperation } from '../observability/metrics.js';
-import { INDEX_DEFINITIONS, searchClusterService } from './SearchClusterService.js';
-import { buildBounds, resolveCountryCoordinates } from '../utils/geo.js';
+import ExplorerSearchDocumentModel from '../models/ExplorerSearchDocumentModel.js';
+import { buildBounds } from '../utils/geo.js';
 import AdsPlacementService from './AdsPlacementService.js';
 
-const ENTITY_CONFIG = {
-  communities: {
-    facets: ['visibility', 'category', 'timezone', 'country', 'languages', 'tags'],
-    sorts: {
-      trending: ['desc(trendScore)'],
-      members: ['desc(memberCount)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'trending'
-  },
-  courses: {
-    facets: ['category', 'level', 'deliveryFormat', 'languages', 'price.currency', 'tags'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      newest: ['desc(releaseAt)'],
-      priceLow: ['asc(price.amount)'],
-      priceHigh: ['desc(price.amount)']
-    },
-    defaultSort: 'relevance'
-  },
-  ebooks: {
-    facets: ['categories', 'languages', 'price.currency', 'tags'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      newest: ['desc(releaseAt)'],
-      readingTime: ['asc(readingTimeMinutes)']
-    },
-    defaultSort: 'relevance'
-  },
-  tutors: {
-    facets: ['languages', 'skills', 'country', 'isVerified'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      priceLow: ['asc(hourlyRate.amount)'],
-      priceHigh: ['desc(hourlyRate.amount)'],
-      responseTime: ['asc(responseTimeMinutes)']
-    },
-    defaultSort: 'relevance'
-  },
-  profiles: {
-    facets: ['role', 'languages', 'country', 'communities', 'badges'],
-    sorts: {
-      relevance: [],
-      followers: ['desc(followerCount)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'relevance'
-  },
-  ads: {
-    facets: ['status', 'objective', 'targeting.audiences', 'targeting.locations'],
-    sorts: {
-      performance: ['desc(performanceScore)', 'desc(ctr)'],
-      spend: ['desc(spend.total)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'performance'
-  },
-  events: {
-    facets: ['type', 'status', 'timezone', 'isTicketed', 'price.currency'],
-    sorts: {
-      upcoming: ['asc(startAt)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'upcoming'
-  }
-};
-
-const SUPPORTED_ENTITIES = Object.keys(ENTITY_CONFIG);
-const INDEX_UIDS = new Map(INDEX_DEFINITIONS.map((definition) => [definition.name, definition.uid]));
-
-function isFiniteNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-function formatCurrency(value) {
-  if (!value || !isFiniteNumber(value.amount)) {
-    return null;
-  }
-  const currency = value.currency ?? 'USD';
-  const amount = value.amount >= 100 ? value.amount / 100 : value.amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0
-  }).format(amount);
-}
-
-function formatNumber(value) {
-  if (!isFiniteNumber(value)) {
-    return null;
-  }
-  return new Intl.NumberFormat('en-US').format(value);
-}
-
-function formatRating(rating) {
-  if (!rating || !isFiniteNumber(rating.average)) {
-    return null;
-  }
-  const average = rating.average.toFixed(1);
-  const count = rating.count ? ` · ${formatNumber(rating.count)} ratings` : '';
-  return `${average}★${count}`;
-}
-
-function sanitiseArray(values) {
-  if (!Array.isArray(values)) {
+function normaliseArray(value) {
+  if (!value) {
     return [];
   }
-  return values
-    .map((value) => (typeof value === 'string' ? value.trim() : value))
-    .filter((value) => value !== null && value !== undefined && value !== '');
+  if (Array.isArray(value)) {
+    return value.filter((entry) => entry !== null && entry !== undefined);
+  }
+  return [value];
 }
 
-function mergeFilterValue(baseValue, overrideValue) {
-  if (overrideValue === undefined || overrideValue === null) {
-    return baseValue;
-  }
-  if (Array.isArray(baseValue) && Array.isArray(overrideValue)) {
-    return overrideValue.length ? overrideValue : baseValue;
-  }
-  if (typeof baseValue === 'object' && typeof overrideValue === 'object' && !Array.isArray(baseValue)) {
-    return { ...baseValue, ...overrideValue };
-  }
-  return overrideValue;
-}
-
-function encodeValue(value) {
+function toLower(value) {
   if (value === null || value === undefined) {
     return null;
   }
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
+  return String(value).toLowerCase();
+}
+
+function intersects(values, expected) {
+  const haystack = new Set(normaliseArray(values).map(toLower));
+  for (const candidate of normaliseArray(expected)) {
+    if (haystack.has(toLower(candidate))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function matchesRange(value, range) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return false;
+  }
+  if (range.min !== undefined && range.min !== null && numeric < Number(range.min)) {
+    return false;
+  }
+  if (range.max !== undefined && range.max !== null && numeric > Number(range.max)) {
+    return false;
+  }
+  if (range.equals !== undefined && range.equals !== null && numeric !== Number(range.equals)) {
+    return false;
+  }
+  if (range.not !== undefined && range.not !== null && numeric === Number(range.not)) {
+    return false;
+  }
+  return true;
+}
+
+function normaliseBoolean(value) {
+  if (value === null || value === undefined) {
+    return null;
   }
   if (typeof value === 'boolean') {
-    return value ? 'true' : 'false';
+    return value;
   }
-  if (value instanceof Date) {
-    return `"${value.toISOString()}"`;
+  if (typeof value === 'number') {
+    return value !== 0;
   }
-  return `"${String(value).replace(/"/g, '\\"')}"`;
-}
-
-function buildFilterClauses(filters) {
-  if (!filters || typeof filters !== 'object') {
-    return null;
+  const normalised = toLower(value);
+  if (['true', '1', 'yes', 'on'].includes(normalised)) {
+    return true;
   }
-  const clauses = [];
-  for (const [attribute, rawValue] of Object.entries(filters)) {
-    if (rawValue === null || rawValue === undefined || rawValue === '') {
-      continue;
-    }
-    if (Array.isArray(rawValue)) {
-      const values = sanitiseArray(rawValue);
-      if (!values.length) {
-        continue;
-      }
-      const encoded = values.map((value) => encodeValue(value)).filter((value) => value !== null);
-      if (!encoded.length) {
-        continue;
-      }
-      clauses.push(`${attribute} IN [${encoded.join(', ')}]`);
-      continue;
-    }
-    if (typeof rawValue === 'object') {
-      const { min, max, equals, not } = rawValue;
-      if (min !== undefined && min !== null) {
-        const encodedMin = encodeValue(min);
-        if (encodedMin !== null) {
-          clauses.push(`${attribute} >= ${encodedMin}`);
-        }
-      }
-      if (max !== undefined && max !== null) {
-        const encodedMax = encodeValue(max);
-        if (encodedMax !== null) {
-          clauses.push(`${attribute} <= ${encodedMax}`);
-        }
-      }
-      if (equals !== undefined && equals !== null) {
-        const encodedEquals = encodeValue(equals);
-        if (encodedEquals !== null) {
-          clauses.push(`${attribute} = ${encodedEquals}`);
-        }
-      }
-      if (not !== undefined && not !== null) {
-        const encodedNot = encodeValue(not);
-        if (encodedNot !== null) {
-          clauses.push(`${attribute} != ${encodedNot}`);
-        }
-      }
-      continue;
-    }
-    if (typeof rawValue === 'boolean') {
-      clauses.push(`${attribute} = ${rawValue ? 'true' : 'false'}`);
-      continue;
-    }
-    const encoded = encodeValue(rawValue);
-    if (encoded !== null) {
-      clauses.push(`${attribute} = ${encoded}`);
-    }
-  }
-  return clauses.length ? clauses : null;
-}
-
-function deriveGeo(entity, hit) {
-  if (!hit) {
-    return null;
-  }
-  if (entity === 'communities') {
-    const country = hit.country ?? hit.metadata?.country ?? null;
-    const resolved = resolveCountryCoordinates(country);
-    if (resolved) {
-      return {
-        latitude: resolved.latitude,
-        longitude: resolved.longitude,
-        label: hit.name,
-        country: resolved.code,
-        context: 'community'
-      };
-    }
-  }
-  if (entity === 'tutors') {
-    const resolved = resolveCountryCoordinates(hit.country ?? hit.metadata?.country ?? null);
-    if (resolved) {
-      return {
-        latitude: resolved.latitude,
-        longitude: resolved.longitude,
-        label: hit.displayName,
-        country: resolved.code,
-        context: 'tutor'
-      };
-    }
-  }
-  if (entity === 'events') {
-    const resolved = resolveCountryCoordinates(hit.country ?? hit.communityCountry ?? null);
-    if (resolved) {
-      return {
-        latitude: resolved.latitude,
-        longitude: resolved.longitude,
-        label: hit.title,
-        country: resolved.code,
-        context: 'event'
-      };
-    }
+  if (['false', '0', 'no', 'off'].includes(normalised)) {
+    return false;
   }
   return null;
 }
 
-function formatHit(entity, hit) {
-  const base = {
-    id: hit.id,
-    entityType: entity,
-    raw: hit
-  };
-  const pickImage = (...keys) => {
-    for (const key of keys) {
-      if (!key) continue;
-      const camelValue = hit[key];
-      if (typeof camelValue === 'string' && camelValue) {
-        return camelValue;
-      }
-      const snakeKey = key.replace(/([A-Z])/g, (match) => `_${match.toLowerCase()}`);
-      const snakeValue = hit[snakeKey];
-      if (typeof snakeValue === 'string' && snakeValue) {
-        return snakeValue;
-      }
-      if (hit.raw) {
-        const rawCamel = hit.raw[key];
-        if (typeof rawCamel === 'string' && rawCamel) {
-          return rawCamel;
-        }
-        const rawSnake = hit.raw[snakeKey];
-        if (typeof rawSnake === 'string' && rawSnake) {
-          return rawSnake;
-        }
-      }
-    }
-    return null;
-  };
-
-  base.imageUrl = pickImage('coverImageUrl', 'thumbnailUrl', 'avatarUrl', 'imageUrl');
-  switch (entity) {
-    case 'communities': {
-      base.title = hit.name;
-      base.subtitle = hit.tagline ?? hit.description?.slice(0, 140) ?? null;
-      base.description = hit.description;
-      base.tags = sanitiseArray([hit.category, ...(hit.topics ?? [])]);
-      base.metrics = {
-        members: formatNumber(hit.memberCount),
-        trendScore: hit.trendScore
-      };
-      base.actions = [{ label: 'View community', href: `/communities/${hit.slug}` }];
-      base.geo = deriveGeo(entity, hit);
-      return base;
-    }
-    case 'courses': {
-      base.title = hit.title;
-      base.subtitle = [hit.level, formatCurrency(hit.price), formatRating(hit.rating)]
-        .filter(Boolean)
-        .join(' · ');
-      base.description = hit.summary ?? hit.description?.slice(0, 140) ?? null;
-      base.tags = sanitiseArray(hit.skills ?? []);
-      base.metrics = {
-        enrolments: formatNumber(hit.enrolmentCount),
-        releaseAt: hit.releaseAt
-      };
-      base.actions = [{ label: 'View course', href: `/courses/${hit.slug}` }];
-      base.geo = null;
-      return base;
-    }
-    case 'ebooks': {
-      base.title = hit.title;
-      base.subtitle = [formatCurrency(hit.price), formatRating(hit.rating)]
-        .filter(Boolean)
-        .join(' · ');
-      base.description = hit.description?.slice(0, 160) ?? null;
-      base.tags = sanitiseArray(hit.tags ?? []);
-      base.metrics = {
-        readingTimeMinutes: hit.readingTimeMinutes
-      };
-      base.actions = [{ label: 'Open ebook', href: `/ebooks/${hit.slug}` }];
-      base.geo = null;
-      return base;
-    }
-    case 'tutors': {
-      base.title = hit.displayName;
-      base.subtitle = [hit.headline, formatCurrency(hit.hourlyRate), formatRating(hit.rating)]
-        .filter(Boolean)
-        .join(' · ');
-      base.description = hit.bio?.slice(0, 160) ?? null;
-      base.tags = sanitiseArray(hit.skills ?? []);
-      base.metrics = {
-        completedSessions: formatNumber(hit.completedSessions),
-        responseTimeMinutes: hit.responseTimeMinutes
-      };
-      base.actions = [{ label: 'Hire tutor', href: `/tutors/${hit.id}` }];
-      base.geo = deriveGeo(entity, hit);
-      return base;
-    }
-    case 'profiles': {
-      base.title = hit.displayName;
-      base.subtitle = [hit.headline, hit.role, formatNumber(hit.followerCount) && `${formatNumber(hit.followerCount)} followers`]
-        .filter(Boolean)
-        .join(' · ');
-      base.description = hit.bio?.slice(0, 160) ?? null;
-      base.tags = sanitiseArray(hit.skills ?? []);
-      base.metrics = {
-        followers: formatNumber(hit.followerCount)
-      };
-      base.actions = [{ label: 'View profile', href: `/profiles/${hit.id}` }];
-      base.geo = deriveGeo(entity, hit);
-      return base;
-    }
-    case 'ads': {
-      base.title = hit.name;
-      base.subtitle = [hit.objective, formatCurrency(hit.budget), `${hit.ctr ? hit.ctr.toFixed(2) : '0.00'}% CTR`]
-        .filter(Boolean)
-        .join(' · ');
-      base.description = hit.creative?.description ?? null;
-      base.tags = sanitiseArray(hit.targeting?.keywords ?? []);
-      base.metrics = {
-        performanceScore: hit.performanceScore,
-        spendTotal: formatCurrency(hit.spend)
-      };
-      base.actions = [{ label: 'Open campaign', href: `/ads/${hit.id}` }];
-      base.geo = null;
-      return base;
-    }
-    case 'events': {
-      base.title = hit.title;
-      base.subtitle = [hit.communityName, hit.type, hit.timezone]
-        .filter(Boolean)
-        .join(' · ');
-      base.description = hit.description?.slice(0, 160) ?? null;
-      base.tags = sanitiseArray(hit.topics ?? []);
-      base.metrics = {
-        startAt: hit.startAt,
-        isTicketed: hit.isTicketed
-      };
-      base.actions = [{ label: 'View event', href: `/events/${hit.slug ?? hit.id}` }];
-      base.geo = deriveGeo(entity, hit);
-      return base;
-    }
-    default:
-      return { ...base, title: hit.title ?? hit.name ?? `Result ${hit.id}` };
+const SORT_COMPARATORS = {
+  communities: {
+    trending: (a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0),
+    members: (a, b) => (b.metrics?.memberCount ?? 0) - (a.metrics?.memberCount ?? 0),
+    newest: (a, b) => new Date(b.metadata?.createdAt ?? 0) - new Date(a.metadata?.createdAt ?? 0)
+  },
+  courses: {
+    relevance: (a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0),
+    rating: (a, b) => (b.rating?.average ?? 0) * (b.rating?.count ?? 1) - (a.rating?.average ?? 0) * (a.rating?.count ?? 1),
+    newest: (a, b) => new Date(b.metadata?.releaseAt ?? 0) - new Date(a.metadata?.releaseAt ?? 0),
+    priceLow: (a, b) => (a.price?.amount ?? 0) - (b.price?.amount ?? 0),
+    priceHigh: (a, b) => (b.price?.amount ?? 0) - (a.price?.amount ?? 0)
+  },
+  ebooks: {
+    relevance: (a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0),
+    newest: (a, b) => new Date(b.metadata?.releaseAt ?? 0) - new Date(a.metadata?.releaseAt ?? 0),
+    rating: (a, b) => (b.rating?.average ?? 0) * (b.rating?.count ?? 1) - (a.rating?.average ?? 0) * (a.rating?.count ?? 1),
+    readingTime: (a, b) => (a.metrics?.readingTimeMinutes ?? 0) - (b.metrics?.readingTimeMinutes ?? 0)
+  },
+  tutors: {
+    relevance: (a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0),
+    rating: (a, b) => (b.rating?.average ?? 0) * (b.rating?.count ?? 1) - (a.rating?.average ?? 0) * (a.rating?.count ?? 1),
+    priceLow: (a, b) => (a.price?.amount ?? 0) - (b.price?.amount ?? 0),
+    priceHigh: (a, b) => (b.price?.amount ?? 0) - (a.price?.amount ?? 0),
+    responseTime: (a, b) => (a.metrics?.responseTimeMinutes ?? Infinity) - (b.metrics?.responseTimeMinutes ?? Infinity)
+  },
+  profiles: {
+    relevance: (a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0),
+    newest: (a, b) => new Date(b.metadata?.createdAt ?? 0) - new Date(a.metadata?.createdAt ?? 0),
+    followers: (a, b) => (b.metrics?.followerCount ?? 0) - (a.metrics?.followerCount ?? 0)
+  },
+  ads: {
+    performance: (a, b) => (b.metrics?.performanceScore ?? 0) - (a.metrics?.performanceScore ?? 0),
+    spend: (a, b) => (b.metrics?.spendTotalCents ?? 0) - (a.metrics?.spendTotalCents ?? 0),
+    newest: (a, b) => new Date(b.metadata?.createdAt ?? 0) - new Date(a.metadata?.createdAt ?? 0)
+  },
+  events: {
+    upcoming: (a, b) => new Date(a.metrics?.startAt ?? 0) - new Date(b.metrics?.startAt ?? 0),
+    newest: (a, b) => new Date(b.metadata?.createdAt ?? 0) - new Date(a.metadata?.createdAt ?? 0),
+    popularity: (a, b) => (b.metrics?.reservedSeats ?? 0) - (a.metrics?.reservedSeats ?? 0)
   }
+};
+
+const FILTER_PATHS = {
+  communities: {
+    visibility: (doc) => doc.metadata?.visibility,
+    category: (doc) => doc.metadata?.category,
+    timezone: (doc) => doc.metadata?.timezone,
+    country: (doc) => doc.metadata?.country,
+    languages: (doc) => doc.metadata?.languages ?? doc.languages,
+    tags: (doc) => doc.tags,
+    isFeatured: (doc) => doc.metadata?.isFeatured
+  },
+  courses: {
+    level: (doc) => doc.metadata?.level,
+    category: (doc) => doc.metadata?.category,
+    deliveryFormat: (doc) => doc.metadata?.deliveryFormat,
+    languages: (doc) => doc.metadata?.languages ?? doc.languages,
+    tags: (doc) => doc.tags,
+    'price.amount': (doc) => doc.price?.amount
+  },
+  ebooks: {
+    categories: (doc) => doc.categories,
+    languages: (doc) => doc.languages,
+    readingTimeMinutes: (doc) => doc.metrics?.readingTimeMinutes
+  },
+  tutors: {
+    isVerified: (doc) => doc.metadata?.isVerified,
+    languages: (doc) => doc.languages,
+    skills: (doc) => doc.metadata?.skills ?? doc.tags,
+    country: (doc) => doc.metadata?.country,
+    'hourlyRate.amount': (doc) => doc.price?.amount
+  },
+  profiles: {
+    role: (doc) => doc.metadata?.role,
+    badges: (doc) => doc.metadata?.badges,
+    languages: (doc) => doc.metadata?.languages ?? doc.languages
+  },
+  ads: {
+    status: (doc) => doc.metadata?.status,
+    objective: (doc) => doc.metadata?.objective,
+    'targeting.audiences': (doc) => doc.metadata?.targetingAudiences,
+    'targeting.locations': (doc) => doc.metadata?.targetingLocations,
+    'targeting.languages': (doc) => doc.metadata?.targetingLanguages
+  },
+  events: {
+    type: (doc) => doc.metadata?.type,
+    timezone: (doc) => doc.metadata?.timezone,
+    isTicketed: (doc) => doc.metrics?.isTicketed,
+    topics: (doc) => doc.metadata?.topics
+  }
+};
+
+const FACET_EXTRACTORS = {
+  communities: {
+    category: (doc) => doc.metadata?.category,
+    visibility: (doc) => doc.metadata?.visibility,
+    languages: (doc) => doc.metadata?.languages ?? doc.languages
+  },
+  courses: {
+    level: (doc) => doc.metadata?.level,
+    deliveryFormat: (doc) => doc.metadata?.deliveryFormat,
+    category: (doc) => doc.metadata?.category,
+    languages: (doc) => doc.metadata?.languages ?? doc.languages
+  },
+  ebooks: {
+    categories: (doc) => doc.categories,
+    languages: (doc) => doc.languages
+  },
+  tutors: {
+    languages: (doc) => doc.languages,
+    skills: (doc) => doc.metadata?.skills ?? doc.tags,
+    country: (doc) => doc.metadata?.country,
+    verified: (doc) => (doc.metadata?.isVerified ? 'yes' : 'no')
+  },
+  profiles: {
+    role: (doc) => doc.metadata?.role,
+    badges: (doc) => doc.metadata?.badges
+  },
+  ads: {
+    status: (doc) => doc.metadata?.status,
+    objective: (doc) => doc.metadata?.objective
+  },
+  events: {
+    type: (doc) => doc.metadata?.type,
+    timezone: (doc) => doc.metadata?.timezone,
+    ticketed: (doc) => (doc.metrics?.isTicketed ? 'yes' : 'no')
+  }
+};
+
+function extractFacetCounts(docs, extractor) {
+  const counts = new Map();
+  for (const doc of docs) {
+    const value = extractor(doc);
+    const values = normaliseArray(value).filter((entry) => entry !== null && entry !== undefined && entry !== '');
+    for (const entry of values) {
+      const key = String(entry);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  return Object.fromEntries([...counts.entries()].sort((a, b) => b[1] - a[1]));
 }
 
 export class ExplorerSearchService {
-  constructor({ clusterService = searchClusterService, loggerInstance = logger } = {}) {
-    this.clusterService = clusterService;
-    this.logger = loggerInstance;
+  constructor({ documentModel = ExplorerSearchDocumentModel, loggerInstance = logger } = {}) {
+    this.documentModel = documentModel;
+    this.logger = loggerInstance?.child ? loggerInstance.child({ service: 'ExplorerSearchService' }) : logger;
   }
 
   getSupportedEntities() {
-    return SUPPORTED_ENTITIES;
+    return ['communities', 'courses', 'ebooks', 'tutors', 'profiles', 'ads', 'events'];
   }
 
   normaliseEntityTypes(entities) {
+    const supported = this.getSupportedEntities();
     if (!entities || !Array.isArray(entities) || !entities.length) {
-      return SUPPORTED_ENTITIES;
+      return supported;
     }
     const filtered = entities
       .map((entry) => (typeof entry === 'string' ? entry.trim().toLowerCase() : null))
-      .filter((entry) => entry && SUPPORTED_ENTITIES.includes(entry));
-    return filtered.length ? filtered : SUPPORTED_ENTITIES;
+      .filter((entry) => entry && supported.includes(entry));
+    return filtered.length ? filtered : supported;
   }
 
-  buildSort(entity, sortPreference) {
-    const config = ENTITY_CONFIG[entity];
-    if (!config) {
-      return undefined;
+  applyQueryFilter(documents, query) {
+    if (!query) {
+      return documents;
     }
-    if (!sortPreference || (Array.isArray(sortPreference) && sortPreference.length === 0)) {
-      const defaultKey = config.defaultSort;
-      const defaultSort = config.sorts[defaultKey];
-      return defaultSort && defaultSort.length ? defaultSort : undefined;
+    const tokens = query
+      .split(/[\s,]+/)
+      .map((token) => token.trim().toLowerCase())
+      .filter(Boolean);
+    if (!tokens.length) {
+      return documents;
     }
-    if (typeof sortPreference === 'string') {
-      if (config.sorts[sortPreference]) {
-        const candidate = config.sorts[sortPreference];
-        return candidate && candidate.length ? candidate : undefined;
+    return documents.filter((doc) => tokens.every((token) => doc.searchTerms.includes(token)));
+  }
+
+  applyFilters(entity, documents, filters = {}, globalFilters = {}) {
+    const mapping = FILTER_PATHS[entity] ?? {};
+    const merged = { ...globalFilters, ...filters };
+
+    const entries = Object.entries(merged).filter(([_, value]) => {
+      if (value === null || value === undefined) {
+        return false;
       }
-      if (sortPreference.includes(':')) {
-        return [sortPreference];
+      if (Array.isArray(value) && value.length === 0) {
+        return false;
       }
+      if (typeof value === 'object' && !Array.isArray(value)) {
+        return Object.values(value).some((item) => item !== null && item !== undefined && item !== '');
+      }
+      if (value === '') {
+        return false;
+      }
+      return true;
+    });
+
+    if (!entries.length) {
+      return documents;
     }
-    if (Array.isArray(sortPreference)) {
-      return sortPreference;
-    }
-    if (typeof sortPreference === 'object' && sortPreference.field) {
-      const direction = sortPreference.direction ?? 'asc';
-      return [`${sortPreference.field}:${direction}`];
-    }
-    return undefined;
+
+    return documents.filter((doc) => {
+      for (const [key, expected] of entries) {
+        const resolver = mapping[key];
+        const resolvedValue = typeof resolver === 'function' ? resolver(doc) : doc[key];
+        if (Array.isArray(expected)) {
+          if (!intersects(resolvedValue, expected)) {
+            return false;
+          }
+          continue;
+        }
+        if (typeof expected === 'object' && expected !== null) {
+          if (!matchesRange(resolvedValue, expected)) {
+            return false;
+          }
+          continue;
+        }
+        if (typeof expected === 'boolean') {
+          const actual = normaliseBoolean(resolvedValue);
+          if (actual === null || actual !== expected) {
+            return false;
+          }
+          continue;
+        }
+        const normalisedExpected = toLower(expected);
+        if (Array.isArray(resolvedValue)) {
+          if (!resolvedValue.some((value) => toLower(value) === normalisedExpected)) {
+            return false;
+          }
+        } else if (toLower(resolvedValue) !== normalisedExpected) {
+          return false;
+        }
+      }
+      return true;
+    });
   }
 
-  buildFilters(entity, filters = {}, globalFilters = {}) {
-    const merged = { ...globalFilters };
-    const entityFilters = filters?.[entity] ?? filters ?? {};
-    for (const [key, value] of Object.entries(entityFilters)) {
-      merged[key] = mergeFilterValue(merged[key], value);
+  applySort(entity, documents, sortPreference) {
+    const comparators = SORT_COMPARATORS[entity] ?? {};
+    const comparator = sortPreference ? comparators[sortPreference] : comparators[Object.keys(comparators)[0]];
+    if (!comparator) {
+      return documents.slice().sort((a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0));
     }
-    return merged;
+    return documents.slice().sort(comparator);
   }
 
-  async searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }) {
-    const indexUid = INDEX_UIDS.get(entity);
-    if (!indexUid) {
-      throw new Error(`Explorer search index missing for entity "${entity}"`);
+  buildFacets(entity, documents) {
+    const extractors = FACET_EXTRACTORS[entity];
+    if (!extractors) {
+      return {};
     }
-    const client = this.clusterService.searchClient;
-    if (!client) {
-      const error = new Error('Search cluster is not initialised');
-      error.status = 503;
-      throw error;
-    }
+    return Object.fromEntries(
+      Object.entries(extractors)
+        .map(([key, extractor]) => [key, extractFacetCounts(documents, extractor)])
+        .filter(([_, counts]) => Object.keys(counts).length > 0)
+    );
+  }
 
-    const index = client.index(indexUid);
-    const effectiveFilters = this.buildFilters(entity, filters, globalFilters);
-    const meiliFilters = buildFilterClauses(effectiveFilters);
-    const sortDirectives = this.buildSort(entity, sort?.[entity] ?? sort);
-    const facets = includeFacets ? ENTITY_CONFIG[entity].facets : undefined;
-
-    const searchOptions = {
-      offset: (page - 1) * perPage,
-      limit: perPage,
-      filter: meiliFilters ?? undefined,
-      facets,
-      sort: sortDirectives && sortDirectives.length ? sortDirectives : undefined
+  toHit(entity, doc) {
+    const previewMedia = doc.previewMedia ?? {};
+    const base = {
+      id: doc.entityId,
+      entityType: entity,
+      title: doc.title,
+      subtitle: doc.subtitle ?? null,
+      description: doc.description ?? null,
+      tags: doc.tags ?? [],
+      imageUrl: previewMedia.url ?? null,
+      previewImage: previewMedia.url ?? null,
+      thumbnailUrl: previewMedia.url ?? null,
+      coverImageUrl: previewMedia.url ?? null,
+      previewMedia: {
+        url: previewMedia.url ?? null,
+        type: previewMedia.type ?? null,
+        placeholder: previewMedia.placeholder ?? null
+      },
+      previewPlaceholder: previewMedia.placeholder ?? null,
+      price: doc.price ?? null,
+      rating: doc.rating ?? null,
+      metrics: doc.metrics ?? {},
+      raw: doc.raw ?? {},
+      metadata: doc.metadata ?? {},
+      geo: doc.geo
+        ? {
+            latitude: doc.geo.latitude ?? null,
+            longitude: doc.geo.longitude ?? null,
+            country: doc.geo.country ?? null,
+            label: doc.title,
+            context: entity
+          }
+        : null,
+      actions: []
     };
 
-    const result = await recordSearchOperation('explorer_query', () => index.search(query ?? '', searchOptions));
+    switch (entity) {
+      case 'communities': {
+        base.actions = [
+          {
+            label: 'View community',
+            href: `/communities/${doc.metadata?.slug ?? doc.entityId}`
+          }
+        ];
+        base.metrics = {
+          ...doc.metrics,
+          members: doc.metrics?.memberCount ?? 0,
+          trendScore: doc.metrics?.trendScore ?? 0,
+          visibility: doc.metadata?.visibility ?? 'public'
+        };
+        return base;
+      }
+      case 'courses': {
+        base.actions = [
+          {
+            label: 'View course',
+            href: `/courses/${doc.metadata?.slug ?? doc.entityId}`
+          }
+        ];
+        base.metrics = {
+          ...doc.metrics,
+          enrolments: doc.metrics?.enrolments ?? 0,
+          releaseAt: doc.metrics?.releaseAt ?? null,
+          skills: doc.metrics?.skills ?? [],
+          level: doc.metrics?.level ?? null,
+          deliveryFormat: doc.metrics?.deliveryFormat ?? null
+        };
+        return base;
+      }
+      case 'ebooks': {
+        base.actions = [
+          {
+            label: 'Open e-book',
+            href: `/ebooks/${doc.metadata?.slug ?? doc.entityId}`
+          }
+        ];
+        base.metrics = {
+          ...doc.metrics,
+          readingTimeMinutes: doc.metrics?.readingTimeMinutes ?? 0,
+          authors: doc.metrics?.authors ?? [],
+          releaseAt: doc.metrics?.releaseAt ?? null
+        };
+        return base;
+      }
+      case 'tutors': {
+        base.actions = [
+          {
+            label: 'Hire tutor',
+            href: `/tutors/${doc.metadata?.slug ?? doc.entityId}`
+          }
+        ];
+        base.metrics = {
+          ...doc.metrics,
+          completedSessions: doc.metrics?.completedSessions ?? 0,
+          responseTimeMinutes: doc.metrics?.responseTimeMinutes ?? null,
+          languages: doc.metrics?.languages ?? [],
+          skills: doc.metrics?.skills ?? [],
+          country: doc.metadata?.country ?? null
+        };
+        return base;
+      }
+      case 'profiles': {
+        base.actions = [
+          {
+            label: 'View profile',
+            href: `/profiles/${doc.entityId}`
+          }
+        ];
+        base.metrics = {
+          ...doc.metrics,
+          followerCount: doc.metrics?.followerCount ?? 0,
+          role: doc.metrics?.role ?? null
+        };
+        return base;
+      }
+      case 'ads': {
+        base.actions = [
+          {
+            label: 'Open campaign',
+            href: doc.metrics?.ctaUrl ?? `/ads/${doc.metadata?.slug ?? doc.entityId}`
+          }
+        ];
+        base.metrics = {
+          ...doc.metrics,
+          performanceScore: doc.metrics?.performanceScore ?? 0,
+          ctr: doc.metrics?.ctr ?? 0,
+          spendTotalCents: doc.metrics?.spendTotalCents ?? 0,
+          objective: doc.metrics?.objective ?? null
+        };
+        return base;
+      }
+      case 'events': {
+        base.actions = [
+          {
+            label: 'View event',
+            href: `/events/${doc.metadata?.slug ?? doc.entityId}`
+          }
+        ];
+        base.metrics = {
+          ...doc.metrics,
+          startAt: doc.metrics?.startAt ?? null,
+          timezone: doc.metrics?.timezone ?? null,
+          capacity: doc.metrics?.capacity ?? 0,
+          isTicketed: doc.metrics?.isTicketed ?? false
+        };
+        return base;
+      }
+      default:
+        return base;
+    }
+  }
 
-    const hits = Array.isArray(result.hits) ? result.hits.map((hit) => formatHit(entity, hit)) : [];
-    const markers = hits.map((hit) => hit.geo).filter(Boolean);
+  resolveSuggestionUrl(entity, doc) {
+    switch (entity) {
+      case 'communities':
+        return `/communities/${doc.metadata?.slug ?? doc.entityId}`;
+      case 'courses':
+        return `/courses/${doc.metadata?.slug ?? doc.entityId}`;
+      case 'ebooks':
+        return `/ebooks/${doc.metadata?.slug ?? doc.entityId}`;
+      case 'tutors':
+        return `/tutors/${doc.metadata?.slug ?? doc.entityId}`;
+      case 'profiles':
+        return `/profiles/${doc.entityId}`;
+      case 'ads':
+        return `/ads/${doc.metadata?.slug ?? doc.entityId}`;
+      case 'events':
+        return `/events/${doc.metadata?.slug ?? doc.entityId}`;
+      default:
+        return '#';
+    }
+  }
+
+  buildMarkers(entitiesResults) {
+    const markers = [];
+    for (const result of entitiesResults) {
+      for (const hit of result.hits) {
+        if (hit.geo && hit.geo.latitude !== null && hit.geo.longitude !== null) {
+          markers.push(hit.geo);
+        }
+      }
+    }
     return {
-      entity,
-      hits,
-      rawHits: result.hits,
-      totalHits: result.estimatedTotalHits ?? hits.length,
-      processingTimeMs: result.processingTimeMs ?? 0,
-      query: result.query,
-      page,
-      perPage,
-      sort: sortDirectives,
-      filter: meiliFilters,
-      facets: result.facetDistribution ?? {},
-      markers
+      items: markers,
+      bounds: buildBounds(markers)
     };
   }
 
@@ -501,21 +524,59 @@ export class ExplorerSearchService {
     query,
     entityTypes,
     page = 1,
-    perPage = 10,
+    perPage = 12,
     filters = {},
     globalFilters = {},
     sort = {},
     includeFacets = true
   } = {}) {
     const resolvedEntities = this.normaliseEntityTypes(entityTypes);
-    const tasks = resolvedEntities.map((entity) =>
-      this.searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets })
-    );
+    const documents = await this.documentModel.listByEntities(resolvedEntities);
 
-    const results = await Promise.all(tasks);
-    const byEntity = Object.fromEntries(results.map((result) => [result.entity, result]));
-    const allMarkers = results.flatMap((result) => result.markers);
-    const bounds = buildBounds(allMarkers);
+    const results = [];
+    for (const entity of resolvedEntities) {
+      const entityStart = Date.now();
+      const entityDocuments = documents.filter((doc) => doc.entityType === entity);
+      const matchedQuery = this.applyQueryFilter(entityDocuments, query);
+      const entityFilters = filters?.[entity] ?? filters ?? {};
+      const filtered = this.applyFilters(entity, matchedQuery, entityFilters, globalFilters);
+      const sortPreference = typeof sort === 'object' ? sort[entity] ?? sort : sort;
+      const sorted = this.applySort(entity, filtered, sortPreference);
+      const totalHits = sorted.length;
+      const offset = Math.max(0, (page - 1) * perPage);
+      const hits = sorted.slice(offset, offset + perPage).map((doc) => this.toHit(entity, doc));
+      const facets = includeFacets ? this.buildFacets(entity, filtered) : {};
+      const processingTimeMs = Date.now() - entityStart;
+
+      results.push({
+        entity,
+        hits,
+        rawHits: sorted.slice(offset, offset + perPage).map((doc) => doc.raw ?? {}),
+        totalHits,
+        processingTimeMs,
+        query,
+        page,
+        perPage,
+        sort: sortPreference ?? null,
+        filter: entityFilters,
+        facets,
+        markers: hits.map((hit) => hit.geo).filter(Boolean)
+      });
+    }
+
+    const totals = results.reduce((acc, result) => {
+      acc[result.entity] = result.totalHits;
+      return acc;
+    }, {});
+
+    const markers = this.buildMarkers(results);
+
+    const analytics = {
+      searchEventId: `doc-${Date.now().toString(36)}`,
+      totalResults: results.reduce((acc, result) => acc + result.totalHits, 0),
+      totalDisplayed: results.reduce((acc, result) => acc + result.hits.length, 0),
+      zeroResult: results.every((result) => result.totalHits === 0)
+    };
 
     const adsPlacements = await AdsPlacementService.placementsForSearch({
       query,
@@ -527,20 +588,27 @@ export class ExplorerSearchService {
       page,
       perPage,
       entities: resolvedEntities,
-      results: byEntity,
-      totals: resolvedEntities.reduce((acc, entity) => {
-        acc[entity] = byEntity[entity]?.totalHits ?? 0;
-        return acc;
-      }, {}),
-      markers: {
-        items: allMarkers,
-        bounds
-      },
-      adsPlacements
+      results: Object.fromEntries(results.map((result) => [result.entity, result])),
+      totals,
+      markers,
+      adsPlacements,
+      analytics
     };
+  }
+
+  async suggest({ query, entityTypes, limit = 6 } = {}) {
+    const resolvedEntities = this.normaliseEntityTypes(entityTypes);
+    const suggestions = await this.documentModel.suggest({ query, entityTypes: resolvedEntities, limit });
+    return suggestions.map((doc) => ({
+      entityType: doc.entityType,
+      entityId: doc.entityId,
+      title: doc.title,
+      subtitle: doc.subtitle ?? null,
+      description: doc.description ?? null,
+      url: this.resolveSuggestionUrl(doc.entityType, doc),
+      previewImage: doc.previewMedia?.url ?? null
+    }));
   }
 }
 
-export const explorerSearchService = new ExplorerSearchService();
-
-export default explorerSearchService;
+export default new ExplorerSearchService();

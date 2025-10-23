@@ -3,10 +3,11 @@ import { parseArgs } from 'node:util';
 
 import '../src/config/env.js';
 import logger from '../src/config/logger.js';
-import { INDEX_DEFINITIONS, searchClusterService } from '../src/services/SearchClusterService.js';
+import { searchClusterService } from '../src/services/SearchClusterService.js';
 import { SearchIngestionService } from '../src/services/SearchIngestionService.js';
 
-const KNOWN_INDEXES = INDEX_DEFINITIONS.map((definition) => definition.name);
+const ingestionService = new SearchIngestionService({ loggerInstance: logger });
+const KNOWN_INDEXES = ingestionService.getSupportedEntities();
 
 function parseCliArguments(argv) {
   const { values } = parseArgs({
@@ -64,13 +65,12 @@ function parseCliArguments(argv) {
     return;
   }
 
-  const ingestionService = new SearchIngestionService({ loggerInstance: logger });
   const startedAt = Date.now();
   try {
-    await searchClusterService.start();
     await ingestionService.fullReindex(options);
     const durationSeconds = Math.round((Date.now() - startedAt) / 1000);
-    logger.info({ options, durationSeconds }, 'Explorer search ingestion completed successfully');
+    const counts = await searchClusterService.checkClusterHealth();
+    logger.info({ options, durationSeconds, counts }, 'Explorer search ingestion completed successfully');
   } catch (error) {
     logger.error({ err: error, options }, 'Explorer search ingestion failed');
     process.exitCode = 1;

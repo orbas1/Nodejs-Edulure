@@ -10,6 +10,24 @@ export async function searchExplorer(payload, { token, signal } = {}) {
   });
 }
 
+export async function fetchExplorerSuggestions({ query, entityTypes, limit = 6 } = {}, { token, signal } = {}) {
+  assertToken(token, 'fetch explorer suggestions');
+  const params = { limit };
+  if (typeof query === 'string' && query.trim()) {
+    params.query = query.trim();
+  }
+  if (entityTypes && entityTypes.length) {
+    const list = Array.isArray(entityTypes) ? entityTypes : String(entityTypes).split(',');
+    params.entityTypes = list.map((entry) => entry.trim()).filter(Boolean).join(',');
+  }
+  return httpClient.get('/explorer/suggestions', {
+    token,
+    signal,
+    params,
+    cache: { enabled: false }
+  });
+}
+
 export async function listSavedSearches({ token, signal } = {}) {
   assertToken(token, 'list saved explorer searches');
   return httpClient.get('/explorer/saved-searches', {

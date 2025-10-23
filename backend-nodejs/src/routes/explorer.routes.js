@@ -5,6 +5,7 @@ import { createApiRouter } from './routerFactory.js';
 const router = createApiRouter();
 
 router.post('/search', auth('user'), ExplorerController.search);
+router.get('/suggestions', auth('user'), ExplorerController.suggest);
 router.get('/saved-searches', auth(), ExplorerController.listSavedSearches);
 router.get('/saved-searches/:savedSearchId', auth(), ExplorerController.getSavedSearch);
 router.post('/saved-searches', auth(), ExplorerController.createSavedSearch);

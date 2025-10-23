@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   AdjustmentsHorizontalIcon,
@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 import SearchResultCard from './SearchResultCard.jsx';
+import GlobalSearchBar from './GlobalSearchBar.jsx';
 import { useExplorerEntitySearch } from '../../hooks/useExplorerEntitySearch.js';
 
 function classNames(...classes) {
@@ -179,6 +180,10 @@ export default function ExplorerSearchSection({
     results,
     loading,
     error,
+    analytics,
+    totalsByEntity,
+    markers,
+    adsPlacements,
     savedSearches,
     savedSearchError,
     savedSearchLoading,
@@ -194,6 +199,19 @@ export default function ExplorerSearchSection({
   }, [query]);
 
   const filtersByKey = filters ?? {};
+  const totalResults = totalsByEntity?.[entityType] ?? total ?? 0;
+
+  const handleSuggestionSelect = useCallback(
+    (suggestion) => {
+      if (!suggestion) return;
+      const nextQuery = suggestion.title ?? suggestion.subtitle ?? '';
+      if (nextQuery) {
+        setQueryDraft(nextQuery);
+        setQuery(nextQuery);
+      }
+    },
+    [setQuery]
+  );
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -257,16 +275,17 @@ export default function ExplorerSearchSection({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label className="relative flex-1">
+            <div className="flex-1">
               <span className="sr-only">Search {title}</span>
-              <input
-                type="search"
+              <GlobalSearchBar
                 value={queryDraft}
-                onChange={(event) => setQueryDraft(event.target.value)}
+                onChange={(nextValue) => setQueryDraft(nextValue)}
                 placeholder={placeholder}
-                className="w-full rounded-full border border-slate-200 bg-white px-6 py-3.5 text-base font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                entityTypes={[entityType]}
+                loading={loading}
+                onSuggestionSelect={handleSuggestionSelect}
               />
-            </label>
+            </div>
             <button
               type="submit"
               className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
@@ -299,6 +318,34 @@ export default function ExplorerSearchSection({
           </div>
         </div>
       </header>
+
+      {(totalResults > 0 || analytics) && (
+        <div className="mt-6 flex flex-col gap-2 rounded-3xl border border-slate-100 bg-slate-50/70 px-6 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <div className="font-semibold text-slate-700">
+            {totalResults} result{totalResults === 1 ? '' : 's'} found
+          </div>
+          {analytics ? (
+            <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <span>{analytics.zeroResult ? 'No matches yet' : `${analytics.totalDisplayed} displayed`}</span>
+              {markers?.items?.length ? (
+                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-500">
+                  {markers.items.length} markers
+                </span>
+              ) : null}
+              {adsPlacements?.length ? (
+                <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">
+                  {adsPlacements.length} sponsored
+                </span>
+              ) : null}
+              {analytics.searchEventId ? (
+                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-500">
+                  ID {analytics.searchEventId}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[3fr,1fr] lg:gap-10">
         <div className="space-y-6">

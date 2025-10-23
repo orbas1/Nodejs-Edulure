@@ -1,96 +1,67 @@
-import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { env } from '../src/config/env.js';
 import { SearchClusterService } from '../src/services/SearchClusterService.js';
 
-vi.mock('meilisearch', () => ({
-  MeiliSearch: vi.fn()
-}));
+function createLogger() {
+  const logger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn()
+  };
+  logger.child = vi.fn().mockReturnValue(logger);
+  return logger;
+}
 
 describe('SearchClusterService', () => {
-  let adminClient;
-  let readClient;
+  let documentModel;
+  let ingestionService;
   let logger;
 
   beforeEach(() => {
-    vi.useFakeTimers();
-    const updateSettings = vi.fn().mockResolvedValue({ taskUid: 2 });
-
-    adminClient = {
-      getIndex: vi.fn().mockRejectedValue(Object.assign(new Error('missing'), { code: 'index_not_found' })),
-      createIndex: vi.fn().mockResolvedValue({ taskUid: 1 }),
-      waitForTask: vi.fn().mockResolvedValue({ status: 'succeeded' }),
-      index: vi.fn(() => ({ updateSettings })),
-      getKeys: vi.fn().mockResolvedValue({
-        results: [
-          {
-            key: env.search.searchApiKey,
-            actions: ['search'],
-            indexes: [`${env.search.indexPrefix}_communities`],
-            uid: 'search-key'
-          }
-        ]
-      }),
-      health: vi.fn().mockResolvedValue({ status: 'available' }),
-      createSnapshot: vi.fn().mockResolvedValue({ taskUid: 3 })
+    documentModel = {
+      countByEntity: vi.fn().mockResolvedValue({ courses: 3 }),
+      exportSnapshot: vi.fn().mockResolvedValue([
+        {
+          entityType: 'courses',
+          entityId: '1',
+          title: 'Ops Guild Foundations',
+          updatedAt: new Date('2024-03-01T00:00:00.000Z'),
+          popularityScore: 42
+        }
+      ])
     };
 
-    readClient = {
-      health: vi.fn().mockResolvedValue({ status: 'available' })
+    ingestionService = {
+      fullReindex: vi.fn().mockResolvedValue(undefined),
+      getSupportedEntities: vi.fn().mockReturnValue(['courses', 'communities'])
     };
 
-    logger = {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn()
-    };
+    logger = createLogger();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  it('bootstraps explorer documents and reports readiness', async () => {
+    const service = new SearchClusterService({ documentModel, ingestionService, loggerInstance: logger });
+    const status = await service.start();
+
+    expect(status).toEqual({ status: 'ready', message: 'Search document registry initialised' });
+    expect(ingestionService.fullReindex).toHaveBeenCalledTimes(1);
+
+    const counts = await service.checkClusterHealth();
+    expect(documentModel.countByEntity).toHaveBeenCalledTimes(1);
+    expect(counts).toEqual({ courses: 3 });
   });
 
-  it('provisions explorer indexes, audits keys, and exposes health metrics', async () => {
-    const service = new SearchClusterService({
-      adminNodes: [{ host: 'https://primary.local:7700', client: adminClient }],
-      replicaNodes: [],
-      readNodes: [{ host: 'https://reader.local:7700', client: readClient }],
-      healthcheckIntervalMs: 5000,
-      requestTimeoutMs: 2000,
-      loggerInstance: logger
-    });
+  it('creates snapshots using the document model', async () => {
+    const service = new SearchClusterService({ documentModel, ingestionService, loggerInstance: logger });
+    const snapshot = await service.createSnapshot();
 
-    await service.start();
-    service.stop();
-
-    expect(adminClient.createIndex).toHaveBeenCalledWith({
-      uid: `${env.search.indexPrefix}_communities`,
-      primaryKey: 'id'
-    });
-    expect(adminClient.index).toHaveBeenCalledWith(`${env.search.indexPrefix}_courses`);
-    expect(adminClient.waitForTask).toHaveBeenCalledWith(1, expect.any(Object));
-    expect(logger.info).toHaveBeenCalledWith(
-      expect.objectContaining({ index: `${env.search.indexPrefix}_communities`, host: 'https://primary.local:7700' }),
-      'Meilisearch index synchronised'
-    );
-    expect(adminClient.getKeys).toHaveBeenCalled();
-    expect(readClient.health).toHaveBeenCalled();
+    expect(documentModel.exportSnapshot).toHaveBeenCalledTimes(1);
+    expect(snapshot).toMatchObject({ status: 'succeeded', documents: expect.any(Array) });
+    expect(snapshot.documents).toHaveLength(1);
   });
 
-  it('creates snapshots for backups when requested', async () => {
-    const service = new SearchClusterService({
-      adminNodes: [{ host: 'https://primary.local:7700', client: adminClient }],
-      replicaNodes: [],
-      readNodes: [{ host: 'https://reader.local:7700', client: readClient }],
-      healthcheckIntervalMs: 0,
-      requestTimeoutMs: 2000,
-      loggerInstance: logger
-    });
-
-    await service.bootstrap();
-    await service.createSnapshot();
-
-    expect(adminClient.createSnapshot).toHaveBeenCalled();
-    expect(adminClient.waitForTask).toHaveBeenCalledWith(3, expect.any(Object));
+  it('exposes supported entities through the ingestion service', () => {
+    const service = new SearchClusterService({ documentModel, ingestionService, loggerInstance: logger });
+    expect(service.getSupportedEntities()).toEqual(['courses', 'communities']);
   });
 });

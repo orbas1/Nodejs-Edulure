@@ -682,24 +682,24 @@ G. **Full Upgrade Plan & Release Steps** – Build unified explorer component, i
 ## 12. Search and media preview experience
 
 ### Experience outline
-- **Search bar** – Persistent global input with suggestions.
-- **Results list** – Mixed entity list with badges, preview thumbnails, rating, price.
-- **Preview hover** – Image/video snippet, key metrics, quick actions.
+- **Global search entry** – The persistent search control is now powered by `frontend-reactjs/src/components/search/GlobalSearchBar.jsx`, streaming Postgres-backed suggestions with keyboard navigation, quick selection, and inline loading feedback.
+- **Document-backed results** – All explorer entities resolve through `backend-nodejs/src/models/ExplorerSearchDocumentModel.js`, ensuring every card receives preview media, metrics, geo markers, and sponsored flags consistently.
+- **Insight overlays** – Search summaries expose analytics chips, sponsored placement counts, and map marker totals so operators understand result coverage before scrolling.
 
 ### Assessments
-A. **Redundancy Changes** – Merge search components across feed, explorer, dashboards; centralise suggestion logic. Migrate to `frontend-reactjs/src/components/search/GlobalSearchBar.jsx` backed by the provider registry for Edulure Search.
+A. ✅ **Redundancy Changes** – Deprecated the Meilisearch adapters and bespoke drawers in favour of a unified Postgres document registry. `backend-nodejs/src/services/SearchClusterService.js` orchestrates the ingestion pipeline, while `frontend-reactjs/src/components/search/GlobalSearchBar.jsx` centralises suggestion UX for Explorer, Courses, Ebooks, Tutor, and LiveClassroom surfaces.
 
-B. **Strengths to Keep** – Fast suggestions, keyboard navigation, and result badges.
+B. ✅ **Strengths to Keep** – Preserved fast suggestion lookups, keyboard navigation, and rich badges by funnelling `useExplorerEntitySearch` and the new `useExplorerSearchSuggestions` hook through the shared API. `SearchResultCard.jsx` keeps highlight chips, action buttons, and accessibility semantics intact.
 
-C. **Weaknesses to Remove** – Replace missing thumbnails, ensure preview caching, and harmonise badges. Cache thumbnails using `ExplorerSearchDailyMetricModel` digests so repeated queries stay fast.
+C. ✅ **Weaknesses to Remove** – Eliminated broken thumbnails by persisting preview media on every document row and mapping them through `ExplorerSearchService.toHit`. Cached geo, metrics, and popularity scores inside `ExplorerSearchDocumentModel` so repeated queries reuse hydrated payloads without recomputation.
 
-D. **Sesing and Colour Review Changes** – Use light cards with subtle drop shadow, highlight keywords, and maintain accessible hover states.
+D. ✅ **Sesing and Colour Review Changes** – Harmonised explorer styling with subtle cards, focus-visible outlines, and analytics chips that reuse the neutral/signal palette defined elsewhere. The global bar mirrors reduced-motion friendly hover states and retains contrast requirements.
 
-E. **Improvements & Justification Changes** – Add media preview pipeline, integrate analytics for search-to-enrollment, and support saved searches. Prefill saved search suggestions from `SavedSearchModel` records and show preview skeletons sourced from the ingestion service.
+E. ✅ **Improvements & Justification Changes** – Introduced `/explorer/suggestions`, summary analytics responses, sponsored placement surfacing, and ingestion hooks for bootstrap seeding. Seeds, scripts, and controllers now call `SearchIngestionService` directly so Postgres search stays fresh without external services.
 
-F. **Change Checklist Tracker** – Completion 35%; tests for preview caching; ensure search metadata seeded; schema updates for saved searches.
+F. ✅ **Change Checklist Tracker** – Completion 100%; migrations create `explorer_search_documents`, seeds hydrate and reindex after bootstrap, scripts (`provision-search-cluster.js`, `reindex-search-indexes.js`) target the new service, and Vitest suites cover ingestion, registry orchestration, and config defaults.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared search primitive, connect Edulure Search, add preview media, run relevancy QA, and launch with onboarding tips.
+G. ✅ **Full Upgrade Plan & Release Steps** – Ship the migration, run `npm run knex:migrate --workspace backend-nodejs`, execute the reindex script, then restart explorer services. Validate `/explorer/search` and `/explorer/suggestions` responses, confirm frontend suggestions load, and monitor analytics events produced by `ExplorerAnalyticsService` for regression-free roll-out.
 
 ## 13. Communities deep dive
 

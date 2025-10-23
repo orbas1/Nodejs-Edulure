@@ -63,6 +63,7 @@ export default function SearchResultCard({ entityType, hit }) {
   const location = hit.geo?.country ?? hit.raw?.country ?? hit.metrics?.location;
   const availability = hit.metrics?.startAt ?? hit.raw?.startAt ?? hit.metrics?.upcomingSession;
   const imageUrl =
+    hit.previewImage ??
     hit.imageUrl ??
     hit.coverImageUrl ??
     hit.thumbnailUrl ??

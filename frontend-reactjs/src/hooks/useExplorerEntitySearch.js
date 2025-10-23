@@ -54,6 +54,9 @@ export function useExplorerEntitySearch({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [totalsByEntity, setTotalsByEntity] = useState({});
+  const [markers, setMarkers] = useState({ items: [], bounds: null });
+  const [adsPlacements, setAdsPlacements] = useState([]);
 
   const [savedSearches, setSavedSearches] = useState([]);
   const [savedSearchError, setSavedSearchError] = useState(null);
@@ -94,12 +97,18 @@ export function useExplorerEntitySearch({
         setResults(entityResult?.hits ?? []);
         setTotal(response.data?.totals?.[entityType] ?? 0);
         setAnalytics(response.data?.analytics ?? null);
+        setTotalsByEntity(response.data?.totals ?? {});
+        setMarkers(response.data?.markers ?? { items: [], bounds: null });
+        setAdsPlacements(response.data?.adsPlacements ?? []);
       } catch (err) {
         if (err.name === 'CanceledError' || err.name === 'AbortError') {
           return;
         }
         setError(err.message ?? 'Unable to fetch explorer results');
         setAnalytics(null);
+        setTotalsByEntity({});
+        setMarkers({ items: [], bounds: null });
+        setAdsPlacements([]);
       } finally {
         setLoading(false);
       }
@@ -279,6 +288,9 @@ export function useExplorerEntitySearch({
     loading,
     error,
     analytics,
+    totalsByEntity,
+    markers,
+    adsPlacements,
     refresh: () => executeSearch({ page }),
     savedSearches,
     savedSearchError,

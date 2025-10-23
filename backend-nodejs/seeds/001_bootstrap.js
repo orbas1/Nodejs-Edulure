@@ -7,6 +7,8 @@ import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
 import { ensureSeedImage } from './_helpers/seedAssets.js';
+import logger from '../src/config/logger.js';
+import { SearchIngestionService } from '../src/services/SearchIngestionService.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -2204,7 +2206,7 @@ export async function seed(knex) {
         conversions: 214,
         spend_cents: 36500,
         revenue_cents: 98200,
-        metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
+        metadata: JSON.stringify({ source: 'explorer-search-reports', funnel: 'creator-growth' })
       },
       {
         campaign_id: growthAdsCampaignId,
@@ -2214,7 +2216,7 @@ export async function seed(knex) {
         conversions: 238,
         spend_cents: 41200,
         revenue_cents: 109500,
-        metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
+        metadata: JSON.stringify({ source: 'explorer-search-reports', funnel: 'creator-growth' })
       }
     ]);
 
@@ -4000,4 +4002,9 @@ export async function seed(knex) {
       output: JSON.stringify({ recordsProcessed: 0, checksum: 'seed-init' })
     });
   });
+
+  const seedLogger = logger.child ? logger.child({ seed: '001_bootstrap' }) : logger;
+  const ingestionService = new SearchIngestionService({ dbClient: knex, loggerInstance: seedLogger });
+  await ingestionService.fullReindex();
+  seedLogger.info('Explorer search documents refreshed as part of bootstrap seed');
 }

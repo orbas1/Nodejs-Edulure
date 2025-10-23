@@ -48,6 +48,14 @@ const updateSavedSearchSchema = Joi.object({
   lastUsedAt: Joi.date()
 }).min(1);
 
+const suggestionSchema = Joi.object({
+  query: Joi.string().allow('', null).default(''),
+  entityTypes: Joi.alternatives()
+    .try(Joi.array().items(Joi.string().valid(...SUPPORTED_ENTITIES)), Joi.string())
+    .default(SUPPORTED_ENTITIES),
+  limit: Joi.number().integer().min(1).max(25).default(6)
+});
+
 export default class ExplorerController {
   static async search(req, res, next) {
     try {
@@ -69,20 +77,22 @@ export default class ExplorerController {
         });
       }
 
-      let analyticsContext = null;
+      let analyticsSummary = result.analytics ?? null;
       try {
         const entitySummaries = Object.entries(result.results ?? {}).map(([entityType, summary]) => ({
           entityType,
           result: {
-            ...summary,
-            displayedHits: summary?.hits?.length ?? 0
+            totalHits: summary?.totalHits ?? 0,
+            displayedHits: summary?.hits?.length ?? 0,
+            processingTimeMs: summary?.processingTimeMs ?? 0,
+            isZeroResult: (summary?.totalHits ?? 0) === 0
           }
         }));
         const latencyMs = entitySummaries.reduce(
           (acc, { result: summary }) => acc + Number(summary?.processingTimeMs ?? 0),
           0
         );
-        analyticsContext = await explorerAnalyticsService.recordSearchExecution({
+        const recorded = await explorerAnalyticsService.recordSearchExecution({
           query: payload.query ?? '',
           entitySummaries,
           userId: req.user?.id,
@@ -98,6 +108,14 @@ export default class ExplorerController {
             savedSearchId: payload.savedSearchId ?? null
           }
         });
+        if (recorded) {
+          analyticsSummary = {
+            searchEventId: recorded.eventUuid,
+            totalResults: recorded.totalResults,
+            totalDisplayed: recorded.totalDisplayed,
+            zeroResult: recorded.entitySummaries.every((summary) => summary.isZeroResult)
+          };
+        }
       } catch (analyticsError) {
         req.log?.warn({ err: analyticsError }, 'Failed to record explorer analytics event');
       }
@@ -105,16 +123,35 @@ export default class ExplorerController {
       return success(res, {
         data: {
           ...result,
-          analytics: analyticsContext
-            ? {
-                searchEventId: analyticsContext.eventUuid,
-                totalResults: analyticsContext.totalResults,
-                totalDisplayed: analyticsContext.totalDisplayed,
-                zeroResult: analyticsContext.entitySummaries.every((summary) => summary.isZeroResult)
-              }
-            : null
+          analytics: analyticsSummary ?? null
         },
         message: 'Explorer results fetched'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async suggest(req, res, next) {
+    try {
+      const raw = await suggestionSchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
+      const entityTypes = Array.isArray(raw.entityTypes)
+        ? raw.entityTypes
+        : typeof raw.entityTypes === 'string'
+        ? raw.entityTypes.split(',').map((entry) => entry.trim()).filter(Boolean)
+        : SUPPORTED_ENTITIES;
+      const suggestions = await explorerSearchService.suggest({
+        query: raw.query,
+        entityTypes,
+        limit: raw.limit
+      });
+      return success(res, {
+        data: suggestions,
+        message: 'Explorer suggestions fetched'
       });
     } catch (error) {
       if (error.isJoi) {
