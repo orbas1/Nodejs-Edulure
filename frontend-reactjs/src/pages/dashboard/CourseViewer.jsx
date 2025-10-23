@@ -5,7 +5,11 @@ import { fetchCoursePlayer, fetchCourseLiveChat, postCourseLiveChat } from '../.
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useRealtime } from '../../context/RealtimeContext.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import CourseProgressBar from '../../components/course/CourseProgressBar.jsx';
+import { CourseModuleNavigator } from '../../components/course/CourseModuleNavigator.jsx';
+import CertificatePreview from '../../components/certification/CertificatePreview.jsx';
 import { useLearnerDashboardContext } from '../../hooks/useLearnerDashboard.js';
+import useLearnerProgress from '../../hooks/useLearnerProgress.js';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -34,6 +38,22 @@ const formatRelativeDay = (date) => {
   if (diffDays === -1) return 'Yesterday';
   if (diffDays < -1) return `${Math.abs(diffDays)} days ago`;
   return 'Date pending';
+};
+
+const formatRelativeTimestamp = (value) => {
+  if (!value) return 'just now';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'recently';
+  }
+  const diffSeconds = Math.round((Date.now() - date.getTime()) / 1000);
+  if (diffSeconds <= 30) return 'just now';
+  if (diffSeconds < 120) return 'about a minute ago';
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} minutes ago`;
+  if (diffSeconds < 7200) return 'about an hour ago';
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} hours ago`;
+  if (diffSeconds < 172800) return 'yesterday';
+  return `${Math.floor(diffSeconds / 86400)} days ago`;
 };
 
 const determineScheduleTone = (date) => {
@@ -107,6 +127,86 @@ const formatLessonTypeLabel = (type) => {
   }
 };
 
+const selectPlaybackSources = (playback) => {
+  if (!playback) return [];
+  if (Array.isArray(playback.variants) && playback.variants.length) {
+    return playback.variants
+      .slice()
+      .sort((a, b) => (a.bandwidth ?? a.bitrate ?? 0) - (b.bandwidth ?? b.bitrate ?? 0))
+      .map((variant, index) => ({
+        url: variant.url,
+        mimeType: variant.mimeType ?? playback.mimeType ?? 'video/mp4',
+        label:
+          variant.label ??
+          (variant.height ? `${variant.height}p` : variant.bandwidth ? `${Math.round(variant.bandwidth / 1000)}kbps` : `Source ${index + 1}`)
+      }));
+  }
+  if (playback.url) {
+    const compressedUrl = playback.url.includes('?')
+      ? `${playback.url}&quality=medium`
+      : `${playback.url}?quality=medium`;
+    return [
+      {
+        url: compressedUrl,
+        mimeType: playback.mimeType ?? 'video/mp4',
+        label: playback.label ?? 'Adaptive'
+      }
+    ];
+  }
+  return [];
+};
+
+const resolvePlaybackPoster = (course, playback) => {
+  if (playback?.posterUrl) return playback.posterUrl;
+  if (playback?.previewImageUrl) return playback.previewImageUrl;
+  if (course?.heroImageUrl) return course.heroImageUrl;
+  if (course?.thumbnailUrl) return course.thumbnailUrl;
+  return undefined;
+};
+
+const normaliseFallbackModules = (modules = []) =>
+  modules.map((module) => {
+    const lessons = Array.isArray(module.lessons) ? module.lessons : [];
+    const normalisedLessons = lessons.map((lesson) => {
+      const releaseDate = parseDate(lesson.releaseAt ?? lesson.availableAt);
+      return {
+        id: lesson.id,
+        moduleId: module.id,
+        courseId: module.courseId,
+        title: lesson.title,
+        status: lesson.status ?? (lesson.completed ? 'completed' : releaseDate && releaseDate > new Date() ? 'scheduled' : 'ready'),
+        completed: Boolean(lesson.completed),
+        releaseAt: lesson.releaseAt ?? (releaseDate ? releaseDate.toISOString() : null),
+        releaseLabel: lesson.releaseLabel ?? (releaseDate ? formatDateLabel(releaseDate) : null),
+        metadata: lesson.metadata ?? {},
+        progressPercent: lesson.progressPercent ?? (lesson.completed ? 100 : 0),
+        completedAt: lesson.completedAt ?? null,
+        nextActionLabel: lesson.nextActionLabel ?? (lesson.completed ? 'Reviewed' : 'Ready to start')
+      };
+    });
+    const completedLessons = normalisedLessons.filter((lesson) => lesson.completed).length;
+    const totalLessons = normalisedLessons.length;
+    const nextLesson = normalisedLessons.find((lesson) => !lesson.completed) ?? null;
+    const progressPercent = module.progress?.completionPercent;
+    return {
+      id: module.id,
+      courseId: module.courseId,
+      title: module.title,
+      position: module.position ?? 0,
+      releaseLabel: module.releaseLabel ?? null,
+      completionPercent:
+        progressPercent !== undefined && progressPercent !== null
+          ? progressPercent
+          : totalLessons === 0
+            ? 0
+            : Math.round((completedLessons / totalLessons) * 100),
+      completedLessons: module.progress?.completedLessons ?? completedLessons,
+      totalLessons: module.progress?.totalLessons ?? totalLessons,
+      nextLesson: module.nextLesson ?? nextLesson,
+      lessons: normalisedLessons
+    };
+  });
+
 export default function CourseViewer() {
   const { courseId } = useParams();
   const { isLearner, dashboard } = useLearnerDashboardContext();
@@ -125,6 +225,20 @@ export default function CourseViewer() {
   const [chatInput, setChatInput] = useState('');
   const [presence, setPresence] = useState({ totalViewers: 0, viewers: [] });
   const messagesEndRef = useRef(null);
+  const {
+    progress: courseProgressSummary,
+    lessons: progressLessons,
+    enrollments: progressEnrollments,
+    loading: progressLoading,
+    error: progressError,
+    refresh: refreshLearnerProgress,
+    stale: progressStale,
+    lastUpdatedAt: progressLastUpdatedAt,
+    source: progressSource
+  } = useLearnerProgress(courseId);
+  const nextLessonFromSummary = courseProgressSummary?.nextLesson ?? null;
+  const lessonFocusRef = useRef(false);
+  const [focusedLessonId, setFocusedLessonId] = useState(() => nextLessonFromSummary?.id ?? null);
 
   const appendChatMessage = useCallback((message) => {
     if (!message) return;
@@ -254,17 +368,76 @@ export default function CourseViewer() {
   const presencePreview = useMemo(() => presence.viewers?.slice?.(0, 3) ?? [], [presence]);
   const extraViewers = Math.max(0, (presence.totalViewers ?? 0) - presencePreview.length);
 
-  const modules = useMemo(
-    () => (Array.isArray(course?.modules) ? course.modules : []),
+  const fallbackModules = useMemo(
+    () => (Array.isArray(course?.modules) ? normaliseFallbackModules(course.modules) : []),
     [course?.modules]
   );
-  const nextLessonDetail = course?.nextLessonDetail ?? null;
+
+  useEffect(() => {
+    const candidate = nextLessonFromSummary?.id ?? null;
+    if (!lessonFocusRef.current) {
+      setFocusedLessonId(candidate);
+    } else if (candidate && candidate === focusedLessonId) {
+      lessonFocusRef.current = false;
+    }
+  }, [focusedLessonId, nextLessonFromSummary?.id]);
+
+  const progressLessonMap = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(progressLessons)) {
+      progressLessons.forEach((lesson) => {
+        if (lesson?.id) {
+          map.set(lesson.id, lesson);
+        }
+      });
+    }
+    return map;
+  }, [progressLessons]);
+
+  const modules = useMemo(() => {
+    const summaryModules = Array.isArray(courseProgressSummary?.modules)
+      ? courseProgressSummary.modules
+      : [];
+    const baseModules = summaryModules.length ? summaryModules : fallbackModules;
+    return baseModules.map((module) => {
+      const lessons = Array.isArray(module.lessons) ? module.lessons : [];
+      const mergedLessons = lessons.map((lesson) => {
+        const progress = progressLessonMap.get(lesson.id) ?? null;
+        const releaseAt = lesson.releaseAt ?? progress?.releaseAt ?? null;
+        return {
+          ...lesson,
+          metadata: progress?.metadata ?? lesson.metadata ?? {},
+          status: lesson.status ?? progress?.status ?? (lesson.completed ? 'completed' : 'ready'),
+          completed: Boolean(lesson.completed ?? progress?.completed),
+          progressPercent: lesson.progressPercent ?? progress?.progressPercent ?? (lesson.completed ? 100 : 0),
+          releaseAt,
+          releaseLabel: lesson.releaseLabel ?? progress?.releaseLabel ?? (releaseAt ? formatDateLabel(parseDate(releaseAt)) : null),
+          completedAt: lesson.completedAt ?? progress?.completedAt ?? null,
+          nextActionLabel: lesson.nextActionLabel ?? progress?.nextActionLabel ?? (lesson.completed ? 'Reviewed' : 'Ready to start')
+        };
+      });
+      return {
+        ...module,
+        lessons: mergedLessons,
+        completionPercent:
+          module.completionPercent ?? (module.totalLessons
+            ? Math.round(((module.completedLessons ?? 0) / module.totalLessons) * 100)
+            : 0),
+        completedLessons: module.completedLessons ?? mergedLessons.filter((lesson) => lesson.completed).length,
+        totalLessons: module.totalLessons ?? mergedLessons.length,
+        nextLesson:
+          module.nextLesson ?? mergedLessons.find((lesson) => !lesson.completed && lesson.status !== 'scheduled') ?? null
+      };
+    });
+  }, [courseProgressSummary?.modules, fallbackModules, progressLessonMap]);
+
+  const nextLessonDetail = nextLessonFromSummary ?? course?.nextLessonDetail ?? null;
   const completedLessonsCount = modules.reduce(
-    (total, module) => total + (module.progress?.completedLessons ?? 0),
+    (total, module) => total + (module.completedLessons ?? 0),
     0
   );
   const totalLessonsCount = modules.reduce(
-    (total, module) => total + (module.progress?.totalLessons ?? 0),
+    (total, module) => total + (module.totalLessons ?? (module.lessons?.length ?? 0)),
     0
   );
 
@@ -306,7 +479,7 @@ export default function CourseViewer() {
   const readyLessons = useMemo(
     () =>
       lessonCatalogue
-        .filter((lesson) => !lesson.completed && lesson.status === 'available')
+        .filter((lesson) => !lesson.completed && ['ready', 'available'].includes(lesson.status ?? 'ready'))
         .map((lesson) => ({ ...lesson, releaseDate: parseDate(lesson.releaseAt) }))
         .sort((a, b) => (a.releaseDate?.getTime() ?? 0) - (b.releaseDate?.getTime() ?? 0)),
     [lessonCatalogue]
@@ -350,6 +523,39 @@ export default function CourseViewer() {
     [courseStartDate]
   );
 
+  useEffect(() => {
+    if (!focusedLessonId) {
+      return;
+    }
+    const exists = lessonCatalogue.some((lesson) => lesson.id === focusedLessonId);
+    if (!exists) {
+      lessonFocusRef.current = false;
+      setFocusedLessonId(nextLessonFromSummary?.id ?? null);
+    }
+  }, [focusedLessonId, lessonCatalogue, nextLessonFromSummary?.id]);
+
+  const handleLessonFocusSelect = useCallback((lesson) => {
+    const nextId = lesson?.id ?? null;
+    lessonFocusRef.current = true;
+    setFocusedLessonId(nextId);
+  }, []);
+
+  const focusedLesson = useMemo(
+    () => lessonCatalogue.find((lesson) => lesson.id === focusedLessonId) ?? null,
+    [lessonCatalogue, focusedLessonId]
+  );
+  const focusedLessonDueDate = focusedLesson ? computeLessonDueDate(focusedLesson) : null;
+  const focusedLessonDueLabel =
+    focusedLessonDueDate != null
+      ? `${formatDateLabel(focusedLessonDueDate)} · ${formatRelativeDay(focusedLessonDueDate)}`
+      : null;
+  const derivedActiveLessonId =
+    focusedLessonId ??
+    nextLessonDetail?.lessonId ??
+    nextLessonDetail?.id ??
+    nextLessonFromSummary?.id ??
+    null;
+
   const assessmentLessons = useMemo(
     () =>
       lessonCatalogue
@@ -362,9 +568,9 @@ export default function CourseViewer() {
     [lessonCatalogue, computeLessonDueDate]
   );
 
-  const modulesCompleted = modules.filter((module) => (module.progress?.completionPercent ?? 0) >= 100);
+  const modulesCompleted = modules.filter((module) => (module.completionPercent ?? 0) >= 100);
   const modulesActive = modules.filter((module) => {
-    const completion = module.progress?.completionPercent ?? 0;
+    const completion = module.completionPercent ?? 0;
     return completion > 0 && completion < 100;
   });
   const modulesUpcoming = Math.max(0, modules.length - modulesCompleted.length - modulesActive.length);
@@ -377,7 +583,61 @@ export default function CourseViewer() {
     () => lessonCatalogue.some((lesson) => lesson.type === 'refresher'),
     [lessonCatalogue]
   );
-  const courseProgress = course?.progress ?? 0;
+  const courseProgress = courseProgressSummary?.progressPercent ?? course?.progress ?? 0;
+  const progressSnapshotLabel = progressLastUpdatedAt ? formatRelativeTimestamp(progressLastUpdatedAt) : null;
+  const progressUsingCache = progressSource !== 'network' && progressSource !== 'initial';
+  let progressInfoMessage = null;
+  if (progressUsingCache) {
+    progressInfoMessage = progressSnapshotLabel
+      ? `Showing offline snapshot from ${progressSnapshotLabel}. Refresh to synchronise lessons.`
+      : 'Showing offline snapshot stored on this device. Refresh to synchronise lessons.';
+  } else if (progressStale && progressSnapshotLabel) {
+    progressInfoMessage = `Progress snapshot from ${progressSnapshotLabel}. Refresh if you've been learning offline.`;
+  } else if (progressSnapshotLabel) {
+    progressInfoMessage = `Progress synced ${progressSnapshotLabel}.`;
+  }
+  const progressInfoTone = progressUsingCache || progressStale ? 'text-amber-600' : 'text-slate-400';
+  const certificateEnrollment = useMemo(
+    () =>
+      Array.isArray(progressEnrollments)
+        ? progressEnrollments.find((enrollment) => enrollment.courseId === course?.id)
+        : null,
+    [progressEnrollments, course?.id]
+  );
+  const certificateIssuedAt = certificateEnrollment?.completedAt ?? null;
+  const certificateTemplate = useMemo(
+    () => ({
+      accentColor: courseProgressSummary?.certificateTemplate?.accentColor ?? '#4338ca',
+      backgroundUrl:
+        courseProgressSummary?.certificateTemplate?.backgroundUrl ?? course?.heroImageUrl ?? course?.thumbnailUrl ?? null,
+      issuedBy:
+        courseProgressSummary?.certificateTemplate?.issuedBy ?? course?.instructor ?? 'Edulure Academy'
+    }),
+    [
+      courseProgressSummary?.certificateTemplate?.accentColor,
+      courseProgressSummary?.certificateTemplate?.backgroundUrl,
+      courseProgressSummary?.certificateTemplate?.issuedBy,
+      course?.heroImageUrl,
+      course?.thumbnailUrl,
+      course?.instructor
+    ]
+  );
+  const learnerDisplayName = useMemo(() => {
+    const user = session?.user ?? {};
+    if (user.fullName) return user.fullName;
+    if (user.name) return user.name;
+    const parts = [user.firstName, user.lastName].filter(Boolean);
+    return parts.length ? parts.join(' ') : 'Learner';
+  }, [session?.user]);
+  const showCertificatePreview = courseProgress >= 100;
+  const playbackSources = useMemo(
+    () => selectPlaybackSources(playerSession?.playback),
+    [playerSession?.playback]
+  );
+  const playbackPoster = useMemo(
+    () => resolvePlaybackPoster(course, playerSession?.playback),
+    [course, playerSession?.playback]
+  );
 
   const insightCards = useMemo(
     () => [
@@ -453,26 +713,6 @@ export default function CourseViewer() {
     );
   }
 
-  const formatLessonAvailability = (lesson) => {
-    if (lesson.completed) {
-      return 'Completed';
-    }
-    if (lesson.status === 'scheduled') {
-      if (!lesson.releaseAt) {
-        return 'Scheduled';
-      }
-      const releaseDate = new Date(lesson.releaseAt);
-      return `Unlocks ${releaseDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
-    }
-    return 'Ready to start';
-  };
-
-  const lessonStatusTone = (lesson) => {
-    if (lesson.completed) return 'text-emerald-600';
-    if (lesson.status === 'scheduled') return 'text-amber-500';
-    return 'text-primary';
-  };
-
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -525,17 +765,26 @@ export default function CourseViewer() {
             <p className="mt-3 text-sm text-red-600" role="alert">
               {playerError}
             </p>
-          ) : playerSession?.playback?.url ? (
+          ) : playbackSources.length ? (
             <video
               controls
+              preload="metadata"
+              poster={playbackPoster}
               className="mt-4 w-full rounded-2xl bg-slate-900"
-              src={playerSession.playback.url}
-            />
+            >
+              {playbackSources.map((source) => (
+                <source key={source.url} src={source.url} type={source.mimeType} />
+              ))}
+              Your browser does not support the video tag.
+            </video>
           ) : (
             <div className="mt-4 rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500">
               Live stream will appear when the instructor starts broadcasting.
             </div>
           )}
+          {playerSession?.playback ? (
+            <p className="mt-2 text-xs text-slate-500">Adaptive streaming keeps playback smooth on slower connections.</p>
+          ) : null}
           {playerSession?.playback && (
             <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
@@ -632,84 +881,89 @@ export default function CourseViewer() {
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Lesson queue</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Navigate cohorts with confidence. Lesson states update instantly as you wrap activities or as modules unlock.
-          </p>
-          {modules.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500">
-              Modules for this program will appear here once your instructor publishes the curriculum.
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Lesson queue</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Navigate cohorts with confidence. Lesson states refresh as you wrap activities or as modules unlock.
+              </p>
             </div>
-          ) : (
-            <div className="mt-6 space-y-4">
-              {modules.map((module, index) => (
-                <div key={module.id ?? `module-${index}`} className="dashboard-card-muted space-y-4 p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="dashboard-kicker">Module {index + 1}</p>
-                      <p className="text-sm font-semibold text-slate-900">{module.title}</p>
-                      <p className="text-xs text-slate-500">{module.releaseLabel}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {module.progress?.completionPercent ?? 0}%
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {module.progress
-                          ? `${module.progress.completedLessons}/${module.progress.totalLessons} lessons`
-                          : 'No lessons yet'}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    {module.nextLesson ? (
-                      <p className="text-xs font-semibold text-primary">
-                        Next lesson · {module.nextLesson.title}
-                        {module.nextLesson.status === 'scheduled' && module.nextLesson.releaseAt
-                          ? ` • Unlocks ${new Date(module.nextLesson.releaseAt).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric'
-                            })}`
-                          : ''}
-                      </p>
-                    ) : (
-                      <p className="text-xs font-semibold text-emerald-600">Module complete</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    {(module.lessons ?? []).slice(0, 4).map((lesson) => (
-                      <div
-                        key={lesson.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{lesson.title}</p>
-                          <p className="text-xs text-slate-500">{formatLessonAvailability(lesson)}</p>
-                        </div>
-                        <span className={`text-xs font-semibold ${lessonStatusTone(lesson)}`}>
-                          {lesson.completed ? 'Done' : lesson.status === 'scheduled' ? 'Scheduled' : 'Ready'}
-                        </span>
-                      </div>
-                    ))}
-                    {module.lessons?.length > 4 ? (
-                      <p className="text-xs text-slate-400">+{module.lessons.length - 4} more lessons</p>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+            <button
+              type="button"
+              className="dashboard-pill self-start px-4 py-2 text-xs font-semibold"
+              onClick={() => refreshLearnerProgress()}
+              disabled={progressLoading}
+            >
+              {progressLoading ? 'Refreshing…' : 'Refresh progress'}
+            </button>
+          </div>
+          {progressError ? (
+            <p className="mt-3 text-sm text-amber-600" role="status">
+              {progressError.message ?? 'Unable to synchronise progress right now.'}
+            </p>
+          ) : null}
+          <CourseModuleNavigator
+            modules={modules}
+            className="mt-6"
+            emptyLabel="Modules for this program will appear here once your instructor publishes the curriculum."
+            onLessonSelect={handleLessonFocusSelect}
+            activeLessonId={derivedActiveLessonId}
+          />
+          {focusedLesson ? (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Focused lesson</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">{focusedLesson.title}</p>
+              <p className="text-xs text-slate-500">{focusedLesson.moduleTitle}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                <span
+                  className={`rounded-full px-2 py-1 ${
+                    focusedLesson.completed
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : focusedLesson.status === 'scheduled'
+                        ? 'bg-amber-50 text-amber-600'
+                        : 'bg-primary/10 text-primary'
+                  }`}
+                >
+                  {focusedLesson.completed
+                    ? 'Completed'
+                    : focusedLesson.status === 'scheduled'
+                      ? 'Scheduled'
+                      : 'Ready'}
+                </span>
+                {focusedLessonDueLabel ? (
+                  <span className="rounded-full bg-white px-2 py-1 text-slate-600">{focusedLessonDueLabel}</span>
+                ) : null}
+                {focusedLesson.durationMinutes ? (
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+                    {focusedLesson.durationMinutes} mins
+                  </span>
+                ) : null}
+              </div>
+              {focusedLesson.nextActionLabel ? (
+                <p className="mt-3 text-xs text-slate-500">{focusedLesson.nextActionLabel}</p>
+              ) : null}
             </div>
-          )}
+          ) : null}
         </div>
         <div className="space-y-6">
           <div className="dashboard-section">
-            <h2 className="text-lg font-semibold text-slate-900">Progress</h2>
-            <p className="mt-2 text-sm text-slate-600">{course.progress}% complete</p>
-            <div className="mt-4 h-2 rounded-full bg-slate-200">
-              <div className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark" style={{ width: `${course.progress}%` }} />
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">Progress</h2>
+              {progressLoading ? <span className="text-xs text-slate-400">Syncing…</span> : null}
             </div>
+            <p className="mt-2 text-sm text-slate-600">{courseProgress}% complete</p>
+            <CourseProgressBar
+              value={courseProgress}
+              className="mt-4"
+              tone={courseProgress >= 100 ? 'emerald' : 'primary'}
+              srLabel="Overall course progress"
+            />
             <p className="mt-3 text-xs text-slate-500">
               {completedLessonsCount} of {totalLessonsCount} lessons wrapped
             </p>
+            {progressInfoMessage ? (
+              <p className={`mt-2 text-xs ${progressInfoTone}`}>{progressInfoMessage}</p>
+            ) : null}
             {nextLessonDetail ? (
               <p className="mt-2 text-xs text-primary">
                 Next action: {nextLessonDetail.moduleTitle} · {nextLessonDetail.lessonTitle}
@@ -724,6 +978,24 @@ export default function CourseViewer() {
               <p className="mt-2 text-xs text-emerald-600">You&apos;ve completed the learning path.</p>
             )}
           </div>
+          {showCertificatePreview ? (
+            <div className="dashboard-section space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Certificate preview</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Celebrate your achievement with a shareable certificate ready for LinkedIn or print.
+                </p>
+              </div>
+              <CertificatePreview
+                courseTitle={course?.title ?? 'Completed course'}
+                learnerName={learnerDisplayName}
+                issuedAt={certificateIssuedAt ?? new Date().toISOString()}
+                issuer={certificateTemplate.issuedBy}
+                accentColor={certificateTemplate.accentColor}
+                backgroundUrl={certificateTemplate.backgroundUrl ?? undefined}
+              />
+            </div>
+          ) : null}
           <div className="dashboard-section">
             <h2 className="text-lg font-semibold text-slate-900">Resources</h2>
             <ul className="mt-4 space-y-2 text-sm text-slate-600">

@@ -1,4 +1,5 @@
 import { httpClient } from './httpClient.js';
+import { createListCacheConfig } from './apiUtils.js';
 
 function ensureToken(token) {
   if (!token) {
@@ -13,6 +14,16 @@ export async function createTutorBookingRequest({ token, payload, signal } = {})
     signal,
     invalidateTags: [`dashboard:me:${token}`]
   });
+}
+
+export async function fetchLearnerCourseProgress({ token, signal } = {}) {
+  ensureToken(token);
+  const response = await httpClient.get('/dashboard/learner/courses/progress', {
+    token,
+    signal,
+    cache: createListCacheConfig(`dashboard:learner:${token}:course-progress`, { ttl: 20_000 })
+  });
+  return response?.data ?? response ?? { courseSummaries: [], lessons: [], enrollments: [] };
 }
 
 export async function listTutorBookings({ token, signal } = {}) {

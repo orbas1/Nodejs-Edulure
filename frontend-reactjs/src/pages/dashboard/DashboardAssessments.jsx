@@ -53,6 +53,32 @@ const statusPills = {
   Scheduled: 'bg-slate-100 text-slate-600'
 };
 
+const statusMessages = {
+  Completed: 'Great work — your result is locked in and certificates will update shortly.',
+  Submitted: 'Submission received. We\'ll notify you as soon as grading finishes.',
+  'Awaiting grading': 'Hang tight while instructors review your work. Feedback will land in your inbox.',
+  Overdue: 'Wrap this assessment soon to stay on track with your cohort.',
+  'Due soon': 'Schedule focus time to submit before the deadline.',
+  Scheduled: 'This checkpoint will unlock automatically when the module opens.'
+};
+
+const statusMessageTone = {
+  Completed: 'text-emerald-600',
+  Submitted: 'text-sky-600',
+  'Awaiting grading': 'text-amber-600',
+  Overdue: 'text-rose-600',
+  'Due soon': 'text-amber-600',
+  Scheduled: 'text-slate-500'
+};
+
+function resolveStatusMessage(status) {
+  return statusMessages[status] ?? null;
+}
+
+function resolveStatusTone(status) {
+  return statusMessageTone[status] ?? 'text-slate-500';
+}
+
 function toDate(value) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -170,6 +196,11 @@ function AssessmentList({ title, items, emptyLabel }) {
               </div>
               {item.instructions ? (
                 <p className="mt-3 text-xs leading-relaxed text-slate-500">{item.instructions}</p>
+              ) : null}
+              {resolveStatusMessage(item.status) ? (
+                <p className={`mt-3 text-xs font-medium ${resolveStatusTone(item.status)}`}>
+                  {resolveStatusMessage(item.status)}
+                </p>
               ) : null}
             </li>
           ))}

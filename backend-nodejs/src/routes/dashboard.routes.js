@@ -21,6 +21,7 @@ router.post(
   auth(),
   LearnerDashboardController.cancelTutorBookingRequest
 );
+router.get('/learner/courses/progress', auth(), LearnerDashboardController.listCourseProgress);
 router.post('/learner/courses/:courseId/goals', auth(), LearnerDashboardController.createCourseGoal);
 router.post('/learner/ebooks/:ebookId/resume', auth(), LearnerDashboardController.resumeEbook);
 router.post('/learner/ebooks/:ebookId/share', auth(), LearnerDashboardController.shareEbook);

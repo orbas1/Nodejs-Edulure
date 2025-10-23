@@ -1427,6 +1427,11 @@ export function buildLearnerDashboard({
         statusLabel === 'closed'
     );
     const requiresReview = Boolean(metadata.requiresReview || statusLabel.includes('review'));
+    const asyncGradingRequested = Boolean(
+      metadata.asyncGrading === true ||
+        metadata.workflow === 'instructor-review' ||
+        metadata.gradingMode === 'manual'
+    );
     if (requiresReview) {
       pendingReviewCount += 1;
     }
@@ -1582,7 +1587,7 @@ export function buildLearnerDashboard({
       });
     }
 
-    if (requiresReview) {
+    if (requiresReview && asyncGradingRequested) {
       gradingQueue.push({
         id: assignment.id ?? `assignment-${crypto.randomUUID()}`,
         title: assignment.title ?? 'Assessment',

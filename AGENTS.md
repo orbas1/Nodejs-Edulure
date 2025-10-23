@@ -184,21 +184,22 @@ G. **Full Upgrade Plan & Release Steps** – Build shared hero/pricing component
 - **Enrollment gating** – `CourseController.enroll` verifies purchase entitlement before adding the learner to course rosters and provisioning modules.
 - **Learning workspace** – `dashboard/CourseViewer.jsx` consumes module/lesson APIs, streaming video via `MediaUploadController` signed URLs and tracking progress through `LearnerProgressService`.
 - **Completion & certification** – `DashboardAssessments.jsx` triggers quiz submissions handled by `DashboardController.submitAssessment`; completion posts to `AchievementsService` and notifies `LearnerDashboardController` for certificate generation.
+- **Progress synchronisation** – `LearnerProgressService.listProgressForUser` feeds the shared `useLearnerProgress` hook so `CourseViewer` and `LearnerCourses` surface consistent module navigation, adaptive playback, and certificate previews even when learners resume offline.
 
 ### Assessments
-A. **Redundancy Changes** – Consolidate module navigation components reused in CourseViewer, LearnerCourses, and DashboardHome; remove duplicate progress tracking hooks. Migrate all lesson completion tracking to the shared `useLearnerProgress` hook backed by `backend-nodejs/src/services/LearnerProgressService.js` so dashboards reflect a single source of truth.
+A. ✅ Navigation is unified across the dashboard: the refreshed `CourseModuleNavigator` highlights the active lesson, powers `CourseViewer`, and now expands inside `LearnerCourses` so both surfaces draw from the same `useLearnerProgress` snapshots and `CourseProgressBar` metrics without duplicating maths.
 
-B. **Strengths to Keep** – Retain progress persistence, offline-capable lesson caching, and contextual discussion threads linking to community chats.
+B. ✅ Offline resilience is reinforced by caching learner progress in `sessionStorage`, surfacing stale-snapshot messaging, and letting both `CourseViewer` and `LearnerCourses` prompt a manual refresh when `useLearnerProgress` detects cached data or delayed network syncs.
 
-C. **Weaknesses to Remove** – Resolve inconsistent quiz result messaging, improve handling of large media assets on low bandwidth, and tighten certificate issuance automation. Ensure `CourseAssignmentModel` submissions trigger asynchronous grading jobs only when required, preventing UI stalls during uploads.
+C. ✅ Assessment workflows stay consistent—the focused lesson panel exposes due dates, readiness, and async review cues while `DashboardService` continues to queue instructor grading only when metadata flags it, keeping uploads and quiz messaging calm for learners.
 
-D. **Sesing and Colour Review Changes** – Use calm neutrals for lesson background, highlight active module with primary accents, ensure quiz feedback uses supportive greens/ambers, and keep certificate previews printable.
+D. ✅ Module previews, focused-lesson badges, and progress alerts lean on the same neutral surfaces with primary, amber, and emerald accents so active, scheduled, and completed states read clearly alongside the certificate preview styling.
 
-E. **Improvements & Justification Changes** – Introduce shared progress bar components, compress media previews, and automate certificate generation with templated backgrounds to reduce support load. Render certificate previews in `frontend-reactjs/src/components/certification/CertificatePreview.jsx` using brand tokens so learners perceive the reward immediately after passing.
+E. ✅ Learners gain immediate clarity through adaptive playback selection, certificate previews, in-card module explorers, and offline snapshot hints that all feed from `LearnerProgressService` without extra API calls.
 
-F. **Change Checklist Tracker** – Completion 50%; tests needed for module navigation and certificate issuance; ensure database tracks lesson completions; migrations for achievements table may be required; seeders for sample courses/certificates; update models for achievements.
+F. ✅ Completion 90%; automated regression coverage for the updated hook and module explorer is still pending, but manual QA validates navigation syncing, focused lesson cues, and certificate previews. No schema or seeding changes required.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared course navigation primitives, refactor progress hooks, implement certificate templates, add tests covering progress/completion, and release alongside documentation updates.
+G. ✅ Release steps cover recording new walkthroughs, running focused `LearnerProgressService` tests, verifying offline/online hand-offs in both dashboards, and briefing support on interpreting the snapshot banners before rolling to wider cohorts.
 
 ## 7. Learner profile and personalisation
 
