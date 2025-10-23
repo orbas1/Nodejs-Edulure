@@ -53,6 +53,11 @@ This guide documents the day-to-day workflows, operational expectations, and arc
 5. **Environment files**
    - Duplicate `.env.example` files for each workspace (`backend-nodejs/.env.example`, `frontend-reactjs/.env.example` if provided) and customise values for your environment.
 
+6. **Unified dev stack**
+   - Run `npm run dev:stack -- --preset=<lite|full|analytics>` to install the database (unless `--skip-db-install` is provided) and launch backend/frontend watchers through the shared process supervisor.
+   - The launcher and the backend `src/bin/stack.js` both call `applyServicePreset` so presets and manual `SERVICE_TARGET` overrides resolve consistently across scripts and runtime environments.
+   - Use interactive commands from the terminal (`:list`, `:restart <label>`, `:quit`) or `--log-format=ndjson` when you need machine-readable logs for piping into other tooling.
+
 ## Backend service
 
 ### Functional responsibilities

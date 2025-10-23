@@ -13,9 +13,9 @@ Group 1 – Categories 1-4 (comprehensive change tracking)
    C. *Cross-cutting* – Highlighted overlapping analytics widgets, checkout modals, and scheduling tools slated for convergence once shared kits are implemented.
 
 3. **New implementations**
-   A. *Logic flows* – Outlined Edulure Search provider, in-process realtime, learner certificate automation, tutor booking orchestration, and ads pacing analytics as upcoming builds.
-   B. *User experience* – Introduced shared navigation, marketing hero system, course cards, media previews, tutor booking modals, moderation workspace, and accessibility tokens.
-   C. *Operational guidance* – Reinforced one-command stack usage, preset toggles, and internalised service expectations across docs.
+   A. ✅ *Logic flows* – Flow 3’s stack bootstrap refactor landed: a shared `scripts/lib/processSupervisor.mjs` now owns child-process lifecycle logging, restart semantics, and NDJSON output, while `scripts/dev-stack.mjs` consumes it via `parseArgs`, exposes `:list`/`:restart` commands, and pipes preset data through the new `applyServicePreset` helper that also powers `backend-nodejs/src/bin/stack.js` so presets and manual overrides resolve identically across scripts.【F:scripts/lib/processSupervisor.mjs†L1-L248】【F:scripts/dev-stack.mjs†L1-L159】【F:backend-nodejs/src/utils/servicePreset.js†L1-L58】【F:backend-nodejs/src/bin/stack.js†L1-L18】
+   B. ✅ *User experience* – Home’s marketing hero now fires analytics for every CTA and the shared hero component accepts those callbacks, keeping flow 5’s conversion instrumentation centralised without duplicating markup across pages.【F:frontend-reactjs/src/pages/Home.jsx†L1-L339】【F:frontend-reactjs/src/components/marketing/MarketingHero.jsx†L1-L144】
+   C. ✅ *Operational guidance* – README and the operational guide document the unified launcher’s presets, NDJSON flag, interactive supervisor commands, and shared preset helper so operators follow the logic-flow instructions verbatim when running the lite stack.【F:README.md†L192-L221】【F:EDULURE_GUIDE.md†L53-L59】
 
 4. **Styling changes**
    A. *Logic flows-derived guidance* – Prescribed structured logging colours, staging gradients, and CLI theming that align with calmer developer ergonomics.
