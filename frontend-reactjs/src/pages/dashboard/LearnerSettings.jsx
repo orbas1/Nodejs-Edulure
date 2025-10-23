@@ -214,6 +214,33 @@ export default function LearnerSettings() {
     }));
   };
 
+  const updateFinanceToggle = (field, nextValue) => {
+    setFinanceForm((previous) => ({
+      ...previous,
+      [field]: Boolean(nextValue)
+    }));
+  };
+
+  const updateFinanceAlertsToggle = (field, nextValue) => {
+    setFinanceForm((previous) => ({
+      ...previous,
+      alerts: {
+        ...previous.alerts,
+        [field]: Boolean(nextValue)
+      }
+    }));
+  };
+
+  const updateFinanceReimbursementsToggle = (field, nextValue) => {
+    setFinanceForm((previous) => ({
+      ...previous,
+      reimbursements: {
+        ...previous.reimbursements,
+        [field]: Boolean(nextValue)
+      }
+    }));
+  };
+
   const handlePurchaseFormChange = (event) => {
     const { name, value } = event.target;
     setPurchaseForm((previous) => ({
@@ -589,19 +616,14 @@ export default function LearnerSettings() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
-              <div>
-                <p className="font-semibold text-slate-900">Enable autopay</p>
-                <p className="text-xs text-slate-500">Automatically settle invoices using the primary method.</p>
-              </div>
-              <input
-                type="checkbox"
-                name="autoPayEnabled"
-                checked={financeForm.autoPayEnabled}
-                onChange={handleFinanceInputChange}
-                className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
-              />
-            </label>
+            <SettingsToggleField
+              name="autoPayEnabled"
+              label="Enable autopay"
+              description="Automatically settle invoices using the primary method."
+              checked={financeForm.autoPayEnabled}
+              onChange={(value) => updateFinanceToggle('autoPayEnabled', value)}
+              disabled={disableActions}
+            />
             <label className="flex flex-col text-sm font-medium text-slate-700">
               Escalation email
               <input
@@ -614,32 +636,22 @@ export default function LearnerSettings() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
-              <div>
-                <p className="font-semibold text-slate-900">Email alerts</p>
-                <p className="text-xs text-slate-500">Notify when purchases clear or invoices are overdue.</p>
-              </div>
-              <input
-                type="checkbox"
-                name="alerts.sendEmail"
-                checked={financeForm.alerts.sendEmail}
-                onChange={handleFinanceInputChange}
-                className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
-              />
-            </label>
-            <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
-              <div>
-                <p className="font-semibold text-slate-900">SMS alerts</p>
-                <p className="text-xs text-slate-500">Send urgent SMS notifications to finance partners.</p>
-              </div>
-              <input
-                type="checkbox"
-                name="alerts.sendSms"
-                checked={financeForm.alerts.sendSms}
-                onChange={handleFinanceInputChange}
-                className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
-              />
-            </label>
+            <SettingsToggleField
+              name="alerts.sendEmail"
+              label="Email alerts"
+              description="Notify when purchases clear or invoices are overdue."
+              checked={financeForm.alerts.sendEmail}
+              onChange={(value) => updateFinanceAlertsToggle('sendEmail', value)}
+              disabled={disableActions}
+            />
+            <SettingsToggleField
+              name="alerts.sendSms"
+              label="SMS alerts"
+              description="Send urgent SMS notifications to finance partners."
+              checked={financeForm.alerts.sendSms}
+              onChange={(value) => updateFinanceAlertsToggle('sendSms', value)}
+              disabled={disableActions}
+            />
             <label className="flex flex-col text-sm font-medium text-slate-700">
               Alert threshold (%)
               <input
@@ -655,19 +667,14 @@ export default function LearnerSettings() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
-              <div>
-                <p className="font-semibold text-slate-900">Enable reimbursements</p>
-                <p className="text-xs text-slate-500">Allow learners to submit expense claims.</p>
-              </div>
-              <input
-                type="checkbox"
-                name="reimbursements.enabled"
-                checked={financeForm.reimbursements.enabled}
-                onChange={handleFinanceInputChange}
-                className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
-              />
-            </label>
+            <SettingsToggleField
+              name="reimbursements.enabled"
+              label="Enable reimbursements"
+              description="Allow learners to submit expense claims."
+              checked={financeForm.reimbursements.enabled}
+              onChange={(value) => updateFinanceReimbursementsToggle('enabled', value)}
+              disabled={disableActions}
+            />
             <label className="flex flex-col text-sm font-medium text-slate-700">
               Reimbursement instructions
               <textarea
