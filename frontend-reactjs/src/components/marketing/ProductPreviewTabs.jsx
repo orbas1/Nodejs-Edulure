@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import clsx from 'clsx';
 
 import HomeSection from '../home/HomeSection.jsx';
 
@@ -149,17 +150,24 @@ export default function ProductPreviewTabs({
               >
                 <div className="absolute -left-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
                 <div className="absolute -right-6 top-12 h-56 w-56 rounded-full bg-fuchsia-300/20 blur-[140px]" aria-hidden="true" />
-                <div className="relative overflow-hidden rounded-[2.75rem] border border-slate-200 bg-white shadow-[0_40px_120px_-45px_rgba(15,23,42,0.45)]">
+                <div className="media-frame">
+                  <div className="absolute inset-0 rounded-[inherit] border border-white/10" aria-hidden="true" />
                   <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10" aria-hidden="true" />
                   {tab.image ? (
                     <img
                       src={tab.image.src}
                       alt={tab.image.alt}
-                      className="relative block h-full w-full object-cover"
+                      className="media-frame__image"
                       loading="lazy"
                     />
-                  ) : null}
-                  <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/20 bg-slate-900/70 p-4 text-white shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] backdrop-blur">
+                  ) : (
+                    <div className="media-skeleton" aria-hidden="true" />
+                  )}
+                  <div
+                    className={clsx(
+                      'absolute bottom-6 left-6 right-6 rounded-2xl border border-white/20 bg-slate-900/70 p-4 text-white shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] backdrop-blur'
+                    )}
+                  >
                     <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/70">{tab.label}</p>
                     {tab.caption ? <p className="mt-2 text-lg font-semibold text-white">{tab.caption}</p> : null}
                     {tab.description ? <p className="mt-2 text-sm text-white/75">{tab.description}</p> : null}

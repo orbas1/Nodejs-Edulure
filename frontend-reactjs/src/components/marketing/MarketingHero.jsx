@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import clsx from 'clsx';
 
 import HomeSection from '../home/HomeSection.jsx';
 
@@ -18,7 +19,7 @@ export default function MarketingHero({
   const chipItems = Array.isArray(chips) ? chips.filter(Boolean) : [];
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
+    <section className="marketing-hero">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-24 left-0 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/30 blur-3xl" />
         <div className="absolute -bottom-40 right-12 h-[28rem] w-[28rem] rounded-full bg-fuchsia-500/30 blur-[160px]" />
@@ -68,7 +69,7 @@ export default function MarketingHero({
             {primaryAction ? (
               <Link
                 to={primaryAction.to}
-                className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_-24px_rgba(79,70,229,0.9)] transition hover:bg-primary-dark sm:w-auto"
+                className={clsx('cta-button cta-button--primary w-full sm:w-auto')}
               >
                 {primaryAction.label}
               </Link>
@@ -76,7 +77,7 @@ export default function MarketingHero({
             {secondaryAction ? (
               <Link
                 to={secondaryAction.to}
-                className="inline-flex w-full items-center justify-center rounded-full border border-white/40 px-6 py-3 text-sm font-semibold text-white transition hover:border-white hover:bg-white/10 sm:w-auto"
+                className={clsx('cta-button cta-button--secondary w-full sm:w-auto')}
               >
                 {secondaryAction.label}
               </Link>
@@ -84,7 +85,7 @@ export default function MarketingHero({
             {tertiaryAction ? (
               <a
                 href={tertiaryAction.href}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-emerald-400/50 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-200 transition hover:border-emerald-400 hover:bg-emerald-500/20 sm:w-auto"
+                className={clsx('cta-button cta-button--tertiary w-full sm:w-auto text-xs')}
               >
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 {tertiaryAction.label}

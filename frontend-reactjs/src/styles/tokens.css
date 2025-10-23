@@ -41,6 +41,47 @@
   --color-amber: #f59e0b;
   --color-rose: #f43f5e;
 
+  /* Radii */
+  --radius-lg: 1.25rem;
+  --radius-xl: 2rem;
+  --radius-xxl: 2.75rem;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-card: 0 24px 60px -30px rgba(15, 23, 42, 0.18);
+  --shadow-card-strong: 0 32px 84px -36px rgba(15, 23, 42, 0.32);
+  --shadow-media: 0 40px 120px -48px rgba(15, 23, 42, 0.42);
+  --shadow-cta: 0 22px 52px -26px rgba(79, 70, 229, 0.7);
+
+  /* Gradients */
+  --gradient-hero: linear-gradient(135deg, #0f172a 0%, #1e1b4b 52%, #111827 100%);
+  --gradient-marketing: linear-gradient(160deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 64, 175, 0.92) 65%, rgba(15, 23, 42, 0.96) 100%);
+  --gradient-cta: linear-gradient(135deg, #4338ca 0%, #6366f1 55%, #7c3aed 100%);
+  --gradient-cta-hover: linear-gradient(135deg, #3730a3 0%, #4f46e5 55%, #6d28d9 100%);
+
+  /* Motion */
+  --motion-duration-fast: 120ms;
+  --motion-duration-medium: 220ms;
+  --motion-easing-standard: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Media */
+  --media-thumb-aspect: 16 / 10;
+  --media-thumb-radius: 2.75rem;
+
+  /* Skeleton */
+  --skeleton-base: #e2e8f0;
+  --skeleton-highlight: #f8fafc;
+
+  /* Form */
+  --form-field-surface: #ffffff;
+  --form-field-surface-focus: #f8fbff;
+  --form-field-border: rgba(148, 163, 184, 0.45);
+  --form-field-border-strong: rgba(79, 70, 229, 0.45);
+  --form-field-shadow: 0 18px 45px -28px rgba(15, 23, 42, 0.35);
+  --form-field-padding-x: 1.25rem;
+  --form-field-padding-y: 0.875rem;
+  --form-label-letterspacing: 0.025em;
+
   /* Focus + overlay */
   --shadow-focus-ring: 0 0 0 3px rgba(45, 98, 255, 0.35);
   --overlay-backdrop: rgba(15, 23, 42, 0.6);
@@ -61,6 +102,21 @@
     --color-text-subtle: #a5b4fc;
     --color-primary-soft: rgba(45, 98, 255, 0.24);
     --overlay-backdrop: rgba(15, 23, 42, 0.75);
+    --shadow-card: 0 24px 60px -30px rgba(15, 23, 42, 0.4);
+    --shadow-card-strong: 0 32px 84px -36px rgba(15, 23, 42, 0.6);
+    --shadow-media: 0 40px 120px -48px rgba(15, 23, 42, 0.6);
+    --shadow-cta: 0 22px 52px -26px rgba(99, 102, 241, 0.75);
+    --gradient-hero: linear-gradient(135deg, #0b1120 0%, #1e1b4b 60%, #111827 100%);
+    --gradient-marketing: linear-gradient(160deg, rgba(15, 23, 42, 1) 0%, rgba(30, 64, 175, 0.92) 55%, rgba(15, 23, 42, 0.96) 100%);
+    --gradient-cta: linear-gradient(135deg, #4338ca 0%, #4f46e5 55%, #7c3aed 100%);
+    --gradient-cta-hover: linear-gradient(135deg, #3730a3 0%, #4338ca 55%, #6d28d9 100%);
+    --form-field-surface: rgba(15, 23, 42, 0.8);
+    --form-field-surface-focus: rgba(30, 58, 138, 0.9);
+    --form-field-border: rgba(148, 163, 184, 0.35);
+    --form-field-border-strong: rgba(129, 140, 248, 0.55);
+    --form-field-shadow: 0 22px 60px -34px rgba(15, 23, 42, 0.8);
+    --skeleton-base: rgba(148, 163, 184, 0.35);
+    --skeleton-highlight: rgba(226, 232, 240, 0.35);
   }
 }
 
@@ -102,6 +158,16 @@
   --color-primary: #1d4ed8;
   --color-primary-dark: #1e3a8a;
   --color-primary-soft: #c7d2fe;
+  --shadow-card: 0 24px 60px -32px rgba(15, 23, 42, 0.4);
+  --shadow-card-strong: 0 32px 84px -36px rgba(15, 23, 42, 0.6);
+  --shadow-media: 0 40px 120px -46px rgba(15, 23, 42, 0.55);
+  --shadow-cta: 0 22px 52px -24px rgba(30, 64, 175, 0.78);
+  --gradient-hero: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #1e293b 100%);
+  --gradient-marketing: linear-gradient(160deg, rgba(226, 232, 240, 1) 0%, rgba(191, 219, 254, 0.85) 45%, rgba(226, 232, 240, 1) 100%);
+  --gradient-cta: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #4f46e5 100%);
+  --gradient-cta-hover: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #4338ca 100%);
+  --form-field-border: rgba(30, 64, 175, 0.55);
+  --form-field-border-strong: rgba(17, 94, 89, 0.55);
 }
 
 :root {

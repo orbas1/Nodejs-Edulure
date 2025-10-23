@@ -34,9 +34,9 @@ Group 1 – Categories 1-4 (comprehensive change tracking)
 Group 2 – Categories 5-8 (frontend structure and code actions)
 
 5. **CSS changes**
-   A. *Token strategy* – Require shared spacing/colour tokens, responsive breakpoints, and motion preferences referenced in the UX blueprint.
-   B. *Media scaffolding* – Mandate thumbnail ratios, hover previews, and skeleton loaders for courses, communities, tutors, and search results.
-   C. *Form surfaces* – Align padding, focus outlines, and gradient usage across onboarding, checkout, and admin forms.
+   A. ✓ Codified the Flow 5 palette guidance by extending the design tokens with shared radii, motion timings, CTA gradients, skeleton stops, and form surfaces so every marketing entry point can reference the same primitives. The new variables power hero/pricing backgrounds, shadows, and focus rings, and ship with dark/high-contrast overrides to keep discovery-to-checkout flows consistent.【F:frontend-reactjs/src/styles/tokens.css†L36-L175】【F:logic flows.md†L95-L116】
+   B. ✓ Implemented reusable marketing and media scaffolding: CTA buttons, hero shells, and plan cards now lean on the shared component layer, while the `media-frame` and shimmer skeleton classes provide stable ratios and loading states for ProductPreviewTabs, matching the acquisition journey’s requirement for polished previews.【F:frontend-reactjs/src/styles.css†L62-L165】【F:frontend-reactjs/src/components/marketing/MarketingHero.jsx†L1-L101】【F:frontend-reactjs/src/components/marketing/ProductPreviewTabs.jsx†L1-L194】
+   C. ✓ Rebuilt onboarding form surfaces around the new form-shell/section/field system so Register and AuthCard share padding, focus treatments, and CTA geometry. Inputs, selects, MFA callouts, and success banners now inherit tokenised spacing and colours, aligning Flow 5’s enrolment expectations with the actual UI code path.【F:frontend-reactjs/src/styles.css†L167-L251】【F:frontend-reactjs/src/components/FormField.jsx†L1-L67】【F:frontend-reactjs/src/components/AuthCard.jsx†L1-L87】【F:frontend-reactjs/src/pages/Register.jsx†L181-L401】【F:logic flows.md†L95-L116】
 
 6. **Component changes**
    A. *Shared primitives* – Build unified navigation, hero, course/tutor cards, feed items, search bar, ticket forms, and analytics widgets noted in both docs.
