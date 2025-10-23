@@ -7,6 +7,7 @@ import { createApiRouter } from './routerFactory.js';
 const router = createApiRouter();
 
 router.get('/me', auth(), DashboardController.current);
+router.post('/learner/onboarding/bootstrap', LearnerDashboardController.bootstrapProfile);
 router.get('/learner/tutor-bookings', auth(), LearnerDashboardController.listTutorBookings);
 router.post('/learner/tutor-bookings', auth(), LearnerDashboardController.createTutorBooking);
 router.post('/learner/tutor-bookings/export', auth(), LearnerDashboardController.exportTutorSchedule);
@@ -125,6 +126,7 @@ router.post(
   auth(),
   LearnerDashboardController.closeFieldServiceAssignment
 );
+router.get('/learner/support/knowledge-base', auth(), LearnerDashboardController.searchSupportKnowledgeBase);
 router.get('/learner/support/tickets', auth(), LearnerDashboardController.listSupportTickets);
 router.post('/learner/support/tickets', auth(), LearnerDashboardController.createSupportTicket);
 router.put('/learner/support/tickets/:ticketId', auth(), LearnerDashboardController.updateSupportTicket);

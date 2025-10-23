@@ -978,6 +978,7 @@ const ROUTE_DEFINITIONS = [
       defaultRole: 'user',
       allowedRoles: ['user', 'admin']
     },
+    notes: 'Includes unauthenticated learner onboarding bootstrap endpoint for pre-registration flows.',
     cors: {
       allowedMethods: ['GET', 'POST', 'PATCH', 'DELETE']
     },

@@ -200,6 +200,135 @@ function dedupeStrings(values) {
   return Array.from(new Set(flattenStrings(values)));
 }
 
+function toTitleCase(value) {
+  if (!value) {
+    return null;
+  }
+  return String(value)
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatInteger(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+  return new Intl.NumberFormat('en-US').format(Math.round(numeric));
+}
+
+function formatMinutes(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+  if (numeric < 60) {
+    return `${Math.round(numeric)} min`;
+  }
+  const hours = numeric / 60;
+  if (hours < 10) {
+    return `${hours.toFixed(1)} hr`;
+  }
+  return `${Math.round(hours)} hr`;
+}
+
+function sanitiseBadgeList(value) {
+  const list = toArray(value);
+  const badges = [];
+  const seen = new Set();
+  for (const entry of list) {
+    if (!entry) {
+      continue;
+    }
+    if (typeof entry === 'string') {
+      const label = entry.trim();
+      if (!label) {
+        continue;
+      }
+      const key = `info|${label.toLowerCase()}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      badges.push({ type: 'info', label });
+      continue;
+    }
+    if (typeof entry === 'object') {
+      const labelCandidate =
+        entry.label ?? entry.title ?? entry.name ?? entry.text ?? entry.value ?? null;
+      const label = typeof labelCandidate === 'string' ? labelCandidate.trim() : labelCandidate;
+      if (!label) {
+        continue;
+      }
+      const typeValue = entry.type ?? entry.key ?? 'info';
+      const type = typeof typeValue === 'string' ? typeValue.trim() : 'info';
+      const key = `${type.toLowerCase()}|${String(label).toLowerCase()}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      const badge = { type, label: String(label).trim() };
+      if (entry.tone && typeof entry.tone === 'string') {
+        badge.tone = entry.tone;
+      }
+      badges.push(badge);
+    }
+  }
+  return badges;
+}
+
+function sanitiseCtaLinks(value, fallbackHref = null) {
+  const list = toArray(value);
+  const links = [];
+  const seen = new Set();
+  for (const entry of list) {
+    if (!entry) {
+      continue;
+    }
+    if (typeof entry === 'string') {
+      const label = entry.trim();
+      if (!label) {
+        continue;
+      }
+      const key = `${label.toLowerCase()}|${fallbackHref ?? ''}|secondary`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      links.push({ label, href: fallbackHref, type: 'secondary' });
+      continue;
+    }
+    if (typeof entry === 'object') {
+      const labelCandidate =
+        entry.label ?? entry.title ?? entry.text ?? entry.name ?? entry.value ?? null;
+      const label = typeof labelCandidate === 'string' ? labelCandidate.trim() : null;
+      if (!label) {
+        continue;
+      }
+      const hrefCandidate = entry.href ?? entry.url ?? entry.link ?? null;
+      const href = hrefCandidate ? String(hrefCandidate).trim() : fallbackHref ?? null;
+      const typeCandidate = entry.type ?? entry.variant ?? entry.intent ?? 'secondary';
+      const type = typeof typeCandidate === 'string' ? typeCandidate.trim().toLowerCase() : 'secondary';
+      const normalizedType = ['primary', 'secondary', 'tertiary'].includes(type) ? type : 'secondary';
+      const key = `${label.toLowerCase()}|${href ?? ''}|${normalizedType}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      const link = {
+        label,
+        href,
+        type: normalizedType
+      };
+      if (entry.id !== undefined && entry.id !== null) {
+        link.id = entry.id;
+      }
+      links.push(link);
+    }
+  }
+  return links;
+}
+
 function normaliseScore(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
@@ -436,6 +565,39 @@ export class SearchDocumentService {
       false
     );
 
+    const previewCandidate = document.preview ?? metadata.preview ?? {};
+    const previewSummary =
+      document.previewSummary ??
+      previewCandidate.summary ??
+      metadata.summary ??
+      document.subtitle ??
+      document.description ??
+      null;
+    const previewImageUrl =
+      document.previewImageUrl ??
+      previewCandidate.image ??
+      previewCandidate.imageUrl ??
+      document.thumbnailUrl ??
+      document.thumbnail_url ??
+      metadata.thumbnailUrl ??
+      null;
+    const previewHighlights = toStringArray(
+      document.previewHighlights ?? previewCandidate.highlights ?? metadata.highlights ?? []
+    );
+    const defaultActionHref =
+      document.url ?? document.href ?? previewCandidate.href ?? metadata.href ?? metadata.url ?? null;
+    const ctaLinks = sanitiseCtaLinks(
+      document.ctaLinks ?? previewCandidate.ctaLinks ?? metadata.ctaLinks ?? metadata.actions ?? [],
+      defaultActionHref
+    );
+    const badges = sanitiseBadgeList(document.badges ?? previewCandidate.badges ?? metadata.badges ?? []);
+    const monetisationTag =
+      document.monetisationTag ??
+      document.monetisation?.tag ??
+      metadata.monetisationTag ??
+      metadata.monetisation?.tag ??
+      null;
+
     return {
       entity_type: resolvedEntityType.toLowerCase(),
       entity_id: String(rawEntityId),
@@ -467,7 +629,13 @@ export class SearchDocumentService {
       published_at: publishedAt,
       indexed_at: indexedAt,
       refreshed_at: refreshedAt,
-      updated_at: timestamp
+      updated_at: timestamp,
+      preview_summary: previewSummary ?? null,
+      preview_image_url: previewImageUrl ?? null,
+      preview_highlights: JSON.stringify(previewHighlights),
+      cta_links: JSON.stringify(ctaLinks),
+      badges: JSON.stringify(badges),
+      monetisation_tag: monetisationTag ?? null
     };
   }
 
@@ -619,6 +787,25 @@ export class SearchDocumentService {
         tags,
         languages
       ]);
+      const enrolmentCount = Number(row.enrolment_count ?? 0);
+      const highlightEntries = dedupeStrings([
+        row.level ? `Level: ${toTitleCase(row.level)}` : null,
+        row.delivery_format ? `${toTitleCase(row.delivery_format)} format` : null,
+        enrolmentCount ? `${formatInteger(enrolmentCount)} learners` : null,
+        languages[0] ? `Language: ${languages[0].toUpperCase()}` : null
+      ]);
+      const monetisationTag = Number(row.price_amount ?? 0) > 0 ? 'Premium course' : 'Free course';
+      const ctaLinks = [
+        {
+          type: 'primary',
+          label: 'View course',
+          href: `/courses/${row.slug ?? row.id}`
+        }
+      ];
+      const badges = sanitiseBadgeList([
+        row.level ? { type: 'level', label: toTitleCase(row.level) } : null,
+        row.delivery_format ? { type: 'format', label: toTitleCase(row.delivery_format) } : null
+      ]);
 
       return {
         entityType: 'courses',
@@ -638,6 +825,12 @@ export class SearchDocumentService {
         priceAmountMinor: toMinorUnits(row.price_amount ?? 0),
         ratingAverage: Number(row.rating_average ?? 0),
         ratingCount: Number(row.rating_count ?? 0),
+        previewSummary: row.summary ?? row.description ?? null,
+        previewImageUrl: row.thumbnail_url ?? null,
+        previewHighlights: highlightEntries,
+        ctaLinks,
+        badges,
+        monetisationTag,
         metadata: {
           type: 'course',
           category: row.category ?? null,
@@ -655,7 +848,15 @@ export class SearchDocumentService {
             amount: Number(row.price_amount ?? 0)
           },
           releaseAt: row.release_at,
-          updatedAt: row.updated_at
+          updatedAt: row.updated_at,
+          preview: {
+            summary: row.summary ?? row.description ?? null,
+            imageUrl: row.thumbnail_url ?? null,
+            highlights: highlightEntries,
+            ctaLinks
+          },
+          badges,
+          monetisation: { tag: monetisationTag }
         },
         popularityScore: computeCoursePopularity(row),
         freshnessScore: computeFreshness(row.release_at, row.updated_at),
@@ -715,6 +916,24 @@ export class SearchDocumentService {
         tags,
         languages
       ]);
+      const highlightEntries = dedupeStrings([
+        memberCount ? `${formatInteger(memberCount)} members` : null,
+        postCount ? `${formatInteger(postCount)} posts` : null,
+        topics[0] ? `Focus: ${toTitleCase(topics[0])}` : null,
+        metadata.country ? `Region: ${metadata.country}` : null
+      ]);
+      const monetisationTag = community.visibility === 'private' ? 'Private community' : 'Open community';
+      const ctaLinks = [
+        {
+          type: 'primary',
+          label: 'View community',
+          href: `/communities/${community.slug ?? community.id}`
+        }
+      ];
+      const badges = sanitiseBadgeList([
+        community.visibility ? { type: 'visibility', label: toTitleCase(community.visibility) } : null,
+        metadata.country ? { type: 'region', label: metadata.country } : null
+      ]);
 
       return {
         entityType: 'communities',
@@ -730,6 +949,12 @@ export class SearchDocumentService {
         country: metadata.country ?? null,
         memberCount,
         postCount,
+        previewSummary: community.description ?? metadata.summary ?? null,
+        previewImageUrl: metadata.coverImageUrl ?? community.cover_image_url ?? null,
+        previewHighlights: highlightEntries,
+        ctaLinks,
+        badges,
+        monetisationTag,
         metadata: {
           visibility: community.visibility,
           topics,
@@ -737,7 +962,15 @@ export class SearchDocumentService {
           languages,
           memberCount,
           postCount,
-          ownerId: community.owner_id ?? null
+          ownerId: community.owner_id ?? null,
+          preview: {
+            summary: community.description ?? metadata.summary ?? null,
+            imageUrl: metadata.coverImageUrl ?? community.cover_image_url ?? null,
+            highlights: highlightEntries,
+            ctaLinks
+          },
+          badges,
+          monetisation: { tag: monetisationTag }
         },
         popularityScore: computeCommunityPopularity(memberCount, postCount),
         freshnessScore: computeFreshness(community.created_at, community.updated_at),
@@ -804,6 +1037,23 @@ export class SearchDocumentService {
       const assetMetadata = assetMetadataById.get(Number(ebook.asset_id)) ?? {};
       const coverImage = assetMetadata.coverImageUrl ?? assetMetadata.thumbnailUrl ?? assetMetadata.previewUrl ?? null;
       const keywords = dedupeStrings([ebook.title, ebook.subtitle, tags, categories, authors, languages]);
+      const highlightEntries = dedupeStrings([
+        authors[0] ? `By ${authors[0]}` : null,
+        languages[0] ? `Language: ${languages[0].toUpperCase()}` : null,
+        ebook.reading_time_minutes ? formatMinutes(ebook.reading_time_minutes) : null
+      ]);
+      const monetisationTag = Number(ebook.price_amount ?? 0) > 0 ? 'Premium ebook' : 'Free ebook';
+      const ctaLinks = [
+        {
+          type: 'primary',
+          label: 'Open ebook',
+          href: `/ebooks/${ebook.slug ?? ebook.id}`
+        }
+      ];
+      const badges = sanitiseBadgeList([
+        categories[0] ? { type: 'category', label: toTitleCase(categories[0]) } : null,
+        languages[0] ? { type: 'language', label: languages[0].toUpperCase() } : null
+      ]);
 
       return {
         entityType: 'ebooks',
@@ -822,6 +1072,12 @@ export class SearchDocumentService {
         priceAmountMinor: toMinorUnits(ebook.price_amount ?? 0),
         ratingAverage: Number(ebook.rating_average ?? 0),
         ratingCount: Number(ebook.rating_count ?? 0),
+        previewSummary: ebook.subtitle ?? ebook.description ?? null,
+        previewImageUrl: coverImage,
+        previewHighlights: highlightEntries,
+        ctaLinks,
+        badges,
+        monetisationTag,
         metadata: {
           authors,
           tags,
@@ -836,7 +1092,15 @@ export class SearchDocumentService {
             average: Number(ebook.rating_average ?? 0),
             count: Number(ebook.rating_count ?? 0)
           },
-          isPublic: Boolean(ebook.is_public)
+          isPublic: Boolean(ebook.is_public),
+          preview: {
+            summary: ebook.subtitle ?? ebook.description ?? null,
+            imageUrl: coverImage,
+            highlights: highlightEntries,
+            ctaLinks
+          },
+          badges,
+          monetisation: { tag: monetisationTag }
         },
         popularityScore: computeEbookPopularity(ebook),
         freshnessScore: computeFreshness(ebook.release_at, ebook.updated_at),
@@ -888,6 +1152,24 @@ export class SearchDocumentService {
       const timezones = toStringArray(tutor.timezones);
       const metadata = parseJson(tutor.metadata, {});
       const keywords = dedupeStrings([tutor.display_name, tutor.headline, tutor.country, skills, languages]);
+      const highlightEntries = dedupeStrings([
+        skills[0] ? `Focus: ${toTitleCase(skills[0])}` : null,
+        languages[0] ? `Speaks ${languages[0].toUpperCase()}` : null,
+        tutor.response_time_minutes ? `Responds in ${formatMinutes(tutor.response_time_minutes)}` : null,
+        tutor.completed_sessions ? `${formatInteger(tutor.completed_sessions)} sessions` : null
+      ]);
+      const monetisationTag = tutor.is_verified ? 'Verified tutor' : 'Expert tutor';
+      const ctaLinks = [
+        {
+          type: 'primary',
+          label: 'Hire tutor',
+          href: `/tutors/${metadata.profileSlug ?? tutor.id}`
+        }
+      ];
+      const badges = sanitiseBadgeList([
+        tutor.is_verified ? { type: 'verified', label: 'Verified' } : null,
+        ...skills.slice(0, 2).map((skill) => ({ type: 'skill', label: toTitleCase(skill) }))
+      ]);
 
       return {
         entityType: 'tutors',
@@ -908,6 +1190,12 @@ export class SearchDocumentService {
         responseTimeMinutes: Number(tutor.response_time_minutes ?? 0),
         isVerified: Boolean(tutor.is_verified),
         country: tutor.country ?? null,
+        previewSummary: tutor.headline ?? tutor.bio ?? null,
+        previewImageUrl: metadata.avatarUrl ?? null,
+        previewHighlights: highlightEntries,
+        ctaLinks,
+        badges,
+        monetisationTag,
         metadata: {
           userId: tutor.user_id,
           skills,
@@ -924,7 +1212,15 @@ export class SearchDocumentService {
           },
           completedSessions: Number(tutor.completed_sessions ?? 0),
           responseTimeMinutes: Number(tutor.response_time_minutes ?? 0),
-          isVerified: Boolean(tutor.is_verified)
+          isVerified: Boolean(tutor.is_verified),
+          preview: {
+            summary: tutor.headline ?? tutor.bio ?? null,
+            imageUrl: metadata.avatarUrl ?? null,
+            highlights: highlightEntries,
+            ctaLinks
+          },
+          badges,
+          monetisation: { tag: monetisationTag }
         },
         popularityScore: computeTutorPopularity(tutor),
         freshnessScore: computeFreshness(tutor.created_at, tutor.updated_at),

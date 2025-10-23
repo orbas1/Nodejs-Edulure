@@ -8,6 +8,8 @@ import ComplianceService from './ComplianceService.js';
 import AuditEventService from './AuditEventService.js';
 import dataPartitionService from './DataPartitionService.js';
 import storageService from './StorageService.js';
+import releaseOrchestrationService from './ReleaseOrchestrationService.js';
+import GovernanceContractModel from '../models/GovernanceContractModel.js';
 import PlatformSettingsService, {
   normaliseAdminProfile as exportedNormaliseAdminProfile,
   normalisePaymentSettings as exportedNormalisePaymentSettings,
@@ -707,7 +709,13 @@ function buildSearchIndex(activeIncidents, runbooks) {
   ];
 }
 
-function buildProfileStats(queueSummary, scamSummary, integrationSnapshot, complianceSnapshot) {
+function buildProfileStats(
+  queueSummary,
+  scamSummary,
+  integrationSnapshot,
+  complianceSnapshot,
+  releaseSnapshot
+) {
   const stats = [
     {
       label: 'Open incidents',
@@ -743,6 +751,25 @@ function buildProfileStats(queueSummary, scamSummary, integrationSnapshot, compl
       label: 'Attestation coverage',
       value: `${Number(complianceSnapshot.attestations?.totals?.coverage ?? 0).toFixed(1)}%`
     });
+    const governanceSummary = complianceSnapshot.governance?.summary;
+    if (governanceSummary?.overdueRenewals > 0) {
+      stats.push({
+        label: 'Vendor renewals',
+        value: `${governanceSummary.overdueRenewals} overdue`
+      });
+    }
+  }
+
+  if (releaseSnapshot) {
+    const pending = releaseSnapshot.tasks?.length ?? 0;
+    if (pending > 0) {
+      stats.push({ label: 'Release gates', value: `${pending} pending` });
+    } else if (releaseSnapshot.gates?.length) {
+      stats.push({
+        label: 'Release gates',
+        value: `${releaseSnapshot.gates.length} green`
+      });
+    }
   }
 
   return stats;
@@ -774,6 +801,8 @@ export default class OperatorDashboardService {
     identityVerificationService = IdentityVerificationService,
     partitionService = dataPartitionService,
     storage = storageService,
+    releaseService = releaseOrchestrationService,
+    governanceContractModel = GovernanceContractModel,
     nowProvider = () => new Date(),
     loggerInstance = logger.child({ service: 'OperatorDashboardService' })
   } = {}) {
@@ -785,6 +814,8 @@ export default class OperatorDashboardService {
     this.identityVerificationService = identityVerificationService;
     this.partitionService = partitionService;
     this.storage = storage;
+    this.releaseService = releaseService;
+    this.governanceContractModel = governanceContractModel;
     this.nowProvider = nowProvider;
     this.logger = loggerInstance;
   }
@@ -978,6 +1009,50 @@ export default class OperatorDashboardService {
       ];
     })();
 
+    let governanceSummary = {
+      totalContracts: 0,
+      activeContracts: 0,
+      renewalsWithinWindow: 0,
+      overdueRenewals: 0,
+      escalatedContracts: 0
+    };
+    let governanceContracts = [];
+
+    if (this.governanceContractModel) {
+      try {
+        if (typeof this.governanceContractModel.getLifecycleSummary === 'function') {
+          governanceSummary = await this.governanceContractModel.getLifecycleSummary({ windowDays: 60 });
+        }
+        if (typeof this.governanceContractModel.list === 'function') {
+          const contracts = await this.governanceContractModel.list(
+            { status: ['active', 'pending_renewal', 'escalated'] },
+            { limit: 20 }
+          );
+          governanceContracts = Array.isArray(contracts?.items)
+            ? contracts.items.map((contract) => ({
+                publicId: contract.publicId,
+                vendorName: contract.vendorName,
+                contractType: contract.contractType,
+                status: contract.status,
+                riskTier: contract.riskTier,
+                renewalDate: contract.renewalDate,
+                ownerEmail: contract.ownerEmail,
+                obligations: Array.isArray(contract.obligations)
+                  ? contract.obligations.slice(0, 5)
+                  : [],
+                runbookUrl:
+                  contract.metadata?.runbookUrl ??
+                  contract.metadata?.runbook ??
+                  contract.metadata?.documentationUrl ??
+                  null
+              }))
+            : [];
+        }
+      } catch (error) {
+        this.logger.warn({ err: error }, 'Failed to compile governance contract summary for admin console');
+      }
+    }
+
     return {
       metrics: kycOverview.metrics ?? [],
       queue: kycOverview.queue ?? [],
@@ -987,6 +1062,10 @@ export default class OperatorDashboardService {
       audits: auditSummary,
       attestations: attestationSummary,
       frameworks: frameworkSummaries,
+      governance: {
+        summary: governanceSummary,
+        contracts: governanceContracts
+      },
       risk: {
         heatmap: riskHeatmap,
         severityTotals,
@@ -1031,6 +1110,117 @@ export default class OperatorDashboardService {
       finance: finance ?? normaliseFinanceSettings({}),
       monetization: monetization ?? normaliseMonetization({})
     };
+  }
+
+  async #buildReleaseReadiness({ now } = {}) {
+    if (!this.releaseService || typeof this.releaseService.listChecklist !== 'function') {
+      return {
+        requiredGates: [],
+        thresholds: {},
+        checklist: [],
+        gates: [],
+        summary: { pass: 0, in_progress: 0, pending: 0, fail: 0 },
+        tasks: [],
+        latestRun: null,
+        readinessScore: null,
+        helperText: null
+      };
+    }
+
+    try {
+      const [checklist, runs] = await Promise.all([
+        this.releaseService.listChecklist({}, { limit: 200 }).catch((error) => {
+          this.logger.warn({ err: error }, 'Failed to load release checklist for admin console');
+          return { items: [], requiredGates: [], thresholds: {} };
+        }),
+        this.releaseService.listRuns({}, { limit: 5 }).catch((error) => {
+          this.logger.warn({ err: error }, 'Failed to load release runs for admin console');
+          return { items: [] };
+        })
+      ]);
+
+      const latestRunSummary = Array.isArray(runs?.items) ? runs.items[0] ?? null : null;
+      let latestRun = latestRunSummary;
+      let gates = [];
+
+      if (latestRunSummary?.publicId && typeof this.releaseService.getRun === 'function') {
+        try {
+          const detailedRun = await this.releaseService.getRun(latestRunSummary.publicId);
+          if (detailedRun?.run) {
+            latestRun = detailedRun.run;
+          }
+          if (Array.isArray(detailedRun?.gates)) {
+            gates = detailedRun.gates;
+          }
+        } catch (error) {
+          this.logger.warn({ err: error }, 'Failed to load release gate snapshot for admin console');
+        }
+      }
+
+      const summary = { pass: 0, in_progress: 0, pending: 0, fail: 0 };
+      const tasks = [];
+
+      for (const gate of gates) {
+        const status = gate?.status ?? 'pending';
+        if (summary[status] === undefined) {
+          summary[status] = 0;
+        }
+        summary[status] += 1;
+
+        if (status !== 'pass') {
+          tasks.push({
+            id: `release-${gate?.gateKey ?? Math.random().toString(36).slice(2)}`,
+            gateKey: gate?.gateKey ?? 'gate',
+            label: gate?.snapshot?.title ?? gate?.gateKey ?? 'Release gate',
+            status,
+            ownerEmail: gate?.ownerEmail ?? null,
+            href: latestRun?.publicId ? `/admin/release/${latestRun.publicId}#${gate?.gateKey ?? ''}` : '#release',
+            notes: gate?.notes ?? null,
+            lastEvaluatedAt: gate?.lastEvaluatedAt ?? null
+          });
+        }
+      }
+
+      const readinessScore = latestRun?.metadata?.readinessScore ?? latestRunSummary?.metadata?.readinessScore ?? null;
+      let helperText = null;
+      if (tasks.length > 0) {
+        const changeWindow = latestRun?.changeWindowStart ?? latestRun?.metadata?.changeWindowStart ?? null;
+        const formattedWindow = changeWindow ? new Date(changeWindow).toLocaleString() : null;
+        helperText = `Release readiness requires ${tasks.length} gate${tasks.length === 1 ? '' : 's'} before ${
+          formattedWindow ?? 'the planned change window'
+        }.`;
+      } else if (gates.length > 0) {
+        helperText = `All ${gates.length} release gates are green${
+          readinessScore !== null ? ` · readiness score ${Math.round(readinessScore)}` : ''
+        }.`;
+      }
+
+      return {
+        requiredGates: Array.isArray(checklist?.requiredGates) ? checklist.requiredGates : [],
+        thresholds: checklist?.thresholds ?? {},
+        checklist: Array.isArray(checklist?.items) ? checklist.items : [],
+        gates,
+        summary,
+        tasks,
+        latestRun,
+        readinessScore,
+        helperText,
+        refreshedAt: now?.toISOString?.() ?? new Date().toISOString()
+      };
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Failed to build release readiness summary for admin console');
+      return {
+        requiredGates: [],
+        thresholds: {},
+        checklist: [],
+        gates: [],
+        summary: { pass: 0, in_progress: 0, pending: 0, fail: 0 },
+        tasks: [],
+        latestRun: null,
+        readinessScore: null,
+        helperText: null
+      };
+    }
   }
 
   async build({ user, tenantId = 'global', now = this.nowProvider() } = {}) {
@@ -1078,6 +1268,7 @@ export default class OperatorDashboardService {
       activeIncidents,
       resolvedIncidents
     });
+    const releaseReadiness = await this.#buildReleaseReadiness({ now });
 
     const integrationList = Array.isArray(integrationSnapshot?.integrations)
       ? integrationSnapshot.integrations
@@ -1120,7 +1311,10 @@ export default class OperatorDashboardService {
           generatedAt: now.toISOString(),
           tenantId,
           manifestGeneratedAt: serviceHealth.summary.manifestGeneratedAt,
-          operationalScore
+          operationalScore,
+          helperText: releaseReadiness.helperText ?? null,
+          releaseTasks: releaseReadiness.tasks?.length ?? 0,
+          readinessScore: releaseReadiness.readinessScore ?? null
         },
         metrics: {
           serviceHealth: serviceHealth.summary,
@@ -1143,6 +1337,7 @@ export default class OperatorDashboardService {
         timeline,
         integrations: integrationSnapshot,
         compliance: complianceSnapshot,
+        release: releaseReadiness,
         settings: settingsSnapshot
       },
       searchIndex: [
@@ -1154,7 +1349,7 @@ export default class OperatorDashboardService {
         }),
         ...(integrationSnapshot?.searchIndex ?? [])
       ],
-      profileStats: buildProfileStats(queueSummary, scamSummary, integrationSnapshot, complianceSnapshot),
+      profileStats: buildProfileStats(queueSummary, scamSummary, integrationSnapshot, complianceSnapshot, releaseReadiness),
       profileTitleSegment: 'Platform operations overview',
       profileBio: buildProfileBio(queueSummary, scamSummary, serviceHealth.summary, complianceSnapshot)
     };

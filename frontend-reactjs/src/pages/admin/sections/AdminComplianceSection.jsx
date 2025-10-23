@@ -26,6 +26,50 @@ const RISK_CATEGORIES = [
 
 const INCIDENT_SEVERITIES = ['critical', 'high', 'medium', 'low'];
 
+const GOVERNANCE_STATUS_LABELS = {
+  active: 'Active',
+  pending_renewal: 'Pending renewal',
+  escalated: 'Escalated',
+  disabled: 'Disabled'
+};
+
+const GOVERNANCE_STATUS_CLASSES = {
+  active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  pending_renewal: 'bg-amber-50 text-amber-700 ring-amber-200',
+  escalated: 'bg-rose-50 text-rose-700 ring-rose-200',
+  disabled: 'bg-slate-100 text-slate-600 ring-slate-200'
+};
+
+const integerFormatter = new Intl.NumberFormat('en-US');
+
+function formatInteger(value) {
+  const numeric = Number.parseInt(value ?? 0, 10);
+  if (Number.isNaN(numeric)) {
+    return '0';
+  }
+  return integerFormatter.format(numeric);
+}
+
+function GovernanceStatusBadge({ status }) {
+  const key = status?.toLowerCase?.() ?? 'active';
+  const classes = GOVERNANCE_STATUS_CLASSES[key] ?? GOVERNANCE_STATUS_CLASSES.active;
+  const label = GOVERNANCE_STATUS_LABELS[key] ?? 'Active';
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${classes}`}>
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+GovernanceStatusBadge.propTypes = {
+  status: PropTypes.string
+};
+
+GovernanceStatusBadge.defaultProps = {
+  status: 'active'
+};
+
 function getRiskCategory(score) {
   if (score >= 75) return 'critical';
   if (score >= 40) return 'high';
@@ -294,6 +338,7 @@ function ComplianceTabNavigation({ activeTab, onSelect }) {
     { id: 'gdpr', label: 'UK GDPR & ICO oversight' },
     { id: 'audits', label: 'Audit & attestations' },
     { id: 'frameworks', label: 'Frameworks' },
+    { id: 'governance', label: 'Vendor governance' },
     { id: 'risk', label: 'Risk heatmap' },
     { id: 'incidents', label: 'Incident response' },
     { id: 'evidence', label: 'Evidence exports' }
@@ -340,6 +385,7 @@ export default function AdminComplianceSection({
   risk = {},
   incidentResponse = {},
   evidence = {},
+  governance = {},
   onReview = () => {}
 }) {
   const [riskOverrides, setRiskOverrides] = useState({});
@@ -356,6 +402,46 @@ export default function AdminComplianceSection({
 
   const queueItems = useMemo(() => queue ?? [], [queue]);
   const metricItems = useMemo(() => metrics ?? [], [metrics]);
+  const governanceSummary = useMemo(() => governance?.summary ?? {}, [governance]);
+  const governanceContracts = useMemo(
+    () => (Array.isArray(governance?.contracts) ? governance.contracts : []),
+    [governance]
+  );
+  const governanceMetrics = useMemo(
+    () => [
+      {
+        id: 'totalContracts',
+        label: 'Total contracts',
+        value: formatInteger(governanceSummary.totalContracts ?? 0),
+        helper: 'Contracts tracked in governance registry'
+      },
+      {
+        id: 'activeContracts',
+        label: 'Active',
+        value: formatInteger(governanceSummary.activeContracts ?? 0),
+        helper: 'Active vendor agreements'
+      },
+      {
+        id: 'renewalsWindow',
+        label: 'Renewals (60d)',
+        value: formatInteger(governanceSummary.renewalsWithinWindow ?? 0),
+        helper: 'Renewals due within 60 days'
+      },
+      {
+        id: 'overdueRenewals',
+        label: 'Overdue renewals',
+        value: formatInteger(governanceSummary.overdueRenewals ?? 0),
+        helper: 'Requires owner follow-up'
+      },
+      {
+        id: 'escalatedContracts',
+        label: 'Escalated',
+        value: formatInteger(governanceSummary.escalatedContracts ?? 0),
+        helper: 'Escalated to compliance review'
+      }
+    ],
+    [governanceSummary]
+  );
 
   const defaultRisk = useMemo(() => {
     const overrides = new Map();
@@ -924,6 +1010,97 @@ export default function AdminComplianceSection({
       </div>
     );
   };
+
+  const renderGovernanceSummary = () => (
+    <div className="space-y-8">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {governanceMetrics.map((metric) => (
+          <MetricCard key={metric.id} metric={metric} />
+        ))}
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h4 className="text-lg font-semibold text-slate-900">Vendor governance &amp; obligations</h4>
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {formatInteger(governanceContracts.length)} tracked vendors
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-slate-600">
+          Link compliance alerts directly to contracts, renewal cadences, and required evidence so policy updates have clear
+          owners.
+        </p>
+
+        {governanceContracts.length ? (
+          <div className="mt-6 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm text-slate-600">
+              <thead className="bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Vendor</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Renewal</th>
+                  <th className="px-4 py-3">Obligations</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {governanceContracts.map((contract) => {
+                  const obligations = Array.isArray(contract.obligations) ? contract.obligations.slice(0, 3) : [];
+                  return (
+                    <tr key={contract.publicId ?? contract.vendorName} className="align-top">
+                      <td className="px-4 py-4">
+                        <p className="font-semibold text-slate-900">{contract.vendorName}</p>
+                        <p className="text-xs uppercase tracking-wide text-slate-400">
+                          {contract.contractType ?? 'Agreement'} · Risk {contract.riskTier ?? 'medium'}
+                        </p>
+                        {contract.ownerEmail ? (
+                          <p className="mt-1 text-xs text-slate-500">Owner {contract.ownerEmail}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-4">
+                        <GovernanceStatusBadge status={contract.status} />
+                      </td>
+                      <td className="px-4 py-4 text-xs text-slate-600">
+                        <p className="font-semibold text-slate-900">{contract.renewalDate ?? 'TBC'}</p>
+                        {contract.runbookUrl ? (
+                          <a
+                            href={contract.runbookUrl}
+                            className="mt-2 inline-flex items-center gap-2 text-primary hover:text-primary-dark"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View runbook
+                            <span aria-hidden="true">↗</span>
+                          </a>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-4 text-xs text-slate-600">
+                        {obligations.length ? (
+                          <ul className="space-y-1">
+                            {obligations.map((item) => (
+                              <li key={item} className="flex items-center gap-2">
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-slate-400">No obligations logged</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-6 text-sm text-slate-500">
+            No vendor contracts are linked yet. Import governance records to align compliance alerts with required actions.
+          </p>
+        )}
+      </div>
+    </div>
+  );
 
   const renderAuditSummary = () => {
     const severityCounts = auditSummary.countsBySeverity ?? {};
@@ -1519,6 +1696,7 @@ export default function AdminComplianceSection({
         {activeTab === 'gdpr' ? renderGdprSummary() : null}
         {activeTab === 'audits' ? renderAuditSummary() : null}
         {activeTab === 'frameworks' ? renderFrameworkSummary() : null}
+        {activeTab === 'governance' ? renderGovernanceSummary() : null}
         {activeTab === 'risk' ? renderRiskOverview() : null}
         {activeTab === 'incidents' ? renderIncidentResponse() : null}
         {activeTab === 'evidence' ? renderEvidenceExports() : null}
@@ -1743,6 +1921,22 @@ AdminComplianceSection.propTypes = {
       bucket: PropTypes.string,
       prefix: PropTypes.string
     })
+  }),
+  governance: PropTypes.shape({
+    summary: PropTypes.object,
+    contracts: PropTypes.arrayOf(
+      PropTypes.shape({
+        publicId: PropTypes.string,
+        vendorName: PropTypes.string,
+        contractType: PropTypes.string,
+        status: PropTypes.string,
+        riskTier: PropTypes.string,
+        renewalDate: PropTypes.string,
+        ownerEmail: PropTypes.string,
+        obligations: PropTypes.arrayOf(PropTypes.string),
+        runbookUrl: PropTypes.string
+      })
+    )
   }),
   onReview: PropTypes.func
 };

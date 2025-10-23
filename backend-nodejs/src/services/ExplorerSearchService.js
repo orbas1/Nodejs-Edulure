@@ -95,6 +95,153 @@ function deriveGeo(entity, hit) {
   };
 }
 
+function ensureArray(value) {
+  if (value === null || value === undefined) {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+}
+
+function normaliseBadge(entry) {
+  if (!entry && entry !== 0) {
+    return null;
+  }
+  if (typeof entry === 'string') {
+    const label = entry.trim();
+    if (!label) {
+      return null;
+    }
+    return { type: 'info', label };
+  }
+  if (typeof entry === 'object') {
+    const labelCandidate = entry.label ?? entry.title ?? entry.text ?? entry.value ?? entry.name ?? null;
+    const label = typeof labelCandidate === 'string' ? labelCandidate.trim() : null;
+    if (!label) {
+      return null;
+    }
+    const typeCandidate = entry.type ?? entry.key ?? 'info';
+    const type = typeof typeCandidate === 'string' ? typeCandidate.trim() : 'info';
+    const badge = { type, label };
+    if (entry.tone && typeof entry.tone === 'string') {
+      badge.tone = entry.tone;
+    }
+    return badge;
+  }
+  return null;
+}
+
+function buildBadges(...sources) {
+  const badges = [];
+  const seen = new Set();
+  sources.forEach((source) => {
+    ensureArray(source).forEach((entry) => {
+      const badge = normaliseBadge(entry);
+      if (!badge) {
+        return;
+      }
+      const key = `${badge.type.toLowerCase()}|${badge.label.toLowerCase()}`;
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      badges.push(badge);
+    });
+  });
+  return badges;
+}
+
+function normaliseAction(entry, fallbackHref = null) {
+  if (!entry && entry !== 0) {
+    return null;
+  }
+  if (typeof entry === 'string') {
+    const label = entry.trim();
+    if (!label) {
+      return null;
+    }
+    return { label, href: fallbackHref, type: 'secondary' };
+  }
+  if (typeof entry === 'object') {
+    const labelCandidate = entry.label ?? entry.title ?? entry.text ?? entry.name ?? entry.value ?? null;
+    const label = typeof labelCandidate === 'string' ? labelCandidate.trim() : null;
+    if (!label) {
+      return null;
+    }
+    const hrefCandidate = entry.href ?? entry.url ?? entry.link ?? entry.permalink ?? null;
+    const href = hrefCandidate ? String(hrefCandidate).trim() : fallbackHref ?? null;
+    const typeCandidate = entry.type ?? entry.variant ?? entry.intent ?? 'secondary';
+    const type = typeof typeCandidate === 'string' ? typeCandidate.trim().toLowerCase() : 'secondary';
+    const normalizedType = ['primary', 'secondary', 'tertiary'].includes(type) ? type : 'secondary';
+    const action = {
+      id: entry.id ?? entry.key ?? entry.href ?? null,
+      label,
+      href,
+      type: normalizedType
+    };
+    return action;
+  }
+  return null;
+}
+
+function buildActions(links, fallback = null) {
+  const actions = [];
+  const seen = new Set();
+  const fallbackAction = fallback
+    ? {
+        id: fallback.id ?? null,
+        label: fallback.label ?? 'Open',
+        href: fallback.href ?? null,
+        type: fallback.type ?? 'primary'
+      }
+    : null;
+
+  ensureArray(links).forEach((entry) => {
+    const action = normaliseAction(entry, fallbackAction?.href ?? null);
+    if (!action) {
+      return;
+    }
+    const key = `${action.label.toLowerCase()}|${action.href ?? ''}|${action.type}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    actions.push(action);
+  });
+
+  if (fallbackAction) {
+    const fallbackKey = `${fallbackAction.label.toLowerCase()}|${fallbackAction.href ?? ''}|${fallbackAction.type}`;
+    if (!seen.has(fallbackKey)) {
+      actions.push(fallbackAction);
+      seen.add(fallbackKey);
+    }
+  }
+
+  return actions;
+}
+
+function buildHighlights(...sources) {
+  const highlights = [];
+  const seen = new Set();
+  sources.forEach((source) => {
+    ensureArray(source).forEach((entry) => {
+      if (!entry && entry !== 0) {
+        return;
+      }
+      const label = typeof entry === 'string' ? entry.trim() : String(entry).trim();
+      if (!label) {
+        return;
+      }
+      const key = label.toLowerCase();
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      highlights.push(label);
+    });
+  });
+  return highlights;
+}
+
 function formatDocument(entity, hit) {
   const base = {
     id: hit.entityId,
@@ -118,6 +265,11 @@ function formatDocument(entity, hit) {
     geo: null
   };
 
+  let fallbackAction = null;
+  let defaultBadges = [];
+  let fallbackHighlights = [];
+  let monetisationTag = hit.monetisationTag ?? hit.metadata?.monetisation?.tag ?? null;
+
   switch (entity) {
     case 'communities': {
       base.title = hit.metadata?.name ?? hit.title;
@@ -130,10 +282,21 @@ function formatDocument(entity, hit) {
         members: formatNumber(hit.memberCount),
         posts: formatNumber(hit.postCount)
       };
-      base.actions = [{ label: 'View community', href: `/communities/${hit.slug ?? hit.entityId}` }];
       base.url = `/communities/${hit.slug ?? hit.entityId}`;
+      fallbackAction = { label: 'View community', href: base.url, type: 'primary' };
+      fallbackHighlights = [
+        hit.memberCount ? `${formatNumber(hit.memberCount)} members` : null,
+        hit.postCount ? `${formatNumber(hit.postCount)} posts` : null
+      ];
+      defaultBadges = [
+        hit.metadata?.visibility ? { type: 'visibility', label: hit.metadata.visibility } : null,
+        hit.country ? { type: 'region', label: hit.country } : null
+      ];
+      if (!monetisationTag) {
+        monetisationTag = hit.metadata?.visibility === 'private' ? 'Private community' : 'Open community';
+      }
       base.geo = deriveGeo(entity, hit);
-      return base;
+      break;
     }
     case 'courses': {
       base.subtitle = [hit.level, formatCurrency(hit.price), formatRating(hit.rating)]
@@ -145,9 +308,21 @@ function formatDocument(entity, hit) {
         enrolments: formatNumber(hit.metadata?.enrolmentCount ?? hit.metadata?.enrolment_count),
         releaseAt: hit.metadata?.releaseAt ?? hit.publishedAt
       };
-      base.actions = [{ label: 'View course', href: `/courses/${hit.slug ?? hit.entityId}` }];
       base.url = `/courses/${hit.slug ?? hit.entityId}`;
-      return base;
+      fallbackAction = { label: 'View course', href: base.url, type: 'primary' };
+      fallbackHighlights = [
+        hit.level ? `Level: ${hit.level}` : null,
+        hit.metadata?.deliveryFormat ? `${hit.metadata.deliveryFormat} format` : null,
+        hit.metadata?.enrolmentCount ? `${formatNumber(hit.metadata.enrolmentCount)} learners` : null
+      ];
+      defaultBadges = [
+        hit.level ? { type: 'level', label: hit.level } : null,
+        hit.metadata?.deliveryFormat ? { type: 'format', label: hit.metadata.deliveryFormat } : null
+      ];
+      if (!monetisationTag) {
+        monetisationTag = hit.price?.amountMinor > 0 ? 'Premium course' : 'Free course';
+      }
+      break;
     }
     case 'ebooks': {
       base.subtitle = [formatCurrency(hit.price), formatRating(hit.rating)]
@@ -158,9 +333,20 @@ function formatDocument(entity, hit) {
       base.metrics = {
         readingTimeMinutes: hit.metadata?.readingTimeMinutes
       };
-      base.actions = [{ label: 'Open ebook', href: `/ebooks/${hit.slug ?? hit.entityId}` }];
       base.url = `/ebooks/${hit.slug ?? hit.entityId}`;
-      return base;
+      fallbackAction = { label: 'Open ebook', href: base.url, type: 'primary' };
+      fallbackHighlights = [
+        hit.metadata?.readingTimeMinutes ? `${hit.metadata.readingTimeMinutes} min read` : null,
+        hit.metadata?.languages?.[0] ? `Language: ${hit.metadata.languages[0]}` : null
+      ];
+      defaultBadges = [
+        hit.metadata?.categories?.[0] ? { type: 'category', label: hit.metadata.categories[0] } : null,
+        hit.metadata?.languages?.[0] ? { type: 'language', label: hit.metadata.languages[0] } : null
+      ];
+      if (!monetisationTag) {
+        monetisationTag = hit.price?.amountMinor > 0 ? 'Premium ebook' : 'Free ebook';
+      }
+      break;
     }
     case 'tutors': {
       base.title = hit.metadata?.displayName ?? hit.title;
@@ -179,15 +365,71 @@ function formatDocument(entity, hit) {
         responseTimeMinutes: Number(hit.responseTimeMinutes ?? 0),
         isVerified: Boolean(hit.isVerified)
       };
-      base.actions = [{ label: 'Hire tutor', href: `/tutors/${hit.slug ?? hit.entityId}` }];
       base.url = `/tutors/${hit.slug ?? hit.entityId}`;
+      fallbackAction = { label: 'Hire tutor', href: base.url, type: 'primary' };
+      fallbackHighlights = [
+        hit.completedSessions ? `${formatNumber(hit.completedSessions)} sessions` : null,
+        hit.responseTimeMinutes ? `Responds in ${hit.responseTimeMinutes}m` : null,
+        hit.metadata?.languages?.[0] ? `Speaks ${hit.metadata.languages[0]}` : null
+      ];
+      defaultBadges = [
+        hit.isVerified ? { type: 'verified', label: 'Verified' } : null,
+        ...(hit.metadata?.skills ?? []).slice(0, 2).map((skill) => ({ type: 'skill', label: skill }))
+      ];
+      if (!monetisationTag) {
+        monetisationTag = hit.isVerified ? 'Verified tutor' : 'Expert tutor';
+      }
       base.geo = deriveGeo(entity, hit);
-      return base;
+      break;
     }
     default: {
-      return base;
+      break;
     }
   }
+  const combinedActions = buildActions(
+    [
+      hit.actions,
+      hit.ctaLinks,
+      hit.preview?.ctaLinks,
+      hit.metadata?.preview?.ctaLinks,
+      hit.metadata?.ctaLinks
+    ].flatMap((source) => ensureArray(source)),
+    fallbackAction
+  );
+  base.actions = combinedActions;
+
+  if (!base.url && combinedActions.length) {
+    const primaryAction = combinedActions.find((action) => action.type === 'primary');
+    base.url = primaryAction?.href ?? combinedActions[0].href ?? null;
+  }
+
+  const highlights = buildHighlights(
+    hit.highlights,
+    hit.previewHighlights,
+    hit.preview?.highlights,
+    hit.metadata?.preview?.highlights,
+    fallbackHighlights
+  );
+  base.highlights = highlights;
+
+  base.preview = {
+    summary: hit.previewSummary ?? hit.preview?.summary ?? base.description,
+    image: hit.previewImageUrl ?? hit.preview?.image ?? hit.preview?.imageUrl ?? base.thumbnailUrl,
+    highlights,
+    ctaLinks: combinedActions
+  };
+
+  base.badges = buildBadges(
+    hit.badges,
+    hit.preview?.badges,
+    hit.metadata?.badges,
+    hit.metadata?.preview?.badges,
+    defaultBadges
+  );
+
+  base.monetisationTag = monetisationTag ?? null;
+
+  return base;
 }
 
 export class ExplorerSearchService {

@@ -105,6 +105,8 @@ export async function seed(knex) {
     await trx('learner_payment_methods').del();
     await trx('learner_billing_contacts').del();
     await trx('learner_system_preferences').del();
+    await trx('learner_onboarding_responses').del();
+    await trx('learner_onboarding_invites').del();
     await trx('learner_course_goals').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flag_tenant_states').del();
@@ -120,6 +122,9 @@ export async function seed(knex) {
     await trx('community_post_moderation_cases').del();
     await trx('scam_reports').del();
     await trx('moderation_analytics_events').del();
+    await trx('learner_support_messages').del();
+    await trx('learner_support_cases').del();
+    await trx('support_articles').del();
     await trx('community_message_reactions').del();
     await trx('community_channel_members').del();
     await trx('community_messages').del();
@@ -142,6 +147,9 @@ export async function seed(knex) {
     await trx('content_asset_events').del();
     await trx('content_audit_logs').del();
     await trx('content_assets').del();
+    await trx('marketing_plan_features').del();
+    await trx('marketing_plan_offers').del();
+    await trx('marketing_blocks').del();
     await trx('telemetry_lineage_runs').del();
     await trx('telemetry_freshness_monitors').del();
     await trx('telemetry_events').del();
@@ -837,6 +845,206 @@ export async function seed(knex) {
       visibility: 'private',
       cover_image_url: growthLabCover.url,
       metadata: JSON.stringify(growthLabMetadata)
+    });
+
+    await trx('marketing_blocks').insert([
+      {
+        slug: 'flow-five-hero',
+        block_type: 'hero',
+        eyebrow: 'Flow 5 launchpad',
+        title: 'Bring learners from hello to enrolled in one Flow 5 launchpad',
+        subtitle:
+          'Design acquisition experiments, surface personal invites, and hand learners into live cohorts without handing off between tools.',
+        status_label: 'Flow 5 beta open',
+        chips: JSON.stringify(['Acquisition experiments', 'Community invites', 'Live cohorts']),
+        media: JSON.stringify({ theme: 'flow-five', palette: ['#6366f1', '#22d3ee'], badge: 'Flow 5' }),
+        primary_cta: JSON.stringify({ label: 'Start free trial', to: '/register' }),
+        secondary_cta: JSON.stringify({ label: 'View pricing', to: '/pricing' }),
+        tertiary_cta: JSON.stringify({ label: 'See how Flow 5 works', href: 'https://marketing.edulure.test/flow-5-demo' }),
+        metadata: JSON.stringify({ analyticsKey: 'flow5-hero', layout: 'split-right' })
+      },
+      {
+        slug: 'flow-five-proof',
+        block_type: 'proof',
+        eyebrow: 'Customer spotlight',
+        title: 'Ops Guild lifted enrolment 28% after consolidating onboarding',
+        subtitle:
+          'Kai and Amina used Flow 5 checklists, templated CTAs, and invite sync to cut drop-off across marketing and register flows.',
+        status_label: null,
+        chips: JSON.stringify(['28% conversion lift', '5 minute checkout', 'Invite sync ready']),
+        media: JSON.stringify({
+          type: 'stat-stack',
+          stats: [
+            { label: 'Marketing → enrolment', value: '+28%' },
+            { label: 'Flow setup time', value: '2 weeks' },
+            { label: 'NPS after onboarding', value: '64' }
+          ]
+        }),
+        primary_cta: JSON.stringify({ label: 'Read the story', href: 'https://stories.edulure.test/flow5-ops-guild' }),
+        secondary_cta: JSON.stringify({ label: 'Download checklist', href: 'https://docs.edulure.test/flow5/checklist.pdf' }),
+        tertiary_cta: JSON.stringify({}),
+        metadata: JSON.stringify({ analyticsKey: 'flow5-proof', theme: 'slate' })
+      }
+    ]);
+
+    const [communityPlanId] = await trx('marketing_plan_offers').insert({
+      public_id: 'plan-community-tutor',
+      name: 'Community + Tutor Pods',
+      headline: 'Community & tutor pods',
+      tagline: 'Invite-only cohorts, live office hours, and sponsor-ready portals.',
+      price_cents: 14900,
+      currency: 'USD',
+      billing_interval: 'monthly',
+      is_featured: true,
+      badge: JSON.stringify({ label: 'Most popular', tone: 'emerald' }),
+      metadata: JSON.stringify({
+        accent: {
+          gradient: 'from-emerald-500/25 via-teal-500/30 to-cyan-500/30',
+          border: 'border-emerald-300/40',
+          shadow: 'shadow-[0_32px_84px_-42px_rgba(16,185,129,0.6)]'
+        }
+      }),
+      upsell: JSON.stringify({ descriptor: 'Add sponsor marketplace for +$49', optional: true })
+    });
+
+    const [cataloguePlanId] = await trx('marketing_plan_offers').insert({
+      public_id: 'plan-catalogue',
+      name: 'Course Catalogue Pro',
+      headline: 'Course catalogue pro',
+      tagline: 'Ship evergreen catalogues with drip scheduling, bundles, and gated previews.',
+      price_cents: 9900,
+      currency: 'USD',
+      billing_interval: 'monthly',
+      is_featured: false,
+      badge: JSON.stringify({ label: 'Great for academies', tone: 'indigo' }),
+      metadata: JSON.stringify({
+        accent: {
+          gradient: 'from-indigo-500/25 via-sky-500/30 to-violet-500/30',
+          border: 'border-indigo-300/40',
+          shadow: 'shadow-[0_38px_92px_-40px_rgba(99,102,241,0.65)]'
+        }
+      }),
+      upsell: JSON.stringify({ descriptor: 'Bundle ebooks and audio courses for +$19', optional: true })
+    });
+
+    const [livePlanId] = await trx('marketing_plan_offers').insert({
+      public_id: 'plan-live-donations',
+      name: 'Live Sessions & Donations',
+      headline: 'Live sessions & donations',
+      tagline: 'Run hybrid broadcasts, accept donations, and automate replay libraries.',
+      price_cents: 12900,
+      currency: 'USD',
+      billing_interval: 'monthly',
+      is_featured: false,
+      badge: JSON.stringify({ label: 'Launch ready', tone: 'rose' }),
+      metadata: JSON.stringify({
+        accent: {
+          gradient: 'from-rose-500/25 via-orange-500/30 to-amber-500/30',
+          border: 'border-rose-300/40',
+          shadow: 'shadow-[0_44px_98px_-38px_rgba(244,114,182,0.6)]'
+        }
+      }),
+      upsell: JSON.stringify({ descriptor: 'Enable SMS reminders for +$15', optional: true })
+    });
+
+    await trx('marketing_plan_features').insert([
+      {
+        plan_id: communityPlanId,
+        position: 0,
+        label: 'Unlimited private communities',
+        metadata: JSON.stringify({ icon: '🤝' })
+      },
+      {
+        plan_id: communityPlanId,
+        position: 1,
+        label: 'Tutor pods with shared agendas & analytics',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: communityPlanId,
+        position: 2,
+        label: 'Sponsor hub & ready-to-run campaigns',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: cataloguePlanId,
+        position: 0,
+        label: 'Unlimited courses & dynamic bundles',
+        metadata: JSON.stringify({ icon: '📚' })
+      },
+      {
+        plan_id: cataloguePlanId,
+        position: 1,
+        label: 'Drip scheduling with progress automations',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: cataloguePlanId,
+        position: 2,
+        label: 'SEO-optimised catalogue landing pages',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: livePlanId,
+        position: 0,
+        label: 'Live studio with backstage chat & run of show',
+        metadata: JSON.stringify({ icon: '🎤' })
+      },
+      {
+        plan_id: livePlanId,
+        position: 1,
+        label: 'Donations, tipping, and sponsor slots',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: livePlanId,
+        position: 2,
+        label: 'Auto-generate replay library & transcripts',
+        metadata: JSON.stringify({})
+      }
+    ]);
+
+    const inviteExpiry = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
+    await trx('learner_onboarding_invites').insert([
+      {
+        invite_code: 'FLOW5-OPS-GUILD',
+        email: 'flow5-preview@edulure.test',
+        community_id: opsCommunityId,
+        status: 'pending',
+        expires_at: inviteExpiry,
+        metadata: JSON.stringify({ source: 'flow-five', cohort: 'ops-guild' })
+      },
+      {
+        invite_code: 'FLOW5-GROWTH-LAB',
+        email: 'flow5-preview@edulure.test',
+        community_id: growthCommunityId,
+        status: 'pending',
+        expires_at: inviteExpiry,
+        metadata: JSON.stringify({ source: 'flow-five', cohort: 'growth-lab' })
+      }
+    ]);
+
+    await trx('learner_onboarding_responses').insert({
+      email: 'flow5-preview@edulure.test',
+      role: 'instructor',
+      first_name: 'Jordan',
+      last_name: 'Rivera',
+      persona: 'Community architect',
+      goals: JSON.stringify(['Launch Flow 5 beta', 'Automate sponsor onboarding']),
+      invites: JSON.stringify([
+        { code: 'FLOW5-OPS-GUILD', status: 'pending', communitySlug: 'learning-ops-guild' },
+        { code: 'FLOW5-GROWTH-LAB', status: 'pending', communitySlug: 'creator-growth-lab' }
+      ]),
+      preferences: JSON.stringify({
+        marketingOptIn: true,
+        timeCommitment: '4h/week',
+        interests: ['Community launches', 'Sponsor workflow']
+      }),
+      metadata: JSON.stringify({ source: 'flow-five', campaign: 'beta-seed' }),
+      terms_accepted: 1,
+      submitted_at: trx.fn.now(),
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now()
     });
 
     const opsAdminMemberMetadata = {
@@ -4077,6 +4285,173 @@ export async function seed(knex) {
     ];
 
     await trx('security_incidents').insert(securityIncidents);
+
+    await trx('support_articles').insert([
+      {
+        slug: 'live-classroom-reset',
+        title: 'Stabilise a live classroom session',
+        summary: 'Step-by-step recovery to restore frozen live classroom rooms and re-sync media.',
+        category: 'Live classroom',
+        keywords: JSON.stringify(['live classroom', 'troubleshooting', 'reset']),
+        url: 'https://support.edulure.test/articles/live-classroom-reset',
+        minutes: 5,
+        helpfulness_score: 9.6
+      },
+      {
+        slug: 'billing-reconcile-declines',
+        title: 'Resolve recurring billing declines',
+        summary: 'Checklist for reconciling recurring payment failures and communicating with learners.',
+        category: 'Billing & payments',
+        keywords: JSON.stringify(['billing', 'payments', 'declines']),
+        url: 'https://support.edulure.test/articles/billing-reconcile-declines',
+        minutes: 4,
+        helpfulness_score: 8.8
+      },
+      {
+        slug: 'course-content-refresh',
+        title: 'Refresh stale course content for learners',
+        summary: 'Guidance to regenerate course caches and notify enrolled learners when modules change.',
+        category: 'Course access',
+        keywords: JSON.stringify(['course', 'cache', 'refresh']),
+        url: 'https://support.edulure.test/articles/course-content-refresh',
+        minutes: 6,
+        helpfulness_score: 8.1
+      }
+    ]);
+
+    const supportCaseAlphaCreatedAt = new Date('2025-02-01T08:30:00Z');
+    const supportCaseAlphaUpdatedAt = new Date('2025-02-01T09:10:00Z');
+    const [supportCaseAlphaInsert] = await trx('learner_support_cases').insert(
+      {
+        user_id: learnerId,
+        reference: 'SUP-1001',
+        subject: 'Live classroom session frozen at 95%',
+        category: 'Live classroom',
+        priority: 'high',
+        status: 'waiting',
+        channel: 'Portal',
+        owner: 'Mira Patel',
+        last_agent: 'Mira Patel',
+        escalation_breadcrumbs: JSON.stringify([
+          {
+            id: 'crumb-created',
+            actor: 'learner',
+            label: 'Ticket created',
+            at: supportCaseAlphaCreatedAt.toISOString()
+          },
+          {
+            id: 'crumb-escalated',
+            actor: 'support',
+            label: 'Escalated to live ops',
+            note: 'Shift handed to live operations to recover frozen breakout rooms.',
+            at: '2025-02-01T08:42:00Z'
+          }
+        ]),
+        knowledge_suggestions: JSON.stringify([
+          {
+            id: 'live-classroom-reset',
+            title: 'Stabilise a live classroom session',
+            excerpt: 'Reset real-time channels and reissue instructor invites to unstick sessions at 95%.',
+            url: 'https://support.edulure.test/articles/live-classroom-reset',
+            category: 'Live classroom',
+            minutes: 5
+          }
+        ]),
+        ai_summary: 'Learner reported “Live classroom session frozen at 95%”. Priority: High.',
+        follow_up_due_at: new Date('2025-02-01T12:30:00Z'),
+        ai_summary_generated_at: new Date('2025-02-01T08:35:00Z'),
+        metadata: JSON.stringify({
+          intake: { channel: 'portal', attachments: 1 },
+          firstResponseMinutes: 28
+        }),
+        created_at: supportCaseAlphaCreatedAt,
+        updated_at: supportCaseAlphaUpdatedAt
+      },
+      ['id']
+    );
+    const supportCaseAlphaId =
+      typeof supportCaseAlphaInsert === 'object' ? supportCaseAlphaInsert.id : supportCaseAlphaInsert;
+
+    await trx('learner_support_messages').insert([
+      {
+        case_id: supportCaseAlphaId,
+        author: 'learner',
+        body: 'Learners report the live classroom stalls at 95% while joining. Restarted twice with same result.',
+        attachments: JSON.stringify([
+          { id: 'att-live-1', name: 'classroom-log.csv', size: 2048, url: null, type: 'text/csv' }
+        ]),
+        created_at: supportCaseAlphaCreatedAt
+      },
+      {
+        case_id: supportCaseAlphaId,
+        author: 'support',
+        body: 'Reset realtime layer, escalated to operations for proactive monitoring.',
+        attachments: JSON.stringify([]),
+        created_at: new Date('2025-02-01T08:45:00Z')
+      }
+    ]);
+
+    const supportCaseBetaCreatedAt = new Date('2025-02-04T14:10:00Z');
+    const [supportCaseBetaInsert] = await trx('learner_support_cases').insert(
+      {
+        user_id: learnerId,
+        reference: 'SUP-1002',
+        subject: 'Recurring billing decline on premium plan',
+        category: 'Billing & payments',
+        priority: 'normal',
+        status: 'open',
+        channel: 'Portal',
+        owner: 'Mira Patel',
+        last_agent: 'Jordan Lee',
+        escalation_breadcrumbs: JSON.stringify([
+          {
+            id: 'crumb-1002-created',
+            actor: 'learner',
+            label: 'Ticket created',
+            at: supportCaseBetaCreatedAt.toISOString()
+          }
+        ]),
+        knowledge_suggestions: JSON.stringify([
+          {
+            id: 'billing-reconcile-declines',
+            title: 'Resolve recurring billing declines',
+            excerpt: 'Run the retry playbook and notify learners when payment profiles need an update.',
+            url: 'https://support.edulure.test/articles/billing-reconcile-declines',
+            category: 'Billing & payments',
+            minutes: 4
+          },
+          {
+            id: 'course-content-refresh',
+            title: 'Refresh stale course content for learners',
+            excerpt: 'Rebuild cached modules after billing reinstatement to avoid access mismatch.',
+            url: 'https://support.edulure.test/articles/course-content-refresh',
+            category: 'Course access',
+            minutes: 6
+          }
+        ]),
+        ai_summary: 'Learner reported “Recurring billing decline on premium plan”. Priority: Normal.',
+        follow_up_due_at: new Date('2025-02-05T14:10:00Z'),
+        ai_summary_generated_at: new Date('2025-02-04T14:15:00Z'),
+        metadata: JSON.stringify({
+          intake: { channel: 'portal', attachments: 0 },
+          renewalAmountCents: 12900
+        }),
+        created_at: supportCaseBetaCreatedAt,
+        updated_at: supportCaseBetaCreatedAt
+      },
+      ['id']
+    );
+    const supportCaseBetaId = typeof supportCaseBetaInsert === 'object' ? supportCaseBetaInsert.id : supportCaseBetaInsert;
+
+    await trx('learner_support_messages').insert([
+      {
+        case_id: supportCaseBetaId,
+        author: 'learner',
+        body: 'Card declined twice on renewal. Bank confirmed funds are available.',
+        attachments: JSON.stringify([]),
+        created_at: supportCaseBetaCreatedAt
+      }
+    ]);
 
     const [
       phishingIncident,

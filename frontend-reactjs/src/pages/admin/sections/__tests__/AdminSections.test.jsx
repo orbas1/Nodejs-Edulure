@@ -12,6 +12,7 @@ import AdminGrowthSection from '../AdminGrowthSection.jsx';
 import AdminRevenueManagementSection from '../AdminRevenueManagementSection.jsx';
 import AdminRevenueSection from '../AdminRevenueSection.jsx';
 import AdminOperationsSection from '../AdminOperationsSection.jsx';
+import AdminReleaseSection from '../AdminReleaseSection.jsx';
 import AdminPolicyHubSection from '../AdminPolicyHubSection.jsx';
 import AdminAdsManagementSection from '../AdminAdsManagementSection.jsx';
 import AdminTopCommunitiesSection from '../AdminTopCommunitiesSection.jsx';
@@ -774,5 +775,83 @@ describe('Admin operational sections', () => {
     await user.type(screen.getByLabelText(/search tooling suites/i), 'control');
     expect(screen.getByText('Active Control')).toBeInTheDocument();
     expect(screen.queryByText('Pilot Flow')).not.toBeInTheDocument();
+  });
+
+  it('presents release readiness snapshot with tasks, thresholds, and gate table rows', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-04-18T19:00:00Z'));
+
+    const summary = { pass: 2, in_progress: 1, pending: 0, fail: 0 };
+    const tasks = [
+      {
+        id: 'security-review',
+        label: 'Security review',
+        status: 'in_progress',
+        ownerEmail: 'security@edulure.com',
+        notes: 'Awaiting mitigation sign-off',
+        lastEvaluatedAt: '2025-04-18T18:15:00Z'
+      }
+    ];
+    const latestRun = {
+      publicId: 'run-1',
+      versionTag: 'v1.0.0-rc.5',
+      environment: 'staging',
+      changeWindowStart: '2025-04-18T18:00:00Z',
+      changeWindowEnd: '2025-04-18T19:00:00Z',
+      startedAt: '2025-04-18T17:30:00Z',
+      metadata: { readinessScore: 72 }
+    };
+    const gates = [
+      {
+        gateKey: 'quality-verification',
+        status: 'pass',
+        ownerEmail: 'qa@edulure.com',
+        lastEvaluatedAt: '2025-04-18T18:10:00Z',
+        snapshot: {
+          title: 'Quality assurance sign-off',
+          description: 'All automated test suites are green.',
+          category: 'quality'
+        }
+      },
+      {
+        gateKey: 'security-review',
+        status: 'in_progress',
+        ownerEmail: 'security@edulure.com',
+        lastEvaluatedAt: '2025-04-18T18:15:00Z',
+        snapshot: {
+          title: 'Security review',
+          description: 'Risk findings under remediation.',
+          category: 'security'
+        }
+      }
+    ];
+
+    render(
+      <AdminReleaseSection
+        sectionId="release"
+        summary={summary}
+        tasks={tasks}
+        latestRun={latestRun}
+        thresholds={{ minCoverage: 0.9, maxErrorRate: 0.01 }}
+        requiredGates={['quality-verification', 'security-review']}
+        gates={gates}
+      />
+    );
+
+    expect(screen.getByRole('heading', { level: 2, name: /release readiness/i })).toBeInTheDocument();
+    expect(screen.getByText('Passing')).toBeInTheDocument();
+    expect(screen.getByText('In progress')).toBeInTheDocument();
+    expect(screen.getByText('Awaiting mitigation sign-off')).toBeInTheDocument();
+    expect(screen.getByText('v1.0.0-rc.5')).toBeInTheDocument();
+    expect(screen.getByText('staging')).toBeInTheDocument();
+    expect(screen.getByText('72 / 100')).toBeInTheDocument();
+    expect(screen.getByText('quality-verification')).toBeInTheDocument();
+    expect(screen.getByText('security-review')).toBeInTheDocument();
+    expect(screen.getByText('Quality assurance sign-off')).toBeInTheDocument();
+    expect(screen.getAllByText('Security review')).not.toHaveLength(0);
+    expect(screen.getByText('min Coverage')).toBeInTheDocument();
+    expect(screen.getByText('0.9')).toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 });

@@ -62,7 +62,8 @@ const serviceMock = {
   createSupportTicket: vi.fn(),
   updateSupportTicket: vi.fn(),
   addSupportTicketMessage: vi.fn(),
-  closeSupportTicket: vi.fn()
+  closeSupportTicket: vi.fn(),
+  searchSupportKnowledgeBase: vi.fn()
 };
 
 vi.mock('../src/services/LearnerDashboardService.js', () => ({
@@ -230,5 +231,24 @@ describe('Learner dashboard HTTP routes', () => {
     expect(serviceMock.addSupportTicketMessage).toHaveBeenCalledWith(42, 'tk-2', {
       body: 'Hello'
     });
+  });
+
+  it('searches the support knowledge base with sanitised parameters', async () => {
+    serviceMock.searchSupportKnowledgeBase.mockResolvedValue([
+      { id: 'kb-1', title: 'Reset classrooms' }
+    ]);
+
+    const response = await request(app)
+      .get('/api/v1/dashboard/learner/support/knowledge-base')
+      .query({ q: '  billing declines  ', category: '  Billing & payments ', limit: '25' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.searchSupportKnowledgeBase).toHaveBeenCalledWith(42, {
+      query: 'billing declines',
+      category: 'Billing & payments',
+      limit: 10
+    });
+    expect(response.body.data.articles).toEqual([{ id: 'kb-1', title: 'Reset classrooms' }]);
   });
 });

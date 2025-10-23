@@ -1,3 +1,5 @@
+import Joi from 'joi';
+
 import LearnerDashboardService from '../services/LearnerDashboardService.js';
 import LearnerProgressService from '../services/LearnerProgressService.js';
 import { success } from '../utils/httpResponse.js';
@@ -87,6 +89,40 @@ function build400Error(message) {
   error.status = 400;
   return error;
 }
+
+const onboardingInviteSchema = Joi.object({
+  code: Joi.string().trim().max(80).required(),
+  communitySlug: Joi.string().trim().max(160).allow('', null).default(null)
+});
+
+const onboardingPreferencesSchema = Joi.object({
+  marketingOptIn: Joi.boolean().optional(),
+  timeCommitment: Joi.string().trim().max(60).allow('', null).default(null),
+  onboardingPath: Joi.string().trim().max(120).allow('', null).default(null),
+  interests: Joi.array().items(Joi.string().trim().max(120)).max(12).optional()
+}).default({});
+
+const onboardingMetadataSchema = Joi.object({
+  source: Joi.string().trim().max(120).allow('', null).default(null),
+  campaign: Joi.string().trim().max(120).allow('', null).default(null),
+  utm: Joi.object()
+    .pattern(/^[a-z0-9_.-]{1,32}$/i, Joi.string().trim().max(120).allow('', null))
+    .optional()
+}).default({});
+
+const onboardingSchema = Joi.object({
+  email: Joi.string().trim().email().required(),
+  role: Joi.string().valid('user', 'instructor').default('user'),
+  firstName: Joi.string().trim().min(2).max(120).required(),
+  lastName: Joi.string().trim().max(120).allow('', null).default(null),
+  persona: Joi.string().trim().max(160).allow('', null).default(null),
+  goals: Joi.array().items(Joi.string().trim().max(160)).max(10).default([]),
+  invites: Joi.array().items(onboardingInviteSchema).max(10).default([]),
+  preferences: onboardingPreferencesSchema,
+  metadata: onboardingMetadataSchema,
+  termsAccepted: Joi.boolean().valid(true).required(),
+  submittedAt: Joi.date().iso().optional()
+});
 
 function requireStringField(value, fieldLabel, maxLength = 255) {
   const trimmed = normaliseStringInput(value, maxLength);
@@ -364,6 +400,34 @@ function normaliseServiceError(error) {
 }
 
 export default class LearnerDashboardController {
+  static async bootstrapProfile(req, res, next) {
+    try {
+      const payload = await onboardingSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await LearnerDashboardService.bootstrapProfile({
+        ...payload,
+        userId: req.user?.id ?? null
+      });
+      const status = result?.created ? 201 : 200;
+      const message = result?.created
+        ? 'Onboarding profile captured'
+        : 'Onboarding profile updated';
+      return success(res, {
+        data: result,
+        message,
+        status
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(normaliseServiceError(error));
+    }
+  }
+
   static async listCourseProgress(req, res, next) {
     try {
       const progress = await LearnerProgressService.listProgressForUser(req.user?.id);
@@ -1583,6 +1647,29 @@ export default class LearnerDashboardController {
       });
     } catch (error) {
       return next(error);
+    }
+  }
+
+  static async searchSupportKnowledgeBase(req, res, next) {
+    try {
+      const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      const category =
+        typeof req.query.category === 'string' && req.query.category.trim()
+          ? req.query.category.trim()
+          : undefined;
+      const limitRaw = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+      const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(10, Math.trunc(limitRaw))) : 5;
+      const articles = await LearnerDashboardService.searchSupportKnowledgeBase(req.user.id, {
+        query,
+        category,
+        limit
+      });
+      return success(res, {
+        data: { articles },
+        message: 'Support knowledge base results loaded'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
     }
   }
 

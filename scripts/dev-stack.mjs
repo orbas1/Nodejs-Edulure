@@ -1,170 +1,109 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
 import process from 'node:process';
 
-const spawnedProcesses = [];
-let shuttingDown = false;
+import {
+  applyPresetDefaults,
+  createProcessSupervisor,
+  parsePresetArgs
+} from './lib/processSupervisor.mjs';
 
-function runCommandOnce(label, command, args, options = {}) {
-  const spawnOptions = {
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-    ...options
-  };
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, spawnOptions);
-
-    child.on('exit', (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      const reason = signal ? `${label} exited via signal ${signal}` : `${label} exited with code ${code}`;
-      reject(new Error(reason));
-    });
-
-    child.on('error', (error) => {
-      reject(error);
-    });
-  });
-}
-
-function spawnPersistent(label, command, args, options = {}) {
-  const spawnOptions = {
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-    ...options
-  };
-
-  const child = spawn(command, args, spawnOptions);
-  spawnedProcesses.push({ label, child });
-
-  child.on('exit', (code, signal) => {
-    if (shuttingDown) {
-      return;
+function resolveWebPort(env) {
+  const candidates = [env.WEB_PORT, env.APP_PORT, env.PORT, env.SERVICE_WEB_PORT, env.VITE_BACKEND_PORT];
+  for (const value of candidates) {
+    if (!value) {
+      continue;
     }
-
-    shuttingDown = true;
-    const reason = signal ? `${label} stopped via signal ${signal}` : `${label} exited with code ${code}`;
-    console.error(`[dev-stack] ${reason}`);
-    stopAll({ except: child }).finally(() => {
-      process.exit(code ?? (signal ? 0 : 1));
-    });
-  });
-
-  child.on('error', (error) => {
-    if (shuttingDown) {
-      return;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
     }
-    shuttingDown = true;
-    console.error(`[dev-stack] ${label} failed to spawn`, error);
-    stopAll({ except: child }).finally(() => {
-      process.exit(1);
-    });
-  });
-}
-
-async function stopAll({ except } = {}) {
-  const terminationPromises = spawnedProcesses.map(({ label, child }) => {
-    if (child === except) {
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      if (child.exitCode !== null || child.signalCode !== null) {
-        resolve();
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        if (child.exitCode === null && child.signalCode === null) {
-          child.kill('SIGKILL');
-        }
-      }, 5000);
-
-      child.once('exit', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-
-      child.kill('SIGINT');
-    });
-  });
-
-  await Promise.allSettled(terminationPromises);
+  }
+  return 3000;
 }
 
 async function main() {
   const args = process.argv.slice(2);
-  const skipDbInstall = args.includes('--skip-db-install');
-  const skipFrontend = args.includes('--skip-frontend');
+  const parsed = parsePresetArgs(args);
+
+  const supervisor = createProcessSupervisor({
+    scope: 'dev-stack',
+    pretty: parsed.prettyLogsExplicit ? parsed.prettyLogs : process.stdout.isTTY,
+    enableCommandInterface: true
+  });
+
+  if (parsed.unknownArguments.length) {
+    supervisor.log('warn', 'Ignoring unknown arguments', {
+      arguments: parsed.unknownArguments
+    });
+  }
 
   const backendEnv = { ...process.env };
-
-  const presetArg = args.find((arg) => arg.startsWith('--preset='));
-  const preset = presetArg ? presetArg.split('=')[1] ?? 'lite' : 'lite';
-  backendEnv.SERVICE_PRESET = preset;
-
-  const serviceTargetArg = args.find((arg) => arg.startsWith('--service-target='));
-  if (serviceTargetArg) {
-    const [, value] = serviceTargetArg.split('=', 2);
-    if (value) {
-      backendEnv.SERVICE_TARGET = value;
-    }
-  }
-
-  if (!backendEnv.SERVICE_TARGET) {
-    if (preset === 'full') {
-      backendEnv.SERVICE_TARGET = 'web,worker,realtime';
-    } else if (preset === 'analytics') {
-      backendEnv.SERVICE_TARGET = 'web,worker,realtime';
-      backendEnv.SERVICE_JOB_GROUPS = backendEnv.SERVICE_JOB_GROUPS ?? 'core,analytics';
-    } else {
-      backendEnv.SERVICE_TARGET = 'web';
-      backendEnv.SERVICE_JOB_GROUPS = backendEnv.SERVICE_JOB_GROUPS ?? 'core';
-    }
-  }
-
-  try {
-    if (!skipDbInstall) {
-      console.log('[dev-stack] Installing and migrating database (backend-nodejs db:install)');
-      await runCommandOnce(
-        'database install',
-        'npm',
-        ['--workspace', 'backend-nodejs', 'run', 'db:install'],
-        { env: process.env }
-      );
-    }
-  } catch (error) {
-    console.error('[dev-stack] Database preparation failed:', error.message ?? error);
-    process.exit(1);
-  }
-
-  console.log(`[dev-stack] Launching backend preset "${preset}" with SERVICE_TARGET=${backendEnv.SERVICE_TARGET}`);
-
-  spawnPersistent('backend stack', 'npm', ['--workspace', 'backend-nodejs', 'run', 'dev:stack'], { env: backendEnv });
-
-  if (!skipFrontend) {
-    spawnPersistent('frontend dev server', 'npm', ['--workspace', 'frontend-reactjs', 'run', 'dev']);
-  }
-
-  const handleSignal = (signal) => {
-    if (shuttingDown) {
-      return;
-    }
-    shuttingDown = true;
-    console.log(`[dev-stack] Received ${signal}, shutting down child processes...`);
-    stopAll().finally(() => {
-      process.exit(0);
-    });
-  };
-
-  ['SIGINT', 'SIGTERM'].forEach((signal) => {
-    process.on(signal, () => handleSignal(signal));
+  const { preset } = applyPresetDefaults({
+    preset: parsed.preset,
+    env: backendEnv,
+    mutate: true,
+    overrides: parsed.overrides
   });
+
+  supervisor.log('info', 'Resolved backend preset', {
+    preset,
+    serviceTarget: backendEnv.SERVICE_TARGET,
+    jobGroups: backendEnv.SERVICE_JOB_GROUPS,
+    enableJobs: backendEnv.SERVICE_ENABLE_JOBS,
+    enableRealtime: backendEnv.SERVICE_ENABLE_REALTIME,
+    enableSearchRefresh: backendEnv.SERVICE_ENABLE_SEARCH_REFRESH
+  });
+
+  if (!parsed.skipDbInstall) {
+    supervisor.log('info', 'Installing and migrating database');
+    try {
+      await supervisor.runOnce({
+        label: 'database-install',
+        command: 'npm',
+        args: ['--workspace', 'backend-nodejs', 'run', 'db:install'],
+        options: { env: backendEnv }
+      });
+    } catch (error) {
+      supervisor.log('error', 'Database preparation failed', { error: error.message });
+      await supervisor.stopAll({ reason: 'db-install-failure' });
+      process.exit(1);
+    }
+  } else {
+    supervisor.log('info', 'Skipping database install as requested');
+  }
+
+  const backendReadinessUrl = `http://localhost:${resolveWebPort(backendEnv)}/ready`;
+
+  supervisor.startProcess({
+    label: 'backend',
+    command: 'npm',
+    args: ['--workspace', 'backend-nodejs', 'run', 'dev:stack'],
+    options: { env: backendEnv },
+    exitOnFailure: true,
+    readinessProbe: {
+      type: 'http',
+      url: backendReadinessUrl,
+      timeoutMs: 30000,
+      intervalMs: 1500
+    }
+  });
+
+  if (!parsed.skipFrontend) {
+    supervisor.startProcess({
+      label: 'frontend',
+      command: 'npm',
+      args: ['--workspace', 'frontend-reactjs', 'run', 'dev'],
+      options: { env: process.env }
+    });
+  } else {
+    supervisor.log('info', 'Frontend dev server startup skipped');
+  }
+
+  supervisor.registerSignalHandlers();
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

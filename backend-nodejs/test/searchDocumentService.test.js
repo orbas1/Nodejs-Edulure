@@ -86,7 +86,13 @@ describe('SearchDocumentService', () => {
       isActive: true,
       publishedAt: new Date('2024-03-01T00:00:00Z'),
       indexedAt: new Date('2024-03-02T00:00:00Z'),
-      refreshedAt: new Date('2024-03-02T00:00:00Z')
+      refreshedAt: new Date('2024-03-02T00:00:00Z'),
+      previewSummary: 'Learn to scale operations',
+      previewImageUrl: 'https://example.com/preview.png',
+      previewHighlights: ['Level: Advanced', '1200 learners'],
+      ctaLinks: [{ label: 'View course', href: '/courses/operations-mastery', type: 'primary' }],
+      badges: [{ type: 'level', label: 'Advanced' }],
+      monetisationTag: 'Premium course'
     };
 
     const service = new SearchDocumentService({
@@ -119,6 +125,14 @@ describe('SearchDocumentService', () => {
     expect(insertedDoc.rating_count).toBe(128);
     expect(insertedDoc.published_at).toEqual(new Date('2024-03-01T00:00:00Z'));
     expect(insertedDoc.updated_at).toBeInstanceOf(Date);
+    expect(insertedDoc.preview_summary).toBe('Learn to scale operations');
+    expect(insertedDoc.preview_image_url).toBe('https://example.com/preview.png');
+    expect(JSON.parse(insertedDoc.preview_highlights)).toEqual(['Level: Advanced', '1200 learners']);
+    expect(JSON.parse(insertedDoc.cta_links)).toEqual([
+      { label: 'View course', href: '/courses/operations-mastery', type: 'primary' }
+    ]);
+    expect(JSON.parse(insertedDoc.badges)).toEqual([{ type: 'level', label: 'Advanced' }]);
+    expect(insertedDoc.monetisation_tag).toBe('Premium course');
 
     expect(queueEntries).toHaveLength(1);
     expect(queueOnConflictMock).toHaveBeenCalledWith(['entity_type', 'entity_id']);

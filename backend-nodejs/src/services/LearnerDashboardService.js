@@ -21,11 +21,14 @@ import LearnerCourseGoalModel from '../models/LearnerCourseGoalModel.js';
 import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
 import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
+import LearnerOnboardingInviteModel from '../models/LearnerOnboardingInviteModel.js';
+import LearnerOnboardingResponseModel from '../models/LearnerOnboardingResponseModel.js';
 import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
 import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
 import CommunityModel from '../models/CommunityModel.js';
 import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import LiveClassroomModel from '../models/LiveClassroomModel.js';
+import SupportKnowledgeBaseService from './SupportKnowledgeBaseService.js';
 
 const log = logger.child({ service: 'LearnerDashboardService' });
 
@@ -79,6 +82,110 @@ function formatCurrencyValue(amountCents, currency = 'USD') {
   }
 }
 
+function normaliseOptionalString(value, maxLength = 160) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
+}
+
+function normaliseGoalList(goals) {
+  if (!Array.isArray(goals)) {
+    return [];
+  }
+  const unique = new Set();
+  const result = [];
+  for (const entry of goals) {
+    const trimmed = normaliseOptionalString(entry, 160);
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (unique.has(key)) {
+      continue;
+    }
+    unique.add(key);
+    result.push(trimmed);
+    if (result.length >= 10) {
+      break;
+    }
+  }
+  return result;
+}
+
+function mergeOnboardingMetadata(existing, incoming) {
+  const base = existing && typeof existing === 'object' ? { ...existing } : {};
+  if (!incoming || typeof incoming !== 'object') {
+    return base;
+  }
+  const result = { ...base };
+  if (incoming.source !== undefined) {
+    result.source = normaliseOptionalString(incoming.source, 120);
+  }
+  if (incoming.campaign !== undefined) {
+    result.campaign = normaliseOptionalString(incoming.campaign, 120);
+  }
+  if (incoming.utm && typeof incoming.utm === 'object') {
+    const utm = {};
+    Object.entries(incoming.utm).forEach(([key, value]) => {
+      const trimmedKey = String(key ?? '').trim();
+      if (!trimmedKey) {
+        return;
+      }
+      const cleanedValue = normaliseOptionalString(value, 120);
+      if (cleanedValue) {
+        utm[trimmedKey] = cleanedValue;
+      }
+    });
+    if (Object.keys(utm).length > 0) {
+      result.utm = utm;
+    }
+  }
+  return result;
+}
+
+function mergeOnboardingPreferences(existing, incoming) {
+  const base = existing && typeof existing === 'object' ? { ...existing } : {};
+  if (!incoming || typeof incoming !== 'object') {
+    return base;
+  }
+  const result = { ...base };
+  if (incoming.marketingOptIn !== undefined) {
+    result.marketingOptIn = Boolean(incoming.marketingOptIn);
+  }
+  if (incoming.timeCommitment !== undefined) {
+    result.timeCommitment = normaliseOptionalString(incoming.timeCommitment, 60);
+  }
+  if (incoming.onboardingPath !== undefined) {
+    result.onboardingPath = normaliseOptionalString(incoming.onboardingPath, 120);
+  }
+  if (Array.isArray(incoming.interests)) {
+    const deduped = [];
+    const seen = new Set();
+    for (const interest of incoming.interests) {
+      const trimmed = normaliseOptionalString(interest, 120);
+      if (!trimmed) {
+        continue;
+      }
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      deduped.push(trimmed);
+      if (deduped.length >= 12) {
+        break;
+      }
+    }
+    result.interests = deduped;
+  }
+  return result;
+}
+
 function formatDateLabel(value, fallback = 'Not recorded') {
   if (!value) return fallback;
   try {
@@ -90,6 +197,28 @@ function formatDateLabel(value, fallback = 'Not recorded') {
   } catch (_error) {
     return fallback;
   }
+}
+
+function buildTicketAiSummary({ subject, description, priority, category }) {
+  const parts = [];
+  if (subject) {
+    parts.push(`Learner reported “${subject}”.`);
+  }
+  if (category) {
+    parts.push(`Category: ${category}.`);
+  }
+  if (priority) {
+    const capitalised = priority.charAt(0).toUpperCase() + priority.slice(1);
+    parts.push(`Priority: ${capitalised}.`);
+  }
+  if (description) {
+    const condensed = description.replace(/\s+/g, ' ').trim();
+    if (condensed) {
+      const snippet = condensed.length > 180 ? `${condensed.slice(0, 177)}…` : condensed;
+      parts.push(`Key details: ${snippet}`);
+    }
+  }
+  return parts.join(' ');
 }
 
 function formatPurchase(purchase) {
@@ -432,6 +561,120 @@ async function buildFieldServiceAssignment({ userId, order, connection = db }) {
 }
 
 export default class LearnerDashboardService {
+  static async bootstrapProfile(payload = {}) {
+    const email = normaliseOptionalString(payload.email, 180)?.toLowerCase();
+    if (!email) {
+      throw new Error('Email is required to capture onboarding preferences');
+    }
+    const role = normaliseOptionalString(payload.role, 40)?.toLowerCase() ?? 'user';
+    const firstName = normaliseOptionalString(payload.firstName, 120);
+    if (!firstName) {
+      throw new Error('First name is required to capture onboarding preferences');
+    }
+    const lastName = normaliseOptionalString(payload.lastName, 120);
+    const persona = normaliseOptionalString(payload.persona, 160);
+    const goals = normaliseGoalList(payload.goals);
+    const preferences = mergeOnboardingPreferences({}, payload.preferences);
+    const metadata = mergeOnboardingMetadata({}, payload.metadata);
+    const termsAccepted = Boolean(payload.termsAccepted);
+
+    const requestedInvites = Array.isArray(payload.invites) ? payload.invites : [];
+    const submittedAt = payload.submittedAt ?? new Date().toISOString();
+
+    return db.transaction(async (trx) => {
+      const existing = await LearnerOnboardingResponseModel.findByEmailAndRole(email, role, trx);
+      const inviteLedger = Array.isArray(existing?.invites) ? [...existing.invites] : [];
+      const acceptedSummaries = [];
+
+      for (const invite of requestedInvites) {
+        const code = normaliseOptionalString(invite?.code, 80);
+        if (!code) {
+          continue;
+        }
+        const pending = await LearnerOnboardingInviteModel.findPendingByCode(code, trx);
+        if (!pending) {
+          continue;
+        }
+        if (pending.email && pending.email.toLowerCase() !== email) {
+          continue;
+        }
+        const claimed = await LearnerOnboardingInviteModel.markAccepted(
+          pending.id,
+          { userId: payload.userId ?? existing?.userId ?? null },
+          trx
+        );
+        let communitySlug = normaliseOptionalString(invite?.communitySlug, 160);
+        let communityName = null;
+        if (claimed.communityId) {
+          const community = await CommunityModel.findById(claimed.communityId, trx);
+          if (community) {
+            communitySlug = community.slug ?? communitySlug ?? null;
+            communityName = community.name ?? null;
+          }
+        }
+        const summary = {
+          code: claimed.inviteCode,
+          status: 'accepted',
+          communityId: claimed.communityId,
+          communitySlug: communitySlug ?? null,
+          communityName,
+          acceptedAt: claimed.claimedAt ?? new Date().toISOString()
+        };
+        acceptedSummaries.push(summary);
+        const existingIndex = inviteLedger.findIndex((item) => item?.code === summary.code);
+        if (existingIndex >= 0) {
+          inviteLedger.splice(existingIndex, 1);
+        }
+        inviteLedger.push(summary);
+      }
+
+      const mergedPreferences = mergeOnboardingPreferences(existing?.preferences, preferences);
+      const mergedMetadata = mergeOnboardingMetadata(existing?.metadata, metadata);
+
+      let record = await LearnerOnboardingResponseModel.upsert(
+        {
+          email,
+          role,
+          userId: payload.userId ?? existing?.userId ?? null,
+          firstName,
+          lastName,
+          persona,
+          goals,
+          invites: inviteLedger,
+          preferences: mergedPreferences,
+          metadata: mergedMetadata,
+          termsAccepted,
+          submittedAt
+        },
+        trx
+      );
+
+      if (payload.userId && record?.userId !== payload.userId) {
+        record = await LearnerOnboardingResponseModel.linkUser(email, role, payload.userId, trx);
+      }
+
+      const onboarding = {
+        email: record.email,
+        role: record.role,
+        firstName: record.firstName,
+        lastName: record.lastName,
+        persona: record.persona,
+        goals: record.goals,
+        invites: record.invites,
+        preferences: record.preferences,
+        metadata: record.metadata,
+        termsAccepted: record.termsAccepted,
+        submittedAt: record.submittedAt
+      };
+
+      return {
+        created: !existing,
+        onboarding,
+        acceptedInvites: acceptedSummaries
+      };
+    });
+  }
+
   static async listPaymentMethods(userId) {
     return LearnerPaymentMethodModel.listByUserId(userId);
   }
@@ -2252,30 +2495,78 @@ export default class LearnerDashboardService {
 
   static async listSupportTickets(userId) {
     const cases = await LearnerSupportRepository.listCases(userId);
-    return cases;
+    if (!cases.length) {
+      return cases;
+    }
+
+    const enriched = await Promise.all(
+      cases.map(async (ticket) => {
+        if (ticket.knowledgeSuggestions?.length) {
+          return ticket;
+        }
+        const learnerNotes = ticket.messages
+          ?.filter((message) => message.author === 'learner')
+          .map((message) => message.body)
+          .join(' ');
+        const suggestions = await SupportKnowledgeBaseService.buildSuggestionsForTicket({
+          subject: ticket.subject,
+          description: learnerNotes,
+          category: ticket.category
+        });
+        if (!suggestions.length) {
+          return ticket;
+        }
+        await LearnerSupportRepository.updateCase(userId, ticket.id, { knowledgeSuggestions: suggestions });
+        return { ...ticket, knowledgeSuggestions: suggestions };
+      })
+    );
+
+    return enriched;
   }
 
   static async createSupportTicket(userId, payload = {}) {
     if (!payload.subject) {
       throw new Error('Subject is required to create a support ticket');
     }
-    const initialMessages = [];
-    if (payload.description) {
-      initialMessages.push({
-        author: 'learner',
-        body: payload.description,
-        attachments: payload.attachments ?? [],
-        createdAt: new Date().toISOString()
-      });
-    }
+    const description = payload.description ?? '';
+    const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+    const knowledgeSuggestions = await SupportKnowledgeBaseService.buildSuggestionsForTicket({
+      subject: payload.subject,
+      description,
+      category: payload.category
+    });
+    const aiSummary = buildTicketAiSummary({
+      subject: payload.subject,
+      description,
+      priority: payload.priority ?? 'normal',
+      category: payload.category ?? 'General'
+    });
+
     const ticket = await LearnerSupportRepository.createCase(userId, {
       subject: payload.subject,
       category: payload.category ?? 'General',
       priority: payload.priority ?? 'normal',
       status: 'open',
       channel: 'Portal',
-      initialMessages,
-      metadata: payload.metadata ?? {}
+      knowledgeSuggestions,
+      aiSummary,
+      messages: description
+        ? [
+            {
+              author: 'learner',
+              body: description,
+              attachments,
+              createdAt: new Date().toISOString()
+            }
+          ]
+        : [],
+      metadata: {
+        ...(payload.metadata ?? {}),
+        intake: {
+          channel: 'portal',
+          attachments: attachments.length
+        }
+      }
     });
     log.info({ userId, ticketId: ticket?.id }, 'Learner created support ticket');
     return ticket;
@@ -2303,6 +2594,23 @@ export default class LearnerDashboardService {
     if (!message) {
       throw new Error('Support ticket not found');
     }
+    if ((payload.author ?? 'learner') === 'learner') {
+      const ticket = await LearnerSupportRepository.findCase(userId, ticketId);
+      if (ticket) {
+        const learnerNotes = ticket.messages
+          .filter((entry) => entry.author === 'learner')
+          .map((entry) => entry.body)
+          .join(' ');
+        const suggestions = await SupportKnowledgeBaseService.buildSuggestionsForTicket({
+          subject: ticket.subject,
+          description: learnerNotes,
+          category: ticket.category
+        });
+        if (suggestions.length) {
+          await LearnerSupportRepository.updateCase(userId, ticketId, { knowledgeSuggestions: suggestions });
+        }
+      }
+    }
     log.info({ userId, ticketId }, 'Learner added support ticket message');
     return message;
   }
@@ -2317,6 +2625,10 @@ export default class LearnerDashboardService {
     }
     log.info({ userId, ticketId }, 'Learner closed support ticket');
     return ticket;
+  }
+
+  static async searchSupportKnowledgeBase(_userId, options = {}) {
+    return SupportKnowledgeBaseService.searchArticles(options);
   }
 
   static async getEngagementOverview(userId) {

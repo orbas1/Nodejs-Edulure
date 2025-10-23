@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
 import AssetService from '../services/AssetService.js';
+import MarketingContentService from '../services/MarketingContentService.js';
 import { success } from '../utils/httpResponse.js';
 
 const uploadSessionSchema = Joi.object({
@@ -15,6 +16,16 @@ const uploadSessionSchema = Joi.object({
 const confirmUploadSchema = Joi.object({
   checksum: Joi.string().alphanum().length(64).optional(),
   metadata: Joi.object().default({})
+});
+
+const marketingQuerySchema = Joi.object({
+  types: Joi.alternatives()
+    .try(
+      Joi.array().items(Joi.string().trim().max(60)).max(12),
+      Joi.string().trim().max(60)
+    )
+    .optional(),
+  email: Joi.string().trim().email().optional()
 });
 
 const progressSchema = Joi.object({
@@ -210,6 +221,27 @@ export default class ContentController {
       const payload = await metadataUpdateSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
       const asset = await AssetService.updateMetadata(req.params.assetId, payload, req.user);
       return success(res, { data: asset, message: 'Material profile updated' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async listMarketingBlocks(req, res, next) {
+    try {
+      const query = await marketingQuerySchema.validateAsync(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const types = query.types === undefined ? [] : query.types;
+      const content = await MarketingContentService.getLandingContent({
+        types,
+        email: query.email ?? undefined
+      });
+      return success(res, { data: content, message: 'Marketing content fetched' });
     } catch (error) {
       if (error.isJoi) {
         error.status = 422;

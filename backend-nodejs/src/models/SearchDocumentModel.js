@@ -35,7 +35,13 @@ const BASE_COLUMNS = [
   'indexed_at as indexedAt',
   'refreshed_at as refreshedAt',
   'created_at as createdAt',
-  'updated_at as updatedAt'
+  'updated_at as updatedAt',
+  'preview_summary as previewSummary',
+  'preview_image_url as previewImageUrl',
+  'preview_highlights as previewHighlights',
+  'cta_links as ctaLinks',
+  'badges',
+  'monetisation_tag as monetisationTag'
 ];
 
 const SUPPORTED_ENTITIES = ['communities', 'courses', 'ebooks', 'tutors'];
@@ -470,7 +476,13 @@ function deserialize(row) {
     indexedAt: toDate(row.indexedAt),
     refreshedAt: toDate(row.refreshedAt),
     createdAt: toDate(row.createdAt),
-    updatedAt: toDate(row.updatedAt)
+    updatedAt: toDate(row.updatedAt),
+    previewSummary: row.previewSummary ?? null,
+    previewImageUrl: row.previewImageUrl ?? null,
+    previewHighlights: parseJsonArray(row.previewHighlights, []),
+    ctaLinks: parseJsonArray(row.ctaLinks, []),
+    badges: parseJsonArray(row.badges, []),
+    monetisationTag: row.monetisationTag ?? null
   };
 }
 

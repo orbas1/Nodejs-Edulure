@@ -48,7 +48,13 @@ describe('ExplorerSearchService', () => {
           popularityScore: 72.4,
           freshnessScore: 88.1,
           slug: 'operations-mastery',
-          publishedAt: '2024-03-01T00:00:00Z'
+          publishedAt: '2024-03-01T00:00:00Z',
+          previewSummary: 'Learn ops playbooks fast',
+          previewImageUrl: 'https://example.com/course.jpg',
+          previewHighlights: ['Level: Advanced', '1200 learners'],
+          ctaLinks: [{ label: 'View course', href: '/courses/operations-mastery', type: 'primary' }],
+          badges: [{ type: 'level', label: 'Advanced' }],
+          monetisationTag: 'Premium course'
         }
       ],
       total: 1,
@@ -73,7 +79,13 @@ describe('ExplorerSearchService', () => {
           isVerified: true,
           popularityScore: 64.5,
           freshnessScore: 70.2,
-          slug: 'ava-sinclair'
+          slug: 'ava-sinclair',
+          previewSummary: 'Ops coaching and mentorship',
+          previewImageUrl: 'https://example.com/ava.png',
+          previewHighlights: ['Verified tutor', 'Responds in 12m'],
+          ctaLinks: [{ label: 'Hire tutor', href: '/tutors/ava-sinclair', type: 'primary' }],
+          badges: [{ type: 'verified', label: 'Verified' }],
+          monetisationTag: 'Verified tutor'
         }
       ],
       total: 1,
@@ -113,12 +125,24 @@ describe('ExplorerSearchService', () => {
     expect(result.entities).toEqual(['courses', 'tutors']);
     expect(result.results.courses.hits[0]).toMatchObject({
       title: 'Operations Mastery',
-      actions: [{ href: '/courses/operations-mastery' }]
+      actions: [{ href: '/courses/operations-mastery', type: 'primary' }],
+      preview: {
+        summary: 'Learn ops playbooks fast',
+        highlights: ['Level: Advanced', '1200 learners'],
+        ctaLinks: [{ href: '/courses/operations-mastery', type: 'primary', label: 'View course' }]
+      },
+      badges: [{ type: 'level', label: 'Advanced' }],
+      monetisationTag: 'Premium course'
     });
     expect(result.results.tutors.hits[0]).toMatchObject({
       title: 'Ava Sinclair',
-      actions: [{ href: '/tutors/ava-sinclair' }],
-      metrics: { isVerified: true }
+      actions: [{ href: '/tutors/ava-sinclair', type: 'primary' }],
+      metrics: { isVerified: true },
+      preview: {
+        summary: 'Ops coaching and mentorship',
+        highlights: ['Verified tutor', 'Responds in 12m']
+      },
+      monetisationTag: 'Verified tutor'
     });
 
     expect(adsServiceMock.placementsForSearch).toHaveBeenCalledWith({
