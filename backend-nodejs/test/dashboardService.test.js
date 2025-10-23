@@ -9,7 +9,11 @@ import {
   calculateLearningStreak,
   humanizeRelativeTime
 } from '../src/services/DashboardService.js';
-import { buildComplianceRiskHeatmap, buildScamSummary, summariseIncidentQueue } from '../src/services/OperatorDashboardService.js';
+import {
+  buildComplianceRiskHeatmap,
+  buildScamSummary,
+  summariseIncidentQueue
+} from '../src/services/operatorDashboardHelpers.js';
 import { normaliseMonetization, resolveDefaultMonetization } from '../src/services/PlatformSettingsService.js';
 
 describe('DashboardService helpers', () => {
