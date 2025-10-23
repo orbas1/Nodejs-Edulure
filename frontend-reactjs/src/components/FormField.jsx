@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import PropTypes from 'prop-types';
+import clsx from 'clsx';
 
 export default function FormField({
   label,
@@ -18,13 +19,11 @@ export default function FormField({
   const helperId = helper ? `${inputId}-helper` : undefined;
   const errorId = error ? `${inputId}-error` : undefined;
   const describedBy = [helperId, errorId].filter(Boolean).join(' ') || undefined;
-  const inputClassName = `mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
-    customClassName ?? ''
-  }`.trim();
+  const inputClassName = clsx('form-field__input', customClassName);
 
   return (
-    <label className="block" htmlFor={inputId}>
-      <span className="text-sm font-semibold text-slate-600">{label}</span>
+    <label className="form-field" htmlFor={inputId}>
+      <span className="form-field__label">{label}</span>
       {children ? (
         children
       ) : (
@@ -41,12 +40,12 @@ export default function FormField({
         />
       )}
       {helper ? (
-        <p id={helperId} className="mt-2 text-xs text-slate-500">
+        <p id={helperId} className="form-field__helper">
           {helper}
         </p>
       ) : null}
       {error ? (
-        <p id={errorId} className="mt-1 text-xs font-semibold text-rose-600">
+        <p id={errorId} className="form-field__error">
           {error}
         </p>
       ) : null}

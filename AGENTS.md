@@ -34,9 +34,9 @@ Group 1 – Categories 1-4 (comprehensive change tracking)
 Group 2 – Categories 5-8 (frontend structure and code actions)
 
 5. **CSS changes**
-   A. *Token strategy* – Require shared spacing/colour tokens, responsive breakpoints, and motion preferences referenced in the UX blueprint.
-   B. *Media scaffolding* – Mandate thumbnail ratios, hover previews, and skeleton loaders for courses, communities, tutors, and search results.
-   C. *Form surfaces* – Align padding, focus outlines, and gradient usage across onboarding, checkout, and admin forms.
+   A. ✓ Flow 5 palette tokens still anchor gradients, shadows, and CTA treatments, and the refreshed `PrimaryHero`/`PlanHighlights` shells now consume those variables while wiring marketing CTAs for analytics-safe callbacks, keeping the dynamic hero and pricing stacks visually in lockstep across light, dark, and high-contrast themes.【F:frontend-reactjs/src/styles/tokens.css†L36-L118】【F:frontend-reactjs/src/components/marketing/PrimaryHero.jsx†L38-L115】【F:frontend-reactjs/src/components/marketing/PlanHighlights.jsx†L16-L83】
+   B. ✓ Home now streams Flow 5 marketing blocks, plans, and invites straight from the backend via `useMarketingContent`, mapping payloads into the shared hero, preview, and plan scaffolding while emitting CTA analytics events so marketing ops can track conversions off the unified data contract.【F:frontend-reactjs/src/pages/Home.jsx†L231-L478】【F:frontend-reactjs/src/hooks/useMarketingContent.js†L1-L48】【F:backend-nodejs/src/services/MarketingContentService.js†L18-L74】
+   C. ✓ Register and instructor onboarding flows both run through `useOnboardingForm`, call `/dashboard/learner/onboarding/bootstrap`, and hydrate marketing metadata, invite claims, and analytics-ready preferences before handing off to auth—keeping the React surfaces, service layer, and seeds aligned for Flow 5 enrolment.【F:frontend-reactjs/src/pages/Register.jsx†L46-L477】【F:frontend-reactjs/src/pages/InstructorRegister.jsx†L22-L239】【F:backend-nodejs/src/services/LearnerDashboardService.js†L561-L651】
 
 6. **Component changes**
    A. *Shared primitives* – Build unified navigation, hero, course/tutor cards, feed items, search bar, ticket forms, and analytics widgets noted in both docs.

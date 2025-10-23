@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import clsx from 'clsx';
 
 const DEFAULT_HIGHLIGHTS = [
   'Enterprise-grade security with SSO and audit trails',
@@ -24,7 +25,7 @@ export default function AuthCard({
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-180px)] max-w-6xl items-center justify-center px-6 py-16">
-      <div className="grid w-full gap-12 rounded-4xl border border-slate-200 bg-white/85 p-10 shadow-2xl backdrop-blur md:grid-cols-2 md:p-12">
+      <div className={clsx('grid w-full gap-12 rounded-4xl p-10 md:grid-cols-2 md:p-12', 'form-shell')}>
         <div className="space-y-6">
           <div>
             {badge && (

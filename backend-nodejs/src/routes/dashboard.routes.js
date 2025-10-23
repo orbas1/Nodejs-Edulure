@@ -7,6 +7,7 @@ import { createApiRouter } from './routerFactory.js';
 const router = createApiRouter();
 
 router.get('/me', auth(), DashboardController.current);
+router.post('/learner/onboarding/bootstrap', LearnerDashboardController.bootstrapProfile);
 router.get('/learner/tutor-bookings', auth(), LearnerDashboardController.listTutorBookings);
 router.post('/learner/tutor-bookings', auth(), LearnerDashboardController.createTutorBooking);
 router.post('/learner/tutor-bookings/export', auth(), LearnerDashboardController.exportTutorSchedule);
