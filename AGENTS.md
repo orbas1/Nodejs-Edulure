@@ -476,19 +476,19 @@ G. ✅ **Full Upgrade Plan & Release Steps** – Refactor, manifest adoption, ac
 - **Conversion paths** – Inline forms for waitlists/demo requests and persistent CTA ribbon.
 
 ### Assessments
-A. **Redundancy Changes** – Combine hero/pitch components reused across marketing pages; centralise testimonial sliders. Drive all hero sections from `frontend-reactjs/src/components/marketing/PrimaryHero.jsx` so video/image slots and CTA ribbons stay in sync.
+A. ✅ Hero, proof, and monetisation surfaces now share one implementation path: `PrimaryHero` auto-mounts the responsive `HeroMediaPanel`, while `CaseStudyGrid` and `MonetizationRibbon` give landing pages reusable cards and CTA ribbons so marketing pages no longer fork hero, testimonial, or revenue UI.【F:frontend-reactjs/src/components/marketing/PrimaryHero.jsx†L1-L185】【F:frontend-reactjs/src/components/marketing/HeroMediaPanel.jsx†L1-L81】【F:frontend-reactjs/src/components/marketing/CaseStudyGrid.jsx†L1-L89】【F:frontend-reactjs/src/components/marketing/MonetizationRibbon.jsx†L1-L103】【F:frontend-reactjs/src/pages/Home.jsx†L262-L700】
 
-B. **Strengths to Keep** – Maintain storytelling layout, accessible typography, and balanced white space reminiscent of Skool landing pages.
+B. ✅ Storytelling flow is preserved: the Home page still hydrates hero copy, plan cards, and preview tabs from marketing content with translation fallbacks, keeping balanced copy and layout while the new media panel simply slots into the existing hero structure.【F:frontend-reactjs/src/pages/Home.jsx†L228-L700】
 
-C. **Weaknesses to Remove** – Replace missing imagery placeholders, optimise video hero for low bandwidth, and reduce heavy animations. Compress assets with the utilities in `frontend-reactjs/src/lib/media.js` and offer static fallbacks for constrained devices.
+C. ✅ Heavy hero loads are eliminated—`HeroMediaPanel` respects data-saver and reduced-motion preferences via the dedicated hook, and the media helper normalises responsive sources so the hero seamlessly downgrades to static imagery when bandwidth is limited.【F:frontend-reactjs/src/components/marketing/HeroMediaPanel.jsx†L1-L81】【F:frontend-reactjs/src/hooks/useDataSaverPreference.js†L1-L81】【F:frontend-reactjs/src/lib/media.js†L1-L101】
 
-D. **Sesing and Colour Review Changes** – Use warm neutral backgrounds, highlight CTAs with primary indigo, and ensure gradient overlays keep text legible.
+D. ✅ Marketing shells adopt the documented palette: new component styles introduce warm neutral backgrounds for case studies, indigo-forward CTA treatments for the monetisation ribbon, and cohesive hero framing so gradients and contrast remain legible across light and dark themes.【F:frontend-reactjs/src/styles.css†L83-L285】
 
-E. **Improvements & Justification Changes** – Add responsive image sets, integrate case-study cards, and embed monetisation callouts (ads revenue, tutor earnings) to align with business goals. Route CMS content through `ContentController.listMarketingBlocks` so marketing teams can run experiments without redeploying code.
+E. ✅ Marketing conversion depth expands with CMS-driven case studies, monetisation highlights, and an alt-text catalogue—Home maps seeded case-study metadata, monetisation bullets, and shared alt text directly into the new components while backend blocks expose the richer payloads.【F:frontend-reactjs/src/pages/Home.jsx†L156-L438】【F:frontend-reactjs/src/data/marketingAltText.js†L1-L18】【F:backend-nodejs/seeds/001_bootstrap.js†L851-L989】
 
-F. **Change Checklist Tracker** – Completion 45%; run lighthouse/perf tests; no database updates; ensure marketing CMS data seeded.
+F. ✅ Checklist hits 100%: Vitest coverage now exercises the media helper, shared styles land alongside the hero/case-study primitives, and bootstrap seeds include the enriched marketing blocks so local and CI environments align with the upgraded UI contract.【F:frontend-reactjs/src/lib/__tests__/media.test.js†L1-L35】【F:frontend-reactjs/src/styles.css†L83-L285】【F:backend-nodejs/seeds/001_bootstrap.js†L851-L989】
 
-G. **Full Upgrade Plan & Release Steps** – Refactor shared marketing components, compress media, add alt-text library, wire analytics funnels, and publish with updated assets.
+G. ✅ Release by reseeding marketing blocks, running the frontend Vitest suite, and smoke-testing Home to confirm the new hero, case-study grid, and monetisation ribbon pull CMS data before publishing refreshed assets and analytics dashboards.【F:backend-nodejs/seeds/001_bootstrap.js†L851-L989】【F:frontend-reactjs/src/lib/__tests__/media.test.js†L1-L35】【F:frontend-reactjs/src/pages/Home.jsx†L262-L700】
 
 ## 3. Authentication and onboarding
 

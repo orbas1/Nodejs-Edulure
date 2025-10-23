@@ -858,7 +858,21 @@ export async function seed(knex) {
           'Design acquisition experiments, surface personal invites, and hand learners into live cohorts without handing off between tools.',
         status_label: 'Flow 5 beta open',
         chips: JSON.stringify(['Acquisition experiments', 'Community invites', 'Live cohorts']),
-        media: JSON.stringify({ theme: 'flow-five', palette: ['#6366f1', '#22d3ee'], badge: 'Flow 5' }),
+        media: JSON.stringify({
+          type: 'video',
+          poster: 'https://images.edulure.test/flow5/hero-poster-960.webp',
+          videoSources: [
+            { src: 'https://media.edulure.test/flow5/hero-loop.webm', type: 'video/webm', resolution: 1080 },
+            { src: 'https://media.edulure.test/flow5/hero-loop.mp4', type: 'video/mp4', resolution: 1080 }
+          ],
+          imageSources: [
+            { src: 'https://images.edulure.test/flow5/hero-poster-960.webp', width: 960 },
+            { src: 'https://images.edulure.test/flow5/hero-poster-720.webp', width: 720 },
+            { src: 'https://images.edulure.test/flow5/hero-poster-480.webp', width: 480 }
+          ],
+          caption: 'Flow 5 orchestrates marketing, onboarding, and payouts in one workspace.',
+          alt: 'Operators reviewing Flow 5 dashboards during a live session.'
+        }),
         primary_cta: JSON.stringify({ label: 'Start free trial', to: '/register' }),
         secondary_cta: JSON.stringify({ label: 'View pricing', to: '/pricing' }),
         tertiary_cta: JSON.stringify({ label: 'See how Flow 5 works', href: 'https://marketing.edulure.test/flow-5-demo' }),
@@ -885,6 +899,93 @@ export async function seed(knex) {
         secondary_cta: JSON.stringify({ label: 'Download checklist', href: 'https://docs.edulure.test/flow5/checklist.pdf' }),
         tertiary_cta: JSON.stringify({}),
         metadata: JSON.stringify({ analyticsKey: 'flow5-proof', theme: 'slate' })
+      },
+      {
+        slug: 'flow-five-case-studies',
+        block_type: 'case-study',
+        eyebrow: 'Operator proof',
+        title: 'Operators scaling revenue with Flow 5',
+        subtitle: 'Revenue, community, and tutor teams growing through shared Edulure workflows.',
+        status_label: null,
+        chips: JSON.stringify(['Acquisition lift', 'Time to launch', 'Sponsor-ready pods']),
+        media: JSON.stringify({}),
+        primary_cta: JSON.stringify({}),
+        secondary_cta: JSON.stringify({}),
+        tertiary_cta: JSON.stringify({}),
+        metadata: JSON.stringify({
+          analyticsKey: 'flow5-case-studies',
+          caseStudies: [
+            {
+              slug: 'ops-guild',
+              title: 'Ops Guild lifted enrolment 28%',
+              summary: 'Kai unified marketing experiments, onboarding checklists, and sponsor offers to lift enrolment across the Flow 5 pipeline.',
+              persona: 'Kai • Revenue Ops',
+              metric: '+28% enrolment',
+              cta: { href: 'https://stories.edulure.test/flow5-ops-guild', label: 'Read Ops Guild story' },
+              media: {
+                imageSources: [
+                  { src: 'https://images.edulure.test/case-studies/ops-guild-960.webp', width: 960 },
+                  { src: 'https://images.edulure.test/case-studies/ops-guild-720.webp', width: 720 },
+                  { src: 'https://images.edulure.test/case-studies/ops-guild-480.webp', width: 480 }
+                ],
+                alt: 'Ops Guild reviewing Flow 5 enrolment metrics.'
+              }
+            },
+            {
+              slug: 'cohort-studio',
+              title: 'Cohort Studio halved production time',
+              summary: 'Amina replaced siloed spreadsheets with Flow 5 lesson kits and automated sponsor unlocks for each cohort launch.',
+              persona: 'Amina • Learning Designer',
+              metric: '-50% build time',
+              cta: { href: 'https://stories.edulure.test/cohort-studio', label: 'Explore Cohort Studio playbook' },
+              media: {
+                imageSources: [
+                  { src: 'https://images.edulure.test/case-studies/cohort-studio-960.webp', width: 960 },
+                  { src: 'https://images.edulure.test/case-studies/cohort-studio-720.webp', width: 720 },
+                  { src: 'https://images.edulure.test/case-studies/cohort-studio-480.webp', width: 480 }
+                ],
+                alt: 'Cohort Studio team planning curriculum in Flow 5.'
+              }
+            },
+            {
+              slug: 'tutor-league',
+              title: 'Tutor League unlocked sponsor-ready pods',
+              summary: 'Noah brought tutor pods, live donations, and affiliate payouts under one dashboard to grow recurring revenue.',
+              persona: 'Noah • Tutor Collective Lead',
+              metric: '+42% sponsor revenue',
+              cta: { href: 'https://stories.edulure.test/tutor-league', label: 'See Tutor League results' },
+              media: {
+                imageSources: [
+                  { src: 'https://images.edulure.test/case-studies/tutor-league-960.webp', width: 960 },
+                  { src: 'https://images.edulure.test/case-studies/tutor-league-720.webp', width: 720 },
+                  { src: 'https://images.edulure.test/case-studies/tutor-league-480.webp', width: 480 }
+                ],
+                alt: 'Tutor League celebrating sponsor wins in Flow 5.'
+              }
+            }
+          ]
+        })
+      },
+      {
+        slug: 'flow-five-monetisation-ribbon',
+        block_type: 'monetization-ribbon',
+        eyebrow: null,
+        title: 'Monetise every surface with Flow 5',
+        subtitle: 'Blend sponsorships, tutor pods, and affiliate revenue without leaving the dashboard.',
+        status_label: null,
+        chips: JSON.stringify(['Ads', 'Tutor pods', 'Affiliates']),
+        media: JSON.stringify({}),
+        primary_cta: JSON.stringify({ label: 'Activate monetisation', to: '/register' }),
+        secondary_cta: JSON.stringify({ label: 'Review pricing', to: '/pricing' }),
+        tertiary_cta: JSON.stringify({}),
+        metadata: JSON.stringify({
+          analyticsKey: 'flow5-monetisation-ribbon',
+          highlights: [
+            'Ad pods with pacing and sponsor controls',
+            'Tutor pods synced with payouts and attendance',
+            'Affiliate revenue reconciled nightly'
+          ]
+        })
       }
     ]);
 

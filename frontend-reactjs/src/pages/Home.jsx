@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from 'react';
-import clsx from 'clsx';
 
 import { useLanguage } from '../context/LanguageContext.jsx';
 import LanguageSelector from '../components/navigation/LanguageSelector.jsx';
 import MarketingHero from '../components/marketing/MarketingHero.jsx';
 import ProductPreviewTabs from '../components/marketing/ProductPreviewTabs.jsx';
 import PlanHighlights from '../components/marketing/PlanHighlights.jsx';
+import CaseStudyGrid from '../components/marketing/CaseStudyGrid.jsx';
+import MonetizationRibbon from '../components/marketing/MonetizationRibbon.jsx';
 import CommunitySpotlight from '../components/home/CommunitySpotlight.jsx';
 import PerksGrid from '../components/home/PerksGrid.jsx';
 import HomeFaq from '../components/home/HomeFaq.jsx';
@@ -19,8 +20,9 @@ import communitiesPreview from '../assets/home/preview/communities.svg';
 import coursesPreview from '../assets/home/preview/courses.svg';
 import liveEventsPreview from '../assets/home/preview/live-events.svg';
 import libraryPreview from '../assets/home/preview/library.svg';
-import { usePrefersReducedMotion } from '../utils/a11y.js';
+import heroIllustration from '../assets/home/hero/flow-five-hero.svg';
 import { trackEvent } from '../lib/analytics.js';
+import { getMarketingAltText } from '../data/marketingAltText.js';
 
 function formatPlanPrice(priceCents, currency = 'USD', billingInterval = 'monthly') {
   const amount = Number.isFinite(priceCents) ? priceCents : 0;
@@ -133,86 +135,95 @@ const PLAN_CONFIG = [
 
 const MAX_PLAN_FEATURES = 6;
 const HIGHLIGHT_KEYS = ['highlightOne', 'highlightTwo', 'highlightThree'];
+const HERO_VIDEO_SOURCES = [
+  {
+    src: 'https://media.edulure.test/flow5/hero-loop.webm',
+    type: 'video/webm',
+    resolution: 1080
+  },
+  {
+    src: 'https://media.edulure.test/flow5/hero-loop.mp4',
+    type: 'video/mp4',
+    resolution: 1080
+  }
+];
+const HERO_IMAGE_SOURCES = [
+  { src: heroIllustration, width: 960 },
+  { src: heroIllustration, width: 720 },
+  { src: heroIllustration, width: 540 }
+];
 
-function HeroPreviewPanel({ t }) {
-  const shouldReduceMotion = usePrefersReducedMotion();
-  return (
-    <div className="relative mx-auto max-w-xl">
-      <span className="sr-only">{t('home.hero.illustrationAlt', 'Collage of instructors and learners collaborating')}</span>
-      <div className="absolute -left-16 -top-20 h-36 w-36 rounded-full bg-primary/40 blur-3xl" aria-hidden="true" />
-      <div className="absolute -right-10 bottom-0 h-48 w-48 rounded-full bg-emerald-500/30 blur-[140px]" aria-hidden="true" />
-      <div className="absolute left-12 top-12 h-16 w-16 rounded-full border border-white/20" aria-hidden="true" />
-      <div
-        className={clsx(
-          'absolute right-10 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/10 text-xs font-semibold uppercase tracking-[0.3em] text-white/60 shadow-lg backdrop-blur-md',
-          { 'animate-pulse': !shouldReduceMotion }
-        )}
-        aria-hidden="true"
-      >
-        Flow
-      </div>
-      <div className="relative grid gap-6 rounded-[3rem] border border-white/10 bg-white/5 p-6 shadow-[0_40px_80px_-32px_rgba(15,23,42,0.7)] backdrop-blur-xl sm:p-8">
-        <div className="absolute inset-0 rounded-[3rem] bg-gradient-to-br from-white/10 via-transparent to-white/5" aria-hidden="true" />
-        <div className="relative grid gap-5">
-          <div className="relative flex flex-col gap-4 rounded-3xl border border-white/20 bg-slate-950/60 p-5 shadow-[0_24px_48px_-32px_rgba(56,189,248,0.5)] sm:flex-row sm:items-center">
-            <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-indigo-400 text-lg font-semibold text-white">
-              <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-400" aria-hidden="true" />
-              ✨
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">{t('home.hero.cards.liveSession.title', 'Live cohort jam')}</p>
-              <p className="text-xs text-white/70">{t('home.hero.cards.liveSession.meta', 'Starts in 12 hours')}</p>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-emerald-300 sm:ml-auto">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              {t('home.hero.cards.liveSession.cta', 'Set reminder')}
-            </div>
-          </div>
-          <div className="relative grid gap-4 rounded-[2.5rem] border border-white/15 bg-gradient-to-br from-indigo-500/30 via-slate-900/70 to-transparent p-6 shadow-[0_20px_60px_-28px_rgba(129,140,248,0.7)]">
-            <div className="flex items-center justify-between text-xs uppercase tracking-[0.35em] text-white/60">
-              <span>{t('home.hero.cards.community.title', 'Community pulse')}</span>
-              <span className="inline-flex items-center gap-1 text-[0.65rem] text-emerald-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                {t('home.hero.cards.community.status', 'Live now')}
-              </span>
-            </div>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="flex -space-x-3">
-                {['AK', 'JR', 'MT', 'LS'].map((initials) => (
-                  <span
-                    key={initials}
-                    className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-slate-900 bg-white/90 text-sm font-semibold text-slate-900"
-                    aria-hidden="true"
-                  >
-                    {initials}
-                  </span>
-                ))}
-              </div>
-              <div className="space-y-1 sm:space-y-2">
-                <p className="text-sm font-semibold text-white">{t('home.hero.cards.community.headline', 'Weekly build circle')}</p>
-                <p className="text-xs text-white/70">{t('home.hero.cards.community.subhead', 'Swap launches, feedback, and wins with peers')}</p>
-              </div>
-            </div>
-          </div>
-          <div className="relative flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/70 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/20 text-base text-emerald-200">
-                ☕
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-white">{t('home.hero.cards.resource.title', 'Creator tea digest')}</p>
-                <p>{t('home.hero.cards.resource.meta', 'Fresh drops every Monday')}</p>
-              </div>
-            </div>
-            <span className="inline-flex w-full justify-center rounded-full border border-white/20 px-3 py-1 text-[0.65rem] uppercase tracking-[0.25em] text-white/60 sm:w-auto">
-              {t('home.hero.cards.resource.cta', 'Read now')}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+const CASE_STUDY_FALLBACKS = [
+  {
+    id: 'opsGuild',
+    slug: 'ops-guild',
+    translationKey: 'home.caseStudies.opsGuild',
+    fallback: {
+      title: 'Ops Guild scaled Flow 5 invites',
+      summary: 'Kai unified marketing experiments, onboarding checklists, and sponsor offers to lift enrolment 28%.',
+      persona: 'Kai • Revenue Ops',
+      metric: '+28% enrolment',
+      ctaLabel: 'Read Ops Guild story',
+      href: 'https://stories.edulure.test/flow5-ops-guild'
+    },
+    media: {
+      imageSources: [
+        { src: 'https://images.edulure.test/case-studies/ops-guild-960.webp', width: 960 },
+        { src: 'https://images.edulure.test/case-studies/ops-guild-720.webp', width: 720 },
+        { src: 'https://images.edulure.test/case-studies/ops-guild-480.webp', width: 480 }
+      ]
+    },
+    altKey: 'case-study.ops-guild'
+  },
+  {
+    id: 'cohortStudio',
+    slug: 'cohort-studio',
+    translationKey: 'home.caseStudies.cohortStudio',
+    fallback: {
+      title: 'Cohort Studio halved production time',
+      summary: 'Amina replaced siloed spreadsheets with Flow 5 lesson kits and automated sponsor unlocks for each cohort.',
+      persona: 'Amina • Learning Designer',
+      metric: '-50% build time',
+      ctaLabel: 'Explore Cohort Studio playbook',
+      href: 'https://stories.edulure.test/cohort-studio'
+    },
+    media: {
+      imageSources: [
+        { src: 'https://images.edulure.test/case-studies/cohort-studio-960.webp', width: 960 },
+        { src: 'https://images.edulure.test/case-studies/cohort-studio-720.webp', width: 720 },
+        { src: 'https://images.edulure.test/case-studies/cohort-studio-480.webp', width: 480 }
+      ]
+    },
+    altKey: 'case-study.cohort-studio'
+  },
+  {
+    id: 'tutorLeague',
+    slug: 'tutor-league',
+    translationKey: 'home.caseStudies.tutorLeague',
+    fallback: {
+      title: 'Tutor League unlocked sponsor-ready pods',
+      summary: 'Noah brought tutor pods, live donations, and affiliate payouts under one dashboard to grow recurring revenue.',
+      persona: 'Noah • Tutor Collective Lead',
+      metric: '+42% sponsor revenue',
+      ctaLabel: 'See Tutor League results',
+      href: 'https://stories.edulure.test/tutor-league'
+    },
+    media: {
+      imageSources: [
+        { src: 'https://images.edulure.test/case-studies/tutor-league-960.webp', width: 960 },
+        { src: 'https://images.edulure.test/case-studies/tutor-league-720.webp', width: 720 },
+        { src: 'https://images.edulure.test/case-studies/tutor-league-480.webp', width: 480 }
+      ]
+    },
+    altKey: 'case-study.tutor-league'
+  }
+];
+
+const MONETISATION_FALLBACK_HIGHLIGHTS = [
+  { key: 'home.monetization.highlights.ads', fallback: 'Ad pods with sponsor pacing controls' },
+  { key: 'home.monetization.highlights.tutors', fallback: 'Tutor pods synced with payouts dashboard' },
+  { key: 'home.monetization.highlights.affiliates', fallback: 'Affiliate revenue reconciled nightly' }
+];
 
 export default function Home() {
   const { t } = useLanguage();
@@ -262,6 +273,169 @@ export default function Home() {
   const heroHeadline = heroBlock?.title ?? fallbackHero.headline;
   const heroSubheadline = heroBlock?.subtitle ?? fallbackHero.subheadline;
   const heroChips = heroBlock?.chips?.length ? heroBlock.chips : fallbackHeroChips;
+
+  const heroMedia = useMemo(() => {
+    const blockMedia = heroBlock?.media ?? null;
+    const fallbackCaption = t(
+      'home.hero.media.caption',
+      'Flow 5 keeps marketing, onboarding, and payouts connected in one workspace.'
+    );
+    const fallbackAlt = t(
+      'home.hero.media.alt',
+      getMarketingAltText('hero.flow-five', 'Operators collaborating inside the Flow 5 workspace.')
+    );
+    if (!blockMedia) {
+      return {
+        type: 'video',
+        videoSources: HERO_VIDEO_SOURCES,
+        imageSources: HERO_IMAGE_SOURCES,
+        poster: heroIllustration,
+        caption: fallbackCaption,
+        alt: fallbackAlt
+      };
+    }
+    const candidateSources = Array.isArray(blockMedia.sources) ? blockMedia.sources : [];
+    const videoSources = Array.isArray(blockMedia.videoSources) && blockMedia.videoSources.length
+      ? blockMedia.videoSources
+      : candidateSources.filter((source) => typeof source?.type === 'string' && source.type.startsWith('video/'));
+    const imageSources = Array.isArray(blockMedia.imageSources) && blockMedia.imageSources.length
+      ? blockMedia.imageSources
+      : candidateSources.filter((source) => !source?.type || source.type.startsWith('image/'));
+    return {
+      ...blockMedia,
+      type: blockMedia.type ?? 'video',
+      videoSources: videoSources.length ? videoSources : HERO_VIDEO_SOURCES,
+      imageSources: imageSources.length ? imageSources : HERO_IMAGE_SOURCES,
+      poster: blockMedia.poster ?? heroIllustration,
+      caption: blockMedia.caption ?? fallbackCaption,
+      alt: blockMedia.alt ?? fallbackAlt
+    };
+  }, [heroBlock, t]);
+
+  const caseStudyBlock = useMemo(() => {
+    if (!marketingData?.blocks?.length) {
+      return null;
+    }
+    return marketingData.blocks.find((block) => block.blockType === 'case-study') ?? null;
+  }, [marketingData]);
+
+  const caseStudies = useMemo(() => {
+    return CASE_STUDY_FALLBACKS.map((fallback) => {
+      const payload = Array.isArray(caseStudyBlock?.metadata?.caseStudies)
+        ? caseStudyBlock.metadata.caseStudies.find(
+            (study) => study.slug === fallback.slug || study.id === fallback.slug
+          ) ?? null
+        : null;
+      const title = t(`${fallback.translationKey}.title`, payload?.title ?? fallback.fallback.title);
+      const summary = t(`${fallback.translationKey}.summary`, payload?.summary ?? fallback.fallback.summary);
+      const persona = t(`${fallback.translationKey}.persona`, payload?.persona ?? fallback.fallback.persona);
+      const metric = t(`${fallback.translationKey}.metric`, payload?.metric ?? fallback.fallback.metric);
+      const ctaLabel = t(`${fallback.translationKey}.ctaLabel`, payload?.cta?.label ?? fallback.fallback.ctaLabel);
+      const href = payload?.cta?.href ?? payload?.href ?? fallback.fallback.href;
+      const alt = t(
+        `${fallback.translationKey}.alt`,
+        getMarketingAltText(fallback.altKey, fallback.fallback.title)
+      );
+      const media = payload?.media ?? fallback.media;
+
+      return {
+        id: fallback.id,
+        title,
+        summary,
+        persona,
+        metric,
+        media,
+        alt,
+        cta: href
+          ? {
+              href,
+              label: ctaLabel,
+              onClick: () =>
+                trackEvent('marketing:case_study_cta', {
+                  surface: 'home',
+                  slug: payload?.slug ?? fallback.slug,
+                  destination: href,
+                  label: ctaLabel
+                })
+            }
+          : null
+      };
+    });
+  }, [caseStudyBlock, t]);
+
+  const caseStudyEyebrow = caseStudyBlock?.eyebrow ?? t('home.caseStudies.eyebrow', 'Operator proof');
+  const caseStudyTitle = caseStudyBlock?.title ?? t('home.caseStudies.title', 'Operators scaling with Flow 5');
+  const caseStudyCaption = caseStudyBlock?.subtitle ??
+    t(
+      'home.caseStudies.caption',
+      'Revenue, community, and tutor teams growing through shared Edulure workflows.'
+    );
+
+  const monetisationBlock = useMemo(() => {
+    if (!marketingData?.blocks?.length) {
+      return null;
+    }
+    return marketingData.blocks.find((block) => block.blockType === 'monetization-ribbon') ?? null;
+  }, [marketingData]);
+
+  const monetisationTitle = t(
+    'home.monetization.title',
+    monetisationBlock?.title ?? 'Monetise every surface with Flow 5'
+  );
+  const monetisationDescription = t(
+    'home.monetization.description',
+    monetisationBlock?.subtitle ??
+      'Blend sponsorships, tutor pods, and affiliate revenue without leaving the dashboard.'
+  );
+  const monetisationHighlights = useMemo(() => {
+    if (Array.isArray(monetisationBlock?.metadata?.highlights) && monetisationBlock.metadata.highlights.length) {
+      return monetisationBlock.metadata.highlights.map((highlight, index) =>
+        t(`home.monetization.highlights.dynamic.${index}`, typeof highlight === 'string' ? highlight : highlight?.label ?? '')
+      ).filter(Boolean);
+    }
+    return MONETISATION_FALLBACK_HIGHLIGHTS.map(({ key, fallback }) => t(key, fallback));
+  }, [monetisationBlock, t]);
+
+  const monetisationPrimaryAction = useMemo(() => {
+    const base = monetisationBlock?.primaryCta ?? null;
+    if (base?.href && !base?.to) {
+      return normaliseExternalAction(
+        base,
+        'https://docs.edulure.test/flow5/monetisation',
+        t('home.monetization.primaryCta', 'Activate monetisation')
+      );
+    }
+    return normaliseInternalAction(
+      base,
+      '/register',
+      t('home.monetization.primaryCta', 'Activate monetisation')
+    );
+  }, [monetisationBlock?.primaryCta, t]);
+
+  const monetisationSecondaryAction = useMemo(() => {
+    const base = monetisationBlock?.secondaryCta ?? null;
+    if (!base) {
+      return normaliseInternalAction(
+        base,
+        '/pricing',
+        t('home.monetization.secondaryCta', 'Review pricing')
+      );
+    }
+    if (base.href && !base.to) {
+      return normaliseExternalAction(
+        base,
+        'https://docs.edulure.test/flow5/monetisation',
+        t('home.monetization.secondaryCta', 'Review pricing')
+      );
+    }
+    return normaliseInternalAction(
+      base,
+      '/pricing',
+      t('home.monetization.secondaryCta', 'Review pricing')
+    );
+  }, [monetisationBlock?.secondaryCta, t]);
+
+  const monetisationAnalyticsKey = monetisationBlock?.metadata?.analyticsKey ?? 'monetization-ribbon';
 
   const heroPrimaryAction = useMemo(() => {
     const base = normaliseInternalAction(heroBlock?.primaryCta, '/register', fallbackHero.primaryLabel);
@@ -444,7 +618,23 @@ export default function Home() {
         primaryAction={heroPrimaryAction}
         secondaryAction={heroSecondaryAction}
         tertiaryAction={heroTertiaryAction}
-        rightPanel={<HeroPreviewPanel t={t} />}
+        media={heroMedia}
+        mediaCaption={heroMedia.caption}
+        mediaAlt={heroMedia.alt}
+      />
+      <CaseStudyGrid
+        eyebrow={caseStudyEyebrow}
+        title={caseStudyTitle}
+        caption={caseStudyCaption}
+        studies={caseStudies}
+      />
+      <MonetizationRibbon
+        title={monetisationTitle}
+        description={monetisationDescription}
+        highlights={monetisationHighlights}
+        primaryAction={monetisationPrimaryAction}
+        secondaryAction={monetisationSecondaryAction}
+        analyticsKey={monetisationAnalyticsKey}
       />
       <CommunitySpotlight />
       <PerksGrid />
