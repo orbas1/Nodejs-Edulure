@@ -17,7 +17,8 @@ const communityMemberModelMock = vi.hoisted(() => ({
   create: vi.fn(),
   findMembership: vi.fn(),
   updateStatus: vi.fn(),
-  markLeft: vi.fn()
+  markLeft: vi.fn(),
+  listByCommunity: vi.fn()
 }));
 
 const communityChannelModelMock = vi.hoisted(() => ({
@@ -41,6 +42,42 @@ const communityResourceModelMock = vi.hoisted(() => ({
   findById: vi.fn(),
   update: vi.fn(),
   markDeleted: vi.fn()
+}));
+
+const communityMemberPointModelMock = vi.hoisted(() => ({
+  listTopByPoints: vi.fn()
+}));
+
+const communityWebinarModelMock = vi.hoisted(() => ({
+  listForCommunity: vi.fn()
+}));
+
+const communityEventModelMock = vi.hoisted(() => ({
+  listForCommunity: vi.fn()
+}));
+
+const communityPaywallTierModelMock = vi.hoisted(() => ({
+  listByCommunity: vi.fn()
+}));
+
+const communitySubscriptionModelMock = vi.hoisted(() => ({
+  listByCommunity: vi.fn()
+}));
+
+const communityRoleDefinitionModelMock = vi.hoisted(() => ({
+  listByCommunity: vi.fn()
+}));
+
+const userModelMock = vi.hoisted(() => ({
+  findByIds: vi.fn()
+}));
+
+const userProfileModelMock = vi.hoisted(() => ({
+  findByUserIds: vi.fn()
+}));
+
+const userPresenceSessionModelMock = vi.hoisted(() => ({
+  listActiveByUserIds: vi.fn()
 }));
 
 const domainEventModelMock = vi.hoisted(() => ({
@@ -75,6 +112,33 @@ vi.mock('../src/models/CommunityPostModel.js', () => ({
 vi.mock('../src/models/CommunityResourceModel.js', () => ({
   default: communityResourceModelMock
 }));
+vi.mock('../src/models/CommunityMemberPointModel.js', () => ({
+  default: communityMemberPointModelMock
+}));
+vi.mock('../src/models/CommunityWebinarModel.js', () => ({
+  default: communityWebinarModelMock
+}));
+vi.mock('../src/models/CommunityEventModel.js', () => ({
+  default: communityEventModelMock
+}));
+vi.mock('../src/models/CommunityPaywallTierModel.js', () => ({
+  default: communityPaywallTierModelMock
+}));
+vi.mock('../src/models/CommunitySubscriptionModel.js', () => ({
+  default: communitySubscriptionModelMock
+}));
+vi.mock('../src/models/CommunityRoleDefinitionModel.js', () => ({
+  default: communityRoleDefinitionModelMock
+}));
+vi.mock('../src/models/UserModel.js', () => ({
+  default: userModelMock
+}));
+vi.mock('../src/models/UserProfileModel.js', () => ({
+  default: userProfileModelMock
+}));
+vi.mock('../src/models/UserPresenceSessionModel.js', () => ({
+  default: userPresenceSessionModelMock
+}));
 vi.mock('../src/models/DomainEventModel.js', () => ({
   default: domainEventModelMock
 }));
@@ -103,6 +167,15 @@ const resetMocks = () => {
     communityChannelModelMock,
     communityPostModelMock,
     communityResourceModelMock,
+    communityMemberPointModelMock,
+    communityWebinarModelMock,
+    communityEventModelMock,
+    communityPaywallTierModelMock,
+    communitySubscriptionModelMock,
+    communityRoleDefinitionModelMock,
+    userModelMock,
+    userProfileModelMock,
+    userPresenceSessionModelMock,
     domainEventModelMock,
     adsPlacementServiceMock
   ].forEach((model) => {
@@ -113,6 +186,17 @@ const resetMocks = () => {
 describe('CommunityService', () => {
   beforeEach(() => {
     resetMocks();
+    communityResourceModelMock.listForCommunity.mockResolvedValue({ items: [], total: 0 });
+    communityMemberModelMock.listByCommunity.mockResolvedValue([]);
+    userModelMock.findByIds.mockResolvedValue([]);
+    userProfileModelMock.findByUserIds.mockResolvedValue([]);
+    userPresenceSessionModelMock.listActiveByUserIds.mockResolvedValue([]);
+    communityMemberPointModelMock.listTopByPoints.mockResolvedValue([]);
+    communityWebinarModelMock.listForCommunity.mockResolvedValue({ items: [], total: 0, limit: 12, offset: 0 });
+    communityEventModelMock.listForCommunity.mockResolvedValue([]);
+    communityPaywallTierModelMock.listByCommunity.mockResolvedValue([]);
+    communitySubscriptionModelMock.listByCommunity.mockResolvedValue([]);
+    communityRoleDefinitionModelMock.listByCommunity.mockResolvedValue([]);
   });
 
   it('serialises community summaries with stats and metadata', async () => {
@@ -172,20 +256,151 @@ describe('CommunityService', () => {
         updatedAt: new Date('2024-01-02T00:00:00Z').toISOString()
       }
     ]);
+    const memberRows = Object.assign(
+      [
+        {
+          id: 99,
+          communityId: baseCommunity.id,
+          userId: 77,
+          role: 'ops-strategist',
+          status: 'active',
+          joinedAt: new Date('2024-01-04T00:00:00Z').toISOString(),
+          updatedAt: new Date('2024-01-05T00:00:00Z').toISOString(),
+          metadata: { title: 'Ops Strategist', tags: ['Automation'], contactEmail: 'ops@example.test' }
+        }
+      ],
+      { total: 1 }
+    );
+    communityMemberModelMock.listByCommunity.mockResolvedValue(memberRows);
+    communityResourceModelMock.listForCommunity.mockResolvedValue({
+      items: [
+        {
+          id: 501,
+          title: 'Incident rehearsal replay',
+          metadata: { facilitator: 'Ops Team', recordedAt: '2024-01-03T00:00:00Z', watchUrl: 'https://example.com/replay' },
+          publishedAt: '2024-01-03T00:00:00Z'
+        }
+      ],
+      total: 1
+    });
+    userModelMock.findByIds.mockResolvedValue([
+      {
+        id: 77,
+        firstName: 'Amina',
+        lastName: 'Diallo',
+        email: 'amina.diallo@edulure.test',
+        role: 'admin'
+      }
+    ]);
+    userProfileModelMock.findByUserIds.mockResolvedValue([
+      {
+        userId: 77,
+        displayName: 'Amina Diallo',
+        location: 'Austin, US',
+        avatarUrl: 'https://example.test/avatar.png'
+      }
+    ]);
+    userPresenceSessionModelMock.listActiveByUserIds.mockResolvedValue([
+      {
+        userId: 77,
+        status: 'online',
+        lastSeenAt: '2024-01-05T12:00:00Z'
+      }
+    ]);
+    communityMemberPointModelMock.listTopByPoints.mockResolvedValue([
+      { userId: 77, points: 1280, lifetimePoints: 5120, metadata: { grade: 'A', role: 'ops-strategist' } }
+    ]);
+    communityWebinarModelMock.listForCommunity.mockResolvedValue({
+      items: [
+        {
+          id: 211,
+          topic: 'Ops Live Session',
+          host: 'Ops Team',
+          startAt: '2024-01-09T12:00:00Z',
+          status: 'announced',
+          metadata: { durationMinutes: 60, seatsRemaining: 10 }
+        }
+      ],
+      total: 1,
+      limit: 12,
+      offset: 0
+    });
+    communityEventModelMock.listForCommunity.mockResolvedValue([
+      {
+        id: 900,
+        title: 'Automation Summit',
+        startAt: '2024-01-15T12:00:00Z',
+        endAt: '2024-01-15T13:30:00Z',
+        status: 'scheduled',
+        visibility: 'members',
+        locationName: 'Virtual',
+        metadata: { registrationUrl: 'https://events.example.test/ops-summit' }
+      }
+    ]);
+    communityPaywallTierModelMock.listByCommunity.mockResolvedValue([
+      {
+        id: 301,
+        name: 'Premium Ops Lab',
+        description: 'Automation labs',
+        priceCents: 8900,
+        currency: 'USD',
+        billingInterval: 'monthly',
+        trialPeriodDays: 7,
+        benefits: ['Labs'],
+        metadata: { seats: 50 }
+      }
+    ]);
+    communitySubscriptionModelMock.listByCommunity.mockResolvedValue([
+      { id: 401, userId: 77, tierId: 301, status: 'active' }
+    ]);
+    communityRoleDefinitionModelMock.listByCommunity.mockResolvedValue([
+      {
+        roleKey: 'ops-strategist',
+        name: 'Ops Strategist',
+        description: 'Automation lead',
+        permissions: { manageChannels: true },
+        isDefaultAssignable: false
+      }
+    ]);
 
     const detail = await CommunityService.getCommunityDetail('42', 7);
 
-    expect(detail).toEqual(
+    expect(detail.id).toBe(42);
+    expect(detail.stats).toEqual(expect.objectContaining({ members: 10, resources: 4 }));
+    expect(detail.channels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 11,
+          name: 'Launch Desk',
+          metadata: { cadence: 'daily' }
+        })
+      ])
+    );
+    expect(detail.members).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Amina Diallo',
+          role: 'Ops Strategist',
+          tags: expect.arrayContaining(['Automation'])
+        })
+      ])
+    );
+    expect(detail.leaderboard).toEqual(
+      expect.arrayContaining([expect.objectContaining({ userId: 77, rank: 1, points: 1280 })])
+    );
+    expect(detail.classrooms.live).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: 'Ops Live Session' })])
+    );
+    expect(detail.classrooms.recorded).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: 'Incident rehearsal replay' })])
+    );
+    expect(detail.events).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: 'Automation Summit' })])
+    );
+    expect(detail.subscription).toEqual(
       expect.objectContaining({
-        id: 42,
-        stats: expect.objectContaining({ members: 10, resources: 4 }),
-        channels: [
-          expect.objectContaining({
-            id: 11,
-            name: 'Launch Desk',
-            metadata: { cadence: 'daily' }
-          })
-        ]
+        plans: expect.arrayContaining([expect.objectContaining({ name: 'Premium Ops Lab' })]),
+        metrics: expect.objectContaining({ activeSubscribers: 1 })
       })
     );
   });

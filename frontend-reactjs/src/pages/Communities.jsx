@@ -24,6 +24,8 @@ import CommunityChatModule from '../components/community/CommunityChatModule.jsx
 import CommunityMembersManager from '../components/community/CommunityMembersManager.jsx';
 import CommunityMap from '../components/community/CommunityMap.jsx';
 import CommunityAboutPanel from '../components/community/CommunityAboutPanel.jsx';
+import CommunityMemberDirectory from '../components/community/CommunityMemberDirectory.jsx';
+import CommunityEventSchedule from '../components/community/CommunityEventSchedule.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
@@ -113,6 +115,89 @@ const FALLBACK_COMMUNITY_DETAIL = {
       'https://randomuser.me/api/portraits/men/61.jpg'
     ]
   },
+  members: [
+    {
+      id: 'member-1',
+      name: 'Amina Rowe',
+      role: 'Owner',
+      status: 'Active',
+      title: 'Community Architect',
+      location: 'San Francisco, USA',
+      email: 'amina@edulure.com',
+      avatarUrl: 'https://randomuser.me/api/portraits/women/68.jpg',
+      tags: ['Leadership', 'Stage host', 'Revenue rituals'],
+      isOnline: true,
+      lastActiveAt: '2024-05-12T17:15:00.000Z'
+    },
+    {
+      id: 'member-2',
+      name: 'Leo Okafor',
+      role: 'Moderator',
+      status: 'Active',
+      title: 'Operator Success',
+      location: 'London, UK',
+      email: 'leo@edulure.com',
+      avatarUrl: 'https://randomuser.me/api/portraits/men/29.jpg',
+      tags: ['Moderation', 'Classroom host'],
+      isOnline: true,
+      lastActiveAt: '2024-05-12T16:45:00.000Z',
+      recommended: true
+    },
+    {
+      id: 'member-3',
+      name: 'Sofia Martínez',
+      role: 'Member',
+      status: 'Pending',
+      title: 'Revenue Strategist',
+      location: 'Madrid, ES',
+      email: 'sofia@edulure.com',
+      avatarUrl: 'https://randomuser.me/api/portraits/women/47.jpg',
+      tags: ['Revenue pod', 'Onboarding'],
+      isOnline: false,
+      lastActiveAt: '2024-05-11T21:00:00.000Z'
+    },
+    {
+      id: 'member-4',
+      name: 'Nikhil Rao',
+      role: 'Member',
+      status: 'Active',
+      title: 'Learning Designer',
+      location: 'Bengaluru, IN',
+      email: 'nikhil@edulure.com',
+      avatarUrl: 'https://randomuser.me/api/portraits/men/94.jpg',
+      tags: ['Instructional design', 'Async labs'],
+      isOnline: true,
+      lastActiveAt: '2024-05-12T13:20:00.000Z',
+      recommended: true
+    },
+    {
+      id: 'member-5',
+      name: 'Linh Nguyen',
+      role: 'Member',
+      status: 'Active',
+      title: 'Growth Operator',
+      location: 'Ho Chi Minh City, VN',
+      email: 'linh@edulure.com',
+      avatarUrl: 'https://randomuser.me/api/portraits/women/75.jpg',
+      tags: ['Growth experiments', 'Sponsorships'],
+      isOnline: false,
+      lastActiveAt: '2024-05-12T10:05:00.000Z'
+    },
+    {
+      id: 'member-6',
+      name: 'Maya Patel',
+      role: 'Moderator',
+      status: 'Active',
+      title: 'Community Producer',
+      location: 'Toronto, CA',
+      email: 'maya@edulure.com',
+      avatarUrl: 'https://randomuser.me/api/portraits/women/65.jpg',
+      tags: ['Programming', 'Sponsor liaison'],
+      isOnline: false,
+      lastActiveAt: '2024-05-12T09:30:00.000Z',
+      recommended: true
+    }
+  ],
   classrooms: {
     live: [
       {
@@ -184,8 +269,8 @@ const FALLBACK_COMMUNITY_DETAIL = {
         name: 'Enterprise',
         price: 329,
         seats: 150,
-        description: 'Dedicated success pod, API integrations, and security perimeter controls'
-      }
+      description: 'Dedicated success pod, API integrations, and security perimeter controls'
+    }
     ],
     addons: [
       { id: 'ads', name: 'Sponsorship placements', price: 120, description: 'Premium placements inside community feed' },
@@ -193,6 +278,44 @@ const FALLBACK_COMMUNITY_DETAIL = {
       { id: 'talent', name: 'Talent marketplace', price: 70, description: 'Verified talent routing and matching' }
     ]
   },
+  events: [
+    {
+      id: 'event-1',
+      title: 'Operator summit',
+      type: 'Flagship',
+      startsAt: '2024-06-01T17:00:00.000Z',
+      endsAt: '2024-06-01T22:00:00.000Z',
+      description: 'Hybrid summit with live broadcast, breakout pods, and networking lounges.',
+      registrationUrl: 'https://events.edulure.com/operator-summit',
+      location: 'Hybrid · Edulure HQ + virtual',
+      speakers: ['Amina Rowe', 'Mira Shah'],
+      seatLimit: 500
+    },
+    {
+      id: 'event-2',
+      title: 'Async build weekend',
+      type: 'Sprint',
+      startsAt: '2024-05-25T12:00:00.000Z',
+      endsAt: '2024-05-26T18:00:00.000Z',
+      description: '72-hour async build with moderated voice rooms and funding pool.',
+      registrationUrl: 'https://events.edulure.com/async-build-weekend',
+      location: 'Virtual',
+      speakers: ['Leo Okafor'],
+      seatLimit: 300
+    },
+    {
+      id: 'event-3',
+      title: 'Sponsor enablement clinic',
+      type: 'Partner',
+      startsAt: '2024-05-29T15:00:00.000Z',
+      endsAt: '2024-05-29T16:30:00.000Z',
+      description: 'Partner success team walks through sponsorship placements, compliance, and reporting.',
+      registrationUrl: 'https://events.edulure.com/sponsor-clinic',
+      location: 'Virtual studio',
+      speakers: ['Maya Patel'],
+      seatLimit: 200
+    }
+  ],
   roles: {
     owner: {
       description: 'Full administrative authority, subscription control, moderation override, and data exports.',
@@ -269,6 +392,10 @@ function normaliseDetail(detail, resources) {
     ...detail,
     stats: { ...FALLBACK_COMMUNITY_DETAIL.stats, ...(detail.stats ?? {}) },
     membership: { ...FALLBACK_COMMUNITY_DETAIL.membership, ...(detail.membership ?? {}) },
+    members:
+      Array.isArray(detail.members) && detail.members.length > 0
+        ? detail.members
+        : [...FALLBACK_COMMUNITY_DETAIL.members],
     metadata: { ...FALLBACK_COMMUNITY_DETAIL.metadata, ...(detail.metadata ?? {}) },
     ratings: { ...FALLBACK_COMMUNITY_DETAIL.ratings, ...(detail.ratings ?? {}) },
     reviews:
@@ -303,6 +430,10 @@ function normaliseDetail(detail, resources) {
           ? detail.subscription.addons
           : [...FALLBACK_COMMUNITY_DETAIL.subscription.addons]
     },
+    events:
+      Array.isArray(detail.events) && detail.events.length > 0
+        ? detail.events
+        : [...FALLBACK_COMMUNITY_DETAIL.events],
     roles: { ...FALLBACK_COMMUNITY_DETAIL.roles, ...(detail.roles ?? {}) },
     security: { ...FALLBACK_COMMUNITY_DETAIL.security, ...(detail.security ?? {}) },
     permissions: { ...FALLBACK_COMMUNITY_DETAIL.permissions, ...(detail.permissions ?? {}) },
@@ -635,7 +766,8 @@ export default function Communities() {
   const recordedSessions = resolvedDetail.classrooms.recorded ?? [];
   const liveStage = resolvedDetail.classrooms.liveClassroom ?? null;
   const leaderboardEntries = resolvedDetail.leaderboard ?? [];
-  const communityEvents = communityDetail?.events ?? [];
+  const communityEvents = resolvedDetail.events ?? [];
+  const communityMembers = resolvedDetail.members ?? [];
   const communityPodcasts = communityDetail?.podcasts ?? [];
 
   const interactiveSeeds = useMemo(() => {
@@ -1435,11 +1567,21 @@ export default function Communities() {
                 initialEvents={interactiveSeeds.events}
               />
 
+              <CommunityMemberDirectory
+                members={communityMembers}
+                isLoading={isLoadingDetail && selectedCommunityId !== 'all'}
+              />
+
               <CommunityChatModule
                 communityId={selectedCommunityId}
                 communityName={resolvedDetail.name}
                 viewerRole={resolvedDetail.membership?.role ?? role}
                 initialChannels={resolvedDetail.classrooms?.chatChannels}
+              />
+
+              <CommunityEventSchedule
+                events={communityEvents}
+                isLoading={isLoadingDetail && selectedCommunityId !== 'all'}
               />
 
               <CommunityMembersManager

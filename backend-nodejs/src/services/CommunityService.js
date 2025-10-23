@@ -2,11 +2,20 @@ import slugify from 'slugify';
 
 import db from '../config/database.js';
 import CommunityChannelModel from '../models/CommunityChannelModel.js';
+import CommunityEventModel from '../models/CommunityEventModel.js';
 import CommunityMemberModel from '../models/CommunityMemberModel.js';
+import CommunityMemberPointModel from '../models/CommunityMemberPointModel.js';
 import CommunityModel from '../models/CommunityModel.js';
+import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import CommunityPostModel from '../models/CommunityPostModel.js';
 import CommunityResourceModel from '../models/CommunityResourceModel.js';
+import CommunityRoleDefinitionModel from '../models/CommunityRoleDefinitionModel.js';
+import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
+import CommunityWebinarModel from '../models/CommunityWebinarModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import UserModel from '../models/UserModel.js';
+import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
+import UserProfileModel from '../models/UserProfileModel.js';
 import AdsPlacementService from './AdsPlacementService.js';
 
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
@@ -76,6 +85,326 @@ function buildAvatarUrl(name) {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${seed}&backgroundColor=0b1120&radius=50`;
 }
 
+function titleCaseRole(role) {
+  if (!role) return 'Member';
+  const normalised = String(role)
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalised) return 'Member';
+  return normalised.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function extractMemberDirectory(members, { usersById, profilesByUserId, presenceByUserId }) {
+  if (!Array.isArray(members) || members.length === 0) {
+    return [];
+  }
+
+  return members.map((member, index) => {
+    const user = usersById.get(member.userId);
+    const profile = profilesByUserId.get(member.userId);
+    const presence = presenceByUserId.get(member.userId);
+    const metadata = member.metadata ?? {};
+
+    const displayName = profile?.displayName || `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
+    const roleLabel = metadata.roleLabel ?? titleCaseRole(member.role);
+    const location = metadata.location ?? profile?.location ?? null;
+    const tags = Array.isArray(metadata.tags)
+      ? metadata.tags
+      : typeof metadata.tags === 'string'
+        ? metadata.tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : Array.isArray(profile?.metadata?.expertise)
+          ? profile.metadata.expertise
+          : [];
+
+    const lastActiveAt = metadata.lastActiveAt ?? presence?.lastSeenAt ?? user?.lastLoginAt ?? member.updatedAt;
+
+    return {
+      id: member.id ?? `membership-${member.userId ?? index}`,
+      userId: member.userId,
+      name: displayName || 'Community Member',
+      role: roleLabel,
+      status: titleCaseRole(member.status ?? 'active'),
+      title: metadata.title ?? profile?.tagline ?? null,
+      location,
+      email: metadata.contactEmail ?? user?.email ?? null,
+      avatarUrl: metadata.avatarUrl ?? profile?.avatarUrl ?? buildAvatarUrl(displayName),
+      tags,
+      isOnline: Boolean(presence && (presence.status === 'online' || presence.status === 'active')),
+      lastActiveAt,
+      recommended: Boolean(metadata.recommended ?? metadata.highlighted ?? false)
+    };
+  });
+}
+
+function buildLeaderboard(entries, { usersById, profilesByUserId }) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return [];
+  }
+
+  return entries.map((entry, index) => {
+    const user = usersById.get(entry.userId);
+    const profile = profilesByUserId.get(entry.userId);
+    const metadata = entry.metadata ?? {};
+    const displayName = profile?.displayName || `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
+
+    return {
+      rank: index + 1,
+      userId: entry.userId,
+      name: displayName || 'Member',
+      role: titleCaseRole(metadata.role ?? user?.role ?? 'member'),
+      points: Number(entry.points ?? 0),
+      lifetimePoints: Number(entry.lifetimePoints ?? entry.points ?? 0),
+      grade: metadata.grade ?? (entry.points >= 1000 ? 'A' : entry.points >= 600 ? 'B' : 'C'),
+      streakDays: metadata.currentStreakDays ?? null
+    };
+  });
+}
+
+function buildLiveSessions(webinars, metadata = []) {
+  const sessions = Array.isArray(webinars)
+    ? webinars.map((webinar) => ({
+        id: webinar.id,
+        title: webinar.topic,
+        facilitator: webinar.host,
+        startsAt: webinar.startAt,
+        durationMinutes:
+          typeof webinar.metadata?.durationMinutes === 'number'
+            ? webinar.metadata.durationMinutes
+            : webinar.metadata?.endAt
+              ? Math.max(
+                  0,
+                  Math.round((new Date(webinar.metadata.endAt).getTime() - new Date(webinar.startAt).getTime()) / 60000)
+                )
+              : null,
+        seatsRemaining: webinar.metadata?.seatsRemaining ?? null,
+        status: webinar.status,
+        registrationUrl: webinar.metadata?.registrationUrl ?? null
+      }))
+    : [];
+
+  const supplemental = Array.isArray(metadata)
+    ? metadata.map((session, index) => ({
+        id: session.id ?? `metadata-live-${index}`,
+        title: session.title ?? 'Live session',
+        facilitator: session.facilitator ?? session.host ?? 'Facilitator',
+        startsAt: session.startsAt ?? session.startAt ?? null,
+        durationMinutes: session.durationMinutes ?? null,
+        seatsRemaining: session.seatsRemaining ?? null,
+        status: session.status ?? 'scheduled',
+        registrationUrl: session.registrationUrl ?? null
+      }))
+    : [];
+
+  if (!sessions.length && supplemental.length) {
+    return supplemental;
+  }
+
+  if (!supplemental.length) {
+    return sessions;
+  }
+
+  const seen = new Set(sessions.map((session) => session.id));
+  supplemental.forEach((session) => {
+    if (!session.id || !seen.has(session.id)) {
+      sessions.push(session);
+    }
+  });
+  return sessions;
+}
+
+function buildRecordedSessions(resources, metadata = []) {
+  const items = Array.isArray(resources)
+    ? resources.map((resource, index) => ({
+        id: resource.id ?? `recorded-${index}`,
+        title: resource.title ?? 'Recorded session',
+        facilitator: resource.metadata?.facilitator ?? null,
+        startsAt: resource.metadata?.recordedAt ?? resource.publishedAt ?? null,
+        durationMinutes: resource.metadata?.durationMinutes ?? null,
+        watchUrl: resource.metadata?.watchUrl ?? resource.linkUrl ?? null
+      }))
+    : [];
+
+  if (items.length) {
+    return items;
+  }
+
+  return Array.isArray(metadata)
+    ? metadata.map((session, index) => ({
+        id: session.id ?? `metadata-recorded-${index}`,
+        title: session.title ?? 'Recorded session',
+        facilitator: session.facilitator ?? null,
+        startsAt: session.startsAt ?? null,
+        durationMinutes: session.durationMinutes ?? null,
+        watchUrl: session.watchUrl ?? session.linkUrl ?? null
+      }))
+    : [];
+}
+
+function mergeEvents(eventRecords, webinars, metadataEvents = []) {
+  const events = [];
+  const seen = new Set();
+
+  (Array.isArray(eventRecords) ? eventRecords : []).forEach((event) => {
+    const id = event.id ?? `event-${events.length}`;
+    seen.add(String(id));
+    events.push({
+      id,
+      title: event.title,
+      type: titleCaseRole(event.status ?? 'event'),
+      startsAt: event.startAt,
+      endsAt: event.endAt,
+      location: event.locationName ?? event.locationAddress ?? (event.isOnline ? 'Virtual' : null),
+      registrationUrl: event.metadata?.registrationUrl ?? event.meetingUrl ?? null,
+      description: event.description ?? event.summary ?? null
+    });
+  });
+
+  (Array.isArray(webinars) ? webinars : []).forEach((webinar) => {
+    const id = `webinar-${webinar.id ?? events.length}`;
+    if (seen.has(String(id))) return;
+    seen.add(String(id));
+    events.push({
+      id,
+      title: webinar.topic,
+      type: 'Webinar',
+      startsAt: webinar.startAt,
+      endsAt: webinar.metadata?.endAt ?? null,
+      location: webinar.metadata?.location ?? (webinar.metadata?.isOnline === false ? 'Onsite' : 'Virtual'),
+      registrationUrl: webinar.metadata?.registrationUrl ?? null,
+      description: webinar.description ?? null
+    });
+  });
+
+  (Array.isArray(metadataEvents) ? metadataEvents : []).forEach((event, index) => {
+    const id = String(event.id ?? `metadata-event-${index}`);
+    if (seen.has(id)) return;
+    seen.add(id);
+    events.push({
+      id,
+      title: event.title ?? 'Community event',
+      type: event.type ?? 'Event',
+      startsAt: event.startsAt ?? event.startAt ?? null,
+      endsAt: event.endsAt ?? event.endAt ?? null,
+      location: event.location ?? null,
+      registrationUrl: event.registrationUrl ?? event.url ?? null,
+      description: event.description ?? null
+    });
+  });
+
+  return events;
+}
+
+function buildSubscriptionSummary(metadata = {}, tiers = [], subscriptions = []) {
+  const currency = metadata.currency ?? tiers[0]?.currency ?? 'USD';
+  const billingInterval = metadata.billingInterval ?? tiers[0]?.billingInterval ?? 'monthly';
+  const tierById = new Map(tiers.map((tier) => [tier.id, tier]));
+  const activeSubscribers = subscriptions.filter((subscription) => subscription.status === 'active');
+  const recurringCents = activeSubscribers.reduce((sum, subscription) => {
+    const tier = tierById.get(subscription.tierId);
+    if (!tier) return sum;
+    return sum + (Number.isFinite(tier.priceCents) ? tier.priceCents : 0);
+  }, 0);
+
+  return {
+    currency,
+    billingInterval,
+    metrics: {
+      activeSubscribers: activeSubscribers.length,
+      recurringRevenueCents: recurringCents,
+      churnRate: metadata.metrics?.churnRate ?? null
+    },
+    plans: tiers.map((tier) => ({
+      id: tier.id,
+      name: tier.name,
+      description: tier.description ?? '',
+      priceCents: tier.priceCents,
+      currency: tier.currency,
+      interval: tier.billingInterval,
+      trialPeriodDays: tier.trialPeriodDays ?? null,
+      benefits: tier.benefits,
+      metadata: tier.metadata ?? {}
+    })),
+    addons: Array.isArray(metadata.addons) ? metadata.addons : [],
+    collection: metadata.collection ?? { provider: 'stripe', mode: 'subscription' }
+  };
+}
+
+function buildRolesMetadata(roleDefinitions, metadataRoles = {}) {
+  if (!Array.isArray(roleDefinitions) || roleDefinitions.length === 0) {
+    return metadataRoles;
+  }
+
+  const roles = {};
+  roleDefinitions.forEach((definition) => {
+    roles[definition.roleKey] = {
+      name: definition.name,
+      description: definition.description ?? metadataRoles[definition.roleKey]?.description ?? '',
+      permissions: definition.permissions ?? {},
+      isDefaultAssignable: definition.isDefaultAssignable
+    };
+  });
+
+  return { ...metadataRoles, ...roles };
+}
+
+function buildMembershipMap(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return {
+      totalCountries: 0,
+      lastUpdatedAt: null,
+      clusters: [],
+      avatars: []
+    };
+  }
+
+  return {
+    totalCountries: metadata.totalCountries ?? 0,
+    lastUpdatedAt: metadata.lastUpdatedAt ?? null,
+    clusters: Array.isArray(metadata.clusters) ? metadata.clusters : [],
+    avatars: Array.isArray(metadata.avatars) ? metadata.avatars : []
+  };
+}
+
+function buildRatings(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return {
+      average: 0,
+      totalReviews: 0,
+      highlight: '',
+      breakdown: {}
+    };
+  }
+
+  return {
+    average: Number(metadata.average ?? 0),
+    totalReviews: Number(metadata.totalReviews ?? 0),
+    highlight: metadata.highlight ?? '',
+    breakdown: metadata.breakdown ?? {}
+  };
+}
+
+function buildLaunchChecklist(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return { overallStatus: 'pending', items: [] };
+  }
+
+  return {
+    overallStatus: metadata.overallStatus ?? 'in-progress',
+    items: Array.isArray(metadata.items)
+      ? metadata.items.map((item, index) => ({
+          id: item.id ?? `checklist-${index}`,
+          label: item.label ?? 'Checklist item',
+          status: item.status ?? 'pending',
+          owner: item.owner ?? null
+        }))
+      : []
+  };
+}
+
 export default class CommunityService {
   static async listForUser(userId) {
     const rows = await CommunityModel.listByUserWithStats(userId);
@@ -97,10 +426,99 @@ export default class CommunityService {
       throw error;
     }
 
-    const stats = await CommunityModel.getStats(community.id);
-    const channels = await CommunityChannelModel.listByCommunity(community.id);
+    const [stats, channels, memberList] = await Promise.all([
+      CommunityModel.getStats(community.id),
+      CommunityChannelModel.listByCommunity(community.id),
+      CommunityMemberModel.listByCommunity(community.id, {
+        status: ['active', 'pending'],
+        order: 'desc',
+        orderBy: 'joined_at',
+        limit: 120
+      })
+    ]);
 
-    return this.serializeCommunityDetail(community, isActiveMembership(membership) ? membership : null, stats, channels);
+    const memberItems = Array.isArray(memberList) ? [...memberList] : [];
+    const memberUserIds = memberItems.map((member) => member.userId).filter((id) => Number.isFinite(Number(id)));
+
+    const [
+      userRecords,
+      userProfiles,
+      presenceRecords,
+      leaderboardEntries,
+      webinarsResult,
+      eventRecords,
+      recordedResources,
+      paywallTiers,
+      activeSubscriptions,
+      roleDefinitions
+    ] = await Promise.all([
+      memberUserIds.length ? UserModel.findByIds(memberUserIds) : [],
+      memberUserIds.length ? UserProfileModel.findByUserIds(memberUserIds) : [],
+      memberUserIds.length ? UserPresenceSessionModel.listActiveByUserIds(memberUserIds) : [],
+      CommunityMemberPointModel.listTopByPoints(community.id, { limit: 10 }),
+      CommunityWebinarModel.listForCommunity(community.id, {
+        status: ['announced', 'live', 'scheduled'],
+        order: 'asc',
+        limit: 12
+      }),
+      CommunityEventModel.listForCommunity(community.id, {
+        status: ['scheduled', 'live'],
+        order: 'asc',
+        limit: 12
+      }),
+      CommunityResourceModel.listForCommunity(community.id, {
+        resourceType: 'classroom_session',
+        limit: 12
+      }),
+      CommunityPaywallTierModel.listByCommunity(community.id, { includeInactive: true }),
+      CommunitySubscriptionModel.listByCommunity(community.id, { status: 'active' }),
+      CommunityRoleDefinitionModel.listByCommunity(community.id)
+    ]);
+
+    const usersById = new Map(userRecords.map((user) => [user.id, user]));
+    const profilesByUserId = new Map(userProfiles.map((profile) => [profile.userId, profile]));
+    const presenceByUserId = new Map();
+    presenceRecords.forEach((session) => {
+      const existing = presenceByUserId.get(session.userId);
+      if (!existing) {
+        presenceByUserId.set(session.userId, session);
+        return;
+      }
+
+      const existingSeen = existing.lastSeenAt ? new Date(existing.lastSeenAt).getTime() : 0;
+      const nextSeen = session.lastSeenAt ? new Date(session.lastSeenAt).getTime() : 0;
+      if (nextSeen >= existingSeen) {
+        presenceByUserId.set(session.userId, session);
+      }
+    });
+
+    const metadata = parseJsonColumn(community.metadata, {});
+    const memberDirectory = extractMemberDirectory(memberItems, { usersById, profilesByUserId, presenceByUserId });
+    const leaderboard = buildLeaderboard(leaderboardEntries, { usersById, profilesByUserId });
+    const webinars = Array.isArray(webinarsResult?.items) ? webinarsResult.items : [];
+    const eventsArray = Array.isArray(eventRecords) ? eventRecords : [];
+    const events = mergeEvents(eventsArray, webinars, metadata.events);
+    const recordedSessions = buildRecordedSessions(recordedResources?.items ?? [], metadata.classrooms?.recorded);
+
+    const context = {
+      members: memberDirectory,
+      leaderboard,
+      webinars,
+      recordedSessions,
+      events,
+      paywallTiers,
+      activeSubscriptions,
+      roleDefinitions,
+      membershipTotal: memberList?.total ?? memberDirectory.length
+    };
+
+    return this.serializeCommunityDetail(
+      community,
+      isActiveMembership(membership) ? membership : null,
+      stats,
+      channels,
+      context
+    );
   }
 
   static async listFeed(communityIdentifier, userId, filters = {}, options = {}) {
@@ -1072,7 +1490,7 @@ export default class CommunityService {
     };
   }
 
-  static serializeCommunityDetail(community, membership, stats, channels) {
+  static serializeCommunityDetail(community, membership, stats, channels, context = {}) {
     const summary = this.serializeCommunity({
       ...community,
       ...stats,
@@ -1081,6 +1499,71 @@ export default class CommunityService {
     });
     const metadata = parseJsonColumn(community.metadata, {});
     const sponsorships = metadata.sponsorships ?? {};
+    const membershipMap = buildMembershipMap(metadata.membershipMap ?? {});
+    const ratings = buildRatings(metadata.ratings ?? {});
+    const reviews = Array.isArray(metadata.reviews) ? metadata.reviews : [];
+    const liveSessions = buildLiveSessions(context.webinars ?? [], metadata.classrooms?.live);
+    const recordedSessions = Array.isArray(context.recordedSessions) && context.recordedSessions.length
+      ? context.recordedSessions
+      : buildRecordedSessions([], metadata.classrooms?.recorded);
+    const firstLiveSession = liveSessions[0];
+    const liveClassroom = {
+      host: metadata.classrooms?.liveClassroom?.host ?? firstLiveSession?.facilitator ?? 'Community Stage',
+      status: metadata.classrooms?.liveClassroom?.status ?? firstLiveSession?.status ?? 'Standby',
+      capacity: metadata.classrooms?.liveClassroom?.capacity ?? null,
+      streamUrl:
+        metadata.classrooms?.liveClassroom?.streamUrl ??
+        metadata.classrooms?.liveClassroom?.broadcastUrl ??
+        firstLiveSession?.registrationUrl ??
+        null
+    };
+    const chatChannels = channels
+      .filter((channel) => ['classroom', 'general', 'events'].includes(channel.channelType))
+      .map((channel) => ({
+        id: channel.id,
+        name: channel.name,
+        slug: channel.slug,
+        type: channel.channelType,
+        description: channel.description,
+        metadata: parseJsonColumn(channel.metadata, {}),
+        createdAt: channel.createdAt,
+        updatedAt: channel.updatedAt
+      }));
+    const leaderboard = Array.isArray(context.leaderboard) && context.leaderboard.length
+      ? context.leaderboard
+      : Array.isArray(metadata.leaderboard)
+        ? metadata.leaderboard
+        : [];
+    const subscription = buildSubscriptionSummary(
+      metadata.subscription ?? {},
+      context.paywallTiers ?? [],
+      context.activeSubscriptions ?? []
+    );
+    const events = Array.isArray(context.events) && context.events.length
+      ? context.events
+      : mergeEvents([], [], metadata.events);
+    const roles = buildRolesMetadata(context.roleDefinitions ?? [], metadata.roles ?? {});
+    const security = {
+      zeroTrust: Boolean(metadata.security?.zeroTrust),
+      singleSignOn: Boolean(metadata.security?.singleSignOn),
+      auditLog: Boolean(metadata.security?.auditLog),
+      lastPenTest: metadata.security?.lastPenTest ?? null,
+      dataResidency: metadata.security?.dataResidency ?? null
+    };
+    const launchChecklist = buildLaunchChecklist(metadata.launchChecklist ?? {});
+    const links = metadata.links ?? {
+      hub: community.slug ? `https://app.edulure.com/communities/${community.slug}` : null
+    };
+    const members = Array.isArray(context.members) && context.members.length
+      ? context.members
+      : Array.isArray(metadata.members)
+        ? metadata.members
+        : [];
+
+    if (context.membershipTotal !== undefined) {
+      membershipMap.totalMembers = context.membershipTotal;
+    }
+
     return {
       ...summary,
       channels: channels.map((channel) => ({
@@ -1096,7 +1579,24 @@ export default class CommunityService {
       })),
       sponsorships: {
         blockedPlacementIds: normalisePlacementIds(sponsorships.blockedPlacementIds)
-      }
+      },
+      members,
+      membershipMap,
+      ratings,
+      reviews,
+      classrooms: {
+        live: liveSessions,
+        recorded: recordedSessions,
+        liveClassroom,
+        chatChannels
+      },
+      leaderboard,
+      subscription,
+      events,
+      roles,
+      security,
+      launchChecklist,
+      links
     };
   }
 

@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
 
+import CommunityResourceLibrary from './community/CommunityResourceLibrary.jsx';
+
 const numberFormatter = new Intl.NumberFormat('en-US');
-const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:']);
 
 const METADATA_LABELS = {
   focus: 'Strategic Focus',
@@ -46,19 +47,6 @@ function formatMetadataValue(value) {
     return Object.keys(value).length ? JSON.stringify(value) : 'Not available';
   }
   return String(value);
-}
-
-function getSafeUrl(url) {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url, 'https://app.edulure.com');
-    if (!SAFE_URL_PROTOCOLS.has(parsed.protocol)) {
-      return null;
-    }
-    return parsed.toString();
-  } catch (error) {
-    return null;
-  }
 }
 
 export default function CommunityProfile({
@@ -125,7 +113,6 @@ export default function CommunityProfile({
   const resourceItems = resources ?? [];
   const totalResources = resourcesMeta?.total ?? resourceItems.length;
   const showLoadMore = typeof onLoadMoreResources === 'function';
-  const showingCount = resourceItems.length;
   const canManageResources = Boolean(
     community.permissions?.canManageResources ??
       (community.membership?.role &&
@@ -133,8 +120,6 @@ export default function CommunityProfile({
   );
 
   const hubUrl = community.links?.hub ?? `https://app.edulure.com/communities/${community.slug}`;
-
-  const hasLoadedAll = totalResources !== undefined && showingCount >= totalResources;
 
   return (
     <div className="space-y-6">
@@ -185,152 +170,21 @@ export default function CommunityProfile({
           </a>
         </div>
       </div>
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Latest resources</h4>
-            <p className="mt-1 text-xs text-slate-500">
-              Share playbooks, external articles, or classroom replays curated for this community.
-            </p>
-          </div>
-          {canManageResources && typeof onAddResource === 'function' && (
-            <button
-              type="button"
-              onClick={onAddResource}
-              disabled={isManagingResource}
-              className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-400"
-            >
-              {isManagingResource ? 'Opening…' : 'Add resource'}
-            </button>
-          )}
-        </div>
-        {resourcesError && (
-          <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600" role="alert">
-            {resourcesError}
-          </div>
-        )}
-        {resourceNotice && (
-          <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700" role="status">
-            {resourceNotice}
-          </div>
-        )}
-        {isLoadingResources && resourceItems.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">Loading resource library…</p>
-        ) : resourceItems.length === 0 ? (
-          <div className="mt-3 space-y-2 text-sm text-slate-500">
-            <p>No resources published yet. Share your first playbook from the composer.</p>
-            {resourceEmptyCta}
-          </div>
-        ) : (
-          <>
-            <ul className="mt-4 space-y-3 text-sm text-slate-600">
-              {resourceItems.map((resource) => (
-                <li key={resource.id} className="rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1">
-                      <div className="text-sm font-semibold text-slate-900">{resource.title}</div>
-                      <p className="text-xs text-slate-500">{resource.description ?? 'No description provided.'}</p>
-                      <div className="flex flex-wrap gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                        <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-slate-600">{resource.resourceType}</span>
-                        <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-slate-600">{formatDate(resource.publishedAt)}</span>
-                        {Array.isArray(resource.tags) &&
-                          resource.tags.slice(0, 3).map((tag) => (
-                            <span key={tag} className="rounded-full bg-slate-200/50 px-2 py-0.5 text-slate-500">
-                              #{tag}
-                            </span>
-                          ))}
-                      </div>
-                      {(() => {
-                        const embedUrl = getSafeUrl(resource.metadata?.embedUrl);
-                        if (!embedUrl) return null;
-                        return (
-                          <div className="aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-900/5">
-                            <iframe
-                              title={`${resource.title} preview`}
-                              src={embedUrl}
-                              className="h-full w-full"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                              loading="lazy"
-                              referrerPolicy="strict-origin-when-cross-origin"
-                              sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
-                              allowFullScreen
-                            />
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      {(() => {
-                        const safeLink = getSafeUrl(resource.linkUrl);
-                        if (!safeLink) return null;
-                        const hostLabel = (() => {
-                          try {
-                            return new URL(safeLink).hostname.replace(/^www\./, '');
-                          } catch (error) {
-                            return 'resource';
-                          }
-                        })();
-                        return (
-                          <a
-                            href={safeLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
-                          >
-                            Visit {hostLabel}
-                          </a>
-                        );
-                      })()}
-                      {canManageResources && (
-                        <div className="flex gap-2">
-                          {typeof onEditResource === 'function' && (
-                            <button
-                              type="button"
-                              onClick={() => onEditResource(resource)}
-                              className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                              disabled={isManagingResource}
-                            >
-                              Edit
-                            </button>
-                          )}
-                          {typeof onDeleteResource === 'function' && (
-                            <button
-                              type="button"
-                              onClick={() => onDeleteResource(resource)}
-                              className="inline-flex items-center justify-center rounded-full border border-rose-200 px-3 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                              disabled={isManagingResource}
-                            >
-                              {resourceActionId === resource.id && isManagingResource ? 'Removing…' : 'Remove'}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4 space-y-3 text-xs text-slate-400">
-              <p>
-                Showing {numberFormatter.format(showingCount)} of {numberFormatter.format(totalResources)} items.
-              </p>
-              {showLoadMore && !hasLoadedAll && (
-                <button
-                  type="button"
-                  onClick={onLoadMoreResources}
-                  className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[13px] font-semibold text-primary shadow-sm transition hover:border-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isLoadingResources}
-                >
-                  {isLoadingResources ? 'Loading more resources…' : 'Load more resources'}
-                </button>
-              )}
-              {showLoadMore && hasLoadedAll && (
-                <p>All resources loaded.</p>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+      <CommunityResourceLibrary
+        resources={resourceItems}
+        total={totalResources}
+        isLoading={isLoadingResources}
+        error={resourcesError}
+        notice={resourceNotice}
+        canManage={canManageResources}
+        onAddResource={canManageResources ? onAddResource : null}
+        onEditResource={canManageResources ? onEditResource : null}
+        onDeleteResource={canManageResources ? onDeleteResource : null}
+        onLoadMore={showLoadMore ? onLoadMoreResources : null}
+        isManaging={isManagingResource}
+        actionResourceId={resourceActionId}
+        emptyCta={resourceEmptyCta}
+      />
       {metadataEntries.length > 0 && (
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Operational context</h4>
