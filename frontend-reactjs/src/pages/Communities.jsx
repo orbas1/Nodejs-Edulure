@@ -17,13 +17,15 @@ import {
 } from '../api/communityApi.js';
 import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
-import FeedCard from '../components/FeedCard.jsx';
+import FeedComposer from '../components/FeedComposer.jsx';
 import CommunityInteractiveSuite from '../components/community/CommunityInteractiveSuite.jsx';
 import CommunityCrudManager from '../components/community/CommunityCrudManager.jsx';
 import CommunityChatModule from '../components/community/CommunityChatModule.jsx';
 import CommunityMembersManager from '../components/community/CommunityMembersManager.jsx';
 import CommunityMap from '../components/community/CommunityMap.jsx';
 import CommunityAboutPanel from '../components/community/CommunityAboutPanel.jsx';
+import CommunityFeedList from '../components/community/CommunityFeedList.jsx';
+import CommunityMembershipModal from '../components/community/CommunityMembershipModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
@@ -375,6 +377,7 @@ export default function Communities() {
   const [joinError, setJoinError] = useState(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState(null);
+  const [membershipPrompt, setMembershipPrompt] = useState(null);
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [selectedAddons, setSelectedAddons] = useState([]);
@@ -1038,70 +1041,180 @@ export default function Communities() {
     resources.length
   ]);
 
-  const handleJoin = async () => {
-    if (!selectedCommunityId || selectedCommunityId === 'all' || !canJoinCommunities || !token) return;
-    setIsJoining(true);
-    setJoinError(null);
-    setLeaveError(null);
-    try {
-      const response = await joinCommunity({ communityId: selectedCommunityId, token });
-      const nextDetail = response.data ?? null;
-      if (nextDetail) {
-        setCommunityDetail(nextDetail);
-        setCommunities((prev) =>
-          prev.map((community) =>
-            String(community.id) === String(selectedCommunityId)
-              ? { ...community, ...nextDetail }
-              : community
-          )
-        );
+  const performJoin = useCallback(
+    async (communityId) => {
+      const targetCommunityId = communityId ?? selectedCommunityId;
+      if (!targetCommunityId || targetCommunityId === 'all' || !canJoinCommunities || !token) {
+        return false;
       }
-      await loadCommunityDetail(selectedCommunityId);
-      await loadFeed(selectedCommunityId);
-    } catch (error) {
-      setJoinError(error.message ?? 'Unable to update membership');
-    } finally {
-      setIsJoining(false);
-    }
-  };
+      setIsJoining(true);
+      setJoinError(null);
+      setLeaveError(null);
+      try {
+        const response = await joinCommunity({ communityId: targetCommunityId, token });
+        const nextDetail = response.data ?? null;
+        if (nextDetail) {
+          setCommunityDetail(nextDetail);
+          setCommunities((prev) =>
+            prev.map((community) =>
+              String(community.id) === String(targetCommunityId)
+                ? { ...community, ...nextDetail }
+                : community
+            )
+          );
+        }
+        await loadCommunityDetail(targetCommunityId);
+        await loadFeed(targetCommunityId);
+        return true;
+      } catch (error) {
+        setJoinError(error.message ?? 'Unable to update membership');
+        return false;
+      } finally {
+        setIsJoining(false);
+      }
+    },
+    [selectedCommunityId, canJoinCommunities, token, loadCommunityDetail, loadFeed]
+  );
 
-  const handleLeave = async () => {
-    if (!selectedCommunityId || selectedCommunityId === 'all' || !token) return;
-    setIsLeaving(true);
-    setLeaveError(null);
-    try {
-      const response = await leaveCommunity({ communityId: selectedCommunityId, token });
-      const summary = response.data ?? null;
-      if (summary) {
-        setCommunityDetail(summary);
-        setCommunities((prev) =>
-          prev.map((community) =>
-            String(community.id) === String(selectedCommunityId)
-              ? { ...community, ...summary }
-              : community
-          )
-        );
-      } else {
-        setCommunityDetail((prev) =>
-          prev
-            ? {
-                ...prev,
-                membership: { status: 'non-member', role: 'non-member' },
-                permissions: { ...(prev.permissions ?? {}), canLeave: false }
-              }
-            : prev
-        );
+  const performLeave = useCallback(
+    async (communityId) => {
+      const targetCommunityId = communityId ?? selectedCommunityId;
+      if (!targetCommunityId || targetCommunityId === 'all' || !token) {
+        return false;
       }
-      setResources([]);
-      setResourcesMeta({ ...DEFAULT_RESOURCES_META });
-      setFeedItems([]);
-      setFeedError(null);
-    } catch (error) {
-      setLeaveError(error.message ?? 'Unable to leave this community right now.');
-    } finally {
-      setIsLeaving(false);
+      setIsLeaving(true);
+      setLeaveError(null);
+      try {
+        const response = await leaveCommunity({ communityId: targetCommunityId, token });
+        const summary = response.data ?? null;
+        if (summary) {
+          setCommunityDetail(summary);
+          setCommunities((prev) =>
+            prev.map((community) =>
+              String(community.id) === String(targetCommunityId)
+                ? { ...community, ...summary }
+                : community
+            )
+          );
+        } else {
+          setCommunityDetail((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  membership: { status: 'non-member', role: 'non-member' },
+                  permissions: { ...(prev.permissions ?? {}), canLeave: false }
+                }
+              : prev
+          );
+        }
+        setResources([]);
+        setResourcesMeta({ ...DEFAULT_RESOURCES_META });
+        setFeedItems([]);
+        setFeedError(null);
+        return true;
+      } catch (error) {
+        setLeaveError(error.message ?? 'Unable to leave this community right now.');
+        return false;
+      } finally {
+        setIsLeaving(false);
+      }
+    },
+    [selectedCommunityId, token, loadCommunityDetail, loadFeed]
+  );
+
+  const handleRetryFeed = useCallback(() => {
+    if (!selectedCommunityId || selectedCommunityId === 'all') return;
+    loadFeed(selectedCommunityId);
+  }, [selectedCommunityId, loadFeed]);
+
+  const handlePostCreated = useCallback(() => {
+    if (!selectedCommunityId || selectedCommunityId === 'all') return;
+    loadFeed(selectedCommunityId);
+    loadCommunityDetail(selectedCommunityId);
+  }, [selectedCommunityId, loadFeed, loadCommunityDetail]);
+
+  const composerSlot = useMemo(() => {
+    if (
+      !canAccessCommunityFeed ||
+      !token ||
+      !selectedCommunityId ||
+      selectedCommunityId === 'all'
+    ) {
+      return null;
     }
-  };
+    return (
+      <FeedComposer
+        key={selectedCommunityId}
+        communities={communities}
+        defaultCommunityId={selectedCommunityId}
+        disabled={isLoadingCommunities}
+        onPostCreated={handlePostCreated}
+      />
+    );
+  }, [
+    canAccessCommunityFeed,
+    token,
+    selectedCommunityId,
+    communities,
+    isLoadingCommunities,
+    handlePostCreated
+  ]);
+
+  const monetizationBannerProps = useMemo(() => {
+    if (!selectedCommunityId || selectedCommunityId === 'all') {
+      return {
+        plans: [],
+        addons: [],
+        isLoading: false,
+        error: null,
+        totalDisplay: null,
+        canManage: false
+      };
+    }
+
+    const plansForBanner = subscriptionPlans.map((plan) => ({
+      id: plan.id,
+      name: plan.name,
+      priceCents: plan.priceCents,
+      currency: plan.currency,
+      intervalLabel: plan.interval ?? plan.billingInterval ?? 'month',
+      benefits: plan.benefits
+    }));
+
+    const addonsForBanner = subscriptionAddons.map((addon) => ({
+      id: addon.id,
+      name: addon.name,
+      priceCents: addon.priceCents,
+      currency: addon.currency
+    }));
+
+    const onManageClick = canManageCommunitySubscriptions
+      ? () => {
+          if (typeof document !== 'undefined') {
+            const section = document.getElementById('community-monetization');
+            section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      : undefined;
+
+    return {
+      plans: plansForBanner,
+      addons: addonsForBanner,
+      isLoading: paywallLoading,
+      error: subscriptionError,
+      totalDisplay: totalSubscriptionCostDisplay,
+      canManage: canManageCommunitySubscriptions,
+      onManageClick
+    };
+  }, [
+    selectedCommunityId,
+    subscriptionPlans,
+    subscriptionAddons,
+    paywallLoading,
+    subscriptionError,
+    totalSubscriptionCostDisplay,
+    canManageCommunitySubscriptions
+  ]);
 
   const experienceModules = useMemo(
     () => [
@@ -1166,17 +1279,15 @@ export default function Communities() {
         description: 'Real-time operator updates and collaborative intelligence drops.',
         disabled: !canAccessCommunityFeed,
         render: () => (
-          <div className="space-y-4">
-            {isLoadingFeed ? (
-              <p className="text-sm text-slate-500">Loading live updates…</p>
-            ) : feedError ? (
-              <p className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{feedError}</p>
-            ) : feedItems.length === 0 ? (
-              <p className="text-sm text-slate-500">No live updates published yet.</p>
-            ) : (
-              feedItems.map((post) => <FeedCard key={post.id} post={post} />)
-            )}
-          </div>
+          <CommunityFeedList
+            items={feedItems}
+            isLoading={isLoadingFeed}
+            error={feedError}
+            onRetry={handleRetryFeed}
+            composerSlot={composerSlot}
+            monetization={monetizationBannerProps}
+            emptyLabel="No live updates published yet."
+          />
         )
       },
       {
@@ -1213,6 +1324,60 @@ export default function Communities() {
   const canLeaveCommunity = Boolean(communityPermissions.canLeave);
 
   const liveClassroomSummary = resolvedDetail.classrooms.liveClassroom;
+
+  const modalPlanSummary = useMemo(
+    () =>
+      subscriptionPlans.slice(0, 3).map((plan) => ({
+        id: plan.id,
+        name: plan.name,
+        priceCents: plan.priceCents,
+        currency: plan.currency,
+        intervalLabel: plan.interval ?? plan.billingInterval ?? 'month',
+        benefits: plan.benefits
+      })),
+    [subscriptionPlans]
+  );
+  const modalAddonSummary = useMemo(
+    () =>
+      subscriptionAddons.slice(0, 3).map((addon) => ({
+        id: addon.id,
+        name: addon.name,
+        priceCents: addon.priceCents,
+        currency: addon.currency
+      })),
+    [subscriptionAddons]
+  );
+  const membershipHighlight =
+    resolvedDetail.metadata?.focus || resolvedDetail.description || 'Unlock private updates and monetisation perks.';
+  const nextLiveSession = Array.isArray(resolvedDetail.classrooms.live)
+    ? resolvedDetail.classrooms.live[0] ?? null
+    : null;
+
+  const handleRequestJoin = useCallback(() => {
+    if (!resolvedDetail || selectedCommunityId === 'all') return;
+    setMembershipPrompt({ mode: 'join', communityId: selectedCommunityId });
+  }, [resolvedDetail, selectedCommunityId]);
+
+  const handleRequestLeave = useCallback(() => {
+    if (!resolvedDetail || selectedCommunityId === 'all') return;
+    setMembershipPrompt({ mode: 'leave', communityId: selectedCommunityId });
+  }, [resolvedDetail, selectedCommunityId]);
+
+  const closeMembershipPrompt = useCallback(() => {
+    setMembershipPrompt(null);
+  }, []);
+
+  const handleMembershipConfirm = useCallback(async () => {
+    if (!membershipPrompt) return;
+    const { mode, communityId } = membershipPrompt;
+    const success = mode === 'join' ? await performJoin(communityId) : await performLeave(communityId);
+    if (success) {
+      setMembershipPrompt(null);
+    }
+  }, [membershipPrompt, performJoin, performLeave]);
+
+  const activeMembershipError = membershipPrompt?.mode === 'join' ? joinError : leaveError;
+  const membershipProcessing = membershipPrompt?.mode === 'join' ? isJoining : isLeaving;
 
   if (!canAccessCommunityFeed) {
     return (
@@ -1281,7 +1446,10 @@ export default function Communities() {
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),380px]">
             <div className="space-y-6">
-              <div className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl">
+              <div
+                id="community-monetization"
+                className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl"
+              >
                 <div className="flex flex-col gap-6 lg:flex-row">
                   <div className="lg:w-1/2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-primary">Ratings & reviews</p>
@@ -1460,8 +1628,8 @@ export default function Communities() {
                 communityId={selectedCommunityId}
                 community={resolvedDetail}
                 leaderboard={resolvedDetail.leaderboard}
-                onJoin={handleJoin}
-                onLeave={canLeaveCommunity ? handleLeave : null}
+                onJoin={handleRequestJoin}
+                onLeave={canLeaveCommunity ? handleRequestLeave : null}
                 isJoining={isJoining}
                 isLeaving={isLeaving}
                 joinError={joinError}
@@ -1508,7 +1676,7 @@ export default function Communities() {
                     error={detailError}
                     resourcesError={resourcesError}
                     onLoadMoreResources={hasMoreResources ? handleLoadMoreResources : null}
-                    onLeave={canLeaveCommunity ? handleLeave : null}
+                    onLeave={canLeaveCommunity ? handleRequestLeave : null}
                     isLeaving={isLeaving}
                     canLeave={canLeaveCommunity}
                   />
@@ -1938,6 +2106,25 @@ export default function Communities() {
           </section>
         </div>
       </div>
+      <CommunityMembershipModal
+        isOpen={Boolean(membershipPrompt)}
+        mode={membershipPrompt?.mode ?? 'join'}
+        communityName={resolvedDetail.name}
+        membershipRole={resolvedDetail.membership?.role}
+        membershipStatus={resolvedDetail.membership?.status}
+        planSummary={modalPlanSummary}
+        addonSummary={modalAddonSummary}
+        onConfirm={handleMembershipConfirm}
+        onCancel={closeMembershipPrompt}
+        isProcessing={membershipProcessing}
+        error={activeMembershipError}
+        highlight={membershipHighlight}
+        nextLiveSession={
+          nextLiveSession
+            ? { title: nextLiveSession.title, startsAt: nextLiveSession.startsAt }
+            : null
+        }
+      />
     </div>
   );
 }

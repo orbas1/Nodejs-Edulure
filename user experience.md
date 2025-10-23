@@ -121,19 +121,19 @@ G. **Full Upgrade Plan & Release Steps** – Build unified course card, refactor
 - **Membership controls** – Join/leave buttons, invite modal, role badges.
 
 ### Assessments
-A. **Redundancy Changes** – Merge feed item renderers across community and global feed; centralise membership modals. Adopt `frontend-reactjs/src/components/community/CommunityFeedList.jsx` as the singular renderer and reuse the membership modal defined in `CommunityJoinModal.jsx`.
+A. **Redundancy Changes** – Replace bespoke feed scaffolding with `frontend-reactjs/src/components/community/CommunityFeedList.jsx`, the virtualised renderer now used by both Communities and Feed surfaces. The list consumes shared post data, sponsorship payloads, and the refreshed composer so pagination logic and empty states stay in sync. Membership join/leave flows route through the reusable `CommunityMembershipModal.jsx`, avoiding duplicate confirm dialogs sprinkled across profile and hero cards.
 
-B. **Strengths to Keep** – Keep friendly copy, simple filters (All, Announcements, Questions), and inline composer.
+B. **Strengths to Keep** – Preserve approachable community copy, the All/Announcements/Questions filter set, and the inline composer experience that makes participation feel casual. The modal keeps the friendly tone while layering in monetisation context instead of swapping to a transactional dialog.
 
-C. **Weaknesses to Remove** – Improve media handling, add poll preview images, and prevent overlapping badges. Cache poll assets via `CommunityPostModel` metadata and align badge stacking with the `z-index` tokens defined in `styles/tokens.css`.
+C. **Weaknesses to Remove** – Strengthen media handling by supporting drag-and-drop uploads in `FeedComposer.jsx` and richer render paths in `FeedCard.jsx` (image grids, poll summaries, accessibility-first badge wraps). Poll attachments now ship with progress bars and vote counts, while tags rely on flex gaps rather than ad-hoc absolute positioning so overlaps disappear.
 
-D. **Sesing and Colour Review Changes** – Use soft neutral backgrounds, accent badges with secondary colour, and ensure reaction buttons meet contrast rules.
+D. **Sesing and Colour Review Changes** – Apply soft slate backgrounds, primary-indigo accents, and consistent hover/focus outlines across composer controls, feed buttons, and the modal. Drop-zone drag states lean on primary/amber tokens to communicate status without breaking contrast guidance.
 
-E. **Improvements & Justification Changes** – Introduce shared composer, add drag-and-drop media previews, and integrate community monetisation banners. Drive monetisation banners from `CommunityPaywallTierModel` so offers respect entitlements without manual configuration.
+E. **Improvements & Justification Changes** – Layer monetisation banners (subscription tiers, add-ons) into the feed via `CommunityFeedList` so members see contextual upsells aligned with `CommunityPaywallTierModel` data. Tie the composer’s upload affordances to media metadata (preview URLs, captions) and surface join/leave confirmations that spell out plan value, next live session, and role implications.
 
-F. **Change Checklist Tracker** – Completion 40%; tests for feed pagination; ensure media storage ready; no schema change besides preview metadata.
+F. **Change Checklist Tracker** – Completion 80%; virtualised feed tested with pagination stubs, drag-and-drop composer coverage added, modal workflow wired to existing permissions. No backend schema changes required beyond leveraging existing preview metadata. Poll assets cache via `CommunityPostModel` and monetisation props hydrate from the live paywall API.
 
-G. **Full Upgrade Plan & Release Steps** – Implement shared feed primitives, enhance composer, test moderation tooling, and ship with community rollout.
+G. **Full Upgrade Plan & Release Steps** – Roll out `CommunityFeedList` alongside composer and card refactors, verify modal-driven membership in Communities, Feed, and profile panels, validate monetisation banner scrolling, and coordinate launch messaging with community ops. Follow-up work includes analytics events for drag-upload adoption and feed performance monitoring.
 
 ## 7. Live experiences and support
 

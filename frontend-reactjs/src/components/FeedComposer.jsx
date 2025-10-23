@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 
 import { createCommunityPost } from '../api/communityApi.js';
@@ -9,6 +9,21 @@ const MAX_BODY_LENGTH = 8000;
 const ALLOWED_MEMBER_ROLES = ['owner', 'admin', 'moderator', 'author', 'instructor', 'creator'];
 const DEFAULT_VISIBILITY_OPTIONS = ['members', 'public', 'admins'];
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:']);
+const MAX_MEDIA_ATTACHMENTS = 4;
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function isAcceptableMediaType(type) {
+  if (!type) return false;
+  return type.startsWith('image/');
+}
 
 function normaliseTags(input) {
   if (!input) return [];
@@ -55,6 +70,10 @@ export default function FeedComposer({ communities, defaultCommunityId, disabled
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [mediaDrafts, setMediaDrafts] = useState([]);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const fileInputRef = useRef(null);
+  const mediaDraftsRef = useRef([]);
 
   const composerCommunities = useMemo(() => {
     if (!Array.isArray(communities)) return [];
@@ -154,12 +173,127 @@ export default function FeedComposer({ communities, defaultCommunityId, disabled
     setSuccessMessage(null);
   }, [isExpanded]);
 
+  useEffect(() => {
+    mediaDraftsRef.current = mediaDrafts;
+  }, [mediaDrafts]);
+
+  useEffect(() => {
+    return () => {
+      mediaDraftsRef.current.forEach((draft) => {
+        if (draft?.objectUrl) {
+          URL.revokeObjectURL(draft.objectUrl);
+        }
+      });
+    };
+  }, []);
+
   const resetForm = () => {
     setTitle('');
     setBody('');
     setTagsInput('');
     setVisibility(defaultVisibilityOption);
     setLinkUrl('');
+    setMediaDrafts((previous) => {
+      previous.forEach((draft) => {
+        if (draft?.objectUrl) {
+          URL.revokeObjectURL(draft.objectUrl);
+        }
+      });
+      return [];
+    });
+    setIsDragActive(false);
+  };
+
+  const handleFilesSelected = async (filesList) => {
+    if (!filesList) return;
+    const availableSlots = Math.max(0, MAX_MEDIA_ATTACHMENTS - mediaDraftsRef.current.length);
+    if (availableSlots <= 0) {
+      setError('You can attach up to four images per post. Remove one to upload another.');
+      return;
+    }
+
+    const rawFiles = Array.from(filesList).filter((file) => isAcceptableMediaType(file.type));
+    if (!rawFiles.length) {
+      setError('Only image attachments are supported right now.');
+      return;
+    }
+
+    const selectedFiles = rawFiles.slice(0, availableSlots);
+    const processed = [];
+
+    for (const file of selectedFiles) {
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        const objectUrl = URL.createObjectURL(file);
+        processed.push({
+          id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          dataUrl,
+          objectUrl
+        });
+      } catch (fileError) {
+        // Skip invalid files silently
+      }
+    }
+
+    if (processed.length) {
+      setMediaDrafts((prev) => {
+        const next = [...prev, ...processed].slice(0, MAX_MEDIA_ATTACHMENTS);
+        return next;
+      });
+      setError(null);
+    }
+  };
+
+  const handleMediaInputChange = async (event) => {
+    const { files } = event.target;
+    await handleFilesSelected(files);
+    event.target.value = '';
+  };
+
+  const handleRemoveDraft = (draftId) => {
+    setMediaDrafts((prev) => {
+      const draft = prev.find((item) => item.id === draftId);
+      if (draft?.objectUrl) {
+        URL.revokeObjectURL(draft.objectUrl);
+      }
+      return prev.filter((item) => item.id !== draftId);
+    });
+  };
+
+  const handleDragEnter = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isDragActive) {
+      setIsDragActive(true);
+    }
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isDragActive) {
+      setIsDragActive(true);
+    }
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(false);
+  };
+
+  const handleDrop = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(false);
+    const files = event.dataTransfer?.files;
+    if (files?.length) {
+      setIsExpanded(true);
+      await handleFilesSelected(files);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -209,6 +343,14 @@ export default function FeedComposer({ communities, defaultCommunityId, disabled
     setError(null);
     setSuccessMessage(null);
 
+    const mediaPayload = mediaDrafts.map((draft) => ({
+      type: 'image',
+      name: draft.name,
+      size: draft.size,
+      mimeType: draft.type,
+      dataUrl: draft.dataUrl
+    }));
+
     const payload = {
       title: trimmedTitle ? trimmedTitle : null,
       body: trimmedBody,
@@ -217,6 +359,10 @@ export default function FeedComposer({ communities, defaultCommunityId, disabled
       postType: 'update',
       attachments
     };
+
+    if (mediaPayload.length > 0) {
+      payload.media = mediaPayload;
+    }
 
     try {
       const response = await createCommunityPost({
@@ -244,6 +390,8 @@ export default function FeedComposer({ communities, defaultCommunityId, disabled
       setIsSubmitting(false);
     }
   };
+
+  const mediaSlotsRemaining = Math.max(0, MAX_MEDIA_ATTACHMENTS - mediaDrafts.length);
 
   if (!canCompose) {
     return (
@@ -376,6 +524,69 @@ export default function FeedComposer({ communities, defaultCommunityId, disabled
                     Links are attached to the post so members can open resources instantly.
                   </span>
                 </label>
+
+                <div
+                  className={`rounded-3xl border-2 border-dashed px-4 py-6 text-sm transition ${
+                    isDragActive
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-slate-300 bg-slate-50 text-slate-600'
+                  }`}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={handleMediaInputChange}
+                  />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Media attachments</p>
+                  <p className="mt-2 text-sm">
+                    Drag and drop imagery here or{' '}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="font-semibold text-primary underline-offset-2 transition hover:underline"
+                    >
+                      browse your library
+                    </button>
+                    .
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Supports JPG, PNG, GIF, and WebP. {mediaSlotsRemaining} slot
+                    {mediaSlotsRemaining === 1 ? '' : 's'} remaining.
+                  </p>
+                  {mediaDrafts.length > 0 ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {mediaDrafts.map((draft) => (
+                        <div
+                          key={draft.id}
+                          className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+                        >
+                          <img
+                            src={draft.objectUrl ?? draft.dataUrl}
+                            alt={draft.name}
+                            className="h-32 w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDraft(draft.id)}
+                            className="absolute right-3 top-3 rounded-full bg-slate-900/70 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-900/90"
+                          >
+                            Remove
+                          </button>
+                          <div className="truncate px-3 py-2 text-xs font-semibold text-slate-600">
+                            {draft.name}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
 
                 {error && (
                   <div
