@@ -25,6 +25,43 @@ function formatPrice(amount, currency) {
   }
 }
 
+function formatMinorUnits(amountCents, currency) {
+  if (amountCents === null || amountCents === undefined) {
+    return null;
+  }
+  const numeric = Number(amountCents);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return formatPrice(numeric / 100, currency);
+}
+
+function resolveUpsellToneClasses(tone) {
+  switch (tone) {
+    case 'emerald':
+      return {
+        container: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100/80',
+        price: 'text-emerald-600'
+      };
+    case 'amber':
+      return {
+        container: 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100/80',
+        price: 'text-amber-600'
+      };
+    case 'slate':
+      return {
+        container: 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white',
+        price: 'text-slate-700'
+      };
+    case 'primary':
+    default:
+      return {
+        container: 'border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10',
+        price: 'text-primary-dark'
+      };
+  }
+}
+
 function Badge({ children, tone }) {
   return (
     <span
@@ -100,11 +137,13 @@ export default function CourseCard({
     price,
     currency,
     progressPercent,
-    highlights
+    highlights,
+    upsellBadges
   } = course;
 
   const hasProgress = progressPercent !== undefined && progressPercent !== null;
   const resolvedPrimaryActionLabel = primaryActionLabel ?? (primaryHref ? 'View course' : null);
+  const upsells = Array.isArray(upsellBadges) ? upsellBadges.filter((entry) => entry && entry.label) : [];
 
   return (
     <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
@@ -180,6 +219,49 @@ export default function CourseCard({
             />
           ) : null}
 
+          {upsells.length ? (
+            <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Bundles &amp; support</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {upsells.map((upsell) => {
+                  const key = upsell.productCode ?? `${upsell.label}-${upsell.formattedPrice ?? upsell.priceCents}`;
+                  const Tag = upsell.href ? 'a' : 'div';
+                  const tone = resolveUpsellToneClasses(upsell.tone);
+                  const priceLabel =
+                    typeof upsell.formattedPrice === 'string'
+                      ? upsell.formattedPrice
+                      : formatMinorUnits(upsell.priceCents, upsell.currency) ?? undefined;
+                  const features = Array.isArray(upsell.features) ? upsell.features.filter(Boolean).slice(0, 3) : [];
+                  return (
+                    <Tag
+                      key={key}
+                      className={clsx(
+                        'group flex h-full flex-col gap-1 rounded-2xl border px-4 py-3 text-left shadow-sm transition',
+                        tone.container
+                      )}
+                      href={upsell.href ?? undefined}
+                      target={upsell.href ? '_blank' : undefined}
+                      rel={upsell.href ? 'noopener noreferrer' : undefined}
+                    >
+                      <span className="text-[11px] font-semibold uppercase tracking-wide">{upsell.label}</span>
+                      {priceLabel ? <span className={clsx('text-sm font-semibold', tone.price)}>{priceLabel}</span> : null}
+                      {upsell.description ? (
+                        <span className="text-xs text-slate-600">{upsell.description}</span>
+                      ) : null}
+                      {features.length ? (
+                        <ul className="mt-1 list-disc pl-4 text-[11px] text-slate-500">
+                          {features.map((feature) => (
+                            <li key={`${key}-${feature}`}>{feature}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </Tag>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-2 flex flex-wrap gap-3">
             {resolvedPrimaryActionLabel ? (
               primaryHref ? (
@@ -242,7 +324,20 @@ CourseCard.propTypes = {
     price: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     currency: PropTypes.string,
     progressPercent: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-    highlights: PropTypes.arrayOf(PropTypes.string)
+    highlights: PropTypes.arrayOf(PropTypes.string),
+    upsellBadges: PropTypes.arrayOf(
+      PropTypes.shape({
+        productCode: PropTypes.string,
+        label: PropTypes.string.isRequired,
+        description: PropTypes.string,
+        priceCents: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+        currency: PropTypes.string,
+        formattedPrice: PropTypes.string,
+        tone: PropTypes.oneOf(['primary', 'emerald', 'amber', 'slate']),
+        href: PropTypes.string,
+        features: PropTypes.arrayOf(PropTypes.string)
+      })
+    )
   }).isRequired,
   primaryHref: PropTypes.string,
   onPrimaryAction: PropTypes.func,

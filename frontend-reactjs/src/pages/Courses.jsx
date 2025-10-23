@@ -185,6 +185,7 @@ function mapCatalogueCourse(course) {
     memberCountLabel,
     highlights: Array.isArray(course.highlights) ? course.highlights : [],
     instructor: course.instructorName ?? course.instructor ?? null,
+    upsellBadges: Array.isArray(course.upsellBadges) ? course.upsellBadges : [],
     actions: [
       course.syllabusUrl
         ? { label: 'View syllabus', href: course.syllabusUrl }
@@ -1528,7 +1529,8 @@ export default function Courses() {
                     price: course.priceValue,
                     currency: course.priceCurrency,
                     progressPercent: course.progressPercent,
-                    highlights: course.highlights ?? []
+                    highlights: course.highlights ?? [],
+                    upsellBadges: Array.isArray(course.upsellBadges) ? course.upsellBadges : []
                   }}
                   onPrimaryAction={() => openCheckout(course)}
                   primaryActionLabel="Purchase cohort"
@@ -1581,7 +1583,8 @@ export default function Courses() {
                     memberCount: mapped.memberCountLabel,
                     price: mapped.priceValue,
                     currency: mapped.priceCurrency,
-                    highlights: mapped.highlights ?? []
+                    highlights: mapped.highlights ?? [],
+                    upsellBadges: Array.isArray(mapped.upsellBadges) ? mapped.upsellBadges : []
                   }}
                   onPrimaryAction={() => openCheckout(mapped)}
                   primaryActionLabel="Purchase cohort"

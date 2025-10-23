@@ -3,6 +3,7 @@ import Joi from 'joi';
 import LiveClassroomModel from '../models/LiveClassroomModel.js';
 import CourseModel from '../models/CourseModel.js';
 import TutorProfileModel from '../models/TutorProfileModel.js';
+import MonetizationCatalogItemModel from '../models/MonetizationCatalogItemModel.js';
 import { success } from '../utils/httpResponse.js';
 
 const liveClassroomQuerySchema = Joi.object({
@@ -48,20 +49,63 @@ function withValidationStatus(error) {
   return error;
 }
 
-function mapCourseToCatalogue(course) {
+function formatMoney(amountCents, currency) {
+  const currencyCode = typeof currency === 'string' && currency.trim() ? currency.trim().toUpperCase() : 'USD';
+  const numeric = Number(amountCents ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return `${currencyCode} ${amountCents ?? 0}`;
+  }
+  const value = numeric / 100;
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(value);
+  } catch (_error) {
+    return `${currencyCode} ${value.toFixed(2)}`;
+  }
+}
+
+function buildUpsellBadges(course, catalogItemsByCode) {
+  if (!course) return [];
+  const metadata = course.metadata ?? {};
+  const entries = Array.isArray(metadata.upsellCatalogItems) ? metadata.upsellCatalogItems : [];
+  if (!entries.length || !(catalogItemsByCode instanceof Map)) {
+    return [];
+  }
+  const badges = [];
+  entries.forEach((entry) => {
+    if (!entry) return;
+    const config = typeof entry === 'string' ? { productCode: entry } : entry;
+    const productCode = typeof config?.productCode === 'string' ? config.productCode.trim().toLowerCase() : null;
+    if (!productCode || !catalogItemsByCode.has(productCode)) {
+      return;
+    }
+    const item = catalogItemsByCode.get(productCode);
+    const amountCents = Number(item.unitAmountCents ?? item.metadata?.unitAmountCents ?? 0);
+    const features = Array.isArray(config.features)
+      ? config.features
+      : Array.isArray(item.metadata?.features)
+        ? item.metadata.features
+        : [];
+    badges.push({
+      productCode: item.productCode,
+      label: config.label ?? item.metadata?.badgeLabel ?? item.name,
+      description: config.description ?? item.description ?? null,
+      priceCents: amountCents,
+      currency: item.currency ?? 'USD',
+      formattedPrice: formatMoney(amountCents, item.currency ?? 'USD'),
+      tone: config.tone ?? item.metadata?.badgeTone ?? 'primary',
+      href: config.href ?? item.metadata?.landingPageUrl ?? null,
+      features
+    });
+  });
+  return badges;
+}
+
+function mapCourseToCatalogue(course, { catalogItemsByCode = new Map() } = {}) {
   if (!course) return null;
   const priceAmount = Number(course.priceAmount ?? 0);
-  let formattedPrice = `${course.priceCurrency ?? 'USD'} ${priceAmount}`;
-  if (Number.isFinite(priceAmount)) {
-    try {
-      formattedPrice = new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: course.priceCurrency ?? 'USD'
-      }).format(priceAmount);
-    } catch (_error) {
-      formattedPrice = `${course.priceCurrency ?? 'USD'} ${priceAmount}`;
-    }
-  }
+  const currency = course.priceCurrency ?? 'USD';
+  const formattedPrice = formatMoney(priceAmount, currency);
+  const metadata = course.metadata ?? {};
 
   return {
     id: course.id,
@@ -91,7 +135,9 @@ function mapCourseToCatalogue(course) {
     isPublished: Boolean(course.isPublished),
     releaseAt: course.releaseAt ?? null,
     status: course.status ?? 'draft',
-    metadata: course.metadata ?? {}
+    metadata,
+    upsellBadges: buildUpsellBadges(course, catalogItemsByCode),
+    highlights: Array.isArray(metadata.highlights) ? metadata.highlights : []
   };
 }
 
@@ -193,8 +239,32 @@ export default class CatalogueController {
         })
       ]);
 
+      const upsellProductCodes = new Set();
+      courses.forEach((course) => {
+        const metadata = course?.metadata ?? {};
+        const entries = Array.isArray(metadata.upsellCatalogItems) ? metadata.upsellCatalogItems : [];
+        entries.forEach((entry) => {
+          if (!entry) return;
+          const code = typeof entry === 'string' ? entry : entry?.productCode;
+          if (typeof code === 'string' && code.trim()) {
+            upsellProductCodes.add(code.trim().toLowerCase());
+          }
+        });
+      });
+
+      let catalogItemsByCode = new Map();
+      if (upsellProductCodes.size) {
+        const catalogItems = await MonetizationCatalogItemModel.listByProductCodes(
+          'global',
+          Array.from(upsellProductCodes)
+        );
+        catalogItemsByCode = new Map(
+          catalogItems.map((item) => [item.productCode.trim().toLowerCase(), item])
+        );
+      }
+
       return success(res, {
-        data: courses.map(mapCourseToCatalogue),
+        data: courses.map((course) => mapCourseToCatalogue(course, { catalogItemsByCode })),
         meta: {
           pagination: {
             limit: query.limit,

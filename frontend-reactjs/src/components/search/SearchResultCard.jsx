@@ -41,7 +41,12 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
           price: priceValue,
           currency: hit.price?.currency ?? hit.metrics?.currency ?? 'USD',
           progressPercent: hit.metrics?.progressPercent ?? null,
-          highlights: hit.highlights ?? []
+          highlights: hit.highlights ?? [],
+          upsellBadges: Array.isArray(hit.upsellBadges)
+            ? hit.upsellBadges
+            : Array.isArray(hit.metadata?.upsellBadges)
+              ? hit.metadata.upsellBadges
+              : []
         }}
         primaryHref={primaryAction?.href ?? hit.url ?? undefined}
         primaryActionLabel={primaryAction?.label ?? (primaryAction?.href ? 'View course' : undefined)}
