@@ -117,6 +117,32 @@ function normaliseStringList(values, { maxItems = 12, maxLength = 120 } = {}) {
   return result;
 }
 
+function normaliseDraftString(value, { maxLength = 60 } = {}) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.slice(0, maxLength);
+}
+
+function normaliseDraftTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+  const candidate = value instanceof Date ? value : new Date(value);
+  if (!Number.isNaN(candidate.getTime())) {
+    return candidate.toISOString();
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : null;
+  }
+  return null;
+}
+
 function formatPurchase(purchase) {
   if (!purchase) return null;
   return {
@@ -597,31 +623,39 @@ export default class LearnerDashboardService {
     }
     const draft = existingPreference.preferences.onboardingDraft;
     return {
-      persona: draft.persona ?? null,
-      roleIntent: draft.roleIntent ?? null,
+      persona: normaliseDraftString(draft.persona),
+      roleIntent: normaliseDraftString(draft.roleIntent),
       interestTags: normaliseStringList(draft.interestTags),
       communityInvites: normaliseStringList(draft.communityInvites, { maxItems: 24, maxLength: 36 }),
       progress: {
-        step: draft.progress?.step ?? 'welcome',
+        step: normaliseDraftString(draft.progress?.step) ?? 'welcome',
         completed: normaliseStringList(draft.progress?.completed ?? [], { maxItems: 24, maxLength: 64 })
       },
-      updatedAt: draft.updatedAt ?? null
+      updatedAt: normaliseDraftTimestamp(draft.updatedAt)
     };
   }
 
   static async saveOnboardingDraft(userId, draftPayload = {}) {
     const existingPreference = await LearnerSystemPreferenceModel.getForUser(userId);
     const base = existingPreference ?? DEFAULT_SYSTEM_PREFERENCES;
+    const previousDraft = existingPreference?.preferences?.onboardingDraft ?? {};
 
     const normalisedDraft = {
-      persona: draftPayload.persona ? String(draftPayload.persona).trim().slice(0, 60) : null,
-      roleIntent: draftPayload.roleIntent ? String(draftPayload.roleIntent).trim().slice(0, 60) : null,
+      persona:
+        draftPayload.persona === undefined
+          ? normaliseDraftString(previousDraft.persona)
+          : normaliseDraftString(draftPayload.persona),
+      roleIntent:
+        draftPayload.roleIntent === undefined
+          ? normaliseDraftString(previousDraft.roleIntent)
+          : normaliseDraftString(draftPayload.roleIntent),
       interestTags: normaliseStringList(draftPayload.interestTags, { maxItems: 16, maxLength: 60 }),
       communityInvites: normaliseStringList(draftPayload.communityInvites, { maxItems: 24, maxLength: 40 }),
       progress: {
-        step: draftPayload.progress?.step
-          ? String(draftPayload.progress.step).trim().slice(0, 60)
-          : existingPreference?.preferences?.onboardingDraft?.progress?.step ?? 'welcome',
+        step:
+          draftPayload.progress?.step === undefined
+            ? normaliseDraftString(previousDraft.progress?.step) ?? 'welcome'
+            : normaliseDraftString(draftPayload.progress.step) ?? 'welcome',
         completed: normaliseStringList(
           draftPayload.progress?.completed ??
             existingPreference?.preferences?.onboardingDraft?.progress?.completed ?? [],

@@ -26,6 +26,15 @@ const sealSensitive = (value) => {
   return Buffer.concat([iv, authTag, encrypted]);
 };
 
+const buildPreferencePayload = (overrides = {}) =>
+  JSON.stringify({
+    interfaceDensity: 'comfortable',
+    analyticsOptIn: true,
+    subtitleLanguage: 'en',
+    audioDescription: false,
+    ...overrides
+  });
+
 const buildEncryptedKycDocument = (
   verificationId,
   documentType,
@@ -100,6 +109,7 @@ export async function seed(knex) {
     await trx('payment_ledger_entries').del();
     await trx('payment_refunds').del();
     await trx('payment_intents').del();
+    await trx('learner_finance_purchases').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flag_tenant_states').del();
     await trx('feature_flags').del();
@@ -152,6 +162,7 @@ export async function seed(knex) {
     await trx('kyc_verifications').del();
     await trx('user_sessions').del();
     await trx('user_email_verification_tokens').del();
+    await trx('learner_system_preferences').del();
     await trx('user_profiles').del();
     await trx('communities').del();
     await trx('users').del();
@@ -216,6 +227,79 @@ export async function seed(knex) {
       badge: 'Learner',
       colors: ['#3b82f6', '#1d4ed8']
     });
+
+    const timestampBase = Date.now();
+    const instructorDraftUpdatedAt = new Date(timestampBase).toISOString();
+    const learnerDraftUpdatedAt = new Date(timestampBase - 5 * 60 * 1000).toISOString();
+
+    await trx('learner_system_preferences').insert([
+      {
+        user_id: adminId,
+        language: 'en',
+        region: 'US',
+        timezone: 'America/Chicago',
+        notifications_enabled: true,
+        digest_enabled: false,
+        auto_play_media: false,
+        high_contrast: false,
+        reduced_motion: false,
+        preferences: buildPreferencePayload({ analyticsOptIn: false }),
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        user_id: instructorId,
+        language: 'en',
+        region: 'JP',
+        timezone: 'Asia/Tokyo',
+        notifications_enabled: true,
+        digest_enabled: true,
+        auto_play_media: true,
+        high_contrast: false,
+        reduced_motion: false,
+        preferences: buildPreferencePayload({
+          onboardingDraft: {
+            persona: 'persona-instructor',
+            roleIntent: 'instructor',
+            interestTags: ['Automation playbooks', 'Community building'],
+            communityInvites: ['community-ops-lab'],
+            progress: {
+              step: 'profile',
+              completed: ['profile', 'community']
+            },
+            updatedAt: instructorDraftUpdatedAt
+          }
+        }),
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        user_id: learnerId,
+        language: 'en',
+        region: 'BR',
+        timezone: 'America/Sao_Paulo',
+        notifications_enabled: true,
+        digest_enabled: true,
+        auto_play_media: false,
+        high_contrast: false,
+        reduced_motion: true,
+        preferences: buildPreferencePayload({
+          onboardingDraft: {
+            persona: 'persona-learner',
+            roleIntent: 'user',
+            interestTags: ['Design systems', 'Product analytics'],
+            communityInvites: ['community-growth-guild', 'community-design-circle'],
+            progress: {
+              step: 'registration',
+              completed: ['profile', 'interests']
+            },
+            updatedAt: learnerDraftUpdatedAt
+          }
+        }),
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      }
+    ]);
 
     await trx('user_profiles').insert([
       {

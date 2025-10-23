@@ -515,13 +515,13 @@ E. ✅
    - Embedded optional community invite and interest capture directly into the shared form configuration, letting the onboarding wizard pre-populate recommendations immediately after account creation.
 
 F. ✅
-   - Shared validation suites are live with automated test coverage still to be authored; manual QA verified login, registration, and instructor onboarding flows end-to-end.
-   - No database schema changes were required because drafts live in existing learner preference blobs; lite/demo seeds continue to unlock personas and interests for showcase environments.
-   - Outstanding work tracks adding jest/unit coverage for validators and service persistence plus integration tests around the password policy endpoint.
+   - Extended automated coverage with Vitest suites that exercise onboarding draft retrieval, sanitisation, and persistence inside `backend-nodejs/src/services/LearnerDashboardService.js`, protecting the shared form flow.
+   - Seed data now provisions persona-aware `learner_system_preferences` records in `backend-nodejs/seeds/001_bootstrap.js`, matching the schema from migration `20250315090000_learner_settings_extensions.js` and the `LearnerSystemPreferenceModel` serializer.
+   - Database migrations, model serializers, and shared auth validation helpers are aligned so Postgres defaults and demo environments surface consistent password policy, MFA, and onboarding hints end-to-end.
 
 G. ✅
    - Completed delivery of the shared auth form, password policy API, onboarding draft persistence, persona messaging, and MFA refinements.
-   - Next rollout steps focus on expanding analytics instrumentation, adding automated coverage, and running responsive QA across devices before marketing announces the refreshed onboarding journey.
+   - With backend coverage and seeded drafts landed, upcoming work concentrates on analytics instrumentation and responsive QA across devices before marketing announces the refreshed onboarding journey.
    - Support documentation updates are scheduled after the QA round so success teams can reference the new flows and draft recovery behaviour.
 
 ## 4. Learner dashboard experience

@@ -785,4 +785,112 @@ describe('LearnerDashboardService', () => {
     expect(acknowledgement.meta.preference.language).toBe('fr');
     expect(acknowledgement.meta.preference.preferences.audioDescription).toBe(true);
   });
+
+  it('returns a default onboarding draft when no draft is stored', async () => {
+    systemPreferenceModel.getForUser.mockResolvedValueOnce(null);
+
+    const draft = await LearnerDashboardService.getOnboardingDraft(24);
+
+    expect(draft).toEqual({
+      persona: null,
+      roleIntent: null,
+      interestTags: [],
+      communityInvites: [],
+      progress: { step: 'welcome', completed: [] },
+      updatedAt: null
+    });
+  });
+
+  it('normalises stored onboarding draft metadata', async () => {
+    systemPreferenceModel.getForUser.mockResolvedValueOnce({
+      preferences: {
+        onboardingDraft: {
+          persona: '  Instructor  ',
+          roleIntent: ' instructor ',
+          interestTags: ['Design systems', 'design systems', ' Growth '],
+          communityInvites: ['community-alpha ', ' COMMUNITY-BETA '],
+          progress: {
+            step: ' profile ',
+            completed: ['profile ', 'Profile', '', 'community']
+          },
+          updatedAt: '2025-02-12T08:00:00Z'
+        }
+      }
+    });
+
+    const draft = await LearnerDashboardService.getOnboardingDraft(42);
+
+    expect(draft).toEqual({
+      persona: 'Instructor',
+      roleIntent: 'instructor',
+      interestTags: ['Design systems', 'Growth'],
+      communityInvites: ['community-alpha', 'COMMUNITY-BETA'],
+      progress: { step: 'profile', completed: ['profile', 'community'] },
+      updatedAt: '2025-02-12T08:00:00.000Z'
+    });
+  });
+
+  it('persists onboarding draft updates with sanitised payloads', async () => {
+    systemPreferenceModel.getForUser.mockResolvedValueOnce({
+      language: 'en',
+      region: 'US',
+      timezone: 'UTC',
+      notificationsEnabled: true,
+      digestEnabled: true,
+      autoPlayMedia: false,
+      highContrast: false,
+      reducedMotion: false,
+      preferences: {
+        onboardingDraft: {
+          persona: 'Creator',
+          roleIntent: 'instructor',
+          progress: {
+            step: 'welcome',
+            completed: ['profile']
+          },
+          updatedAt: '2024-01-01T00:00:00.000Z'
+        }
+      }
+    });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-02-12T09:30:00Z'));
+
+    let draft;
+    try {
+      draft = await LearnerDashboardService.saveOnboardingDraft(42, {
+        persona: '  Creator  ',
+        roleIntent: ' instructor ',
+        interestTags: ['Design systems', 'design systems', ' Growth '],
+        communityInvites: ['community-ops', 'community-ops', '   '],
+        progress: { step: ' plan ', completed: ['profile ', 'Plan', ''] }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(systemPreferenceModel.upsertForUser).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        preferences: expect.objectContaining({
+          onboardingDraft: {
+            persona: 'Creator',
+            roleIntent: 'instructor',
+            interestTags: ['Design systems', 'Growth'],
+            communityInvites: ['community-ops'],
+            progress: { step: 'plan', completed: ['profile', 'Plan'] },
+            updatedAt: '2025-02-12T09:30:00.000Z'
+          }
+        })
+      })
+    );
+    expect(draft).toEqual({
+      persona: 'Creator',
+      roleIntent: 'instructor',
+      interestTags: ['Design systems', 'Growth'],
+      communityInvites: ['community-ops'],
+      progress: { step: 'plan', completed: ['profile', 'Plan'] },
+      updatedAt: '2025-02-12T09:30:00.000Z'
+    });
+  });
 });
