@@ -68,6 +68,114 @@ function normaliseAnalyticsTargets(targets) {
   };
 }
 
+function ensureBlockId(id, index) {
+  if (id) return `${id}`;
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `block-${index}-${Date.now()}`;
+}
+
+function normaliseBlock(block, index = 0) {
+  if (!block) return null;
+  const type = block.type ?? block.kind ?? 'paragraph';
+  const data = typeof block.data === 'object' && block.data !== null ? block.data : {};
+  const resolvedType = ['heading', 'paragraph', 'media', 'callout', 'list'].includes(type) ? type : 'paragraph';
+
+  const defaults = {
+    heading: { text: '', level: 2 },
+    paragraph: { text: '' },
+    media: { url: '', caption: '' },
+    callout: { text: '', tone: 'info' },
+    list: { items: [] }
+  };
+
+  const resolvedData = { ...defaults[resolvedType], ...data };
+  if (resolvedType === 'list') {
+    if (!Array.isArray(resolvedData.items)) {
+      resolvedData.items = toArray(resolvedData.items);
+    }
+    if (resolvedData.items.length === 0) {
+      resolvedData.items = [''];
+    }
+  }
+
+  return {
+    id: ensureBlockId(block.id ?? block.blockId ?? block.key, index),
+    type: resolvedType,
+    data: resolvedData
+  };
+}
+
+function serialiseBlock(block, index = 0) {
+  if (!block) return null;
+  const normalised = normaliseBlock(block, index);
+  return {
+    id: normalised.id,
+    type: normalised.type,
+    data: normalised.data
+  };
+}
+
+function serialiseBlocks(blocks) {
+  return (Array.isArray(blocks) ? blocks : []).map((block, index) => serialiseBlock(block, index)).filter(Boolean);
+}
+
+function normaliseChecklistTask(task, index = 0) {
+  if (!task) return null;
+  return {
+    id: `${task.id ?? task.taskId ?? index}`,
+    label: task.label ?? task.title ?? 'Task',
+    description: task.description ?? '',
+    milestoneKey: task.milestoneKey ?? task.milestone_key ?? null,
+    completed: Boolean(task.completed ?? task.isComplete ?? task.done),
+    completedAt: toIsoDate(task.completedAt ?? task.completed_at),
+    dueAt: toIsoDate(task.dueAt ?? task.due_at),
+    blockedReason: task.blockedReason ?? task.blocked_reason ?? null
+  };
+}
+
+function normaliseChecklist(payload) {
+  if (!Array.isArray(payload)) return [];
+  return payload.map(normaliseChecklistTask).filter(Boolean);
+}
+
+function normaliseProjectEarnings(payload) {
+  if (!payload) return null;
+  const summary = typeof payload.summary === 'object' && payload.summary !== null ? payload.summary : payload;
+
+  const nextPayout = summary.nextPayout ?? summary.next_payout ?? null;
+  const normalisedNextPayout = nextPayout
+    ? {
+        expectedAt: toIsoDate(nextPayout.expectedAt ?? nextPayout.expected_at),
+        displayAmount: nextPayout.displayAmount ?? nextPayout.amount_display ?? null
+      }
+    : null;
+
+  const topProducts = Array.isArray(summary.topProducts ?? summary.top_products)
+    ? (summary.topProducts ?? summary.top_products).map((product) => ({
+        id: product.id ?? product.productId ?? product.sku ?? null,
+        name: product.name ?? 'Unnamed',
+        contributionPercent: Number(product.contributionPercent ?? product.contribution_percent ?? 0)
+      }))
+    : [];
+
+  return {
+    grossCents: Number(summary.grossCents ?? summary.gross_cents ?? 0),
+    netCents: Number(summary.netCents ?? summary.net_cents ?? 0),
+    currency: summary.currency ?? 'USD',
+    changePercentage: Number(summary.changePercentage ?? summary.change_percent ?? 0),
+    bookings: Number(summary.bookings ?? summary.totalBookings ?? 0),
+    averageSellingPriceCents: Number(
+      summary.averageSellingPriceCents ?? summary.avgSellingPriceCents ?? summary.average_selling_price_cents ?? 0
+    ),
+    averageSellingPriceDisplay:
+      summary.averageSellingPriceDisplay ?? summary.avgSellingPriceDisplay ?? summary.average_selling_price_display ?? null,
+    nextPayout: normalisedNextPayout,
+    topProducts
+  };
+}
+
 function normaliseComplianceNotes(notes) {
   if (!Array.isArray(notes)) return [];
   return notes
@@ -98,6 +206,11 @@ function normaliseProject(project) {
     : Array.isArray(project.content_outline)
     ? project.content_outline
     : [];
+  const rawBlocks = Array.isArray(project.contentBlocks)
+    ? project.contentBlocks
+    : Array.isArray(metadata.blocks)
+    ? metadata.blocks
+    : [];
 
   const collaborators = Array.isArray(project.collaborators)
     ? project.collaborators.map(normaliseCollaborator).filter(Boolean)
@@ -105,6 +218,12 @@ function normaliseProject(project) {
 
   const activeSessions = Array.isArray(project.activeSessions)
     ? project.activeSessions.map(normaliseSession).filter(Boolean)
+    : [];
+
+  const monetisationGuidance = Array.isArray(metadata.monetisationGuidance)
+    ? metadata.monetisationGuidance
+    : Array.isArray(metadata.monetizationGuidance)
+    ? metadata.monetizationGuidance
     : [];
 
   return {
@@ -131,7 +250,10 @@ function normaliseProject(project) {
     collaboratorCount: Number.isFinite(Number(project.collaboratorCount))
       ? Number(project.collaboratorCount)
       : collaborators.length,
-    activeSessions
+    activeSessions,
+    contentBlocks: rawBlocks.map((block, index) => normaliseBlock(block, index)).filter(Boolean),
+    contentUpdatedAt: toIsoDate(project.contentUpdatedAt ?? project.content_updated_at),
+    monetisationGuidance
   };
 }
 
@@ -402,6 +524,119 @@ export async function fetchAnalyticsSummary({ token, range = '30d', ownerId, sig
   return response.data;
 }
 
+export async function saveProjectContent(publicId, payload = {}, { token, signal } = {}) {
+  if (!token) throw new Error('Authentication token is required to save project content');
+  if (!publicId) throw new Error('Project identifier is required');
+
+  const response = await httpClient.put(
+    `/creation/projects/${publicId}/content`,
+    {
+      blocks: serialiseBlocks(payload.blocks ?? []),
+      summary: payload.summary,
+      metadata: payload.metadata
+    },
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [
+          `creation:project:${publicId}:${token}`,
+          `creation:projects:${token}`,
+          'creation:recommendations',
+          'creation:recommendations:self',
+          'creation:analytics',
+          'creation:analytics:self'
+        ]
+      }
+    }
+  );
+
+  const data = response.data ?? response;
+  const blocks = Array.isArray(data?.blocks)
+    ? data.blocks.map((block, index) => normaliseBlock(block, index)).filter(Boolean)
+    : serialiseBlocks(payload.blocks ?? []);
+
+  return {
+    blocks,
+    summary: data?.summary ?? payload.summary ?? '',
+    metadata: typeof data?.metadata === 'object' && data.metadata !== null ? data.metadata : payload.metadata ?? {},
+    updatedAt: toIsoDate(data?.updatedAt ?? data?.updated_at)
+  };
+}
+
+export async function getProjectChecklist(publicId, { token, signal } = {}) {
+  if (!token) throw new Error('Authentication token is required to load project checklist');
+  if (!publicId) throw new Error('Project identifier is required');
+
+  const response = await httpClient.get(`/creation/projects/${publicId}/checklist`, {
+    token,
+    signal,
+    cache: {
+      ttl: 1000 * 30,
+      tags: [`creation:project:${publicId}:${token}`, `creation:checklist:${publicId}:${token}`]
+    }
+  });
+
+  const data = response.data ?? response;
+  const tasks = Array.isArray(data?.tasks) ? normaliseChecklist(data.tasks) : normaliseChecklist(data);
+  return {
+    tasks,
+    updatedAt: toIsoDate(data?.updatedAt ?? data?.updated_at)
+  };
+}
+
+export async function updateProjectChecklist(publicId, payload = {}, { token, signal } = {}) {
+  if (!token) throw new Error('Authentication token is required to update project checklist');
+  if (!publicId) throw new Error('Project identifier is required');
+  if (!payload?.taskId) throw new Error('Checklist task identifier is required');
+
+  const response = await httpClient.patch(
+    `/creation/projects/${publicId}/checklist`,
+    {
+      taskId: payload.taskId,
+      completed: Boolean(payload.completed)
+    },
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [
+          `creation:project:${publicId}:${token}`,
+          `creation:checklist:${publicId}:${token}`,
+          'creation:recommendations'
+        ]
+      }
+    }
+  );
+
+  const data = response.data ?? response;
+  const tasks = Array.isArray(data?.tasks) ? normaliseChecklist(data.tasks) : normaliseChecklist(data);
+  return {
+    tasks,
+    updatedAt: toIsoDate(data?.updatedAt ?? data?.updated_at)
+  };
+}
+
+export async function fetchProjectEarnings(publicId, { token, signal, range = '30d' } = {}) {
+  if (!token) throw new Error('Authentication token is required to load project earnings');
+  if (!publicId) throw new Error('Project identifier is required');
+
+  const params = {};
+  if (range) params.range = range;
+
+  const response = await httpClient.get(`/creation/projects/${publicId}/earnings`, {
+    token,
+    signal,
+    params,
+    cache: {
+      ttl: 1000 * 60,
+      tags: [`creation:earnings:${publicId}:${range}:${token}`]
+    }
+  });
+
+  return normaliseProjectEarnings(response.data ?? response);
+}
+
 export async function fetchRecommendations({ token, limit, includeHistory = false, ownerId, signal } = {}) {
   if (!token) throw new Error('Authentication token is required to load recommendations');
   const params = {};
@@ -442,7 +677,11 @@ export const creationStudioApi = {
   startCollaborationSession,
   endCollaborationSession,
   fetchAnalyticsSummary,
-  fetchRecommendations
+  fetchRecommendations,
+  saveProjectContent,
+  getProjectChecklist,
+  updateProjectChecklist,
+  fetchProjectEarnings
 };
 
 export default creationStudioApi;

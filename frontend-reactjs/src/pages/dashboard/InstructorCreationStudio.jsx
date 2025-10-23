@@ -7,6 +7,7 @@ import { creationStudioApi } from '../../api/creationStudioApi.js';
 import CreationStudioSummary from './instructor/creationStudio/CreationStudioSummary.jsx';
 import CreationProjectList from './instructor/creationStudio/CreationProjectList.jsx';
 import CreationWizardStepper from './instructor/creationStudio/CreationWizardStepper.jsx';
+import CreationContentWorkspace from './instructor/creationStudio/CreationContentWorkspace.jsx';
 import CreationAssetLibrary from './instructor/creationStudio/CreationAssetLibrary.jsx';
 import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 import CreationCollaboratorsPanel from './instructor/creationStudio/CreationCollaboratorsPanel.jsx';
@@ -51,6 +52,21 @@ function InstructorCreationStudio() {
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [recommendationsError, setRecommendationsError] = useState(null);
 
+  const [editorBlocks, setEditorBlocks] = useState([]);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [saveDrafting, setSaveDrafting] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+
+  const [checklist, setChecklist] = useState([]);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistError, setChecklistError] = useState(null);
+  const [pendingChecklistIds, setPendingChecklistIds] = useState([]);
+
+  const [earnings, setEarnings] = useState(null);
+  const [earningsLoading, setEarningsLoading] = useState(false);
+  const [earningsError, setEarningsError] = useState(null);
+
   const summary = useMemo(() => calculateProjectSummary(projects), [projects]);
 
   const selectedProject = useMemo(
@@ -67,6 +83,25 @@ function InstructorCreationStudio() {
     () => (projectDetail ? findActiveSessionForUser(projectDetail.activeSessions, currentUserId) : null),
     [projectDetail, currentUserId]
   );
+
+  useEffect(() => {
+    if (!projectDetail) {
+      setEditorBlocks([]);
+      setEditorDirty(false);
+      setLastSavedAt(null);
+      return;
+    }
+
+    const candidateBlocks = Array.isArray(projectDetail.contentBlocks) && projectDetail.contentBlocks.length
+      ? projectDetail.contentBlocks
+      : Array.isArray(projectDetail.metadata?.blocks)
+      ? projectDetail.metadata.blocks
+      : [];
+
+    setEditorBlocks(candidateBlocks);
+    setEditorDirty(false);
+    setLastSavedAt(projectDetail.contentUpdatedAt ?? projectDetail.updatedAt ?? null);
+  }, [projectDetail]);
 
   const loadProjects = useCallback(() => {
     if (!token) return;
@@ -181,6 +216,66 @@ function InstructorCreationStudio() {
 
   useEffect(() => {
     if (!token || !selectedProjectId) {
+      setChecklist([]);
+      setChecklistError(null);
+      setChecklistLoading(false);
+      setPendingChecklistIds([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    setChecklistLoading(true);
+    setChecklistError(null);
+
+    creationStudioApi
+      .getProjectChecklist(selectedProjectId, { token, signal: controller.signal })
+      .then((payload) => {
+        const tasks = Array.isArray(payload?.tasks) ? payload.tasks : Array.isArray(payload) ? payload : [];
+        setChecklist(tasks);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setChecklistError(error instanceof Error ? error : new Error('Failed to load checklist'));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setChecklistLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedProjectId, token]);
+
+  useEffect(() => {
+    if (!token || !selectedProjectId) {
+      setEarnings(null);
+      setEarningsError(null);
+      setEarningsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setEarningsLoading(true);
+    setEarningsError(null);
+
+    creationStudioApi
+      .fetchProjectEarnings(selectedProjectId, { token, signal: controller.signal, range: '30d' })
+      .then((payload) => setEarnings(payload ?? null))
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setEarningsError(error instanceof Error ? error : new Error('Failed to load earnings'));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setEarningsLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedProjectId, token]);
+
+  useEffect(() => {
+    if (!token || !selectedProjectId) {
       setProjectDetail(null);
       return;
     }
@@ -266,6 +361,67 @@ function InstructorCreationStudio() {
     [token]
   );
 
+  const handleBlocksChange = useCallback((nextBlocks) => {
+    setEditorBlocks(nextBlocks);
+    setEditorDirty(true);
+  }, []);
+
+  const handleSaveDraft = useCallback(async () => {
+    if (!token || !selectedProjectId) {
+      return;
+    }
+
+    setSaveDrafting(true);
+    setSaveError(null);
+
+    try {
+      const response = await creationStudioApi.saveProjectContent(
+        selectedProjectId,
+        {
+          blocks: editorBlocks,
+          summary: projectDetail?.summary ?? ''
+        },
+        { token }
+      );
+
+      const savedBlocks = Array.isArray(response?.blocks) ? response.blocks : editorBlocks;
+      setEditorBlocks(savedBlocks);
+      setEditorDirty(false);
+      setLastSavedAt(response?.updatedAt ?? new Date().toISOString());
+    } catch (error) {
+      setSaveError(error instanceof Error ? error : new Error('Failed to save content draft'));
+    } finally {
+      setSaveDrafting(false);
+    }
+  }, [editorBlocks, projectDetail?.summary, selectedProjectId, token]);
+
+  const handleToggleChecklistTask = useCallback(
+    async (taskId, completed) => {
+      if (!token || !selectedProjectId) {
+        return;
+      }
+
+      setPendingChecklistIds((prev) => (prev.includes(taskId) ? prev : [...prev, taskId]));
+      setChecklistError(null);
+
+      try {
+        const payload = await creationStudioApi.updateProjectChecklist(
+          selectedProjectId,
+          { taskId, completed },
+          { token }
+        );
+
+        const tasks = Array.isArray(payload?.tasks) ? payload.tasks : Array.isArray(payload) ? payload : checklist;
+        setChecklist(tasks);
+      } catch (error) {
+        setChecklistError(error instanceof Error ? error : new Error('Failed to update checklist'));
+      } finally {
+        setPendingChecklistIds((prev) => prev.filter((id) => id !== taskId));
+      }
+    },
+    [checklist, selectedProjectId, token]
+  );
+
   if (role !== 'instructor') {
     return (
       <DashboardStateMessage
@@ -336,6 +492,32 @@ function InstructorCreationStudio() {
           sessionError={sessionError}
           onStartSession={handleStartSession}
           onEndSession={() => handleEndSession(activeSession)}
+        />
+      ) : null}
+
+      {projectDetail ? (
+        <CreationContentWorkspace
+          project={projectDetail}
+          blocks={editorBlocks}
+          onBlocksChange={handleBlocksChange}
+          onSave={handleSaveDraft}
+          saving={saveDrafting}
+          dirty={editorDirty}
+          saveError={saveError}
+          lastSavedAt={lastSavedAt}
+          checklist={checklist}
+          checklistLoading={checklistLoading}
+          checklistError={checklistError}
+          onToggleTask={handleToggleChecklistTask}
+          checklistPending={pendingChecklistIds}
+          monetisationGuidance={
+            projectDetail.metadata?.monetisationGuidance ??
+            projectDetail.metadata?.monetizationGuidance ??
+            []
+          }
+          earnings={earnings}
+          earningsLoading={earningsLoading}
+          earningsError={earningsError}
         />
       ) : null}
 
