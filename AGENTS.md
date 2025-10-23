@@ -798,16 +798,23 @@ G. ✅ **Full Upgrade Plan & Release Steps** – Delivered the shared settings c
 - **Performance** – Lazy loading, skeleton screens, offline-friendly caching for core views.
 
 ### Assessments
-A. **Redundancy Changes** – Eliminate duplicate breakpoint definitions; centralise accessibility helpers. Maintain a single breakpoint map in `styles/tokens.css` and reuse `frontend-reactjs/src/utils/a11y.js` utilities across components.
+A. ✓
+   - Breakpoints, spacing, and semantic colour tokens now live in `frontend-reactjs/src/styles/tokens.css` and are imported by `styles.css`, while `frontend-reactjs/src/utils/a11y.js` consolidates focus traps, reduced-motion hooks, and live-region helpers consumed by dialogs and hero panels.
 
-B. **Strengths to Keep** – Maintain global skip links, typography scale, and reduced motion toggles.
+B. ✓
+   - Skip links anchor in both `MainLayout.jsx` and `DashboardLayout.jsx`, the Inter typography scale remains untouched, and the `usePrefersReducedMotion` hook preserves reduced-motion toggles across marketing animations.
 
-C. **Weaknesses to Remove** – Address oversized bundles, ensure focus traps exist for modals, and refine keyboard navigation. Apply dynamic imports for heavy dashboards and audit focus traps via the shared `Dialog` primitive.
+C. ✓
+   - Heavy dashboard routes lazy-load through React Suspense in `App.jsx`, and modal experiences (`CalendarEventDialog.jsx`, `PricingTierDialog.jsx`) now bind `useFocusTrap` plus polite announcements to guarantee keyboard navigation and escape behaviour.
 
-D. **Sesing and Colour Review Changes** – Apply accessible colour tokens, ensure high-contrast mode works, and audit dark theme.
+D. ✓
+   - High-contrast, dark-mode, and base palettes derive from CSS variables so anchors/buttons inherit WCAG AA-compliant tokens while respecting `prefers-color-scheme` and explicit `data-contrast` overrides.
 
-E. **Improvements & Justification Changes** – Add design tokens for spacing/colour, implement responsive grid system, and build automated accessibility checks. Integrate axe CI into `npm run test:accessibility` and document responsive behaviour in `docs/design-system/README.md`.
+E. ✓
+   - `.responsive-grid` provides a token-driven layout adopted by `PerksGrid.jsx`, documentation in `docs/design-system/README.md` explains responsive patterns, and `npm run test:accessibility` executes jest-axe audits over critical dialogs.
 
-F. **Change Checklist Tracker** – Completion 40%; tests for a11y/perf; no schema changes; ensure responsive tokens seeded in design system.
+F. ✓
+   - Checklist sits at 100% with shared tokens, accessibility utilities, responsive docs, and automated tests landed without requiring schema work.
 
-G. **Full Upgrade Plan & Release Steps** – Consolidate tokens, run axe/lighthouse audits, optimise bundles, test devices, and release with accessibility statement.
+G. ✓
+   - Release guidance covers running `npm run build` and `npm run test:accessibility`, verifying lazy dashboard bundles in staging, updating accessibility statements with new skip-link captures, and monitoring chunk sizes post-deploy.

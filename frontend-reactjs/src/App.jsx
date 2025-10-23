@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout.jsx';
 import Home from './pages/Home.jsx';
@@ -23,17 +24,13 @@ import TutorProfile from './pages/TutorProfile.jsx';
 import IntegrationCredentialInvite from './pages/IntegrationCredentialInvite.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
-import DashboardLayout from './layouts/DashboardLayout.jsx';
 import Setup from './pages/Setup.jsx';
-import DashboardHome from './pages/dashboard/DashboardHome.jsx';
 import LearnerCommunities from './pages/dashboard/LearnerCommunities.jsx';
 import LearnerCourses from './pages/dashboard/LearnerCourses.jsx';
 import CourseViewer from './pages/dashboard/CourseViewer.jsx';
 import DashboardCalendar from './pages/dashboard/DashboardCalendar.jsx';
 import DashboardBookingsSwitch from './pages/dashboard/DashboardBookingsSwitch.jsx';
 import DashboardEbooksSwitch from './pages/dashboard/DashboardEbooksSwitch.jsx';
-import LearnerFinancial from './pages/dashboard/LearnerFinancial.jsx';
-import LearnerGrowth from './pages/dashboard/LearnerGrowth.jsx';
 import BecomeInstructor from './pages/dashboard/BecomeInstructor.jsx';
 import DashboardAffiliate from './pages/dashboard/DashboardAffiliate.jsx';
 import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
@@ -42,7 +39,6 @@ import InstructorCommunityManage from './pages/dashboard/InstructorCommunityMana
 import InstructorCommunityChats from './pages/dashboard/InstructorCommunityChats.jsx';
 import InstructorCommunityWebinars from './pages/dashboard/InstructorCommunityWebinars.jsx';
 import InstructorCommunityPodcasts from './pages/dashboard/InstructorCommunityPodcasts.jsx';
-import InstructorCommunityOperations from './pages/dashboard/InstructorCommunityOperations.jsx';
 import InstructorCourseCreate from './pages/dashboard/InstructorCourseCreate.jsx';
 import InstructorCourseLibrary from './pages/dashboard/InstructorCourseLibrary.jsx';
 import InstructorCourseManage from './pages/dashboard/InstructorCourseManage.jsx';
@@ -53,20 +49,13 @@ import InstructorTutorManagement from './pages/dashboard/InstructorTutorManageme
 import InstructorServiceSuite from './pages/dashboard/InstructorServiceSuite.jsx';
 import InstructorProjects from './pages/dashboard/InstructorProjects.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
-import InstructorGrowth from './pages/dashboard/InstructorGrowth.jsx';
-import EdulureAds from './pages/dashboard/EdulureAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
 import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
-import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
 import FieldServices from './pages/dashboard/FieldServices.jsx';
 import AdminOperator from './pages/dashboard/AdminOperator.jsx';
 import AdminGovernance from './pages/dashboard/AdminGovernance.jsx';
-import AdminIntegrations from './pages/dashboard/AdminIntegrations.jsx';
 import AdminFinanceMonetisation from './pages/dashboard/admin/AdminFinanceMonetisation.jsx';
-import AdminSupportHub from './pages/dashboard/admin/AdminSupportHub.jsx';
-import AdminTrustSafety from './pages/dashboard/admin/AdminTrustSafety.jsx';
-import AdminControl from './pages/dashboard/AdminControl.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
 import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
@@ -74,14 +63,33 @@ import CommunitySafety from './pages/dashboard/community/CommunitySafety.jsx';
 import CommunityCommunications from './pages/dashboard/community/CommunityCommunications.jsx';
 import LearnerSocial from './pages/dashboard/LearnerSocial.jsx';
 import LearnerCommunityChats from './pages/dashboard/LearnerCommunityChats.jsx';
-import LearnerSupport from './pages/dashboard/LearnerSupport.jsx';
-import LearnerSettings from './pages/dashboard/LearnerSettings.jsx';
+const DashboardLayout = lazy(() => import('./layouts/DashboardLayout.jsx'));
+const DashboardHome = lazy(() => import('./pages/dashboard/DashboardHome.jsx'));
+const LearnerFinancial = lazy(() => import('./pages/dashboard/LearnerFinancial.jsx'));
+const LearnerGrowth = lazy(() => import('./pages/dashboard/LearnerGrowth.jsx'));
+const LearnerSupport = lazy(() => import('./pages/dashboard/LearnerSupport.jsx'));
+const LearnerSettings = lazy(() => import('./pages/dashboard/LearnerSettings.jsx'));
+const DashboardSettings = lazy(() => import('./pages/dashboard/DashboardSettings.jsx'));
+const InstructorCommunityOperations = lazy(() => import('./pages/dashboard/InstructorCommunityOperations.jsx'));
+const InstructorGrowth = lazy(() => import('./pages/dashboard/InstructorGrowth.jsx'));
+const EdulureAds = lazy(() => import('./pages/dashboard/EdulureAds.jsx'));
+const AdminIntegrations = lazy(() => import('./pages/dashboard/AdminIntegrations.jsx'));
+const AdminSupportHub = lazy(() => import('./pages/dashboard/admin/AdminSupportHub.jsx'));
+const AdminTrustSafety = lazy(() => import('./pages/dashboard/admin/AdminTrustSafety.jsx'));
+const AdminControl = lazy(() => import('./pages/dashboard/AdminControl.jsx'));
 
 function App() {
   return (
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600" role="status">
+          Loading the Edulure experience…
+        </div>
+      }
+    >
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/instructor" element={<InstructorRegister />} />
@@ -340,7 +348,8 @@ function App() {
           )}
         />
       </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }
 

@@ -14,6 +14,7 @@
     "lint": "eslint \"src\"",
     "lint:fix": "eslint \"src\" --fix",
     "test": "vitest run --coverage",
+    "test:accessibility": "vitest run test/accessibility --reporter=basic",
     "test:release": "vitest run test/release --reporter=basic",
     "audit:dependencies": "npm audit --audit-level=moderate",
     "sdk:build": "npm run --prefix ../sdk-typescript build",

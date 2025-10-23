@@ -184,6 +184,9 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
+      <a className="skip-link" href="#dashboard-main">
+        Skip to dashboard content
+      </a>
       <AppTopBar
         session={session}
         onLogout={logout}
@@ -212,7 +215,11 @@ export default function DashboardLayout() {
           statusByRoute={sidebarStatuses}
           pinnedIds={pinnedNavigation}
         />
-        <main className="flex-1 overflow-y-auto bg-slate-25 px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+        <main
+          id="dashboard-main"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto bg-slate-25 px-4 pb-16 pt-6 sm:px-6 lg:px-8"
+        >
           {loading ? (
             <DashboardStateMessage
               variant="loading"

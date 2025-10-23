@@ -97,6 +97,9 @@ export default function MainLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <AppTopBar
         session={session}
         onLogout={logout}
@@ -114,7 +117,11 @@ export default function MainLayout() {
         callToAction={null}
       />
       <ServiceHealthBanner />
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8"
+      >
         <Outlet />
       </main>
       <footer className="border-t border-slate-200 bg-white/90 px-4 py-6 text-sm text-slate-500 sm:px-6 lg:px-8">

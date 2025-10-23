@@ -1,3 +1,5 @@
+import clsx from 'clsx';
+
 import { useLanguage } from '../context/LanguageContext.jsx';
 import LanguageSelector from '../components/navigation/LanguageSelector.jsx';
 import MarketingHero from '../components/marketing/MarketingHero.jsx';
@@ -15,6 +17,7 @@ import communitiesPreview from '../assets/home/preview/communities.svg';
 import coursesPreview from '../assets/home/preview/courses.svg';
 import liveEventsPreview from '../assets/home/preview/live-events.svg';
 import libraryPreview from '../assets/home/preview/library.svg';
+import { usePrefersReducedMotion } from '../utils/a11y.js';
 
 const HERO_CHIP_KEYS = [
   { key: 'home.hero.chips.communities', fallback: 'Communities' },
@@ -102,13 +105,20 @@ const MAX_PLAN_FEATURES = 6;
 const HIGHLIGHT_KEYS = ['highlightOne', 'highlightTwo', 'highlightThree'];
 
 function HeroPreviewPanel({ t }) {
+  const shouldReduceMotion = usePrefersReducedMotion();
   return (
     <div className="relative mx-auto max-w-xl">
       <span className="sr-only">{t('home.hero.illustrationAlt', 'Collage of instructors and learners collaborating')}</span>
       <div className="absolute -left-16 -top-20 h-36 w-36 rounded-full bg-primary/40 blur-3xl" aria-hidden="true" />
       <div className="absolute -right-10 bottom-0 h-48 w-48 rounded-full bg-emerald-500/30 blur-[140px]" aria-hidden="true" />
       <div className="absolute left-12 top-12 h-16 w-16 rounded-full border border-white/20" aria-hidden="true" />
-      <div className="absolute right-10 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/10 text-xs font-semibold uppercase tracking-[0.3em] text-white/60 shadow-lg backdrop-blur-md animate-pulse" aria-hidden="true">
+      <div
+        className={clsx(
+          'absolute right-10 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/10 text-xs font-semibold uppercase tracking-[0.3em] text-white/60 shadow-lg backdrop-blur-md',
+          { 'animate-pulse': !shouldReduceMotion }
+        )}
+        aria-hidden="true"
+      >
         Flow
       </div>
       <div className="relative grid gap-6 rounded-[3rem] border border-white/10 bg-white/5 p-6 shadow-[0_40px_80px_-32px_rgba(15,23,42,0.7)] backdrop-blur-xl sm:p-8">
