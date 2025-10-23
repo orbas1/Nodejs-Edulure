@@ -731,6 +731,10 @@ describe('LearnerDashboardService', () => {
     expect(preferences.language).toBe('en');
     expect(preferences.preferences.interfaceDensity).toBe('comfortable');
     expect(preferences.notificationsEnabled).toBe(true);
+    expect(preferences.preferences.recommendedTopics).toEqual(
+      expect.arrayContaining(['community-building', 'learner-success'])
+    );
+    expect(preferences.preferences.adPersonalisation).toBe(true);
   });
 
   it('updates system preferences and returns acknowledgement metadata', async () => {
@@ -784,5 +788,9 @@ describe('LearnerDashboardService', () => {
     );
     expect(acknowledgement.meta.preference.language).toBe('fr');
     expect(acknowledgement.meta.preference.preferences.audioDescription).toBe(true);
+    expect(acknowledgement.meta.preference.preferences.recommendedTopics).toEqual(
+      expect.arrayContaining(['community-building'])
+    );
+    expect(acknowledgement.meta.preference.preferences.adPersonalisation).toBe(true);
   });
 });

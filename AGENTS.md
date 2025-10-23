@@ -775,19 +775,19 @@ G. **Full Upgrade Plan & Release Steps** – Unify admin layout, refactor tables
 - **Personalisation** – Interests, learning goals, ad preferences.
 
 ### Assessments
-A. **Redundancy Changes** – Merge duplicate settings forms across learner/instructor dashboards; reuse toggles. Drive both from `frontend-reactjs/src/components/settings/SettingsLayout.jsx`.
+A. ✅ **Redundancy Changes** – Consolidated learner and admin settings shells around the shared `SettingsLayout`, `SettingsToggleField`, and `SettingsAccordion` primitives so both dashboards inherit identical spacing, status messaging, and toggle semantics. Refactored `LearnerSettings.jsx` and `DashboardSettings.jsx` to consume the shared layout, eliminating bespoke headers, cards, and checkbox wiring while keeping action handlers unchanged.
 
-B. **Strengths to Keep** – Maintain autosave feedback, preview panel, and inline guidance.
+B. ✅ **Strengths to Keep** – Preserved autosave and acknowledgement flows by centralising status banners in `SettingsLayout` and retaining optimistic updates plus refresh hooks in `LearnerSettings.jsx`. The preview grid and contextual helper copy continue to render alongside forms, with updated copy emphasising learner guidance rather than removing existing reassurance patterns.
 
-C. **Weaknesses to Remove** – Improve image cropping, reduce tab sprawl, and fix inconsistent notifications. Adopt the cropper from `components/media/AvatarCropper.jsx` and condense sections using accordions.
+C. ✅ **Weaknesses to Remove** – Introduced the reusable `AvatarCropper.jsx` with zoom/offset controls and circular masking, embedded inside `ProfileIdentityEditor.jsx` to replace the previous static upload field. Collapsed sprawling settings tabs into responsive accordions driven by `SettingsAccordion.jsx`, which now avoids nested buttons, exposes proper focus outlines, and positions section actions predictably.
 
-D. **Sesing and Colour Review Changes** – Keep neutral panel, highlight important toggles, and ensure error states are accessible.
+D. ✅ **Sesing and Colour Review Changes** – Harmonised surfaces with neutral white/stone backgrounds, subtle borders, and focus-visible rings that meet contrast targets. Toggle states leverage primary accent shades, and alert banners follow status-specific palettes (sky/emerald/amber/rose) to keep error messaging accessible across dashboards.
 
-E. **Improvements & Justification Changes** – Add avatar cropper, integrate recommended content preview, and expose ad preference toggles. Pull recommendations from `LearnerSystemPreferenceModel` and display ad toggles referencing Edulure Ads data usage statements.
+E. ✅ **Improvements & Justification Changes** – Added personalisation controls that surface ad and sponsored toggles, recommended-topic text inputs, and a live recommendation preview built from backend helpers. `LearnerDashboardService.js` now normalises ad metadata, seeds recommendation defaults, and rebuilds previews so UI payloads align with learner preferences, while the frontend renders the preview cards and Edulure Ads data usage copy inline.
 
-F. **Change Checklist Tracker** – Completion 45%; tests for preference saving; ensure defaults seeded; schema updates for ad preferences.
+F. ✅ **Change Checklist Tracker** – All preference flows covered by updated vitest suites (`LearnerSettings` and `ProfileIdentityEditor`) and backend unit tests for `LearnerDashboardService`. Default seeds extend ad personalisation fields, avatar handling is exercised via the cropper component, and finance dialogs expose ARIA-compliant modals to match accessibility expectations.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared settings components, add cropping tool, integrate preview, test flows, and release with onboarding email.
+G. ✅ **Full Upgrade Plan & Release Steps** – Delivered the shared settings components, avatar cropper, ad preference wiring, and recommendation preview end-to-end. Updated dialogs with `role="dialog"`, executed backend/frontend vitest runs, and documented the new architecture here so onboarding and release comms can highlight the unified settings experience.
 
 ## 17. Accessibility and responsiveness
 

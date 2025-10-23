@@ -241,6 +241,8 @@ function computeEngagementScore({
   return clampScore(total);
 }
 
+const DEFAULT_RECOMMENDED_TOPICS = Object.freeze(['community-building', 'learner-success', 'automation']);
+
 const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
   language: 'en',
   region: 'US',
@@ -254,7 +256,12 @@ const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
     interfaceDensity: 'comfortable',
     analyticsOptIn: true,
     subtitleLanguage: 'en',
-    audioDescription: false
+    audioDescription: false,
+    adPersonalisation: true,
+    sponsoredHighlights: true,
+    adDataUsageAcknowledged: false,
+    recommendedTopics: DEFAULT_RECOMMENDED_TOPICS,
+    recommendationPreview: []
   }
 });
 
@@ -310,6 +317,94 @@ function normaliseFieldServiceAttachments(value) {
       }
     });
   return attachments;
+}
+
+
+const RECOMMENDATION_LIBRARY = Object.freeze([
+  {
+    id: 'course-async-leadership',
+    topic: 'community-building',
+    title: 'Design async learning rituals',
+    category: 'Course',
+    descriptor: 'Course • 6 lessons',
+    imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80'
+  },
+  {
+    id: 'community-cohort-kickoff',
+    topic: 'learner-success',
+    title: 'Launch your next cohort with confidence',
+    category: 'Playbook',
+    descriptor: 'Guide • 12 steps',
+    imageUrl: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=900&q=80'
+  },
+  {
+    id: 'ops-automation',
+    topic: 'automation',
+    title: 'Automate learner check-ins',
+    category: 'Workflow',
+    descriptor: 'Automation • 4 rules',
+    imageUrl: 'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?auto=format&fit=crop&w=900&q=80'
+  }
+]);
+
+function normaliseRecommendedTopics(value) {
+  if (!value) {
+    return [...DEFAULT_RECOMMENDED_TOPICS];
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((topic) => String(topic ?? '').trim().toLowerCase())
+      .filter((topic) => topic.length > 0)
+      .slice(0, 6);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => entry.length > 0)
+      .slice(0, 6);
+  }
+  return [...DEFAULT_RECOMMENDED_TOPICS];
+}
+
+function buildRecommendationPreview(topics = []) {
+  const topicSet = new Set((topics ?? []).map((topic) => String(topic ?? '').toLowerCase()));
+  const curated = [];
+  RECOMMENDATION_LIBRARY.forEach((item) => {
+    if (topicSet.size === 0 || topicSet.has(item.topic.toLowerCase())) {
+      curated.push(item);
+    }
+  });
+  if (curated.length < 3) {
+    RECOMMENDATION_LIBRARY.forEach((item) => {
+      if (!curated.includes(item)) {
+        curated.push(item);
+      }
+    });
+  }
+  return curated.slice(0, 3).map((item) => ({
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    descriptor: item.descriptor,
+    imageUrl: item.imageUrl
+  }));
+}
+
+function normaliseRecommendationPreview(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item, index) => ({
+      id: item?.id ?? `recommendation-${index}`,
+      title: item?.title ?? null,
+      category: item?.category ?? item?.type ?? 'Course',
+      descriptor: item?.descriptor ?? item?.subtitle ?? '',
+      imageUrl: item?.imageUrl ?? item?.coverImage ?? ''
+    }))
+    .filter((item) => Boolean(item.id) && Boolean(item.title))
+    .slice(0, 3);
 }
 
 async function buildFieldServiceAssignment({ userId, order, connection = db }) {
@@ -455,6 +550,15 @@ export default class LearnerDashboardService {
     if (!stored) {
       return { ...DEFAULT_SYSTEM_PREFERENCES };
     }
+    const mergedPreferences = {
+      ...DEFAULT_SYSTEM_PREFERENCES.preferences,
+      ...(stored.preferences ?? {})
+    };
+    const recommendedTopics = normaliseRecommendedTopics(mergedPreferences.recommendedTopics);
+    const storedPreview = normaliseRecommendationPreview(mergedPreferences.recommendationPreview);
+    const recommendationPreview = storedPreview.length
+      ? storedPreview
+      : buildRecommendationPreview(recommendedTopics);
     return {
       id: stored.id ?? null,
       language: stored.language ?? DEFAULT_SYSTEM_PREFERENCES.language,
@@ -467,8 +571,9 @@ export default class LearnerDashboardService {
       highContrast: stored.highContrast ?? DEFAULT_SYSTEM_PREFERENCES.highContrast,
       reducedMotion: stored.reducedMotion ?? DEFAULT_SYSTEM_PREFERENCES.reducedMotion,
       preferences: {
-        ...DEFAULT_SYSTEM_PREFERENCES.preferences,
-        ...(stored.preferences ?? {})
+        ...mergedPreferences,
+        recommendedTopics,
+        recommendationPreview
       },
       createdAt: stored.createdAt ?? null,
       updatedAt: stored.updatedAt ?? null
@@ -500,6 +605,23 @@ export default class LearnerDashboardService {
       ...(existingPreference?.preferences ?? {})
     };
     const interfaceDensity = rawPreferences.interfaceDensity;
+    const recommendedTopics = normaliseRecommendedTopics(
+      rawPreferences.recommendedTopics ?? basePreferences.recommendedTopics
+    );
+    const adPersonalisation =
+      rawPreferences.adPersonalisation !== undefined
+        ? Boolean(rawPreferences.adPersonalisation)
+        : basePreferences.adPersonalisation;
+    const sponsoredHighlights =
+      rawPreferences.sponsoredHighlights !== undefined
+        ? Boolean(rawPreferences.sponsoredHighlights)
+        : basePreferences.sponsoredHighlights;
+    const adDataUsageAcknowledged = adPersonalisation
+      ? true
+      : rawPreferences.adDataUsageAcknowledged !== undefined
+        ? Boolean(rawPreferences.adDataUsageAcknowledged)
+        : basePreferences.adDataUsageAcknowledged;
+    const recommendationPreview = buildRecommendationPreview(recommendedTopics);
     const normalisedPreferences = {
       ...basePreferences,
       ...rawPreferences,
@@ -517,7 +639,12 @@ export default class LearnerDashboardService {
       audioDescription:
         rawPreferences.audioDescription !== undefined
           ? Boolean(rawPreferences.audioDescription)
-          : basePreferences.audioDescription
+          : basePreferences.audioDescription,
+      adPersonalisation,
+      sponsoredHighlights,
+      adDataUsageAcknowledged,
+      recommendedTopics,
+      recommendationPreview
     };
 
     const preference = await LearnerSystemPreferenceModel.upsertForUser(userId, {
