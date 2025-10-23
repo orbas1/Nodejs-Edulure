@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   buildCommunityDashboard,
@@ -9,8 +9,46 @@ import {
   calculateLearningStreak,
   humanizeRelativeTime
 } from '../src/services/DashboardService.js';
-import { buildComplianceRiskHeatmap, buildScamSummary, summariseIncidentQueue } from '../src/services/OperatorDashboardService.js';
 import { normaliseMonetization, resolveDefaultMonetization } from '../src/services/PlatformSettingsService.js';
+
+vi.mock('../src/controllers/CommunityModerationController.js', () => ({
+  __esModule: true,
+  default: {
+    flagPost: vi.fn(),
+    listCases: vi.fn(),
+    getCase: vi.fn(),
+    listCaseActions: vi.fn(),
+    applyCaseAction: vi.fn(),
+    undoCaseAction: vi.fn(),
+    listScamReports: vi.fn(),
+    submitScamReport: vi.fn(),
+    updateScamReport: vi.fn(),
+    recordAnalyticsEvent: vi.fn(),
+    getAnalyticsSummary: vi.fn()
+  }
+}));
+
+let buildComplianceRiskHeatmap;
+let buildScamSummary;
+let summariseIncidentQueue;
+let composeRevenueSnapshot;
+let buildOperationsSnapshot;
+let buildActivitySnapshot;
+let buildBlogSnapshot;
+let buildDashboardMeta;
+
+beforeAll(async () => {
+  ({
+    buildComplianceRiskHeatmap,
+    buildScamSummary,
+    summariseIncidentQueue,
+    composeRevenueSnapshot,
+    buildOperationsSnapshot,
+    buildActivitySnapshot,
+    buildBlogSnapshot,
+    buildDashboardMeta
+  } = await import('../src/services/OperatorDashboardService.js'));
+});
 
 describe('DashboardService helpers', () => {
   it('calculates learning streak with contiguous days', () => {
@@ -50,6 +88,259 @@ describe('DashboardService helpers', () => {
 
     expect(sameHour).toBe('45m ago');
     expect(daysAgo).toBe('5d ago');
+  });
+});
+
+describe('OperatorDashboardService helpers', () => {
+  it('composes revenue snapshot from BI and payment data', () => {
+    const executiveOverview = {
+      timeframe: { days: 30 },
+      scorecard: {
+        netRevenue: { cents: 25000000, change: { percentage: 5 } },
+        recognisedRevenue: { cents: 24000000 }
+      },
+      topCommunities: [
+        {
+          communityId: 'comm-1',
+          name: 'DesignOps',
+          recognisedRevenueCents: 12000000,
+          comments: 340,
+          share: 55.5,
+          change: { percentage: 4.2 }
+        }
+      ]
+    };
+
+    const savedViews = {
+      views: [
+        {
+          id: 'overall-30d',
+          currency: 'USD',
+          totals: {
+            grossVolumeCents: 32000000,
+            recognisedVolumeCents: 24000000,
+            discountCents: 1500000,
+            refundedCents: 500000,
+            intents: {
+              succeededIntents: 180,
+              processingIntents: 12,
+              requiresActionIntents: 3,
+              failedIntents: 5
+            }
+          },
+          change: {
+            recognisedVolume: { percentage: 6.5 }
+          }
+        }
+      ]
+    };
+
+    const paymentsRow = {
+      succeededIntents: 185,
+      processingIntents: 10,
+      requiresActionIntents: 4,
+      failedIntents: 6,
+      refundedCents: 600000
+    };
+
+    const snapshot = composeRevenueSnapshot({ executiveOverview, savedViews, paymentsRow });
+
+    expect(snapshot.overview.netRevenue).toBe('$250,000');
+    expect(snapshot.overview.arr).toBe('$2,880,000');
+    expect(snapshot.overview.netRevenueChange).toBe('▲ +5.0%');
+    expect(snapshot.paymentHealth).toMatchObject({ succeeded: 185, processing: 10, requiresAction: 4, failed: 6 });
+    expect(snapshot.topCommunities[0]).toMatchObject({
+      id: 'comm-1',
+      name: 'DesignOps',
+      revenue: '$120,000',
+      subscribers: 340,
+      trend: '▲ +4.2%'
+    });
+    expect(snapshot.refundsPendingCents).toBe(500000);
+    expect(snapshot.currency).toBe('USD');
+  });
+
+  it('builds operations snapshot with integrations and launch context', () => {
+    const queueSummary = {
+      totalOpen: 7,
+      severityCounts: { critical: 2, high: 1 },
+      medianAckMinutes: 45,
+      watchers: 320
+    };
+    const complianceSnapshot = {
+      queue: [{}, {}],
+      manualReviewQueue: 3
+    };
+    const platformSnapshot = {
+      totalUsers: 1200,
+      newUsers30d: 120,
+      newUsersChange: '+12.0%',
+      communitiesLive: 8,
+      instructors: 45
+    };
+    const revenueSnapshot = {
+      paymentHealth: { processing: 4, failed: 2 },
+      refundsPendingCents: 350000,
+      currency: 'USD'
+    };
+    const integrationSnapshot = {
+      integrations: [
+        {
+          id: 'zapier',
+          enabled: true,
+          label: 'Zapier',
+          health: { status: 'operational', score: 92 },
+          category: 'Automation',
+          owner: 'Ops',
+          summary: { successRate: 98, openFailures: 1, recordsPushed: 1200 },
+          reconciliation: { latestGeneratedAt: '2024-01-05T12:00:00Z' }
+        },
+        {
+          id: 'stripe',
+          enabled: false,
+          name: 'Stripe',
+          health: 'warning',
+          summary: { successRate: 80, openFailures: 2, recordsPushed: 800, recordsFailed: 100 },
+          callHealth: { errorRate: 0.02 }
+        }
+      ],
+      concurrency: { activeJobs: 3, maxConcurrentJobs: 10 },
+      pipelineValue: 'high',
+      occupancy: 0.8,
+      generatedAt: '2024-01-06T10:00:00Z'
+    };
+    const upcomingLaunches = [
+      {
+        id: 'launch-1',
+        title: 'Course Launch',
+        community: 'Courses',
+        startAt: '2024-01-15T12:00:00Z',
+        owner: 'Team',
+        status: 'scheduled'
+      }
+    ];
+
+    const snapshot = buildOperationsSnapshot({
+      queueSummary,
+      complianceSnapshot,
+      platformSnapshot,
+      revenueSnapshot,
+      integrationSnapshot,
+      upcomingLaunches,
+      now: new Date('2024-01-10T12:00:00Z')
+    });
+
+    expect(snapshot.support).toMatchObject({ backlog: 7, pendingMemberships: 2, followRequests: 3, avgResponseMinutes: 45 });
+    expect(snapshot.risk).toMatchObject({ payoutsProcessing: 4, failedPayments: 2, refundsPending: '$3,500', alertsOpen: 3 });
+    expect(snapshot.platform).toMatchObject({ totalUsers: 1200, newUsers30d: 120, newUsersChange: '+12.0%' });
+    expect(snapshot.upcomingLaunches).toHaveLength(1);
+    expect(snapshot.tools.summary.cards).toHaveLength(4);
+    expect(snapshot.tools.listing[0]).toMatchObject({ id: 'zapier', status: 'operational', owner: 'Ops' });
+  });
+
+  it('builds activity snapshot with alerts and events', () => {
+    const now = new Date('2024-01-10T12:00:00Z');
+    const activeIncidents = [
+      {
+        incidentUuid: 'inc-1',
+        severity: 'HIGH',
+        reportedAt: '2024-01-10T10:00:00Z',
+        metadata: { summary: 'Payment delays' },
+        resolution: { resolvedAt: '2024-01-10T11:00:00Z' }
+      }
+    ];
+    const timeline = [
+      {
+        id: 'evt-1',
+        category: 'Payments',
+        timestamp: '2024-01-10T11:30:00Z',
+        label: 'Capture queue cleared'
+      }
+    ];
+
+    const snapshot = buildActivitySnapshot(activeIncidents, timeline, now);
+
+    expect(snapshot.alerts[0]).toMatchObject({ id: 'inc-1', severity: 'high', message: 'Payment delays' });
+    expect(snapshot.alerts[0].detectedLabel).toBe('2 hours ago');
+    expect(snapshot.alerts[0].resolvedLabel).toBe('1 hour ago');
+    expect(snapshot.events[0]).toMatchObject({ entity: 'Payments', summary: 'Capture queue cleared' });
+  });
+
+  it('normalises blog snapshot rows', () => {
+    const summaryRows = [
+      { status: 'published', total: '3' },
+      { status: 'draft', total: 2 },
+      { status: 'scheduled', total: '1' }
+    ];
+    const recentPosts = [
+      {
+        id: 1,
+        slug: 'ops-update',
+        title: 'Ops Update',
+        status: 'published',
+        publishedAt: '2024-01-09T12:00:00Z',
+        readingTimeMinutes: 5,
+        views: 120
+      }
+    ];
+    const totalViewsRow = { totalViews: '450' };
+
+    const snapshot = buildBlogSnapshot({ summaryRows, recentPosts, totalViewsRow });
+
+    expect(snapshot.summary).toMatchObject({ published: 3, drafts: 2, scheduled: 1, totalViews: 450 });
+    expect(snapshot.recent[0]).toMatchObject({ id: 1, slug: 'ops-update', views: 120 });
+  });
+
+  it('builds dashboard meta from runtime configuration values', () => {
+    const runtimeValues = {
+      'admin.console.escalation-channel': '#ops-channel',
+      'admin.console.policy-owner': 'Trust & Safety',
+      'admin.console.policy-contact': 'mailto:compliance@edulure.com?subject=ops',
+      'admin.console.policy-status': 'Operational',
+      'admin.console.policy-sla-hours': 16,
+      'admin.console.policy-last-reviewed': '2024-01-08T12:00:00Z',
+      'admin.console.policy-hub-url': '/policies'
+    };
+    const runtimeConfig = {
+      getValue: vi.fn((key, _options) => runtimeValues[key])
+    };
+    const now = new Date('2024-01-10T12:00:00Z');
+
+    const meta = buildDashboardMeta({
+      runtimeConfig,
+      tenantId: 'tenant-1',
+      now,
+      manifestGeneratedAt: '2024-01-10T11:00:00Z',
+      operationalScore: { score: 92 }
+    });
+
+    expect(meta.policy).toMatchObject({
+      owner: 'Trust & Safety',
+      contact: 'mailto:compliance@edulure.com?subject=ops',
+      status: 'Operational',
+      slaHours: 16,
+      hubUrl: '/policies',
+      escalationChannel: '#ops-channel',
+      lastReviewedAt: '2024-01-08T12:00:00.000Z',
+      lastReviewedRelative: '2024-01-08'
+    });
+    expect(meta.helperText).toContain('Use saved views');
+    expect(meta.helperText).toContain('Policy status: Operational.');
+    expect(meta.helperText).toContain('Reviews target 16h SLA.');
+    expect(meta.helperText).toContain('Last reviewed 2024-01-08.');
+    expect(meta.helperText).toContain('Handbook: /policies.');
+    expect(meta.helperText).toContain('Contact mailto:compliance@edulure.com?subject=ops for escalations.');
+    expect(meta.note).toBe('Escalation channel: #ops-channel. Policy owner: Trust & Safety.');
+  });
+
+  it('falls back to defaults when runtime configuration is unavailable', () => {
+    const now = new Date('2024-01-10T12:00:00Z');
+
+    const meta = buildDashboardMeta({ runtimeConfig: null, tenantId: 'tenant-2', now });
+
+    expect(meta.helperText).toContain('Use saved views');
+    expect(meta.policy.owner).toBe('Trust & Safety');
+    expect(meta.note).toBe('Escalation channel: #admin-escalations. Policy owner: Trust & Safety.');
   });
 });
 

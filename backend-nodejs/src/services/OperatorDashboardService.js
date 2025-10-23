@@ -1,5 +1,6 @@
 import logger from '../config/logger.js';
 import { env } from '../config/env.js';
+import db from '../config/database.js';
 import CapabilityManifestService from './CapabilityManifestService.js';
 import IntegrationDashboardService from './IntegrationDashboardService.js';
 import SecurityIncidentModel from '../models/SecurityIncidentModel.js';
@@ -8,6 +9,7 @@ import ComplianceService from './ComplianceService.js';
 import AuditEventService from './AuditEventService.js';
 import dataPartitionService from './DataPartitionService.js';
 import storageService from './StorageService.js';
+import BusinessIntelligenceService from './BusinessIntelligenceService.js';
 import PlatformSettingsService, {
   normaliseAdminProfile as exportedNormaliseAdminProfile,
   normalisePaymentSettings as exportedNormalisePaymentSettings,
@@ -16,6 +18,7 @@ import PlatformSettingsService, {
   normaliseFinanceSettings as exportedNormaliseFinanceSettings,
   normaliseMonetization as exportedNormaliseMonetization
 } from './PlatformSettingsService.js';
+import { runtimeConfigService } from './FeatureFlagService.js';
 
 const mergeWithDefaults = (defaults, payload) => {
   const base = structuredClone(defaults);
@@ -162,6 +165,85 @@ const EVIDENCE_ACCESS_ROLES = evidenceRoleOverrides.length
   ? evidenceRoleOverrides
   : ['admin', 'compliance_manager', 'legal'];
 
+const currencyFormatterCache = new Map();
+const percentFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const relativeFormatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+const DEFAULT_DASHBOARD_HELPER_TEXT =
+  'Use saved views, task lists, and the operations handbook to triage incidents, finance checks, and integrations quickly.';
+const DEFAULT_ESCALATION_CHANNEL = '#admin-escalations';
+const DEFAULT_POLICY_OWNER = 'Trust & Safety';
+const DEFAULT_POLICY_CONTACT = 'mailto:compliance@edulure.com';
+const DEFAULT_POLICY_STATUS = 'Operational';
+const DEFAULT_POLICY_HUB_URL = '/policies';
+const DEFAULT_POLICY_SLA_HOURS = 24;
+
+function getCurrencyFormatter(currency = 'USD', { minimumFractionDigits = 0, maximumFractionDigits = 0 } = {}) {
+  const key = `${currency}:${minimumFractionDigits}:${maximumFractionDigits}`;
+  if (!currencyFormatterCache.has(key)) {
+    currencyFormatterCache.set(
+      key,
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits,
+        maximumFractionDigits
+      })
+    );
+  }
+  return currencyFormatterCache.get(key);
+}
+
+function formatCurrencyValue(value, currency = 'USD', { denominator = 100, minimumFractionDigits = 0, maximumFractionDigits = 0, fallback = '—' } = {}) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  const formatter = getCurrencyFormatter(currency, { minimumFractionDigits, maximumFractionDigits });
+  return formatter.format(numeric / denominator);
+}
+
+function formatPercentChange(change) {
+  if (!change || typeof change !== 'object') {
+    return null;
+  }
+  const percent = Number(change.percentage ?? change.percent);
+  if (!Number.isFinite(percent)) {
+    return null;
+  }
+  const formatted = percentFormatter.format(Math.abs(percent));
+  const arrow = percent > 0 ? '▲' : percent < 0 ? '▼' : '•';
+  const prefix = percent > 0 ? '+' : percent < 0 ? '−' : '';
+  return `${arrow} ${prefix}${formatted}%`;
+}
+
+function formatNumberValue(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.round(numeric);
+}
+
+function formatRelativeTimeFrom(value, reference = new Date()) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const diffMs = date.getTime() - reference.getTime();
+  const diffMinutes = Math.round(diffMs / (60 * 1000));
+  if (Math.abs(diffMinutes) >= 60 * 24) {
+    return date.toISOString().slice(0, 10);
+  }
+  if (Math.abs(diffMinutes) >= 60) {
+    return relativeFormatter.format(Math.round(diffMinutes / 60), 'hour');
+  }
+  return relativeFormatter.format(diffMinutes, 'minute');
+}
+
 function formatBytes(value) {
   const bytes = Number(value ?? 0);
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -171,6 +253,398 @@ function formatBytes(value) {
   const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const sized = bytes / 1024 ** exponent;
   return `${sized.toFixed(exponent === 0 ? 0 : 1)} ${units[exponent]}`;
+}
+
+function safeIsoString(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString();
+}
+
+function readRuntimeConfigValue(runtimeConfig, key, { environment = env.nodeEnv, defaultValue = null } = {}) {
+  if (!runtimeConfig || typeof runtimeConfig.getValue !== 'function') {
+    return defaultValue;
+  }
+
+  try {
+    return runtimeConfig.getValue(key, {
+      environment: environment ?? env.nodeEnv ?? 'production',
+      audience: 'ops',
+      defaultValue
+    });
+  } catch (error) {
+    logger.debug({ err: error, key }, 'Failed to read runtime configuration for operator dashboard meta');
+    return defaultValue;
+  }
+}
+
+export function buildDashboardMeta({
+  runtimeConfig,
+  tenantId = 'global',
+  now = new Date(),
+  manifestGeneratedAt = null,
+  operationalScore = null,
+  environment = env.nodeEnv
+} = {}) {
+  const escalationChannel =
+    readRuntimeConfigValue(runtimeConfig, 'admin.console.escalation-channel', {
+      environment,
+      defaultValue: DEFAULT_ESCALATION_CHANNEL
+    }) ?? DEFAULT_ESCALATION_CHANNEL;
+  const policyOwner =
+    readRuntimeConfigValue(runtimeConfig, 'admin.console.policy-owner', {
+      environment,
+      defaultValue: DEFAULT_POLICY_OWNER
+    }) ?? DEFAULT_POLICY_OWNER;
+  const policyContact =
+    readRuntimeConfigValue(runtimeConfig, 'admin.console.policy-contact', {
+      environment,
+      defaultValue: DEFAULT_POLICY_CONTACT
+    }) ?? DEFAULT_POLICY_CONTACT;
+  const policyStatus =
+    readRuntimeConfigValue(runtimeConfig, 'admin.console.policy-status', {
+      environment,
+      defaultValue: DEFAULT_POLICY_STATUS
+    }) ?? DEFAULT_POLICY_STATUS;
+  const policySlaRaw = readRuntimeConfigValue(runtimeConfig, 'admin.console.policy-sla-hours', {
+    environment,
+    defaultValue: DEFAULT_POLICY_SLA_HOURS
+  });
+  const policyHubUrl =
+    readRuntimeConfigValue(runtimeConfig, 'admin.console.policy-hub-url', {
+      environment,
+      defaultValue: DEFAULT_POLICY_HUB_URL
+    }) ?? DEFAULT_POLICY_HUB_URL;
+  const policyLastReviewedRaw = readRuntimeConfigValue(runtimeConfig, 'admin.console.policy-last-reviewed', {
+    environment,
+    defaultValue: null
+  });
+
+  const policySlaHours = Number(policySlaRaw);
+  const lastReviewedIso = safeIsoString(policyLastReviewedRaw);
+  const lastReviewedRelative = lastReviewedIso ? formatRelativeTimeFrom(lastReviewedIso, now) : null;
+
+  const helperSegments = [DEFAULT_DASHBOARD_HELPER_TEXT];
+
+  if (policyStatus) {
+    helperSegments.push(`Policy status: ${policyStatus}.`);
+  }
+
+  if (Number.isFinite(policySlaHours) && policySlaHours > 0) {
+    helperSegments.push(`Reviews target ${policySlaHours}h SLA.`);
+  }
+
+  if (lastReviewedRelative) {
+    helperSegments.push(`Last reviewed ${lastReviewedRelative}.`);
+  }
+
+  if (policyHubUrl) {
+    helperSegments.push(`Handbook: ${policyHubUrl}.`);
+  }
+
+  if (policyContact) {
+    helperSegments.push(`Contact ${policyContact} for escalations.`);
+  }
+
+  const helperText = helperSegments.join(' ');
+  const note = `Escalation channel: ${escalationChannel}. Policy owner: ${policyOwner}.`;
+
+  return {
+    generatedAt: now.toISOString(),
+    tenantId,
+    manifestGeneratedAt,
+    operationalScore,
+    helperText,
+    note,
+    policy: {
+      escalationChannel,
+      owner: policyOwner,
+      contact: policyContact,
+      status: policyStatus,
+      slaHours: Number.isFinite(policySlaHours) ? policySlaHours : null,
+      lastReviewedAt: lastReviewedIso,
+      lastReviewedRelative,
+      hubUrl: policyHubUrl
+    }
+  };
+}
+
+export function composeRevenueSnapshot({
+  executiveOverview = null,
+  savedViews = null,
+  paymentsRow = null,
+  timeframeDays = executiveOverview?.timeframe?.days ?? 30,
+  fallbackCurrency = 'USD'
+} = {}) {
+  const overallView = savedViews?.views?.find((view) => view.id?.startsWith('overall-')) ?? savedViews?.views?.[0] ?? null;
+  const totals = overallView?.totals ?? {};
+  const change = overallView?.change ?? {};
+  const currency = overallView?.currency ?? fallbackCurrency;
+
+  const recognisedCents = Number(
+    totals.recognisedVolumeCents ?? executiveOverview?.scorecard?.recognisedRevenue?.cents ?? 0
+  );
+  const netRevenueCents = Number(
+    executiveOverview?.scorecard?.netRevenue?.cents ?? recognisedCents - Number(totals.refundedCents ?? 0)
+  );
+  const grossCents = Number(totals.grossVolumeCents ?? 0);
+  const discountCents = Number(totals.discountCents ?? 0);
+  const refundCents = Number(totals.refundedCents ?? paymentsRow?.refundedCents ?? 0);
+  const timeframe = Number(timeframeDays ?? 30);
+  const timeframeSafe = Number.isFinite(timeframe) && timeframe > 0 ? timeframe : 30;
+  const mrrCents = timeframeSafe > 0 ? Math.round((recognisedCents / timeframeSafe) * 30) : recognisedCents;
+  const arrCents = Math.round(mrrCents * 12);
+  const captureRate = grossCents > 0 ? (netRevenueCents / grossCents) * 100 : null;
+
+  const overview = {
+    netRevenue: formatCurrencyValue(netRevenueCents, currency, { denominator: 100, minimumFractionDigits: 0 }),
+    netRevenueChange: formatPercentChange(executiveOverview?.scorecard?.netRevenue?.change ?? change?.recognisedVolume),
+    arr: formatCurrencyValue(arrCents, currency, { denominator: 100, minimumFractionDigits: 0 }),
+    mrr: formatCurrencyValue(mrrCents, currency, { denominator: 100, minimumFractionDigits: 0 }),
+    captureRate: captureRate === null ? '—' : `${percentFormatter.format(Math.abs(captureRate))}%`,
+    failedPayments: formatNumberValue(paymentsRow?.failedIntents ?? totals?.intents?.failedIntents ?? 0),
+    refundsPending: formatCurrencyValue(refundCents, currency, { denominator: 100, minimumFractionDigits: 0 }),
+    discountImpact: formatCurrencyValue(discountCents, currency, { denominator: 100, minimumFractionDigits: 0 })
+  };
+
+  const paymentHealth = {
+    succeeded: formatNumberValue(paymentsRow?.succeededIntents ?? totals?.intents?.succeededIntents ?? 0),
+    processing: formatNumberValue(paymentsRow?.processingIntents ?? totals?.intents?.processingIntents ?? 0),
+    requiresAction: formatNumberValue(
+      paymentsRow?.requiresActionIntents ?? totals?.intents?.requiresActionIntents ?? 0
+    ),
+    failed: formatNumberValue(paymentsRow?.failedIntents ?? totals?.intents?.failedIntents ?? 0)
+  };
+
+  const topCommunities = Array.isArray(executiveOverview?.topCommunities)
+    ? executiveOverview.topCommunities.slice(0, 6).map((community, index) => ({
+        id: community.communityId ?? `community-${index}`,
+        name: community.name ?? `Community ${community.communityId ?? index + 1}`,
+        revenue: formatCurrencyValue(community.recognisedRevenueCents ?? community.posts ?? 0, currency, {
+          denominator: community.recognisedRevenueCents ? 100 : 1,
+          minimumFractionDigits: 0
+        }),
+        currency,
+        subscribers: formatNumberValue(community.comments ?? 0),
+        share: percentFormatter.format(
+          community.share ?? (grossCents > 0 ? ((community.recognisedRevenueCents ?? 0) / grossCents) * 100 : 0)
+        ),
+        trend: formatPercentChange(community.change)
+      }))
+    : [];
+
+  return {
+    overview,
+    paymentHealth,
+    topCommunities,
+    refundsPendingCents: refundCents,
+    currency
+  };
+}
+
+export function buildOperationsSnapshot({
+  queueSummary,
+  complianceSnapshot,
+  platformSnapshot,
+  revenueSnapshot,
+  integrationSnapshot,
+  upcomingLaunches,
+  now
+}) {
+  const alertsOpen =
+    Number(queueSummary?.severityCounts?.critical ?? 0) + Number(queueSummary?.severityCounts?.high ?? 0);
+
+  const support = {
+    backlog: Number(queueSummary?.totalOpen ?? 0),
+    pendingMemberships: Number(complianceSnapshot?.queue?.length ?? 0),
+    followRequests: Number(complianceSnapshot?.manualReviewQueue ?? 0),
+    avgResponseMinutes: Number(queueSummary?.medianAckMinutes ?? 0),
+    dailyActiveMembers: Number(queueSummary?.watchers ?? platformSnapshot?.totalUsers ?? 0)
+  };
+
+  const risk = {
+    payoutsProcessing: formatNumberValue(revenueSnapshot?.paymentHealth?.processing ?? 0),
+    failedPayments: formatNumberValue(revenueSnapshot?.paymentHealth?.failed ?? 0),
+    refundsPending: revenueSnapshot
+      ? formatCurrencyValue(revenueSnapshot.refundsPendingCents, revenueSnapshot.currency, {
+          denominator: 100,
+          minimumFractionDigits: 0
+        })
+      : '—',
+    alertsOpen: formatNumberValue(alertsOpen)
+  };
+
+  const platform = {
+    totalUsers: formatNumberValue(platformSnapshot?.totalUsers ?? 0),
+    newUsers30d: formatNumberValue(platformSnapshot?.newUsers30d ?? 0),
+    newUsersChange: platformSnapshot?.newUsersChange ?? '0%',
+    communitiesLive: formatNumberValue(platformSnapshot?.communitiesLive ?? 0),
+    instructors: formatNumberValue(platformSnapshot?.instructors ?? 0)
+  };
+
+  const launches = Array.isArray(upcomingLaunches)
+    ? upcomingLaunches.map((launch) => ({
+        id: launch.id,
+        title: launch.title,
+        community: launch.community,
+        startAt: launch.startAt,
+        owner: launch.owner,
+        callToAction: launch.status && launch.status !== 'scheduled' ? launch.status : null
+      }))
+    : [];
+
+  const integrations = Array.isArray(integrationSnapshot?.integrations)
+    ? integrationSnapshot.integrations.map((integration) => ({
+        id: integration.id,
+        name: integration.label ?? integration.name ?? integration.id,
+        status: integration.health?.status ?? integration.health ?? 'unknown',
+        lifecycleStage: integration.lifecycleStage ?? integration.category ?? 'General',
+        category: integration.category ?? 'Platform tooling',
+        owner: integration.owner ?? integration.team ?? 'Integrations',
+        ownerEmail: integration.ownerEmail ?? null,
+        utilisation: integration.summary?.successRate ?? null,
+        availableUnits: integration.summary?.recordsPushed ?? null,
+        totalCapacity: integration.summary?.recordsFailed
+          ? (integration.summary.recordsPushed ?? 0) + integration.summary.recordsFailed
+          : null,
+        adoptionVelocity: integration.summary?.averageDurationSeconds ?? null,
+        demandLevel: integration.callHealth?.errorRate ?? null,
+        healthScore: integration.health?.score ?? null,
+        rentalContracts: integration.summary?.openFailures ?? null,
+        value: integration.revenueContribution ?? null,
+        lastAudit: integration.reconciliation?.latestGeneratedAt ?? integration.summary?.lastRunAt ?? null
+      }))
+    : [];
+
+  const cards = Array.isArray(integrationSnapshot?.integrations)
+    ? [
+        {
+          id: 'integrations-enabled',
+          label: 'Integrations enabled',
+          value: integrationSnapshot.integrations.filter((integration) => integration.enabled).length,
+          helper: 'Active connections'
+        },
+        {
+          id: 'integrations-alerts',
+          label: 'Open failures',
+          value: integrationSnapshot.integrations.reduce(
+            (acc, integration) => acc + Number(integration.summary?.openFailures ?? 0),
+            0
+          ),
+          helper: 'Requires follow-up'
+        },
+        {
+          id: 'integrations-success',
+          label: 'Median success rate',
+          value:
+            integrationSnapshot.integrations.length === 0
+              ? 0
+              : Math.round(
+                  integrationSnapshot.integrations.reduce(
+                    (acc, integration) => acc + Number(integration.summary?.successRate ?? 0),
+                    0
+                  ) / Math.max(integrationSnapshot.integrations.length, 1)
+                ),
+          helper: 'Successful sync runs',
+          kind: 'percent'
+        },
+        {
+          id: 'integrations-concurrency',
+          label: 'Active jobs',
+          value: Number(integrationSnapshot?.concurrency?.activeJobs ?? 0),
+          helper: `Max ${integrationSnapshot?.concurrency?.maxConcurrentJobs ?? 0}`
+        }
+      ]
+    : [];
+
+  return {
+    support,
+    risk,
+    platform,
+    upcomingLaunches: launches,
+    tools: {
+      summary: {
+        cards,
+        meta: {
+          pipelineValue: integrationSnapshot?.pipelineValue ?? null,
+          occupancy: integrationSnapshot?.occupancy ?? null,
+          lastAudit: integrationSnapshot?.generatedAt ?? null
+        }
+      },
+      listing: integrations
+    },
+    generatedAt: now?.toISOString?.() ?? null
+  };
+}
+
+export function buildActivitySnapshot(activeIncidents, timeline, referenceDate = new Date()) {
+  const alerts = Array.isArray(activeIncidents)
+    ? activeIncidents.slice(0, 15).map((incident, index) => ({
+        id: incident.incidentUuid ?? `alert-${index}`,
+        severity: (incident.severity ?? 'info').toLowerCase(),
+        detectedLabel: formatRelativeTimeFrom(incident.reportedAt, referenceDate) ?? 'Just now',
+        resolvedLabel: incident.resolution?.resolvedAt
+          ? formatRelativeTimeFrom(incident.resolution.resolvedAt, referenceDate)
+          : null,
+        message: incident.metadata?.summary ?? incident.description ?? 'Incident detected'
+      }))
+    : [];
+
+  const events = Array.isArray(timeline)
+    ? timeline.slice(0, 25).map((event, index) => ({
+        id: event.id ?? `event-${index}`,
+        entity: event.category ?? 'System',
+        occurredLabel: formatRelativeTimeFrom(event.timestamp, referenceDate) ?? '',
+        summary: event.label ?? event.description ?? 'Activity captured'
+      }))
+    : [];
+
+  return { alerts, events };
+}
+
+export function buildBlogSnapshot({ summaryRows = [], recentPosts = [], totalViewsRow = null } = {}) {
+  const summary = (Array.isArray(summaryRows) ? summaryRows : []).reduce(
+    (acc, row) => {
+      const status = row.status ?? 'draft';
+      const total = Number(row.total ?? 0);
+      if (status === 'published') {
+        acc.published += total;
+      } else if (status === 'scheduled') {
+        acc.scheduled += total;
+      } else {
+        acc.drafts += total;
+      }
+      return acc;
+    },
+    { published: 0, drafts: 0, scheduled: 0 }
+  );
+
+  const totalViews = Number(totalViewsRow?.totalViews ?? totalViewsRow?.total ?? 0);
+
+  const recent = (Array.isArray(recentPosts) ? recentPosts : []).map((post, index) => ({
+    id: post.id ?? `post-${index}`,
+    slug: post.slug ?? null,
+    title: post.title ?? 'Untitled post',
+    status: post.status ?? 'draft',
+    publishedAt: post.publishedAt ?? null,
+    readingTimeMinutes: Number(post.readingTimeMinutes ?? 0),
+    views: Number(post.views ?? post.viewCount ?? 0)
+  }));
+
+  return {
+    summary: {
+      published: summary.published,
+      drafts: summary.drafts,
+      scheduled: summary.scheduled,
+      totalViews
+    },
+    recent
+  };
 }
 
 export function buildComplianceRiskHeatmap(incidents = []) {
@@ -774,6 +1248,8 @@ export default class OperatorDashboardService {
     identityVerificationService = IdentityVerificationService,
     partitionService = dataPartitionService,
     storage = storageService,
+    businessIntelligenceService = new BusinessIntelligenceService(),
+    runtimeConfig = runtimeConfigService,
     nowProvider = () => new Date(),
     loggerInstance = logger.child({ service: 'OperatorDashboardService' })
   } = {}) {
@@ -785,8 +1261,196 @@ export default class OperatorDashboardService {
     this.identityVerificationService = identityVerificationService;
     this.partitionService = partitionService;
     this.storage = storage;
+    this.businessIntelligenceService = businessIntelligenceService;
+    this.runtimeConfig = runtimeConfig;
     this.nowProvider = nowProvider;
     this.logger = loggerInstance;
+  }
+
+  async #loadRevenueSnapshot({ tenantId, now }) {
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const thirtyDaysAgo = new Date(now.getTime() - thirtyDaysMs);
+
+    let executiveOverview = null;
+    let savedViews = null;
+
+    if (this.businessIntelligenceService) {
+      try {
+        [executiveOverview, savedViews] = await Promise.all([
+          this.businessIntelligenceService.getExecutiveOverview({ range: '30d', tenantId }),
+          this.businessIntelligenceService.getRevenueSavedViews({ range: '30d', tenantId })
+        ]);
+      } catch (error) {
+        this.logger.warn({ err: error }, 'Failed to load business intelligence snapshots for operator dashboard');
+      }
+    }
+
+    let paymentsRow = null;
+    try {
+      paymentsRow = await db('payment_intents')
+        .select({
+          succeededIntents: db.raw("SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)::bigint"),
+          processingIntents: db.raw(
+            "SUM(CASE WHEN status IN ('processing','requires_capture') THEN 1 ELSE 0 END)::bigint"
+          ),
+          requiresActionIntents: db.raw(
+            "SUM(CASE WHEN status IN ('requires_action','requires_payment_method') THEN 1 ELSE 0 END)::bigint"
+          ),
+          failedIntents: db.raw("SUM(CASE WHEN status IN ('canceled','failed') THEN 1 ELSE 0 END)::bigint"),
+          totalIntents: db.raw('COUNT(*)::bigint'),
+          capturedCents: db.raw(
+            "SUM(CASE WHEN status IN ('succeeded','requires_capture') THEN amount_total ELSE 0 END)::bigint"
+          ),
+          pendingCents: db.raw(
+            "SUM(CASE WHEN status IN ('processing','requires_action') THEN amount_total ELSE 0 END)::bigint"
+          ),
+          refundedCents: db.raw('SUM(amount_refunded)::bigint')
+        })
+        .where('created_at', '>=', thirtyDaysAgo)
+        .first();
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Failed to aggregate payment intent status for operator dashboard');
+    }
+
+    return composeRevenueSnapshot({ executiveOverview, savedViews, paymentsRow });
+  }
+
+  async #loadPlatformSnapshot({ now }) {
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    let totalUsersRow = null;
+    let newUsersRow = null;
+    let previousNewUsersRow = null;
+    let communityRow = null;
+    let instructorsRow = null;
+
+    try {
+      [totalUsersRow, newUsersRow, previousNewUsersRow, communityRow, instructorsRow] = await Promise.all([
+        db('users').count({ total: '*' }).first(),
+        db('users').where('created_at', '>=', thirtyDaysAgo).count({ total: '*' }).first(),
+        db('users')
+          .where('created_at', '>=', sixtyDaysAgo)
+          .andWhere('created_at', '<', thirtyDaysAgo)
+          .count({ total: '*' })
+          .first(),
+        db('communities').whereNull('deleted_at').count({ total: '*' }).first(),
+        db('users').where('role', 'instructor').count({ total: '*' }).first()
+      ]);
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Failed to load platform snapshot for operator dashboard');
+    }
+
+    const totalUsers = Number(totalUsersRow?.total ?? 0);
+    const newUsers = Number(newUsersRow?.total ?? 0);
+    const previousNewUsers = Number(previousNewUsersRow?.total ?? 0);
+    const changeBase = previousNewUsers === 0 ? (newUsers > 0 ? newUsers : 1) : previousNewUsers;
+    const newUsersChangePercentage = ((newUsers - previousNewUsers) / changeBase) * 100;
+
+    return {
+      totalUsers,
+      newUsers30d: newUsers,
+      newUsersChange: Number.isFinite(newUsersChangePercentage)
+        ? `${newUsersChangePercentage >= 0 ? '+' : ''}${percentFormatter.format(Math.abs(newUsersChangePercentage))}%`
+        : '0%',
+      communitiesLive: Number(communityRow?.total ?? 0),
+      instructors: Number(instructorsRow?.total ?? 0)
+    };
+  }
+
+  async #loadUpcomingLaunches({ now }) {
+    const fourteenDaysAhead = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+    try {
+      const rows = await db('courses as c')
+        .leftJoin('users as u', 'u.id', 'c.instructor_id')
+        .select({
+          id: 'c.id',
+          title: 'c.title',
+          releaseAt: 'c.release_at',
+          status: 'c.status',
+          instructorFirstName: 'u.first_name',
+          instructorLastName: 'u.last_name'
+        })
+        .whereNotNull('c.release_at')
+        .andWhere('c.release_at', '>=', now)
+        .andWhere('c.release_at', '<=', fourteenDaysAhead)
+        .andWhereNull('c.deleted_at')
+        .orderBy('c.release_at', 'asc')
+        .limit(12);
+
+      return rows.map((row) => ({
+        id: `course-${row.id}`,
+        title: row.title ?? 'Course launch',
+        community: 'Courses',
+        startAt: row.releaseAt,
+        owner: [row.instructorFirstName, row.instructorLastName].filter(Boolean).join(' ') || 'Curriculum',
+        status: row.status ?? 'scheduled'
+      }));
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Failed to load upcoming course launches for operator dashboard');
+      return [];
+    }
+  }
+
+  #buildApprovalsSnapshot(complianceSnapshot, referenceDate = new Date()) {
+    const queue = Array.isArray(complianceSnapshot?.queue) ? complianceSnapshot.queue : [];
+    const items = queue.slice(0, 8).map((item, index) => {
+      const submittedAt = item.lastSubmittedAt ?? item.verification?.submittedAt ?? null;
+      const waitingLabel = item.waitingHours
+        ? `${Math.round(Number(item.waitingHours))}h in queue`
+        : submittedAt
+          ? formatRelativeTimeFrom(submittedAt, referenceDate)
+          : null;
+
+      return {
+        id: item.id ? `kyc-${item.id}` : `approval-${index}`,
+        name: item.user?.name ?? item.reference ?? `Verification ${item.id ?? index + 1}`,
+        type: 'KYC',
+        summary: `Risk ${Number(item.riskScore ?? 0)}/10 · Docs ${Number(item.documentsSubmitted ?? 0)}/${
+          Number(item.documentsRequired ?? 0)
+        }`,
+        status: item.status ?? 'pending_review',
+        submittedAt: waitingLabel,
+        amount: null,
+        action: item.hasBreachedSla ? 'Escalate' : 'Review'
+      };
+    });
+
+    return {
+      pendingCount: queue.length,
+      items
+    };
+  }
+
+  async #loadBlogSnapshot() {
+    try {
+      const [summaryRows, recentPosts] = await Promise.all([
+        db('blog_posts')
+          .select({ status: 'status' })
+          .count({ total: '*' })
+          .groupBy('status'),
+        db('blog_posts as bp')
+          .select({
+            id: 'bp.id',
+            slug: 'bp.slug',
+            title: 'bp.title',
+            status: 'bp.status',
+            publishedAt: 'bp.published_at',
+            readingTimeMinutes: 'bp.reading_time_minutes',
+            views: 'bp.view_count'
+          })
+          .orderBy('bp.published_at', 'desc')
+          .orderBy('bp.created_at', 'desc')
+          .limit(8)
+      ]);
+
+      const totalViewsRow = await db('blog_posts').sum({ totalViews: 'view_count' }).first();
+      return buildBlogSnapshot({ summaryRows, recentPosts, totalViewsRow });
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Failed to load blog snapshot for operator dashboard');
+      return buildBlogSnapshot();
+    }
   }
 
   async #buildComplianceSnapshot({ tenantId, now, activeIncidents, resolvedIncidents }) {
@@ -1114,14 +1778,35 @@ export default class OperatorDashboardService {
       storageUsage
     });
 
+    const [revenueSnapshot, platformSnapshot, upcomingLaunches, blogSnapshot] = await Promise.all([
+      this.#loadRevenueSnapshot({ tenantId, now }),
+      this.#loadPlatformSnapshot({ now }),
+      this.#loadUpcomingLaunches({ now }),
+      this.#loadBlogSnapshot()
+    ]);
+
+    const approvals = this.#buildApprovalsSnapshot(complianceSnapshot, now);
+    const operationsSnapshot = buildOperationsSnapshot({
+      queueSummary,
+      complianceSnapshot,
+      platformSnapshot,
+      revenueSnapshot,
+      integrationSnapshot,
+      upcomingLaunches,
+      now
+    });
+    const activitySnapshot = buildActivitySnapshot(activeIncidents, timeline, now);
+    const meta = buildDashboardMeta({
+      runtimeConfig: this.runtimeConfig,
+      tenantId,
+      now,
+      manifestGeneratedAt: serviceHealth.summary?.manifestGeneratedAt ?? null,
+      operationalScore
+    });
+
     return {
       dashboard: {
-        meta: {
-          generatedAt: now.toISOString(),
-          tenantId,
-          manifestGeneratedAt: serviceHealth.summary.manifestGeneratedAt,
-          operationalScore
-        },
+        meta,
         metrics: {
           serviceHealth: serviceHealth.summary,
           incidents: queueSummary,
@@ -1143,7 +1828,18 @@ export default class OperatorDashboardService {
         timeline,
         integrations: integrationSnapshot,
         compliance: complianceSnapshot,
-        settings: settingsSnapshot
+        approvals,
+        revenue: revenueSnapshot,
+        operations: {
+          support: operationsSnapshot.support,
+          risk: operationsSnapshot.risk,
+          platform: operationsSnapshot.platform,
+          upcomingLaunches: operationsSnapshot.upcomingLaunches
+        },
+        tools: operationsSnapshot.tools,
+        activity: activitySnapshot,
+        settings: settingsSnapshot,
+        blog: blogSnapshot
       },
       searchIndex: [
         ...buildSearchIndex(activeIncidents, runbooks),

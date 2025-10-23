@@ -3043,6 +3043,66 @@ export async function seed(knex) {
         metadata: JSON.stringify({ pagerDutyService: 'edulure-admin' })
       },
       {
+        key: 'admin.console.policy-owner',
+        environment_scope: 'production',
+        value_type: 'string',
+        value: 'Trust & Safety',
+        description: 'Policy owner responsible for the admin console operations handbook.',
+        exposure_level: 'ops',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Trust & Safety' })
+      },
+      {
+        key: 'admin.console.policy-contact',
+        environment_scope: 'production',
+        value_type: 'string',
+        value: 'mailto:compliance@edulure.com',
+        description: 'Primary contact for policy escalations surfaced in the admin console.',
+        exposure_level: 'ops',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Compliance' })
+      },
+      {
+        key: 'admin.console.policy-status',
+        environment_scope: 'production',
+        value_type: 'string',
+        value: 'Operational',
+        description: 'Current policy posture displayed in the admin console overview.',
+        exposure_level: 'ops',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Trust & Safety' })
+      },
+      {
+        key: 'admin.console.policy-sla-hours',
+        environment_scope: 'production',
+        value_type: 'number',
+        value: '24',
+        description: 'Target SLA (in hours) for policy reviews originating from the admin console.',
+        exposure_level: 'ops',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Compliance', unit: 'hours' })
+      },
+      {
+        key: 'admin.console.policy-last-reviewed',
+        environment_scope: 'production',
+        value_type: 'string',
+        value: new Date().toISOString(),
+        description: 'Timestamp of the most recent policy review presented in the admin console.',
+        exposure_level: 'ops',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Trust & Safety' })
+      },
+      {
+        key: 'admin.console.policy-hub-url',
+        environment_scope: 'production',
+        value_type: 'string',
+        value: '/policies',
+        description: 'URL to the policy hub referenced from the admin console overview.',
+        exposure_level: 'ops',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Operations' })
+      },
+      {
         key: 'live-classrooms.max-concurrent-rooms',
         environment_scope: 'production',
         value_type: 'number',
