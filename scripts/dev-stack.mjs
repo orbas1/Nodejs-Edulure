@@ -28,7 +28,7 @@ async function main() {
 
   const supervisor = createProcessSupervisor({
     scope: 'dev-stack',
-    pretty: parsed.prettyLogs,
+    pretty: parsed.prettyLogsExplicit ? parsed.prettyLogs : process.stdout.isTTY,
     enableCommandInterface: true
   });
 

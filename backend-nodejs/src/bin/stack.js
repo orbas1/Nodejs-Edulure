@@ -1,22 +1,41 @@
 import logger from '../config/logger.js';
 import { bootstrapServices } from '../server.js';
 import { resolveRuntimeToggles } from '../servers/runtimeToggles.js';
-import { applyPresetDefaults, createLifecycleLogger } from '../../../scripts/lib/processSupervisor.mjs';
+import {
+  applyPresetDefaults,
+  createLifecycleLogger,
+  parsePresetArgs
+} from '../../../scripts/lib/processSupervisor.mjs';
 
-applyPresetDefaults({ env: process.env, mutate: true });
-
-const toggles = resolveRuntimeToggles(process.env);
+const parsed = parsePresetArgs(process.argv.slice(2));
 const lifecycleLogger = createLifecycleLogger({
   scope: 'stack-bin',
-  pretty: process.stdout.isTTY
+  pretty: parsed.prettyLogsExplicit ? parsed.prettyLogs : process.stdout.isTTY
 });
+
+if (parsed.unknownArguments.length) {
+  lifecycleLogger.log('warn', 'Ignoring unknown CLI arguments', {
+    arguments: parsed.unknownArguments
+  });
+}
+
+const { preset } = applyPresetDefaults({
+  preset: parsed.preset,
+  env: process.env,
+  mutate: true,
+  overrides: parsed.overrides
+});
+
+const toggles = resolveRuntimeToggles(process.env);
 
 lifecycleLogger.log('info', 'Bootstrapping stack services', {
   preset: toggles.preset,
+  resolvedPreset: preset,
   serviceTarget: process.env.SERVICE_TARGET,
   jobGroups: process.env.SERVICE_JOB_GROUPS,
   enableJobs: process.env.SERVICE_ENABLE_JOBS,
-  enableRealtime: process.env.SERVICE_ENABLE_REALTIME
+  enableRealtime: process.env.SERVICE_ENABLE_REALTIME,
+  enableSearchRefresh: process.env.SERVICE_ENABLE_SEARCH_REFRESH
 });
 
 bootstrapServices()

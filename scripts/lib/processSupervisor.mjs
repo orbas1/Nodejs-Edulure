@@ -137,9 +137,8 @@ export function applyPresetDefaults({
   const presetConfig = resolvePresetConfiguration(resolvedPreset);
   const target = mutate ? env : { ...env };
 
-  if (!target.SERVICE_PRESET) {
-    target.SERVICE_PRESET = presetConfig.id;
-  }
+  target.SERVICE_PRESET = presetConfig.id;
+  target.RUNTIME_PRESET = presetConfig.id;
 
   const resolvedServiceTarget = overrides.serviceTarget ?? target.SERVICE_TARGET ?? presetConfig.serviceTarget;
   target.SERVICE_TARGET = resolvedServiceTarget;
@@ -177,12 +176,24 @@ export function applyPresetDefaults({
 export function parsePresetArgs(args = [], { env = process.env } = {}) {
   let skipDbInstall = false;
   let skipFrontend = false;
-  let prettyLogs = env.DEV_STACK_PRETTY_LOGS === '1';
+  let prettyLogs = false;
+  let prettyLogsExplicit = false;
   let presetToken = null;
   let serviceTarget = null;
   let jobGroups = null;
 
   const unknownArguments = [];
+
+  if (env.DEV_STACK_PRETTY_LOGS !== undefined) {
+    const normalised = String(env.DEV_STACK_PRETTY_LOGS).trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(normalised)) {
+      prettyLogs = true;
+      prettyLogsExplicit = true;
+    } else if (['0', 'false', 'no', 'off'].includes(normalised)) {
+      prettyLogs = false;
+      prettyLogsExplicit = true;
+    }
+  }
 
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
@@ -202,11 +213,13 @@ export function parsePresetArgs(args = [], { env = process.env } = {}) {
 
     if (token === '--pretty-logs') {
       prettyLogs = true;
+      prettyLogsExplicit = true;
       continue;
     }
 
     if (token === '--ndjson-logs') {
       prettyLogs = false;
+      prettyLogsExplicit = true;
       continue;
     }
 
@@ -261,6 +274,7 @@ export function parsePresetArgs(args = [], { env = process.env } = {}) {
     skipDbInstall,
     skipFrontend,
     prettyLogs,
+    prettyLogsExplicit,
     overrides,
     unknownArguments
   };
