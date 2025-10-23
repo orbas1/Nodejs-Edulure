@@ -18,9 +18,8 @@ import {
 import { fetchLiveFeed } from '../api/feedApi.js';
 import TopBar from '../components/TopBar.jsx';
 import SkewedMenu from '../components/SkewedMenu.jsx';
-import FeedComposer from '../components/FeedComposer.jsx';
-import FeedCard from '../components/FeedCard.jsx';
-import FeedSponsoredCard from '../components/FeedSponsoredCard.jsx';
+import FeedComposer from '../components/feed/Composer.jsx';
+import FeedList from '../components/feed/FeedList.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import CommunityHero from '../components/CommunityHero.jsx';
 import CommunityResourceEditor from '../components/community/CommunityResourceEditor.jsx';
@@ -527,6 +526,24 @@ export default function Feed() {
       loadFeed({ page: feedMeta.page + 1, append: true });
     }
   };
+
+  const handleReactToPost = useCallback(
+    (targetPost) => {
+      if (!targetPost?.id) return;
+      updateFeedPost(targetPost.id, (existing) => {
+        if (!existing) return existing;
+        const currentReactions = Number(existing.stats?.reactions ?? 0);
+        return {
+          ...existing,
+          stats: {
+            ...existing.stats,
+            reactions: currentReactions + 1
+          }
+        };
+      });
+    },
+    [updateFeedPost]
+  );
 
   const hasCommunitiesLoaded = communities.length > 0 && !isLoadingCommunities;
   const composerCommunities = useMemo(
@@ -1218,58 +1235,27 @@ export default function Feed() {
               </div>
             )}
             <div className="space-y-4">
-              {isLoadingFeed && !isLoadingMore ? (
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-                  Loading community feed...
+              {feedAdsMeta?.count > 0 && !feedError && (
+                <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                  Sponsored placements active · {feedAdsMeta.count}{' '}
+                  {feedAdsMeta.count === 1 ? 'campaign' : 'campaigns'} matched for your feed.
                 </div>
-              ) : feedError ? (
+              )}
+              {sponsorshipError && (
+                <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600" role="alert">
+                  {sponsorshipError}
+                </div>
+              )}
+              {feedError ? (
                 <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">{feedError}</div>
               ) : (
-                <>
-                  {feedAdsMeta?.count > 0 && (
-                    <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
-                      Sponsored placements active · {feedAdsMeta.count}{' '}
-                      {feedAdsMeta.count === 1 ? 'campaign' : 'campaigns'} matched for your feed.
-                    </div>
-                  )}
-                  {sponsorshipError && (
-                    <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600" role="alert">
-                      {sponsorshipError}
-                    </div>
-                  )}
-                  {feedItems.map((item) => {
-                    if (item?.kind === 'ad' && item.ad) {
-                      return (
-                        <FeedSponsoredCard
-                          key={`ad-${item.ad.placementId}`}
-                          ad={item.ad}
-                          canManage={Boolean(
-                            selectedCommunity?.id !== 'all' && communityDetail?.permissions?.canManageSponsorships
-                          )}
-                          onDismiss={
-                            selectedCommunity?.id !== 'all' && communityDetail?.permissions?.canManageSponsorships
-                              ? () => handleDismissPlacement(item.ad)
-                              : undefined
-                          }
-                          isProcessing={isUpdatingSponsorship || isLoadingSponsorships}
-                        />
-                      );
-                    }
-                    const post = item?.kind === 'post' ? item.post : item;
-                    if (!post) {
-                      return null;
-                    }
-                    return (
-                      <FeedCard
-                        key={`post-${post.id}`}
-                        post={post}
-                        onModerate={handleModeratePost}
-                        onRemove={handleRemovePost}
-                        actionState={postActions[post.id]}
-                      />
-                    );
-                  })}
-                  {feedItems.length === 0 && (
+                <FeedList
+                  items={feedItems}
+                  loading={isLoadingFeed}
+                  loadingMore={isLoadingMore}
+                  hasMore={canLoadMore}
+                  onLoadMore={handleLoadMore}
+                  emptyState={
                     <div className="space-y-4">
                       {CURATED_STORIES.map((story) => (
                         <div key={story.title} className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm">
@@ -1292,18 +1278,17 @@ export default function Feed() {
                         No activity yet. Be the first to share an update.
                       </div>
                     </div>
+                  }
+                  actionStates={postActions}
+                  onModerate={handleModeratePost}
+                  onRemove={handleRemovePost}
+                  onDismissPlacement={handleDismissPlacement}
+                  canManagePlacements={Boolean(
+                    selectedCommunity?.id !== 'all' && communityDetail?.permissions?.canManageSponsorships
                   )}
-                  {canLoadMore && (
-                    <button
-                      type="button"
-                      onClick={handleLoadMore}
-                      className="w-full rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-primary shadow-sm transition hover:border-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={isLoadingMore}
-                    >
-                      {isLoadingMore ? 'Loading…' : 'Load more updates'}
-                    </button>
-                  )}
-                </>
+                  isManagingPlacements={isUpdatingSponsorship || isLoadingSponsorships}
+                  onReact={handleReactToPost}
+                />
               )}
             </div>
           </div>

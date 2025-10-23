@@ -25,13 +25,7 @@ function getSafeUrl(url) {
   }
 }
 
-export default function FeedSponsoredCard({
-  ad,
-  canManage = false,
-  onDismiss,
-  isProcessing = false,
-  onVisit
-}) {
+export default function SponsoredCard({ ad, canManage = false, onDismiss, isProcessing = false, onVisit }) {
   const advertiser = ad.advertiser ?? 'Edulure Partner';
   const description = ad.description || 'Discover how operators are scaling with Edulure Ads.';
   const safeCtaUrl = getSafeUrl(ad.ctaUrl);
@@ -98,7 +92,7 @@ export default function FeedSponsoredCard({
   );
 }
 
-FeedSponsoredCard.propTypes = {
+SponsoredCard.propTypes = {
   ad: PropTypes.shape({
     placementId: PropTypes.string,
     headline: PropTypes.string.isRequired,
@@ -119,10 +113,9 @@ FeedSponsoredCard.propTypes = {
   onVisit: PropTypes.func
 };
 
-FeedSponsoredCard.defaultProps = {
+SponsoredCard.defaultProps = {
   canManage: false,
   onDismiss: undefined,
   isProcessing: false,
   onVisit: undefined
 };
-

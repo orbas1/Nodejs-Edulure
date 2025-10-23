@@ -378,7 +378,10 @@ export default class CommunityService {
           status: payload.status,
           scheduledAt: payload.scheduledAt,
           publishedAt,
-          metadata: payload.metadata
+          metadata: payload.metadata,
+          mediaAssetId: payload.mediaAssetId,
+          previewMetadata: payload.previewMetadata,
+          pinnedAt: payload.pinnedAt
         },
         trx
       );
@@ -468,6 +471,21 @@ export default class CommunityService {
     if (payload.metadata !== undefined) {
       const existingMetadata = parseJsonColumn(post.metadata, {});
       updates.metadata = { ...existingMetadata, ...payload.metadata };
+    }
+    if (payload.mediaAssetId !== undefined) {
+      updates.mediaAssetId = payload.mediaAssetId;
+    }
+    if (payload.clearMediaAsset) {
+      updates.mediaAssetId = null;
+    }
+    if (payload.previewMetadata !== undefined) {
+      updates.previewMetadata = payload.previewMetadata ?? {};
+    }
+    if (payload.clearPreviewMetadata) {
+      updates.previewMetadata = {};
+    }
+    if (payload.pinnedAt !== undefined) {
+      updates.pinnedAt = payload.pinnedAt;
     }
     if (payload.channelId !== undefined) {
       updates.channelId = payload.channelId;
@@ -1105,6 +1123,8 @@ export default class CommunityService {
     const reactionSummary = parseJsonColumn(post.reactionSummary, {});
     const metadata = parseJsonColumn(post.metadata, {});
     const moderationMetadata = parseJsonColumn(post.moderationMetadata, {});
+    const previewMetadata = parseJsonColumn(post.previewMetadata, {});
+    const assetMetadata = post.mediaAsset ? parseJsonColumn(post.mediaAsset.metadata, {}) : {};
     const totalReactions = typeof reactionSummary.total === 'number'
       ? reactionSummary.total
       : Object.values(reactionSummary).reduce((sum, value) => (typeof value === 'number' ? sum + value : sum), 0);
@@ -1122,6 +1142,24 @@ export default class CommunityService {
     const canModerate = canModerateMembership(membership, actor.role);
     const canRemove = canModerate || actor.id === post.authorId;
 
+    const preview = {
+      thumbnailUrl: previewMetadata.thumbnailUrl ?? assetMetadata.thumbnailUrl ?? null,
+      width: previewMetadata.width ?? assetMetadata.width ?? null,
+      height: previewMetadata.height ?? assetMetadata.height ?? null,
+      aspectRatio: previewMetadata.aspectRatio ?? assetMetadata.aspectRatio ?? null,
+      dominantColor: previewMetadata.dominantColor ?? assetMetadata.dominantColor ?? null
+    };
+
+    const media = post.mediaAssetId || preview.thumbnailUrl
+      ? {
+          assetId: post.mediaAssetId ?? null,
+          assetPublicId: post.mediaAsset?.publicId ?? null,
+          mimeType: post.mediaAsset?.mimeType ?? null,
+          preview,
+          metadata: assetMetadata
+        }
+      : undefined;
+
     return {
       id: post.id,
       type: post.postType,
@@ -1132,6 +1170,8 @@ export default class CommunityService {
       visibility: post.visibility,
       status: post.status,
       tags,
+      isPinned: Boolean(post.pinnedAt),
+      pinnedAt: post.pinnedAt ?? undefined,
       channel: post.channelId
         ? {
             id: post.channelId,
@@ -1147,6 +1187,7 @@ export default class CommunityService {
         role: post.authorRole,
         avatarUrl: buildAvatarUrl(authorName)
       },
+      media,
       stats: {
         reactions: totalReactions,
         reactionBreakdown: reactionSummary,
@@ -1159,7 +1200,8 @@ export default class CommunityService {
         riskHistory: Array.isArray(moderationMetadata.riskHistory)
           ? moderationMetadata.riskHistory
           : [],
-        notes: moderationMetadata.notes ?? []
+        notes: moderationMetadata.notes ?? [],
+        context: moderationMetadata.context ?? null
       },
       metadata,
       permissions: {

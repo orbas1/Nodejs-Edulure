@@ -814,7 +814,16 @@ export async function seed(knex) {
         published_at: trx.fn.now(),
         comment_count: 6,
         reaction_summary: JSON.stringify({ applause: 18, thumbsUp: 9, total: 27 }),
-        metadata: JSON.stringify({ relatedResource: 'ops-blueprint-v1', analyticsKey: 'ops-hq-roadmap-drop' })
+        metadata: JSON.stringify({ relatedResource: 'ops-blueprint-v1', analyticsKey: 'ops-hq-roadmap-drop' }),
+        media_asset_id: opsPlaybookAssetId,
+        preview_metadata: JSON.stringify({
+          thumbnailUrl: 'https://cdn.edulure.test/assets/ops-roadmap-preview.jpg',
+          width: 1280,
+          height: 720,
+          aspectRatio: '16:9',
+          dominantColor: '#4338CA'
+        }),
+        pinned_at: trx.fn.now()
       });
 
     const [growthCampaignPostId] = await trx('community_posts')
@@ -835,6 +844,14 @@ export async function seed(knex) {
         metadata: JSON.stringify({
           classroomReference: 'LC-AMA-001',
           registrationUrl: 'https://events.edulure.test/ama-multi-channel-funnels'
+        }),
+        media_asset_id: growthPlaybookEbookAssetId,
+        preview_metadata: JSON.stringify({
+          thumbnailUrl: 'https://cdn.edulure.test/assets/growth-lab-ama.jpg',
+          width: 1200,
+          height: 675,
+          aspectRatio: '16:9',
+          dominantColor: '#0EA5E9'
         })
       });
 
@@ -971,6 +988,42 @@ export async function seed(knex) {
         notes: 'Requires data feed from rehearsal attendance tool.',
         experiment_url: null,
         metadata: JSON.stringify({ requiresModeling: true })
+      }
+    ]);
+
+    const experiments = await trx('community_growth_experiments')
+      .select(['id', 'community_id as communityId']);
+    const opsExperiment = experiments.find((experiment) => experiment.communityId === opsCommunityId);
+    const growthExperiment = experiments.find((experiment) => experiment.communityId === growthCommunityId);
+
+    const feedRangeEnd = new Date();
+    const feedRangeStart = new Date(feedRangeEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+    feedRangeStart.setUTCHours(0, 0, 0, 0);
+    const feedRangeEndNormalized = new Date(feedRangeEnd.getTime());
+    feedRangeEndNormalized.setUTCHours(23, 59, 59, 999);
+
+    await trx('community_feed_impressions').insert([
+      {
+        community_id: opsCommunityId,
+        experiment_id: opsExperiment?.id ?? null,
+        actor_id: instructorId,
+        momentum_score: 74,
+        posts_sampled: 6,
+        trending_tags: JSON.stringify(['automation', 'roadmap', 'playbooks']),
+        range_start: feedRangeStart,
+        range_end: feedRangeEndNormalized,
+        recorded_at: feedRangeEnd
+      },
+      {
+        community_id: growthCommunityId,
+        experiment_id: growthExperiment?.id ?? null,
+        actor_id: adminId,
+        momentum_score: 68,
+        posts_sampled: 5,
+        trending_tags: JSON.stringify(['campaigns', 'live session', 'ads']),
+        range_start: feedRangeStart,
+        range_end: feedRangeEndNormalized,
+        recorded_at: new Date(feedRangeEnd.getTime() - 2 * 60 * 60 * 1000)
       }
     ]);
 

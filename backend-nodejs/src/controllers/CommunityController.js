@@ -41,7 +41,18 @@ const createPostSchema = Joi.object({
   status: Joi.string().valid('draft', 'scheduled', 'published').default('published'),
   scheduledAt: Joi.date().optional(),
   publishedAt: Joi.date().optional(),
-  metadata: Joi.object().default({})
+  metadata: Joi.object().default({}),
+  mediaAssetId: Joi.number().integer().min(1).optional().allow(null),
+  previewMetadata: Joi.object({
+    thumbnailUrl: Joi.string().uri().allow(null, ''),
+    width: Joi.number().integer().min(1).optional(),
+    height: Joi.number().integer().min(1).optional(),
+    aspectRatio: Joi.string().max(20).allow(null, '').optional(),
+    dominantColor: Joi.string().max(30).allow(null, '').optional()
+  })
+    .default({})
+    .unknown(false),
+  pinnedAt: Joi.date().optional().allow(null)
 });
 
 const updatePostSchema = Joi.object({
@@ -53,7 +64,18 @@ const updatePostSchema = Joi.object({
   status: Joi.string().valid('draft', 'scheduled', 'published', 'archived'),
   scheduledAt: Joi.date().optional().allow(null),
   publishedAt: Joi.date().optional().allow(null),
-  metadata: Joi.object()
+  metadata: Joi.object(),
+  mediaAssetId: Joi.number().integer().min(1).allow(null),
+  clearMediaAsset: Joi.boolean(),
+  previewMetadata: Joi.object({
+    thumbnailUrl: Joi.string().uri().allow(null, ''),
+    width: Joi.number().integer().min(1).optional(),
+    height: Joi.number().integer().min(1).optional(),
+    aspectRatio: Joi.string().max(20).allow(null, '').optional(),
+    dominantColor: Joi.string().max(30).allow(null, '').optional()
+  }).unknown(false),
+  clearPreviewMetadata: Joi.boolean(),
+  pinnedAt: Joi.date().allow(null)
 })
   .min(1)
   .messages({ 'object.min': 'At least one field must be provided for update' });

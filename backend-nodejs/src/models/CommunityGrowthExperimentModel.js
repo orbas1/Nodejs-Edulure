@@ -301,4 +301,29 @@ export default class CommunityGrowthExperimentModel {
       .where({ id: ensureIntegerInRange(id, { fieldName: 'id', min: 1 }) })
       .del();
   }
+
+  static async listActiveForCommunities(communityIds, connection = db) {
+    if (!Array.isArray(communityIds) || communityIds.length === 0) {
+      return [];
+    }
+
+    const ids = Array.from(new Set(communityIds.map((value) => Number(value)).filter((value) => Number.isFinite(value))));
+    if (!ids.length) {
+      return [];
+    }
+
+    const rows = await this.table(connection)
+      .select(['id', 'community_id as communityId', 'title', 'status', 'metadata', 'updated_at as updatedAt'])
+      .whereIn('community_id', ids)
+      .andWhere('status', 'active')
+      .orderBy('updated_at', 'desc');
+
+    return rows.map((row) => ({
+      id: row.id,
+      communityId: row.communityId,
+      title: row.title,
+      metadata: readJsonColumn(row.metadata, {}),
+      updatedAt: row.updatedAt ?? null
+    }));
+  }
 }

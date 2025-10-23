@@ -5,9 +5,9 @@ import { vi } from 'vitest';
 import CommunityHero from '../CommunityHero.jsx';
 import CommunityProfile from '../CommunityProfile.jsx';
 import CommunitySwitcher from '../CommunitySwitcher.jsx';
-import FeedCard from '../FeedCard.jsx';
-import FeedComposer from '../FeedComposer.jsx';
-import FeedSponsoredCard from '../FeedSponsoredCard.jsx';
+import FeedItemCard from '../feed/FeedItemCard.jsx';
+import FeedComposer from '../feed/Composer.jsx';
+import SponsoredCard from '../feed/SponsoredCard.jsx';
 import { AuthContext } from '../../context/AuthContext.jsx';
 
 vi.mock('../../api/communityApi.js', () => ({
@@ -79,7 +79,7 @@ describe('CommunitySwitcher', () => {
   });
 });
 
-describe('FeedCard', () => {
+describe('FeedItemCard', () => {
   it('renders fallback initials when avatar is missing', () => {
     const post = {
       id: 'post-1',
@@ -92,7 +92,7 @@ describe('FeedCard', () => {
       community: { id: 'c1', name: 'Launch Crew' }
     };
 
-    render(<FeedCard post={post} />);
+    render(<FeedItemCard post={post} />);
 
     expect(screen.getByText('TS')).toBeInTheDocument();
     expect(screen.getByText(/excited to share/i)).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('FeedCard', () => {
       stats: { reactions: 0, comments: 0 }
     };
 
-    render(<FeedCard post={post} onModerate={handleModerate} />);
+    render(<FeedItemCard post={post} onModerate={handleModerate} />);
 
     await user.click(screen.getByRole('button', { name: /suppress/i }));
     expect(handleModerate).toHaveBeenCalledWith(post, 'suppress');
@@ -127,7 +127,7 @@ describe('FeedCard', () => {
       stats: { reactions: 1, comments: 0 }
     };
 
-    render(<FeedCard post={post} />);
+    render(<FeedItemCard post={post} />);
 
     expect(screen.getByText(/post is hidden from members/i)).toBeInTheDocument();
     expect(screen.getByText(/reason: awaiting review/i)).toBeInTheDocument();
@@ -139,11 +139,13 @@ describe('FeedCard', () => {
       body: 'Check the new runbook.',
       publishedAt: new Date().toISOString(),
       author: { id: 'user-4', name: 'Jordan Ops', avatarUrl: null },
-      attachments: [{ id: 'att-1', type: 'link', url: 'https://edulure.com/runbook', label: 'Runbook' }],
+      metadata: {
+        attachments: [{ id: 'att-1', type: 'link', url: 'https://edulure.com/runbook', label: 'Runbook' }]
+      },
       stats: { reactions: 0, comments: 0 }
     };
 
-    render(<FeedCard post={post} />);
+    render(<FeedItemCard post={post} />);
 
     expect(screen.getByRole('link', { name: /visit runbook/i })).toHaveAttribute('href', 'https://edulure.com/runbook');
   });
@@ -178,13 +180,13 @@ describe('FeedComposer', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /share something/i }));
+    await user.click(screen.getByRole('button', { name: /start typing/i }));
 
-    fireEvent.change(screen.getByLabelText(/what would you like to share/i), {
+    fireEvent.change(screen.getByLabelText(/share the update/i), {
       target: { value: 'This is a rich update for our community members.' }
     });
 
-    fireEvent.change(screen.getByLabelText(/share a link/i), {
+    fireEvent.change(screen.getByLabelText(/attach a link/i), {
       target: { value: 'https://edulure.com/update' }
     });
 
@@ -196,7 +198,9 @@ describe('FeedComposer', () => {
           communityId: '101',
           payload: expect.objectContaining({
             body: expect.stringContaining('rich update'),
-            attachments: [expect.objectContaining({ url: 'https://edulure.com/update' })]
+            metadata: expect.objectContaining({
+              attachments: [expect.objectContaining({ url: 'https://edulure.com/update' })]
+            })
           })
         })
       );
@@ -204,7 +208,7 @@ describe('FeedComposer', () => {
 
     expect(await screen.findByText(/update shared with ops guild/i)).toBeInTheDocument();
     expect(onPostCreated).toHaveBeenCalledWith({ id: 'post-123' });
-    expect(screen.getByRole('button', { name: /share something/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /start typing/i })).toBeInTheDocument();
   });
 
   it('surfaces permission errors and deduplicates tags', async () => {
@@ -221,15 +225,15 @@ describe('FeedComposer', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /share something/i }));
-    fireEvent.change(screen.getByLabelText(/what would you like to share/i), {
+    await user.click(screen.getByRole('button', { name: /start typing/i }));
+    fireEvent.change(screen.getByLabelText(/share the update/i), {
       target: { value: 'Short update that will be rejected by permissions.' }
     });
     fireEvent.change(screen.getByLabelText(/tags \(comma separated\)/i), {
       target: { value: 'Ops, ops, Launch' }
     });
 
-    fireEvent.change(screen.getByLabelText(/share a link/i), {
+    fireEvent.change(screen.getByLabelText(/attach a link/i), {
       target: { value: 'https://edulure.com/update' }
     });
 
@@ -256,13 +260,13 @@ describe('FeedComposer', () => {
       <FeedComposer communities={communities} defaultCommunityId="301" onPostCreated={() => {}} />
     );
 
-    await user.click(screen.getByRole('button', { name: /share something/i }));
+    await user.click(screen.getByRole('button', { name: /start typing/i }));
 
-    fireEvent.change(screen.getByLabelText(/what would you like to share/i), {
+    fireEvent.change(screen.getByLabelText(/share the update/i), {
       target: { value: 'Security update for the ops circle.' }
     });
 
-    fireEvent.change(screen.getByLabelText(/share a link/i), {
+    fireEvent.change(screen.getByLabelText(/attach a link/i), {
       target: { value: 'javascript:alert(1)' }
     });
 
@@ -286,7 +290,7 @@ describe('FeedComposer', () => {
       <FeedComposer communities={communities} defaultCommunityId="401" onPostCreated={() => {}} />
     );
 
-    await user.click(screen.getByRole('button', { name: /share something/i }));
+    await user.click(screen.getByRole('button', { name: /start typing/i }));
 
     const visibilitySelect = screen.getByLabelText(/visibility/i);
     const optionLabels = within(visibilitySelect)
@@ -372,7 +376,7 @@ describe('CommunityProfile', () => {
   });
 });
 
-describe('FeedSponsoredCard', () => {
+describe('SponsoredCard', () => {
   it('does not render CTA buttons when url is unsafe', () => {
     const ad = {
       placementId: 'slot-1',
@@ -383,7 +387,7 @@ describe('FeedSponsoredCard', () => {
       metrics: { clicks: 12 }
     };
 
-    render(<FeedSponsoredCard ad={ad} />);
+    render(<SponsoredCard ad={ad} />);
 
     expect(screen.queryByRole('link', { name: /visit/i })).not.toBeInTheDocument();
   });

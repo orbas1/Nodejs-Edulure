@@ -4,6 +4,8 @@ import AdsPlacementService from './AdsPlacementService.js';
 import CreationProjectModel from '../models/CreationProjectModel.js';
 import AdsCampaignModel from '../models/AdsCampaignModel.js';
 import AdsCampaignMetricModel from '../models/AdsCampaignMetricModel.js';
+import CommunityFeedImpressionModel from '../models/CommunityFeedImpressionModel.js';
+import CommunityGrowthExperimentModel from '../models/CommunityGrowthExperimentModel.js';
 
 const log = logger.child({ service: 'LiveFeedService' });
 
@@ -278,7 +280,7 @@ export default class LiveFeedService {
     }
   }
 
-  static async computeAnalytics({ base, range }) {
+  static async computeAnalytics({ actor, base, range }) {
     const posts = base.items
       .filter((entry) => entry.kind === 'post' && entry.post)
       .map((entry) => entry.post);
@@ -344,6 +346,18 @@ export default class LiveFeedService {
       uniqueCommunities
     });
 
+    const communityIds = Array.from(uniqueCommunities).filter((value) => value !== undefined && value !== null);
+    if (communityIds.length) {
+      await this.logFeedImpressions({
+        actorId: actor?.id ?? null,
+        communityIds,
+        momentumScore: momentum,
+        postsSampled: posts.length,
+        trendingTags: trendingTags.map((tag) => tag.tag),
+        range
+      });
+    }
+
     return {
       generatedAt: new Date().toISOString(),
       range: {
@@ -362,6 +376,43 @@ export default class LiveFeedService {
       },
       ads: adsSummary
     };
+  }
+
+  static async logFeedImpressions({ actorId, communityIds, momentumScore, postsSampled, trendingTags, range }) {
+    try {
+      const experiments = await CommunityGrowthExperimentModel.listActiveForCommunities(communityIds);
+      const experimentsByCommunity = new Map();
+
+      for (const experiment of experiments) {
+        const existing = experimentsByCommunity.get(experiment.communityId) ?? [];
+        if (existing.length < 3) {
+          existing.push(experiment);
+          experimentsByCommunity.set(experiment.communityId, existing);
+        }
+      }
+
+      for (const communityId of communityIds) {
+        const experimentList = experimentsByCommunity.get(communityId) ?? [null];
+        if (experimentList.length === 0) {
+          experimentList.push(null);
+        }
+
+        for (const experiment of experimentList) {
+          await CommunityFeedImpressionModel.record({
+            communityId,
+            experimentId: experiment?.id ?? null,
+            actorId,
+            momentumScore,
+            postsSampled,
+            trendingTags,
+            rangeStart: range.start,
+            rangeEnd: range.end
+          });
+        }
+      }
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to record feed impression telemetry');
+    }
   }
 
   static async getMomentumScore(args = {}) {
