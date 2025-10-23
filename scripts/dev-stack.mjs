@@ -94,6 +94,9 @@ async function main() {
     preset: presetConfiguration.preset,
     targets: backendEnv.SERVICE_TARGET,
     jobGroups: backendEnv.SERVICE_JOB_GROUPS,
+    requestedJobGroups: presetConfiguration.requestedJobGroups,
+    disabledJobGroups: presetConfiguration.disabledJobGroups,
+    unknownJobGroups: presetConfiguration.unknownJobGroups,
     features: featureSnapshot
   });
 

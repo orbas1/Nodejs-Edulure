@@ -2,6 +2,7 @@ import http from 'node:http';
 
 import { ensureDatabaseConnection, startCoreInfrastructure } from '../bootstrap/bootstrap.js';
 import { env } from '../config/env.js';
+import { getJobFeatureSnapshot } from '../config/featureFlags.js';
 import logger from '../config/logger.js';
 import { createProbeApp } from '../observability/probes.js';
 import { createReadinessTracker } from '../observability/readiness.js';
@@ -15,6 +16,10 @@ import integrationOrchestratorService from '../services/IntegrationOrchestratorS
 import webhookEventBusService from '../services/WebhookEventBusService.js';
 import domainEventDispatcherService from '../services/DomainEventDispatcherService.js';
 import { createProcessSignalRegistry } from './processSignalRegistry.js';
+import {
+  normalizeJobGroupInput,
+  resolveJobGroupActivation
+} from '../../../scripts/lib/processSupervisor.mjs';
 
 const serviceLogger = logger.child({ service: 'worker-service' });
 
@@ -31,6 +36,8 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'integration-orchestrator',
     'telemetry-warehouse',
     'monetization-reconciliation',
+    'analytics-pipelines',
+    'ads-campaign-pacing',
     'webhook-event-bus',
     'domain-event-dispatcher',
     'probe-server'
@@ -79,6 +86,76 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     registry.cleanup();
     throw error;
   }
+
+  const featureSnapshot = getJobFeatureSnapshot();
+  const jobGroupActivation = resolveJobGroupActivation(process.env.SERVICE_JOB_GROUPS, featureSnapshot);
+  const explicitJobGroups = normalizeJobGroupInput(process.env.SERVICE_JOB_GROUPS);
+
+  const requestedJobGroupSet = new Set(jobGroupActivation.requested);
+  const activeJobGroupSet = new Set(jobGroupActivation.active);
+  const disabledJobGroupSet = new Set(jobGroupActivation.disabled);
+
+  if (jobGroupActivation.unknown.length) {
+    serviceLogger.warn(
+      { unknownJobGroups: jobGroupActivation.unknown },
+      'Ignoring unknown job groups from SERVICE_JOB_GROUPS environment variable'
+    );
+  }
+
+  serviceLogger.info(
+    {
+      explicitJobGroups,
+      requestedJobGroups: jobGroupActivation.requested,
+      activeJobGroups: jobGroupActivation.active,
+      disabledJobGroups: jobGroupActivation.disabled,
+      featureSnapshot
+    },
+    'Resolved worker job group activation'
+  );
+
+  const jobGroupEnabled = (group) => activeJobGroupSet.has(group);
+  const jobGroupRequested = (group) => requestedJobGroupSet.has(group);
+  const describeDisabledGroup = (group) => {
+    if (!jobGroupRequested(group)) {
+      return `Job group "${group}" not requested by preset`;
+    }
+    if (disabledJobGroupSet.has(group)) {
+      return `Job group "${group}" disabled by feature flag configuration`;
+    }
+    return `Job group "${group}" disabled by runtime configuration`;
+  };
+
+  const skipJobGroup = (component, group) => {
+    const reason = describeDisabledGroup(group);
+    readiness.markMaintenance(component, reason);
+    serviceLogger.info({ component, group, reason }, 'Skipping background job group');
+  };
+
+  const ensureUnimplementedGroup = (group, component, warningMessage) => {
+    if (!jobGroupRequested(group)) {
+      readiness.markMaintenance(component, `Job group "${group}" not requested by preset`);
+      return;
+    }
+
+    if (!jobGroupEnabled(group)) {
+      skipJobGroup(component, group);
+      return;
+    }
+
+    readiness.markDegraded(component, warningMessage);
+    serviceLogger.warn({ component, group }, warningMessage);
+  };
+
+  ensureUnimplementedGroup(
+    'analytics',
+    'analytics-pipelines',
+    'Analytics job group enabled but analytics scheduler is not yet implemented'
+  );
+  ensureUnimplementedGroup(
+    'ads',
+    'ads-campaign-pacing',
+    'Ads job group enabled but campaign pacing scheduler is not yet implemented'
+  );
 
   const probeApp = createProbeApp({
     service: 'worker-service',
@@ -154,34 +231,42 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
       throw error;
     }
 
-    readiness.markPending('telemetry-warehouse', 'Starting telemetry warehouse scheduler');
-    try {
-      telemetryWarehouseJob.start();
-      registerCleanup('telemetry-warehouse', () => telemetryWarehouseJob.stop());
-      if (!env.telemetry.export.enabled) {
-        readiness.markDegraded('telemetry-warehouse', 'Telemetry export scheduler disabled by configuration');
-      } else {
-        readiness.markReady('telemetry-warehouse', 'Telemetry export scheduler active');
+    if (!jobGroupEnabled('telemetry')) {
+      skipJobGroup('telemetry-warehouse', 'telemetry');
+    } else {
+      readiness.markPending('telemetry-warehouse', 'Starting telemetry warehouse scheduler');
+      try {
+        telemetryWarehouseJob.start();
+        registerCleanup('telemetry-warehouse', () => telemetryWarehouseJob.stop());
+        if (!env.telemetry.export.enabled) {
+          readiness.markDegraded('telemetry-warehouse', 'Telemetry export scheduler disabled by configuration');
+        } else {
+          readiness.markReady('telemetry-warehouse', 'Telemetry export scheduler active');
+        }
+      } catch (error) {
+        readiness.markFailed('telemetry-warehouse', error);
+        serviceLogger.error({ err: error }, 'Failed to start telemetry warehouse job');
+        throw error;
       }
-    } catch (error) {
-      readiness.markFailed('telemetry-warehouse', error);
-      serviceLogger.error({ err: error }, 'Failed to start telemetry warehouse job');
-      throw error;
     }
 
-    readiness.markPending('monetization-reconciliation', 'Starting monetization reconciliation scheduler');
-    try {
-      monetizationReconciliationJob.start();
-      registerCleanup('monetization-reconciliation', () => monetizationReconciliationJob.stop());
-      if (!env.monetization.reconciliation.enabled) {
-        readiness.markDegraded('monetization-reconciliation', 'Monetization reconciliation disabled by configuration');
-      } else {
-        readiness.markReady('monetization-reconciliation', 'Monetization reconciliation scheduler active');
+    if (!jobGroupEnabled('monetisation')) {
+      skipJobGroup('monetization-reconciliation', 'monetisation');
+    } else {
+      readiness.markPending('monetization-reconciliation', 'Starting monetization reconciliation scheduler');
+      try {
+        monetizationReconciliationJob.start();
+        registerCleanup('monetization-reconciliation', () => monetizationReconciliationJob.stop());
+        if (!env.monetization.reconciliation.enabled) {
+          readiness.markDegraded('monetization-reconciliation', 'Monetization reconciliation disabled by configuration');
+        } else {
+          readiness.markReady('monetization-reconciliation', 'Monetization reconciliation scheduler active');
+        }
+      } catch (error) {
+        readiness.markFailed('monetization-reconciliation', error);
+        serviceLogger.error({ err: error }, 'Failed to start monetization reconciliation job');
+        throw error;
       }
-    } catch (error) {
-      readiness.markFailed('monetization-reconciliation', error);
-      serviceLogger.error({ err: error }, 'Failed to start monetization reconciliation job');
-      throw error;
     }
 
     readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');

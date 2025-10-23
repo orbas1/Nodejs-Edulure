@@ -41,6 +41,9 @@ logger.info(
     preset: configuration.preset,
     targets: process.env.SERVICE_TARGET,
     jobGroups: process.env.SERVICE_JOB_GROUPS,
+    requestedJobGroups: configuration.requestedJobGroups,
+    disabledJobGroups: configuration.disabledJobGroups,
+    unknownJobGroups: configuration.unknownJobGroups,
     features: featureSnapshot
   },
   'Resolved stack bootstrap configuration'
@@ -51,7 +54,10 @@ bootstrapServices()
     logger.info({
       preset: configuration.preset,
       targets: process.env.SERVICE_TARGET,
-      jobGroups: process.env.SERVICE_JOB_GROUPS
+      jobGroups: process.env.SERVICE_JOB_GROUPS,
+      requestedJobGroups: configuration.requestedJobGroups,
+      disabledJobGroups: configuration.disabledJobGroups,
+      unknownJobGroups: configuration.unknownJobGroups
     }, 'Stack services bootstrapped');
   })
   .catch((error) => {

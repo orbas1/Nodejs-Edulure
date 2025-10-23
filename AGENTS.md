@@ -115,19 +115,20 @@ G. **Full Upgrade Plan & Release Steps** – Ship migrations for indexes/views, 
 - **Developer convenience** – `scripts/dev-stack.mjs` provisions the database, seeds lite data, and launches backend + frontend concurrently with preset-aware flags and structured logs.【F:scripts/dev-stack.mjs†L1-L170】
 - **Backend stack entrypoint** – `backend-nodejs/src/bin/stack.js` reads `SERVICE_TARGET` and presets, starting web, jobs, realtime, and media orchestration inside a single Node process suitable for production lite deployments.【F:backend-nodejs/src/bin/stack.js†L1-L120】
 - **Production mirroring** – `npm run start:stack --workspace backend-nodejs -- --preset=full` mirrors staging/production boots without nodemon, keeping one backend container.
+- **Job group governance** – `resolveJobGroupActivation` canonicalises CLI overrides and preset defaults so the worker can mark telemetry/monetisation schedulers ready while keeping analytics/ads groups in maintenance until their feature flags flip on.【F:scripts/lib/processSupervisor.mjs†L15-L175】【F:backend-nodejs/src/servers/workerService.js†L90-L270】
 
 ### Assessments
-A. ✅ **Redundancy Changes** – Introduced `scripts/lib/processSupervisor.mjs` to own spawn orchestration, signal handling, readiness probes, and lifecycle logging. `scripts/dev-stack.mjs` and `backend-nodejs/src/bin/stack.js` now share `parsePresetCli`, `derivePresetConfiguration`, and restart helpers so both entry points emit identical lifecycle metadata while avoiding bespoke child-process code paths.
+A. ✅ **Redundancy Changes** – `scripts/lib/processSupervisor.mjs` now folds preset parsing, job-group aliasing, and `resolveJobGroupActivation` into one helper consumed by both the dev script and stack entrypoint so they hydrate identical environment variables without duplicating filter logic.【F:scripts/lib/processSupervisor.mjs†L15-L175】【F:scripts/dev-stack.mjs†L62-L101】【F:backend-nodejs/src/bin/stack.js†L1-L61】
 
 B. ✅ **Strengths to Keep** – Preserved the one-command bootstrap (`npm run dev:stack`) with automatic database preparation and optional frontend boot. The supervisor keeps preset-aware environment hydration while leaving the streamlined developer flow untouched.
 
-C. ✅ **Weaknesses to Remove** – Added `backend-nodejs/src/config/featureFlags.js` plus manifest toggles so telemetry, monetisation, analytics, and ads job groups only activate when their flags are enabled. The preset resolver filters `SERVICE_JOB_GROUPS` accordingly, preventing noisy schedulers and double restarts for disabled domains.
+C. ✅ **Weaknesses to Remove** – `startWorkerService` now inspects the activated job groups before starting schedulers, skips telemetry/monetisation when their flags are off, and marks analytics/ads readiness slots in maintenance until real pacing pipelines ship, eliminating cascading restarts and making disabled groups explicit in probes.【F:backend-nodejs/src/servers/workerService.js†L90-L270】
 
 D. ✅ **Sesing and Colour Review Changes** – Lifecycle logs funnel through the supervisor’s formatter, yielding NDJSON for forwarding or colourised pretty output (info blue, success green, warn amber, error red) when terminals support TTY rendering, aligning CLI ergonomics with the documented palette.
 
 E. ✅ **Improvements & Justification Changes** – CLI parsing now recognises `lite`, `full`, and `ads-analytics` presets, exposes `--log-format`, and records targeted restarts through the interactive command interface (`status`, `restart <label>`). Child processes stream readiness data from `/health` and the Vite dev server so admin dashboards can consume consistent green/yellow/red states without extra APIs.
 
-F. ✅ **Change Checklist Tracker** – Completed preset propagation smoke coverage in code, centralised spawn failure handling, kept migrations untouched, and ensured the lite preset seeds remain minimal while new feature flags guard additional schedulers.
+F. ✅ **Change Checklist Tracker** – Added an idempotent migration to seed the background-job feature flag rows and a vitest suite that locks in job-group canonicalisation so migrations, models, and runtime parsing stay aligned.【F:backend-nodejs/migrations/20250316140000_feature_flag_job_groups_alignment.js†L1-L112】【F:backend-nodejs/test/jobGroupActivation.test.js†L1-L45】
 
 G. ✅ **Full Upgrade Plan & Release Steps** – The refactor, preset parser, NDJSON logging, targeted restarts, and documentation signalling are implemented; remaining rollout steps are reduced to routine smoke tests now backed by the shared supervisor utilities.
 

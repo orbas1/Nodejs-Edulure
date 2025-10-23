@@ -12,6 +12,33 @@ const COLOURS = {
 
 const DEFAULT_PRESET = 'lite';
 
+const JOB_GROUP_ALIASES = new Map([
+  ['core', 'core'],
+  ['default', 'core'],
+  ['baseline', 'core'],
+  ['telemetry', 'telemetry'],
+  ['telemetry-jobs', 'telemetry'],
+  ['observability', 'telemetry'],
+  ['analytics', 'analytics'],
+  ['insights', 'analytics'],
+  ['monetisation', 'monetisation'],
+  ['monetization', 'monetisation'],
+  ['revenue', 'monetisation'],
+  ['revops', 'monetisation'],
+  ['ads', 'ads'],
+  ['advertising', 'ads'],
+  ['campaigns', 'ads']
+]);
+
+const KNOWN_JOB_GROUPS = new Set(JOB_GROUP_ALIASES.values());
+
+const FEATURE_FLAG_DEPENDENCIES = {
+  telemetry: 'telemetry',
+  monetisation: 'monetisation',
+  analytics: 'analytics',
+  ads: 'ads'
+};
+
 const PRESET_DEFINITIONS = {
   lite: {
     targets: ['web'],
@@ -27,6 +54,98 @@ const PRESET_DEFINITIONS = {
   }
 };
 
+function extractJobGroupTokens(input) {
+  const list = Array.isArray(input)
+    ? input
+    : input === undefined || input === null
+      ? []
+      : String(input).split(',');
+
+  const canonical = [];
+  const unknown = [];
+  const seenCanonical = new Set();
+  const seenUnknown = new Set();
+
+  for (const token of list) {
+    const normalised = String(token ?? '')
+      .trim()
+      .toLowerCase();
+    if (!normalised) {
+      continue;
+    }
+
+    const alias = JOB_GROUP_ALIASES.get(normalised);
+    if (alias) {
+      if (!seenCanonical.has(alias)) {
+        seenCanonical.add(alias);
+        canonical.push(alias);
+      }
+      continue;
+    }
+
+    if (KNOWN_JOB_GROUPS.has(normalised)) {
+      if (!seenCanonical.has(normalised)) {
+        seenCanonical.add(normalised);
+        canonical.push(normalised);
+      }
+      continue;
+    }
+
+    if (!seenUnknown.has(normalised)) {
+      seenUnknown.add(normalised);
+      unknown.push(normalised);
+    }
+  }
+
+  return { canonical, unknown };
+}
+
+export function resolveJobGroupActivation(jobGroupsInput, featureSnapshot = {}) {
+  const { canonical, unknown } = extractJobGroupTokens(jobGroupsInput);
+
+  const requestedSet = new Set(canonical);
+  if (!requestedSet.size) {
+    requestedSet.add('core');
+  }
+  if (!requestedSet.has('core')) {
+    requestedSet.add('core');
+  }
+
+  const requested = Array.from(requestedSet);
+  const active = [];
+  const disabled = [];
+
+  for (const group of requested) {
+    if (!KNOWN_JOB_GROUPS.has(group)) {
+      continue;
+    }
+
+    if (group === 'core') {
+      active.push(group);
+      continue;
+    }
+
+    const dependencyKey = FEATURE_FLAG_DEPENDENCIES[group];
+    if (dependencyKey && featureSnapshot[dependencyKey] !== true) {
+      if (!disabled.includes(group)) {
+        disabled.push(group);
+      }
+      continue;
+    }
+
+    if (!active.includes(group)) {
+      active.push(group);
+    }
+  }
+
+  return {
+    requested,
+    active,
+    disabled,
+    unknown
+  };
+}
+
 function toCsv(list) {
   return list.join(',');
 }
@@ -36,35 +155,17 @@ export function derivePresetConfiguration(presetInput, { featureSnapshot = {}, e
   const definition = PRESET_DEFINITIONS[preset];
 
   const targets = explicitTargets?.length ? explicitTargets : [...definition.targets];
-  const jobGroupSet = new Set(explicitJobGroups?.length ? explicitJobGroups : definition.jobGroups);
-
-  const telemetryEnabled = featureSnapshot.telemetry ?? false;
-  const monetisationEnabled = featureSnapshot.monetisation ?? false;
-  const analyticsEnabled = featureSnapshot.analytics ?? false;
-  const adsEnabled = featureSnapshot.ads ?? false;
-
-  if (!telemetryEnabled) {
-    jobGroupSet.delete('telemetry');
-  }
-
-  if (!monetisationEnabled) {
-    jobGroupSet.delete('monetisation');
-  }
-
-  if (!analyticsEnabled) {
-    jobGroupSet.delete('analytics');
-  }
-
-  if (!adsEnabled) {
-    jobGroupSet.delete('ads');
-  }
-
-  const jobGroups = [...jobGroupSet];
+  const baseJobGroups = explicitJobGroups?.length ? explicitJobGroups : definition.jobGroups;
+  const activation = resolveJobGroupActivation(baseJobGroups, featureSnapshot);
+  const jobGroups = activation.active;
 
   return {
     preset,
     targets,
     jobGroups,
+    requestedJobGroups: activation.requested,
+    disabledJobGroups: activation.disabled,
+    unknownJobGroups: activation.unknown,
     env: {
       SERVICE_PRESET: preset,
       SERVICE_TARGET: toCsv(targets),
@@ -522,13 +623,8 @@ export function parsePresetCli(args = []) {
 }
 
 export function normalizeJobGroupInput(input) {
-  if (!input) {
-    return undefined;
-  }
-  const list = Array.isArray(input) ? input : String(input).split(',');
-  return list
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const { canonical } = extractJobGroupTokens(input);
+  return canonical.length ? canonical : undefined;
 }
 
 export function normalizeTargetInput(input) {
