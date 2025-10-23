@@ -453,11 +453,11 @@ C. ✅ **Weaknesses to Remove** – Iconography, focus order, and breadcrumb red
 
 D. ✅ **Sesing and Colour Review Changes** – Primary indigo active states, slate neutrals, and compliant focus outlines now live in the shared components, inheriting semantic tokens for light, dark, and high-contrast modes.
 
-E. ✅ **Improvements & Justification Changes** – Role-based pinning, monetisation cues, and presence-driven CTAs land through shared contexts so learners, instructors, and admins see tailored quick paths without bespoke variants.
+E. ✅ **Improvements & Justification Changes** – Role-based pinning, monetisation cues, and presence-driven CTAs land through shared contexts so learners, instructors, and admins see tailored quick paths without bespoke variants. Navigation intent persists via the `users.dashboard_preferences` JSON, keeping manifest pinning, notification toggles, and presence state cohesive across sessions.
 
-F. ✅ **Change Checklist Tracker** – Analytics wiring, drawer focus traps, seeded notification categories, and responsive token alignment are complete; no schema updates were required.
+F. ✅ **Change Checklist Tracker** – Analytics wiring, drawer focus traps, seeded notification categories, and responsive token alignment are complete. Database alignment shipped with the `users.dashboard_preferences`, `users.unread_community_count`, and `users.pending_payouts` columns plus seed updates to mirror production navigation data.
 
-G. ✅ **Full Upgrade Plan & Release Steps** – Refactor, manifest adoption, accessibility sweeps, documentation updates, and rollout sequencing are executed. Remaining follow-up is limited to capturing refreshed marketing screenshots and scheduling analytics QA cadences.
+G. ✅ **Full Upgrade Plan & Release Steps** – Refactor, manifest adoption, accessibility sweeps, documentation updates, and rollout sequencing are executed. Remaining follow-up is limited to capturing refreshed marketing screenshots, scheduling analytics QA cadences, and promoting migration `20241120104500_user_dashboard_preferences.js` through staged environments.
 
 ## 2. Marketing site surfaces
 

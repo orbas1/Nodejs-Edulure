@@ -25,11 +25,11 @@ C. **Weaknesses to Remove** – ✅ Iconography and focus handling are unified: 
 
 D. **Sesing and Colour Review Changes** – ✅ Primary indigo active states, slate neutrals, and high-contrast outlines land directly in the new components. Tokens from `styles/tokens.css` shape hover/focus states, and badge colours reuse the shared semantic palette so dark/high-contrast variants inherit the same rules.
 
-E. **Improvements & Justification Changes** – ✅ Navigation preferences support pinning through dashboard payloads, quick-create slots adapt to role, and monetisation cues surface automatically when payout or live-session signals arrive. All CTA/notification analytics stream through the helper for release-readiness reporting.
+E. **Improvements & Justification Changes** – ✅ Navigation preferences support pinning through dashboard payloads, quick-create slots adapt to role, and monetisation cues surface automatically when payout or live-session signals arrive. All CTA/notification analytics stream through the helper for release-readiness reporting, and persisted navigation/alert state now lives in `users.dashboard_preferences` so manifests stay aligned across sessions.
 
-F. **Change Checklist Tracker** – ✅ Unified analytics wiring, drawer focus traps, seeded demo categories, and responsive tokens are in place. No migrations required; presets and manifests now load from shared modules.
+F. **Change Checklist Tracker** – ✅ Unified analytics wiring, drawer focus traps, seeded demo categories, and responsive tokens are in place. Navigation preferences and alert counts persist via the new `users.dashboard_preferences`, `users.unread_community_count`, and `users.pending_payouts` columns with seed updates keeping demo data authoritative.
 
-G. **Full Upgrade Plan & Release Steps** – ✅ Shared nav shipped to marketing + dashboard shells, accessibility sweeps run as part of lint/test workflow, and documentation now covers personalisation plus manifest updates. Remaining follow-up: capture screenshot catalogue once marketing assets refresh and schedule periodic analytics QA.
+G. **Full Upgrade Plan & Release Steps** – ✅ Shared nav shipped to marketing + dashboard shells, accessibility sweeps run as part of lint/test workflow, and documentation now covers personalisation plus manifest updates. Remaining follow-up: capture screenshot catalogue once marketing assets refresh, schedule periodic analytics QA, and roll the navigation preference migration (`20241120104500_user_dashboard_preferences.js`) through staging before production.
 
 ## 2. Marketing site surfaces
 

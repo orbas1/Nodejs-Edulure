@@ -3966,6 +3966,18 @@ export default class DashboardService {
       throw error;
     }
 
+    const dashboardPreferencesRaw = safeJsonParse(user.dashboardPreferences ?? user.dashboard_preferences, {});
+    const pinnedNavigation = Array.isArray(dashboardPreferencesRaw.pinnedNavigation)
+      ? Array.from(
+          new Set(
+            dashboardPreferencesRaw.pinnedNavigation
+              .filter((entry) => typeof entry === 'string')
+              .map((entry) => entry.trim())
+              .filter((entry) => entry.length > 0)
+          )
+        )
+      : [];
+
     let supportCases = [];
     const supportMetrics = {
       open: 0,
@@ -5029,6 +5041,22 @@ export default class DashboardService {
       stats: profileStats,
       feedHighlights: uniqueFeedHighlights
     };
+
+    Object.keys(dashboards).forEach((key) => {
+      const value = dashboards[key];
+      if (!value || typeof value !== 'object') {
+        return;
+      }
+      const existingPreferences =
+        value.preferences && typeof value.preferences === 'object' ? value.preferences : {};
+      dashboards[key] = {
+        ...value,
+        preferences: {
+          ...existingPreferences,
+          pinnedNavigation
+        }
+      };
+    });
 
     return {
       profile,

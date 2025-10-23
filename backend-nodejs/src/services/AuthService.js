@@ -54,7 +54,68 @@ function parseStoredAddress(address) {
   return null;
 }
 
+function parseJsonObject(value, fallback) {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (_error) {
+    return fallback;
+  }
+  return fallback;
+}
+
+function normalisePinnedNavigation(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const deduped = new Set();
+  value.forEach((entry) => {
+    if (typeof entry !== 'string') {
+      return;
+    }
+    const trimmed = entry.trim();
+    if (trimmed.length) {
+      deduped.add(trimmed);
+    }
+  });
+  return Array.from(deduped);
+}
+
+function parseDashboardPreferences(value) {
+  const parsed = parseJsonObject(value, {});
+  return {
+    ...parsed,
+    pinnedNavigation: normalisePinnedNavigation(parsed?.pinnedNavigation)
+  };
+}
+
+function toNonNegativeInteger(value) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
 function sanitizeUserRecord(user) {
+  const dashboardPreferences = parseDashboardPreferences(
+    user.dashboardPreferences ?? user.dashboard_preferences ?? {}
+  );
+  const activeLiveRoom =
+    parseActiveLiveRoom(user.activeLiveRoom ?? user.active_live_room ?? null) ??
+    (dashboardPreferences.activeLiveRoom ? parseActiveLiveRoom(dashboardPreferences.activeLiveRoom) : null);
+
   return {
     id: user.id,
     firstName: user.firstName ?? user.first_name,
@@ -63,6 +124,11 @@ function sanitizeUserRecord(user) {
     role: user.role,
     age: user.age,
     address: parseStoredAddress(user.address),
+    dashboardPreferences,
+    pinnedNavigation: dashboardPreferences.pinnedNavigation,
+    unreadCommunityCount: toNonNegativeInteger(user.unreadCommunityCount ?? user.unread_community_count),
+    pendingPayouts: toNonNegativeInteger(user.pendingPayouts ?? user.pending_payouts),
+    activeLiveRoom,
     twoFactorEnabled: TwoFactorService.isTwoFactorEnabled(user),
     twoFactorEnrolledAt: user.twoFactorEnrolledAt ?? user.two_factor_enrolled_at ?? null,
     twoFactorLastVerifiedAt: user.twoFactorLastVerifiedAt ?? user.two_factor_last_verified_at ?? null,
@@ -87,6 +153,54 @@ function toIso(value) {
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function parseActiveLiveRoom(value) {
+  const parsed = parseJsonObject(value, null);
+  if (!parsed) {
+    return null;
+  }
+
+  const id = typeof parsed.id === 'string' ? parsed.id.trim() : '';
+  if (!id) {
+    return null;
+  }
+
+  const normalised = {
+    id,
+    title:
+      typeof parsed.title === 'string' && parsed.title.trim().length > 0 ? parsed.title.trim() : undefined,
+    startedAt: toIso(parsed.startedAt ?? parsed.started_at ?? null) ?? undefined,
+    endsAt: toIso(parsed.endsAt ?? parsed.ends_at ?? null) ?? undefined,
+    courseId:
+      typeof parsed.courseId === 'string' && parsed.courseId.trim().length > 0
+        ? parsed.courseId.trim()
+        : typeof parsed.course_id === 'string' && parsed.course_id.trim().length > 0
+          ? parsed.course_id.trim()
+          : undefined,
+    communityId:
+      typeof parsed.communityId === 'string' && parsed.communityId.trim().length > 0
+        ? parsed.communityId.trim()
+        : typeof parsed.community_id === 'string' && parsed.community_id.trim().length > 0
+          ? parsed.community_id.trim()
+          : undefined,
+    hostRole:
+      typeof parsed.hostRole === 'string' && parsed.hostRole.trim().length > 0
+        ? parsed.hostRole.trim()
+        : typeof parsed.role === 'string' && parsed.role.trim().length > 0
+          ? parsed.role.trim()
+          : undefined,
+    roomUrl:
+      typeof parsed.roomUrl === 'string' && parsed.roomUrl.trim().length > 0 ? parsed.roomUrl.trim() : undefined
+  };
+
+  Object.keys(normalised).forEach((key) => {
+    if (normalised[key] === undefined) {
+      delete normalised[key];
+    }
+  });
+
+  return normalised;
 }
 
 function buildSessionPayload(session) {
