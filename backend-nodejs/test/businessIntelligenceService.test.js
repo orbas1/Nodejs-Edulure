@@ -29,6 +29,8 @@ const freshnessModel = {
 
 describe('BusinessIntelligenceService', () => {
   let service;
+  let currentRevenueDaily;
+  let previousRevenueDaily;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -73,7 +75,7 @@ describe('BusinessIntelligenceService', () => {
       { communityId: 1, name: 'Global Cohort', posts: 24, comments: 120, publicPosts: 18, eventPosts: 3 }
     ]);
 
-    paymentsReportingModel.fetchDailySummaries.mockResolvedValue([
+    currentRevenueDaily = [
       {
         date: '2025-03-01',
         currency: 'USD',
@@ -84,8 +86,51 @@ describe('BusinessIntelligenceService', () => {
         refundedCents: 3000,
         totalIntents: 48,
         succeededIntents: 42
+      },
+      {
+        date: '2025-03-02',
+        currency: 'USD',
+        grossVolumeCents: 91000,
+        recognisedVolumeCents: 84000,
+        discountCents: 2500,
+        taxCents: 6200,
+        refundedCents: 2600,
+        totalIntents: 52,
+        succeededIntents: 46
       }
-    ]);
+    ];
+    previousRevenueDaily = [
+      {
+        date: '2025-02-22',
+        currency: 'USD',
+        grossVolumeCents: 70000,
+        recognisedVolumeCents: 65000,
+        discountCents: 1800,
+        taxCents: 5400,
+        refundedCents: 4000,
+        totalIntents: 44,
+        succeededIntents: 38
+      },
+      {
+        date: '2025-02-23',
+        currency: 'USD',
+        grossVolumeCents: 72000,
+        recognisedVolumeCents: 66000,
+        discountCents: 2000,
+        taxCents: 5500,
+        refundedCents: 3200,
+        totalIntents: 45,
+        succeededIntents: 39
+      }
+    ];
+
+    paymentsReportingModel.fetchDailySummaries.mockImplementation(async ({ end }) => {
+      const endIso = end instanceof Date ? end.toISOString().slice(0, 10) : end;
+      if (endIso && endIso >= '2025-03-05') {
+        return currentRevenueDaily;
+      }
+      return previousRevenueDaily;
+    });
     paymentsReportingModel.fetchTotals
       .mockResolvedValueOnce({
         grossVolumeCents: 220000,
@@ -165,6 +210,43 @@ describe('BusinessIntelligenceService', () => {
     expect(overview.experiments[0]).toMatchObject({ experimentId: 'exp-123', status: 'active' });
     expect(overview.dataQuality.status).toBe('warning');
     expect(overview.dataQuality.pipelines).toHaveLength(2);
+  });
+
+  it('returns revenue saved views with computed deltas and ratios', async () => {
+    const payload = await service.getRevenueSavedViews({ range: '7d', tenantId: 'tenant-ops' });
+
+    expect(payload.tenantId).toBe('tenant-ops');
+    expect(payload.views).toHaveLength(3);
+
+    const netView = payload.views.find((view) => view.id === 'net-revenue');
+    expect(netView).toBeDefined();
+    const netMetric = netView.metrics.find((metric) => metric.key === 'netRevenue');
+    expect(netMetric.current).toBe(154400);
+    expect(netMetric.change.absolute).toBe(30600);
+
+    const refundRateMetric = netView.metrics.find((metric) => metric.key === 'refundRate');
+    expect(refundRateMetric.current).toBeCloseTo(0.035, 3);
+    expect(refundRateMetric.change.absolute).toBeCloseTo(-0.0199, 3);
+
+    const healthView = payload.views.find((view) => view.id === 'payment-health');
+    expect(healthView.metrics.find((metric) => metric.key === 'successRate').current).toBeCloseTo(0.88, 3);
+    expect(
+      healthView.metrics.find((metric) => metric.key === 'grossVolume').change.absolute
+    ).toBe(31000);
+
+    const leakageView = payload.views.find((view) => view.id === 'revenue-leakage');
+    expect(leakageView.metrics.find((metric) => metric.key === 'averageTicket').current).toBeCloseTo(
+      1818.18,
+      2
+    );
+    expect(leakageView.metrics.find((metric) => metric.key === 'discountRate').change.absolute).toBeCloseTo(
+      -0.00075,
+      4
+    );
+
+    expect(payload.timeframe.days).toBe(7);
+    expect(payload.timeframe.start).toBe('2025-02-27T00:00:00.000Z');
+    expect(payload.timeframe.previousEnd).toBe('2025-02-26T23:59:59.999Z');
   });
 
   afterEach(() => {
