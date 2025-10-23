@@ -167,6 +167,8 @@ export async function seed(knex) {
     await trx('users').del();
 
     const passwordHash = await bcrypt.hash('LaunchReady!2024', 12);
+    const operationsSyncStartedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const studioSessionStartedAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
     const [adminId] = await trx('users').insert({
       first_name: 'Amina',
@@ -177,7 +179,17 @@ export async function seed(knex) {
       email_verified_at: trx.fn.now(),
       failed_login_attempts: 0,
       last_login_at: trx.fn.now(),
-      password_changed_at: trx.fn.now()
+      password_changed_at: trx.fn.now(),
+      dashboard_preferences: JSON.stringify({ pinnedNavigation: ['admin-operations', 'admin-governance'] }),
+      unread_community_count: 9,
+      pending_payouts: 2,
+      active_live_room: JSON.stringify({
+        id: 'live_ops_sync',
+        title: 'Weekly operations sync',
+        startedAt: operationsSyncStartedAt,
+        role: 'admin',
+        roomUrl: 'https://live.edulure.test/ops-sync'
+      })
     });
 
     const [instructorId] = await trx('users').insert({
@@ -189,7 +201,18 @@ export async function seed(knex) {
       email_verified_at: trx.fn.now(),
       failed_login_attempts: 0,
       last_login_at: trx.fn.now(),
-      password_changed_at: trx.fn.now()
+      password_changed_at: trx.fn.now(),
+      dashboard_preferences: JSON.stringify({ pinnedNavigation: ['instructor-studio', 'instructor-clients'] }),
+      unread_community_count: 5,
+      pending_payouts: 1,
+      active_live_room: JSON.stringify({
+        id: 'live_course_build',
+        title: 'Cohort design working session',
+        startedAt: studioSessionStartedAt,
+        courseId: 'course-automation-fundamentals',
+        role: 'instructor',
+        roomUrl: 'https://live.edulure.test/cohort-design'
+      })
     });
 
     const [learnerId] = await trx('users').insert({
@@ -201,7 +224,11 @@ export async function seed(knex) {
       email_verified_at: trx.fn.now(),
       failed_login_attempts: 0,
       last_login_at: trx.fn.now(),
-      password_changed_at: trx.fn.now()
+      password_changed_at: trx.fn.now(),
+      dashboard_preferences: JSON.stringify({ pinnedNavigation: ['learner-community'] }),
+      unread_community_count: 7,
+      pending_payouts: 0,
+      active_live_room: null
     });
 
     const adminVerificationRef = makeVerificationRef();

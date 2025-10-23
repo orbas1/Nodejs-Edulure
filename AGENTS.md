@@ -4,7 +4,7 @@ Group 1 – Categories 1-4 (comprehensive change tracking)
 
 1. **All changes**
    A. *Logic flows* – Expanded `logic flows.md` to sixteen flows covering platform setup, service consolidation, search migration, learner journeys, instructor publishing, monetisation, admin oversight, support, ads, and analytics with A–G assessments for each scenario.
-   B. *User experience* – Rewrote `user experience.md` so every surface from navigation through accessibility carries the same A–G analysis, detailing component requirements, styling, imagery, monetisation hooks, and rollout plans.
+   B. ✅
    C. *Enablement docs* – Ledger now mirrors the updated documentation, emphasising the simplified runtime (frontend, backend, database) and the Edulure-first search/realtime stack.
 
 2. **Redundancies**
@@ -439,25 +439,25 @@ This blueprint defines how Edulure should feel: Skool-style community energy pai
 ## 1. Global shell and navigation
 
 ### Experience outline
-- **Header bar** – Compact top navigation with logo, primary tabs (Feed, Courses, Communities, Tutors, Library), quick-create button, and avatar menu.
-- **Sidebar** – Contextual nav on dashboards with role-aware sections (Learner, Instructor, Admin) and collapsible groups.
-- **Notifications & quick actions** – Bell icon reveals notifications; plus button surfaces create actions for posts, courses, events.
-- **Responsive behaviour** – Mobile collapses nav into bottom tab bar with floating action button for creation.
+- **Header bar** – Delivered via `frontend-reactjs/src/components/navigation/AppTopBar.jsx`, combining the logo, manifest-driven primary tabs, omnibox search, quick-create menu, notifications, language selector, and avatar menu with analytics instrumentation.
+- **Sidebar** – Powered by `frontend-reactjs/src/components/navigation/AppSidebar.jsx`, which ingests role-aware route groups from `frontend-reactjs/src/navigation/routes.js`, supports pinning, and surfaces status badges sourced from dashboard payloads.
+- **Notifications & quick actions** – Managed by `frontend-reactjs/src/components/navigation/AppNotificationPanel.jsx`, grouping alerts by surface, persisting preference toggles, and dispatching analytics events, while quick actions inherit from the shared manifest so roles see contextual creation affordances.
+- **Responsive behaviour** – Breakpoints and collapse logic respect the shared token set (`frontend-reactjs/src/styles/tokens.css`), ensuring the top bar condenses gracefully, quick-create falls back to modal sheets, and sidebar toggles remain keyboard accessible.
 
 ### Assessments
-A. **Redundancy Changes** – Remove duplicate nav components between `layouts/AppShell.jsx` and `layouts/DashboardShell.jsx`; unify notification drawers. Centralise header rendering inside `frontend-reactjs/src/components/navigation/TopBar.jsx` so badges, presence indicators, and monetisation shortcuts stay aligned.
+A. ✅ **Redundancy Changes** – Navigation primitives replace bespoke layouts; both `MainLayout.jsx` and `DashboardLayout.jsx` consume `AppTopBar`, `AppSidebar`, and `AppNotificationPanel`, eliminating duplicate headers and drawers while funnelling analytics through `frontend-reactjs/src/lib/analytics.js`.
 
-B. **Strengths to Keep** – Keep concise nav labels, avatar quick menu, and responsive collapse patterns that mimic Skool simplicity.
+B. ✅ **Strengths to Keep** – Compact labelling, avatar menu ergonomics, deterministic routing, and responsive collapse patterns persist because manifests feed every surface.
 
-C. **Weaknesses to Remove** – Reduce icon inconsistency, improve keyboard focus order, and eliminate redundant breadcrumbs when sidebar already signals context. Map keyboard focus to the order defined in `navigation/routes.js` so screen reader announcements match visual hierarchy.
+C. ✅ **Weaknesses to Remove** – Iconography, focus order, and breadcrumb redundancy are resolved: manifest order defines tab stops, sidebar context renders breadcrumbs unnecessary, and localisation strings unify tooltip copy.
 
-D. **Sesing and Colour Review Changes** – Use the primary indigo for active states, neutral slate backgrounds, and 1px dividers; ensure hover/focus outlines meet contrast guidelines.
+D. ✅ **Sesing and Colour Review Changes** – Primary indigo active states, slate neutrals, and compliant focus outlines now live in the shared components, inheriting semantic tokens for light, dark, and high-contrast modes.
 
-E. **Improvements & Justification Changes** – Introduce a shared navigation primitive, add personalization for pinning sections, and integrate monetisation badges (ads manager, payouts) to highlight revenue features. Persist pinned links through `UserPreferenceController.updateNavigation` so the shell reflects learner, instructor, or owner priorities automatically.
+E. ✅ **Improvements & Justification Changes** – Role-based pinning, monetisation cues, and presence-driven CTAs land through shared contexts so learners, instructors, and admins see tailored quick paths without bespoke variants. Navigation intent persists via the `users.dashboard_preferences` JSON, keeping manifest pinning, notification toggles, and presence state cohesive across sessions.
 
-F. **Change Checklist Tracker** – Completion 55%; tests for focus management needed; no database changes; ensure analytics events update; assets share tokens.
+F. ✅ **Change Checklist Tracker** – Analytics wiring, drawer focus traps, seeded notification categories, and responsive token alignment are complete. Database alignment shipped with the `users.dashboard_preferences`, `users.unread_community_count`, and `users.pending_payouts` columns plus seed updates to mirror production navigation data.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared nav components, refactor layouts to consume them, audit keyboard navigation, update theme tokens, and release after responsive QA.
+G. ✅ **Full Upgrade Plan & Release Steps** – Refactor, manifest adoption, accessibility sweeps, documentation updates, and rollout sequencing are executed. Remaining follow-up is limited to capturing refreshed marketing screenshots, scheduling analytics QA cadences, and promoting migration `20241120104500_user_dashboard_preferences.js` through staged environments.
 
 ## 2. Marketing site surfaces
 

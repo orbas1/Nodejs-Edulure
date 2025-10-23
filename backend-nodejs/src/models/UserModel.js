@@ -1,5 +1,38 @@
 import db from '../config/database.js';
 
+function serialiseJsonColumn(value, fallback = '{}') {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function serialiseNullableJson(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function toUnsignedInt(value) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.trunc(numeric));
+}
+
 const BASE_COLUMNS = [
   'id',
   'first_name as firstName',
@@ -8,6 +41,10 @@ const BASE_COLUMNS = [
   'role',
   'age',
   'address',
+  'dashboard_preferences as dashboardPreferences',
+  'unread_community_count as unreadCommunityCount',
+  'pending_payouts as pendingPayouts',
+  'active_live_room as activeLiveRoom',
   'two_factor_enabled as twoFactorEnabled',
   'two_factor_enrolled_at as twoFactorEnrolledAt',
   'two_factor_last_verified_at as twoFactorLastVerifiedAt',
@@ -38,6 +75,10 @@ export default class UserModel {
         user.address && typeof user.address === 'object'
           ? JSON.stringify(user.address)
           : user.address ?? null,
+      dashboard_preferences: serialiseJsonColumn(user.dashboardPreferences, '{}'),
+      unread_community_count: toUnsignedInt(user.unreadCommunityCount),
+      pending_payouts: toUnsignedInt(user.pendingPayouts),
+      active_live_room: serialiseNullableJson(user.activeLiveRoom),
       two_factor_enabled: user.twoFactorEnabled ? 1 : 0,
       two_factor_secret: user.twoFactorSecret ?? null,
       two_factor_enrolled_at: user.twoFactorEnrolledAt ?? null,
@@ -78,6 +119,18 @@ export default class UserModel {
         updates.address && typeof updates.address === 'object'
           ? JSON.stringify(updates.address)
           : updates.address ?? null;
+    }
+    if (updates.dashboardPreferences !== undefined) {
+      payload.dashboard_preferences = serialiseJsonColumn(updates.dashboardPreferences, '{}');
+    }
+    if (updates.unreadCommunityCount !== undefined) {
+      payload.unread_community_count = toUnsignedInt(updates.unreadCommunityCount);
+    }
+    if (updates.pendingPayouts !== undefined) {
+      payload.pending_payouts = toUnsignedInt(updates.pendingPayouts);
+    }
+    if (updates.activeLiveRoom !== undefined) {
+      payload.active_live_room = serialiseNullableJson(updates.activeLiveRoom);
     }
     if (updates.passwordHash !== undefined) {
       payload.password_hash = updates.passwordHash ?? null;
