@@ -31,6 +31,7 @@ import AdminBookingsSection from './admin/sections/AdminBookingsSection.jsx';
 import AdminGrowthSection from './admin/sections/AdminGrowthSection.jsx';
 import AdminRevenueManagementSection from './admin/sections/AdminRevenueManagementSection.jsx';
 import AdminAdsManagementSection from './admin/sections/AdminAdsManagementSection.jsx';
+import AdminReleaseSection from './admin/sections/AdminReleaseSection.jsx';
 import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
 
 const EMPTY_OBJECT = Object.freeze({});
@@ -56,6 +57,7 @@ const SECTION_NAVIGATION = Object.freeze([
   { id: 'communities', label: 'Communities' },
   { id: 'tools', label: 'Tools' },
   { id: 'operations', label: 'Operations' },
+  { id: 'release', label: 'Release readiness' },
   { id: 'blog', label: 'Blog' },
   { id: 'compliance', label: 'Compliance' },
   { id: 'policies', label: 'Policies' },
@@ -67,7 +69,7 @@ const NAVIGATION_STRUCTURE = Object.freeze([
   {
     id: 'control-dashboard',
     title: 'Control dashboard',
-    items: ['overview', 'approvals', 'operations', 'compliance', 'policies', 'launches', 'activity']
+    items: ['overview', 'approvals', 'operations', 'release', 'compliance', 'policies', 'launches', 'activity']
   },
   {
     id: 'revenue-console',
@@ -232,6 +234,12 @@ export default function Admin() {
   const platform = operations.platform ?? EMPTY_OBJECT;
   const upcomingLaunches = operations.upcomingLaunches ?? EMPTY_ARRAY;
   const tools = adminData.tools ?? EMPTY_OBJECT;
+
+  const release = adminData.release ?? EMPTY_OBJECT;
+  const releaseTasks = release.tasks ?? EMPTY_ARRAY;
+  const releaseSummary = release.summary ?? EMPTY_OBJECT;
+  const releaseGates = release.gates ?? EMPTY_ARRAY;
+  const releaseReadinessScore = release.readinessScore ?? null;
 
   const compliance = adminData.compliance ?? EMPTY_OBJECT;
   const complianceMetrics = compliance.metrics ?? EMPTY_ARRAY;
@@ -450,6 +458,13 @@ export default function Admin() {
     if (tools?.summary?.cards?.length) {
       helpers.tools = `${formatNumber(tools.summary.cards.length)} suites`;
     }
+    if (releaseTasks.length > 0) {
+      helpers.release = `${formatNumber(releaseTasks.length)} gates pending`;
+    } else if (releaseGates.length > 0) {
+      helpers.release = `${formatNumber(releaseGates.length)} gates ready`;
+    } else if (releaseReadinessScore !== null) {
+      helpers.release = `Score ${formatNumber(Math.round(releaseReadinessScore))}`;
+    }
     return helpers;
   }, [
     pendingApprovals,
@@ -461,7 +476,10 @@ export default function Admin() {
     upcomingLaunches,
     topCommunities,
     adminMetrics,
-    tools
+    tools,
+    releaseTasks,
+    releaseGates,
+    releaseReadinessScore
   ]);
 
   const navigationGroups = useMemo(() => {
@@ -528,8 +546,20 @@ export default function Admin() {
         tone: 'neutral'
       });
     }
+    releaseTasks.slice(0, 4).forEach((task) => {
+      const tone = task.status === 'fail' ? 'danger' : task.status === 'in_progress' ? 'warning' : 'neutral';
+      const statusLabel = task.status
+        ? task.status.replace(/_/g, ' ')
+        : 'pending';
+      items.push({
+        id: `task-${task.id}`,
+        label: `${task.label} · ${statusLabel}`,
+        href: task.href ?? '#release',
+        tone
+      });
+    });
     return items;
-  }, [pendingApprovals, paymentHealth, complianceManualReview, alerts, upcomingLaunches]);
+  }, [pendingApprovals, paymentHealth, complianceManualReview, alerts, upcomingLaunches, releaseTasks]);
 
   const helperLinks = useMemo(
     () => [
@@ -547,6 +577,11 @@ export default function Admin() {
         label: 'Integration runbooks',
         href: '/docs/operations/README.md#integration-runbooks',
         description: 'Webhooks, partner API keys, and sandbox rotation steps.'
+      },
+      {
+        label: 'Release readiness checklist',
+        href: '/docs/operations/README.md#release-readiness',
+        description: 'Gate owners, evidence expectations, and change window protocol.'
       }
     ],
     []
@@ -556,6 +591,14 @@ export default function Admin() {
     const alertsOpen = Number(risk.alertsOpen ?? 0);
     const backlogCount = Number(support.backlog ?? 0);
     const requiresAction = Number(paymentHealth?.requiresAction ?? 0);
+    const failingGates = Number(releaseSummary.fail ?? 0);
+    const pendingGates = Number(releaseSummary.pending ?? 0) + Number(releaseSummary.in_progress ?? 0);
+    if (failingGates > 0) {
+      return { label: `${formatNumber(failingGates)} release gates failing`, tone: 'danger' };
+    }
+    if (pendingGates > 0) {
+      return { label: `${formatNumber(pendingGates)} release gates pending`, tone: 'warning' };
+    }
     if (alertsOpen > 0) {
       return { label: `${formatNumber(alertsOpen)} alerts open`, tone: 'warning' };
     }
@@ -566,7 +609,7 @@ export default function Admin() {
       return { label: `${formatNumber(backlogCount)} support backlog`, tone: 'warning' };
     }
     return { label: 'Operational', tone: 'success' };
-  }, [risk.alertsOpen, support.backlog, paymentHealth]);
+  }, [risk.alertsOpen, support.backlog, paymentHealth, releaseSummary.fail, releaseSummary.pending, releaseSummary.in_progress]);
 
   const generatedAtDisplay = useMemo(
     () => describeTimestamp(adminData.meta?.generatedAt ?? adminData.meta?.refreshedAt ?? null),
@@ -577,11 +620,24 @@ export default function Admin() {
     if (adminData.meta?.note) {
       return adminData.meta.note;
     }
+    if ((adminData.meta?.releaseTasks ?? 0) > 0) {
+      return `${formatNumber(adminData.meta.releaseTasks)} release gates pending review.`;
+    }
     if (adminData.meta?.preset) {
       return `Preset: ${adminData.meta.preset}`;
     }
+    if (releaseReadinessScore !== null) {
+      return `Release readiness score ${formatNumber(Math.round(releaseReadinessScore))}.`;
+    }
     return `Escalation channel: ${escalationChannel}. Policy owner: ${policyOwner}.`;
-  }, [adminData.meta?.note, adminData.meta?.preset, escalationChannel, policyOwner]);
+  }, [
+    adminData.meta?.note,
+    adminData.meta?.preset,
+    adminData.meta?.releaseTasks,
+    escalationChannel,
+    policyOwner,
+    releaseReadinessScore
+  ]);
 
   const shellMeta = useMemo(
     () => ({
@@ -663,6 +719,7 @@ export default function Admin() {
   const shellSubtitle = 'System health, revenue, and integration governance in one console.';
   const overviewHelperText =
     adminData.meta?.helperText ??
+    release.helperText ??
     'Use saved views, task lists, and the operations handbook to triage incidents, finance checks, and integrations quickly.';
 
   return (
@@ -795,6 +852,16 @@ export default function Admin() {
         platformStats={platformStats}
       />
 
+      <AdminReleaseSection
+        sectionId="release"
+        summary={releaseSummary}
+        gates={releaseGates}
+        tasks={releaseTasks}
+        latestRun={release.latestRun ?? null}
+        thresholds={release.thresholds ?? EMPTY_OBJECT}
+        requiredGates={release.requiredGates ?? EMPTY_ARRAY}
+      />
+
       <AdminBlogSection sectionId="blog" blog={blog} token={token} onPostCreated={refresh} />
 
       <AdminComplianceSection
@@ -810,6 +877,7 @@ export default function Admin() {
         risk={complianceRisk}
         incidentResponse={complianceIncidentResponse}
         evidence={complianceEvidence}
+        governance={compliance.governance ?? EMPTY_OBJECT}
         onReview={handleVerificationReview}
       />
 
