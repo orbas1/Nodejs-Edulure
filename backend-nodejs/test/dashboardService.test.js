@@ -263,6 +263,28 @@ describe('buildLearnerDashboard', () => {
     expect(snapshot.searchIndex.some((entry) => entry.id === 'learner-overview')).toBe(true);
     expect(snapshot.feedHighlights.length).toBeGreaterThan(0);
     expect(snapshot.profileBio).toContain('Learning across 1 course');
+    expect(snapshot.dashboard.quickActions.map((action) => action.label)).toEqual([
+      'Resume course',
+      'Join live session',
+      'Book a tutor',
+      'Upload assignment'
+    ]);
+
+    const resumeAction = snapshot.dashboard.quickActions.find((action) => action.label === 'Resume course');
+    expect(resumeAction.href).toBe('/dashboard/learner/courses?courseId=101');
+
+    const liveAction = snapshot.dashboard.quickActions.find((action) => action.label === 'Join live session');
+    expect(liveAction.href).toBe('/dashboard/learner/live-classes');
+    expect(liveAction.description).toContain('Critique Lab');
+
+    const tutorAction = snapshot.dashboard.quickActions.find((action) => action.label === 'Book a tutor');
+    expect(tutorAction.href).toBe('/dashboard/learner/bookings');
+    expect(tutorAction.description).toContain('Next slot');
+
+    const assignmentAction = snapshot.dashboard.quickActions.find(
+      (action) => action.label === 'Upload assignment'
+    );
+    expect(assignmentAction.href).toBe('/dashboard/learner/assessments');
   });
 
   it('deduplicates upcoming entries and orders them chronologically for the learner', () => {
