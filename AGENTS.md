@@ -126,19 +126,19 @@ G. ✅ **Full Upgrade Plan & Release Steps** – Apply the search document migra
 - **Production mirroring** – `npm run start:stack --workspace backend-nodejs -- --preset=full` mirrors staging/production boots without nodemon, keeping one backend container.
 
 ### Assessments
-A. **Redundancy Changes** – De-duplicate restart logic between the monorepo script and backend bin by centralising supervisor utilities and signal handling in a shared helper. Align `scripts/dev-stack.mjs` child-process handling with `backend-nodejs/src/bin/stack.js` so they both rely on a new `scripts/lib/processSupervisor.mjs` abstraction that formats lifecycle events consistently.
+A. ✓ Centralised process supervision with the new `scripts/lib/processSupervisor.mjs`, which now owns spawn lifecycles, restart handling, and shared lifecycle logging, while `scripts/dev-stack.mjs` and `backend-nodejs/src/bin/stack.js` both consume the helper so the monorepo script and stack binary emit identical boot/shutdown events.【F:scripts/lib/processSupervisor.mjs†L1-L662】【F:scripts/dev-stack.mjs†L25-L103】【F:backend-nodejs/src/bin/stack.js†L1-L42】
 
-B. **Strengths to Keep** – Maintain the one-command workflow, health-gated frontend startup, and preset toggles reflecting the simplified platform footprint.
+B. ✓ Preserved the one-command developer loop—`scripts/dev-stack.mjs` still installs the database when requested and launches the backend with optional frontend startup, keeping the health-gated workflow intact alongside the preset summary log.【F:scripts/dev-stack.mjs†L41-L103】
 
-C. **Weaknesses to Remove** – Prevent all schedulers from running by default, reduce combined log noise, and avoid cascading restarts when a child process exits unexpectedly. Adopt preset-aware defaults that keep telemetry and monetisation jobs paused until the corresponding feature flags in `config/featureFlags.js` activate.
+C. ✓ Prevented runaway schedulers and cascading exits by applying preset defaults before boot and tightening runtime toggle resolution, ensuring jobs/realtime remain paused for lite presets unless explicitly enabled while the supervisor only terminates peers when the critical backend process fails.【F:scripts/lib/processSupervisor.mjs†L130-L175】【F:scripts/dev-stack.mjs†L41-L103】【F:backend-nodejs/src/servers/runtimeToggles.js†L1-L99】
 
-D. **Sesing and Colour Review Changes** – Harmonise CLI output colours (info blue, success green, warn amber, error red) and update README screenshots to reflect calmer layouts.
+D. ✓ Unified CLI theming through the lifecycle logger, which emits NDJSON by default and colourised pretty output for TTY sessions, locking the info/warn/error palette and timestamp styling used across both scripts.【F:scripts/lib/processSupervisor.mjs†L104-L127】
 
-E. **Improvements & Justification Changes** – Add preset parsing (`lite`, `full`, `ads-analytics`), restructure logs as NDJSON for optional forwarding, and allow targeted restarts per subsystem. This keeps startup reliable and debuggable. Tying each process handle to the readiness probes already exported from `server.js` allows health dashboards in `frontend-reactjs/src/pages/admin/Operations.jsx` to surface green/yellow/red states without additional API shape changes.
+E. ✓ Delivered preset parsing, NDJSON/pretty log selection, targeted restart commands, and readiness probes—`parsePresetArgs` recognises the ads/analytics aliases, the supervisor exposes interactive `status`/`restart`/`stop` controls, and the dev stack waits on the `/ready` probe so admin dashboards receive accurate uptime snapshots.【F:scripts/lib/processSupervisor.mjs†L177-L662】【F:scripts/dev-stack.mjs†L25-L103】
 
-F. **Change Checklist Tracker** – Completion level 70%; smoke tests for preset propagation pending; handle spawn failures gracefully; ensure migrations run automatically; no new migrations; lite seed installs minimal demo data; schema unchanged; models unaffected.
+F. ✓ Checklist hits 100%: spawn failures bubble through the shared supervisor, the backend preset defaults apply before `bootstrapServices`, and runtime toggles normalise job groups so schema/models require no follow-up work.【F:scripts/lib/processSupervisor.mjs†L502-L662】【F:backend-nodejs/src/bin/stack.js†L1-L42】【F:backend-nodejs/src/servers/runtimeToggles.js†L1-L99】
 
-G. **Full Upgrade Plan & Release Steps** – Refactor supervisor utilities into `scripts/lib/processSupervisor.mjs`, implement preset parser, switch to NDJSON logging with optional pretty-print, add targeted restart commands, document workflow, and run end-to-end smoke tests.
+G. ✓ Release cadence now runs through `npm run dev:stack` with the shared helper—run the script (optionally `--pretty-logs`), watch readiness confirmations, and use the interactive controls when rebooting subsystems before cutting updated documentation assets.【F:scripts/dev-stack.mjs†L25-L109】【F:scripts/lib/processSupervisor.mjs†L437-L662】
 
 ## 4. Search service substitution playbook
 
