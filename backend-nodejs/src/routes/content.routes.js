@@ -14,5 +14,6 @@ router.post('/assets/:assetId/progress', auth(), ContentController.updateProgres
 router.get('/assets/:assetId/progress', auth(), ContentController.getProgress);
 router.get('/assets/:assetId/analytics', auth('instructor'), ContentController.analytics);
 router.patch('/assets/:assetId/metadata', auth('instructor'), ContentController.updateMetadata);
+router.get('/marketing/pages/:slug', ContentController.listMarketingBlocks);
 
 export default router;

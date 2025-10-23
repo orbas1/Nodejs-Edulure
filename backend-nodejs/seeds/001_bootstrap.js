@@ -141,6 +141,8 @@ export async function seed(knex) {
     await trx('content_asset_events').del();
     await trx('content_audit_logs').del();
     await trx('content_assets').del();
+    await trx('marketing_blocks').del();
+    await trx('marketing_pages').del();
     await trx('telemetry_lineage_runs').del();
     await trx('telemetry_freshness_monitors').del();
     await trx('telemetry_events').del();
@@ -327,6 +329,226 @@ export async function seed(knex) {
         recommendationPreview: learnerRecommendationPreview
       })
     });
+
+    const marketingSeoMetadata = {
+      seo: {
+        title: 'Edulure · Education operating system for community-led learning',
+        description:
+          'Operate your education business with live classrooms, cohort management, content studios, and analytics inside one secure workspace built for operators.',
+        canonicalPath: '/',
+        image: 'https://cdn.edulure.test/assets/og/edulure-home.jpg',
+        keywords: [
+          'community-led learning',
+          'cohort management',
+          'education operating system',
+          'live classrooms',
+          'learning marketplace'
+        ],
+        analytics: { page_type: 'marketing-home' }
+      },
+      theme: 'aurora',
+      segments: ['acquisition', 'home']
+    };
+
+    const [homeMarketingPageId] = await trx('marketing_pages').insert({
+      slug: 'home',
+      title: 'Edulure Home',
+      status: 'published',
+      description: 'Primary marketing landing experience connecting discovery, onboarding, and plan selection.',
+      default_locale: 'en',
+      metadata: JSON.stringify(marketingSeoMetadata)
+    });
+
+    const marketingBlocks = [
+      {
+        page_id: homeMarketingPageId,
+        locale: 'en',
+        block_key: 'home.hero',
+        block_type: 'hero',
+        heading: 'Learn, teach, and build together.',
+        subheading: 'Swap playbooks, host live jams, and grow with peers on Edulure.',
+        content: {
+          eyebrow: 'Learning community & marketplace',
+          status: 'Built for cohort-based learning',
+          headline: 'Learn, teach, and build together.',
+          subheadline:
+            'Swap playbooks, host live jams, and turn shared knowledge into momentum with peers who cheer you on.',
+          chips: ['Communities', 'Courses', 'E-books', '1:1 Tutors'],
+          primaryAction: { to: '/register', label: 'Join the community' },
+          secondaryAction: { to: '/feed', label: 'Peek inside live circles' },
+          tertiaryAction: { href: '#instructor', label: "I'm an instructor" }
+        },
+        media: {
+          highlightLabel: 'Flow',
+          heroCards: [
+            { title: 'Live cohort jam', meta: 'Starts in 12 hours', cta: 'Set reminder' },
+            {
+              title: 'Community pulse',
+              status: 'Live now',
+              headline: 'Weekly build circle',
+              subheadline: 'Swap launches, feedback, and wins with peers'
+            },
+            { title: 'Creator tea digest', meta: 'Fresh drops every Monday', cta: 'Read now' }
+          ]
+        },
+        cta: { primary: { to: '/register', label: 'Join the community' } },
+        metadata: { surface: 'hero', layout: 'two-column' },
+        position: 1,
+        is_active: true,
+        variant: 'nightfall'
+      },
+      {
+        page_id: homeMarketingPageId,
+        locale: 'en',
+        block_key: 'home.preview-tabs',
+        block_type: 'tabbed-preview',
+        heading: 'See what’s waiting inside the Edulure clubhouse',
+        subheading: 'Toggle between community rooms, curriculum, and live ops to feel the flow before you sign in.',
+        content: {
+          helper: 'Spotlights from this week’s launches',
+          tablistLabel: 'Preview categories',
+          footnote: 'Fresh previews rotate every Monday at 09:00 UTC.',
+          cta: { to: '/register', label: 'Browse all spaces' },
+          tabs: [
+            {
+              key: 'communities',
+              label: 'Communities',
+              caption: 'Threaded clubhouses with rituals built in.',
+              description: 'Spin up themed rooms, layer rituals, and keep every cohort pulsing with guided prompts.',
+              highlights: ['Guided weekly prompts', 'Moderation cues baked in', 'Members see wins instantly'],
+              accent: 'from-emerald-400 via-cyan-400 to-sky-400',
+              image: {
+                src: 'https://images.unsplash.com/photo-1485217988980-11786ced9454?auto=format&fit=crop&w=1200&q=80',
+                alt: 'Preview of Edulure community spaces'
+              }
+            },
+            {
+              key: 'courses',
+              label: 'Courses',
+              caption: 'Story-based curricula without the spreadsheets.',
+              description: 'Design multi-week arcs, stack media-rich lessons, and publish refreshes without exporting spreadsheets.',
+              highlights: ['Drag-and-drop modules', 'Completion signals live', 'Scope updates in real time'],
+              accent: 'from-indigo-400 via-purple-500 to-fuchsia-500',
+              image: {
+                src: 'https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=1200&q=80',
+                alt: 'Preview of Edulure course builder interface'
+              }
+            },
+            {
+              key: 'liveEvents',
+              label: 'Live events',
+              caption: 'Studio energy minus the chaos.',
+              description: 'Host jam sessions, AMAs, and office hours with a control room that keeps everything in sync.',
+              highlights: ['Green-room checklists', 'Auto recordings ready', 'Backstage chat for hosts'],
+              accent: 'from-amber-400 via-orange-400 to-rose-400',
+              image: {
+                src: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80',
+                alt: 'Preview of Edulure live event control center'
+              }
+            },
+            {
+              key: 'library',
+              label: 'Resource library',
+              caption: 'A candy shop of downloads and replays.',
+              description: 'Curate templates, replays, and swipe files with smart filters so learners find exactly what they need.',
+              highlights: ['Filter by format fast', 'Smart recs rotate weekly', 'Brand-safe sharing links'],
+              accent: 'from-sky-400 via-emerald-400 to-violet-400',
+              image: {
+                src: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1200&q=80',
+                alt: 'Preview of Edulure resource library grid'
+              }
+            }
+          ]
+        },
+        media: { layout: 'interactive-media-frame' },
+        cta: { to: '/register', label: 'Browse all spaces' },
+        metadata: { rotationSchedule: 'weekly' },
+        position: 2,
+        is_active: true,
+        variant: 'daybreak'
+      },
+      {
+        page_id: homeMarketingPageId,
+        locale: 'en',
+        block_key: 'home.plan-highlights',
+        block_type: 'plan-grid',
+        heading: 'Flat commissions, zero monthly fees',
+        subheading: 'Operate on transparent usage-based pricing designed for modern learning businesses.',
+        content: {
+          eyebrow: 'Commission snapshot',
+          title: 'Flat commissions, zero monthly fees',
+          subtitle: 'Operate on transparent usage-based pricing designed for modern learning businesses.',
+          disclaimer: 'Commission defaults include a 25% affiliate share and non-custodial settlement.',
+          cta: { to: '/register', label: 'Launch your workspace', icon: '✨' },
+          plans: [
+            {
+              id: 'communityTutor',
+              icon: '🤝',
+              heading: 'Community + 1:1',
+              tagline: 'Launch guided communities with tutoring add-ons.',
+              price: '3% per transaction',
+              features: [
+                'Guided rituals and weekly prompts included',
+                'Instant booking handoffs to 1:1 tutors',
+                'Auto payouts to collaborators and affiliates'
+              ],
+              note: 'Includes affiliate distribution with instant ledger sync.',
+              accent: 'from-emerald-500/25 via-teal-500/30 to-cyan-500/30',
+              border: 'border-emerald-300/40',
+              shadow: 'shadow-[0_32px_84px_-42px_rgba(16,185,129,0.6)]'
+            },
+            {
+              id: 'catalogue',
+              icon: '📚',
+              heading: 'Courses & library',
+              tagline: 'Publish curriculum, replays, and resource drops.',
+              price: '8% per transaction',
+              features: [
+                'Unlimited modules and resource drops',
+                'Completion dashboards and drip pacing',
+                'Bundled replays with instant access passes'
+              ],
+              note: 'Usage fee covers hosting, analytics, and payment ops.',
+              accent: 'from-indigo-500/25 via-sky-500/30 to-violet-500/30',
+              border: 'border-indigo-300/40',
+              shadow: 'shadow-[0_38px_92px_-40px_rgba(99,102,241,0.65)]'
+            },
+            {
+              id: 'liveDonations',
+              icon: '🎤',
+              heading: 'Live events & donations',
+              tagline: 'Spin up live sessions with community tipping built in.',
+              price: '5% per transaction',
+              features: [
+                'Live studio with backstage chat',
+                'Donation goals and sponsor placements',
+                'Automatic replay monetisation'
+              ],
+              note: 'Includes live production tooling and payout compliance.',
+              accent: 'from-rose-500/25 via-orange-500/30 to-amber-500/30',
+              border: 'border-rose-300/40',
+              shadow: 'shadow-[0_44px_98px_-38px_rgba(244,114,182,0.6)]'
+            }
+          ]
+        },
+        media: { background: 'aurora-gradient' },
+        cta: { to: '/register', label: 'Launch your workspace', icon: '✨' },
+        metadata: { pricingVersion: '2025-03' },
+        position: 3,
+        is_active: true,
+        variant: 'midnight'
+      }
+    ];
+
+    await trx('marketing_blocks').insert(
+      marketingBlocks.map((block) => ({
+        ...block,
+        content: JSON.stringify(block.content ?? {}),
+        media: JSON.stringify(block.media ?? {}),
+        cta: JSON.stringify(block.cta ?? {}),
+        metadata: JSON.stringify(block.metadata ?? {})
+      }))
+    );
 
     const financeDocuments = [
       {

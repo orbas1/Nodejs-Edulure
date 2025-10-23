@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useState } from 'react';
+
 import { useLanguage } from '../context/LanguageContext.jsx';
 import LanguageSelector from '../components/navigation/LanguageSelector.jsx';
 import MarketingHero from '../components/marketing/MarketingHero.jsx';
@@ -11,10 +13,30 @@ import TutorArcade from '../components/home/TutorArcade.jsx';
 import CoursesAdventure from '../components/home/CoursesAdventure.jsx';
 import EbookShowcase from '../components/home/EbookShowcase.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import useMountedRef from '../hooks/useMountedRef.js';
+import { fetchMarketingPage } from '../api/marketingApi.js';
 import communitiesPreview from '../assets/home/preview/communities.svg';
 import coursesPreview from '../assets/home/preview/courses.svg';
 import liveEventsPreview from '../assets/home/preview/live-events.svg';
 import libraryPreview from '../assets/home/preview/library.svg';
+
+const DEFAULT_MARKETING_METADATA = {
+  title: 'Edulure · Education operating system for community-led learning',
+  description:
+    'Operate your education business with live classrooms, cohort management, content studios, and analytics inside one secure workspace built for operators.',
+  canonicalPath: '/',
+  image: 'https://www.edulure.com/assets/og/edulure-home.jpg',
+  keywords: [
+    'community-led learning',
+    'education operations',
+    'cohort management',
+    'live classrooms',
+    'content studio'
+  ],
+  analytics: {
+    page_type: 'home'
+  }
+};
 
 const HERO_CHIP_KEYS = [
   { key: 'home.hero.chips.communities', fallback: 'Communities' },
@@ -175,129 +197,346 @@ function HeroPreviewPanel({ t }) {
 }
 
 export default function Home() {
-  const { t } = useLanguage();
-  usePageMetadata({
-    title: 'Edulure · Education operating system for community-led learning',
-    description:
-      'Operate your education business with live classrooms, cohort management, content studios, and analytics inside one secure workspace built for operators.',
-    canonicalPath: '/',
-    image: 'https://www.edulure.com/assets/og/edulure-home.jpg',
-    keywords: ['community-led learning', 'education operations', 'cohort management', 'live classrooms', 'content studio'],
-    analytics: {
-      page_type: 'home'
-    }
-  });
+  const { t, language } = useLanguage();
+  const mountedRef = useMountedRef();
+  const [marketingState, setMarketingState] = useState(() => ({
+    data: null,
+    loading: true,
+    error: null,
+    locale: language
+  }));
 
-  const heroChips = HERO_CHIP_KEYS.map(({ key, fallback }) => t(key, fallback));
-  const heroData = {
-    eyebrow: t('home.hero.eyebrow', 'Learning community & marketplace'),
-    status: t('home.hero.status', 'Built for cohort-based learning'),
-    headline: t('home.hero.headline', 'Learn, teach, and build together.'),
-    subheadline: t('home.hero.subhead', 'Swap playbooks, host live jams, and grow with peers on Edulure.'),
-    primaryLabel: t('home.hero.ctaPrimary', 'Get started'),
-    secondaryLabel: t('home.hero.ctaSecondary', 'Preview the community'),
-    instructorLabel: t('home.hero.instructorPill', "I'm an instructor")
-  };
+  useEffect(() => {
+    const controller = new AbortController();
 
-  const previewTabs = PREVIEW_TAB_CONFIG.map((tab) => {
-    const highlights = HIGHLIGHT_KEYS.map((highlightKey, index) =>
-      t(`home.preview.tabs.${tab.key}.${highlightKey}`, tab.fallback.highlights[index])
-    ).filter(Boolean);
+    setMarketingState((prev) => ({
+      data: prev.locale === language ? prev.data : null,
+      loading: true,
+      error: null,
+      locale: language
+    }));
 
-    return {
-      key: tab.key,
-      label: t(`home.preview.tabs.${tab.key}.label`, tab.fallback.label),
-      caption: t(`home.preview.tabs.${tab.key}.caption`, tab.fallback.caption),
-      description: t(`home.preview.tabs.${tab.key}.description`, tab.fallback.description),
-      highlights,
-      accent: tab.accent,
-      image: {
-        src: tab.image,
-        alt: t(`home.preview.tabs.${tab.key}.imageAlt`, tab.fallback.imageAlt)
-      }
+    fetchMarketingPage({ slug: 'home', locale: language, fallbackLocale: 'en', signal: controller.signal })
+      .then((data) => {
+        if (!mountedRef.current || controller.signal.aborted) {
+          return;
+        }
+        setMarketingState({ data, loading: false, error: null, locale: language });
+      })
+      .catch((error) => {
+        if (!mountedRef.current || controller.signal.aborted) {
+          return;
+        }
+        setMarketingState((prev) => ({
+          data: prev.locale === language ? prev.data : null,
+          loading: false,
+          error,
+          locale: language
+        }));
+      });
+
+    return () => {
+      controller.abort();
     };
-  });
+  }, [language, mountedRef]);
 
-  const planCards = PLAN_CONFIG.map((plan) => {
-    const heading = t(`home.membership.plans.${plan.id}.title`, 'Channel title');
-    const tagline = t(`home.membership.plans.${plan.id}.tagline`, 'Standard commission structure for this channel.');
-    const price = t(`home.membership.plans.${plan.id}.price`, 'Flat commission rate');
-    const features = [];
+  const marketingData = marketingState.data ?? null;
+  const marketingPage = marketingData?.page ?? null;
+  const marketingBlocks = Array.isArray(marketingData?.blocks) ? marketingData.blocks : [];
 
-    for (let index = 0; index < MAX_PLAN_FEATURES; index += 1) {
-      const translationKey = `home.membership.plans.${plan.id}.features.${index}`;
-      const feature = t(translationKey);
-      if (feature === translationKey) {
-        break;
-      }
-      features.push(feature);
+  const marketingBlockMap = useMemo(() => {
+    if (!marketingBlocks.length) {
+      return new Map();
     }
-
-    if (features.length === 0) {
-      features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
-    }
-
-    const note = t(
-      `home.membership.plans.${plan.id}.note`,
-      'Applies automatically across this revenue channel.'
+    return new Map(
+      marketingBlocks.map((block) => [block.blockKey ?? `${block.blockType ?? 'block'}-${block.id}`, block])
     );
+  }, [marketingBlocks]);
 
+  const pageMetadata = useMemo(() => {
+    const seo = marketingPage?.metadata?.seo ?? {};
+    const keywords = Array.isArray(seo.keywords) && seo.keywords.length ? seo.keywords : DEFAULT_MARKETING_METADATA.keywords;
     return {
-      ...plan,
-      heading,
-      tagline,
-      price,
-      features,
-      note
+      title: seo.title ?? DEFAULT_MARKETING_METADATA.title,
+      description: seo.description ?? DEFAULT_MARKETING_METADATA.description,
+      canonicalPath: seo.canonicalPath ?? DEFAULT_MARKETING_METADATA.canonicalPath,
+      image: seo.image ?? DEFAULT_MARKETING_METADATA.image,
+      keywords,
+      analytics: seo.analytics ?? DEFAULT_MARKETING_METADATA.analytics
     };
-  });
+  }, [marketingPage]);
+
+  usePageMetadata(pageMetadata);
+
+  const fallbackHeroChips = useMemo(
+    () => HERO_CHIP_KEYS.map(({ key, fallback }) => t(key, fallback)),
+    [t]
+  );
+
+  const fallbackHeroData = useMemo(
+    () => ({
+      eyebrow: t('home.hero.eyebrow', 'Learning community & marketplace'),
+      status: t('home.hero.status', 'Built for cohort-based learning'),
+      headline: t('home.hero.headline', 'Learn, teach, and build together.'),
+      subheadline: t('home.hero.subhead', 'Swap playbooks, host live jams, and grow with peers on Edulure.'),
+      primaryLabel: t('home.hero.ctaPrimary', 'Get started'),
+      secondaryLabel: t('home.hero.ctaSecondary', 'Preview the community'),
+      instructorLabel: t('home.hero.instructorPill', "I'm an instructor")
+    }),
+    [t]
+  );
+
+  const heroBlock = marketingBlockMap.get('home.hero');
+  const heroContent = heroBlock?.content && typeof heroBlock.content === 'object' ? heroBlock.content : {};
+  const heroChips = Array.isArray(heroContent.chips) && heroContent.chips.length ? heroContent.chips : fallbackHeroChips;
+  const heroEyebrow = heroContent.eyebrow ?? fallbackHeroData.eyebrow;
+  const heroStatus = heroContent.status ?? fallbackHeroData.status;
+  const heroHeadline = heroContent.headline ?? fallbackHeroData.headline;
+  const heroSubheadline = heroContent.subheadline ?? fallbackHeroData.subheadline;
+  const heroPrimaryAction = heroContent.primaryAction
+    ? {
+        to: heroContent.primaryAction.to ?? heroContent.primaryAction.href ?? '/register',
+        label: heroContent.primaryAction.label ?? fallbackHeroData.primaryLabel
+      }
+    : { to: '/register', label: fallbackHeroData.primaryLabel };
+  const heroSecondaryAction = heroContent.secondaryAction
+    ? {
+        to: heroContent.secondaryAction.to ?? heroContent.secondaryAction.href ?? '/feed',
+        label: heroContent.secondaryAction.label ?? fallbackHeroData.secondaryLabel
+      }
+    : { to: '/feed', label: fallbackHeroData.secondaryLabel };
+  const heroTertiaryAction = heroContent.tertiaryAction
+    ? {
+        href: heroContent.tertiaryAction.href ?? heroContent.tertiaryAction.to ?? '#instructor',
+        label: heroContent.tertiaryAction.label ?? fallbackHeroData.instructorLabel
+      }
+    : { href: '#instructor', label: fallbackHeroData.instructorLabel };
+
+  const fallbackPreviewTabs = useMemo(() => {
+    return PREVIEW_TAB_CONFIG.map((tab) => {
+      const highlights = HIGHLIGHT_KEYS.map((highlightKey, index) =>
+        t(`home.preview.tabs.${tab.key}.${highlightKey}`, tab.fallback.highlights[index])
+      ).filter(Boolean);
+
+      return {
+        key: tab.key,
+        label: t(`home.preview.tabs.${tab.key}.label`, tab.fallback.label),
+        caption: t(`home.preview.tabs.${tab.key}.caption`, tab.fallback.caption),
+        description: t(`home.preview.tabs.${tab.key}.description`, tab.fallback.description),
+        highlights,
+        accent: tab.accent,
+        image: {
+          src: tab.image,
+          alt: t(`home.preview.tabs.${tab.key}.imageAlt`, tab.fallback.imageAlt)
+        }
+      };
+    });
+  }, [t]);
+
+  const fallbackPreviewCopy = useMemo(
+    () => ({
+      helper: t('home.preview.helper', 'Spotlights from this week’s launches'),
+      title: t('home.preview.title', 'See what’s waiting inside the Edulure clubhouse'),
+      subtitle: t(
+        'home.preview.subtitle',
+        'Toggle between community rooms, curriculum, and live ops to feel the flow before you sign in.'
+      ),
+      ctaLabel: t('home.preview.cta', 'Browse all spaces'),
+      footnote: t('home.preview.footnote', 'Fresh previews rotate every Monday at 09:00 UTC.'),
+      tablistLabel: t('home.preview.tablistLabel', 'Preview categories')
+    }),
+    [t]
+  );
+
+  const previewBlock = marketingBlockMap.get('home.preview-tabs');
+  const previewContent = previewBlock?.content && typeof previewBlock.content === 'object' ? previewBlock.content : {};
+  const previewTabsOverride = Array.isArray(previewContent.tabs) ? previewContent.tabs : null;
+
+  const previewTabs = useMemo(() => {
+    if (!Array.isArray(previewTabsOverride) || !previewTabsOverride.length) {
+      return fallbackPreviewTabs;
+    }
+
+    const fallbackByKey = new Map(fallbackPreviewTabs.map((tab) => [tab.key, tab]));
+
+    return previewTabsOverride.map((tab, index) => {
+      const base = fallbackByKey.get(tab.key) ?? fallbackPreviewTabs[index] ?? {
+        key: tab.key ?? `tab-${index}`,
+        label: '',
+        caption: '',
+        description: '',
+        highlights: [],
+        accent: undefined,
+        image: { src: undefined, alt: undefined }
+      };
+
+      const highlights =
+        Array.isArray(tab.highlights) && tab.highlights.length ? tab.highlights : base.highlights;
+
+      return {
+        ...base,
+        key: tab.key ?? base.key ?? `tab-${index}`,
+        label: tab.label ?? base.label,
+        caption: tab.caption ?? base.caption,
+        description: tab.description ?? base.description,
+        highlights,
+        accent: tab.accent ?? base.accent,
+        image: {
+          src: tab.image?.src ?? base.image?.src,
+          alt: tab.image?.alt ?? base.image?.alt
+        }
+      };
+    });
+  }, [fallbackPreviewTabs, previewTabsOverride]);
+
+  const previewHelper = previewContent.helper ?? fallbackPreviewCopy.helper;
+  const previewTitle = previewContent.title ?? fallbackPreviewCopy.title;
+  const previewSubtitle = previewContent.subtitle ?? fallbackPreviewCopy.subtitle;
+  const previewFootnote = previewContent.footnote ?? fallbackPreviewCopy.footnote;
+  const previewTablistLabel = previewContent.tablistLabel ?? fallbackPreviewCopy.tablistLabel;
+  const previewCta = previewContent.cta
+    ? {
+        to: previewContent.cta.to ?? previewContent.cta.href ?? '/register',
+        label: previewContent.cta.label ?? fallbackPreviewCopy.ctaLabel
+      }
+    : { to: '/register', label: fallbackPreviewCopy.ctaLabel };
+
+  const fallbackPlanCards = useMemo(() => {
+    return PLAN_CONFIG.map((plan) => {
+      const heading = t(`home.membership.plans.${plan.id}.title`, 'Channel title');
+      const tagline = t(`home.membership.plans.${plan.id}.tagline`, 'Standard commission structure for this channel.');
+      const price = t(`home.membership.plans.${plan.id}.price`, 'Flat commission rate');
+      const features = [];
+
+      for (let index = 0; index < MAX_PLAN_FEATURES; index += 1) {
+        const translationKey = `home.membership.plans.${plan.id}.features.${index}`;
+        const feature = t(translationKey);
+        if (feature === translationKey) {
+          break;
+        }
+        features.push(feature);
+      }
+
+      if (features.length === 0) {
+        features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
+      }
+
+      const note = t(
+        `home.membership.plans.${plan.id}.note`,
+        'Applies automatically across this revenue channel.'
+      );
+
+      return {
+        ...plan,
+        heading,
+        tagline,
+        price,
+        features,
+        note
+      };
+    });
+  }, [t]);
+
+  const fallbackPlanCopy = useMemo(
+    () => ({
+      eyebrow: t('home.membership.pretitle', 'Commission snapshot'),
+      title: t('home.membership.title', 'Flat commissions, zero monthly fees'),
+      subtitle: t(
+        'home.membership.subtitle',
+        'Operate on transparent usage-based pricing designed for modern learning businesses.'
+      ),
+      ctaLabel: t('home.membership.cta', 'Launch your workspace'),
+      disclaimer: t(
+        'home.membership.disclaimer',
+        'Commission defaults include a 25% affiliate share and non-custodial settlement.'
+      )
+    }),
+    [t]
+  );
+
+  const planBlock = marketingBlockMap.get('home.plan-highlights');
+  const planContent = planBlock?.content && typeof planBlock.content === 'object' ? planBlock.content : {};
+  const planOverrides = Array.isArray(planContent.plans) ? planContent.plans : null;
+
+  const planCards = useMemo(() => {
+    if (!Array.isArray(planOverrides) || !planOverrides.length) {
+      return fallbackPlanCards;
+    }
+
+    const fallbackById = new Map(fallbackPlanCards.map((plan) => [plan.id, plan]));
+
+    return planOverrides.map((plan, index) => {
+      const fallback = plan.id ? fallbackById.get(plan.id) : null;
+      const base = fallback ?? fallbackPlanCards[index] ?? {};
+      const features =
+        Array.isArray(plan.features) && plan.features.length ? plan.features : base.features ?? [];
+
+      return {
+        ...base,
+        ...plan,
+        id: plan.id ?? base.id ?? `plan-${index}`,
+        icon: plan.icon ?? base.icon,
+        accent: plan.accent ?? base.accent,
+        border: plan.border ?? base.border,
+        shadow: plan.shadow ?? base.shadow,
+        heading: plan.heading ?? base.heading ?? '',
+        tagline: plan.tagline ?? base.tagline,
+        price: plan.price ?? base.price,
+        features,
+        note: plan.note ?? base.note
+      };
+    });
+  }, [fallbackPlanCards, planOverrides]);
+
+  const planEyebrow = planContent.eyebrow ?? fallbackPlanCopy.eyebrow;
+  const planTitle = planContent.title ?? fallbackPlanCopy.title;
+  const planSubtitle = planContent.subtitle ?? fallbackPlanCopy.subtitle;
+  const planDisclaimer = planContent.disclaimer ?? fallbackPlanCopy.disclaimer;
+  const planCta = planContent.cta
+    ? {
+        to: planContent.cta.to ?? planContent.cta.href ?? '/register',
+        label: planContent.cta.label ?? fallbackPlanCopy.ctaLabel,
+        icon: planContent.cta.icon ?? '✨'
+      }
+    : { to: '/register', label: fallbackPlanCopy.ctaLabel, icon: '✨' };
 
   return (
     <div className="bg-slate-50 text-slate-900">
       <MarketingHero
-        eyebrow={heroData.eyebrow}
-        statusLabel={heroData.status}
+        eyebrow={heroEyebrow}
+        statusLabel={heroStatus}
         languageSelector={{
           desktop: <LanguageSelector size="compact" variant="dark" align="end" />,
           mobile: <LanguageSelector size="compact" variant="dark" align="start" fullWidth />
         }}
         chips={heroChips}
-        headline={heroData.headline}
-        subheadline={heroData.subheadline}
-        primaryAction={{ to: '/register', label: heroData.primaryLabel }}
-        secondaryAction={{ to: '/feed', label: heroData.secondaryLabel }}
-        tertiaryAction={{ href: '#instructor', label: heroData.instructorLabel }}
+        headline={heroHeadline}
+        subheadline={heroSubheadline}
+        primaryAction={heroPrimaryAction}
+        secondaryAction={heroSecondaryAction}
+        tertiaryAction={heroTertiaryAction}
         rightPanel={<HeroPreviewPanel t={t} />}
       />
       <CommunitySpotlight />
       <PerksGrid />
       <ProductPreviewTabs
-        helper={t('home.preview.helper', 'Spotlights from this week’s launches')}
-        title={t('home.preview.title', 'See what’s waiting inside the Edulure clubhouse')}
-        subtitle={t(
-          'home.preview.subtitle',
-          'Toggle between community rooms, curriculum, and live ops to feel the flow before you sign in.'
-        )}
-        cta={{ to: '/register', label: t('home.preview.cta', 'Browse all spaces') }}
-        footnote={t('home.preview.footnote', 'Fresh previews rotate every Monday at 09:00 UTC.')}
-        tablistLabel={t('home.preview.tablistLabel', 'Preview categories')}
+        helper={previewHelper}
+        title={previewTitle}
+        subtitle={previewSubtitle}
+        cta={previewCta}
+        footnote={previewFootnote}
+        tablistLabel={previewTablistLabel}
         tabs={previewTabs}
       />
       <TutorArcade />
       <EbookShowcase />
       <PlanHighlights
-        eyebrow={t('home.membership.pretitle', 'Commission snapshot')}
-        title={t('home.membership.title', 'Flat commissions, zero monthly fees')}
-        subtitle={t(
-          'home.membership.subtitle',
-          'Operate on transparent usage-based pricing designed for modern learning businesses.'
-        )}
+        eyebrow={planEyebrow}
+        title={planTitle}
+        subtitle={planSubtitle}
         plans={planCards}
-        cta={{ to: '/register', label: t('home.membership.cta', 'Launch your workspace'), icon: '✨' }}
-        disclaimer={t(
-          'home.membership.disclaimer',
-          'Commission defaults include a 25% affiliate share and non-custodial settlement.'
-        )}
+        cta={planCta}
+        disclaimer={planDisclaimer}
       />
       <HomeFaq />
       <ClosingCtaBanner />

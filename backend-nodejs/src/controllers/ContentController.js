@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
 import AssetService from '../services/AssetService.js';
+import MarketingContentService from '../services/MarketingContentService.js';
 import { success } from '../utils/httpResponse.js';
 
 const uploadSessionSchema = Joi.object({
@@ -210,6 +211,36 @@ export default class ContentController {
       const payload = await metadataUpdateSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
       const asset = await AssetService.updateMetadata(req.params.assetId, payload, req.user);
       return success(res, { data: asset, message: 'Material profile updated' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async listMarketingBlocks(req, res, next) {
+    try {
+      const query = await Joi.object({
+        locale: Joi.string().trim().min(2).max(8).optional(),
+        fallbackLocale: Joi.string().trim().min(2).max(8).optional(),
+        includeInactive: Joi.boolean().default(false)
+      }).validateAsync(req.query, { abortEarly: false, stripUnknown: true });
+
+      const result = await MarketingContentService.getPageBySlug(req.params.slug, {
+        locale: query.locale,
+        fallbackLocale: query.fallbackLocale,
+        includeInactive: query.includeInactive
+      });
+
+      if (!result) {
+        return res
+          .status(404)
+          .json({ success: false, message: 'Marketing page not found', data: null, code: 'marketing_page_not_found' });
+      }
+
+      return success(res, { data: result });
     } catch (error) {
       if (error.isJoi) {
         error.status = 422;
