@@ -2385,7 +2385,14 @@ export async function seed(knex) {
       position: 1,
       duration_minutes: 45,
       release_at: trx.fn.now(),
-      metadata: JSON.stringify({ format: 'presentation', keyTakeaway: 'Runbook readiness matrix' })
+      metadata: JSON.stringify({
+        format: 'presentation',
+        keyTakeaway: 'Runbook readiness matrix',
+        thumbnailUrl: 'https://cdn.edulure.com/lessons/command-center-blueprint.jpg',
+        resources: [
+          { label: 'Command center worksheet', href: 'https://cdn.edulure.com/resources/command-center-worksheet.pdf' }
+        ]
+      })
     });
 
     const [telemetryLessonId] = await trx('course_lessons').insert({
@@ -2397,7 +2404,14 @@ export async function seed(knex) {
       position: 1,
       duration_minutes: 60,
       release_at: trx.fn.now(),
-      metadata: JSON.stringify({ format: 'reading', worksheet: 'forecast-checklist' })
+      metadata: JSON.stringify({
+        format: 'reading',
+        worksheet: 'forecast-checklist',
+        thumbnailUrl: 'https://cdn.edulure.com/lessons/funnel-telemetry-preview.jpg',
+        resources: [
+          { label: 'Telemetry readiness checklist', href: 'https://cdn.edulure.com/resources/telemetry-readiness.xlsx' }
+        ]
+      })
     });
 
     await trx('course_assignments').insert({

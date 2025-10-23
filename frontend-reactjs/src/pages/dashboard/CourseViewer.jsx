@@ -8,6 +8,7 @@ import DashboardStateMessage from '../../components/dashboard/DashboardStateMess
 import CourseProgressBar from '../../components/course/CourseProgressBar.jsx';
 import { CourseModuleNavigator } from '../../components/course/CourseModuleNavigator.jsx';
 import CertificatePreview from '../../components/certification/CertificatePreview.jsx';
+import AssessmentQuickView from '../../components/course/AssessmentQuickView.jsx';
 import { useLearnerDashboardContext } from '../../hooks/useLearnerDashboard.js';
 import useLearnerProgress from '../../hooks/useLearnerProgress.js';
 
@@ -466,6 +467,33 @@ export default function CourseViewer() {
       ),
     [modules]
   );
+
+  const courseResources = useMemo(() => {
+    const resourceMap = new Map();
+    lessonCatalogue.forEach((lesson) => {
+      const metadata = lesson.metadata ?? {};
+      const rawResources = Array.isArray(metadata.resources)
+        ? metadata.resources
+        : metadata.resources && typeof metadata.resources === 'object'
+          ? [metadata.resources]
+          : [];
+      rawResources.forEach((resource) => {
+        if (!resource) return;
+        const label = resource.label ?? resource.title ?? resource.name ?? null;
+        if (!label) return;
+        const href = resource.href ?? resource.url ?? resource.link ?? null;
+        const key = `${label}:${href ?? ''}`;
+        if (resourceMap.has(key)) return;
+        resourceMap.set(key, {
+          label,
+          href,
+          lessonTitle: lesson.title,
+          type: resource.type ?? metadata.format ?? lesson.type ?? 'resource'
+        });
+      });
+    });
+    return Array.from(resourceMap.values());
+  }, [lessonCatalogue]);
 
   const scheduledLessons = useMemo(
     () =>
@@ -996,13 +1024,56 @@ export default function CourseViewer() {
               />
             </div>
           ) : null}
-          <div className="dashboard-section">
-            <h2 className="text-lg font-semibold text-slate-900">Resources</h2>
-            <ul className="mt-4 space-y-2 text-sm text-slate-600">
-              <li className="dashboard-card-muted px-3 py-2">Program handbook</li>
-              <li className="dashboard-card-muted px-3 py-2">Sprint templates</li>
-              <li className="dashboard-card-muted px-3 py-2">Mentor office hours</li>
-            </ul>
+          <div className="dashboard-section space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Resources</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Download supporting materials, worksheets, and reference guides for each lesson.
+              </p>
+            </div>
+            {courseResources.length ? (
+              <ul className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                {courseResources.map((resource) => {
+                  const key = `${resource.label}-${resource.href ?? resource.lessonTitle ?? 'no-link'}`;
+                  const content = (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-slate-900">{resource.label}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                          {resource.type?.toString().replace(/_/g, ' ') ?? 'resource'}
+                        </span>
+                      </div>
+                      {resource.lessonTitle ? (
+                        <p className="text-xs text-slate-500">From “{resource.lessonTitle}”</p>
+                      ) : null}
+                    </>
+                  );
+                  if (resource.href) {
+                    return (
+                      <li key={key}>
+                        <a
+                          href={resource.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm transition hover:border-primary hover:text-primary"
+                        >
+                          {content}
+                        </a>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={key} className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                      {content}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">
+                Lesson downloads will appear here as instructors attach workbooks or playbooks to upcoming modules.
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -1067,35 +1138,29 @@ export default function CourseViewer() {
                 <p className="text-xs text-slate-500">No graded work scheduled. Focus on progressing through available lessons.</p>
               ) : (
                 assessmentLessons.slice(0, 5).map((lesson) => {
-                  const dueDate = lesson.dueDate;
-                  const tone = determineScheduleTone(dueDate);
+                  const metadata = lesson.metadata ?? {};
+                  const dueDate = lesson.dueDate ?? null;
+                  const required = metadata.required ?? lesson.required ?? true;
+                  const attempts = metadata.attempts ?? lesson.attempts ?? metadata.attemptCount ?? null;
+                  const score = metadata.score ?? lesson.score ?? null;
                   return (
-                    <div key={lesson.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{lesson.title}</p>
-                          <p className="text-xs text-slate-500">{lesson.moduleTitle}</p>
-                        </div>
-                        <div className="text-right text-xs">
-                          <p className={classNames('text-sm font-semibold', tone)}>{formatDateLabel(dueDate)}</p>
-                          <p className={classNames('font-semibold', tone)}>{formatRelativeDay(dueDate)}</p>
-                        </div>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">{formatLessonTypeLabel(lesson.type)}</span>
-                        <span className="rounded-full bg-white px-2 py-1 text-slate-600">
-                          {lesson.required === false ? 'Optional' : 'Required'}
-                        </span>
-                        {typeof lesson.score === 'number' && Number.isFinite(lesson.score) && (
-                          <span className="rounded-full bg-white px-2 py-1 text-slate-600">Score {lesson.score}%</span>
-                        )}
-                        {typeof lesson.attempts === 'number' && lesson.attempts > 0 && (
-                          <span className="rounded-full bg-white px-2 py-1 text-slate-600">
-                            {lesson.attempts} attempt{lesson.attempts === 1 ? '' : 's'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    <AssessmentQuickView
+                      key={lesson.id}
+                      assessment={{
+                        id: lesson.id,
+                        title: lesson.title,
+                        moduleTitle: lesson.moduleTitle,
+                        typeLabel: formatLessonTypeLabel(lesson.type),
+                        type: lesson.type,
+                        dueDate,
+                        required,
+                        completed: lesson.completed,
+                        statusLabel: required ? (lesson.completed ? 'Completed' : 'Required') : 'Optional',
+                        attempts: attempts != null ? Number(attempts) : null,
+                        score: score != null ? Number(score) : null,
+                        durationMinutes: lesson.durationMinutes ?? metadata.durationMinutes
+                      }}
+                    />
                   );
                 })
               )}

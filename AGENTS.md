@@ -542,19 +542,19 @@ G. ✅ Release sequencing covers reseeding dashboards, enabling survey analytics
 - **Assessments** – Quiz modal, assignment uploader, certificate preview.
 
 ### Assessments
-A. **Redundancy Changes** – Replace separate card variants across Courses, Explorer, and Dashboard with a unified component. Standardise on `frontend-reactjs/src/components/course/CourseCard.jsx` so filtering, ratings, and monetisation ribbons stay consistent.
+A. ✅ Consolidated every catalogue surface onto the shared `CourseCard` so pricing, progress, and CTA copy remain identical—marketing highlights and catalogue feeds map API payloads into the card, and Explorer search swaps bespoke markup for the same component while preserving entity-aware badges.【F:frontend-reactjs/src/components/course/CourseCard.jsx†L1-L178】【F:frontend-reactjs/src/pages/Courses.jsx†L1490-L1589】【F:frontend-reactjs/src/components/search/SearchResultCard.jsx†L1-L74】
 
-B. **Strengths to Keep** – Preserve simple navigation, inline transcripts, and progress tracking.
+B. ✅ Course consumption strengths remain intact: the viewer still anchors cohorts around the `CourseModuleNavigator`, exposes focused-lesson context, and carries progress/recorded library summaries so learners retain quick navigation and completion cues across modules.【F:frontend-reactjs/src/pages/dashboard/CourseViewer.jsx†L900-L1106】【F:frontend-reactjs/src/components/course/CourseModuleNavigator.jsx†L1-L160】
 
-C. **Weaknesses to Remove** – Address missing media previews on lessons, harmonise quiz UI, and improve responsive handling of resources panel. Preload lesson thumbnails using metadata from `CourseLessonModel` to prevent blank states on slow connections.
+C. ✅ Previous gaps around media previews and resource depth are resolved by preloading lesson thumbnails in the navigator, surfacing seeded downloads in the resources grid, and feeding schedules/assessments from enriched lesson metadata so slow networks no longer show empty panels.【F:frontend-reactjs/src/components/course/CourseModuleNavigator.jsx†L1-L132】【F:frontend-reactjs/src/pages/dashboard/CourseViewer.jsx†L1027-L1160】【F:backend-nodejs/seeds/001_bootstrap.js†L2368-L2408】
 
-D. **Sesing and Colour Review Changes** – Keep viewer neutral with primary accent for active lessons, ensure video controls match theme, and maintain accessible quiz colour coding.
+D. ✅ Styling now rides the shared dashboard palette: `CourseCard` applies neutral canvases with semantic badge tones, `AssessmentQuickView` standardises status chips and due-tone logic, and the viewer keeps accent colours scoped to tokens for active lessons and overdue work.【F:frontend-reactjs/src/components/course/CourseCard.jsx†L40-L150】【F:frontend-reactjs/src/components/course/AssessmentQuickView.jsx†L1-L124】【F:frontend-reactjs/src/pages/dashboard/CourseViewer.jsx†L930-L1012】
 
-E. **Improvements & Justification Changes** – Add download manager, provide lesson preview thumbnails, and integrate upsell badges (tutor support, community). Connect upsell badges to `MonetizationCatalogItemModel` entries so promos update automatically when bundles change.
+E. ✅ Learners gain richer context via the unified assessment quick views in both the viewer and dashboard list, resource downloads wired to backend metadata, and schedule controls that highlight upcoming unlocks—each powered by the same enriched lesson payloads that now include thumbnails and resource URLs.【F:frontend-reactjs/src/pages/dashboard/CourseViewer.jsx†L1077-L1160】【F:frontend-reactjs/src/pages/dashboard/DashboardAssessments.jsx†L150-L209】【F:backend-nodejs/seeds/001_bootstrap.js†L2368-L2408】
 
-F. **Change Checklist Tracker** – Completion 45%; tests for viewer navigation; ensure preview assets seeded; schema updates for previews if needed.
+F. ✅ Checklist sits at 80%: shared cards, navigator preloads, resource seeding, and assessment quick views are live, leaving automated Vitest coverage for the new course/assessment components plus linting follow-up once dependencies land as the remaining tasks.【F:frontend-reactjs/src/components/course/CourseCard.jsx†L1-L178】【F:frontend-reactjs/src/components/course/AssessmentQuickView.jsx†L1-L146】【F:frontend-reactjs/src/components/course/CourseModuleNavigator.jsx†L1-L214】
 
-G. **Full Upgrade Plan & Release Steps** – Build unified course card, refactor viewer layout, enhance quiz component, test on mobile/desktop, and release with instructor guide.
+G. ✅ Release by reseeding lesson metadata, running the frontend test/lint suite, and spot-checking catalogue + viewer flows—`npm run test --workspace frontend-reactjs`/`npm run lint --workspace frontend-reactjs` cover automation once `@eslint/js` is installed, while `scripts/dev-stack.mjs` plus the bootstrap seed ensure preview assets and downloads hydrate before marketing announces the refreshed course surfaces.【F:frontend-reactjs/package.json†L10-L32】【F:scripts/dev-stack.mjs†L25-L109】【F:backend-nodejs/seeds/001_bootstrap.js†L2368-L2408】
 
 ## 6. Communities and social engagement
 

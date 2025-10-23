@@ -1,12 +1,33 @@
+import { useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 import CourseProgressBar from './CourseProgressBar.jsx';
+import { preloadImage } from '../../utils/mediaCache.js';
 
 function resolveLessonStatusTone(lesson) {
   if (!lesson) return 'text-slate-500';
   if (lesson.completed) return 'text-emerald-600';
   if (lesson.status === 'scheduled') return 'text-amber-600';
   return 'text-primary';
+}
+
+function extractLessonThumbnail(lesson) {
+  if (!lesson) return null;
+  const metadata = lesson.metadata ?? {};
+  const candidates = [
+    lesson.thumbnailUrl,
+    lesson.previewImageUrl,
+    metadata.thumbnailUrl,
+    metadata.previewImageUrl,
+    metadata.coverImage,
+    metadata.imageUrl
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+  return null;
 }
 
 function LessonPreview({ lesson, onSelect, isActive }) {
@@ -20,6 +41,13 @@ function LessonPreview({ lesson, onSelect, isActive }) {
   } else {
     baseClasses.push('border-slate-200 bg-slate-50');
   }
+  const thumbnailUrl = extractLessonThumbnail(lesson);
+  const statusLabel = lesson.completed ? 'Done' : lesson.status === 'scheduled' ? 'Scheduled' : 'Ready';
+  const fallbackInitials = (() => {
+    const base = (lesson.title ?? 'Lesson').trim();
+    if (!base) return 'L';
+    return base.slice(0, 2).toUpperCase();
+  })();
   return (
     <button
       type="button"
@@ -27,13 +55,25 @@ function LessonPreview({ lesson, onSelect, isActive }) {
       className={baseClasses.join(' ')}
       aria-current={isActive ? 'true' : undefined}
     >
-      <div>
-        <p className="text-sm font-medium text-slate-800">{lesson.title}</p>
-        <p className="text-xs text-slate-500">{lesson.releaseLabel ?? lesson.nextActionLabel}</p>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt=""
+            className="h-12 w-12 flex-none rounded-xl object-cover shadow-sm"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {fallbackInitials}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-slate-800">{lesson.title}</p>
+          <p className="truncate text-xs text-slate-500">{lesson.releaseLabel ?? lesson.nextActionLabel}</p>
+        </div>
       </div>
-      <span className={`text-xs font-semibold ${resolveLessonStatusTone(lesson)}`}>
-        {lesson.completed ? 'Done' : lesson.status === 'scheduled' ? 'Scheduled' : 'Ready'}
-      </span>
+      <span className={`text-xs font-semibold ${resolveLessonStatusTone(lesson)}`}>{statusLabel}</span>
     </button>
   );
 }
@@ -147,6 +187,25 @@ export function CourseModuleNavigator({
   className,
   activeLessonId
 }) {
+  const lessonThumbnails = useMemo(() => {
+    const urls = new Set();
+    (modules ?? []).forEach((module) => {
+      (module?.lessons ?? []).forEach((lesson) => {
+        const thumbnailUrl = extractLessonThumbnail(lesson);
+        if (thumbnailUrl) {
+          urls.add(thumbnailUrl);
+        }
+      });
+    });
+    return Array.from(urls);
+  }, [modules]);
+
+  useEffect(() => {
+    lessonThumbnails.forEach((url) => {
+      preloadImage(url);
+    });
+  }, [lessonThumbnails]);
+
   if (!modules?.length) {
     return (
       <div className={`rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500 ${className}`}>
