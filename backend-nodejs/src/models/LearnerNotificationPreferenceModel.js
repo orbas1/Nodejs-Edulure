@@ -73,6 +73,37 @@ function serialiseMetadata(metadata) {
   return JSON.stringify({});
 }
 
+function resolveInsertedId(result) {
+  if (Array.isArray(result)) {
+    const [first] = result;
+    if (!first) {
+      return null;
+    }
+
+    if (typeof first === 'object') {
+      if ('id' in first) {
+        return first.id;
+      }
+
+      const values = Object.values(first);
+      return values.length > 0 ? values[0] : null;
+    }
+
+    return first;
+  }
+
+  if (result && typeof result === 'object') {
+    if ('id' in result) {
+      return result.id;
+    }
+
+    const values = Object.values(result);
+    return values.length > 0 ? values[0] : null;
+  }
+
+  return result ?? null;
+}
+
 function normaliseBoolean(value, fallback) {
   if (value === undefined || value === null) {
     return Boolean(fallback);
@@ -165,8 +196,12 @@ export default class LearnerNotificationPreferenceModel {
       return deserialize(row);
     }
 
-    const [id] = await connection(TABLE).insert(insert);
-    const row = await connection(TABLE).select('*').where({ id }).first();
+    const insertResult = await connection(TABLE).insert(insert, ['id']);
+    const insertedId = resolveInsertedId(insertResult);
+    const row = await connection(TABLE)
+      .select('*')
+      .where(insertedId ? { id: insertedId } : { user_id: userId })
+      .first();
     return deserialize(row);
   }
 }
@@ -175,5 +210,6 @@ export const __testables = {
   DEFAULTS,
   parseMetadata,
   serialiseMetadata,
+  resolveInsertedId,
   normaliseBoolean
 };

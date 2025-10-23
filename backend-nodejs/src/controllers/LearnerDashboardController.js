@@ -576,6 +576,18 @@ export default class LearnerDashboardController {
     }
   }
 
+  static async getNotificationSettings(req, res, next) {
+    try {
+      const settings = await LearnerDashboardService.getNotificationPreferences(req.user.id);
+      return success(res, {
+        data: settings,
+        message: 'Notification settings retrieved'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
   static async updateNotificationSettings(req, res, next) {
     try {
       const body = sanitiseBody(req.body ?? {});

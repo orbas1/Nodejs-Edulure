@@ -57,6 +57,11 @@ router.put(
   auth(),
   LearnerDashboardController.updatePersonalisationSettings
 );
+router.get(
+  '/learner/settings/notifications',
+  auth(),
+  LearnerDashboardController.getNotificationSettings
+);
 router.put(
   '/learner/settings/notifications',
   auth(),

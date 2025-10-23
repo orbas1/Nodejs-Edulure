@@ -32,6 +32,25 @@ export async function fetchPersonalisationSettings({ token, signal } = {}) {
   return normaliseResponse(response);
 }
 
+export async function fetchNotificationSettings({ token, signal } = {}) {
+  ensureToken(token);
+  const response = await httpClient.get('/dashboard/learner/settings/notifications', {
+    token,
+    signal,
+    cache: { ttl: 30_000, tags: [`dashboard:me:${token}:settings:notifications`] }
+  });
+
+  const payload = response?.data ?? response ?? {};
+  return {
+    weeklyDigest: Boolean(payload.weeklyDigest ?? true),
+    communityDigest: Boolean(payload.communityDigest ?? true),
+    productUpdates: Boolean(payload.productUpdates ?? true),
+    smsAlerts: Boolean(payload.smsAlerts ?? false),
+    tutorReminders: Boolean(payload.tutorReminders ?? true),
+    metadata: payload.metadata ?? {}
+  };
+}
+
 export async function updatePersonalisationSettings({ token, payload, signal } = {}) {
   ensureToken(token);
   return httpClient.put('/dashboard/learner/settings/personalisation', payload ?? {}, {
@@ -48,6 +67,23 @@ export async function updateNotificationSettings({ token, payload, signal } = {}
     signal,
     invalidateTags: [`dashboard:me:${token}:settings`]
   });
+}
+
+export async function fetchSecuritySettings({ token, signal } = {}) {
+  ensureToken(token);
+  const response = await httpClient.get('/dashboard/learner/settings/security', {
+    token,
+    signal,
+    cache: { ttl: 30_000, tags: [`dashboard:me:${token}:settings:security`] }
+  });
+
+  const payload = response?.data ?? response ?? {};
+  return {
+    requireMfa: Boolean(payload.requireMfa ?? false),
+    notifyOnNewDevice: Boolean(payload.notifyOnNewDevice ?? true),
+    sessionTimeoutMinutes: Number.parseInt(payload.sessionTimeoutMinutes ?? 60, 10),
+    metadata: payload.metadata ?? {}
+  };
 }
 
 export async function updateSecuritySettings({ token, payload, signal } = {}) {

@@ -486,13 +486,15 @@ const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({
   communityDigest: true,
   productUpdates: true,
   smsAlerts: false,
-  tutorReminders: true
+  tutorReminders: true,
+  metadata: {}
 });
 
 const DEFAULT_SECURITY_SETTINGS = Object.freeze({
   requireMfa: false,
   notifyOnNewDevice: true,
-  sessionTimeoutMinutes: 60
+  sessionTimeoutMinutes: 60,
+  metadata: {}
 });
 
 const DEFAULT_FINANCE_ALERTS = Object.freeze({
@@ -828,7 +830,20 @@ export default class LearnerDashboardService {
   static async getNotificationPreferences(userId) {
     const stored = await LearnerNotificationPreferenceModel.getForUser(userId);
     if (!stored) {
-      return { ...DEFAULT_NOTIFICATION_SETTINGS };
+      const defaults = LearnerNotificationPreferenceModel.defaults();
+      const created = await LearnerNotificationPreferenceModel.upsertForUser(userId, defaults);
+      if (!created) {
+        return { ...DEFAULT_NOTIFICATION_SETTINGS };
+      }
+
+      return {
+        weeklyDigest: coerceBoolean(created.weeklyDigest, DEFAULT_NOTIFICATION_SETTINGS.weeklyDigest),
+        communityDigest: coerceBoolean(created.communityDigest, DEFAULT_NOTIFICATION_SETTINGS.communityDigest),
+        productUpdates: coerceBoolean(created.productUpdates, DEFAULT_NOTIFICATION_SETTINGS.productUpdates),
+        smsAlerts: coerceBoolean(created.smsAlerts, DEFAULT_NOTIFICATION_SETTINGS.smsAlerts),
+        tutorReminders: coerceBoolean(created.tutorReminders, DEFAULT_NOTIFICATION_SETTINGS.tutorReminders),
+        metadata: created.metadata ?? { ...DEFAULT_NOTIFICATION_SETTINGS.metadata }
+      };
     }
 
     return {
@@ -836,7 +851,8 @@ export default class LearnerDashboardService {
       communityDigest: coerceBoolean(stored.communityDigest, DEFAULT_NOTIFICATION_SETTINGS.communityDigest),
       productUpdates: coerceBoolean(stored.productUpdates, DEFAULT_NOTIFICATION_SETTINGS.productUpdates),
       smsAlerts: coerceBoolean(stored.smsAlerts, DEFAULT_NOTIFICATION_SETTINGS.smsAlerts),
-      tutorReminders: coerceBoolean(stored.tutorReminders, DEFAULT_NOTIFICATION_SETTINGS.tutorReminders)
+      tutorReminders: coerceBoolean(stored.tutorReminders, DEFAULT_NOTIFICATION_SETTINGS.tutorReminders),
+      metadata: stored.metadata ?? { ...DEFAULT_NOTIFICATION_SETTINGS.metadata }
     };
   }
 
@@ -858,25 +874,41 @@ export default class LearnerDashboardService {
       LearnerSecuritySettingModel.getForUser(userId)
     ]);
 
+    let securityRecord = stored;
+    if (!securityRecord) {
+      securityRecord = await LearnerSecuritySettingModel.upsertForUser(userId, {
+        requireMfa: user?.twoFactorEnabled ?? DEFAULT_SECURITY_SETTINGS.requireMfa,
+        notifyOnNewDevice: DEFAULT_SECURITY_SETTINGS.notifyOnNewDevice,
+        sessionTimeoutMinutes: DEFAULT_SECURITY_SETTINGS.sessionTimeoutMinutes,
+        metadata: DEFAULT_SECURITY_SETTINGS.metadata
+      });
+    }
+
+    const metadata =
+      securityRecord?.metadata && typeof securityRecord.metadata === 'object'
+        ? securityRecord.metadata
+        : { ...DEFAULT_SECURITY_SETTINGS.metadata };
+
     const requireMfa = coerceBoolean(
-      stored?.requireMfa ?? user?.twoFactorEnabled ?? DEFAULT_SECURITY_SETTINGS.requireMfa,
+      securityRecord?.requireMfa ?? user?.twoFactorEnabled ?? DEFAULT_SECURITY_SETTINGS.requireMfa,
       DEFAULT_SECURITY_SETTINGS.requireMfa
     );
 
     const notifyOnNewDevice = coerceBoolean(
-      stored?.notifyOnNewDevice ?? DEFAULT_SECURITY_SETTINGS.notifyOnNewDevice,
+      securityRecord?.notifyOnNewDevice ?? DEFAULT_SECURITY_SETTINGS.notifyOnNewDevice,
       DEFAULT_SECURITY_SETTINGS.notifyOnNewDevice
     );
 
     const sessionTimeoutMinutes = normaliseDurationMinutes(
-      stored?.sessionTimeoutMinutes ?? DEFAULT_SECURITY_SETTINGS.sessionTimeoutMinutes,
+      securityRecord?.sessionTimeoutMinutes ?? DEFAULT_SECURITY_SETTINGS.sessionTimeoutMinutes,
       DEFAULT_SECURITY_SETTINGS.sessionTimeoutMinutes
     );
 
     return {
       requireMfa,
       notifyOnNewDevice,
-      sessionTimeoutMinutes
+      sessionTimeoutMinutes,
+      metadata
     };
   }
 
