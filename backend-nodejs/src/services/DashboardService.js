@@ -466,6 +466,31 @@ function formatRelativeDay(target, now = new Date()) {
   return `${Math.abs(diffDays)} days ago`;
 }
 
+function sanitiseDashboardHref(url) {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed, 'https://app.edulure.com');
+    if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+      return null;
+    }
+    return parsed.toString();
+  } catch (_error) {
+    return null;
+  }
+}
+
 function parseTagsList(tags) {
   const parsed = safeJsonParse(tags, []);
   if (Array.isArray(parsed)) {
@@ -769,6 +794,18 @@ export function buildLearnerDashboard({
     }))
     .filter((session) => session.startAt && session.startAt >= now)
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+  const tutorAvailability = Array.isArray(_tutorAvailability)
+    ? _tutorAvailability
+        .map((slot) => ({
+          ...slot,
+          startAt: normaliseDate(slot.startAt ?? slot.start ?? slot.start_time ?? slot.startsAt),
+          endAt: normaliseDate(slot.endAt ?? slot.end ?? slot.end_time ?? slot.endsAt),
+          metadata: safeJsonParse(slot.metadata, {})
+        }))
+        .filter((slot) => slot.startAt && slot.startAt >= now)
+        .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+    : [];
 
   const metrics = [
     {
@@ -2244,6 +2281,128 @@ export function buildLearnerDashboard({
 
   const upcomingEntries = upcomingUnique;
 
+  const quickActions = [];
+
+  const primaryCourse = activeCourses[0] ?? null;
+  if (primaryCourse) {
+    const resumeCourseId = primaryCourse.courseId ?? primaryCourse.id ?? 'primary';
+    const defaultCourseHref = `/dashboard/learner/courses?courseId=${encodeURIComponent(resumeCourseId)}`;
+    const candidateHref =
+      primaryCourse.goal?.metadata?.resumeUrl ??
+      primaryCourse.goal?.metadata?.resumeHref ??
+      primaryCourse.goal?.metadata?.actionHref ??
+      primaryCourse.goal?.metadata?.ctaHref ??
+      primaryCourse.goal?.primaryAction?.href ??
+      primaryCourse.goal?.actionHref ??
+      primaryCourse.goal?.cta?.href ??
+      null;
+    const resumeHref = sanitiseDashboardHref(candidateHref) ?? defaultCourseHref;
+    const resumeDescriptionParts = [];
+    if (primaryCourse.goal?.nextStep) {
+      resumeDescriptionParts.push(primaryCourse.goal.nextStep);
+    } else if (primaryCourse.title) {
+      resumeDescriptionParts.push(`Continue ${primaryCourse.title}`);
+    }
+    if (primaryCourse.goal?.dueLabel) {
+      resumeDescriptionParts.push(primaryCourse.goal.dueLabel);
+    }
+    const resumeDescription =
+      resumeDescriptionParts.filter(Boolean).join(' · ') || 'Pick up where you left off.';
+
+    quickActions.push({
+      id: `resume-course-${resumeCourseId}`,
+      label: 'Resume course',
+      description: resumeDescription,
+      href: resumeHref,
+      ctaLabel: primaryCourse.goal?.metadata?.ctaLabel ?? 'Resume'
+    });
+  }
+
+  const nextLiveSession = upcomingLiveSessions[0] ?? null;
+  if (nextLiveSession) {
+    const sessionId = nextLiveSession.publicId ?? nextLiveSession.id ?? 'session';
+    const liveCandidateHref =
+      nextLiveSession.metadata?.meetingUrl ??
+      nextLiveSession.metadata?.joinUrl ??
+      nextLiveSession.metadata?.ctaUrl ??
+      nextLiveSession.action ??
+      nextLiveSession.callToAction?.href ??
+      null;
+    const liveHref = sanitiseDashboardHref(liveCandidateHref) ?? '/dashboard/learner/live-classes';
+    const liveDescriptionParts = [];
+    if (nextLiveSession.title) {
+      liveDescriptionParts.push(nextLiveSession.title);
+    }
+    const liveStartLabel = formatRelativeDay(nextLiveSession.startAt, now);
+    if (liveStartLabel) {
+      liveDescriptionParts.push(liveStartLabel);
+    }
+    const liveDescription =
+      liveDescriptionParts.filter(Boolean).join(' · ') || 'Open the live classroom lobby.';
+    const defaultLiveCta = liveHref.startsWith('http') ? 'Join now' : 'Open lobby';
+
+    quickActions.push({
+      id: `join-live-${sessionId}`,
+      label: 'Join live session',
+      description: liveDescription,
+      href: liveHref,
+      ctaLabel: nextLiveSession.callToAction?.label ?? defaultLiveCta
+    });
+  }
+
+  const nextTutorAvailability = tutorAvailability[0] ?? null;
+  let tutorDescription = 'Schedule time with a mentor to stay on track.';
+  if (nextTutorAvailability) {
+    const availabilityLabel = formatRelativeDay(nextTutorAvailability.startAt, now);
+    const availabilityTime = formatDateTime(nextTutorAvailability.startAt, {
+      dateStyle: undefined,
+      timeStyle: 'short'
+    });
+    const availabilityParts = [];
+    if (availabilityLabel) {
+      availabilityParts.push(availabilityLabel);
+    }
+    if (availabilityTime) {
+      availabilityParts.push(availabilityTime);
+    }
+    if (availabilityParts.length) {
+      tutorDescription = `Next slot ${availabilityParts.join(' · ')}`;
+    }
+  }
+
+  quickActions.push({
+    id: 'book-tutor',
+    label: 'Book a tutor',
+    description: tutorDescription,
+    href: '/dashboard/learner/bookings',
+    ctaLabel: 'Book session'
+  });
+
+  const upcomingAssignment = assignmentsTimeline.upcoming[0] ?? null;
+  let assignmentDescription = 'Submit coursework or upload supporting files.';
+  if (upcomingAssignment) {
+    const assignmentParts = [];
+    if (upcomingAssignment.course) {
+      assignmentParts.push(upcomingAssignment.course);
+    }
+    if (upcomingAssignment.dueIn) {
+      assignmentParts.push(upcomingAssignment.dueIn);
+    } else if (upcomingAssignment.due) {
+      assignmentParts.push(`Due ${upcomingAssignment.due}`);
+    }
+    if (assignmentParts.length) {
+      assignmentDescription = assignmentParts.join(' · ');
+    }
+  }
+
+  quickActions.push({
+    id: 'upload-assignment',
+    label: 'Upload assignment',
+    description: assignmentDescription,
+    href: '/dashboard/learner/assessments',
+    ctaLabel: 'Open workspace'
+  });
+
   const dashboard = {
     metrics,
     analytics: {
@@ -2291,6 +2450,7 @@ export function buildLearnerDashboard({
     assessments: assessmentsSection,
     liveClassrooms: liveDashboard,
     support: supportSection,
+    quickActions,
     followers: followerSection,
     settings: {
       privacy,
