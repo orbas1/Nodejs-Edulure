@@ -1447,6 +1447,109 @@ export async function seed(knex) {
       })
     });
 
+    await trx('monetization_catalog_items').insert([
+      {
+        public_id: crypto.randomUUID(),
+        tenant_id: 'global',
+        product_code: 'course-plan-starter',
+        name: 'Starter Plan',
+        description: 'Launch your first cohort with essential tooling and email support.',
+        pricing_model: 'flat_fee',
+        billing_interval: 'monthly',
+        revenue_recognition_method: 'immediate',
+        recognition_duration_days: 30,
+        unit_amount_cents: 4900,
+        currency: 'USD',
+        usage_metric: 'seats',
+        revenue_account: '4000-education-services',
+        deferred_revenue_account: '2050-deferred-revenue',
+        metadata: JSON.stringify({
+          category: 'course_plan',
+          audience: 'public',
+          display: {
+            tierLabel: 'Starter',
+            features: [
+              '1 live cohort seat pack',
+              'Course landing page templates',
+              'Community bundle optional add-on'
+            ],
+            recommended: false,
+            ctaLabel: 'Choose starter',
+            order: 10
+          }
+        }),
+        status: 'active',
+        effective_from: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        tenant_id: 'global',
+        product_code: 'course-plan-growth',
+        name: 'Growth Plan',
+        description: 'Scale recurring cohorts with community bundles and insight dashboards.',
+        pricing_model: 'flat_fee',
+        billing_interval: 'monthly',
+        revenue_recognition_method: 'immediate',
+        recognition_duration_days: 30,
+        unit_amount_cents: 12900,
+        currency: 'USD',
+        usage_metric: 'seats',
+        revenue_account: '4000-education-services',
+        deferred_revenue_account: '2050-deferred-revenue',
+        metadata: JSON.stringify({
+          category: 'course_plan',
+          audience: 'public',
+          display: {
+            tierLabel: 'Growth',
+            features: [
+              '3 concurrent cohorts',
+              'Community bundle included',
+              'Conversion analytics and waitlists'
+            ],
+            recommended: true,
+            ctaLabel: 'Choose growth',
+            disclaimer: 'Most learners upgrade here for bundled communities.',
+            order: 20
+          }
+        }),
+        status: 'active',
+        effective_from: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        tenant_id: 'global',
+        product_code: 'course-plan-enterprise',
+        name: 'Enterprise Plan',
+        description: 'Advanced governance, API integrations, and dedicated launch concierge.',
+        pricing_model: 'flat_fee',
+        billing_interval: 'monthly',
+        revenue_recognition_method: 'immediate',
+        recognition_duration_days: 30,
+        unit_amount_cents: 28900,
+        currency: 'USD',
+        usage_metric: 'seats',
+        revenue_account: '4000-education-services',
+        deferred_revenue_account: '2050-deferred-revenue',
+        metadata: JSON.stringify({
+          category: 'course_plan',
+          audience: 'public',
+          display: {
+            tierLabel: 'Enterprise',
+            features: [
+              'Unlimited cohorts & instructors',
+              'Dedicated success pod',
+              'Security & compliance exports'
+            ],
+            recommended: false,
+            ctaLabel: 'Talk to sales',
+            order: 30
+          }
+        }),
+        status: 'active',
+        effective_from: trx.fn.now()
+      }
+    ]);
+
     const [catalogItemId] = await trx('monetization_catalog_items').insert({
       public_id: crypto.randomUUID(),
       tenant_id: 'global',

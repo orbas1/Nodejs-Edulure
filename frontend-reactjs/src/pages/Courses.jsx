@@ -3,10 +3,11 @@ import { AcademicCapIcon, CheckCircleIcon, CreditCardIcon, XMarkIcon } from '@he
 
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
 import FormStepper from '../components/forms/FormStepper.jsx';
+import CatalogueHero from '../components/courses/CatalogueHero.jsx';
 import adminControlApi from '../api/adminControlApi.js';
 import { searchExplorer } from '../api/explorerApi.js';
-import { listPublicCourses } from '../api/catalogueApi.js';
-import { createPaymentIntent } from '../api/paymentsApi.js';
+import { listPublicCourses, listPublicPlans } from '../api/catalogueApi.js';
+import { createPaymentIntent, createCheckoutSession } from '../api/paymentsApi.js';
 import { requestMediaUpload } from '../api/mediaApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
@@ -201,7 +202,18 @@ function CourseHighlightCard({ course, onPurchase }) {
   );
 }
 
-function CourseCheckoutDrawer({ course, open, onClose, form, onChange, onSubmit, status, pending }) {
+function CourseCheckoutDrawer({
+  course,
+  open,
+  onClose,
+  form,
+  onChange,
+  onSubmit,
+  status,
+  pending,
+  upsells,
+  sessionSummary
+}) {
   if (!open || !course) {
     return null;
   }
@@ -329,6 +341,58 @@ function CourseCheckoutDrawer({ course, open, onClose, form, onChange, onSubmit,
           </button>
         </form>
 
+        {sessionSummary ? (
+          <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50/70 p-4 text-xs text-slate-600">
+            <p className="text-sm font-semibold text-slate-900">Checkout summary</p>
+            <dl className="mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <dt>Subtotal</dt>
+                <dd className="font-semibold text-slate-800">
+                  {formatPrice((sessionSummary.subtotal ?? 0) / 100, sessionSummary.currency ?? 'USD')}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt>Required add-ons</dt>
+                <dd className="font-semibold text-slate-800">
+                  {formatPrice(((sessionSummary.total ?? 0) - (sessionSummary.subtotal ?? 0)) / 100, sessionSummary.currency ?? 'USD')}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-3 rounded-2xl bg-primary/10 px-3 py-2 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-primary">
+              Optional upsells are highlighted below.
+            </p>
+          </div>
+        ) : null}
+
+        {Array.isArray(upsells) && upsells.length ? (
+          <div className="mt-5 space-y-3 rounded-3xl border border-primary/20 bg-primary/5 p-4 text-xs text-primary">
+            <p className="text-sm font-semibold text-primary-dark">Recommended add-ons</p>
+            <ul className="space-y-3">
+              {upsells.map((upsell) => (
+                <li key={upsell.addonId} className="rounded-2xl border border-primary/30 bg-white/60 p-3 text-slate-700">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{upsell.title}</p>
+                      <p className="text-xs text-slate-500">{upsell.description}</p>
+                    </div>
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-primary">
+                      {upsell.displayPrice}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[0.65rem] text-slate-500">
+                    <span>{upsell.benefit ?? (upsell.optional ? 'Optional add-on' : 'Included')}</span>
+                    {upsell.recommended ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 font-semibold uppercase tracking-[0.3em] text-emerald-600">
+                        Recommended
+                      </span>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {status ? (
           <div
             className={`mt-4 rounded-3xl border px-4 py-3 text-sm ${
@@ -374,6 +438,36 @@ function mapCatalogueCourse(course) {
         : null
     ].filter(Boolean)
   };
+}
+
+function buildCourseAddOns(course) {
+  const priceCents = Number(course?.priceAmountCents ?? 0);
+  const currency = course?.priceCurrency ?? 'USD';
+  const communityPrice = Math.max(Math.round(priceCents * 0.35), 1500);
+  const tutorPrice = 1200;
+
+  return [
+    {
+      id: 'community-bundle',
+      name: 'Community bundle',
+      description: 'Unlock the private community, live forums, and accountability sprints.',
+      unitAmount: communityPrice,
+      optional: true,
+      recommended: course?.deliveryFormat !== 'self_paced',
+      benefit: 'Most cohorts pair with the community bundle to maintain momentum.',
+      currency
+    },
+    {
+      id: 'tutor-credits',
+      name: 'Tutor office hours',
+      description: 'Add three tutor credits for 1:1 support sessions.',
+      unitAmount: tutorPrice,
+      optional: true,
+      recommended: false,
+      benefit: 'Great for learners who want extra coaching between sessions.',
+      currency
+    }
+  ];
 }
 
 function CourseForm({
@@ -881,6 +975,10 @@ export default function Courses() {
   const [catalogueCourses, setCatalogueCourses] = useState([]);
   const [catalogueLoading, setCatalogueLoading] = useState(false);
   const [catalogueError, setCatalogueError] = useState(null);
+  const [planOptions, setPlanOptions] = useState([]);
+  const [planCurrency, setPlanCurrency] = useState('USD');
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planError, setPlanError] = useState(null);
   const [liveCourses, setLiveCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -904,6 +1002,8 @@ export default function Courses() {
   const [checkoutStatus, setCheckoutStatus] = useState(null);
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
+  const [checkoutUpsells, setCheckoutUpsells] = useState([]);
+  const [checkoutSession, setCheckoutSession] = useState(null);
   const [uploadState, setUploadState] = useState({});
 
   const featuredCourse = useMemo(() => highlightCourses[0] ?? null, [highlightCourses]);
@@ -1166,6 +1266,35 @@ export default function Courses() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    setPlanLoading(true);
+    setPlanError(null);
+
+    listPublicPlans({ signal: controller.signal })
+      .then((response) => {
+        if (!active) return;
+        setPlanOptions(response?.data ?? []);
+        setPlanCurrency(response?.meta?.currency ?? 'USD');
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setPlanOptions([]);
+        setPlanError(err.message ?? 'Unable to load pricing plans');
+      })
+      .finally(() => {
+        if (active) {
+          setPlanLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
   const loadCourses = useCallback(
     async ({ signal } = {}) => {
       if (!isAdmin || !token || signal?.aborted) {
@@ -1223,14 +1352,91 @@ export default function Courses() {
       }));
       setCheckoutStatus(null);
       setCheckoutOpen(true);
+      const addons = buildCourseAddOns(course);
+      setCheckoutUpsells(
+        addons.map((addon) => ({
+          addonId: addon.id,
+          title: addon.name,
+          description: addon.description,
+          optional: addon.optional !== false,
+          recommended: Boolean(addon.recommended),
+          benefit: addon.benefit,
+          displayPrice: formatPrice(addon.unitAmount / 100, addon.currency)
+        }))
+      );
+      setCheckoutSession({
+        currency: course?.priceCurrency ?? 'USD',
+        subtotal: Number(course?.priceAmountCents ?? 0),
+        total: Number(course?.priceAmountCents ?? 0)
+      });
+
+      if (!token) {
+        return;
+      }
+
+      (async () => {
+        try {
+          const payload = {
+            currency: course?.priceCurrency ?? 'USD',
+            primaryItem: {
+              id: course?.id,
+              name: course?.title,
+              description: course?.description ?? course?.subtitle ?? undefined,
+              unitAmount: Number(course?.priceAmountCents ?? 0),
+              quantity: 1
+            },
+            addons,
+            entity: {
+              id: course?.id,
+              type: 'course',
+              name: course?.title,
+              description: course?.subtitle ?? course?.description ?? undefined
+            },
+            context: {
+              hasActiveCommunityAccess: false
+            }
+          };
+          const sessionData = await createCheckoutSession({ token, payload });
+          if (sessionData) {
+            setCheckoutSession(sessionData);
+            if (Array.isArray(sessionData.upsellDescriptors)) {
+              const descriptors = sessionData.upsellDescriptors.map((descriptor) => {
+                const matchedAddon = (sessionData.addons ?? []).find((addon) => addon.id === descriptor.addonId);
+                const fallbackCurrency = sessionData.currency ?? payload.currency;
+                const priceCents = matchedAddon?.unitAmount ?? descriptor.price ?? 0;
+                return {
+                  addonId: descriptor.addonId,
+                  title: descriptor.title,
+                  description: descriptor.description,
+                  optional: descriptor.optional !== false,
+                  recommended: Boolean(descriptor.recommended),
+                  benefit: descriptor.benefit ?? matchedAddon?.benefit ?? null,
+                  displayPrice: formatPrice(priceCents / 100, matchedAddon?.currency ?? fallbackCurrency)
+                };
+              });
+              setCheckoutUpsells(descriptors);
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to load checkout session', error);
+        }
+      })();
     },
-    [session?.user?.email]
+    [session?.user?.email, token]
   );
 
   const closeCheckout = useCallback(() => {
     setCheckoutCourse(null);
     setCheckoutOpen(false);
+    setCheckoutUpsells([]);
+    setCheckoutSession(null);
   }, []);
+
+  const handlePlanSelect = useCallback(() => {
+    if (featuredCourse) {
+      openCheckout(featuredCourse);
+    }
+  }, [featuredCourse, openCheckout]);
 
   const handleCheckoutSubmit = useCallback(
     async (event) => {
@@ -1526,7 +1732,16 @@ export default function Courses() {
 
   return (
     <div className="bg-slate-100 pb-24 pt-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6">
+      <div className="mx-auto max-w-6xl px-6">
+        <CatalogueHero
+          onSelectPlan={handlePlanSelect}
+          plans={planOptions}
+          currency={planCurrency}
+          loading={planLoading}
+          error={planError}
+        />
+      </div>
+      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6 pt-12">
         <section className="space-y-10">
           <ExplorerSearchSection {...EXPLORER_CONFIG} />
         </section>
@@ -1653,6 +1868,8 @@ export default function Courses() {
         onSubmit={handleCheckoutSubmit}
         status={checkoutStatus}
         pending={checkoutPending}
+        upsells={checkoutUpsells}
+        sessionSummary={checkoutSession}
       />
     </div>
   );

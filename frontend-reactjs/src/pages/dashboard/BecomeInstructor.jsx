@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import OnboardingFormLayout from '../../components/onboarding/OnboardingFormLayout.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import {
@@ -8,13 +9,18 @@ import {
   saveInstructorApplication,
   submitInstructorApplication
 } from '../../api/learnerDashboardApi.js';
+import { validateInstructorApplication } from '../../utils/validation/onboarding.js';
 
 const DAY_OPTIONS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const FORMAT_OPTIONS = ['Live cohort', 'Async cohort', 'On-demand library', 'Workshops', 'Office hours'];
 
 const STORAGE_KEY_PREFIX = 'edulure::instructor-application::';
 
-const MIN_MOTIVATION_LENGTH = 30;
+const HIGHLIGHTS = [
+  'Gain access to production crew support for your next cohort',
+  'Bundle communities, live classrooms, and analytics in one workspace',
+  'Monetise expertise with guided onboarding and marketing playbooks'
+];
 
 const formatRelativeTimestamp = (value) => {
   if (!value) {
@@ -40,82 +46,7 @@ const formatRelativeTimestamp = (value) => {
   return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'} ago`;
 };
 
-const looksLikeUrl = (value) => {
-  if (!value) return false;
-  try {
-    const parsed = new URL(value);
-    return Boolean(parsed.protocol && parsed.host);
-  } catch (error) {
-    return false;
-  }
-};
-
 const buildStorageKey = (userId) => `${STORAGE_KEY_PREFIX}${userId ?? 'anonymous'}`;
-
-function computeStepErrors(formState, stepId) {
-  const errors = {};
-  if (!formState) {
-    return errors;
-  }
-
-  const trimmedMotivation = formState.motivation?.trim() ?? '';
-  const experienceYears = Number(formState.experienceYears ?? 0);
-  const focus = formState.teachingFocus?.trim() ?? '';
-  const trimmedPortfolio = formState.portfolioUrl?.trim() ?? '';
-
-  const ensureMotivation = () => {
-    if (trimmedMotivation.length < MIN_MOTIVATION_LENGTH) {
-      errors.motivation = `Share at least ${MIN_MOTIVATION_LENGTH} characters about your motivation.`;
-    }
-    if (Number.isNaN(experienceYears) || experienceYears < 0) {
-      errors.experienceYears = 'Add your years of experience as a non-negative number.';
-    }
-    if (!focus) {
-      errors.teachingFocus = 'List at least one teaching focus area.';
-    }
-  };
-
-  const ensurePortfolio = () => {
-    if (!trimmedPortfolio) {
-      errors.portfolioUrl = 'Add a portfolio or flagship cohort URL.';
-    } else if (!looksLikeUrl(trimmedPortfolio)) {
-      errors.portfolioUrl = 'Provide a valid https:// URL so reviewers can verify your work.';
-    }
-  };
-
-  const ensureAvailability = () => {
-    if (!formState.availabilityTimezone?.trim()) {
-      errors.availabilityTimezone = 'Confirm your primary timezone.';
-    }
-    if (!Array.isArray(formState.availabilityPreferredDays) || formState.availabilityPreferredDays.length === 0) {
-      errors.availabilityPreferredDays = 'Select at least one day you can host cohorts.';
-    }
-    if (!Array.isArray(formState.availabilitySessionFormats) || formState.availabilitySessionFormats.length === 0) {
-      errors.availabilitySessionFormats = 'Choose at least one delivery format you support.';
-    }
-  };
-
-  switch (stepId) {
-    case 'motivation':
-      ensureMotivation();
-      break;
-    case 'portfolio':
-      ensurePortfolio();
-      break;
-    case 'availability':
-      ensureAvailability();
-      break;
-    case 'review':
-      ensureMotivation();
-      ensurePortfolio();
-      ensureAvailability();
-      break;
-    default:
-      break;
-  }
-
-  return errors;
-}
 
 const STEPS = [
   { id: 'motivation', title: 'Motivation & expertise', description: 'Share your teaching story and experience.', stage: 'intake' },
@@ -369,7 +300,7 @@ export default function BecomeInstructor() {
     async (options = {}) => {
       const submit = Boolean(options.submit);
       const step = STEPS[stepIndex] ?? STEPS[0];
-      const currentStepErrors = computeStepErrors(form, step.id);
+      const currentStepErrors = validateInstructorApplication(form, { stepId: step.id });
       if (Object.keys(currentStepErrors).length) {
         setFormErrors(currentStepErrors);
         setStatusMessage({
@@ -381,7 +312,7 @@ export default function BecomeInstructor() {
 
       if (submit) {
         const aggregateErrors = STEPS.reduce((acc, definition) => {
-          const stepErrors = computeStepErrors(form, definition.id);
+          const stepErrors = validateInstructorApplication(form, { stepId: definition.id });
           return Object.keys(stepErrors).length ? { ...acc, ...stepErrors } : acc;
         }, {});
         if (Object.keys(aggregateErrors).length) {
@@ -451,7 +382,7 @@ export default function BecomeInstructor() {
         }
         if (targetIndex > currentIndex) {
           const currentStepDefinition = STEPS[currentIndex] ?? STEPS[0];
-          const stepErrors = computeStepErrors(form, currentStepDefinition.id);
+          const stepErrors = validateInstructorApplication(form, { stepId: currentStepDefinition.id });
           if (Object.keys(stepErrors).length) {
             setFormErrors(stepErrors);
             setStatusMessage({
@@ -529,28 +460,38 @@ export default function BecomeInstructor() {
       : hasLocalDraft
         ? 'Local draft stored on this device'
         : 'Draft synced with reviewer workspace';
+  const fallbackNextSteps = [
+    'Our partnerships team will contact you within 48 hours after submission.',
+    'Prepare examples of curriculum artefacts and cohort outcomes for the interview.'
+  ];
+  const displayedNextSteps = nextSteps.length ? nextSteps : fallbackNextSteps;
 
   return (
-    <div className="space-y-10">
-      <header className="rounded-3xl border border-primary/20 bg-primary/5 p-8 text-slate-900">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="dashboard-kicker text-primary">Instructor accelerator</p>
-            <h1 className="text-3xl font-semibold text-slate-900">Turn your playbooks into premium cohorts</h1>
-            <p className="mt-3 max-w-2xl text-sm text-slate-600">
-              Apply for the Edulure instructor network to access production resources, cohort strategists, and the marketing
-              engine powering our most successful programs.
-            </p>
+    <OnboardingFormLayout
+      title="Turn your playbooks into premium cohorts"
+      description="Apply for the Edulure instructor network to access production resources, cohort strategists, and the marketing engine powering our most successful programs."
+      highlights={HIGHLIGHTS}
+      aside={
+        <>
+          <div className="space-y-2 text-slate-700">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Application status</p>
+            <p className="text-lg font-semibold text-slate-900">{form.status ?? 'draft'}</p>
+            <p className="text-xs text-slate-500">Stage · {form.stage ?? 'intake'}</p>
+            <p className={`text-xs ${isDirty ? 'font-semibold text-rose-600' : 'text-slate-500'}`}>{autosaveLabel}</p>
           </div>
-          <div className="flex flex-col gap-2 text-right">
-            <span className="text-xs uppercase tracking-wide text-slate-500">Application status</span>
-            <span className="text-lg font-semibold text-slate-900">{form.status ?? 'draft'}</span>
-            <span className="text-xs text-slate-500">Stage · {form.stage ?? 'intake'}</span>
-            <span className={`text-xs ${isDirty ? 'font-semibold text-rose-600' : 'text-slate-500'}`}>{autosaveLabel}</span>
+          <div className="space-y-2 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next steps</p>
+            <ul className="space-y-2 text-sm text-slate-600">
+              {displayedNextSteps.map((step) => (
+                <li key={step} className="rounded-2xl bg-white/80 px-3 py-2">
+                  {step}
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
-      </header>
-
+        </>
+      }
+    >
       <nav aria-label="Application progress" className="rounded-3xl border border-slate-200 bg-white/70 p-6">
         <ol className="grid gap-4 md:grid-cols-4">
           {STEPS.map((step, index) => {
@@ -870,26 +811,6 @@ export default function BecomeInstructor() {
           ) : null}
         </div>
       </section>
-
-      <section className="dashboard-section">
-        <h2 className="text-lg font-semibold text-slate-900">Next steps from Edulure</h2>
-        <ul className="mt-3 space-y-2 text-sm text-slate-600">
-          {nextSteps.length
-            ? nextSteps.map((step) => (
-                <li key={step} className="rounded-2xl bg-slate-50 px-4 py-3">
-                  {step}
-                </li>
-              ))
-            : [
-                'Our partnerships team will contact you within 48 hours after submission.',
-                'Prepare examples of curriculum artefacts and cohort outcomes for the interview.'
-              ].map((step) => (
-                <li key={step} className="rounded-2xl bg-slate-50 px-4 py-3">
-                  {step}
-                </li>
-              ))}
-        </ul>
-      </section>
-    </div>
+    </OnboardingFormLayout>
   );
 }

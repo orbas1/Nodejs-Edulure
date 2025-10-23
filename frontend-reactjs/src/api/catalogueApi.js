@@ -33,10 +33,22 @@ export function listPublicTutors({ params, signal } = {}) {
   });
 }
 
+export function listPublicPlans({ params, signal } = {}) {
+  return httpClient.get('/catalogue/plans', {
+    params,
+    signal,
+    cache: {
+      ttl: 60_000,
+      tags: ['catalogue:plans']
+    }
+  });
+}
+
 const catalogueApi = {
   listPublicLiveClassrooms,
   listPublicCourses,
-  listPublicTutors
+  listPublicTutors,
+  listPublicPlans
 };
 
 export default catalogueApi;

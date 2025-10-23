@@ -3,6 +3,7 @@ import Joi from 'joi';
 import LiveClassroomModel from '../models/LiveClassroomModel.js';
 import CourseModel from '../models/CourseModel.js';
 import TutorProfileModel from '../models/TutorProfileModel.js';
+import PricingCatalogueService from '../services/PricingCatalogueService.js';
 import { success } from '../utils/httpResponse.js';
 
 const liveClassroomQuerySchema = Joi.object({
@@ -29,6 +30,11 @@ const tutorQuerySchema = Joi.object({
   verifiedOnly: Joi.boolean().default(true),
   limit: Joi.number().integer().min(1).max(50).default(12),
   offset: Joi.number().integer().min(0).default(0)
+});
+
+const planQuerySchema = Joi.object({
+  tenantId: Joi.string().trim().max(120).default('global'),
+  limit: Joi.number().integer().min(1).max(50).default(12)
 });
 
 function normaliseStatuses(statuses) {
@@ -241,6 +247,32 @@ export default class CatalogueController {
             offset: query.offset,
             total
           }
+        }
+      });
+    } catch (error) {
+      return next(withValidationStatus(error));
+    }
+  }
+
+  static async listPlans(req, res, next) {
+    try {
+      const query = await planQuerySchema.validateAsync(req.query, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const plans = await PricingCatalogueService.listPublicPlans({
+        tenantId: query.tenantId,
+        limit: query.limit
+      });
+
+      const currency = plans.find((plan) => plan?.currency)?.currency ?? 'USD';
+
+      return success(res, {
+        data: plans,
+        meta: {
+          tenantId: query.tenantId,
+          currency
         }
       });
     } catch (error) {

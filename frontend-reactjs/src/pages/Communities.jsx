@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { SparklesIcon, UserGroupIcon, UsersIcon } from '@heroicons/react/24/solid';
 import { ArrowPathIcon, ChevronRightIcon, MapIcon, PlayCircleIcon } from '@heroicons/react/24/outline';
@@ -24,6 +24,7 @@ import CommunityChatModule from '../components/community/CommunityChatModule.jsx
 import CommunityMembersManager from '../components/community/CommunityMembersManager.jsx';
 import CommunityMap from '../components/community/CommunityMap.jsx';
 import CommunityAboutPanel from '../components/community/CommunityAboutPanel.jsx';
+import CommunitiesLandingHero from '../components/community/CommunitiesLandingHero.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
@@ -357,6 +358,7 @@ export default function Communities() {
   const [communitiesError, setCommunitiesError] = useState(null);
 
   const [communityDetail, setCommunityDetail] = useState(null);
+  const directorySectionRef = useRef(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState(null);
 
@@ -396,6 +398,13 @@ export default function Communities() {
   const [subscriptionCheckouts, setSubscriptionCheckouts] = useState([]);
 
   const selectedCommunityId = selectedCommunity?.id ?? null;
+
+  const handleExploreDirectory = useCallback(() => {
+    const element = directorySectionRef.current ?? document?.getElementById('community-directory');
+    if (element && typeof element.scrollIntoView === 'function') {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
 
   const activeCommunity = useMemo(() => {
     if (communityDetail) {
@@ -1232,7 +1241,14 @@ export default function Communities() {
 
   return (
     <div className="bg-gradient-to-b from-primary/5 via-white to-white">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 lg:px-8">
+        <CommunitiesLandingHero onExploreDirectory={handleExploreDirectory} />
+      </div>
+      <div
+        ref={directorySectionRef}
+        id="community-directory"
+        className="mx-auto max-w-7xl px-4 pb-12 pt-10 sm:px-6 lg:px-8"
+      >
         <div className="flex flex-col gap-8">
           <section className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl backdrop-blur">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
