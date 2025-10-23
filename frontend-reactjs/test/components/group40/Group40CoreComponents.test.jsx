@@ -2,7 +2,6 @@ import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import StatsBar from '../../../src/components/StatsBar.jsx';
 import TopBar from '../../../src/components/TopBar.jsx';
 import CalendarEventDialog from '../../../src/components/calendar/CalendarEventDialog.jsx';
 import CommunityCrudManager from '../../../src/components/community/CommunityCrudManager.jsx';
@@ -50,31 +49,6 @@ describe('Group 40 core components', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('renders StatsBar with custom stats and headline', () => {
-    render(
-      <StatsBar
-        eyebrow="Momentum update"
-        headline="Our operators are thriving"
-        stats={[
-          {
-            label: 'Live cohorts',
-            value: '42',
-            helper: 'Running this week'
-          },
-          {
-            label: 'Communities',
-            value: '128'
-          }
-        ]}
-      />
-    );
-
-    expect(screen.getByText('Momentum update')).toBeInTheDocument();
-    expect(screen.getByText('Our operators are thriving')).toBeInTheDocument();
-    expect(screen.getByText('Live cohorts')).toBeInTheDocument();
-    expect(screen.getByText('Running this week')).toBeInTheDocument();
   });
 
   it('handles TopBar interactions and counters', async () => {

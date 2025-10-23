@@ -112,6 +112,196 @@ function computeBounds(points = []) {
   };
 }
 
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  if (
+    !Number.isFinite(lat1) ||
+    !Number.isFinite(lng1) ||
+    !Number.isFinite(lat2) ||
+    !Number.isFinite(lng2)
+  ) {
+    return null;
+  }
+  const toRadians = (value) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  const latRad1 = toRadians(lat1);
+  const latRad2 = toRadians(lat2);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(latRad1) * Math.cos(latRad2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
+
+function normalisePreferenceTags(value) {
+  if (!value) {
+    return [];
+  }
+  const list = Array.isArray(value) ? value : String(value).split(',');
+  const seen = new Set();
+  return list
+    .map((entry) => String(entry ?? '').trim())
+    .filter((entry) => entry.length > 0)
+    .filter((entry) => {
+      const key = entry.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function normaliseUpsellOffers(value, preferenceTags = [], serviceType = 'Field service engagement') {
+  if (Array.isArray(value) && value.length) {
+    return value
+      .map((offer, index) => {
+        if (!offer) return null;
+        if (typeof offer === 'string') {
+          return {
+            id: `offer-${index}`,
+            title: offer,
+            cta: 'View details',
+            href: null
+          };
+        }
+        if (typeof offer === 'object') {
+          return {
+            id: offer.id ?? `offer-${index}`,
+            title: offer.title ?? serviceType,
+            cta: offer.cta ?? offer.action ?? 'Open',
+            href: offer.href ?? offer.url ?? null
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+  const recommendations = [];
+  if (preferenceTags.includes('training')) {
+    recommendations.push({
+      id: 'offer-training',
+      title: 'Schedule onsite training follow-up',
+      cta: 'Book session',
+      href: '/dashboard/learner/bookings'
+    });
+  }
+  if (preferenceTags.includes('hardware')) {
+    recommendations.push({
+      id: 'offer-hardware',
+      title: 'Quote replacement hardware bundle',
+      cta: 'View packages',
+      href: '/dashboard/learner/financial'
+    });
+  }
+  if (!recommendations.length) {
+    recommendations.push({
+      id: 'offer-survey',
+      title: `${serviceType} follow-up survey`,
+      cta: 'Send survey',
+      href: '/dashboard/learner/support'
+    });
+  }
+  return recommendations;
+}
+
+function buildReminderSchedule({ metadata = {}, scheduledFor, now }) {
+  const reminders = Array.isArray(metadata.reminders)
+    ? metadata.reminders
+    : [];
+
+  const baseList = reminders.length
+    ? reminders
+    : (() => {
+        const scheduledDate = parseDateSafe(scheduledFor);
+        if (!scheduledDate) {
+          return [];
+        }
+        return [
+          {
+            id: 'reminder-prep',
+            label: 'Pre-visit checklist',
+            sendAt: new Date(scheduledDate.getTime() - 60 * 60 * 1000).toISOString()
+          },
+          {
+            id: 'reminder-arrival',
+            label: 'Technician arrival confirmation',
+            sendAt: scheduledDate.toISOString()
+          },
+          {
+            id: 'reminder-followup',
+            label: 'Post-visit satisfaction survey',
+            sendAt: new Date(scheduledDate.getTime() + 2 * 60 * 60 * 1000).toISOString()
+          }
+        ];
+      })();
+
+  const referenceTime = now instanceof Date ? now : new Date();
+  return baseList
+    .map((entry, index) => {
+      if (!entry) return null;
+      const sendAtDate = parseDateSafe(entry.sendAt ?? entry.send_at);
+      const sendAt = sendAtDate ? sendAtDate.toISOString() : null;
+      return {
+        id: entry.id ?? `reminder-${index}`,
+        label: entry.label ?? 'Reminder',
+        sendAt,
+        sendAtLabel: sendAtDate ? formatDateTime(sendAtDate) : null,
+        status: sendAtDate && sendAtDate < referenceTime ? 'sent' : 'scheduled'
+      };
+    })
+    .filter((entry) => entry && entry.sendAt);
+}
+
+function buildRoutePreview({ provider, location, metadata }) {
+  const providerLocation = provider?.location;
+  if (!providerLocation || !location) {
+    const fallback = metadata?.routePreview;
+    if (fallback && typeof fallback === 'object') {
+      return {
+        distanceKm: fallback.distanceKm ?? null,
+        estimatedDurationMinutes: fallback.estimatedDurationMinutes ?? null,
+        summary: fallback.summary ?? null,
+        departureWindow: fallback.departureWindow ?? null,
+        waypoints: Array.isArray(fallback.waypoints) ? fallback.waypoints : []
+      };
+    }
+    return null;
+  }
+
+  const distanceKm = haversineDistance(
+    providerLocation.lat,
+    providerLocation.lng,
+    location.lat,
+    location.lng
+  );
+  if (!Number.isFinite(distanceKm)) {
+    return null;
+  }
+  const estimatedDurationMinutes = Math.max(5, Math.round((distanceKm / 38) * 60));
+  const summary = `${distanceKm.toFixed(1)} km • ~${estimatedDurationMinutes} min drive`;
+  const departureWindow = providerLocation.updatedAt
+    ? formatDateTime(providerLocation.updatedAt)
+    : null;
+  return {
+    distanceKm: Number(distanceKm.toFixed(1)),
+    estimatedDurationMinutes,
+    summary,
+    departureWindow,
+    waypoints: [
+      {
+        label: providerLocation.label ?? provider?.name ?? 'Technician',
+        lat: providerLocation.lat,
+        lng: providerLocation.lng
+      },
+      {
+        label: location.label ?? 'Customer site',
+        lat: location.lat,
+        lng: location.lng
+      }
+    ]
+  };
+}
+
 const FIELD_SERVICE_STATUS_LABELS = {
   pending: 'Pending',
   pending_assignment: 'Pending assignment',
@@ -335,6 +525,10 @@ function buildFieldServiceWorkspace({ now, user, orders = [], events = [], provi
         riskLevel = status === 'completed' ? 'closed' : 'cancelled';
       }
       const slaBreached = !['completed', 'cancelled'].includes(status) && slaMinutes && elapsedMinutes !== null && elapsedMinutes > slaMinutes;
+      const preferenceTags = normalisePreferenceTags(metadata.preferenceTags);
+      const upsellOffers = normaliseUpsellOffers(metadata.upsellOffers, preferenceTags, row.serviceType ?? 'Field service request');
+      const reminderSchedule = buildReminderSchedule({ metadata, scheduledFor, now: safeNow });
+      const routePreview = buildRoutePreview({ provider, location, metadata });
       const nextAction = (() => {
         if (['completed', 'cancelled'].includes(status)) {
           return 'Review service report';
@@ -376,6 +570,13 @@ function buildFieldServiceWorkspace({ now, user, orders = [], events = [], provi
         customer,
         provider,
         metadata,
+        preferences: {
+          tags: preferenceTags,
+          followUpChannel: metadata.followUpChannel ?? metadata.supportChannel ?? null
+        },
+        upsellOffers,
+        reminders: reminderSchedule,
+        routePreview,
         timeline: eventTimeline,
         incidents: incidents.map((event) => ({
           id: `${orderId}-${event.id}`,
@@ -759,6 +960,18 @@ function buildFieldServiceWorkspace({ now, user, orders = [], events = [], provi
       lastUpdate: order.lastUpdate ? order.lastUpdate.toISOString() : null,
       lastUpdateLabel: order.lastUpdate ? humanizeRelativeTime(order.lastUpdate, safeNow) : 'Unknown',
       metrics: order.metrics,
+      supportChannel: order.metadata?.supportChannel ?? null,
+      briefUrl: order.metadata?.briefUrl ?? null,
+      fieldNotes: order.metadata?.fieldNotes ?? null,
+      equipment: order.metadata?.equipment ?? null,
+      attachments: Array.isArray(order.metadata?.attachments) ? order.metadata.attachments : [],
+      debriefHost: order.metadata?.debriefHost ?? order.metadata?.owner ?? null,
+      debriefAt: order.metadata?.debriefAt ?? null,
+      debriefAtLabel: order.metadata?.debriefAt ? formatDateTime(order.metadata.debriefAt) : null,
+      preferences: order.preferences,
+      upsellOffers: order.upsellOffers,
+      reminders: order.reminders,
+      routePreview: order.routePreview,
       location: {
         ...order.location,
         lat: order.location.lat,
