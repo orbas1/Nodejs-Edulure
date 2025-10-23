@@ -17,6 +17,7 @@ import LearnerAffiliatePayoutModel from '../models/LearnerAffiliatePayoutModel.j
 import LearnerAdCampaignModel from '../models/LearnerAdCampaignModel.js';
 import InstructorApplicationModel from '../models/InstructorApplicationModel.js';
 import LearnerLibraryEntryModel from '../models/LearnerLibraryEntryModel.js';
+import LearnerCourseGoalModel from '../models/LearnerCourseGoalModel.js';
 import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
 import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
@@ -1351,16 +1352,185 @@ export default class LearnerDashboardService {
   }
 
   static async createCourseGoal(userId, courseId, payload = {}) {
-    const goalId = generateReference('goal');
-    log.info({ userId, courseId, goalId, payload }, 'Learner created a new course goal');
-    return buildAcknowledgement({
-      reference: goalId,
-      message: 'Learning goal created',
-      meta: {
-        courseId,
-        target: payload.target ?? null,
-        dueDate: payload.dueDate ?? null
+    if (!userId) {
+      throw new Error('A user is required to create a learning goal');
+    }
+
+    const parsedCourseId = Number(courseId);
+    const resolvedCourseId = Number.isFinite(parsedCourseId) ? parsedCourseId : courseId;
+    if (!resolvedCourseId) {
+      throw new Error('A course identifier is required to create a learning goal');
+    }
+
+    const defaultDueDate = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
+    const dueDate = parseDate(payload.dueDate, defaultDueDate);
+
+    const normaliseMinutes = (value) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return null;
       }
+      return Math.max(30, Math.min(720, Math.round(numeric)));
+    };
+
+    const normaliseStatus = (status, { remainingLessons, progressPercent }) => {
+      if (typeof status === 'string') {
+        const trimmed = status.trim().toLowerCase();
+        if (['planned', 'in-progress', 'at-risk', 'completed', 'on-hold'].includes(trimmed)) {
+          return trimmed;
+        }
+      }
+
+      if (progressPercent >= 100 || remainingLessons === 0) {
+        return 'completed';
+      }
+      if (progressPercent >= 70) {
+        return 'in-progress';
+      }
+      if (progressPercent < 40 && remainingLessons > 3) {
+        return 'at-risk';
+      }
+      return 'planned';
+    };
+
+    return db.transaction(async (trx) => {
+      const [
+        { default: CourseModel },
+        { default: CourseEnrollmentModel },
+        { default: CourseLessonModel },
+        { default: CourseProgressModel }
+      ] = await Promise.all([
+        import('../models/CourseModel.js'),
+        import('../models/CourseEnrollmentModel.js'),
+        import('../models/CourseLessonModel.js'),
+        import('../models/CourseProgressModel.js')
+      ]);
+
+      const course = await CourseModel.findById(resolvedCourseId, trx);
+      if (!course) {
+        const error = new Error('Course not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const enrollments = await CourseEnrollmentModel.listByUserId(userId, trx);
+      const enrollment = enrollments.find((item) => item.courseId === course.id);
+      const enrollmentId = enrollment?.id ?? null;
+      const enrollmentProgressPercent = Number(enrollment?.progressPercent ?? 0);
+
+      let totalLessons = 0;
+      let completedLessons = 0;
+
+      if (enrollmentId) {
+        const [lessons, progressEntries] = await Promise.all([
+          CourseLessonModel.listByCourseIds([course.id], trx),
+          CourseProgressModel.listByEnrollmentIds([enrollmentId], trx)
+        ]);
+        totalLessons = lessons.length;
+        completedLessons = progressEntries.filter((entry) => entry.completed).length;
+      } else {
+        const lessons = await CourseLessonModel.listByCourseIds([course.id], trx);
+        totalLessons = lessons.length;
+        completedLessons = Math.round((enrollmentProgressPercent / 100) * totalLessons);
+      }
+
+      const remainingLessonsFromPayload = Number(payload.remainingLessons ?? payload.remainingLessonCount);
+      const remainingLessons = Number.isFinite(remainingLessonsFromPayload)
+        ? Math.max(0, Math.round(remainingLessonsFromPayload))
+        : Math.max(0, totalLessons - completedLessons);
+
+      const progressPercent = (() => {
+        if (payload.progressPercent != null && Number.isFinite(Number(payload.progressPercent))) {
+          return Math.max(0, Math.min(100, Number(payload.progressPercent)));
+        }
+        if (enrollmentProgressPercent) {
+          return Math.max(0, Math.min(100, Math.round(enrollmentProgressPercent)));
+        }
+        if (totalLessons > 0) {
+          return Math.round((completedLessons / totalLessons) * 100);
+        }
+        return 0;
+      })();
+
+      const focusMinutesFromPayload = normaliseMinutes(
+        payload.focusMinutesPerWeek ?? payload.focusMinutes ?? payload.studyMinutes
+      );
+      const focusMinutesPerWeek =
+        focusMinutesFromPayload ?? (remainingLessons > 0 ? Math.max(45, Math.min(remainingLessons * 45, 360)) : 45);
+
+      const status = normaliseStatus(payload.status, { remainingLessons, progressPercent });
+      const priority = Number.isFinite(Number(payload.priority))
+        ? Math.max(0, Math.round(Number(payload.priority)))
+        : status === 'at-risk'
+          ? 2
+          : status === 'in-progress'
+            ? 1
+            : 0;
+
+      const metadata = {
+        ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}),
+        target: payload.target ?? null,
+        notes: payload.notes ?? null,
+        surface: 'learner-dashboard',
+        createdVia: 'dashboard-home'
+      };
+
+      const existingGoal = await LearnerCourseGoalModel.findActiveForCourse(userId, course.id, trx);
+
+      const goalRecord = {
+        userId,
+        courseId: course.id,
+        enrollmentId,
+        title:
+          typeof payload.title === 'string' && payload.title.trim().length
+            ? payload.title.trim()
+            : `Complete ${course.title}`,
+        status,
+        isActive: true,
+        priority,
+        targetLessons: Number.isFinite(Number(payload.targetLessons))
+          ? Math.max(0, Math.round(Number(payload.targetLessons)))
+          : totalLessons,
+        remainingLessons,
+        focusMinutesPerWeek,
+        progressPercent,
+        dueDate: dueDate.toISOString(),
+        metadata
+      };
+
+      let goal;
+      if (existingGoal) {
+        goal = await LearnerCourseGoalModel.updateById(existingGoal.id, goalRecord, trx);
+      } else {
+        goal = await LearnerCourseGoalModel.create(goalRecord, trx);
+      }
+
+      log.info(
+        {
+          userId,
+          courseId: course.id,
+          goalUuid: goal.goalUuid,
+          enrollmentId,
+          remainingLessons,
+          progressPercent,
+          status
+        },
+        'Learner course goal saved'
+      );
+
+      return buildAcknowledgement({
+        reference: goal.goalUuid,
+        message: 'Learning goal created',
+        meta: {
+          courseId: course.id,
+          dueDate: goal.dueDate,
+          focusMinutesPerWeek,
+          progressPercent,
+          remainingLessons,
+          status,
+          goal
+        }
+      });
     });
   }
 

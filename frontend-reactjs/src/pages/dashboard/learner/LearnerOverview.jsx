@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 import VerificationStatusCard from '../../../components/dashboard/VerificationStatusCard.jsx';
+import LearnerProgressCard from '../../../components/dashboard/LearnerProgressCard.jsx';
 import LearnerCommunityEngagementSection from './sections/LearnerCommunityEngagementSection.jsx';
 import LearnerFeedHighlightsSection from './sections/LearnerFeedHighlightsSection.jsx';
 import LearnerMetricsSection from './sections/LearnerMetricsSection.jsx';
@@ -12,6 +13,9 @@ import LearnerSafetySection from './sections/LearnerSafetySection.jsx';
 import LearnerUpcomingSection from './sections/LearnerUpcomingSection.jsx';
 import LearnerBlogSection from './sections/LearnerBlogSection.jsx';
 import LearnerProfileEditor from './sections/LearnerProfileEditor.jsx';
+import LearnerGoalsSection from './sections/LearnerGoalsSection.jsx';
+import LearnerSurveySection from './sections/LearnerSurveySection.jsx';
+import LearnerRevenueBanner from './sections/LearnerRevenueBanner.jsx';
 
 function normaliseSectionKey(name) {
   return name?.toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -222,6 +226,177 @@ function normaliseBlog(blog) {
   };
 }
 
+function normaliseProgressCards(courses, goals) {
+  const goalMap = new Map();
+  if (Array.isArray(goals)) {
+    goals.forEach((goal) => {
+      if (!goal) return;
+      const key = goal.courseId ?? goal.id ?? goal.slug ?? null;
+      if (!key) return;
+      goalMap.set(key, goal);
+    });
+  }
+
+  if (!Array.isArray(courses)) {
+    return [];
+  }
+
+  return courses.slice(0, 3).map((course, index) => {
+    const goal = goalMap.get(course.courseId ?? course.id) ?? null;
+    const progressPercent = Number.isFinite(Number(goal?.progressPercent ?? course.progress))
+      ? Number(goal?.progressPercent ?? course.progress)
+      : 0;
+    const dueLabel = goal?.dueLabel
+      ? goal.dueLabel
+      : goal?.dueDate
+        ? new Date(goal.dueDate).toLocaleDateString()
+        : null;
+    const nextStep = goal?.nextStep ?? goal?.upNext ?? course?.nextLesson ?? null;
+
+    return {
+      id: course.id ?? course.courseId ?? `course-${index}`,
+      title: course.title ?? 'Course',
+      status: course.status ?? 'Active',
+      instructor: course.instructor ?? null,
+      progressPercent,
+      nextLessonLabel: nextStep,
+      goal: goal
+        ? {
+            statusLabel: goal.status ?? goal.statusLabel ?? null,
+            dueLabel,
+            focusMinutesPerWeek: Number.isFinite(Number(goal.focusMinutesPerWeek))
+              ? Number(goal.focusMinutesPerWeek)
+              : null,
+            nextStep
+          }
+        : null,
+      primaryAction: {
+        label: 'Resume course',
+        href: `/dashboard/courses?courseId=${encodeURIComponent(course.courseId ?? course.id ?? '')}`
+      },
+      secondaryAction: nextStep
+        ? {
+            label: 'View modules',
+            href: `/dashboard/courses?courseId=${encodeURIComponent(course.courseId ?? course.id ?? '')}#modules`
+          }
+        : null,
+      highlight:
+        goal?.priority === 1 ||
+        (typeof goal?.status === 'string' && goal.status.toLowerCase().includes('focus')),
+      revenue: course.revenueOpportunity ?? null,
+      meta: course.lastTouchedLabel ? { lastUpdatedLabel: course.lastTouchedLabel } : null
+    };
+  });
+}
+
+function normaliseGoals(goals) {
+  if (!Array.isArray(goals)) {
+    return [];
+  }
+
+  return goals.map((goal, index) => {
+    const progressPercent = Number.isFinite(Number(goal?.progressPercent))
+      ? Number(goal.progressPercent)
+      : 0;
+    const dueLabel = goal?.dueLabel
+      ? goal.dueLabel
+      : goal?.dueDate
+        ? new Date(goal.dueDate).toLocaleDateString()
+        : null;
+
+    return {
+      id: goal.id ?? goal.courseId ?? `goal-${index}`,
+      title: goal.title ?? goal.courseTitle ?? 'Learning goal',
+      subtitle: goal.subtitle ?? goal.courseTitle ?? null,
+      status: goal.status ?? goal.statusLabel ?? null,
+      remainingLessons: Number.isFinite(Number(goal.remainingLessons))
+        ? Number(goal.remainingLessons)
+        : 0,
+      focusMinutesPerWeek: Number.isFinite(Number(goal.focusMinutesPerWeek))
+        ? Number(goal.focusMinutesPerWeek)
+        : null,
+      dueLabel,
+      progressPercent
+    };
+  });
+}
+
+function normaliseSurveyPrompt(survey) {
+  if (!survey?.id || !survey?.question) {
+    return null;
+  }
+
+  const options = Array.isArray(survey.options)
+    ? survey.options
+        .map((option) => {
+          const value = option?.value ?? option?.id ?? null;
+          if (!value) {
+            return null;
+          }
+          return {
+            value,
+            label: option.label ?? String(value),
+            description: option.description ?? option.caption ?? null
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  if (!options.length) {
+    return null;
+  }
+
+  return {
+    id: survey.id,
+    questionId: survey.questionId ?? null,
+    question: survey.question,
+    description: survey.description ?? null,
+    options,
+    ctaLabel: survey.ctaLabel ?? 'Share feedback',
+    thankYouMessage: survey.thankYouMessage ?? null,
+    channel: survey.channel ?? 'learner-dashboard',
+    surface: survey.surface ?? 'dashboard.home',
+    scale: survey.scale ?? null,
+    courseContext: survey.courseContext ?? null,
+    suggestedAction: survey.suggestedAction ?? null,
+    secondaryAction: survey.secondaryAction
+      ? {
+          label: survey.secondaryAction.label,
+          href: survey.secondaryAction.href
+        }
+      : null
+  };
+}
+
+function normalisePromotion(promotion) {
+  if (!promotion) {
+    return null;
+  }
+  const headline = promotion.headline ?? promotion.title;
+  if (!headline) {
+    return null;
+  }
+  const bullets = Array.isArray(promotion.bullets)
+    ? promotion.bullets
+    : Array.isArray(promotion.points)
+      ? promotion.points
+      : null;
+  const action = promotion.actionLabel && promotion.actionHref
+    ? { label: promotion.actionLabel, href: promotion.actionHref }
+    : promotion.action && promotion.action.label && promotion.action.href
+      ? { label: promotion.action.label, href: promotion.action.href }
+      : null;
+
+  return {
+    id: promotion.id ?? promotion.reference ?? headline,
+    kicker: promotion.kicker ?? promotion.label ?? null,
+    headline,
+    body: promotion.body ?? promotion.description ?? null,
+    bullets,
+    action
+  };
+}
+
 export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   const metricsSource = dashboard?.metrics;
   const analytics = dashboard?.analytics ?? {};
@@ -229,6 +404,10 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   const settings = dashboard?.settings ?? {};
   const accessControl = useMemo(() => createSectionAccessControl(dashboard), [dashboard]);
 
+  const progressCards = useMemo(
+    () => normaliseProgressCards(dashboard?.courses?.active, dashboard?.courses?.goals),
+    [dashboard?.courses?.active, dashboard?.courses?.goals]
+  );
   const metrics = useMemo(() => normaliseMetrics(metricsSource), [metricsSource]);
   const learningPace = useMemo(
     () => normaliseLearningPace(analytics.learningPace),
@@ -236,6 +415,7 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   );
   const upcoming = useMemo(() => normaliseUpcoming(dashboard?.upcoming), [dashboard?.upcoming]);
   const profileStats = useMemo(() => normaliseMetrics(profile?.stats), [profile?.stats]);
+  const goalEntries = useMemo(() => normaliseGoals(dashboard?.courses?.goals), [dashboard?.courses?.goals]);
   const feedHighlights = useMemo(
     () => normaliseFeedHighlights(profile?.feedHighlights),
     [profile?.feedHighlights]
@@ -252,10 +432,28 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
     ? Number(notificationsSource.total)
     : notifications.length;
   const blog = useMemo(() => normaliseBlog(dashboard?.blog), [dashboard?.blog]);
+  const surveyPrompt = useMemo(
+    () => normaliseSurveyPrompt(dashboard?.feedback?.microSurvey),
+    [dashboard?.feedback?.microSurvey]
+  );
+  const revenuePromotion = useMemo(
+    () => normalisePromotion(dashboard?.courses?.promotions?.[0] ?? dashboard?.promotions?.[0]),
+    [dashboard?.courses?.promotions, dashboard?.promotions]
+  );
   const privacySettings = settings.privacy ?? null;
   const messagingSettings = settings.messaging ?? null;
   const followerSummary = dashboard?.followers ?? null;
   const unreadMessages = notificationsSource.unreadMessages ?? 0;
+
+  const handleAddGoal = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.location.assign('/dashboard/courses');
+    }
+  }, []);
+
+  const handleSurveySubmitted = useCallback(() => {
+    onRefresh?.();
+  }, [onRefresh]);
 
   const canViewMetrics = accessControl.canView('learner-metrics');
   const canViewProfile = accessControl.canView('learner-profile');
@@ -271,7 +469,32 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
 
   return (
     <div className="space-y-10">
+      {progressCards.length ? (
+        <section className="grid gap-6 xl:grid-cols-3">
+          {progressCards.map((card) => (
+            <LearnerProgressCard
+              key={card.id}
+              title={card.title}
+              status={card.status}
+              instructor={card.instructor}
+              progressPercent={card.progressPercent}
+              nextLabel={card.nextLessonLabel}
+              goal={card.goal}
+              primaryAction={card.primaryAction}
+              secondaryAction={card.secondaryAction}
+              highlight={card.highlight}
+              revenue={card.revenue}
+              meta={card.meta}
+            />
+          ))}
+        </section>
+      ) : null}
+
       {canViewMetrics ? <LearnerMetricsSection metrics={metrics} /> : null}
+
+      {goalEntries.length ? (
+        <LearnerGoalsSection goals={goalEntries} onAddGoal={handleAddGoal} />
+      ) : null}
 
       {(canViewProfile || canViewPace || canViewCommunity) && (
         <section className="grid gap-6 xl:grid-cols-7">
@@ -294,6 +517,19 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
       {canViewVerification ? (
         <VerificationStatusCard verification={profile?.verification ?? null} onRefresh={onRefresh} />
       ) : null}
+
+      {(surveyPrompt || revenuePromotion) && (
+        <section className="grid gap-6 xl:grid-cols-3">
+          {surveyPrompt ? (
+            <LearnerSurveySection
+              survey={surveyPrompt}
+              className={revenuePromotion ? 'xl:col-span-2' : 'xl:col-span-3'}
+              onSubmitted={handleSurveySubmitted}
+            />
+          ) : null}
+          {revenuePromotion ? <LearnerRevenueBanner promotion={revenuePromotion} /> : null}
+        </section>
+      )}
 
       {(canViewUpcoming || canViewNotifications) && (
         <section className="grid gap-6 xl:grid-cols-3">
