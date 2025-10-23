@@ -83,6 +83,18 @@ describe('buildLearnerDashboard', () => {
       }
     ];
 
+    const coursePromotions = [
+      {
+        id: 'promo-design-referral',
+        courseId: 101,
+        headline: 'Share the studio, earn credits',
+        caption: 'Invite a peer to join Design Foundations and unlock extra mentor time.',
+        actionLabel: 'Share invite',
+        actionHref: '/dashboard/learner/growth',
+        metadata: { kicker: 'Referral bonus', bullets: ['Earn $50 credit', 'Grow together'] }
+      }
+    ];
+
     const courseProgress = [
       {
         enrollmentId: 11,
@@ -250,7 +262,8 @@ describe('buildLearnerDashboard', () => {
       followerSummary,
       privacySettings,
       messagingSummary,
-      notifications
+      notifications,
+      coursePromotions
     });
 
     expect(snapshot).not.toBeNull();
@@ -259,6 +272,17 @@ describe('buildLearnerDashboard', () => {
     expect(snapshot.dashboard.tutorBookings.active).toHaveLength(1);
     expect(snapshot.dashboard.ebooks.library[0].timeSpent).toBe('2h');
     expect(snapshot.dashboard.notifications.total).toBeGreaterThan(0);
+    expect(snapshot.dashboard.courses.promotions[0]).toMatchObject({
+      id: 'promo-design-referral',
+      courseId: 101,
+      headline: 'Share the studio, earn credits',
+      actionLabel: 'Share invite'
+    });
+    expect(snapshot.dashboard.promotions[0].kicker).toBe('Referral bonus');
+    expect(snapshot.dashboard.courses.active[0].revenueOpportunity).toMatchObject({
+      headline: 'Share the studio, earn credits',
+      actionLabel: 'Share invite'
+    });
     expect(snapshot.profileStats).toContainEqual({ label: 'Courses', value: '1 active' });
     expect(snapshot.searchIndex.some((entry) => entry.id === 'learner-overview')).toBe(true);
     expect(snapshot.feedHighlights.length).toBeGreaterThan(0);

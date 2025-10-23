@@ -108,6 +108,7 @@ export async function seed(knex) {
     await trx('learner_onboarding_responses').del();
     await trx('learner_onboarding_invites').del();
     await trx('learner_course_goals').del();
+    await trx('learner_course_promotions').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flag_tenant_states').del();
     await trx('feature_flags').del();
@@ -2459,6 +2460,22 @@ export async function seed(knex) {
         target: 'Complete automation toolkit',
         nextStep: 'Resume lesson 3',
         surface: 'seed'
+      })
+    });
+
+    await trx('learner_course_promotions').insert({
+      promotion_uuid: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      slug: 'automation-masterclass-referral',
+      headline: 'Invite a teammate, earn tutoring credits',
+      caption: 'Share your automation masterclass access and unlock bonus mentor time when a peer enrols.',
+      action_label: 'Copy invite link',
+      action_href: '/dashboard/learner/growth',
+      priority: 5,
+      status: 'active',
+      metadata: JSON.stringify({
+        kicker: 'Referral bonus',
+        bullets: ['Earn $150 in credits', 'Bring peers into your sprint cadence']
       })
     });
 

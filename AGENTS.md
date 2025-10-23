@@ -18,18 +18,9 @@ Group 1 – Categories 1-4 (comprehensive change tracking)
    C. *Operational guidance* – Reinforced one-command stack usage, preset toggles, and internalised service expectations across docs.
 
 4. **Styling changes**
-   A. ✓
-      - Flow 1 mandates indigo progress gradients, accessible warning toasts, and calm card shadows across setup dashboards; this note threads those same tokens into the developer presets so stack boot feedback mirrors the orchestration styling already codified in the playbook.【F:logic flows.md†L5-L26】
-      - Flow 2 calls for colour-coded log prefixes and status indicators for unified realtime/job/search services; the styling guidance now locks our CLI output, terminal badges, and admin service health widgets to the documented `[jobs]/[realtime]/[search]` palette so on-call engineers see identical hues from console to UI.【F:logic flows.md†L28-L48】
-      - Flow 3 harmonises CLI colours and documentation captures; this section folds those requirements into preset review checklists so screenshots, terminal captures, and README snippets all reflect the same info/warn/error mapping described in the bootstrap flow.【F:logic flows.md†L50-L66】
-   B. ✓
-      - Flow 5 enforces indigo CTAs, neutral canvases, and accessible pricing badges; styling directives here now pin marketing heroes, pricing grids, and onboarding surfaces to the same palette tokens and contrast ratios for every acquisition touchpoint.【F:logic flows.md†L95-L116】
-      - Flow 6 keeps neutral/emerald progress palettes consistent across course viewers and dashboards; this entry aligns learner progress widgets, certificate previews, and module cards so they inherit the documented colour ramp without bespoke overrides.【F:logic flows.md†L118-L141】
-      - Flow 7 centres minimal backdrops, contrast-compliant toggles, and uniform avatar frames within profile settings; the critique ensures profile, dashboard settings, and identity editors reuse the shared styling primitives described there instead of ad-hoc variants.【F:logic flows.md†L142-L159】
-   C. ✓
-      - Flow 4 outlines shared skeleton loaders, thumbnail frames, and focus states for Postgres-backed search; this note cements those specs as the baseline for every catalogue, explorer, and tutor search surface as the Meilisearch shim retires.【F:logic flows.md†L72-L93】
-      - Flow 5’s marketing discovery updates add hover and badge expectations for search-powered hero previews; integrating that language here guarantees marketing-led search entry points reuse the same shimmer and badge tokens as the core results grids.【F:logic flows.md†L95-L116】
-      - Flow 14’s support and moderation rollout reuses the Edulure Search provider for ticket suggestions; locking SLA badges and moderation flags to the same skeleton rhythm ensures the support workspace inherits the hover/focus treatments defined in the search migration once flows 4 and 14 converge.【F:logic flows.md†L300-L324】
+   A. ✓ Learner dashboard promotions now flow from Postgres: `buildLearnerDashboard` normalises stored course promotions alongside computed referral incentives, applies them to each course’s `revenueOpportunity`, and exposes a shared promotions array for downstream CTAs.【F:backend-nodejs/src/services/DashboardService.js†L650-L1047】【F:backend-nodejs/src/services/DashboardService.js†L2360-L2416】
+   B. ✓ Overview and courses surfaces consume the shared progress-card builder with promotion support, keeping highlight states, skeletons, and action wiring consistent across the learner shell.【F:frontend-reactjs/src/utils/dashboard/learnerProgressCards.js†L72-L185】【F:frontend-reactjs/src/pages/dashboard/learner/LearnerOverview.jsx†L338-L449】【F:frontend-reactjs/src/pages/dashboard/LearnerCourses.jsx†L203-L258】
+   C. ✓ Database, seeds, and tests back the styling contract: the `learner_course_promotions` migration and model persist referral callouts, bootstrap seeds populate automation cohort promos, and the dashboard test asserts promotions surface in the learner snapshot.【F:backend-nodejs/migrations/20250326110000_learner_course_promotions.js†L1-L72】【F:backend-nodejs/src/models/LearnerCoursePromotionModel.js†L1-L92】【F:backend-nodejs/seeds/001_bootstrap.js†L2444-L2480】【F:backend-nodejs/test/dashboardService.test.js†L200-L285】
 
 Group 2 – Categories 5-8 (frontend structure and code actions)
 

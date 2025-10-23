@@ -16,6 +16,7 @@ import LearnerAdCampaignModel from '../models/LearnerAdCampaignModel.js';
 import InstructorApplicationModel from '../models/InstructorApplicationModel.js';
 import LearnerLibraryEntryModel from '../models/LearnerLibraryEntryModel.js';
 import LearnerCourseGoalModel from '../models/LearnerCourseGoalModel.js';
+import LearnerCoursePromotionModel from '../models/LearnerCoursePromotionModel.js';
 import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
 import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
@@ -551,7 +552,8 @@ export function buildLearnerDashboard({
   adCampaigns = [],
   instructorApplication = null,
   supportCases = [],
-  supportMetrics = DEFAULT_SUPPORT_METRICS
+  supportMetrics = DEFAULT_SUPPORT_METRICS,
+  coursePromotions = []
 } = {}) {
   const resolvedCommunityEvents = Array.isArray(communityEvents) ? communityEvents : [];
   const hasSignals =
@@ -614,6 +616,79 @@ export function buildLearnerDashboard({
     if (!course || !course.id) return;
     const metadata = safeJsonParse(course.metadata, {});
     courseMap.set(course.id, { ...course, metadata });
+  });
+
+  const normaliseCoursePromotion = (promotion) => {
+    if (!promotion) {
+      return null;
+    }
+
+    const metadata = promotion.metadata && typeof promotion.metadata === 'object' ? promotion.metadata : {};
+    const courseId = promotion.courseId ?? metadata.courseId ?? null;
+    const headline = promotion.headline ?? promotion.title ?? null;
+    if (!courseId || !headline) {
+      return null;
+    }
+
+    const caption = promotion.caption ?? promotion.body ?? metadata.caption ?? null;
+    const actionLabel = promotion.actionLabel ?? metadata.actionLabel ?? metadata.action?.label ?? null;
+    const actionHref = promotion.actionHref ?? metadata.actionHref ?? metadata.action?.href ?? null;
+    const action = actionLabel && actionHref ? { label: actionLabel, href: actionHref } : null;
+    const bullets = Array.isArray(metadata.bullets)
+      ? metadata.bullets
+          .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+          .filter((entry) => entry.length > 0)
+      : [];
+
+    return {
+      id: promotion.id ?? promotion.promotionUuid ?? promotion.slug ?? headline,
+      promotionUuid: promotion.promotionUuid ?? null,
+      courseId,
+      slug: promotion.slug ?? null,
+      headline,
+      caption,
+      body: promotion.body ?? metadata.body ?? caption ?? null,
+      actionLabel,
+      actionHref,
+      action,
+      bullets,
+      kicker: metadata.kicker ?? metadata.label ?? null,
+      priority: Number.isFinite(Number(promotion.priority)) ? Number(promotion.priority) : 0,
+      status: promotion.status ?? 'active',
+      startsAt: promotion.startsAt ?? null,
+      endsAt: promotion.endsAt ?? null,
+      metadata
+    };
+  };
+
+  const toRevenueOpportunity = (promotion) => {
+    if (!promotion) {
+      return null;
+    }
+    const actionLabel = promotion.actionLabel ?? promotion.action?.label ?? null;
+    const actionHref = promotion.actionHref ?? promotion.action?.href ?? null;
+    return {
+      id: promotion.id,
+      headline: promotion.headline,
+      caption: promotion.caption ?? promotion.body ?? null,
+      actionLabel,
+      actionHref,
+      action: actionLabel && actionHref ? { label: actionLabel, href: actionHref } : null,
+      kicker: promotion.kicker ?? null,
+      bullets: promotion.bullets ?? [],
+      metadata: promotion.metadata ?? {},
+      priority: promotion.priority ?? 0
+    };
+  };
+
+  const storedCoursePromotions = Array.isArray(coursePromotions)
+    ? coursePromotions.map(normaliseCoursePromotion).filter(Boolean)
+    : [];
+  const promotionByCourseId = new Map();
+  storedCoursePromotions.forEach((promotion) => {
+    if (promotion.courseId != null && !promotionByCourseId.has(promotion.courseId)) {
+      promotionByCourseId.set(promotion.courseId, promotion);
+    }
   });
 
   const progressByEnrollment = new Map();
@@ -858,6 +933,9 @@ export function buildLearnerDashboard({
     }
     computedGoalsByCourse.set(enrollment.courseId, mergedGoal);
 
+    const storedPromotion = promotionByCourseId.get(enrollment.courseId);
+    const revenueOpportunity = toRevenueOpportunity(storedPromotion);
+
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
       courseId: enrollment.courseId,
@@ -872,9 +950,14 @@ export function buildLearnerDashboard({
       lastTouchedAt: lastCompletedAt ? lastCompletedAt.toISOString() : null,
       lastTouchedLabel,
       goalStatus: mergedGoal.statusLabel ?? mergedGoal.status ?? baseGoal.statusLabel,
-      goal: mergedGoal
+      goal: mergedGoal,
+      revenueOpportunity
     };
   });
+
+  const activeCourseByCourseId = new Map(
+    activeCourses.map((course) => [course.courseId, course])
+  );
 
   const learnerGoals = activeEnrollments
     .map((enrollment) => computedGoalsByCourse.get(enrollment.courseId))
@@ -908,7 +991,7 @@ export function buildLearnerDashboard({
   );
   const referralCreditCents = Math.max(1500, Math.round(totalInvoiceCents * 0.08));
   const primaryCourse = activeCourses[0] ?? null;
-  const coursePromotions = primaryCourse
+  const computedCoursePromotionsRaw = primaryCourse
     ? [
         {
           id: `learner-referral-${primaryCourse.courseId ?? primaryCourse.id}`,
@@ -921,17 +1004,47 @@ export function buildLearnerDashboard({
       ]
     : [];
 
-  if (coursePromotions.length) {
-    const promotionByCourseId = new Map(
-      coursePromotions.map((promotion) => [promotion.courseId ?? primaryCourse?.courseId ?? primaryCourse?.id, promotion])
-    );
-    activeCourses.forEach((course) => {
-      const promotion = promotionByCourseId.get(course.courseId ?? course.id);
-      if (promotion) {
-        course.revenueOpportunity = promotion;
+  const computedCoursePromotions = computedCoursePromotionsRaw
+    .map(normaliseCoursePromotion)
+    .filter(Boolean);
+
+  computedCoursePromotions.forEach((promotion) => {
+    if (promotion.courseId != null && !promotionByCourseId.has(promotion.courseId)) {
+      promotionByCourseId.set(promotion.courseId, promotion);
+    }
+    if (promotion.courseId != null) {
+      const courseEntry = activeCourseByCourseId.get(promotion.courseId);
+      if (courseEntry && !courseEntry.revenueOpportunity) {
+        courseEntry.revenueOpportunity = toRevenueOpportunity(promotion);
       }
-    });
-  }
+    }
+  });
+
+  const combinedCoursePromotions = [];
+  const promotionSeen = new Set();
+  const pushPromotion = (promotion) => {
+    if (!promotion) {
+      return;
+    }
+    const key = promotion.id ?? `${promotion.courseId ?? 'global'}::${promotion.headline}`;
+    if (promotionSeen.has(key)) {
+      return;
+    }
+    promotionSeen.add(key);
+    combinedCoursePromotions.push(promotion);
+  };
+
+  storedCoursePromotions.forEach(pushPromotion);
+  computedCoursePromotions.forEach(pushPromotion);
+
+  activeCourses.forEach((course) => {
+    if (!course.revenueOpportunity) {
+      const promotion = promotionByCourseId.get(course.courseId);
+      if (promotion) {
+        course.revenueOpportunity = toRevenueOpportunity(promotion);
+      }
+    }
+  });
 
   const microSurvey = (() => {
     if (!primaryCourse && learnerGoalsCombined.length === 0) {
@@ -2260,7 +2373,7 @@ export function buildLearnerDashboard({
       goals: learnerGoalsCombined,
       recommendations: recommendedCourses,
       orders: courseOrders,
-      promotions: coursePromotions
+      promotions: combinedCoursePromotions
     },
     calendar: calendarEvents,
     tutorBookings: {
@@ -2299,6 +2412,7 @@ export function buildLearnerDashboard({
       system: systemSettings,
       finance: financeSettings
     },
+    promotions: combinedCoursePromotions,
     feedback: {
       microSurvey
     }
@@ -5096,6 +5210,15 @@ export default class DashboardService {
       const learnerCourses = courseIds.length ? await CourseModel.listByIds(courseIds) : [];
       const learnerAssignments = courseIds.length ? await CourseAssignmentModel.listByCourseIds(courseIds) : [];
       const recommendedCourses = await CourseModel.listPublished({ limit: 6, excludeIds: courseIds });
+      const promotionCourseIds = Array.from(
+        new Set([
+          ...courseIds,
+          ...recommendedCourses.map((course) => course.id).filter((id) => id != null)
+        ])
+      );
+      const learnerCoursePromotions = promotionCourseIds.length
+        ? await LearnerCoursePromotionModel.listActive({ courseIds: promotionCourseIds, now: referenceDate })
+        : [];
 
       const instructorDirectory = new Map();
       const instructorIds = new Set(learnerCourses.map((course) => course.instructorId).filter(Boolean));
@@ -5217,6 +5340,7 @@ export default class DashboardService {
           instructorDirectory,
           tutorBookings: learnerBookings,
           liveClassrooms: learnerLiveClassrooms,
+          coursePromotions: learnerCoursePromotions,
           ebookLibrary,
           ebookProgress: learnerEbookProgress,
           ebookRecommendations,
