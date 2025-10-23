@@ -288,19 +288,19 @@ G. ✓ Release by applying the new migration, running the search-document seed r
 - **Post-event follow-up** – Surveys and replays triggered through `DashboardAssessments` and notifications.
 
 ### Assessments
-A. ✅ **Redundancy Changes** – Introduced the shared `frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx` and wired it into both `InstructorLiveClasses.jsx` and `LearnerLiveClasses.jsx`, giving hosts and learners the same availability grid the tutor suite will reuse. Attendance summaries and occupancy chips now render through one component, eliminating divergent scheduling UIs.
+A. ✓ **Redundancy Changes** – The shared `frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx` now powers both `frontend-reactjs/src/pages/dashboard/InstructorLiveClasses.jsx` and `frontend-reactjs/src/pages/dashboard/LearnerLiveClasses.jsx`, so availability, occupancy, and attendance summaries render from a single grid component across host and learner surfaces.
 
-B. ✅ **Strengths to Keep** – Preserved existing readiness cards, countdown metadata, and backstage controls while layering the new grid alongside existing session cards. The updates leave the host backstage preview, facilitator listings, and automatic replay wiring untouched so the core experience remains familiar.
+B. ✓ **Strengths to Keep** – Host backstage panels, countdown copy, facilitator listings, and replay wiring remain untouched while the shared grid rides alongside the existing session cards in both dashboards, keeping readiness workflows consistent for facilitators.
 
-C. ✅ **Weaknesses to Remove** – Added offline resilience by queueing join/check-in intents in `liveSessionQueue.js`, replaying them once connectivity returns. Backend services append attendance checkpoints via `LiveClassroomModel.appendAttendanceCheckpointByPublicId`, ensuring engagement telemetry survives process restarts.
+C. ✓ **Weaknesses to Remove** – Offline resilience is enforced by queueing join/check-in intents in `frontend-reactjs/src/utils/liveSessionQueue.js`, auto-flushing them from `LearnerLiveClasses.jsx`, and covering the flow with `frontend-reactjs/test/utils/liveSessionQueue.test.js`. Attendance checkpoints persist through `LiveClassroomModel.appendAttendanceCheckpointByPublicId` so telemetry survives restarts.
 
-D. ✅ **Sesing and Colour Review Changes** – Extended the neutral scheduler palette across the shared grid, keeping focus outlines and contrast aligned with the established dashboard styling so new attendance rows match existing cards in light and dark modes.
+D. ✓ **Sesing and Colour Review Changes** – Schedule cards inherit the neutral palette and focus treatments embedded in `ScheduleGrid.jsx`, matching the session cards and ensuring parity between light and dark modes without bespoke styling.
 
-E. ✅ **Improvements & Justification Changes** – Surfaced live attendance analytics by enriching `DashboardService` to aggregate checkpoints and expose them in both dashboards. Metrics now display total pings and latest activity, giving hosts unified attendance/engagement insight without a separate analytics surface.
+E. ✓ **Improvements & Justification Changes** – `backend-nodejs/src/services/DashboardService.js` aggregates checkpoint metadata into live attendance analytics, and the new `backend-nodejs/test/liveClassroomModel.test.js` locks in checkpoint persistence behaviour for the model used by both dashboards.
 
-F. ✅ **Change Checklist Tracker** – Completion 60%; integration tests for queue flushing and realtime presence remain; schema stores attendance metadata via `LiveClassroomModel` JSON; no migrations required; seeders still need demo attendance data before launch.
+F. ✓ **Change Checklist Tracker** – Demo data now seeds attendance checkpoints, facilitators, and whiteboard states via `backend-nodejs/seeds/001_bootstrap.js`, while Vitest suites in `frontend-reactjs/test/utils/liveSessionQueue.test.js` and `backend-nodejs/test/liveClassroomModel.test.js` guard queue flushing and checkpoint append flows.
 
-G. ✅ **Full Upgrade Plan & Release Steps** – Ship cross-squad docs covering the shared grid, finish presence/channel consolidation, add adaptive streaming toggles, run end-to-end classroom drills validating queued actions, and roll out with updated host training on the new attendance analytics.
+G. ✓ **Full Upgrade Plan & Release Steps** – Run workspace Vitest suites, apply the seeded attendance fixtures, and validate dashboard summaries end-to-end before rolling the shared live classroom experience out alongside updated host training and analytics sign-off.
 
 ## 11. Instructor course authoring and publishing
 

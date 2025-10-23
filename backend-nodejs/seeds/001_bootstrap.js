@@ -2807,6 +2807,67 @@ export async function seed(knex) {
     liveClassroomStart.setUTCHours(17, 0, 0, 0);
     const liveClassroomEnd = new Date(liveClassroomStart.getTime() + 90 * 60 * 1000);
 
+    const liveAttendanceCheckpoints = [
+      {
+        id: crypto.randomUUID(),
+        type: 'attendance',
+        source: 'host',
+        userId: instructorId,
+        recordedAt: new Date(liveClassroomStart.getTime() - 10 * 60 * 1000).toISOString(),
+        metadata: { stage: 'Pre-flight checks' }
+      },
+      {
+        id: crypto.randomUUID(),
+        type: 'attendance',
+        source: 'learner',
+        userId: learnerId,
+        recordedAt: new Date(liveClassroomStart.getTime() - 2 * 60 * 1000).toISOString(),
+        metadata: { stage: 'Lobby joined' }
+      },
+      {
+        id: crypto.randomUUID(),
+        type: 'attendance',
+        source: 'learner',
+        userId: learnerId,
+        recordedAt: new Date(liveClassroomStart.getTime() + 15 * 60 * 1000).toISOString(),
+        metadata: { stage: 'Mid-session checkpoint' }
+      }
+    ];
+
+    const lastAttendanceCheckpoint = liveAttendanceCheckpoints[liveAttendanceCheckpoints.length - 1];
+
+    const liveClassroomMetadata = {
+      agoraChannel: 'OPS-LAUNCH-001',
+      featureFlag: 'live-simulations',
+      timezone: 'Etc/UTC',
+      community: 'Operations Guild',
+      summary: 'Automation rehearsal with escalation practice and analytics reviews.',
+      facilitators: ['Kai Watanabe', 'Ops Producer'],
+      breakoutRooms: [
+        { name: 'War room drills', capacity: 12 },
+        { name: 'Analytics huddle', capacity: 10 }
+      ],
+      whiteboard: {
+        template: 'Ops launch template',
+        summary: 'Checklist for automation command drills and escalation routing.',
+        ready: true,
+        updatedAt: new Date(liveClassroomStart.getTime() - 45 * 60 * 1000).toISOString(),
+        snapshots: [
+          {
+            template: 'Ops launch template',
+            summary: 'Facilitator prep with escalation lanes annotated.',
+            updatedAt: new Date(liveClassroomStart.getTime() - 20 * 60 * 1000).toISOString()
+          }
+        ]
+      },
+      attendanceCheckpoints: liveAttendanceCheckpoints,
+      attendanceAnalytics: {
+        total: liveAttendanceCheckpoints.length,
+        lastRecordedAt: lastAttendanceCheckpoint.recordedAt,
+        lastRecordedBy: learnerId
+      }
+    };
+
     const [opsLiveClassroomId] = await trx('live_classrooms').insert({
       public_id: crypto.randomUUID(),
       community_id: opsCommunityId,
@@ -2827,7 +2888,7 @@ export async function seed(knex) {
       start_at: liveClassroomStart,
       end_at: liveClassroomEnd,
       topics: JSON.stringify(['Automation', 'Live Operations']),
-      metadata: JSON.stringify({ agoraChannel: 'OPS-LAUNCH-001', featureFlag: 'live-simulations' })
+      metadata: JSON.stringify(liveClassroomMetadata)
     });
 
     await trx('live_classroom_registrations').insert({
