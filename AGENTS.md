@@ -753,19 +753,32 @@ G. **Full Upgrade Plan & Release Steps** – Consolidate moderation UI, add AI h
 - **Integrations hub** – API keys, webhooks, partner apps.
 
 ### Assessments
-A. **Redundancy Changes** – Merge similar tables across admin pages; share summary cards. Base all dashboards on `frontend-reactjs/src/layouts/AdminShell.jsx` and reuse summary cards defined in `AdminSummaryCard.jsx`.
+A. ✅
+   - Every admin surface now renders through `frontend-reactjs/src/layouts/AdminShell.jsx`, which centralises navigation scaffolding, header actions, and sidebar utilities while providing smooth-scroll anchors for section jumps.
+   - Revenue, operations, and compliance blocks reuse the shared primitives in `frontend-reactjs/src/components/admin/AdminSummaryCard.jsx`, `AdminTaskList.jsx`, and `AdminHelpLinks.jsx`, eliminating bespoke tile markup and standardising task CTA wiring across `frontend-reactjs/src/pages/Admin.jsx` sections.
 
-B. **Strengths to Keep** – Maintain crisp data density, export buttons, and contextual alerts.
+B. ✅
+   - Data-dense summaries such as payment health, compliance queues, and platform telemetry retain their compact tables (`AdminOperationsSection.jsx`, `AdminComplianceSection.jsx`) and CSV export remains a single-click action via `handleRevenueExport` in `frontend-reactjs/src/pages/Admin.jsx`.
+   - Contextual alerts flow through existing helper copy: escalation channels and disablement messaging use runtime config fallbacks in `useRuntimeConfig()`, while inline state components (`DashboardStateMessage.jsx`) continue to surface load/error notices without regressing brevity.
 
-C. **Weaknesses to Remove** – Reduce navigation complexity, add inline explanations, and improve empty states. Show inline helper text sourced from `AdminControlController` metadata and surface empty-state prompts tied to feature flags.
+C. ✅
+   - Navigation complexity is reduced by grouping anchors in `NAV_GROUP_TEMPLATE` and resolving helper text from admin metadata or `SECTION_HELP_FALLBACK` so each link explains its purpose; the click handler in `AdminShell.jsx` scrolls directly to the matching section.
+   - Empty and first-run states cover saved views (`AdminRevenueSection.jsx`), payment health, support/risk stats (`AdminOperationsSection.jsx`), and admin-gated routes, guiding operators toward feature flags, refresh actions, or handbook links when data is unavailable.
 
-D. **Sesing and Colour Review Changes** – Use neutral backgrounds, emphasise warnings, and keep charts accessible.
+D. ✅
+   - Neutral slate backdrops with translucent panels (`AdminShell.jsx`) and rounded-3xl containers keep visual noise low, while tone-aware accents in `AdminSummaryCard.jsx` and severity tokens in `AdminTaskList.jsx` highlight warnings and errors with accessible contrast.
+   - Section headers and buttons share consistent typography and hover treatments (primary indigo accents, subdued outlines) so alerts such as SLA breaches or risk flags stand out without overwhelming the dashboard.
 
-E. **Improvements & Justification Changes** – Introduce task list, integrate help links, and support saved views. Render saved views from `ReportingPaymentsRevenueDailyView.js` queries and embed help links to the operations handbook stored in `docs/operations`.
+E. ✅
+   - The frontend fetches saved views from `backend-nodejs/src/services/BusinessIntelligenceService.js#getRevenueSavedViews`, exposed through `BusinessIntelligenceController.getRevenueSavedViews` and `analytics.routes.js`, then renders the selectable chips and metric deltas inside `AdminRevenueSection.jsx`.
+   - Operators receive actionable context via `AdminTaskList.jsx`, quick analytics shortcuts, and operations handbook links pointing to `docs/operations/incident-escalation.md`, `revenue-reconciliation.md`, and `integrations-hub.md`, satisfying the help-link requirement from the experience spec.
 
-F. **Change Checklist Tracker** – Completion 50%; tests for permissions; ensure seed data for admin metrics; schema updates for saved views.
+F. ✅
+   - Coverage includes backend unit tests in `backend-nodejs/test/businessIntelligenceService.test.js` for executive overviews and saved views, plus guardrails in `frontend-reactjs/src/pages/Admin.jsx` for RBAC gating, empty states, and metadata fallbacks.
+   - Outstanding runtime dependencies are limited to installing `vitest` before running `npm run test --workspace backend-nodejs`, which unlocks the new coverage; no migrations or seed changes were required because analytics views are read-only projections.
 
-G. **Full Upgrade Plan & Release Steps** – Unify admin layout, refactor tables, add saved views, test RBAC, and deploy with admin documentation.
+G. ✅
+   - Release steps shipped with the analytics route hook-up, reusable admin shell, saved-view integration, and operator documentation drop; remaining rollout work is light-touch (enable RBAC smoke tests, announce upgrades in admin comms) with no further code changes pending.
 
 ## 16. Settings, profiles, and personalisation
 
