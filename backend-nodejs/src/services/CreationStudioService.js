@@ -6,6 +6,8 @@ import CreationProjectCollaboratorModel from '../models/CreationProjectCollabora
 import CreationCollaborationSessionModel from '../models/CreationCollaborationSessionModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import AdsCampaignModel from '../models/AdsCampaignModel.js';
+import CreationProjectChecklistItemModel from '../models/CreationProjectChecklistItemModel.js';
+import InstructorWorkspaceGuideModel from '../models/InstructorWorkspaceGuideModel.js';
 import deepMerge from '../utils/deepMerge.js';
 
 const log = logger.child({ service: 'CreationStudioService' });
@@ -190,7 +192,83 @@ function enrichProjectDraft(projectPayload = {}) {
   return draft;
 }
 
-async function hydrateProject(project, { includeCollaborators = true, includeSessions = false } = {}) {
+const EMPTY_CHECKLIST_SUMMARY = Object.freeze({
+  total: 0,
+  completed: 0,
+  overdue: 0,
+  critical: 0,
+  warnings: 0,
+  blocked: 0
+});
+
+function calculateChecklistSummary(items = []) {
+  const summary = {
+    total: 0,
+    completed: 0,
+    overdue: 0,
+    critical: 0,
+    warnings: 0,
+    blocked: 0
+  };
+
+  const now = Date.now();
+  for (const item of items) {
+    summary.total += 1;
+    if (item.status === 'completed') {
+      summary.completed += 1;
+      continue;
+    }
+
+    if (item.severity === 'critical') {
+      summary.critical += 1;
+    } else if (item.severity === 'warning') {
+      summary.warnings += 1;
+    }
+
+    if (item.status === 'blocked' && item.severity === 'critical') {
+      summary.blocked += 1;
+    }
+
+    if (item.dueAt) {
+      const dueTime = new Date(item.dueAt).getTime();
+      if (Number.isFinite(dueTime) && dueTime < now) {
+        summary.overdue += 1;
+      }
+    }
+  }
+
+  return summary;
+}
+
+function resolveChecklistSummary(map, projectId) {
+  if (!map || !map.size) {
+    return { ...EMPTY_CHECKLIST_SUMMARY };
+  }
+  const entry = map.get(projectId);
+  if (!entry) {
+    return { ...EMPTY_CHECKLIST_SUMMARY };
+  }
+  return {
+    total: Number(entry.total ?? 0),
+    completed: Number(entry.completed ?? 0),
+    overdue: Number(entry.overdue ?? 0),
+    critical: Number(entry.critical ?? 0),
+    warnings: Number(entry.warnings ?? 0),
+    blocked: Number(entry.blocked ?? 0)
+  };
+}
+
+async function hydrateProject(
+  project,
+  {
+    includeCollaborators = true,
+    includeSessions = false,
+    includeChecklist = false,
+    includeChecklistSummary = false,
+    includeGuides = false,
+    preloadedChecklistSummary
+  } = {}
+) {
   const hydrated = { ...project };
   if (includeCollaborators) {
     hydrated.collaborators = await CreationProjectCollaboratorModel.listByProject(project.id);
@@ -198,6 +276,18 @@ async function hydrateProject(project, { includeCollaborators = true, includeSes
   hydrated.latestVersion = await CreationProjectModel.latestVersion(project.id);
   if (includeSessions) {
     hydrated.activeSessions = await CreationCollaborationSessionModel.listActiveByProject(project.id);
+  }
+  if (includeChecklist) {
+    const checklist = await CreationProjectChecklistItemModel.listByProject(project.id, {
+      includeCompleted: true
+    });
+    hydrated.workspaceChecklist = checklist;
+    hydrated.workspaceChecklistSummary = calculateChecklistSummary(checklist);
+  } else if (includeChecklistSummary) {
+    hydrated.workspaceChecklistSummary = resolveChecklistSummary(preloadedChecklistSummary, project.id);
+  }
+  if (includeGuides) {
+    hydrated.workspaceGuides = await InstructorWorkspaceGuideModel.listActiveForProjectType(project.type);
   }
   return hydrated;
 }
@@ -302,7 +392,19 @@ export default class CreationStudioService {
       CreationProjectModel.count(queryOptions)
     ]);
 
-    const hydrated = await Promise.all(projects.map((project) => hydrateProject(project, { includeCollaborators: true })));
+    const summaryMap = await CreationProjectChecklistItemModel.summaryForProjects(
+      projects.map((project) => project.id)
+    );
+
+    const hydrated = await Promise.all(
+      projects.map((project) =>
+        hydrateProject(project, {
+          includeCollaborators: true,
+          includeChecklistSummary: true,
+          preloadedChecklistSummary: summaryMap
+        })
+      )
+    );
 
     return {
       data: hydrated.map((project) => ({
@@ -329,7 +431,12 @@ export default class CreationStudioService {
     }
 
     await resolveCollaborator(project, actor);
-    return hydrateProject(project, { includeCollaborators: true, includeSessions: true });
+    return hydrateProject(project, {
+      includeCollaborators: true,
+      includeSessions: true,
+      includeChecklist: true,
+      includeGuides: true
+    });
   }
 
   static async createProject(actor, payload) {
@@ -402,7 +509,11 @@ export default class CreationStudioService {
 
       log.info({ projectId: project.publicId, actorId: actor.id }, 'Creation project created');
 
-      return hydrateProject(project, { includeCollaborators: true });
+      return hydrateProject(project, {
+        includeCollaborators: true,
+        includeChecklist: true,
+        includeGuides: true
+      });
     });
   }
 
@@ -466,7 +577,11 @@ export default class CreationStudioService {
         trx
       );
 
-      const hydrated = await hydrateProject(updated, { includeCollaborators: true });
+      const hydrated = await hydrateProject(updated, {
+        includeCollaborators: true,
+        includeChecklist: true,
+        includeGuides: true
+      });
 
       const changeSummary = buildChangeSummary(project, hydrated, actor);
       if (changeSummary) {

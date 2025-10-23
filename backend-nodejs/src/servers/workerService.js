@@ -12,6 +12,7 @@ import moderationFollowUpJob from '../jobs/moderationFollowUpJob.js';
 import dataPartitionJob from '../jobs/dataPartitionJob.js';
 import telemetryWarehouseJob from '../jobs/telemetryWarehouseJob.js';
 import monetizationReconciliationJob from '../jobs/monetizationReconciliationJob.js';
+import creationWorkspaceMaintenanceJob from '../jobs/creationWorkspaceMaintenanceJob.js';
 import integrationOrchestratorService from '../services/IntegrationOrchestratorService.js';
 import webhookEventBusService from '../services/WebhookEventBusService.js';
 import domainEventDispatcherService from '../services/DomainEventDispatcherService.js';
@@ -33,6 +34,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'integration-orchestrator',
     'telemetry-warehouse',
     'monetization-reconciliation',
+    'creation-workspace-maintenance',
     'webhook-event-bus',
     'domain-event-dispatcher',
     'probe-server'
@@ -201,6 +203,24 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     } catch (error) {
       readiness.markFailed('monetization-reconciliation', error);
       serviceLogger.error({ err: error }, 'Failed to start monetization reconciliation job');
+      throw error;
+    }
+
+    readiness.markPending('creation-workspace-maintenance', 'Starting instructor workspace maintenance scheduler');
+    try {
+      creationWorkspaceMaintenanceJob.start();
+      registerCleanup('creation-workspace-maintenance', () => creationWorkspaceMaintenanceJob.stop());
+      if (!env.creationWorkspace.scheduler.enabled) {
+        readiness.markDegraded(
+          'creation-workspace-maintenance',
+          'Instructor workspace maintenance scheduler disabled by configuration'
+        );
+      } else {
+        readiness.markReady('creation-workspace-maintenance', 'Instructor workspace maintenance scheduler active');
+      }
+    } catch (error) {
+      readiness.markFailed('creation-workspace-maintenance', error);
+      serviceLogger.error({ err: error }, 'Failed to start instructor workspace maintenance job');
       throw error;
     }
 
