@@ -193,21 +193,15 @@ process.env.TELEMETRY_FRESHNESS_WAREHOUSE_THRESHOLD_MINUTES =
 process.env.TELEMETRY_LINEAGE_TOOL = process.env.TELEMETRY_LINEAGE_TOOL ?? 'dbt';
 process.env.TELEMETRY_LINEAGE_AUTO_RECORD =
   process.env.TELEMETRY_LINEAGE_AUTO_RECORD ?? 'true';
-process.env.MEILISEARCH_HOSTS = process.env.MEILISEARCH_HOSTS ?? 'https://meilisearch-primary.local:7700';
-process.env.MEILISEARCH_REPLICA_HOSTS =
-  process.env.MEILISEARCH_REPLICA_HOSTS ?? 'https://meilisearch-replica.local:7700';
-process.env.MEILISEARCH_SEARCH_HOSTS =
-  process.env.MEILISEARCH_SEARCH_HOSTS ?? 'https://meilisearch-primary.local:7700,https://meilisearch-replica.local:7700';
-process.env.MEILISEARCH_ADMIN_API_KEY =
-  process.env.MEILISEARCH_ADMIN_API_KEY ?? 'masterKey-masterKey-masterKey';
-process.env.MEILISEARCH_SEARCH_API_KEY =
-  process.env.MEILISEARCH_SEARCH_API_KEY ?? 'searchKey-searchKey-searchKey';
-process.env.MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS =
-  process.env.MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS ?? '30';
-process.env.MEILISEARCH_REQUEST_TIMEOUT_MS =
-  process.env.MEILISEARCH_REQUEST_TIMEOUT_MS ?? '5000';
-process.env.MEILISEARCH_INDEX_PREFIX = process.env.MEILISEARCH_INDEX_PREFIX ?? 'edulure';
-process.env.MEILISEARCH_ALLOWED_IPS = process.env.MEILISEARCH_ALLOWED_IPS ?? '127.0.0.1/32';
+process.env.SEARCH_PROVIDER = process.env.SEARCH_PROVIDER ?? 'database';
+process.env.SEARCH_DEFAULT_PAGE_SIZE = process.env.SEARCH_DEFAULT_PAGE_SIZE ?? '10';
+process.env.SEARCH_MAX_PAGE_SIZE = process.env.SEARCH_MAX_PAGE_SIZE ?? '50';
+process.env.SEARCH_INGESTION_BATCH_SIZE = process.env.SEARCH_INGESTION_BATCH_SIZE ?? '500';
+process.env.SEARCH_INGESTION_CONCURRENCY = process.env.SEARCH_INGESTION_CONCURRENCY ?? '2';
+process.env.SEARCH_INGESTION_DELETE_BEFORE_REINDEX =
+  process.env.SEARCH_INGESTION_DELETE_BEFORE_REINDEX ?? 'true';
+process.env.SEARCH_INGESTION_SCHEDULE = process.env.SEARCH_INGESTION_SCHEDULE ?? '*/30 * * * *';
+process.env.SEARCH_INGESTION_TIMEZONE = process.env.SEARCH_INGESTION_TIMEZONE ?? 'UTC';
 
 process.env.TWILIO_ENVIRONMENT = process.env.TWILIO_ENVIRONMENT ?? 'sandbox';
 process.env.TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID ?? 'AC0000000000000000000000000000000';

@@ -2204,7 +2204,7 @@ export async function seed(knex) {
         conversions: 214,
         spend_cents: 36500,
         revenue_cents: 98200,
-        metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
+        metadata: JSON.stringify({ source: 'search-reports', funnel: 'creator-growth' })
       },
       {
         campaign_id: growthAdsCampaignId,
@@ -2214,7 +2214,7 @@ export async function seed(knex) {
         conversions: 238,
         spend_cents: 41200,
         revenue_cents: 109500,
-        metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
+        metadata: JSON.stringify({ source: 'search-reports', funnel: 'creator-growth' })
       }
     ]);
 

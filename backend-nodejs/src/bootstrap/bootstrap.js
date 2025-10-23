@@ -5,7 +5,6 @@ import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 import { featureFlagService, runtimeConfigService } from '../services/FeatureFlagService.js';
 import { featureFlagGovernanceService } from '../services/FeatureFlagGovernanceService.js';
-import { searchClusterService } from '../services/SearchClusterService.js';
 
 const bootstrapLogger = logger.child({ module: 'bootstrap' });
 
@@ -91,11 +90,6 @@ const INFRASTRUCTURE_SERVICES = {
     start: () => runtimeConfigService.start(),
     stop: () => runtimeConfigService.stop(),
     readyMessage: 'Runtime configuration cache online'
-  },
-  'search-cluster': {
-    start: () => searchClusterService.start(),
-    stop: () => searchClusterService.stop(),
-    readyMessage: 'Search cluster polling active'
   }
 };
 

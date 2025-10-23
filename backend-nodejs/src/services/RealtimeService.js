@@ -8,6 +8,7 @@ import UserModel from '../models/UserModel.js';
 import DirectMessageParticipantModel from '../models/DirectMessageParticipantModel.js';
 import courseLiveService from './CourseLiveService.js';
 import { createCorsOriginValidator } from '../config/corsPolicy.js';
+import { setRealtimeConnections } from '../observability/metrics.js';
 
 const log = logger.child({ service: 'RealtimeService' });
 
@@ -45,12 +46,21 @@ class RealtimeService {
     this.activeConnections = new Map();
   }
 
+  updateConnectionMetrics() {
+    const totalConnections = Array.from(this.activeConnections.values()).reduce(
+      (count, sockets) => count + sockets.size,
+      0
+    );
+    setRealtimeConnections('total', totalConnections);
+  }
+
   async start(httpServer) {
     if (this.io) {
       return this.io;
     }
 
     this.activeConnections.clear();
+    this.updateConnectionMetrics();
 
     const corsPolicy = createCorsOriginValidator(env.app.corsOrigins ?? [], {
       allowDevelopmentOrigins: !env.isProduction
@@ -98,6 +108,7 @@ class RealtimeService {
       const userConnections = this.activeConnections.get(user.id) ?? new Set();
       userConnections.add(socket.id);
       this.activeConnections.set(user.id, userConnections);
+      this.updateConnectionMetrics();
 
       socket.on('inbox.join', async (payload) => {
         const threadId = Number(payload?.threadId);
@@ -171,6 +182,7 @@ class RealtimeService {
             this.activeConnections.delete(user.id);
           }
         }
+        this.updateConnectionMetrics();
         socket.data.joinedCourses?.forEach((courseId) => {
           const presence = courseLiveService.leaveCourse(courseId, user.id);
           this.io.to(`course:${courseId}`).emit('course.presence', {
@@ -192,6 +204,7 @@ class RealtimeService {
     this.io.removeAllListeners();
     this.io.close();
     this.activeConnections.clear();
+    this.updateConnectionMetrics();
     courseLiveService.reset();
     this.io = null;
   }
