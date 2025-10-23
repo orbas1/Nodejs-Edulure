@@ -27,6 +27,14 @@ import { useAuth } from '../context/AuthContext.jsx';
 import useConsentRecords from '../hooks/useConsentRecords.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import ProfileIdentityEditor from '../components/profile/ProfileIdentityEditor.jsx';
+import SettingsLayout from '../components/settings/SettingsLayout.jsx';
+import ToggleField from '../components/settings/ToggleField.jsx';
+import {
+  fetchPersonalisationSettings,
+  updateNotificationSettings,
+  updatePersonalisationSettings,
+  updateSecuritySettings
+} from '../api/learnerSettingsApi.js';
 import {
   mapFollowerItem,
   mapRecommendationItem,
@@ -192,6 +200,34 @@ const defaultProfile = {
     note: 'We approve new documents within 24 business hours once all three images are uploaded.'
   }
 };
+
+const defaultPersonalisationSettings = Object.freeze({
+  enableRecommendations: true,
+  learningPace: 'flexible',
+  allowCommunityInvites: true,
+  monetisation: {
+    allowAdsPersonalisation: false,
+    allowUpsellPrompts: true
+  },
+  accessibility: {
+    reducedMotion: false,
+    highContrast: false
+  }
+});
+
+const defaultNotificationSettings = Object.freeze({
+  weeklyDigest: true,
+  communityDigest: true,
+  productUpdates: true,
+  smsAlerts: false,
+  tutorReminders: true
+});
+
+const defaultSecuritySettings = Object.freeze({
+  requireMfa: false,
+  notifyOnNewDevice: true,
+  sessionTimeoutMinutes: 60
+});
 
 const idTypeCopy = {
   passport: 'International passports must be valid for at least 6 months.',
@@ -427,6 +463,50 @@ function formatCompactNumber(value) {
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
 
+function parseRetryAfter(value) {
+  if (!value) {
+    return null;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  const numeric = Number.parseInt(value, 10);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric;
+  }
+  const asDate = Date.parse(value);
+  if (!Number.isNaN(asDate)) {
+    const diffSeconds = Math.round((asDate - Date.now()) / 1000);
+    return diffSeconds > 0 ? diffSeconds : null;
+  }
+  return null;
+}
+
+function extractRetryHint(error) {
+  const headers = error?.response?.headers;
+  let seconds = null;
+  if (headers?.get) {
+    seconds = parseRetryAfter(headers.get('retry-after'));
+  }
+  if (!seconds) {
+    seconds = parseRetryAfter(
+      error?.retryAfterSeconds ??
+        error?.data?.retryAfterSeconds ??
+        error?.response?.data?.retryAfterSeconds ??
+        error?.retryAfter ??
+        error?.data?.retryAfter
+    );
+  }
+  const retryAt = seconds ? new Date(Date.now() + seconds * 1000).toISOString() : null;
+  return {
+    retryAfterSeconds: seconds,
+    retryAt,
+    message:
+      error?.message ??
+      (seconds ? `Upload queue is busy. Try again in ${seconds} seconds.` : 'Failed to upload verification document.')
+  };
+}
+
 export default function Profile() {
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
@@ -482,6 +562,24 @@ export default function Profile() {
   const { consents, loading: consentLoading, error: consentError, revokeConsent: revokeConsentRecord } =
     useConsentRecords(userId);
   const [revokingConsentId, setRevokingConsentId] = useState(null);
+  const [personalisationSettings, setPersonalisationSettings] = useState(defaultPersonalisationSettings);
+  const [notificationSettings, setNotificationSettings] = useState(defaultNotificationSettings);
+  const [securitySettings, setSecuritySettings] = useState(defaultSecuritySettings);
+  const [personalisationLoading, setPersonalisationLoading] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [personalisationError, setPersonalisationError] = useState(null);
+  const [notificationError, setNotificationError] = useState(null);
+  const [securityError, setSecurityError] = useState(null);
+  const [personalisationFeedback, setPersonalisationFeedback] = useState(null);
+  const [notificationFeedback, setNotificationFeedback] = useState(null);
+  const [securityFeedback, setSecurityFeedback] = useState(null);
+  const [personalisationDirty, setPersonalisationDirty] = useState(false);
+  const [notificationDirty, setNotificationDirty] = useState(false);
+  const [securityDirty, setSecurityDirty] = useState(false);
+  const [personalisationSaving, setPersonalisationSaving] = useState(false);
+  const [notificationSaving, setNotificationSaving] = useState(false);
+  const [securitySaving, setSecuritySaving] = useState(false);
   const affiliate = profile.affiliate;
   const affiliateSummary = affiliate.summary;
   const affiliatePayouts = affiliate.payouts;
@@ -634,6 +732,83 @@ export default function Profile() {
     });
   }, [profile.verification?.supported]);
 
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    if (!token) {
+      setPersonalisationSettings(defaultPersonalisationSettings);
+      setNotificationSettings(defaultNotificationSettings);
+      setSecuritySettings(defaultSecuritySettings);
+      setPersonalisationDirty(false);
+      setNotificationDirty(false);
+      setSecurityDirty(false);
+      setPersonalisationLoading(false);
+      setNotificationLoading(false);
+      setSecurityLoading(false);
+      setPersonalisationError(null);
+      setNotificationError(null);
+      setSecurityError(null);
+      return () => controller.abort();
+    }
+
+    setPersonalisationLoading(true);
+    setNotificationLoading(true);
+    setSecurityLoading(true);
+    setPersonalisationError(null);
+    setNotificationError(null);
+    setSecurityError(null);
+
+    fetchPersonalisationSettings({ token, signal: controller.signal })
+      .then((payload) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const nextPersonalisation = {
+          ...defaultPersonalisationSettings,
+          ...(payload.personalisation ?? {})
+        };
+        const nextNotifications = {
+          ...defaultNotificationSettings,
+          ...(payload.notifications ?? {})
+        };
+        const nextSecurity = {
+          ...defaultSecuritySettings,
+          ...(payload.security ?? {})
+        };
+
+        setPersonalisationSettings(nextPersonalisation);
+        setNotificationSettings(nextNotifications);
+        setSecuritySettings(nextSecurity);
+        setPersonalisationDirty(false);
+        setNotificationDirty(false);
+        setSecurityDirty(false);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+        const message = error?.message ?? 'Unable to load your personalisation settings.';
+        setPersonalisationError(message);
+        setNotificationError(message);
+        setSecurityError(message);
+      })
+      .finally(() => {
+        if (!isMounted) {
+          return;
+        }
+        setPersonalisationLoading(false);
+        setNotificationLoading(false);
+        setSecurityLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [token]);
+
   const handleRevokeConsent = async (consentId) => {
     try {
       setRevokingConsentId(consentId);
@@ -723,6 +898,184 @@ export default function Profile() {
       setProfileLoading(false);
     }
   }, [token, resetProfileMessages]);
+
+  const applyPersonalisationChanges = useCallback((updater) => {
+    setPersonalisationSettings((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      return { ...prev, ...next };
+    });
+    setPersonalisationDirty(true);
+    setPersonalisationFeedback(null);
+    setPersonalisationError(null);
+  }, []);
+
+  const handlePersonalisationToggle = useCallback(
+    (field, value) => {
+      applyPersonalisationChanges((prev) => ({ ...prev, [field]: value }));
+    },
+    [applyPersonalisationChanges]
+  );
+
+  const handlePersonalisationNestedToggle = useCallback(
+    (section, field, value) => {
+      applyPersonalisationChanges((prev) => ({
+        ...prev,
+        [section]: { ...(prev[section] ?? {}), [field]: value }
+      }));
+    },
+    [applyPersonalisationChanges]
+  );
+
+  const handleLearningPaceChange = useCallback(
+    (value) => {
+      applyPersonalisationChanges({ learningPace: value });
+    },
+    [applyPersonalisationChanges]
+  );
+
+  const resetPersonalisationToDefault = useCallback(() => {
+    setPersonalisationSettings(defaultPersonalisationSettings);
+    setPersonalisationDirty(true);
+    setPersonalisationFeedback(null);
+    setPersonalisationError(null);
+  }, []);
+
+  const applyNotificationChanges = useCallback((updater) => {
+    setNotificationSettings((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      return { ...prev, ...next };
+    });
+    setNotificationDirty(true);
+    setNotificationFeedback(null);
+    setNotificationError(null);
+  }, []);
+
+  const handleNotificationToggle = useCallback(
+    (field, value) => {
+      applyNotificationChanges({ [field]: value });
+    },
+    [applyNotificationChanges]
+  );
+
+  const resetNotificationsToDefault = useCallback(() => {
+    setNotificationSettings(defaultNotificationSettings);
+    setNotificationDirty(true);
+    setNotificationFeedback(null);
+    setNotificationError(null);
+  }, []);
+
+  const applySecurityChanges = useCallback((updater) => {
+    setSecuritySettings((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      return { ...prev, ...next };
+    });
+    setSecurityDirty(true);
+    setSecurityFeedback(null);
+    setSecurityError(null);
+  }, []);
+
+  const handleSecurityToggle = useCallback(
+    (field, value) => {
+      applySecurityChanges({ [field]: value });
+    },
+    [applySecurityChanges]
+  );
+
+  const handleSessionTimeoutChange = useCallback(
+    (value) => {
+      const numericValue = Number.parseInt(value, 10);
+      applySecurityChanges({ sessionTimeoutMinutes: Number.isNaN(numericValue) ? 60 : numericValue });
+    },
+    [applySecurityChanges]
+  );
+
+  const resetSecurityToDefault = useCallback(() => {
+    setSecuritySettings(defaultSecuritySettings);
+    setSecurityDirty(true);
+    setSecurityFeedback(null);
+    setSecurityError(null);
+  }, []);
+
+  const handlePersonalisationSubmit = useCallback(
+    async (event) => {
+      event?.preventDefault?.();
+      if (!token) {
+        setPersonalisationError('You need to be signed in to update your preferences.');
+        return;
+      }
+      if (!personalisationDirty) {
+        setPersonalisationFeedback('No new preference changes to publish.');
+        return;
+      }
+      setPersonalisationSaving(true);
+      setPersonalisationFeedback(null);
+      setPersonalisationError(null);
+      try {
+        await updatePersonalisationSettings({ token, payload: personalisationSettings });
+        setPersonalisationDirty(false);
+        setPersonalisationFeedback('Preferences updated successfully.');
+      } catch (error) {
+        setPersonalisationError(error?.message ?? 'Unable to update your preferences right now.');
+      } finally {
+        setPersonalisationSaving(false);
+      }
+    },
+    [token, personalisationDirty, personalisationSettings]
+  );
+
+  const handleNotificationSubmit = useCallback(
+    async (event) => {
+      event?.preventDefault?.();
+      if (!token) {
+        setNotificationError('You need to be signed in to update notification settings.');
+        return;
+      }
+      if (!notificationDirty) {
+        setNotificationFeedback('Your notification settings are already up to date.');
+        return;
+      }
+      setNotificationSaving(true);
+      setNotificationFeedback(null);
+      setNotificationError(null);
+      try {
+        await updateNotificationSettings({ token, payload: notificationSettings });
+        setNotificationDirty(false);
+        setNotificationFeedback('Notification settings saved.');
+      } catch (error) {
+        setNotificationError(error?.message ?? 'Unable to update notification settings.');
+      } finally {
+        setNotificationSaving(false);
+      }
+    },
+    [token, notificationDirty, notificationSettings]
+  );
+
+  const handleSecuritySubmit = useCallback(
+    async (event) => {
+      event?.preventDefault?.();
+      if (!token) {
+        setSecurityError('You need to be signed in to update security settings.');
+        return;
+      }
+      if (!securityDirty) {
+        setSecurityFeedback('Security controls already reflect your latest choices.');
+        return;
+      }
+      setSecuritySaving(true);
+      setSecurityFeedback(null);
+      setSecurityError(null);
+      try {
+        await updateSecuritySettings({ token, payload: securitySettings });
+        setSecurityDirty(false);
+        setSecurityFeedback('Security settings updated.');
+      } catch (error) {
+        setSecurityError(error?.message ?? 'Unable to update security controls right now.');
+      } finally {
+        setSecuritySaving(false);
+      }
+    },
+    [token, securityDirty, securitySettings]
+  );
 
   const loadFollowers = useCallback(
     async ({ append = false, offset = 0 } = {}) => {
@@ -1245,6 +1598,28 @@ export default function Profile() {
         }
       });
 
+      const throttleSeconds = parseRetryAfter(
+        uploadInstruction?.retryAfterSeconds ??
+          uploadInstruction?.throttle?.retryAfterSeconds ??
+          uploadInstruction?.limits?.retryAfterSeconds
+      );
+      if (throttleSeconds) {
+        const retryAt = new Date(Date.now() + throttleSeconds * 1000).toISOString();
+        setDocumentStates((prev) => ({
+          ...prev,
+          [documentType]: {
+            status: 'delayed',
+            error: null,
+            fileName: file.name,
+            completedAt: null,
+            retryAfterSeconds: throttleSeconds,
+            retryAt
+          }
+        }));
+        setVerificationError(`Upload queue is busy. Try again in ${throttleSeconds} seconds.`);
+        return;
+      }
+
       await fetch(uploadInstruction.upload.url, {
         method: 'PUT',
         headers: {
@@ -1272,16 +1647,25 @@ export default function Profile() {
           status: 'attached',
           error: null,
           fileName: file.name,
-          completedAt: new Date().toISOString()
+          completedAt: new Date().toISOString(),
+          retryAfterSeconds: null,
+          retryAt: null
         }
       }));
       setVerificationSuccess('Document uploaded successfully.');
       await refreshVerificationSummary();
     } catch (error) {
-      const message = error?.message ?? 'Failed to upload verification document.';
+      const { retryAfterSeconds, retryAt, message } = extractRetryHint(error);
       setDocumentStates((prev) => ({
         ...prev,
-        [documentType]: { status: 'error', error: message, fileName: file.name, completedAt: null }
+        [documentType]: {
+          status: 'error',
+          error: message,
+          fileName: file.name,
+          completedAt: null,
+          retryAfterSeconds: retryAfterSeconds ?? null,
+          retryAt: retryAt ?? null
+        }
       }));
       setVerificationError(message);
     }
@@ -1422,21 +1806,312 @@ export default function Profile() {
           </div>
         </div>
 
-        {isOwnProfile && (
-          <ProfileIdentityEditor
-            form={profileForm}
-            onFieldChange={handleProfileFieldChange}
-            onAddressChange={handleProfileAddressChange}
-            onSocialLinkChange={handleSocialLinkChange}
-            onAddSocialLink={handleAddSocialLink}
-            onRemoveSocialLink={handleRemoveSocialLink}
-            onSubmit={handleProfileSubmit}
-            isSaving={isSavingProfile}
-            canSubmit={canSubmitProfile}
-            error={profileSaveError}
-            success={profileSaveSuccess}
-          />
-        )}
+        {isOwnProfile ? (
+          <SettingsLayout
+            eyebrow="Personalisation"
+            title="Profile & preferences"
+            description="Control your public identity, recommendation signals, notifications, and security posture."
+            navigation={[
+              { id: 'profile-identity-settings', label: 'Identity' },
+              { id: 'profile-preferences-settings', label: 'Learning preferences' },
+              { id: 'profile-notifications-settings', label: 'Notifications' },
+              { id: 'profile-security-settings', label: 'Security & consent' }
+            ]}
+          >
+            <section id="profile-identity-settings" className="scroll-mt-32 space-y-6">
+              <ProfileIdentityEditor
+                form={profileForm}
+                onFieldChange={handleProfileFieldChange}
+                onAddressChange={handleProfileAddressChange}
+                onSocialLinkChange={handleSocialLinkChange}
+                onAddSocialLink={handleAddSocialLink}
+                onRemoveSocialLink={handleRemoveSocialLink}
+                onSubmit={handleProfileSubmit}
+                isSaving={isSavingProfile}
+                canSubmit={canSubmitProfile}
+                error={profileSaveError}
+                success={profileSaveSuccess}
+              />
+            </section>
+
+            <section id="profile-preferences-settings" className="scroll-mt-32 space-y-4">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-xl font-semibold text-slate-900">Learning preferences</h2>
+                  <p className="text-sm text-slate-600">
+                    Tailor the recommendations, pacing, and accessibility support you receive across Edulure.
+                  </p>
+                </div>
+                {personalisationLoading ? (
+                  <p className="mt-4 text-sm text-slate-500">Loading your current preferences…</p>
+                ) : (
+                  <form onSubmit={handlePersonalisationSubmit} className="mt-6 space-y-6">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <ToggleField
+                        label="Enable personalised recommendations"
+                        description="Surface courses, cohorts, and communities matched to your goals."
+                        checked={Boolean(personalisationSettings.enableRecommendations)}
+                        onChange={(value) => handlePersonalisationToggle('enableRecommendations', value)}
+                        disabled={personalisationSaving}
+                      />
+                      <ToggleField
+                        label="Allow community invites"
+                        description="Let admins invite you to relevant communities."
+                        checked={Boolean(personalisationSettings.allowCommunityInvites)}
+                        onChange={(value) => handlePersonalisationToggle('allowCommunityInvites', value)}
+                        disabled={personalisationSaving}
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                        <span>Preferred learning pace</span>
+                        <select
+                          value={personalisationSettings.learningPace ?? 'flexible'}
+                          onChange={(event) => handleLearningPaceChange(event.target.value)}
+                          disabled={personalisationSaving}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        >
+                          <option value="flexible">Flexible (recommended)</option>
+                          <option value="accelerated">Accelerated</option>
+                          <option value="steady">Steady weekly cadence</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Monetisation controls</h3>
+                      <ToggleField
+                        label="Allow personalised ads suggestions"
+                        description="Use your activity to improve sponsored resource suggestions."
+                        checked={Boolean(personalisationSettings.monetisation?.allowAdsPersonalisation)}
+                        onChange={(value) => handlePersonalisationNestedToggle('monetisation', 'allowAdsPersonalisation', value)}
+                        disabled={personalisationSaving}
+                      />
+                      <ToggleField
+                        label="Show upsell prompts for tutor support"
+                        checked={Boolean(personalisationSettings.monetisation?.allowUpsellPrompts)}
+                        onChange={(value) => handlePersonalisationNestedToggle('monetisation', 'allowUpsellPrompts', value)}
+                        disabled={personalisationSaving}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Accessibility</h3>
+                      <ToggleField
+                        label="Reduce motion across interfaces"
+                        checked={Boolean(personalisationSettings.accessibility?.reducedMotion)}
+                        onChange={(value) => handlePersonalisationNestedToggle('accessibility', 'reducedMotion', value)}
+                        disabled={personalisationSaving}
+                      />
+                      <ToggleField
+                        label="Enable high-contrast theme elements"
+                        checked={Boolean(personalisationSettings.accessibility?.highContrast)}
+                        onChange={(value) => handlePersonalisationNestedToggle('accessibility', 'highContrast', value)}
+                        disabled={personalisationSaving}
+                      />
+                    </div>
+                    {personalisationError ? <p className="text-sm text-rose-600">{personalisationError}</p> : null}
+                    {personalisationFeedback ? <p className="text-sm text-emerald-600">{personalisationFeedback}</p> : null}
+                    <div className="flex flex-wrap justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={resetPersonalisationToDefault}
+                        disabled={personalisationSaving}
+                        className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reset to defaults
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!personalisationDirty || personalisationSaving}
+                        className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card transition disabled:cursor-not-allowed disabled:bg-primary/40"
+                      >
+                        {personalisationSaving ? 'Saving…' : 'Save preferences'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </section>
+
+            <section id="profile-notifications-settings" className="scroll-mt-32 space-y-4">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-xl font-semibold text-slate-900">Notification settings</h2>
+                  <p className="text-sm text-slate-600">Choose how you want to stay informed about progress and community activity.</p>
+                </div>
+                {notificationLoading ? (
+                  <p className="mt-4 text-sm text-slate-500">Loading notification preferences…</p>
+                ) : (
+                  <form onSubmit={handleNotificationSubmit} className="mt-6 space-y-6">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <ToggleField
+                        label="Weekly learning digest"
+                        checked={Boolean(notificationSettings.weeklyDigest)}
+                        onChange={(value) => handleNotificationToggle('weeklyDigest', value)}
+                        disabled={notificationSaving}
+                      />
+                      <ToggleField
+                        label="Community engagement alerts"
+                        checked={Boolean(notificationSettings.communityDigest)}
+                        onChange={(value) => handleNotificationToggle('communityDigest', value)}
+                        disabled={notificationSaving}
+                      />
+                      <ToggleField
+                        label="Product updates"
+                        checked={Boolean(notificationSettings.productUpdates)}
+                        onChange={(value) => handleNotificationToggle('productUpdates', value)}
+                        disabled={notificationSaving}
+                      />
+                      <ToggleField
+                        label="SMS reminders"
+                        checked={Boolean(notificationSettings.smsAlerts)}
+                        onChange={(value) => handleNotificationToggle('smsAlerts', value)}
+                        disabled={notificationSaving}
+                      />
+                      <ToggleField
+                        label="Tutor session reminders"
+                        checked={Boolean(notificationSettings.tutorReminders)}
+                        onChange={(value) => handleNotificationToggle('tutorReminders', value)}
+                        disabled={notificationSaving}
+                      />
+                    </div>
+                    {notificationError ? <p className="text-sm text-rose-600">{notificationError}</p> : null}
+                    {notificationFeedback ? <p className="text-sm text-emerald-600">{notificationFeedback}</p> : null}
+                    <div className="flex flex-wrap justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={resetNotificationsToDefault}
+                        disabled={notificationSaving}
+                        className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reset to defaults
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!notificationDirty || notificationSaving}
+                        className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card transition disabled:cursor-not-allowed disabled:bg-primary/40"
+                      >
+                        {notificationSaving ? 'Saving…' : 'Save notifications'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </section>
+
+            <section id="profile-security-settings" className="scroll-mt-32 space-y-6">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-xl font-semibold text-slate-900">Security controls</h2>
+                  <p className="text-sm text-slate-600">Keep your account protected with MFA, device alerts, and session controls.</p>
+                </div>
+                {securityLoading ? (
+                  <p className="mt-4 text-sm text-slate-500">Checking security posture…</p>
+                ) : (
+                  <form onSubmit={handleSecuritySubmit} className="mt-6 space-y-6">
+                    <div className="space-y-3">
+                      <ToggleField
+                        label="Require multi-factor authentication at sign-in"
+                        checked={Boolean(securitySettings.requireMfa)}
+                        onChange={(value) => handleSecurityToggle('requireMfa', value)}
+                        disabled={securitySaving}
+                      />
+                      <ToggleField
+                        label="Alert me about new device sign-ins"
+                        checked={Boolean(securitySettings.notifyOnNewDevice)}
+                        onChange={(value) => handleSecurityToggle('notifyOnNewDevice', value)}
+                        disabled={securitySaving}
+                      />
+                    </div>
+                    <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                      <span>Session timeout</span>
+                      <select
+                        value={securitySettings.sessionTimeoutMinutes ?? 60}
+                        onChange={(event) => handleSessionTimeoutChange(event.target.value)}
+                        disabled={securitySaving}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:bg-slate-100"
+                      >
+                        <option value="30">30 minutes</option>
+                        <option value="60">60 minutes</option>
+                        <option value="120">2 hours</option>
+                      </select>
+                    </label>
+                    {securityError ? <p className="text-sm text-rose-600">{securityError}</p> : null}
+                    {securityFeedback ? <p className="text-sm text-emerald-600">{securityFeedback}</p> : null}
+                    <div className="flex flex-wrap justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={resetSecurityToDefault}
+                        disabled={securitySaving}
+                        className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reset to defaults
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!securityDirty || securitySaving}
+                        className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card transition disabled:cursor-not-allowed disabled:bg-primary/40"
+                      >
+                        {securitySaving ? 'Saving…' : 'Save security'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Privacy & consent ledger</h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {userId ? 'Live consent records fetched from the compliance API.' : 'Sign in to view consent records.'}
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    <ShieldCheckIcon className="h-4 w-4" /> {activeConsents.length} active grants
+                  </span>
+                </div>
+                {consentError ? (
+                  <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                    {consentError.message ?? consentError}
+                  </div>
+                ) : null}
+                <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                  {consentLoading ? <li className="text-slate-500">Loading consent history…</li> : null}
+                  {!consentLoading && consents.length === 0 ? (
+                    <li className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                      No consent activity captured yet.
+                    </li>
+                  ) : null}
+                  {consents.map((consent) => (
+                    <li key={consent.id} className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{consent.consentType}</p>
+                          <p className="text-xs text-slate-500">
+                            Version {consent.policyVersion} · Granted{' '}
+                            {consent.grantedAt ? new Date(consent.grantedAt).toLocaleDateString() : 'N/A'} via {consent.channel}
+                          </p>
+                        </div>
+                        {consent.status === 'granted' ? (
+                          <button
+                            type="button"
+                            disabled={revokingConsentId === consent.id}
+                            onClick={() => handleRevokeConsent(consent.id)}
+                            className="rounded-full border border-rose-500 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-rose-300 disabled:text-rose-300"
+                          >
+                            {revokingConsentId === consent.id ? 'Revoking…' : 'Revoke'}
+                          </button>
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">{consent.status}</span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          </SettingsLayout>
+        ) : null}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
           <div className="space-y-8">
@@ -1733,6 +2408,9 @@ export default function Profile() {
                     const attached = summaryDocumentsByType[requirement.type] ?? null;
                     const isUploading = state.status === 'uploading';
                     const hasError = state.status === 'error';
+                    const isDelayed = state.status === 'delayed';
+                    const retrySeconds = state.retryAfterSeconds ?? null;
+                    const retryAt = state.retryAt ? new Date(state.retryAt).toLocaleTimeString() : null;
                     const isAttached = Boolean(attached) || state.status === 'attached';
                     const displayName = attached?.fileName ?? state.fileName ?? requirement.label;
                     const statusLabel = attached?.status ? attached.status.replace(/_/g, ' ') : null;
@@ -1745,8 +2423,19 @@ export default function Profile() {
                           Uploading {state.fileName ?? requirement.label}…
                         </span>
                       );
+                    } else if (isDelayed) {
+                      helperContent = (
+                        <span className="text-amber-600">
+                          Upload queue busy. Try again {retryAt ? `at ${retryAt}` : retrySeconds ? `in ${retrySeconds} seconds` : 'soon'}.
+                        </span>
+                      );
                     } else if (hasError) {
-                      helperContent = <span className="text-rose-600">{state.error ?? 'Upload failed. Try again.'}</span>;
+                      helperContent = (
+                        <span className="text-rose-600">
+                          {state.error ?? 'Upload failed. Try again.'}
+                          {retrySeconds ? ` Retry in approximately ${retrySeconds} seconds.` : ''}
+                        </span>
+                      );
                     } else if (isAttached) {
                       helperContent = (
                         <span className="text-emerald-600">
@@ -2079,56 +2768,6 @@ export default function Profile() {
               </ul>
             </div>
           </div>
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Privacy & consent ledger</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                {userId ? 'Live consent records fetched from the compliance API.' : 'Sign in to view consent records.'}
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              <ShieldCheckIcon className="h-4 w-4" /> {activeConsents.length} active grants
-            </span>
-          </div>
-          {consentError && (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-              {consentError.message}
-            </div>
-          )}
-          <ul className="mt-4 space-y-3 text-sm text-slate-600">
-            {consentLoading && <li className="text-slate-500">Loading consent history…</li>}
-            {!consentLoading && consents.length === 0 && (
-              <li className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                No consent activity captured yet.
-              </li>
-            )}
-            {consents.map((consent) => (
-              <li key={consent.id} className="rounded-2xl border border-slate-200 bg-white/80 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{consent.consentType}</p>
-                    <p className="text-xs text-slate-500">
-                      Version {consent.policyVersion} · Granted {consent.grantedAt ? new Date(consent.grantedAt).toLocaleDateString() : 'N/A'} via {consent.channel}
-                    </p>
-                  </div>
-                  {consent.status === 'granted' ? (
-                    <button
-                      type="button"
-                      disabled={revokingConsentId === consent.id}
-                      onClick={() => handleRevokeConsent(consent.id)}
-                      className="rounded-full border border-rose-500 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-rose-300 disabled:text-rose-300"
-                    >
-                      {revokingConsentId === consent.id ? 'Revoking…' : 'Revoke'}
-                    </button>
-                  ) : (
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">{consent.status}</span>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
         </div>
       </div>
     </section>
