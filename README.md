@@ -374,6 +374,8 @@ Each workspace ships its own README with deep configuration details. The section
 - [Frontend README](frontend-reactjs/README.md)
 - [Flutter README](Edulure-Flutter/README.md)
 - [Terraform README](infrastructure/terraform/README.md)
+- [Logic flows playbook](logic%20flows.md)
+- [User experience blueprint](user%20experience.md)
 - [Pre-launch valuation](valuation/edulure-prelaunch-valuation.md)
 - [Operational & developer guide](EDULURE_GUIDE.md)
 

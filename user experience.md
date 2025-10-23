@@ -2,6 +2,12 @@
 
 This blueprint defines how Edulure should feel: Skool-style community energy paired with Udemy-grade course depth, wrapped in monetisation-ready surfaces that still run comfortably on a lightweight stack. Each numbered section lists the experience outline followed by assessments A–G covering redundancies, strengths, weaknesses, styling/colour, improvements with justification, a change checklist, and a release sequence.
 
+### Alignment checkpoints
+
+- **Cross-reference logic flows** – The blueprint now directs readers back to the companion diagrams in `logic flows.md` so designers know which backend controllers, job runners, and realtime namespaces support their surfaces before committing to UX changes.
+- **Shared component registry** – Primary navigation, marketing hero, dashboard cards, and moderation workspaces reference their implementation homes inside `frontend-reactjs/src/components` or `frontend-reactjs/src/features`, reinforcing the expectation that new experiences extend the shared kits rather than forking one-off components.
+- **Operational notes surfaced** – Wherever the UX blueprint mandates telemetry, monetisation banners, or safety affordances, annotations now point to the relevant backend services (`PaymentController`, `CommunityPostModerationActionModel`, `LearnerSystemPreferenceModel`) so the roadmap ties visual intent to existing API contracts.
+
 ## 1. Global shell and navigation
 
 ### Experience outline
