@@ -2,7 +2,8 @@ import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const biServiceMock = {
-  getExecutiveOverview: vi.fn()
+  getExecutiveOverview: vi.fn(),
+  getRevenueSavedViews: vi.fn()
 };
 
 vi.mock('../src/middleware/auth.js', () => ({
@@ -26,6 +27,7 @@ describe('Analytics BI HTTP routes', () => {
 
   beforeEach(() => {
     biServiceMock.getExecutiveOverview.mockReset();
+    biServiceMock.getRevenueSavedViews.mockReset();
   });
 
   it('returns executive overview payload using default tenant scope', async () => {
@@ -76,6 +78,31 @@ describe('Analytics BI HTTP routes', () => {
 
     expect(response.status).toBe(200);
     expect(biServiceMock.getExecutiveOverview).toHaveBeenCalledWith({ range: '30d', tenantId: 'tenant-eu' });
+  });
+
+  it('returns revenue saved views scoped to tenant headers', async () => {
+    biServiceMock.getRevenueSavedViews.mockResolvedValue({
+      tenantId: 'tenant-emea',
+      range: '90d',
+      views: [
+        {
+          id: 'overall-90d',
+          totals: { grossVolumeCents: 136000 },
+          change: { grossVolume: { absolute: 31000, percentage: 22.8 } },
+          breakdown: { currencies: [] }
+        }
+      ]
+    });
+
+    const response = await request(app)
+      .get('/api/v1/analytics/bi/revenue/saved-views?range=90d')
+      .set('Authorization', 'Bearer token')
+      .set('x-tenant-id', 'tenant-emea');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.tenantId).toBe('tenant-emea');
+    expect(response.body.data.views[0].id).toBe('overall-90d');
+    expect(biServiceMock.getRevenueSavedViews).toHaveBeenCalledWith({ range: '90d', tenantId: 'tenant-emea' });
   });
 });
 
