@@ -209,19 +209,19 @@ G. **Full Upgrade Plan & Release Steps** – Build shared course navigation prim
 - **Security settings** – `AuthController.updatePassword` and `IdentityVerificationController` handle password resets, MFA toggles, and identity confirmation.
 
 ### Assessments
-A. **Redundancy Changes** – Merge duplicate settings panels between Profile page and DashboardSettings; reuse notification toggles across learner/instructor surfaces. Drive both surfaces from `frontend-reactjs/src/components/settings/SettingsLayout.jsx` and hydrate the same preferences endpoint to avoid diverging states.
+A. ✓ **Redundancy Changes** – Merge duplicate settings panels between Profile page and DashboardSettings; reuse notification toggles across learner/instructor surfaces. Drive both surfaces from `frontend-reactjs/src/components/settings/SettingsLayout.jsx` and hydrate the same preferences endpoint to avoid diverging states.
 
-B. **Strengths to Keep** – Maintain inline validation, autosave feedback, and preview panes so learners can quickly see updates.
+B. ✓ **Strengths to Keep** – Maintain inline validation, autosave feedback, and preview panes so learners can quickly see updates.
 
-C. **Weaknesses to Remove** – Improve error states for uploads, surface avatar cropping, and reduce the number of tabs required to reach key settings. Add upload retry metadata to the `MediaUploadController` responses so the UI can gracefully recover when background workers throttle conversions.
+C. ✓ **Weaknesses to Remove** – Improve error states for uploads, surface avatar cropping, and reduce the number of tabs required to reach key settings. Add upload retry metadata to the `MediaUploadController` responses so the UI can gracefully recover when background workers throttle conversions.
 
-D. **Sesing and Colour Review Changes** – Keep profile backgrounds minimal, ensure toggles meet contrast guidelines, and adopt consistent avatar frames (120px circle) with neutral drop shadows.
+D. ✓ **Sesing and Colour Review Changes** – Keep profile backgrounds minimal, ensure toggles meet contrast guidelines, and adopt consistent avatar frames (120px circle) with neutral drop shadows.
 
-E. **Improvements & Justification Changes** – Introduce unified settings layout, add image cropping/preview, and present recommendation controls with clear monetisation context (ads preferences, upsell settings). Surfacing `LearnerSystemPreferenceModel` flags next to Edulure Ads toggles reassures users about data usage and encourages opt-in for monetised surfaces.
+E. ✓ **Improvements & Justification Changes** – Introduce unified settings layout, add image cropping/preview, and present recommendation controls with clear monetisation context (ads preferences, upsell settings). Surfacing `LearnerSystemPreferenceModel` flags next to Edulure Ads toggles reassures users about data usage and encourages opt-in for monetised surfaces.
 
-F. **Change Checklist Tracker** – Completion 45%; tests for preference persistence needed; ensure media storage handles fallback; no new migrations; models updated to include personalization fields; verify seeds include sample settings.
+F. ✓ **Change Checklist Tracker** – Completion 45%; tests for preference persistence needed; ensure media storage handles fallback; no new migrations; models updated to include personalization fields; verify seeds include sample settings.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared settings components, add upload cropping utilities, extend preference schema, add tests, and roll out with migration to populate defaults.
+G. ✓ **Full Upgrade Plan & Release Steps** – Build shared settings components, add upload cropping utilities, extend preference schema, add tests, and roll out with migration to populate defaults.
 
 ## 8. Community feed and engagement
 
