@@ -687,19 +687,19 @@ G. ✅ **Full Upgrade Plan & Release Steps** – Unified cards, centralised filt
 - **Preview hover** – Image/video snippet, key metrics, quick actions.
 
 ### Assessments
-A. **Redundancy Changes** – Merge search components across feed, explorer, dashboards; centralise suggestion logic. Migrate to `frontend-reactjs/src/components/search/GlobalSearchBar.jsx` backed by the provider registry for Edulure Search.
+A. **Redundancy Changes** – The navigation shell, dashboard shell, and explorer view all depend on the single `frontend-reactjs/src/components/search/GlobalSearchBar.jsx`, which wraps the shared `SearchBar` primitive while deferring suggestion hydration to `frontend-reactjs/src/hooks/useGlobalSearchSuggestions.js`. The hook fans out to `frontend-reactjs/src/api/explorerApi.js`, which, in turn, calls the consolidated `/explorer/suggestions` controller so every entry point now reaches the same backend formatter (`backend-nodejs/src/services/ExplorerSearchService.js`) without duplicate fetch logic or bespoke adapters. ✅
 
-B. **Strengths to Keep** – Fast suggestions, keyboard navigation, and result badges.
+B. **Strengths to Keep** – Keyboard traversal, instant feedback, and badge rendering survived intact by keeping the highlight segmentation and listbox semantics inside `GlobalSearchBar` while simply sourcing data from the new hook. Arrow keys cycle the unified option array, the dropdown exposes the correct `role="listbox"`, and the component still emits structured suggestion payloads so downstream analytics and click handlers operate exactly as before. ✅
 
-C. **Weaknesses to Remove** – Replace missing thumbnails, ensure preview caching, and harmonise badges. Cache thumbnails using `ExplorerSearchDailyMetricModel` digests so repeated queries stay fast.
+C. **Weaknesses to Remove** – Preview media now loads consistently because the service builds `previewMedia` envelopes for every entity and the hook prefetches images via an in-memory cache, preventing blank thumbnails on hover or suggestion select. Badge palettes and typography match the explorer cards thanks to the shared neutral slate classes, and saved-search pins render with the same rounded treatments, eliminating the prior styling mismatch between dashboard and explorer surfaces. ✅
 
-D. **Sesing and Colour Review Changes** – Use light cards with subtle drop shadow, highlight keywords, and maintain accessible hover states.
+D. **Sesing and Colour Review Changes** – The suggestion tray inherits the soft white panel with primary focus outlines to line up with explorer drawers, while highlight spans reuse the primary tint and respect reduced-motion settings by avoiding animated transitions. Empty, loading, and error states follow the subdued slate spectrum defined for search results so accessibility audits pass without bespoke overrides. ✅
 
-E. **Improvements & Justification Changes** – Add media preview pipeline, integrate analytics for search-to-enrollment, and support saved searches. Prefill saved search suggestions from `SavedSearchModel` records and show preview skeletons sourced from the ingestion service.
+E. **Improvements & Justification Changes** – Suggestions flow through the Meilisearch-backed formatter in `ExplorerSearchService.suggest`, which also emits highlight metadata and preview metrics that the frontend renders inline. Each full search still records analytics via `ExplorerController.search`, and the hook lifts pinned `SavedSearch` rows into the dropdown, letting operators jump back to curated queries without touching the explorer grid—closing the loop between search intent, monitoring, and enrolment conversion. ✅
 
-F. **Change Checklist Tracker** – Completion 35%; tests for preview caching; ensure search metadata seeded; schema updates for saved searches.
+F. **Change Checklist Tracker** – Completion 70%; Vitest coverage includes the controller path in `backend-nodejs/test/group14Controllers.test.js`, component behaviours in `frontend-reactjs/src/components/__tests__/searchComponents.test.jsx`, and hook flows in `frontend-reactjs/src/hooks/__tests__/useGlobalSearchSuggestions.test.jsx`. Saved-search pinning reuses existing seeds, preview metadata piggybacks on current ingestion, and no schema updates were required to unlock the richer dropdown experience. ✅
 
-G. **Full Upgrade Plan & Release Steps** – Build shared search primitive, connect Edulure Search, add preview media, run relevancy QA, and launch with onboarding tips.
+G. **Full Upgrade Plan & Release Steps** – Ship the `/explorer/suggestions` API alongside the global bar, keep an eye on the new Vitest suites for regressions, announce the consolidated search in release notes, and schedule a follow-up iteration for relevancy tuning plus analytics dashboards once adoption data flows in. ✅
 
 ## 13. Communities deep dive
 

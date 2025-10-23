@@ -1,6 +1,28 @@
 import { httpClient } from './httpClient.js';
 import { assertId, assertToken, createInvalidationConfig, createListCacheConfig } from './apiUtils.js';
 
+export async function fetchExplorerSuggestions(params = {}, { token, signal } = {}) {
+  assertToken(token, 'retrieve explorer suggestions');
+  const { query, limit, entityTypes } = params;
+  const requestParams = {};
+  if (query !== undefined && query !== null) {
+    requestParams.query = query;
+  }
+  if (limit !== undefined && limit !== null) {
+    requestParams.limit = limit;
+  }
+  if (entityTypes !== undefined && entityTypes !== null) {
+    requestParams.entityTypes = Array.isArray(entityTypes) ? entityTypes : [entityTypes];
+  }
+
+  return httpClient.get('/explorer/suggestions', {
+    token,
+    signal,
+    params: requestParams,
+    cache: { enabled: false }
+  });
+}
+
 export async function searchExplorer(payload, { token, signal } = {}) {
   assertToken(token, 'perform explorer search');
   return httpClient.post('/explorer/search', payload, {

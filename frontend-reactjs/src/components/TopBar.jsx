@@ -1,8 +1,9 @@
 import PropTypes from 'prop-types';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline';
 import CommunitySwitcher from './CommunitySwitcher.jsx';
-import SearchBar from './SearchBar.jsx';
+import GlobalSearchBar from './search/GlobalSearchBar.jsx';
 import LanguageSelector from './navigation/LanguageSelector.jsx';
 
 export default function TopBar({
@@ -22,6 +23,7 @@ export default function TopBar({
   profileImageUrl = 'https://i.pravatar.cc/100?img=15',
   profileAlt = 'Your profile'
 }) {
+  const navigate = useNavigate();
   const [localSearchValue, setLocalSearchValue] = useState('');
   const resolvedSearchValue = searchValue ?? localSearchValue;
 
@@ -34,12 +36,27 @@ export default function TopBar({
     }
   };
 
-  const handleSearchSubmit = (event) => {
+  const handleSearchSubmit = (value) => {
     if (typeof onSearchSubmit === 'function') {
-      const formValue = event?.target?.search?.value;
-      const rawValue = searchValue ?? localSearchValue ?? formValue ?? '';
-      const trimmedValue = (formValue ?? rawValue ?? '').trim();
-      onSearchSubmit(trimmedValue);
+      onSearchSubmit((value ?? '').trim());
+    }
+    if (searchValue === undefined) {
+      setLocalSearchValue(value ?? '');
+    }
+  };
+
+  const handleSuggestionSelect = (item) => {
+    if (!item) return;
+    if (item.kind === 'saved') {
+      handleSearchSubmit(item.query ?? item.name ?? '');
+      return;
+    }
+    if (item.url) {
+      navigate(item.url);
+    }
+    const fallback = item.title ?? item.query ?? '';
+    if (fallback) {
+      handleSearchSubmit(fallback);
     }
   };
 
@@ -72,12 +89,14 @@ export default function TopBar({
         )}
       </div>
       <div className="w-full sm:flex-1">
-        <SearchBar
+        <GlobalSearchBar
           value={resolvedSearchValue}
           onChange={handleSearchChange}
           onSubmit={handleSearchSubmit}
-          loading={isSearching}
+          onSuggestionSelect={handleSuggestionSelect}
           placeholder="Search the Edulure network"
+          suggestionLimit={8}
+          searchLoading={isSearching}
         />
       </div>
       <div className="flex items-center justify-end gap-3 text-slate-500">

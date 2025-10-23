@@ -257,7 +257,8 @@ function formatHit(entity, hit) {
   const base = {
     id: hit.id,
     entityType: entity,
-    raw: hit
+    raw: hit,
+    previewMedia: null
   };
   const pickImage = (...keys) => {
     for (const key of keys) {
@@ -286,6 +287,13 @@ function formatHit(entity, hit) {
   };
 
   base.imageUrl = pickImage('coverImageUrl', 'thumbnailUrl', 'avatarUrl', 'imageUrl');
+  if (base.imageUrl) {
+    base.previewMedia = {
+      type: 'image',
+      src: base.imageUrl,
+      alt: hit.title ?? hit.name ?? null
+    };
+  }
   switch (entity) {
     case 'communities': {
       base.title = hit.name;
@@ -537,6 +545,94 @@ export class ExplorerSearchService {
         bounds
       },
       adsPlacements
+    };
+  }
+
+  buildHighlight(rawHit) {
+    if (!rawHit || typeof rawHit !== 'object') {
+      return null;
+    }
+    const formatted = rawHit._formatted ?? {};
+    const highlightFields = ['title', 'name', 'summary', 'description', 'tagline', 'headline', 'bio'];
+    for (const field of highlightFields) {
+      const value = formatted[field];
+      if (typeof value !== 'string' || !value.includes('<em>')) {
+        continue;
+      }
+      const segments = value
+        .split(/(<em>.*?<\/em>)/g)
+        .filter(Boolean)
+        .map((segment) => ({
+          text: segment.replace(/<\/?em>/g, ''),
+          isMatch: segment.startsWith('<em>')
+        }))
+        .filter((segment) => segment.text?.length);
+      if (!segments.length) {
+        continue;
+      }
+      return { field, segments };
+    }
+    return null;
+  }
+
+  async suggest({ query, entityTypes, limit = 8 } = {}) {
+    const trimmedQuery = typeof query === 'string' ? query.trim() : '';
+    if (!trimmedQuery) {
+      return { query: '', items: [] };
+    }
+
+    const resolvedEntities = this.normaliseEntityTypes(entityTypes);
+    const perEntityLimit = Math.max(1, Math.ceil(limit / resolvedEntities.length));
+
+    const suggestions = [];
+    const tasks = resolvedEntities.map(async (entity) => {
+      try {
+        const result = await this.searchEntity(entity, {
+          query: trimmedQuery,
+          page: 1,
+          perPage: perEntityLimit,
+          filters: {},
+          globalFilters: {},
+          sort: {},
+          includeFacets: false
+        });
+
+        result.hits.forEach((hit, index) => {
+          const rawHit = Array.isArray(result.rawHits) ? result.rawHits[index] : null;
+          const highlight = this.buildHighlight(rawHit);
+          suggestions.push({
+            entity,
+            id: hit.id,
+            title: hit.title,
+            subtitle: hit.subtitle,
+            description: hit.description,
+            imageUrl: hit.imageUrl,
+            previewMedia: hit.previewMedia ?? null,
+            url: hit.actions?.[0]?.href ?? null,
+            highlight,
+            metrics: hit.metrics ?? {},
+            tags: hit.tags ?? []
+          });
+        });
+      } catch (error) {
+        this.logger.warn({ err: error, entity, query: trimmedQuery }, 'Explorer suggestion fetch failed for entity');
+      }
+    });
+
+    await Promise.all(tasks);
+
+    suggestions.sort((a, b) => {
+      const aScore = a.highlight ? 0 : 1;
+      const bScore = b.highlight ? 0 : 1;
+      if (aScore !== bScore) {
+        return aScore - bScore;
+      }
+      return a.entity.localeCompare(b.entity);
+    });
+
+    return {
+      query: trimmedQuery,
+      items: suggestions.slice(0, limit)
     };
   }
 }

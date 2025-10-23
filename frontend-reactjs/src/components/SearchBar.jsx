@@ -10,7 +10,11 @@ export default function SearchBar({
   loading = false,
   ariaLabel = 'Search the catalogue',
   allowClear = false,
-  onClear
+  onClear,
+  inputRef,
+  onKeyDown,
+  onFocus,
+  onBlur
 }) {
   const handleSubmit = (event) => {
     if (typeof onSubmit !== 'function') return;
@@ -42,6 +46,22 @@ export default function SearchBar({
 
   if (onChange) {
     inputProps.onChange = (event) => onChange(event.target.value, event);
+  }
+
+  if (onKeyDown) {
+    inputProps.onKeyDown = onKeyDown;
+  }
+
+  if (onFocus) {
+    inputProps.onFocus = onFocus;
+  }
+
+  if (onBlur) {
+    inputProps.onBlur = onBlur;
+  }
+
+  if (inputRef) {
+    inputProps.ref = inputRef;
   }
 
   const inputField = (
@@ -89,7 +109,14 @@ SearchBar.propTypes = {
   loading: PropTypes.bool,
   ariaLabel: PropTypes.string,
   allowClear: PropTypes.bool,
-  onClear: PropTypes.func
+  onClear: PropTypes.func,
+  inputRef: PropTypes.oneOfType([
+    PropTypes.func,
+    PropTypes.shape({ current: PropTypes.instanceOf(Element) })
+  ]),
+  onKeyDown: PropTypes.func,
+  onFocus: PropTypes.func,
+  onBlur: PropTypes.func
 };
 
 SearchBar.defaultProps = {
@@ -101,5 +128,9 @@ SearchBar.defaultProps = {
   loading: false,
   ariaLabel: 'Search the catalogue',
   allowClear: false,
-  onClear: undefined
+  onClear: undefined,
+  inputRef: undefined,
+  onKeyDown: undefined,
+  onFocus: undefined,
+  onBlur: undefined
 };
