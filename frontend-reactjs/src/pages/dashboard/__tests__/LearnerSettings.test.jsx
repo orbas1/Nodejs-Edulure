@@ -13,6 +13,28 @@ const updateFinancePurchaseMock = vi.hoisted(() => vi.fn());
 const deleteFinancePurchaseMock = vi.hoisted(() => vi.fn());
 const fetchSystemPreferencesMock = vi.hoisted(() => vi.fn());
 const fetchFinanceSettingsMock = vi.hoisted(() => vi.fn());
+const requestMediaUploadMock = vi.hoisted(() => vi.fn());
+const updateCurrentUserMock = vi.hoisted(() => vi.fn());
+const computeFileChecksumMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../components/media/AvatarCropper.jsx', () => ({
+  __esModule: true,
+  default: ({ onSave, busy }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() =>
+          onSave(new File(['avatar'], 'avatar.jpg', { type: 'image/jpeg' }), {
+            previewUrl: 'blob:mock-preview'
+          })
+        }
+        disabled={busy}
+      >
+        Trigger avatar save
+      </button>
+    </div>
+  )
+}));
 
 vi.mock('../../../hooks/useLearnerDashboard.js', () => ({
   useLearnerDashboardSection: useLearnerDashboardSectionMock
@@ -32,7 +54,26 @@ vi.mock('../../../api/learnerDashboardApi.js', () => ({
   fetchFinanceSettings: fetchFinanceSettingsMock
 }));
 
+vi.mock('../../../api/mediaApi.js', () => ({
+  requestMediaUpload: requestMediaUploadMock
+}));
+
+vi.mock('../../../api/userApi.js', () => ({
+  updateCurrentUser: updateCurrentUserMock
+}));
+
+vi.mock('../../../utils/uploads.js', () => ({
+  computeFileChecksum: computeFileChecksumMock
+}));
+
 describe('<LearnerSettings />', () => {
+  const originalFetch = global.fetch;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+
+  beforeAll(() => {
+    URL.revokeObjectURL = vi.fn();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     useLearnerDashboardSectionMock.mockReturnValue({
@@ -118,6 +159,12 @@ describe('<LearnerSettings />', () => {
         metadata: { receiptUrl: 'https://example.com/receipt-200.pdf' }
       }
     });
+    requestMediaUploadMock.mockResolvedValue({
+      upload: { url: 'https://uploads.example.com/avatar', method: 'PUT', headers: {} },
+      file: { publicUrl: 'https://cdn.example.com/avatar.jpg' }
+    });
+    updateCurrentUserMock.mockResolvedValue({ message: 'Profile updated' });
+    computeFileChecksumMock.mockResolvedValue('checksum-123');
     fetchSystemPreferencesMock.mockResolvedValue({
       data: {
         language: 'en',
@@ -157,6 +204,12 @@ describe('<LearnerSettings />', () => {
         subscriptions: []
       }
     });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true });
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
   it('renders learner settings with prefilled values', () => {
@@ -244,6 +297,54 @@ describe('<LearnerSettings />', () => {
 
     render(<LearnerSettings />);
 
-    expect(screen.getByText(/Learner Learnspace required/i)).toBeInTheDocument();
+    expect(screen.getByText(/Learner workspace required/i)).toBeInTheDocument();
+  });
+
+  it('uploads a new avatar and surfaces status updates', async () => {
+    const user = userEvent.setup();
+    render(<LearnerSettings />);
+
+    await user.click(screen.getByRole('button', { name: /trigger avatar save/i }));
+
+    expect(screen.getByText(/Uploading avatar/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(requestMediaUploadMock).toHaveBeenCalledWith({
+        token: 'token-123',
+        payload: expect.objectContaining({ kind: 'avatar' })
+      });
+    });
+
+    await waitFor(() => {
+      expect(updateCurrentUserMock).toHaveBeenCalledWith({
+        token: 'token-123',
+        payload: { profile: { avatarUrl: 'https://cdn.example.com/avatar.jpg' } }
+      });
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://uploads.example.com/avatar',
+      expect.objectContaining({ method: 'PUT' })
+    );
+
+    expect(await screen.findByText(/Avatar updated/i)).toBeInTheDocument();
+  });
+
+  it('falls back to preview when upload response lacks a public URL', async () => {
+    const user = userEvent.setup();
+    requestMediaUploadMock.mockResolvedValueOnce({
+      upload: { url: 'https://uploads.example.com/avatar', method: 'PUT', headers: {} },
+      file: {}
+    });
+
+    render(<LearnerSettings />);
+
+    await user.click(screen.getByRole('button', { name: /trigger avatar save/i }));
+
+    await waitFor(() => {
+      expect(updateCurrentUserMock).not.toHaveBeenCalled();
+    });
+
+    expect(await screen.findByText(/Preview saved locally until sync completes/i)).toBeInTheDocument();
   });
 });

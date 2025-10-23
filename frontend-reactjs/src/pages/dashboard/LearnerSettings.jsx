@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Cog6ToothIcon, CreditCardIcon, SparklesIcon } from '@heroicons/react/24/outline';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
@@ -12,6 +13,11 @@ import {
   updateFinancePurchase,
   deleteFinancePurchase
 } from '../../api/learnerDashboardApi.js';
+import { requestMediaUpload } from '../../api/mediaApi.js';
+import { updateCurrentUser } from '../../api/userApi.js';
+import SettingsLayout from '../../components/settings/SettingsLayout.jsx';
+import AvatarCropper from '../../components/media/AvatarCropper.jsx';
+import { computeFileChecksum } from '../../utils/uploads.js';
 
 const SUPPORTED_LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -75,7 +81,12 @@ const DEFAULT_SYSTEM_FORM = {
     interfaceDensity: 'comfortable',
     analyticsOptIn: true,
     subtitleLanguage: 'en',
-    audioDescription: false
+    audioDescription: false,
+    recommendationsEnabled: true,
+    recommendationTopics: [],
+    adsPersonalisation: false,
+    adsMeasurement: true,
+    adsEmailOptIn: false
   }
 };
 
@@ -157,6 +168,30 @@ export default function LearnerSettings() {
   const [purchaseForm, setPurchaseForm] = useState(DEFAULT_PURCHASE_FORM);
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const [recommendationTopicInput, setRecommendationTopicInput] = useState('');
+  const releasePreviewUrl = useCallback((url) => {
+    if (typeof url === 'string' && url.startsWith('blob:')) {
+      URL.revokeObjectURL(url);
+    }
+  }, []);
+  const avatarPreviewRef = useRef(null);
+  const [avatarPreview, setAvatarPreview] = useState(() => {
+    const sessionAvatar = session?.user?.profile?.avatarUrl ?? session?.user?.avatarUrl ?? null;
+    avatarPreviewRef.current = sessionAvatar;
+    return sessionAvatar;
+  });
+  const updateAvatarPreview = useCallback(
+    (nextUrl) => {
+      setAvatarPreview((previous) => {
+        if (previous && previous !== nextUrl) {
+          releasePreviewUrl(previous);
+        }
+        avatarPreviewRef.current = nextUrl;
+        return nextUrl;
+      });
+    },
+    [releasePreviewUrl]
+  );
 
   useEffect(() => {
     if (!settings?.system || !settings?.finance) {
@@ -170,6 +205,12 @@ export default function LearnerSettings() {
         ...(settings.system.preferences ?? {})
       }
     };
+    const rawTopics = normalisedSystem.preferences.recommendationTopics;
+    normalisedSystem.preferences.recommendationTopics = Array.isArray(rawTopics)
+      ? rawTopics
+      : typeof rawTopics === 'string'
+        ? rawTopics.split(',').map((topic) => topic.trim()).filter(Boolean)
+        : [];
     setSystemForm(normalisedSystem);
 
     const normalisedFinance = {
@@ -195,6 +236,25 @@ export default function LearnerSettings() {
     }
   }, [error]);
 
+  useEffect(() => {
+    const topics = Array.isArray(systemForm.preferences?.recommendationTopics)
+      ? systemForm.preferences.recommendationTopics
+      : [];
+    setRecommendationTopicInput(topics.join(', '));
+  }, [systemForm.preferences?.recommendationTopics]);
+
+  useEffect(() => {
+    if (settings?.profile?.avatarUrl) {
+      updateAvatarPreview(settings.profile.avatarUrl);
+    }
+  }, [settings?.profile?.avatarUrl, updateAvatarPreview]);
+
+  useEffect(() => {
+    avatarPreviewRef.current = avatarPreview;
+  }, [avatarPreview]);
+
+  useEffect(() => () => releasePreviewUrl(avatarPreviewRef.current), [releasePreviewUrl]);
+
   const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
 
   const handleSystemInputChange = (event) => {
@@ -213,6 +273,22 @@ export default function LearnerSettings() {
     setSystemForm((previous) => ({
       ...previous,
       [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleRecommendationTopicInputChange = (event) => {
+    const { value } = event.target;
+    setRecommendationTopicInput(value);
+    const topics = value
+      .split(',')
+      .map((topic) => topic.trim())
+      .filter(Boolean);
+    setSystemForm((previous) => ({
+      ...previous,
+      preferences: {
+        ...previous.preferences,
+        recommendationTopics: topics
+      }
     }));
   };
 
@@ -259,14 +335,21 @@ export default function LearnerSettings() {
     const response = await fetchSystemPreferences({ token }).catch(() => null);
     if (response?.data) {
       const payload = response.data;
-      setSystemForm({
+      const next = {
         ...DEFAULT_SYSTEM_FORM,
         ...payload,
         preferences: {
           ...DEFAULT_SYSTEM_FORM.preferences,
           ...(payload.preferences ?? {})
         }
-      });
+      };
+      const topics = Array.isArray(next.preferences.recommendationTopics)
+        ? next.preferences.recommendationTopics
+        : typeof next.preferences.recommendationTopics === 'string'
+          ? next.preferences.recommendationTopics.split(',').map((topic) => topic.trim()).filter(Boolean)
+          : [];
+      next.preferences.recommendationTopics = topics;
+      setSystemForm(next);
     }
   };
 
@@ -469,6 +552,211 @@ export default function LearnerSettings() {
     }
   };
 
+  const handleAvatarSave = useCallback(
+    async (file, { previewUrl }) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to update your avatar.' });
+        throw new Error('Authentication required to update avatar');
+      }
+
+      setPendingAction('avatar');
+      setStatusMessage({ type: 'pending', message: 'Uploading avatar…' });
+
+      try {
+        const checksum = await computeFileChecksum(file);
+        const instruction = await requestMediaUpload({
+          token,
+          payload: {
+            kind: 'avatar',
+            filename: file.name,
+            mimeType: file.type || 'image/jpeg',
+            size: file.size,
+            checksum
+          }
+        });
+
+        if (!instruction?.upload?.url) {
+          throw new Error('Upload session did not return a destination URL.');
+        }
+
+        const uploadHeaders = instruction.upload.headers ?? {
+          'Content-Type': file.type || 'image/jpeg'
+        };
+
+        await fetch(instruction.upload.url, {
+          method: instruction.upload.method ?? 'PUT',
+          headers: uploadHeaders,
+          body: file
+        });
+
+        const resolvedUrl = instruction.file?.publicUrl ?? instruction.file?.storageKey ?? null;
+
+        if (resolvedUrl) {
+          await updateCurrentUser({
+            token,
+            payload: { profile: { avatarUrl: resolvedUrl } }
+          });
+          updateAvatarPreview(resolvedUrl);
+          if (previewUrl && previewUrl !== resolvedUrl) {
+            releasePreviewUrl(previewUrl);
+          }
+        } else if (previewUrl) {
+          updateAvatarPreview(previewUrl);
+        }
+
+        setStatusMessage({
+          type: 'success',
+          message: 'Avatar updated.',
+          detail: resolvedUrl ? undefined : 'Preview saved locally until sync completes.'
+        });
+        refresh?.();
+      } catch (avatarError) {
+        if (previewUrl) {
+          releasePreviewUrl(previewUrl);
+        }
+        setStatusMessage({
+          type: 'error',
+          message:
+            avatarError instanceof Error
+              ? avatarError.message
+              : 'We were unable to update your avatar.'
+        });
+        throw avatarError;
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [token, refresh, releasePreviewUrl, updateAvatarPreview]
+  );
+
+  const recommendedPreview = useMemo(() => {
+    const seeded = Array.isArray(settings?.recommendations)
+      ? settings.recommendations.slice(0, 3).map((item, index) => ({
+          id: item?.id ?? `recommendation-${index}`,
+          title: item?.title ?? item?.name ?? 'Recommended insight',
+          reason:
+            item?.reason ??
+            item?.context ??
+            'Curated from your learning goals and recent activity.',
+          type: item?.type ?? item?.category ?? 'Learning'
+        }))
+      : [];
+
+    if (seeded.length > 0) {
+      return seeded;
+    }
+
+    const topics = Array.isArray(systemForm.preferences?.recommendationTopics)
+      ? systemForm.preferences.recommendationTopics
+      : [];
+
+    if (topics.length > 0) {
+      return topics.slice(0, 3).map((topic, index) => ({
+        id: `topic-${index}`,
+        title: topic,
+        reason: 'Highlighted because you follow this topic.',
+        type: 'Topic'
+      }));
+    }
+
+    return [
+      {
+        id: 'starter-guide',
+        title: 'Getting started with Edulure',
+        reason: 'Essential actions for new cohort members.',
+        type: 'Guide'
+      },
+      {
+        id: 'community-suggestion',
+        title: 'Join the Growth Guild community',
+        reason: 'Popular with creators who share your goals.',
+        type: 'Community'
+      },
+      {
+        id: 'monetisation-playbook',
+        title: 'Creator monetisation playbook',
+        reason: 'Pairs with ads and sponsorship preferences.',
+        type: 'Playbook'
+      }
+    ];
+  }, [settings?.recommendations, systemForm.preferences?.recommendationTopics]);
+
+  const layoutActions = (
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        className="dashboard-pill"
+        onClick={() => {
+          refreshSystemPreferences();
+          refreshFinanceSettings();
+          refresh?.();
+        }}
+        disabled={Boolean(pendingAction)}
+      >
+        Sync from cloud
+      </button>
+      <button
+        type="button"
+        className="dashboard-pill"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      >
+        Back to top
+      </button>
+    </div>
+  );
+
+  const layoutPreview = useMemo(() => {
+    const topics = Array.isArray(systemForm.preferences?.recommendationTopics)
+      ? systemForm.preferences.recommendationTopics
+      : [];
+    return (
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-700">At-a-glance</h3>
+        <dl className="space-y-2 text-xs text-slate-600">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="font-medium text-slate-500">Language</dt>
+            <dd className="font-semibold text-slate-900">{(systemForm.language ?? 'en').toUpperCase()}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="font-medium text-slate-500">Timezone</dt>
+            <dd className="font-semibold text-slate-900">{systemForm.timezone}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="font-medium text-slate-500">Autoplay</dt>
+            <dd className="font-semibold text-slate-900">
+              {systemForm.autoPlayMedia ? 'Enabled' : 'Disabled'}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="font-medium text-slate-500">Ads personalisation</dt>
+            <dd className="font-semibold text-slate-900">
+              {systemForm.preferences?.adsPersonalisation ? 'On' : 'Off'}
+            </dd>
+          </div>
+        </dl>
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Focus topics</p>
+          <div className="flex flex-wrap gap-2">
+            {topics.length > 0 ? (
+              topics.map((topic) => (
+                <span
+                  key={topic}
+                  className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
+                >
+                  {topic}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-slate-400">Add topics to fine-tune recommendations.</span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }, [systemForm]);
+
+  const adsDataUsageHref = 'https://docs.edulure.io/policies/ads-data-usage';
+
   if (!isLearner) {
     return (
       <DashboardStateMessage
@@ -500,64 +788,136 @@ export default function LearnerSettings() {
   }
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="dashboard-title">Settings</h1>
-          <p className="dashboard-subtitle">
-            Optimise your learning experience with precise control over accessibility, notifications, and
-            finance automation.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className="dashboard-pill"
-            onClick={() => {
-              refreshSystemPreferences();
-              refreshFinanceSettings();
-              refresh?.();
-            }}
-          >
-            Sync from cloud
-          </button>
-          <button
-            type="button"
-            className="dashboard-pill"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          >
-            Back to top
-          </button>
-        </div>
-      </div>
-
-      {statusMessage ? (
-        <div
-          role="status"
-          className={`rounded-2xl border p-4 text-sm shadow-sm ${
-            statusMessage.type === 'error'
-              ? 'border-rose-200 bg-rose-50 text-rose-700'
-              : statusMessage.type === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border-primary/30 bg-primary/5 text-primary'
-          }`}
+    <>
+      <SettingsLayout
+        title="Settings"
+        description="Optimise your learning experience with precise control over accessibility, notifications, and finance automation."
+        actions={layoutActions}
+        status={statusMessage}
+        onDismissStatus={() => setStatusMessage(null)}
+        preview={layoutPreview}
+      >
+        <SettingsLayout.Section
+          id="profile-personalisation"
+          title="Profile personalisation"
+          description="Keep your profile imagery and recommendations aligned with your learning goals."
+          icon={SparklesIcon}
+          badge="New"
         >
-          {statusMessage.message}
-        </div>
-      ) : null}
-
-      <section className="dashboard-section">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">System preferences</h2>
-            <p className="text-sm text-slate-600">
-              Configure accessibility, localisation, and notification cadence across the learner experience.
-            </p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-800">Avatar & identity</h3>
+              <p className="text-xs text-slate-500">Update your avatar and preview how it appears across courses, communities, and live sessions.</p>
+              <AvatarCropper
+                currentImage={avatarPreview}
+                onSave={handleAvatarSave}
+                busy={pendingAction === 'avatar'}
+                disabled={Boolean(pendingAction) && pendingAction !== 'avatar'}
+              />
+            </div>
+            <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-800">Recommendation preview</h3>
+              <p className="text-xs text-slate-500">These cards mirror what surfaces on your learner dashboard and digest emails.</p>
+              <ul className="space-y-3">
+                {recommendedPreview.map((item) => (
+                  <li key={item.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {item.type}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{item.reason}</p>
+                  </li>
+                ))}
+              </ul>
+              <label className="flex flex-col text-sm font-medium text-slate-700">
+                Focus topics (comma separated)
+                <input
+                  type="text"
+                  value={recommendationTopicInput}
+                  onChange={handleRecommendationTopicInputChange}
+                  placeholder="e.g. Monetisation, Community building, SaaS growth"
+                  className="mt-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+            </div>
           </div>
-          <span className="dashboard-kicker text-primary">Personalised</span>
-        </div>
-
-        <form className="mt-6 space-y-6" onSubmit={handleSystemSubmit}>
+          <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Edulure Ads preferences</h3>
+                <p className="text-xs text-slate-500">
+                  Control how Edulure Ads uses your activity data. Review the{' '}
+                  <a href={adsDataUsageHref} className="text-primary underline">data usage statement</a>{' '}
+                  before adjusting monetisation toggles.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-semibold text-slate-900">Recommendations feed</p>
+                  <p className="text-xs text-slate-500">Show curated modules based on your interests.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  name="preferences.recommendationsEnabled"
+                  checked={systemForm.preferences.recommendationsEnabled}
+                  onChange={handleSystemInputChange}
+                  className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+              </label>
+              <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-semibold text-slate-900">Ads personalisation</p>
+                  <p className="text-xs text-slate-500">Serve ads tailored to your learning profile.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  name="preferences.adsPersonalisation"
+                  checked={systemForm.preferences.adsPersonalisation}
+                  onChange={handleSystemInputChange}
+                  className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+              </label>
+              <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-semibold text-slate-900">Ads measurement</p>
+                  <p className="text-xs text-slate-500">Share anonymised performance metrics to improve placements.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  name="preferences.adsMeasurement"
+                  checked={systemForm.preferences.adsMeasurement}
+                  onChange={handleSystemInputChange}
+                  className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+              </label>
+              <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-semibold text-slate-900">Ads email updates</p>
+                  <p className="text-xs text-slate-500">Receive programme highlights and monetisation opportunities.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  name="preferences.adsEmailOptIn"
+                  checked={systemForm.preferences.adsEmailOptIn}
+                  onChange={handleSystemInputChange}
+                  className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+              </label>
+            </div>
+          </div>
+        </SettingsLayout.Section>
+        <SettingsLayout.Section
+          id="system-preferences"
+          title="System preferences"
+          description="Configure accessibility, localisation, and notification cadence across the learner experience."
+          icon={Cog6ToothIcon}
+          badge="Personalised"
+        >
+<form className="mt-6 space-y-6" onSubmit={handleSystemSubmit}>
           <div className="grid gap-4 md:grid-cols-3">
             <label className="flex flex-col text-sm font-medium text-slate-700">
               Language
@@ -723,22 +1083,14 @@ export default function LearnerSettings() {
             </button>
           </div>
         </form>
-      </section>
-
-      <section className="dashboard-section">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Finance settings</h2>
-            <p className="text-sm text-slate-600">
-              Control autopay, reserve strategy, and finance alerts. Keep your tuition and reimbursements on track.
-            </p>
-          </div>
-          <button type="button" className="dashboard-pill" onClick={() => openPurchaseModal()}>
-            Log purchase
-          </button>
-        </div>
-
-        <form className="mt-6 space-y-6" onSubmit={handleFinanceSubmit}>
+        </SettingsLayout.Section>
+        <SettingsLayout.Section
+          id="finance-settings"
+          title="Finance settings"
+          description="Control autopay, reserve strategy, and finance alerts. Keep your tuition and reimbursements on track."
+          icon={CreditCardIcon}
+        >
+<form className="mt-6 space-y-6" onSubmit={handleFinanceSubmit}>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col text-sm font-medium text-slate-700">
               Preferred currency
@@ -1063,7 +1415,8 @@ export default function LearnerSettings() {
             </button>
           </div>
         </form>
-      </section>
+        </SettingsLayout.Section>
+      </SettingsLayout>
 
       {purchaseModalOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-4">
@@ -1181,5 +1534,6 @@ export default function LearnerSettings() {
         </div>
       ) : null}
     </div>
+  );
   );
 }
