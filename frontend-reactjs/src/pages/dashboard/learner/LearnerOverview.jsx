@@ -16,6 +16,7 @@ import LearnerProfileEditor from './sections/LearnerProfileEditor.jsx';
 import LearnerGoalsSection from './sections/LearnerGoalsSection.jsx';
 import LearnerSurveySection from './sections/LearnerSurveySection.jsx';
 import LearnerRevenueBanner from './sections/LearnerRevenueBanner.jsx';
+import buildLearnerProgressCards from '../../../utils/dashboard/learnerProgressCards.js';
 
 function normaliseSectionKey(name) {
   return name?.toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -226,69 +227,6 @@ function normaliseBlog(blog) {
   };
 }
 
-function normaliseProgressCards(courses, goals) {
-  const goalMap = new Map();
-  if (Array.isArray(goals)) {
-    goals.forEach((goal) => {
-      if (!goal) return;
-      const key = goal.courseId ?? goal.id ?? goal.slug ?? null;
-      if (!key) return;
-      goalMap.set(key, goal);
-    });
-  }
-
-  if (!Array.isArray(courses)) {
-    return [];
-  }
-
-  return courses.slice(0, 3).map((course, index) => {
-    const goal = goalMap.get(course.courseId ?? course.id) ?? null;
-    const progressPercent = Number.isFinite(Number(goal?.progressPercent ?? course.progress))
-      ? Number(goal?.progressPercent ?? course.progress)
-      : 0;
-    const dueLabel = goal?.dueLabel
-      ? goal.dueLabel
-      : goal?.dueDate
-        ? new Date(goal.dueDate).toLocaleDateString()
-        : null;
-    const nextStep = goal?.nextStep ?? goal?.upNext ?? course?.nextLesson ?? null;
-
-    return {
-      id: course.id ?? course.courseId ?? `course-${index}`,
-      title: course.title ?? 'Course',
-      status: course.status ?? 'Active',
-      instructor: course.instructor ?? null,
-      progressPercent,
-      nextLessonLabel: nextStep,
-      goal: goal
-        ? {
-            statusLabel: goal.status ?? goal.statusLabel ?? null,
-            dueLabel,
-            focusMinutesPerWeek: Number.isFinite(Number(goal.focusMinutesPerWeek))
-              ? Number(goal.focusMinutesPerWeek)
-              : null,
-            nextStep
-          }
-        : null,
-      primaryAction: {
-        label: 'Resume course',
-        href: `/dashboard/courses?courseId=${encodeURIComponent(course.courseId ?? course.id ?? '')}`
-      },
-      secondaryAction: nextStep
-        ? {
-            label: 'View modules',
-            href: `/dashboard/courses?courseId=${encodeURIComponent(course.courseId ?? course.id ?? '')}#modules`
-          }
-        : null,
-      highlight:
-        goal?.priority === 1 ||
-        (typeof goal?.status === 'string' && goal.status.toLowerCase().includes('focus')),
-      revenue: course.revenueOpportunity ?? null,
-      meta: course.lastTouchedLabel ? { lastUpdatedLabel: course.lastTouchedLabel } : null
-    };
-  });
-}
-
 function normaliseGoals(goals) {
   if (!Array.isArray(goals)) {
     return [];
@@ -405,9 +343,20 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   const accessControl = useMemo(() => createSectionAccessControl(dashboard), [dashboard]);
 
   const progressCards = useMemo(
-    () => normaliseProgressCards(dashboard?.courses?.active, dashboard?.courses?.goals),
-    [dashboard?.courses?.active, dashboard?.courses?.goals]
+    () =>
+      buildLearnerProgressCards({
+        courses: dashboard?.courses?.active ?? [],
+        goals: dashboard?.courses?.goals ?? [],
+        promotions: dashboard?.courses?.promotions ?? []
+      }),
+    [dashboard?.courses?.active, dashboard?.courses?.goals, dashboard?.courses?.promotions]
   );
+  const isProgressLoading = Boolean(
+    dashboard?.courses?.loading ||
+      dashboard?.courses?.status === 'loading' ||
+      dashboard?.courses?.active == null
+  );
+  const showProgressSkeletons = isProgressLoading && progressCards.length === 0;
   const metrics = useMemo(() => normaliseMetrics(metricsSource), [metricsSource]);
   const learningPace = useMemo(
     () => normaliseLearningPace(analytics.learningPace),
@@ -469,24 +418,36 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
 
   return (
     <div className="space-y-10">
-      {progressCards.length ? (
+      {progressCards.length || showProgressSkeletons ? (
         <section className="grid gap-6 xl:grid-cols-3">
-          {progressCards.map((card) => (
-            <LearnerProgressCard
-              key={card.id}
-              title={card.title}
-              status={card.status}
-              instructor={card.instructor}
-              progressPercent={card.progressPercent}
-              nextLabel={card.nextLessonLabel}
-              goal={card.goal}
-              primaryAction={card.primaryAction}
-              secondaryAction={card.secondaryAction}
-              highlight={card.highlight}
-              revenue={card.revenue}
-              meta={card.meta}
-            />
-          ))}
+          {showProgressSkeletons
+            ? Array.from({ length: Math.max(1, progressCards.length || 3) }).map((_, index) => (
+                <LearnerProgressCard key={`progress-card-skeleton-${index}`} loading />
+              ))
+            : progressCards.map((card) => (
+                <LearnerProgressCard
+                  key={card.id}
+                  title={card.title}
+                  status={card.status}
+                  instructor={card.instructor}
+                  progressPercent={card.progressPercent}
+                  nextLabel={card.nextLabel}
+                  goal={card.goal}
+                  primaryAction={
+                    card.links.course
+                      ? { label: 'Resume course', href: card.links.course }
+                      : null
+                  }
+                  secondaryAction={
+                    card.links.modules
+                      ? { label: 'View modules', href: card.links.modules }
+                      : null
+                  }
+                  highlight={card.highlight}
+                  revenue={card.revenue}
+                  meta={card.meta}
+                />
+              ))}
         </section>
       ) : null}
 
