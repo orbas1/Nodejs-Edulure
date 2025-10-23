@@ -862,6 +862,12 @@ const envSchema = z
       .min(1)
       .max(24 * 60)
       .default(30),
+    CREATION_WORKSPACE_SCHEDULER_ENABLED: z.coerce.boolean().default(true),
+    CREATION_WORKSPACE_SCHEDULER_CRON: z.string().default('*/30 * * * *'),
+    CREATION_WORKSPACE_SCHEDULER_TIMEZONE: z.string().default('Etc/UTC'),
+    CREATION_WORKSPACE_SCHEDULER_RUN_ON_STARTUP: z.coerce.boolean().default(true),
+    CREATION_WORKSPACE_CHECKLIST_WARNING_HOURS: z.coerce.number().int().min(1).max(168).default(48),
+    CREATION_WORKSPACE_CHECKLIST_ESCALATION_HOURS: z.coerce.number().int().min(2).max(240).default(96),
     SMTP_HOST: z.string().min(1),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
     SMTP_SECURE: z.coerce.boolean().default(false),
@@ -1571,6 +1577,18 @@ export const env = {
       recognitionWindowDays: raw.MONETIZATION_RECOGNITION_WINDOW_DAYS,
       tenants: monetizationTenantAllowlist,
       tenantCacheMinutes: raw.MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES
+    }
+  },
+  creationWorkspace: {
+    scheduler: {
+      enabled: raw.CREATION_WORKSPACE_SCHEDULER_ENABLED,
+      cronExpression: raw.CREATION_WORKSPACE_SCHEDULER_CRON,
+      timezone: raw.CREATION_WORKSPACE_SCHEDULER_TIMEZONE,
+      runOnStartup: raw.CREATION_WORKSPACE_SCHEDULER_RUN_ON_STARTUP
+    },
+    checklist: {
+      warningThresholdHours: raw.CREATION_WORKSPACE_CHECKLIST_WARNING_HOURS,
+      escalationThresholdHours: raw.CREATION_WORKSPACE_CHECKLIST_ESCALATION_HOURS
     }
   },
   domainEvents: {

@@ -131,6 +131,13 @@ export async function seed(knex) {
     await trx('content_asset_events').del();
     await trx('content_audit_logs').del();
     await trx('content_assets').del();
+    await trx('creation_project_checklist_items').del();
+    await trx('creation_project_versions').del();
+    await trx('creation_collaboration_sessions').del();
+    await trx('creation_project_collaborators').del();
+    await trx('creation_templates').del();
+    await trx('creation_projects').del();
+    await trx('instructor_workspace_guides').del();
     await trx('telemetry_lineage_runs').del();
     await trx('telemetry_freshness_monitors').del();
     await trx('telemetry_events').del();
@@ -3987,6 +3994,292 @@ export async function seed(knex) {
         notes: 'Change advisory board met, awaiting CAB minutes upload.',
         evidence_url: 'https://change.edulure.com/tickets/CHG-2048',
         last_evaluated_at: trx.fn.now()
+      }
+    ]);
+
+    const creationWorkspaceNow = new Date();
+
+    const [courseWorkspaceProjectId] = await trx('creation_projects').insert({
+      owner_id: instructorId,
+      type: 'course',
+      status: 'in_review',
+      title: 'Automation Launch Masterclass – Spring Refresh',
+      summary:
+        'Refreshes hero assets, compliance notes, and monetisation tracks ahead of the spring cohort launch.',
+      metadata: JSON.stringify({
+        heroArtwork: automationCourseArtwork.url,
+        monetisation: {
+          defaultPriceCents: 129900,
+          bundles: [
+            { id: 'bundle-community', title: 'Ops Lab bundle', priceCents: 159900 },
+            { id: 'bundle-tutor', title: '1:1 tutor office hours add-on', priceCents: 189900 }
+          ],
+          analyticsKey: 'ops-masterclass-refresh'
+        },
+        accessibility: { captions: true, altTextComplete: false },
+        liveExperiences: { rehearsalLobby: true, recapReplay: true }
+      }),
+      content_outline: JSON.stringify([
+        {
+          id: 'module-foundations',
+          label: 'Command centre foundations',
+          description: 'Align onboarding hero, navigation, and live rehearsal modules.',
+          durationMinutes: 120
+        },
+        {
+          id: 'module-rehearsals',
+          label: 'Live rehearsal simulations',
+          description: 'Pair countdown lobby, chat scaffolding, and compliance nudges.',
+          children: [
+            { id: 'module-rehearsals-setup', label: 'Green-room setup walkthrough', durationMinutes: 45 },
+            { id: 'module-rehearsals-policy', label: 'Policy and disclosure overlays', durationMinutes: 35 }
+          ]
+        }
+      ]),
+      compliance_notes: JSON.stringify([
+        { type: 'policy', message: 'Update ads disclosure language for monetised replay segments.' },
+        { type: 'legal', message: 'Confirm SOC 2 mention aligns with governance_contracts obligations.' }
+      ]),
+      analytics_targets: JSON.stringify({
+        goals: ['increase-enrolment', 'upsell-community-tier'],
+        keywords: ['automation', 'launch-readiness', 'ops-lab'],
+        audiences: ['operations-leads', 'enablement-managers']
+      }),
+      publishing_channels: JSON.stringify(['catalogue', 'community', 'live_sessions']),
+      review_requested_at: new Date(creationWorkspaceNow.getTime() - 36 * 60 * 60 * 1000),
+      approved_at: null,
+      published_at: null
+    });
+
+    await trx('creation_project_collaborators').insert([
+      {
+        project_id: courseWorkspaceProjectId,
+        user_id: instructorId,
+        role: 'owner',
+        permissions: JSON.stringify([
+          'project:read',
+          'project:edit',
+          'project:submit',
+          'project:publish',
+          'collaboration:manage',
+          'session:start'
+        ])
+      },
+      {
+        project_id: courseWorkspaceProjectId,
+        user_id: adminId,
+        role: 'commenter',
+        permissions: JSON.stringify(['project:read', 'comment:create', 'session:start'])
+      }
+    ]);
+
+    await trx('creation_project_versions').insert({
+      project_id: courseWorkspaceProjectId,
+      version_number: 3,
+      created_by: instructorId,
+      snapshot: JSON.stringify({
+        status: 'in_review',
+        title: 'Automation Launch Masterclass – Spring Refresh',
+        contentOutlineVersion: 3,
+        monetisationBundles: 2,
+        lastEditedBy: 'Kai Watanabe'
+      }),
+      change_summary: JSON.stringify({ reason: 'seed-bootstrap', highlights: ['Added monetisation bundles', 'Refined compliance notes'] })
+    });
+
+    await trx('creation_project_checklist_items').insert([
+      {
+        project_id: courseWorkspaceProjectId,
+        task_key: 'outline-refresh',
+        title: 'Reconcile module outline with learner survey insights',
+        description: 'Use learner dashboard goals to confirm module order and update reduced motion variants.',
+        category: 'content',
+        status: 'in_progress',
+        severity: 'warning',
+        sequence_index: 1,
+        due_at: new Date(creationWorkspaceNow.getTime() + 48 * 60 * 60 * 1000),
+        metadata: JSON.stringify({
+          relatedSurfaces: ['Learner dashboard', 'Courses viewer'],
+          persona: 'instructor',
+          references: ['user-experience#5', 'user-experience#7']
+        })
+      },
+      {
+        project_id: courseWorkspaceProjectId,
+        task_key: 'thumbnail-a11y',
+        title: 'Regenerate accessible thumbnails and transcripts',
+        description: 'Ensure hover previews and transcripts meet accessibility tokens for search and replay.',
+        category: 'compliance',
+        status: 'pending',
+        severity: 'critical',
+        sequence_index: 2,
+        due_at: new Date(creationWorkspaceNow.getTime() + 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({
+          tokens: ['a11y.high-contrast', 'media.captions'],
+          surfaces: ['Search previews', 'Live classrooms'],
+          escalationContact: 'accessibility@edulure.com'
+        })
+      },
+      {
+        project_id: courseWorkspaceProjectId,
+        task_key: 'pricing-alignment',
+        title: 'Validate pricing tiles and upsell copy',
+        description: 'Align plan comparison layout with marketing site surfaces and tutor bundles.',
+        category: 'monetisation',
+        status: 'pending',
+        severity: 'info',
+        sequence_index: 3,
+        due_at: new Date(creationWorkspaceNow.getTime() + 72 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ relatedSurfaces: ['Marketing site', 'Tutor bookings'], owners: ['growth@edulure.com'] })
+      },
+      {
+        project_id: courseWorkspaceProjectId,
+        task_key: 'launch-readiness',
+        title: 'Schedule launch comms with moderation safety checklist',
+        description: 'Coordinate announcements across community feeds and moderation queue for live cohorts.',
+        category: 'launch',
+        status: 'pending',
+        severity: 'warning',
+        sequence_index: 4,
+        due_at: new Date(creationWorkspaceNow.getTime() + 5 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ relatedSurfaces: ['Communities', 'Moderation workspace'], automation: 'notify-ops-hq' })
+      }
+    ]);
+
+    const [communityWorkspaceProjectId] = await trx('creation_projects').insert({
+      owner_id: adminId,
+      type: 'community',
+      status: 'ready_for_review',
+      title: 'Ops Lab Community Relaunch',
+      summary: 'Expands member directory filters, resources, and monetisation placements for the Ops guild.',
+      metadata: JSON.stringify({
+        heroBanner: 'https://cdn.edulure.test/community/ops-lab-hero.png',
+        programmes: ['incident-drills', 'office-hours'],
+        monetisation: { tiers: ['premium-ops-lab'], sponsoredResources: true }
+      }),
+      content_outline: JSON.stringify([
+        { id: 'community-hero', label: 'Community hero refresh', description: 'Align hero banner with marketing palette.' },
+        { id: 'directory-updates', label: 'Member directory filters', description: 'Add expertise and availability tags.' }
+      ]),
+      compliance_notes: JSON.stringify([
+        { type: 'policy', message: 'Confirm sponsorship tags for paid resources.' },
+        { type: 'security', message: 'Ensure moderation undo stacks remain enabled.' }
+      ]),
+      analytics_targets: JSON.stringify({ goals: ['increase-engagement'], audiences: ['operations-leads'] }),
+      publishing_channels: JSON.stringify(['community', 'events']),
+      review_requested_at: new Date(creationWorkspaceNow.getTime() - 12 * 60 * 60 * 1000),
+      approved_at: null,
+      published_at: null
+    });
+
+    await trx('creation_project_collaborators').insert({
+      project_id: communityWorkspaceProjectId,
+      user_id: instructorId,
+      role: 'editor',
+      permissions: JSON.stringify(['project:read', 'project:edit', 'project:submit', 'session:start'])
+    });
+
+    await trx('creation_project_versions').insert({
+      project_id: communityWorkspaceProjectId,
+      version_number: 2,
+      created_by: adminId,
+      snapshot: JSON.stringify({ status: 'ready_for_review', focus: 'directory-enhancements' }),
+      change_summary: JSON.stringify({ reason: 'seed-bootstrap', highlights: ['Directory filters', 'Sponsored resources draft'] })
+    });
+
+    await trx('creation_project_checklist_items').insert([
+      {
+        project_id: communityWorkspaceProjectId,
+        task_key: 'directory-a11y',
+        title: 'QA member directory filters for keyboard navigation',
+        description: 'Ensure new filters align with accessibility tokens and responsive breakpoints.',
+        category: 'compliance',
+        status: 'pending',
+        severity: 'warning',
+        sequence_index: 1,
+        due_at: new Date(creationWorkspaceNow.getTime() + 36 * 60 * 60 * 1000),
+        metadata: JSON.stringify({
+          tokens: ['a11y.focus-outline'],
+          relatedSurfaces: ['Communities deep dive', 'Accessibility roadmap']
+        })
+      },
+      {
+        project_id: communityWorkspaceProjectId,
+        task_key: 'sponsored-resource-review',
+        title: 'Review sponsored resource disclosures',
+        description: 'Confirm paid placements use consistent monetisation tags and moderation copy.',
+        category: 'monetisation',
+        status: 'pending',
+        severity: 'info',
+        sequence_index: 2,
+        due_at: new Date(creationWorkspaceNow.getTime() + 4 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({
+          relatedSurfaces: ['Communities resources', 'Ads campaign builder'],
+          policyReference: 'ads.disclosure.v2'
+        })
+      },
+      {
+        project_id: communityWorkspaceProjectId,
+        task_key: 'moderation-handoff',
+        title: 'Prep moderation hand-off notes for relaunch week',
+        description: 'Document queue filters, undo expectations, and AI suggestions for moderators.',
+        category: 'launch',
+        status: 'pending',
+        severity: 'warning',
+        sequence_index: 3,
+        due_at: new Date(creationWorkspaceNow.getTime() + 6 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ relatedSurfaces: ['Moderation workspace'], reminderDays: [2, 1] })
+      }
+    ]);
+
+    await trx('instructor_workspace_guides').insert([
+      {
+        slug: 'course-refresh-monetisation-guide',
+        title: 'Pair your course refresh with bundled monetisation',
+        summary: 'Layer community bundles, tutor upsells, and pricing tiles for the refreshed masterclass.',
+        body:
+          'Highlight the Premium Ops Lab tier inside the course CTA ribbon, surface tutor office hours in the viewer sidebar, and reuse the marketing site pricing palette so learners understand upgrade options without leaving the lesson.',
+        project_types: JSON.stringify(['course']),
+        tone: 'success',
+        recommendations: JSON.stringify([
+          'Update course CTA ribbon copy to mention Premium Ops Lab.',
+          'Enable tutor booking upsell in the lesson sidebar.',
+          'Sync pricing tiles with marketing site tokens so checkout feels consistent.'
+        ]),
+        metadata: JSON.stringify({ relatedDocs: ['user-experience#2', 'user-experience#5', 'user-experience#10'] }),
+        published_at: creationWorkspaceNow
+      },
+      {
+        slug: 'community-relaunch-readiness',
+        title: 'Community relaunch readiness checklist',
+        summary: 'Prep member directory filters, sponsored resources, and moderation guardrails.',
+        body:
+          'Confirm directory filters mirror accessibility tokens, stage sponsored resource badges, and rehearse moderation undo flows so the relaunch week feels calm for members and moderators alike.',
+        project_types: JSON.stringify(['community']),
+        tone: 'warning',
+        recommendations: JSON.stringify([
+          'Validate filter focus states against accessibility tokens.',
+          'Preview sponsored resources with monetisation disclosure copy.',
+          'Share moderation playbook covering undo stacks and AI suggestions.'
+        ]),
+        metadata: JSON.stringify({ relatedDocs: ['user-experience#6', 'user-experience#13', 'user-experience#14'] }),
+        published_at: creationWorkspaceNow
+      },
+      {
+        slug: 'workspace-ops-harmony',
+        title: 'Keep instructor workspace signals aligned',
+        summary: 'Blend checklist health, analytics callouts, and safety nudges across surfaces.',
+        body:
+          'Use the checklist summary widget to prioritise high-severity items, mirror analytics wins in the instructor dashboard hero, and feed compliance nudges back into governance review cycles.',
+        project_types: JSON.stringify(['all']),
+        tone: 'info',
+        recommendations: JSON.stringify([
+          'Embed the checklist summary chip next to each project card.',
+          'Surface monetisation guidance alongside analytics deltas.',
+          'Route compliance alerts into governance review cycles for traceability.'
+        ]),
+        metadata: JSON.stringify({ relatedDocs: ['user-experience#1', 'user-experience#9', 'user-experience#17'] }),
+        published_at: creationWorkspaceNow
       }
     ]);
 

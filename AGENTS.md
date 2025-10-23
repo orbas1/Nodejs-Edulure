@@ -47,9 +47,9 @@ Group 2 – Categories 5-8 (frontend structure and code actions)
 Group 3 – Categories 9-10 (data and alignment)
 
 9. **Database migrations & seeders**
-   A. *Migrations* – Plan Postgres search indexes/views, achievements tables, booking availability, ads pacing, compliance checklists, and analytics aggregates referenced in the flows.
-   B. *Seeders* – Populate demo courses, communities, tutors, campaigns, incidents, and accessibility tokens to back the UX demos.
-   C. *Maintenance* – Schedule vacuum/refresh jobs for search views, analytics tables, and ticket escalations to keep internal services responsive.
+   A. ✓ *Migrations* – Shipped `backend-nodejs/migrations/20250321123000_instructor_workspace_enhancements.js` establishing `creation_project_checklist_items` and `instructor_workspace_guides` so instructor workspace, community relaunch, and moderation journeys (#5, #6, #9, #13, #14 in user_experience.md) persist per-project tasks, severities, due dates, and guidance in line with the refreshed UX contract.
+   B. ✓ *Seeders* – Enriched `backend-nodejs/seeds/001_bootstrap.js` with creation projects, collaborator assignments, checklist entries, and workspace guides that mirror the navigation, marketing, course, community, and moderation surfaces described across sections #1–#14 of user_experience.md, ensuring demos expose checklist summaries, monetisation prompts, and compliance alerts out of the box.
+   C. ✓ *Maintenance* – Introduced `backend-nodejs/src/services/CreationWorkspaceMaintenanceService.js` and the scheduled `backend-nodejs/src/jobs/creationWorkspaceMaintenanceJob.js` (wired through worker readiness and `env.creationWorkspace`) to elevate warnings, block overdue tasks, and keep instructor workspace signals in sync with accessibility, monetisation, and safety cues highlighted in sections #9, #14, and #17 of user_experience.md.
 
 10. **Alignment changes**
    A. *Logic flows* – Sync engineering tasks with preset-aware stack scripts, cooperative schedulers, learner lifecycle automation, and ads monetisation updates.
