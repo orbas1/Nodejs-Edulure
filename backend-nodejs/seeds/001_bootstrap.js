@@ -3379,6 +3379,28 @@ export async function seed(knex) {
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
     oneDayAgo.setUTCHours(0, 0, 0, 0);
 
+    const adsCompatibilityCheckedAt = new Date().toISOString();
+    const seededPlacements = [
+      {
+        context: 'global_feed',
+        slot: 'feed-inline',
+        surface: 'Discovery Feed',
+        label: 'Discovery feed card'
+      },
+      {
+        context: 'community_feed',
+        slot: 'feed-community',
+        surface: 'Community Feed',
+        label: 'Community feed highlight'
+      },
+      {
+        context: 'search',
+        slot: 'search-top',
+        surface: 'Explorer Search',
+        label: 'Search result feature'
+      }
+    ];
+
     const [growthAdsCampaignId] = await trx('ads_campaigns').insert({
       public_id: crypto.randomUUID(),
       created_by: adminId,
@@ -3402,7 +3424,28 @@ export async function seed(knex) {
       creative_url: 'https://edulure.test/ads/creator-funnel-boost',
       start_at: adsStart,
       end_at: adsEnd,
-      metadata: JSON.stringify({ promotedCommunityId: growthCommunityId, featureFlag: 'ads-explorer-placements' })
+      metadata: JSON.stringify({
+        promotedCommunityId: growthCommunityId,
+        featureFlag: 'ads-explorer-placements',
+        reviewChecklist: ['creative-approved', 'targeting-verified'],
+        landingPage: 'https://edulure.test/ads/creator-funnel-boost',
+        placements: seededPlacements,
+        brandSafety: {
+          categories: ['education', 'financial'],
+          excludedTopics: ['crypto', 'speculative investing'],
+          reviewNotes: 'Approved for explorer and live classroom placements'
+        },
+        creativeAsset: {
+          url: 'https://cdn.edulure.test/assets/ads/creator-funnel-boost.png',
+          type: 'image/png',
+          width: 1200,
+          height: 675,
+          storageBucket: 'edulure-uploads'
+        },
+        preview: { theme: 'dark', accent: 'indigo' },
+        lastFormSurface: 'dashboard_ads_seed',
+        lastCompatibilityCheckAt: adsCompatibilityCheckedAt
+      })
     });
 
     await trx('ads_campaign_metrics_daily').insert([

@@ -281,8 +281,11 @@ export default class AdsService {
 
   static async createCampaign(actor, payload) {
     const { id: actorId } = assertActorCanManageCampaigns(actor);
-    const startAt = payload.startAt ? new Date(payload.startAt) : null;
-    const endAt = payload.endAt ? new Date(payload.endAt) : null;
+    const schedule = payload.schedule ?? {};
+    const startInput = payload.startAt ?? schedule.startAt ?? null;
+    const endInput = payload.endAt ?? schedule.endAt ?? null;
+    const startAt = startInput ? new Date(startInput) : null;
+    const endAt = endInput ? new Date(endInput) : null;
     if (startAt && endAt && endAt < startAt) {
       const error = new Error('End date must be after the start date');
       error.status = 422;
