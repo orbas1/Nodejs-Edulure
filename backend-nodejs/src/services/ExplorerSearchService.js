@@ -209,6 +209,23 @@ function buildFilterClauses(filters) {
   return clauses.length ? clauses : null;
 }
 
+function limitFacetDistribution(distribution, limit = 5) {
+  if (!distribution || typeof distribution !== 'object') {
+    return {};
+  }
+  return Object.entries(distribution).reduce((acc, [facet, values]) => {
+    if (!values || typeof values !== 'object') {
+      acc[facet] = {};
+      return acc;
+    }
+    const ranked = Object.entries(values)
+      .sort(([, aCount], [, bCount]) => Number(bCount ?? 0) - Number(aCount ?? 0))
+      .slice(0, limit);
+    acc[facet] = Object.fromEntries(ranked);
+    return acc;
+  }, {});
+}
+
 function deriveGeo(entity, hit) {
   if (!hit) {
     return null;
@@ -286,6 +303,26 @@ function formatHit(entity, hit) {
   };
 
   base.imageUrl = pickImage('coverImageUrl', 'thumbnailUrl', 'avatarUrl', 'imageUrl');
+  base.badges = [];
+  if (hit.isFeatured || hit.featured) {
+    base.badges.push('Featured');
+  }
+  if (hit.isSponsored || hit.sponsored) {
+    base.badges.push('Sponsored');
+  }
+  const monetisationTags = sanitiseArray([
+    ...(Array.isArray(hit.monetisationTags) ? hit.monetisationTags : []),
+    ...(Array.isArray(hit.monetizationTags) ? hit.monetizationTags : []),
+    hit.monetisationTag,
+    hit.monetizationTag,
+    hit.sponsorshipLabel,
+    hit.featuredCampaignName,
+    hit.featuredCampaignLabel
+  ]);
+  if (hit.isSponsored || hit.sponsored) {
+    monetisationTags.push('Sponsored listing');
+  }
+  base.monetisationTags = Array.from(new Set(monetisationTags));
   switch (entity) {
     case 'communities': {
       base.title = hit.name;
@@ -481,6 +518,10 @@ export class ExplorerSearchService {
 
     const hits = Array.isArray(result.hits) ? result.hits.map((hit) => formatHit(entity, hit)) : [];
     const markers = hits.map((hit) => hit.geo).filter(Boolean);
+    const preloadImageUrls = hits
+      .map((hit) => hit.imageUrl)
+      .filter((url, index, arr) => typeof url === 'string' && url && arr.indexOf(url) === index)
+      .slice(0, perPage * 2);
     return {
       entity,
       hits,
@@ -492,8 +533,9 @@ export class ExplorerSearchService {
       perPage,
       sort: sortDirectives,
       filter: meiliFilters,
-      facets: result.facetDistribution ?? {},
-      markers
+      facets: limitFacetDistribution(result.facetDistribution ?? {}),
+      markers,
+      preloadImageUrls
     };
   }
 

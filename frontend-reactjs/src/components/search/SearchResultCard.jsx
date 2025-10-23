@@ -71,6 +71,12 @@ export default function SearchResultCard({ entityType, hit }) {
     hit.raw?.thumbnailUrl ??
     hit.raw?.avatarUrl ??
     null;
+  const badges = Array.isArray(hit.badges) ? hit.badges : [];
+  const monetisationTags = Array.isArray(hit.monetisationTags)
+    ? hit.monetisationTags
+    : Array.isArray(hit.monetizationTags)
+    ? hit.monetizationTags
+    : [];
 
   return (
     <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
@@ -89,8 +95,18 @@ export default function SearchResultCard({ entityType, hit }) {
               <span>Visual preview coming soon</span>
             </div>
           )}
-          <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary shadow-sm">
-            <Icon className="h-4 w-4" /> {entityType.replace('-', ' ')}
+          <div className="absolute left-4 top-4 inline-flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary shadow-sm">
+              <Icon className="h-4 w-4" /> {entityType.replace('-', ' ')}
+            </span>
+            {badges.map((badge) => (
+              <span
+                key={badge}
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm"
+              >
+                {badge}
+              </span>
+            ))}
           </div>
         </div>
         <div className="flex flex-col gap-4">
@@ -99,6 +115,15 @@ export default function SearchResultCard({ entityType, hit }) {
             {hit.subtitle ? <p className="mt-1 text-sm font-medium text-slate-500">{hit.subtitle}</p> : null}
             {hit.description ? <p className="mt-3 text-sm leading-relaxed text-slate-600">{hit.description}</p> : null}
           </div>
+          {monetisationTags.length ? (
+            <div className="flex flex-wrap gap-2">
+              {monetisationTags.map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {hit.tags?.length ? (
             <div className="flex flex-wrap gap-2">
               {hit.tags.slice(0, 8).map((tag) => (
@@ -190,6 +215,9 @@ SearchResultCard.propTypes = {
         label: PropTypes.string,
         href: PropTypes.string
       })
-    )
+    ),
+    badges: PropTypes.arrayOf(PropTypes.string),
+    monetisationTags: PropTypes.arrayOf(PropTypes.string),
+    monetizationTags: PropTypes.arrayOf(PropTypes.string)
   }).isRequired
 };
