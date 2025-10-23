@@ -29,4 +29,13 @@ export default class ContentAuditLogModel {
       payload: typeof row.payload === 'string' ? JSON.parse(row.payload || '{}') : row.payload
     }));
   }
+
+  static async listRecent({ limit = 25 } = {}, connection = db) {
+    const safeLimit = Math.max(1, Math.min(200, Number.parseInt(limit, 10) || 25));
+    const rows = await connection(TABLE).select(BASE_COLUMNS).orderBy('created_at', 'desc').limit(safeLimit);
+    return rows.map((row) => ({
+      ...row,
+      payload: typeof row.payload === 'string' ? JSON.parse(row.payload || '{}') : row.payload
+    }));
+  }
 }

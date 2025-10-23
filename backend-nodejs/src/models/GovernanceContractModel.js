@@ -234,6 +234,35 @@ export default class GovernanceContractModel {
     };
   }
 
+  static async listUpcomingReviews({ limit = 5 } = {}, connection = db) {
+    const safeLimit = Math.max(1, Math.min(50, Number.parseInt(limit, 10) || 5));
+    const rows = await connection(TABLE)
+      .select([
+        'id',
+        'public_id as publicId',
+        'vendor_name as vendorName',
+        'contract_type as contractType',
+        'risk_tier as riskTier',
+        'owner_email as ownerEmail',
+        'next_governance_check_at as nextGovernanceCheckAt',
+        'metadata'
+      ])
+      .whereNotNull('next_governance_check_at')
+      .orderBy('next_governance_check_at', 'asc')
+      .limit(safeLimit);
+
+    return rows.map((row) => ({
+      id: row.id,
+      publicId: row.publicId,
+      vendorName: row.vendorName,
+      contractType: row.contractType,
+      riskTier: row.riskTier,
+      ownerEmail: row.ownerEmail,
+      nextGovernanceCheckAt: row.nextGovernanceCheckAt,
+      metadata: parseJson(row.metadata, {})
+    }));
+  }
+
   static async getLifecycleSummary({ windowDays = 90 } = {}, connection = db) {
     const [totalRow, activeRow, renewalRow, overdueRow, escalatedRow] = await Promise.all([
       connection(TABLE).count({ count: '*' }).first(),

@@ -40,4 +40,18 @@ export default class KycAuditLogModel {
       .where('kal.verification_id', verificationId)
       .orderBy('kal.created_at', 'desc');
   }
+
+  static async listRecent({ limit = 25 } = {}, connection = db) {
+    const safeLimit = Math.max(1, Math.min(200, Number.parseInt(limit, 10) || 25));
+    return connection('kyc_audit_logs as kal')
+      .leftJoin('users as actor', 'actor.id', 'kal.actor_id')
+      .select([
+        ...BASE_COLUMNS,
+        'actor.first_name as actorFirstName',
+        'actor.last_name as actorLastName',
+        'actor.email as actorEmail'
+      ])
+      .orderBy('kal.created_at', 'desc')
+      .limit(safeLimit);
+  }
 }
