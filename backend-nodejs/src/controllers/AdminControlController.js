@@ -12,6 +12,7 @@ import PodcastEpisodeModel from '../models/PodcastEpisodeModel.js';
 import PodcastShowModel from '../models/PodcastShowModel.js';
 import TutorProfileModel from '../models/TutorProfileModel.js';
 import { paginated, success } from '../utils/httpResponse.js';
+import adminOperationsOverviewService from '../services/AdminOperationsOverviewService.js';
 
 const listQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
@@ -860,6 +861,22 @@ export default class AdminControlController {
       }
       await PodcastEpisodeModel.deleteById(episodeId);
       return success(res, { data: null, message: 'Podcast episode removed', status: 204 });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async getOverview(req, res, next) {
+    try {
+      const overview = await adminOperationsOverviewService.getOverview({
+        limit: req.query?.limit,
+        auditLimit: req.query?.auditLimit,
+        since: req.query?.since
+      });
+      return success(res, {
+        data: overview,
+        message: 'Admin operations overview generated'
+      });
     } catch (error) {
       return next(error);
     }
