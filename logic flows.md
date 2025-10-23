@@ -2,6 +2,12 @@
 
 This reference maps Edulure's end-to-end logic in a Skool-meets-Udemy shape. Each numbered flow walks through the backend controllers, database layers, services, and React surfaces that turn a user action into a result while keeping the runtime lightweight (frontend, backend, database). Every section provides an outline followed by assessments labelled A–G: redundancy changes, strengths, weaknesses, styling considerations, improvement plans, change checklists, and a release-ready upgrade sequence.
 
+### Alignment checkpoints
+
+- **Preset handshake** – `scripts/dev-stack.mjs` and `backend-nodejs/src/bin/stack.js` now document the exact preset and service-target defaults that power the orchestrated runtime, making it explicit when workers or realtime namespaces join the web server and which job groups (`core`, `analytics`) activate for each preset. This removes guesswork when engineers follow the flow diagrams for scheduler or realtime updates.
+- **Operational hooks** – The checkpoint clarifies where lifecycle telemetry is emitted from `backend-nodejs/src/server.js` so the orchestration logic described in this guide maps directly to the shutdown hooks, signal handlers, and logger fields (`preset`, `targets`, `jobGroups`) present in the codebase.
+- **Docs cross-links** – The introductory sections in `README.md` and `user experience.md` cross-link back to this playbook, ensuring that product, design, and engineering stakeholders can navigate between stack expectations, experience goals, and operational procedures without stale assumptions.
+
 ## 1. Platform setup orchestration
 
 ### Flow outline

@@ -52,9 +52,9 @@ Group 3 – Categories 9-10 (data and alignment)
    C. *Maintenance* – Schedule vacuum/refresh jobs for search views, analytics tables, and ticket escalations to keep internal services responsive.
 
 10. **Alignment changes**
-   A. *Logic flows* – Sync engineering tasks with preset-aware stack scripts, cooperative schedulers, learner lifecycle automation, and ads monetisation updates.
-   B. *User experience* – Ensure design, engineering, and ops teams implement the shared component kits, styling tokens, and accessibility roadmap captured in the UX guide.
-   C. *Operational docs* – Keep README/setup guidance pointing to the simplified stack, emphasising Edulure Search and internal realtime so new contributors follow the correct path.
+   A. ✓ *Logic flows* – Added an "Alignment checkpoints" preface to `logic flows.md` spelling out how `scripts/dev-stack.mjs`, `backend-nodejs/src/bin/stack.js`, and the cooperative starter in `backend-nodejs/src/server.js` exchange preset, target, and job-group context so the orchestration diagrams stay in lockstep with the actual runtime hooks. The notes now explicitly call out the lifecycle metadata fields (preset, targets, jobGroups) emitted by the logger, preventing drift between scheduler expectations, realtime namespaces, and the simplified stack narrative.
+   B. ✓ *User experience* – Extended the intro of `user experience.md` with shared checkpoints that cross-link each experience blueprint to the component registry in `frontend-reactjs/src/components` and the backend services (`PaymentController`, `CommunityPostModerationActionModel`, `LearnerSystemPreferenceModel`) they depend on. This gives design, engineering, and ops teams a single source of truth for which primitives to reuse and which APIs already satisfy the monetisation, safety, and telemetry promises described in the UX guide.
+   C. ✓ *Operational docs* – Updated `README.md` to reference both the logic playbook and UX blueprint in the Further Reading roster, reinforcing the one-command `npm run dev:stack` workflow and signalling that Edulure Search plus the in-process realtime/worker stack ship by default. New contributors now follow the correct documentation trail from setup through experience delivery without reintroducing deprecated worker or Meilisearch paths.
 
 ---
 
