@@ -109,6 +109,9 @@ export async function seed(knex) {
     await trx('community_podcast_episodes').del();
     await trx('community_webinars').del();
     await trx('community_message_moderation_actions').del();
+    await trx('community_post_moderation_followups').del();
+    await trx('community_post_moderation_actions').del();
+    await trx('community_post_moderation_cases').del();
     await trx('community_message_reactions').del();
     await trx('community_channel_members').del();
     await trx('community_messages').del();
@@ -836,6 +839,292 @@ export async function seed(knex) {
           classroomReference: 'LC-AMA-001',
           registrationUrl: 'https://events.edulure.test/ama-multi-channel-funnels'
         })
+      });
+
+    const opsModerationCasePublicId = crypto.randomUUID();
+    const opsModerationFlaggedAt = new Date('2025-03-02T10:15:00Z');
+    const opsModerationEscalatedAt = new Date('2025-03-02T15:40:00Z');
+    const opsFollowUpPublicId = `fup_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
+    const opsFollowUpRemindAt = new Date('2025-03-04T09:00:00Z');
+    const opsCaseMetadata = {
+      summary: 'Potential vendor impersonation flagged on automation roadmap update.',
+      flags: [
+        {
+          actorId: adminId,
+          reason: 'Member reported call-to-action mirroring known impersonation scripts.',
+          riskScore: 78,
+          flaggedSource: 'user_report',
+          evidence: [
+            {
+              type: 'screenshot',
+              value: 'https://cdn.edulure.test/moderation/case-ops-01.png'
+            }
+          ],
+          tags: ['impersonation', 'automation', 'vendor'],
+          flaggedAt: opsModerationFlaggedAt.toISOString()
+        }
+      ],
+      riskHistory: [
+        { riskScore: 78, at: opsModerationFlaggedAt.toISOString() },
+        { riskScore: 82, at: opsModerationEscalatedAt.toISOString() }
+      ],
+      notes: [
+        {
+          message: 'Escalated to policy desk for vendor verification and templated response.',
+          authorId: adminId,
+          createdAt: opsModerationEscalatedAt.toISOString(),
+          action: 'escalate'
+        }
+      ],
+      policySnippets: [
+        {
+          id: 'community-code-of-conduct',
+          contractPublicId: 'gov-contract-community',
+          title: 'Community Code of Conduct',
+          summary: 'Harassment, impersonation, and fraud are prohibited across Edulure spaces.',
+          url: 'https://policies.edulure.test/community-code-of-conduct',
+          tags: ['moderation', 'harassment'],
+          owner: 'policy@edulure.test',
+          riskTier: 'high'
+        }
+      ],
+      aiSuggestions: [
+        {
+          id: 'ai-escalate-critical',
+          message: 'Escalate to trust & safety leadership for immediate review.',
+          severity: 'critical'
+        },
+        {
+          id: 'ai-policy-community-code-of-conduct',
+          message: 'Reference policy “Community Code of Conduct” before finalising the decision.',
+          severity: 'high',
+          policyId: 'community-code-of-conduct'
+        }
+      ],
+      reminders: [
+        {
+          id: opsFollowUpPublicId,
+          remindAt: opsFollowUpRemindAt.toISOString(),
+          status: 'pending',
+          reason: 'Await vendor authenticity verification from compliance review.',
+          requestedBy: adminId
+        }
+      ]
+    };
+
+    const [opsModerationCaseId] = await trx('community_post_moderation_cases').insert({
+      public_id: opsModerationCasePublicId,
+      community_id: opsCommunityId,
+      post_id: opsRoadmapPostId,
+      reporter_id: adminId,
+      assigned_to: adminId,
+      status: 'in_review',
+      severity: 'high',
+      flagged_source: 'user_report',
+      reason: 'Suspected vendor impersonation on automation roadmap update.',
+      risk_score: 82,
+      metadata: JSON.stringify(opsCaseMetadata),
+      escalated_at: opsModerationEscalatedAt,
+      created_at: opsModerationFlaggedAt,
+      updated_at: opsModerationEscalatedAt
+    });
+
+    await trx('community_post_moderation_actions').insert([
+      {
+        case_id: opsModerationCaseId,
+        actor_id: adminId,
+        action: 'flagged',
+        notes: 'Vendor impersonation flagged by automation lead.',
+        metadata: JSON.stringify({
+          riskScore: 78,
+          severity: 'high',
+          flaggedSource: 'user_report',
+          tags: ['impersonation']
+        }),
+        created_at: opsModerationFlaggedAt
+      },
+      {
+        case_id: opsModerationCaseId,
+        actor_id: adminId,
+        action: 'assigned',
+        notes: 'Assigned to automation pod moderator for review.',
+        metadata: JSON.stringify({ assignedTo: adminId }),
+        created_at: new Date('2025-03-02T12:05:00Z')
+      },
+      {
+        case_id: opsModerationCaseId,
+        actor_id: adminId,
+        action: 'updated',
+        notes: 'Added policy snippet guidance and AI recommendation context.',
+        metadata: JSON.stringify({ riskScore: 82, severity: 'high' }),
+        created_at: opsModerationEscalatedAt
+      }
+    ]);
+
+    await trx('community_post_moderation_followups').insert({
+      case_id: opsModerationCaseId,
+      public_id: opsFollowUpPublicId,
+      status: 'pending',
+      remind_at: opsFollowUpRemindAt,
+      reason: 'Await vendor authenticity verification from compliance review.',
+      metadata: JSON.stringify({
+        requestedBy: adminId,
+        casePublicId: opsModerationCasePublicId,
+        lastAction: 'updated'
+      }),
+      created_at: opsModerationEscalatedAt,
+      updated_at: opsModerationEscalatedAt
+    });
+
+    await trx('community_posts')
+      .where({ id: opsRoadmapPostId })
+      .update({
+        moderation_state: 'under_review',
+        moderation_metadata: JSON.stringify(opsCaseMetadata),
+        last_moderated_at: opsModerationEscalatedAt
+      });
+
+    const growthModerationCasePublicId = crypto.randomUUID();
+    const growthModerationFlaggedAt = new Date('2025-02-24T14:20:00Z');
+    const growthModerationResolvedAt = new Date('2025-02-24T16:45:00Z');
+    const growthFollowUpPublicId = `fup_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
+    const growthFollowUpRemindAt = new Date('2025-02-25T09:00:00Z');
+    const growthFollowUpProcessedAt = new Date('2025-02-25T09:05:00Z');
+    const growthCaseMetadata = {
+      summary: 'Automated detection flagged duplicate promotional link for AMA campaign.',
+      flags: [
+        {
+          actorId: instructorId,
+          reason: 'Automated detection flagged duplicate promotional link.',
+          riskScore: 46,
+          flaggedSource: 'automated_detection',
+          evidence: [
+            {
+              type: 'detection',
+              value: 'https://cdn.edulure.test/moderation/detection-growth-ama.json'
+            }
+          ],
+          tags: ['promotion', 'spam'],
+          flaggedAt: growthModerationFlaggedAt.toISOString()
+        }
+      ],
+      riskHistory: [
+        { riskScore: 46, at: growthModerationFlaggedAt.toISOString() },
+        { riskScore: 32, at: growthModerationResolvedAt.toISOString() }
+      ],
+      notes: [
+        {
+          message: 'Confirmed co-host legitimacy and reinstated promotional link with guardrails.',
+          authorId: adminId,
+          createdAt: growthModerationResolvedAt.toISOString(),
+          action: 'approve'
+        }
+      ],
+      policySnippets: [
+        {
+          id: 'promotion-guidelines',
+          contractPublicId: 'gov-contract-growth',
+          title: 'Promotions & Affiliate Guidelines',
+          summary: 'Requirements for sharing promotional and affiliate links during community events.',
+          url: 'https://policies.edulure.test/promo-affiliate',
+          tags: ['moderation', 'spam'],
+          owner: 'growth-ops@edulure.test',
+          riskTier: 'medium'
+        }
+      ],
+      aiSuggestions: [
+        {
+          id: 'ai-acknowledge',
+          message: 'Acknowledge the report and update the reporter within 24 hours.',
+          severity: 'medium'
+        },
+        {
+          id: 'ai-policy-promotion-guidelines',
+          message: 'Reference policy “Promotions & Affiliate Guidelines” before finalising the decision.',
+          severity: 'medium',
+          policyId: 'promotion-guidelines'
+        }
+      ],
+      reminders: [
+        {
+          id: growthFollowUpPublicId,
+          remindAt: growthFollowUpRemindAt.toISOString(),
+          status: 'notified',
+          reason: 'Confirm AMA host posted compliance summary and link guardrails.',
+          requestedBy: instructorId,
+          processedAt: growthFollowUpProcessedAt.toISOString()
+        }
+      ]
+    };
+
+    const [growthModerationCaseId] = await trx('community_post_moderation_cases').insert({
+      public_id: growthModerationCasePublicId,
+      community_id: growthCommunityId,
+      post_id: growthCampaignPostId,
+      reporter_id: instructorId,
+      assigned_to: adminId,
+      status: 'approved',
+      severity: 'medium',
+      flagged_source: 'automated_detection',
+      reason: 'Automated detection flagged duplicate promotional link.',
+      risk_score: 46,
+      metadata: JSON.stringify(growthCaseMetadata),
+      resolved_at: growthModerationResolvedAt,
+      resolved_by: adminId,
+      created_at: growthModerationFlaggedAt,
+      updated_at: growthModerationResolvedAt
+    });
+
+    await trx('community_post_moderation_actions').insert([
+      {
+        case_id: growthModerationCaseId,
+        actor_id: instructorId,
+        action: 'flagged',
+        notes: 'Automated detection queued the AMA promo link for review.',
+        metadata: JSON.stringify({ riskScore: 46, flaggedSource: 'automated_detection' }),
+        created_at: growthModerationFlaggedAt
+      },
+      {
+        case_id: growthModerationCaseId,
+        actor_id: adminId,
+        action: 'escalated',
+        notes: 'Growth operations validating promo guardrails with compliance.',
+        metadata: JSON.stringify({ severity: 'medium' }),
+        created_at: new Date('2025-02-24T15:05:00Z')
+      },
+      {
+        case_id: growthModerationCaseId,
+        actor_id: adminId,
+        action: 'approved',
+        notes: 'Legitimate co-host promotion confirmed and post restored.',
+        metadata: JSON.stringify({ riskScore: 32, archivePost: false }),
+        created_at: growthModerationResolvedAt
+      }
+    ]);
+
+    await trx('community_post_moderation_followups').insert({
+      case_id: growthModerationCaseId,
+      public_id: growthFollowUpPublicId,
+      status: 'notified',
+      remind_at: growthFollowUpRemindAt,
+      reason: 'Confirm AMA host posted compliance summary and link guardrails.',
+      metadata: JSON.stringify({
+        requestedBy: instructorId,
+        casePublicId: growthModerationCasePublicId,
+        lastAction: 'approve',
+        processedAt: growthFollowUpProcessedAt.toISOString()
+      }),
+      processed_at: growthFollowUpProcessedAt,
+      created_at: growthModerationResolvedAt,
+      updated_at: growthFollowUpProcessedAt
+    });
+
+    await trx('community_posts')
+      .where({ id: growthCampaignPostId })
+      .update({
+        moderation_state: 'clean',
+        moderation_metadata: JSON.stringify(growthCaseMetadata),
+        last_moderated_at: growthModerationResolvedAt
       });
 
     const [opsBlueprintResourceId] = await trx('community_resources').insert({

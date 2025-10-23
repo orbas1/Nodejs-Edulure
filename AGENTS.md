@@ -739,17 +739,21 @@ G. **Full Upgrade Plan & Release Steps** – Build shared directory component, e
   community identifier.
 - **Backend case intelligence** – Extended
   `backend-nodejs/src/services/CommunityModerationService.js` to hydrate policy snippets from
-  `GovernanceContractModel`, generate AI suggestion metadata, clamp risk scores, and expose reminder metadata alongside
-  case details.
+  `GovernanceContractModel`, generate AI suggestion metadata, clamp risk scores, expose reminder metadata alongside
+  case details, and normalise case-action audit trails so stored events respect persistence enums.
 - **Follow-up persistence & jobs** – Introduced migration `backend-nodejs/migrations/20250320124500_moderation_followups.js`,
   the persistence helper `backend-nodejs/src/models/ModerationFollowUpModel.js`, controller validations for follow-up
-  fields, and the scheduled runner `backend-nodejs/src/jobs/moderationFollowUpJob.js` registered via
-  `backend-nodejs/src/servers/workerService.js` to notify moderators when reminders mature.
+  fields, tightened the scheduler query window to honour the lookahead horizon, and registered the
+  `backend-nodejs/src/jobs/moderationFollowUpJob.js` runner via `backend-nodejs/src/servers/workerService.js` so
+  moderators are notified when reminders mature.
 - **Surface adoption** – Refactored community (`frontend-reactjs/src/pages/dashboard/community/CommunitySafety.jsx`) and
   admin (`frontend-reactjs/src/pages/dashboard/admin/AdminSupportHub.jsx`) dashboards to consume the shared queue/workspace
   primitives while preserving existing incident backlogs and support automation panels.
 - **API coverage & caching** – Expanded `frontend-reactjs/src/api/moderationApi.js` for listing cases, fetching detail,
   retrieving action history, and applying decisions with cache-tag invalidation so UI refreshes stay efficient.
+- **Data seeding alignment** – Bootstrapped moderation cases, actions, and follow-up reminders in
+  `backend-nodejs/seeds/001_bootstrap.js` so QA fixtures mirror production schema defaults and queue widgets
+  demonstrate reminder lifecycles out of the box.
 
 ### Assessments
 A. ✅

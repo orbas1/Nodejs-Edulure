@@ -125,6 +125,25 @@ function ensureActionAllowed(action) {
   }
 }
 
+function mapActionForHistory(action) {
+  switch (action) {
+    case 'assign':
+      return 'assigned';
+    case 'escalate':
+      return 'escalated';
+    case 'approve':
+      return 'approved';
+    case 'reject':
+      return 'rejected';
+    case 'suppress':
+      return 'suppressed';
+    case 'restore':
+      return 'restored';
+    default:
+      return action;
+  }
+}
+
 function normaliseTags(tags = []) {
   return Array.isArray(tags)
     ? tags
@@ -668,7 +687,7 @@ export default class CommunityModerationService {
         {
           caseId: updatedCase.id,
           actorId: actor.id,
-          action: payload.action,
+          action: mapActionForHistory(payload.action),
           notes: payload.notes ?? null,
           metadata: {
             riskScore,

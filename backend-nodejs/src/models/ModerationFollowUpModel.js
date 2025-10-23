@@ -94,7 +94,6 @@ export default class ModerationFollowUpModel {
       })
       .where({ status: 'pending' })
       .where('remind_at', '<=', lookaheadTime)
-      .andWhere('remind_at', '<=', now)
       .orderBy('remind_at', 'asc')
       .limit(limit);
 
