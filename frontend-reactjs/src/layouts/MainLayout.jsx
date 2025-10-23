@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, useCallback } from 'react';
+import { Fragment, useMemo, useState, useCallback, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Disclosure, Transition, Dialog } from '@headlessui/react';
 import {
@@ -31,6 +31,11 @@ import ServiceHealthBanner from '../components/status/ServiceHealthBanner.jsx';
 import HeaderMegaMenu from '../components/navigation/HeaderMegaMenu.jsx';
 import MobileMegaMenu from '../components/navigation/MobileMegaMenu.jsx';
 import CommunityCrudManager from '../components/community/CommunityCrudManager.jsx';
+import {
+  observeBreakpoint,
+  observeHighContrast,
+  observePrefersReducedMotion
+} from '../utils/a11y.js';
 
 const DASHBOARD_PATH_BY_ROLE = {
   admin: '/dashboard/admin',
@@ -52,6 +57,68 @@ export default function MainLayout() {
   const contentLibraryEnabled = isFeatureEnabled('content.library', true);
 
   const [communityConsoleOpen, setCommunityConsoleOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return () => {};
+    }
+
+    const detach = observePrefersReducedMotion((isReduced) => {
+      if (typeof document === 'undefined') {
+        return;
+      }
+      const body = document.body;
+      if (!body || body.dataset.motionSource === 'user') {
+        return;
+      }
+      body.dataset.motionSource = 'system';
+      body.setAttribute('data-motion', isReduced ? 'reduce' : 'standard');
+    });
+
+    return () => {
+      const body = typeof document === 'undefined' ? null : document.body;
+      if (body && body.dataset.motionSource === 'system') {
+        body.removeAttribute('data-motion');
+        delete body.dataset.motionSource;
+      }
+      detach();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return () => {};
+    }
+
+    const detach = observeHighContrast((isHigh) => {
+      if (typeof document === 'undefined') {
+        return;
+      }
+      const body = document.body;
+      if (!body || body.dataset.contrastSource === 'user') {
+        return;
+      }
+      body.dataset.contrastSource = 'system';
+      body.setAttribute('data-contrast', isHigh ? 'high' : 'standard');
+    });
+
+    return () => {
+      const body = typeof document === 'undefined' ? null : document.body;
+      if (body && body.dataset.contrastSource === 'system') {
+        body.removeAttribute('data-contrast');
+        delete body.dataset.contrastSource;
+      }
+      detach();
+    };
+  }, []);
+
+  useEffect(() => {
+    return observeBreakpoint('lg', (matches) => {
+      if (matches) {
+        setCommunityConsoleOpen(false);
+      }
+    });
+  }, [setCommunityConsoleOpen]);
 
   const handleOpenCommunityConsole = useCallback(() => {
     setCommunityConsoleOpen(true);
@@ -756,6 +823,9 @@ export default function MainLayout() {
 
   return (
     <div className="min-h-screen bg-white">
+      <a href="#main-content" className="skip-to-content">
+        {t('navigation.skipToContent', 'Skip to main content')}
+      </a>
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
           <a href="/" className="flex items-center gap-3 sm:gap-4" aria-label="Edulure home">
@@ -960,7 +1030,7 @@ export default function MainLayout() {
         </div>
       </header>
       <ServiceHealthBanner />
-      <main className="bg-white">
+      <main id="main-content" className="bg-white">
         <Outlet key={location.pathname} />
       </main>
       <footer

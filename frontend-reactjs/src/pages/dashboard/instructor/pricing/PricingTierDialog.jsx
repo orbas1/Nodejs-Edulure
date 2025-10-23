@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { trapFocus } from '../../../../utils/a11y.js';
 
 const DEFAULT_FORM = {
   name: '',
@@ -47,6 +48,8 @@ export default function PricingTierDialog({
   onDelete,
   deleting
 }) {
+  const containerRef = useRef(null);
+  const closeButtonRef = useRef(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [errors, setErrors] = useState({});
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -72,7 +75,20 @@ export default function PricingTierDialog({
       : DEFAULT_FORM;
     setForm(initial);
     setErrors({});
+    requestAnimationFrame(() => {
+      closeButtonRef.current?.focus({ preventScroll: true });
+    });
   }, [isOpen, tier]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return () => {};
+    }
+
+    return trapFocus(containerRef.current, {
+      initialFocus: closeButtonRef.current
+    });
+  }, [isOpen]);
 
   const dialogTitle = useMemo(
     () => (mode === 'edit' ? 'Update subscription tier' : 'Create subscription tier'),
@@ -138,6 +154,7 @@ export default function PricingTierDialog({
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4"
       role="dialog"
       aria-modal="true"
@@ -156,7 +173,12 @@ export default function PricingTierDialog({
               Define pricing, benefits, and billing cadence for your gated community experiences.
             </p>
           </div>
-          <button type="button" className="dashboard-pill" onClick={onClose}>
+          <button
+            type="button"
+            className="dashboard-pill"
+            onClick={onClose}
+            ref={closeButtonRef}
+          >
             Close
           </button>
         </div>

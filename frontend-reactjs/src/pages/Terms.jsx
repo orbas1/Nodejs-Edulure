@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import PageHero from '../components/PageHero.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import { prefersReducedMotion } from '../utils/a11y.js';
 
 const companyProfile = {
   name: 'Blackwellen Ltd',
@@ -298,8 +299,8 @@ export default function Terms() {
         return;
       }
 
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      element.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+      const reduceMotion = prefersReducedMotion();
+      element.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
       setActiveSection(id);
 
       try {
