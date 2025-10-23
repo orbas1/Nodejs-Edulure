@@ -75,7 +75,8 @@ const DEFAULT_SYSTEM_FORM = {
     interfaceDensity: 'comfortable',
     analyticsOptIn: true,
     subtitleLanguage: 'en',
-    audioDescription: false
+    audioDescription: false,
+    adsOptOut: false
   }
 };
 
@@ -711,6 +712,19 @@ export default function LearnerSettings() {
                 type="checkbox"
                 name="preferences.audioDescription"
                 checked={systemForm.preferences.audioDescription}
+                onChange={handleSystemInputChange}
+                className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
+              />
+            </label>
+            <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+              <div>
+                <p className="font-semibold text-slate-900">Hide sponsored placements</p>
+                <p className="text-xs text-slate-500">Remove ads and sponsored cards from your feed.</p>
+              </div>
+              <input
+                type="checkbox"
+                name="preferences.adsOptOut"
+                checked={systemForm.preferences.adsOptOut}
                 onChange={handleSystemInputChange}
                 className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
               />

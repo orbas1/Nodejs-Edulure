@@ -54,7 +54,8 @@ describe('<LearnerSettings />', () => {
             interfaceDensity: 'comfortable',
             analyticsOptIn: true,
             subtitleLanguage: 'en',
-            audioDescription: false
+            audioDescription: false,
+            adsOptOut: false
           }
         },
         finance: {
@@ -132,7 +133,8 @@ describe('<LearnerSettings />', () => {
           interfaceDensity: 'comfortable',
           analyticsOptIn: true,
           subtitleLanguage: 'en',
-          audioDescription: false
+          audioDescription: false,
+          adsOptOut: false
         }
       }
     });
@@ -173,12 +175,16 @@ describe('<LearnerSettings />', () => {
     render(<LearnerSettings />);
 
     await user.selectOptions(screen.getByLabelText(/^language$/i), 'fr');
+    await user.click(screen.getByRole('checkbox', { name: /hide sponsored placements/i }));
     await user.click(screen.getByRole('button', { name: /save system preferences/i }));
 
     await waitFor(() => {
       expect(updateSystemPreferencesMock).toHaveBeenCalledWith({
         token: 'token-123',
-        payload: expect.objectContaining({ language: 'fr' })
+        payload: expect.objectContaining({
+          language: 'fr',
+          preferences: expect.objectContaining({ adsOptOut: true })
+        })
       });
     });
   });
