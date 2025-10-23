@@ -6,7 +6,7 @@ export async function up(knex) {
   if (!hasEvents) {
     await knex.schema.createTable('explorer_search_events', (table) => {
       table.increments('id').primary();
-      table.uuid('event_uuid').notNullable().defaultTo(knex.raw('(UUID())'));
+      table.uuid('event_uuid').notNullable();
       table
         .integer('user_id')
         .unsigned()

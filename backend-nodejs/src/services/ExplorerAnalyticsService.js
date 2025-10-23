@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import db from '../config/database.js';
+import { prepareExplorerEntityMetadata } from '../utils/explorerMetadata.js';
 import logger from '../config/logger.js';
 import ExplorerSearchEventModel from '../models/ExplorerSearchEventModel.js';
 import ExplorerSearchEventEntityModel from '../models/ExplorerSearchEventEntityModel.js';
@@ -65,19 +66,33 @@ function serialiseEntityRecord(entityType, entityResult) {
   const displayedHits = Number(entityResult.displayedHits ?? entityResult.hits?.length ?? 0);
   const totalHits = Number(entityResult.totalHits ?? entityResult.total ?? 0);
   const processingTimeMs = Number(entityResult.processingTimeMs ?? entityResult.processingTime ?? 0);
+
+  const metadata = prepareExplorerEntityMetadata({
+    ...(entityResult.metadata ?? {}),
+    facets: entityResult.facets ?? entityResult.metadata?.facets ?? {},
+    markers: entityResult.markers ?? entityResult.metadata?.markers ?? [],
+    previewImages:
+      entityResult.preloadImageUrls ??
+      entityResult.metadata?.previewImages ??
+      (Array.isArray(entityResult.hits)
+        ? entityResult.hits
+            .map((hit) => (typeof hit?.imageUrl === 'string' ? hit.imageUrl : null))
+            .filter(Boolean)
+        : []),
+    page: entityResult.page ?? entityResult.metadata?.page ?? 1,
+    perPage: entityResult.perPage ?? entityResult.metadata?.perPage ?? displayedHits
+  });
+
+  metadata.page = Number.isFinite(Number(metadata.page)) ? Number(metadata.page) : 1;
+  metadata.perPage = Number.isFinite(Number(metadata.perPage)) ? Number(metadata.perPage) : displayedHits;
+
   return {
     entityType,
     totalHits,
     displayedHits,
     processingTimeMs,
     isZeroResult: totalHits === 0,
-    metadata: {
-      facets: entityResult.facets ?? {},
-      page: entityResult.page ?? 1,
-      perPage: entityResult.perPage ?? displayedHits,
-      markers: entityResult.markers ?? [],
-      previewImages: entityResult.preloadImageUrls ?? []
-    }
+    metadata
   };
 }
 

@@ -2224,6 +2224,57 @@ export async function seed(knex) {
     const analyticsTwoDaysAgo = new Date(analyticsToday.getTime() - 2 * 24 * 60 * 60 * 1000);
 
     const explorerSeedUuid = crypto.randomUUID();
+    const explorerPreviewImages = [
+      'https://cdn.edulure.test/explorer/courses/automation-masterclass.jpg',
+      'https://cdn.edulure.test/explorer/communities/learning-ops-guild.jpg',
+      'https://cdn.edulure.test/explorer/tutors/automation-coach.jpg',
+      'https://cdn.edulure.test/explorer/ebooks/automation-playbook.jpg'
+    ];
+    const explorerMarkers = [
+      {
+        latitude: 37.7749,
+        longitude: -122.4194,
+        label: 'Automation Masterclass',
+        country: 'US',
+        context: 'courses'
+      },
+      {
+        latitude: 51.5074,
+        longitude: -0.1278,
+        label: 'Learning Ops Guild',
+        country: 'UK',
+        context: 'communities'
+      },
+      {
+        latitude: 35.6762,
+        longitude: 139.6503,
+        label: 'Kai Automation Coaching',
+        country: 'JP',
+        context: 'tutors'
+      }
+    ];
+    const explorerFacetSummary = {
+      communities: { timezone: { UTC: 12, PST: 6 } },
+      courses: { level: { advanced: 8, intermediate: 4 }, modality: { cohort: 6, selfPaced: 8 } },
+      tutors: { languages: { en: 10, es: 2 } }
+    };
+    const explorerAdsPlacements = [
+      {
+        placementId: 'seed-search-placement-1',
+        campaignId: `campaign:${growthAdsCampaignId}`,
+        slot: 'search-inline',
+        position: 1,
+        headline: 'Launch your automation academy',
+        description: 'Promote your cohort with Edulure Ads and reach ready-to-enrol learners.',
+        ctaUrl: 'https://ads.edulure.test/launch',
+        advertiser: 'Edulure Marketing',
+        objective: 'acquisition',
+        disclosure: 'Sponsored',
+        tracking: {
+          impression: 'https://ads.edulure.test/i/seed-search-placement-1'
+        }
+      }
+    ];
     const [explorerSeedEventId] = await trx('explorer_search_events').insert({
       event_uuid: explorerSeedUuid,
       user_id: adminId,
@@ -2236,7 +2287,17 @@ export async function seed(knex) {
       filters: JSON.stringify({ courses: { level: ['advanced'] } }),
       global_filters: JSON.stringify({ languages: ['en'] }),
       sort_preferences: JSON.stringify({ courses: 'rating', communities: 'trending' }),
-      metadata: JSON.stringify({ source: 'seed', cohort: 'operations' })
+      metadata: JSON.stringify({
+        source: 'seed',
+        cohort: 'operations',
+        previewImages: explorerPreviewImages,
+        facets: explorerFacetSummary,
+        markers: explorerMarkers,
+        adsPlacements: explorerAdsPlacements,
+        totals: { communities: 18, courses: 14, tutors: 10 },
+        entityOrder: ['communities', 'courses', 'tutors'],
+        savedSearchId: null
+      })
     });
 
     await trx('explorer_search_event_entities').insert([
@@ -2249,7 +2310,13 @@ export async function seed(knex) {
         is_zero_result: false,
         click_count: 2,
         conversion_count: 0,
-        metadata: JSON.stringify({ category: 'operations', timezone: 'UTC' })
+        metadata: JSON.stringify({
+          category: 'operations',
+          timezone: 'UTC',
+          previewImages: ['https://cdn.edulure.test/explorer/communities/learning-ops-guild.jpg'],
+          markers: [explorerMarkers[1]],
+          facets: explorerFacetSummary.communities
+        })
       },
       {
         event_id: explorerSeedEventId,
@@ -2260,7 +2327,13 @@ export async function seed(knex) {
         is_zero_result: false,
         click_count: 3,
         conversion_count: 1,
-        metadata: JSON.stringify({ delivery: 'cohort', rating: 4.8 })
+        metadata: JSON.stringify({
+          delivery: 'cohort',
+          rating: 4.8,
+          previewImages: ['https://cdn.edulure.test/explorer/courses/automation-masterclass.jpg'],
+          markers: [explorerMarkers[0]],
+          facets: explorerFacetSummary.courses
+        })
       },
       {
         event_id: explorerSeedEventId,
@@ -2271,7 +2344,13 @@ export async function seed(knex) {
         is_zero_result: false,
         click_count: 1,
         conversion_count: 0,
-        metadata: JSON.stringify({ languages: ['en'], verified: true })
+        metadata: JSON.stringify({
+          languages: ['en'],
+          verified: true,
+          previewImages: ['https://cdn.edulure.test/explorer/tutors/automation-coach.jpg'],
+          markers: [explorerMarkers[2]],
+          facets: explorerFacetSummary.tutors
+        })
       }
     ]);
 

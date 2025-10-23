@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { prepareExplorerEntityMetadata } from '../utils/explorerMetadata.js';
 
 function parseJson(value, fallback = {}) {
   if (value === null || value === undefined) {
@@ -28,7 +29,7 @@ function toDomain(row) {
     isZeroResult: Boolean(row.is_zero_result),
     clickCount: Number(row.click_count ?? 0),
     conversionCount: Number(row.conversion_count ?? 0),
-    metadata: parseJson(row.metadata, {}),
+    metadata: prepareExplorerEntityMetadata(parseJson(row.metadata, {})),
     createdAt: row.created_at
   };
 }
@@ -47,7 +48,7 @@ export default class ExplorerSearchEventEntityModel {
       is_zero_result: Boolean(entity.isZeroResult),
       click_count: Number(entity.clickCount ?? 0),
       conversion_count: Number(entity.conversionCount ?? 0),
-      metadata: JSON.stringify(entity.metadata ?? {})
+      metadata: JSON.stringify(prepareExplorerEntityMetadata(entity.metadata ?? {}))
     }));
     await connection('explorer_search_event_entities').insert(payloads);
     return this.listByEventId(eventId, connection);

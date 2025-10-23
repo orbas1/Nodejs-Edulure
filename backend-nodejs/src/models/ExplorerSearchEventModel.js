@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { prepareExplorerEventMetadata } from '../utils/explorerMetadata.js';
 
 function parseJson(value, fallback = {}) {
   if (value === null || value === undefined) {
@@ -117,7 +118,7 @@ function toDomain(row) {
     filters: parseJson(row.filters, {}),
     globalFilters: parseJson(row.global_filters, {}),
     sortPreferences: parseJson(row.sort_preferences, {}),
-    metadata: parseJson(row.metadata, {}),
+    metadata: prepareExplorerEventMetadata(parseJson(row.metadata, {})),
     createdAt: row.created_at
   };
 }
@@ -144,7 +145,7 @@ export default class ExplorerSearchEventModel {
       filters: serialiseJson(payload.filters ?? {}),
       global_filters: serialiseJson(payload.globalFilters ?? {}),
       sort_preferences: serialiseJson(payload.sortPreferences ?? {}),
-      metadata: serialiseJson(payload.metadata ?? {})
+      metadata: serialiseJson(prepareExplorerEventMetadata(payload.metadata ?? {}))
     };
 
     const [id] = await connection('explorer_search_events').insert(insertPayload);

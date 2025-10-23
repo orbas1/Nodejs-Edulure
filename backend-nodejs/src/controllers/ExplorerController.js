@@ -4,6 +4,7 @@ import explorerSearchService from '../services/ExplorerSearchService.js';
 import explorerAnalyticsService from '../services/ExplorerAnalyticsService.js';
 import savedSearchService from '../services/SavedSearchService.js';
 import { success } from '../utils/httpResponse.js';
+import { prepareExplorerEventMetadata } from '../utils/explorerMetadata.js';
 
 const SUPPORTED_ENTITIES = explorerSearchService.getSupportedEntities();
 
@@ -48,6 +49,43 @@ const updateSavedSearchSchema = Joi.object({
   lastUsedAt: Joi.date()
 }).min(1);
 
+function collectPreviewImageCandidates(resultsByEntity = {}) {
+  const previews = [];
+  for (const summary of Object.values(resultsByEntity)) {
+    if (Array.isArray(summary?.preloadImageUrls)) {
+      previews.push(...summary.preloadImageUrls);
+    }
+    if (Array.isArray(summary?.hits)) {
+      for (const hit of summary.hits) {
+        if (typeof hit?.imageUrl === 'string' && hit.imageUrl) {
+          previews.push(hit.imageUrl);
+        }
+      }
+    }
+  }
+  return previews;
+}
+
+function collectFacetSummary(resultsByEntity = {}) {
+  const summary = {};
+  for (const [entity, result] of Object.entries(resultsByEntity)) {
+    if (result?.facets && typeof result.facets === 'object') {
+      summary[entity] = result.facets;
+    }
+  }
+  return summary;
+}
+
+function collectMarkers(markers = {}) {
+  if (Array.isArray(markers)) {
+    return markers;
+  }
+  if (Array.isArray(markers?.items)) {
+    return markers.items;
+  }
+  return [];
+}
+
 export default class ExplorerController {
   static async search(req, res, next) {
     try {
@@ -82,6 +120,18 @@ export default class ExplorerController {
           (acc, { result: summary }) => acc + Number(summary?.processingTimeMs ?? 0),
           0
         );
+        const analyticsMetadata = prepareExplorerEventMetadata({
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+          savedSearchId: payload.savedSearchId ?? null,
+          previewImages: collectPreviewImageCandidates(result.results),
+          facets: collectFacetSummary(result.results),
+          markers: collectMarkers(result.markers),
+          adsPlacements: result.adsPlacements ?? [],
+          totals: result.totals ?? {},
+          entityOrder: result.entities ?? []
+        });
+
         analyticsContext = await explorerAnalyticsService.recordSearchExecution({
           query: payload.query ?? '',
           entitySummaries,
@@ -92,11 +142,7 @@ export default class ExplorerController {
           globalFilters: payload.globalFilters,
           sort: payload.sort,
           latencyMs,
-          metadata: {
-            ip: req.ip,
-            userAgent: req.get('user-agent'),
-            savedSearchId: payload.savedSearchId ?? null
-          }
+          metadata: analyticsMetadata
         });
       } catch (analyticsError) {
         req.log?.warn({ err: analyticsError }, 'Failed to record explorer analytics event');
