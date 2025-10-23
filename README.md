@@ -189,10 +189,36 @@ npm run test
 npm run audit
 ```
 
+### One-command stack launcher
+
+Use the unified launcher to prepare the database and run backend + frontend services with a single command. Presets control which subsystems start automatically.
+
+```bash
+# Start lite preset (HTTP APIs with in-process jobs + websocket gateway)
+npm run dev:stack -- --preset=lite
+
+# Start full preset (includes heavy schedulers and realtime fan-out)
+npm run dev:stack -- --preset=full
+
+# Skip frontend if you only need the backend
+npm run dev:stack -- --preset=lite -- --skip-frontend
+```
+
+- `--preset=lite` (default) launches the API with internalised job runners, realtime gateway, messaging, and search so only the frontend and backend processes are required locally.
+- `--preset=full` mirrors production by enabling heavier scheduler groups and realtime broadcasting, still inside the primary backend process.
+- `--preset=analytics` extends `full` by starting analytics/billing exporters; use when testing heavy data workflows.
+- `--service-target=<list>` overrides preset defaults if you need explicit control (for example, `web,worker`).
+
+When the launcher runs it:
+
+1. Ensures Postgres migrations and seeds execute once, caching completion in `.edulure/setup-state.json` to avoid redundant installs.
+2. Boots the backend with the cooperative job coordinator so worker, realtime, messaging, video, and notification subsystems live inside the same Node.js process.
+3. Enables the Edulure Search provider (Postgres-backed) and exposes health/readiness probes before starting the frontend.
+4. Streams prefixed logs (`[web]`, `[jobs]`, `[search]`, `[realtime]`) so you can differentiate subsystems quickly and see remediation hints if environment variables are missing.
+
 ### Guided installation UI
 
-The repository now ships a browser-based installer that writes `.env.local` files, provisions the database, configures
-Meilisearch, and warms the worker + realtime gateways. After installing dependencies:
+The browser-based installer remains available for teams that prefer a graphical setup walkthrough. It writes `.env.local` files, provisions the database, seeds Edulure Search metadata (Postgres materialised views), and warms the internalised job/realtime subsystems. After installing dependencies:
 
 1. Start the backend API in one terminal so the installer endpoints are available:
 
@@ -208,8 +234,8 @@ Meilisearch, and warms the worker + realtime gateways. After installing dependen
 
 3. Visit [http://localhost:5173/setup](http://localhost:5173/setup) and follow the guided steps. Provide local or Cloudflare R2
    storage credentials, review the generated environment variables, and launch the installer. The UI streams task logs while it
-   writes environment files, applies database migrations + seeds, provisions Meilisearch indexes, lint-checks the backend, and
-   warms worker/realtime services.
+   writes environment files, applies database migrations + seeds, builds Edulure Search indexes, lint-checks the backend, and
+   verifies that worker/realtime/messaging schedulers are running inside the main process.
 
 You can rerun individual tasks (for example, rebuilding the frontend bundle) by deselecting the steps you wish to skip before
 relaunching the installer.
