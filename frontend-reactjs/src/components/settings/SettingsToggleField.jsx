@@ -13,6 +13,8 @@ export default function SettingsToggleField({
 }) {
   const autoId = useId();
   const controlId = id ?? `${name ?? 'settings-toggle'}-${autoId}`;
+  const labelId = `${controlId}-label`;
+  const descriptionId = description ? `${controlId}-description` : undefined;
 
   return (
     <div
@@ -22,10 +24,14 @@ export default function SettingsToggleField({
       )}
     >
       <div className="max-w-xl">
-        <label htmlFor={controlId} className="text-sm font-semibold text-slate-800">
+        <label id={labelId} htmlFor={controlId} className="text-sm font-semibold text-slate-800">
           {label}
         </label>
-        {description ? <p className="mt-1 text-xs text-slate-500">{description}</p> : null}
+        {description ? (
+          <p id={descriptionId} className="mt-1 text-xs text-slate-500">
+            {description}
+          </p>
+        ) : null}
       </div>
       <div className="flex items-center gap-3">
         <input
@@ -45,13 +51,10 @@ export default function SettingsToggleField({
             disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
           )}
           onClick={() => onChange(!checked)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              onChange(!checked);
-            }
-          }}
-          aria-pressed={checked}
+          role="switch"
+          aria-checked={checked}
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
           aria-controls={controlId}
           disabled={disabled}
         >
