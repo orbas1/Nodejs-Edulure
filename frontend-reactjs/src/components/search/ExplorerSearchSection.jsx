@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 import SearchResultCard from './SearchResultCard.jsx';
+import ExplorerPreviewDrawer from './ExplorerPreviewDrawer.jsx';
 import FilterChips, { buildFilterChips } from './FilterChips.jsx';
 import { useExplorerEntitySearch } from '../../hooks/useExplorerEntitySearch.js';
 
@@ -176,6 +177,8 @@ export default function ExplorerSearchSection({
   const [editingSearchId, setEditingSearchId] = useState(null);
   const [editingName, setEditingName] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [previewHit, setPreviewHit] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const {
     query,
@@ -327,6 +330,29 @@ export default function ExplorerSearchSection({
     };
   }, [hasMore, loadMore]);
 
+  const handleOpenPreview = useCallback((hit) => {
+    setPreviewHit(hit);
+    setPreviewOpen(true);
+  }, []);
+
+  const handleClosePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewHit(null);
+  }, []);
+
+  useEffect(() => {
+    if (!previewHit) return;
+    const previewKey = previewHit.id ?? previewHit.documentId ?? previewHit.slug;
+    const stillExists = results.some((candidate) => {
+      const candidateKey = candidate.id ?? candidate.documentId ?? candidate.slug;
+      return previewKey && candidateKey ? candidateKey === previewKey : candidate === previewHit;
+    });
+    if (!stillExists) {
+      setPreviewOpen(false);
+      setPreviewHit(null);
+    }
+  }, [previewHit, results]);
+
   return (
     <section className="rounded-4xl bg-white/80 p-8 shadow-xl ring-1 ring-slate-100">
       <header className="flex flex-col gap-6 border-b border-slate-100 pb-6 lg:flex-row lg:items-center lg:justify-between">
@@ -459,7 +485,12 @@ export default function ExplorerSearchSection({
 
         <div className="space-y-4">
           {results.map((hit) => (
-            <SearchResultCard key={`${entityType}-${hit.id ?? hit.documentId ?? hit.slug}`} entityType={entityType} hit={hit} />
+            <SearchResultCard
+              key={`${entityType}-${hit.id ?? hit.documentId ?? hit.slug}`}
+              entityType={entityType}
+              hit={hit}
+              onPreview={handleOpenPreview}
+            />
           ))}
         </div>
 
@@ -622,6 +653,12 @@ export default function ExplorerSearchSection({
           </div>
         </aside>
       </div>
+      <ExplorerPreviewDrawer
+        open={previewOpen}
+        hit={previewHit}
+        entityType={entityType}
+        onClose={handleClosePreview}
+      />
     </section>
   );
 }
