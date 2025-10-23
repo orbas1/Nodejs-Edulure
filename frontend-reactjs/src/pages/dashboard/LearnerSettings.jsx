@@ -61,7 +61,8 @@ const DEFAULT_FINANCE_FORM = {
   reimbursements: {
     enabled: false,
     instructions: ''
-  }
+  },
+  documents: []
 };
 
 const DEFAULT_PURCHASE_FORM = {
@@ -106,6 +107,23 @@ function toInputDateTime(value) {
     return date.toISOString().slice(0, 16);
   } catch (_error) {
     return '';
+  }
+}
+
+function formatDocumentDate(value) {
+  if (!value) return 'Uploaded';
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Uploaded';
+    }
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (_error) {
+    return 'Uploaded';
   }
 }
 
@@ -166,7 +184,8 @@ export default function LearnerSettings() {
       reimbursements: {
         ...DEFAULT_FINANCE_FORM.reimbursements,
         ...(settings.finance.reimbursements ?? {})
-      }
+      },
+      documents: Array.isArray(settings.finance.documents) ? settings.finance.documents : []
     };
     normalisedFinance.expensePolicyUrl = settings.finance.profile?.expensePolicyUrl ?? '';
     normalisedFinance.taxId = settings.finance.profile?.taxId ?? '';
@@ -183,6 +202,10 @@ export default function LearnerSettings() {
   }, [error]);
 
   const disableActions = useMemo(() => pendingAction !== null || systemSaving, [pendingAction, systemSaving]);
+  const financeDocuments = useMemo(
+    () => (Array.isArray(financeForm.documents) ? financeForm.documents : []),
+    [financeForm.documents]
+  );
 
   const handleFinanceInputChange = (event) => {
     const { name, type, checked, value } = event.target;
@@ -281,7 +304,8 @@ export default function LearnerSettings() {
         reimbursements: {
           ...DEFAULT_FINANCE_FORM.reimbursements,
           ...(payload.reimbursements ?? {})
-        }
+        },
+        documents: Array.isArray(payload.documents) ? payload.documents : []
       });
     }
   };
@@ -330,7 +354,8 @@ export default function LearnerSettings() {
           reimbursements: {
             enabled: Boolean(financeForm.reimbursements.enabled),
             instructions: financeForm.reimbursements.instructions
-          }
+          },
+          documents: Array.isArray(financeForm.documents) ? financeForm.documents : []
         }
       });
       await refreshFinanceSettings();
@@ -554,7 +579,7 @@ export default function LearnerSettings() {
               </button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <label className="flex flex-col text-sm font-medium text-slate-700">
                 Preferred currency
                 <input
@@ -570,6 +595,17 @@ export default function LearnerSettings() {
                 name="taxId"
                 value={financeForm.taxId}
                 onChange={handleFinanceInputChange}
+                className="mt-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="flex flex-col text-sm font-medium text-slate-700">
+              Expense policy URL
+              <input
+                type="url"
+                name="expensePolicyUrl"
+                value={financeForm.expensePolicyUrl}
+                onChange={handleFinanceInputChange}
+                placeholder="https://"
                 className="mt-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
@@ -685,6 +721,36 @@ export default function LearnerSettings() {
                 className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
+          </div>
+
+          <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/70 p-6">
+            <h3 className="text-base font-semibold text-slate-900">Finance documents</h3>
+            <p className="text-sm text-slate-600">
+              Reference submitted finance documents such as tax forms and policy acknowledgements. Contact support to upload
+              new documents if changes are required.
+            </p>
+            {financeDocuments.length ? (
+              <ul className="space-y-3">
+                {financeDocuments.map((document) => (
+                  <li key={document.url} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{document.name ?? document.url}</p>
+                      <p className="text-xs text-slate-500">{formatDocumentDate(document.uploadedAt)}</p>
+                    </div>
+                    <a
+                      href={document.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center rounded-xl bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary/20"
+                    >
+                      View
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">No finance documents available yet.</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/70 p-6">

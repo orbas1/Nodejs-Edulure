@@ -403,6 +403,124 @@ const DEFAULT_FINANCE_ALERTS = Object.freeze({
   notifyThresholdPercent: 80
 });
 
+function toBoolean(value, fallback = false) {
+  if (value === undefined || value === null) {
+    return Boolean(fallback);
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  if (typeof value === 'string') {
+    const normalised = value.trim().toLowerCase();
+    if (!normalised) {
+      return Boolean(fallback);
+    }
+    if (['true', '1', 'yes', 'on', 'enabled'].includes(normalised)) {
+      return true;
+    }
+    if (['false', '0', 'no', 'off', 'disabled'].includes(normalised)) {
+      return false;
+    }
+  }
+  return Boolean(fallback);
+}
+
+function clampNumber(value, fallback = 0, { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY, integer = false } = {}) {
+  let resolved;
+  if (value === undefined || value === null || Number.isNaN(Number(value))) {
+    resolved = Number(fallback);
+  } else {
+    resolved = Number(value);
+  }
+  if (Number.isNaN(resolved)) {
+    resolved = Number(fallback);
+  }
+  if (integer) {
+    resolved = Math.trunc(resolved);
+  }
+  if (resolved < min) {
+    resolved = min;
+  }
+  if (resolved > max) {
+    resolved = max;
+  }
+  return resolved;
+}
+
+function normaliseCurrency(value, fallback = 'USD') {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+  const trimmed = value.trim().toUpperCase();
+  if (/^[A-Z]{3}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return fallback;
+}
+
+function normaliseFinanceAlerts(rawAlerts = {}) {
+  const source = rawAlerts && typeof rawAlerts === 'object' ? rawAlerts : {};
+  const sendEmail = toBoolean(source.sendEmail, DEFAULT_FINANCE_ALERTS.sendEmail);
+  const sendSms = toBoolean(source.sendSms, DEFAULT_FINANCE_ALERTS.sendSms);
+  const escalationEmail =
+    typeof source.escalationEmail === 'string' && source.escalationEmail.trim()
+      ? source.escalationEmail.trim()
+      : null;
+  const notifyThresholdPercent = clampNumber(
+    source.notifyThresholdPercent ?? DEFAULT_FINANCE_ALERTS.notifyThresholdPercent,
+    DEFAULT_FINANCE_ALERTS.notifyThresholdPercent,
+    { min: 1, max: 100, integer: true }
+  );
+
+  return {
+    sendEmail,
+    sendSms,
+    escalationEmail,
+    notifyThresholdPercent
+  };
+}
+
+function normaliseFinanceReimbursements(rawReimbursements = {}) {
+  const source = rawReimbursements && typeof rawReimbursements === 'object' ? rawReimbursements : {};
+  const enabled = toBoolean(source.enabled, false);
+  const instructions =
+    typeof source.instructions === 'string' && source.instructions.trim()
+      ? source.instructions.trim()
+      : null;
+
+  return {
+    enabled,
+    instructions
+  };
+}
+
+function normaliseFinanceDocuments(rawDocuments = []) {
+  if (!Array.isArray(rawDocuments)) {
+    return [];
+  }
+  return rawDocuments
+    .filter((document) => {
+      if (!document || typeof document !== 'object' || typeof document.url !== 'string') {
+        return false;
+      }
+      return Boolean(document.url.trim());
+    })
+    .map((document) => {
+      const name = typeof document.name === 'string' && document.name.trim() ? document.name.trim() : null;
+      const url = document.url.trim();
+      const uploadedAt =
+        typeof document.uploadedAt === 'string' && document.uploadedAt.trim() ? document.uploadedAt.trim() : null;
+      return {
+        name: name ?? url,
+        url,
+        uploadedAt
+      };
+    });
+}
+
 const FIELD_SERVICE_PRIORITIES = new Set(['critical', 'high', 'standard', 'low']);
 
 function normaliseFieldServicePriority(value) {
@@ -1029,30 +1147,30 @@ export default class LearnerDashboardService {
       CommunitySubscriptionModel.listByUser(userId)
     ]);
     const preferences = profile?.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
-    const alerts = {
-      ...DEFAULT_FINANCE_ALERTS,
-      ...(preferences.alerts ?? {})
-    };
+    const alerts = normaliseFinanceAlerts(preferences.alerts);
+    const reserveTargetCents = clampNumber(profile?.reserveTargetCents ?? 0, 0, { min: 0, integer: true });
     const financeProfile = {
       autoPayEnabled: Boolean(profile?.autoPayEnabled),
-      reserveTargetCents: Number(profile?.reserveTargetCents ?? 0),
-      reserveTarget: Math.round(Number(profile?.reserveTargetCents ?? 0) / 100),
-      currency: preferences.currency ?? 'USD',
-      taxId: preferences.taxId ?? null,
-      invoiceDelivery: preferences.invoiceDelivery ?? 'email',
-      payoutSchedule: preferences.payoutSchedule ?? 'monthly',
-      expensePolicyUrl: preferences.expensePolicyUrl ?? null
+      reserveTargetCents,
+      reserveTarget: Math.round(reserveTargetCents / 100),
+      currency: normaliseCurrency(preferences.currency ?? 'USD'),
+      taxId:
+        typeof preferences.taxId === 'string' && preferences.taxId.trim() ? preferences.taxId.trim() : null,
+      invoiceDelivery:
+        typeof preferences.invoiceDelivery === 'string' && preferences.invoiceDelivery.trim()
+          ? preferences.invoiceDelivery.trim()
+          : 'email',
+      payoutSchedule:
+        typeof preferences.payoutSchedule === 'string' && preferences.payoutSchedule.trim()
+          ? preferences.payoutSchedule.trim()
+          : 'monthly',
+      expensePolicyUrl:
+        typeof preferences.expensePolicyUrl === 'string' && preferences.expensePolicyUrl.trim()
+          ? preferences.expensePolicyUrl.trim()
+          : null
     };
-    const documents = Array.isArray(preferences.documents)
-      ? preferences.documents
-      : [];
-    const reimbursements =
-      preferences.reimbursements && typeof preferences.reimbursements === 'object'
-        ? {
-            enabled: Boolean(preferences.reimbursements.enabled),
-            instructions: preferences.reimbursements.instructions ?? null
-          }
-        : { enabled: false, instructions: null };
+    const documents = normaliseFinanceDocuments(preferences.documents);
+    const reimbursements = normaliseFinanceReimbursements(preferences.reimbursements);
 
     const communityIds = Array.from(
       new Set(subscriptions.map((subscription) => subscription.communityId).filter(Boolean))
@@ -1087,42 +1205,30 @@ export default class LearnerDashboardService {
 
   static async updateFinanceSettings(userId, payload = {}) {
     const alertsPayload = payload.alerts && typeof payload.alerts === 'object' ? payload.alerts : {};
-    const documents = Array.isArray(payload.documents) ? payload.documents : undefined;
+    const documents = payload.documents !== undefined ? normaliseFinanceDocuments(payload.documents) : undefined;
     const reimbursementsPayload =
       payload.reimbursements && typeof payload.reimbursements === 'object' ? payload.reimbursements : {};
 
     const preferences = {
-      currency: payload.currency ?? payload.profile?.currency ?? 'USD',
-      taxId: payload.taxId ?? payload.profile?.taxId ?? null,
-      invoiceDelivery: payload.invoiceDelivery ?? payload.profile?.invoiceDelivery ?? 'email',
-      payoutSchedule: payload.payoutSchedule ?? payload.profile?.payoutSchedule ?? 'monthly',
-      expensePolicyUrl: payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl ?? null,
-      alerts: {
-        ...DEFAULT_FINANCE_ALERTS,
-        ...alertsPayload,
-        sendEmail:
-          alertsPayload.sendEmail !== undefined ? Boolean(alertsPayload.sendEmail) : DEFAULT_FINANCE_ALERTS.sendEmail,
-        sendSms:
-          alertsPayload.sendSms !== undefined ? Boolean(alertsPayload.sendSms) : DEFAULT_FINANCE_ALERTS.sendSms,
-        escalationEmail:
-          typeof alertsPayload.escalationEmail === 'string'
-            ? alertsPayload.escalationEmail.trim() || null
-            : DEFAULT_FINANCE_ALERTS.escalationEmail,
-        notifyThresholdPercent: Math.min(
-          100,
-          Math.max(1, Number.parseInt(alertsPayload.notifyThresholdPercent ?? DEFAULT_FINANCE_ALERTS.notifyThresholdPercent, 10))
-        )
-      },
-      reimbursements: {
-        enabled:
-          reimbursementsPayload.enabled !== undefined
-            ? Boolean(reimbursementsPayload.enabled)
-            : false,
-        instructions:
-          typeof reimbursementsPayload.instructions === 'string'
-            ? reimbursementsPayload.instructions.trim() || null
-            : null
-      }
+      currency: normaliseCurrency(payload.currency ?? payload.profile?.currency ?? 'USD'),
+      taxId:
+        typeof (payload.taxId ?? payload.profile?.taxId) === 'string'
+          ? (payload.taxId ?? payload.profile?.taxId).trim() || null
+          : null,
+      invoiceDelivery:
+        typeof (payload.invoiceDelivery ?? payload.profile?.invoiceDelivery) === 'string'
+          ? (payload.invoiceDelivery ?? payload.profile?.invoiceDelivery).trim() || 'email'
+          : 'email',
+      payoutSchedule:
+        typeof (payload.payoutSchedule ?? payload.profile?.payoutSchedule) === 'string'
+          ? (payload.payoutSchedule ?? payload.profile?.payoutSchedule).trim() || 'monthly'
+          : 'monthly',
+      expensePolicyUrl:
+        typeof (payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl) === 'string'
+          ? (payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl).trim() || null
+          : null,
+      alerts: normaliseFinanceAlerts({ ...DEFAULT_FINANCE_ALERTS, ...alertsPayload }),
+      reimbursements: normaliseFinanceReimbursements(reimbursementsPayload)
     };
 
     if (documents !== undefined) {

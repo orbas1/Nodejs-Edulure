@@ -66,14 +66,14 @@ describe('<LearnerSettings />', () => {
           profile: {
             currency: 'USD',
             taxId: '12345',
-            invoiceDelivery: 'email',
-            payoutSchedule: 'monthly',
-            expensePolicyUrl: '',
-            autoPayEnabled: true,
-            reserveTarget: 500
-          },
-          alerts: {
-            sendEmail: true,
+          invoiceDelivery: 'email',
+          payoutSchedule: 'monthly',
+          expensePolicyUrl: 'https://finance.example.com/policy',
+          autoPayEnabled: true,
+          reserveTarget: 500
+        },
+        alerts: {
+          sendEmail: true,
             sendSms: false,
             escalationEmail: 'finance@example.com',
             notifyThresholdPercent: 80
@@ -161,10 +161,17 @@ describe('<LearnerSettings />', () => {
           sendSms: false,
           escalationEmail: 'finance@example.com',
           notifyThresholdPercent: 80
-        },
-        reimbursements: { enabled: false, instructions: '' },
-        purchases: [],
-        subscriptions: []
+          },
+          reimbursements: { enabled: false, instructions: '' },
+          purchases: [],
+          subscriptions: [],
+          documents: [
+            {
+              name: 'W-9 tax form',
+              url: 'https://cdn.edulure.test/docs/seed-w9.pdf',
+              uploadedAt: '2024-01-10T10:30:00Z'
+            }
+          ]
       }
     });
   });
@@ -180,6 +187,9 @@ describe('<LearnerSettings />', () => {
     await viewer.click(financeAccordionToggle);
 
     expect(await screen.findByLabelText(/preferred currency/i)).toHaveValue('USD');
+    expect(screen.getByLabelText(/expense policy url/i)).toHaveValue('https://finance.example.com/policy');
+    expect(screen.getByText(/finance documents/i)).toBeInTheDocument();
+    expect(screen.getByText('W-9 tax form')).toBeInTheDocument();
     expect(screen.getByRole('table')).toBeInTheDocument();
   });
 
@@ -194,6 +204,35 @@ describe('<LearnerSettings />', () => {
       expect(updateSystemPreferencesMock).toHaveBeenCalledWith({
         token: 'token-123',
         payload: expect.objectContaining({ language: 'fr' })
+      });
+    });
+  });
+
+  it('updates finance settings using shared toggle fields', async () => {
+    const user = userEvent.setup();
+    render(<LearnerSettings />);
+
+    const financeAccordionToggle = screen.getByRole('button', { name: /finance settings/i });
+    await user.click(financeAccordionToggle);
+
+    const autopayToggle = await screen.findByRole('button', { name: /enable autopay/i });
+    await user.click(autopayToggle);
+
+    const smsToggle = screen.getByRole('button', { name: /sms alerts/i });
+    await user.click(smsToggle);
+
+    await user.click(screen.getByRole('button', { name: /save finance settings/i }));
+
+    await waitFor(() => {
+      expect(updateFinanceSettingsMock).toHaveBeenCalledWith({
+        token: 'token-123',
+        payload: expect.objectContaining({
+          autoPayEnabled: false,
+          alerts: expect.objectContaining({
+            sendSms: true,
+            sendEmail: true
+          })
+        })
       });
     });
   });
