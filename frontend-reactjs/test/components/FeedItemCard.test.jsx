@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import FeedCard from '../../src/components/FeedCard.jsx';
+import FeedItemCard from '../../src/components/feed/FeedItemCard.jsx';
 
 const basePost = {
   id: 7,
@@ -16,14 +16,14 @@ const basePost = {
   permissions: { canModerate: true, canRemove: true }
 };
 
-describe('FeedCard', () => {
+describe('FeedItemCard', () => {
   beforeEach(() => {
     vi.useRealTimers();
   });
 
   it('renders core post details with safe fallbacks', () => {
     render(
-      <FeedCard
+      <FeedItemCard
         post={{
           ...basePost,
           title: null,
@@ -45,7 +45,7 @@ describe('FeedCard', () => {
   it('toggles moderation actions based on post state', () => {
     const handleModerate = vi.fn();
     render(
-      <FeedCard
+      <FeedItemCard
         post={{
           ...basePost,
           moderation: { state: 'suppressed' }
@@ -66,7 +66,7 @@ describe('FeedCard', () => {
     const handleModerate = vi.fn();
     const handleRemove = vi.fn();
     render(
-      <FeedCard
+      <FeedItemCard
         post={basePost}
         onModerate={handleModerate}
         onRemove={handleRemove}
@@ -83,7 +83,7 @@ describe('FeedCard', () => {
 
   it('hides privileged moderation controls without RBAC permissions', () => {
     render(
-      <FeedCard
+      <FeedItemCard
         post={{
           ...basePost,
           permissions: { canModerate: false, canRemove: false }
@@ -100,7 +100,7 @@ describe('FeedCard', () => {
     const handleRemove = vi.fn();
 
     render(
-      <FeedCard
+      <FeedItemCard
         post={{
           ...basePost,
           permissions: { canModerate: true, canRemove: true },

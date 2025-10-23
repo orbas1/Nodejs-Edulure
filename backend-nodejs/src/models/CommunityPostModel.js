@@ -19,6 +19,9 @@ const POST_COLUMNS = [
   'cp.comment_count as commentCount',
   'cp.reaction_summary as reactionSummary',
   'cp.metadata',
+  'cp.media_asset_id as mediaAssetId',
+  'cp.pinned_at as pinnedAt',
+  'cp.preview_metadata as previewMetadata',
   'cp.created_at as createdAt',
   'cp.updated_at as updatedAt',
   'cp.deleted_at as deletedAt'
@@ -35,6 +38,13 @@ const CHANNEL_COLUMNS = [
   'cc.name as channelName',
   'cc.slug as channelSlug',
   'cc.channel_type as channelType'
+];
+
+const ASSET_COLUMNS = [
+  'ca.id as assetId',
+  'ca.public_id as assetPublicId',
+  'ca.mime_type as assetMimeType',
+  'ca.metadata as assetMetadata'
 ];
 
 function parseJson(value, fallback) {
@@ -103,6 +113,9 @@ function toDomain(record) {
     commentCount: Number(record.commentCount ?? 0),
     reactionSummary: parseJson(record.reactionSummary, {}),
     metadata: parseJson(record.metadata, {}),
+    mediaAssetId: record.mediaAssetId ?? null,
+    previewMetadata: parseJson(record.previewMetadata, {}),
+    pinnedAt: record.pinnedAt ?? null,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     deletedAt: record.deletedAt ?? null,
@@ -112,7 +125,15 @@ function toDomain(record) {
     channelSlug: record.channelSlug ?? null,
     channelType: record.channelType ?? null,
     communityName: record.communityName ?? null,
-    communitySlug: record.communitySlug ?? null
+    communitySlug: record.communitySlug ?? null,
+    mediaAsset: record.assetId
+      ? {
+          id: record.assetId,
+          publicId: record.assetPublicId ?? null,
+          mimeType: record.assetMimeType ?? null,
+          metadata: parseJson(record.assetMetadata, {})
+        }
+      : null
   };
 }
 
@@ -153,7 +174,10 @@ export default class CommunityPostModel {
       published_at: post.publishedAt ?? null,
       comment_count: post.commentCount ?? 0,
       reaction_summary: JSON.stringify(parseJson(post.reactionSummary, {})),
-      metadata: JSON.stringify(parseJson(post.metadata, {}))
+      metadata: JSON.stringify(parseJson(post.metadata, {})),
+      media_asset_id: post.mediaAssetId ?? null,
+      pinned_at: post.pinnedAt ?? null,
+      preview_metadata: JSON.stringify(parseJson(post.previewMetadata, {}))
     };
 
     const [id] = await connection('community_posts').insert(payload);
@@ -165,10 +189,12 @@ export default class CommunityPostModel {
       .leftJoin('community_channels as cc', 'cp.channel_id', 'cc.id')
       .leftJoin('communities as c', 'cp.community_id', 'c.id')
       .leftJoin('users as u', 'cp.author_id', 'u.id')
+      .leftJoin('content_assets as ca', 'cp.media_asset_id', 'ca.id')
       .select([
         ...POST_COLUMNS,
         ...AUTHOR_COLUMNS,
         ...CHANNEL_COLUMNS,
+        ...ASSET_COLUMNS,
         'c.name as communityName',
         'c.slug as communitySlug'
       ])
@@ -227,6 +253,15 @@ export default class CommunityPostModel {
     if (updates.metadata !== undefined) {
       payload.metadata = JSON.stringify(updates.metadata ?? {});
     }
+    if (updates.mediaAssetId !== undefined) {
+      payload.media_asset_id = updates.mediaAssetId ?? null;
+    }
+    if (updates.pinnedAt !== undefined) {
+      payload.pinned_at = updates.pinnedAt ?? null;
+    }
+    if (updates.previewMetadata !== undefined) {
+      payload.preview_metadata = JSON.stringify(updates.previewMetadata ?? {});
+    }
     if (updates.channelId !== undefined) {
       payload.channel_id = updates.channelId ?? null;
     }
@@ -261,7 +296,8 @@ export default class CommunityPostModel {
     const baseQuery = connection('community_posts as cp')
       .leftJoin('community_channels as cc', 'cp.channel_id', 'cc.id')
       .leftJoin('users as u', 'cp.author_id', 'u.id')
-      .select([...POST_COLUMNS, ...AUTHOR_COLUMNS, ...CHANNEL_COLUMNS])
+      .leftJoin('content_assets as ca', 'cp.media_asset_id', 'ca.id')
+      .select([...POST_COLUMNS, ...AUTHOR_COLUMNS, ...CHANNEL_COLUMNS, ...ASSET_COLUMNS])
       .where('cp.community_id', communityId)
       .andWhere('cp.status', 'published')
       .andWhereNull('cp.deleted_at');
@@ -295,6 +331,8 @@ export default class CommunityPostModel {
       .first();
 
     const items = await baseQuery
+      .orderByRaw('CASE WHEN cp.pinned_at IS NULL THEN 1 ELSE 0 END ASC')
+      .orderBy('cp.pinned_at', 'desc')
       .orderBy('cp.published_at', 'desc')
       .orderBy('cp.created_at', 'desc')
       .limit(perPage)
@@ -324,6 +362,7 @@ export default class CommunityPostModel {
       .leftJoin('communities as c', 'cp.community_id', 'c.id')
       .leftJoin('community_channels as cc', 'cp.channel_id', 'cc.id')
       .leftJoin('users as u', 'cp.author_id', 'u.id')
+      .leftJoin('content_assets as ca', 'cp.media_asset_id', 'ca.id')
       .select([
         ...POST_COLUMNS,
         ...AUTHOR_COLUMNS,
@@ -331,7 +370,8 @@ export default class CommunityPostModel {
         'c.id as communityId',
         'c.name as communityName',
         'c.slug as communitySlug',
-        'cm.role as viewerRole'
+        'cm.role as viewerRole',
+        ...ASSET_COLUMNS
       ])
       .where('cm.status', 'active')
       .andWhere('cp.status', 'published')
@@ -358,6 +398,8 @@ export default class CommunityPostModel {
       .first();
 
     const items = await baseQuery
+      .orderByRaw('CASE WHEN cp.pinned_at IS NULL THEN 1 ELSE 0 END ASC')
+      .orderBy('cp.pinned_at', 'desc')
       .orderBy('cp.published_at', 'desc')
       .orderBy('cp.created_at', 'desc')
       .limit(perPage)

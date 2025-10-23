@@ -17,7 +17,7 @@ import {
 } from '../api/communityApi.js';
 import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
-import FeedCard from '../components/FeedCard.jsx';
+import FeedList from '../components/feed/FeedList.jsx';
 import CommunityInteractiveSuite from '../components/community/CommunityInteractiveSuite.jsx';
 import CommunityCrudManager from '../components/community/CommunityCrudManager.jsx';
 import CommunityChatModule from '../components/community/CommunityChatModule.jsx';
@@ -1299,14 +1299,15 @@ export default function Communities() {
         disabled: !canAccessCommunityFeed,
         render: () => (
           <div className="space-y-4">
-            {isLoadingFeed ? (
-              <p className="text-sm text-slate-500">Loading live updates…</p>
-            ) : feedError ? (
+            {feedError ? (
               <p className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{feedError}</p>
-            ) : feedItems.length === 0 ? (
-              <p className="text-sm text-slate-500">No live updates published yet.</p>
             ) : (
-              feedItems.map((post) => <FeedCard key={post.id} post={post} />)
+              <FeedList
+                items={feedItems}
+                loading={isLoadingFeed}
+                emptyState={<p className="text-sm text-slate-500">No live updates published yet.</p>}
+                hasMore={false}
+              />
             )}
           </div>
         )

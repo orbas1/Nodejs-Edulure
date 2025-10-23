@@ -2,30 +2,6 @@ import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 
 const numberFormatter = new Intl.NumberFormat('en-US');
-const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:']);
-
-function normaliseLinkAttachments(attachments) {
-  if (!Array.isArray(attachments)) return [];
-
-  return attachments
-    .filter((attachment) => attachment?.type === 'link' && typeof attachment.url === 'string')
-    .map((attachment) => {
-      try {
-        const parsed = new URL(attachment.url);
-        if (!SAFE_URL_PROTOCOLS.has(parsed.protocol)) {
-          return null;
-        }
-        return {
-          id: attachment.id ?? attachment.url,
-          label: attachment.label ?? parsed.hostname.replace(/^www\./, ''),
-          url: parsed.toString()
-        };
-      } catch (error) {
-        return null;
-      }
-    })
-    .filter(Boolean);
-}
 
 function formatRelativeTime(timestamp) {
   if (!timestamp) return 'Just now';
@@ -48,8 +24,31 @@ function formatRelativeTime(timestamp) {
   return date.toLocaleDateString();
 }
 
-export default function FeedCard({ post, onModerate, onRemove, actionState }) {
-  const publishedLabel = formatRelativeTime(post.publishedAt);
+function normaliseLinkAttachments(attachments) {
+  if (!Array.isArray(attachments)) return [];
+
+  return attachments
+    .filter((attachment) => attachment?.type === 'link' && typeof attachment.url === 'string')
+    .map((attachment) => {
+      try {
+        const parsed = new URL(attachment.url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return null;
+        }
+        return {
+          id: attachment.id ?? attachment.url,
+          label: attachment.label ?? parsed.hostname.replace(/^www\./, ''),
+          url: parsed.toString()
+        };
+      } catch (_error) {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+export default function FeedItemCard({ post, onModerate, onRemove, actionState, onReact }) {
+  const publishedLabel = formatRelativeTime(post.publishedAt ?? post.createdAt);
   const communityName = post.community?.name;
   const tags = useMemo(() => {
     if (!Array.isArray(post.tags)) return [];
@@ -81,12 +80,21 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
   const bodyCopy = post.body?.trim() || 'No update provided.';
   const title = post.title?.trim();
   const avatarUrl = post.author?.avatarUrl;
-  const linkAttachments = normaliseLinkAttachments(post.attachments);
-  const moderationReason = post.moderation?.reason;
+  const linkAttachments = normaliseLinkAttachments(post.metadata?.attachments);
+  const moderationReason = post.moderation?.context ?? post.moderation?.reason;
+  const preview = post.media?.preview;
+  const previewUrl = preview?.thumbnailUrl;
+  const previewAspectRatio = preview?.aspectRatio ?? '16:9';
+
+  const handleReact = (reaction) => {
+    if (typeof onReact === 'function') {
+      onReact(post, reaction);
+    }
+  };
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex items-start gap-4">
+      <div className="flex flex-wrap items-start gap-4">
         {avatarUrl && !isAvatarBroken ? (
           <img
             src={avatarUrl}
@@ -95,14 +103,24 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
             onError={() => setIsAvatarBroken(true)}
           />
         ) : (
-          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary" aria-hidden="true">
+          <span
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+            aria-hidden="true"
+          >
             {authorInitials}
           </span>
         )}
         <div className="flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-base font-semibold text-slate-900">{authorName}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-slate-900">{authorName}</h3>
+                {post.isPinned ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                    Pinned
+                  </span>
+                ) : null}
+              </div>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                 {post.author?.role ?? 'Member'}
                 {communityName && <span className="ml-1 text-slate-300">•</span>}
@@ -139,6 +157,23 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
           </div>
           {title && <h4 className="mt-4 break-words text-sm font-semibold text-slate-900">{title}</h4>}
           <p className="mt-3 break-words text-sm leading-6 text-slate-700">{bodyCopy}</p>
+
+          {previewUrl ? (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+              <div
+                className="relative w-full bg-slate-100"
+                style={{ paddingBottom: `calc(100% / (${previewAspectRatio.replace(':', '/') || '16/9'}))` }}
+              >
+                <img
+                  src={previewUrl}
+                  alt={post.title ?? 'Post preview'}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+          ) : null}
+
           {linkAttachments.length > 0 && (
             <div className="mt-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Shared links</p>
@@ -158,6 +193,7 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
               </ul>
             </div>
           )}
+
           {tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-primary">
               {tags.map((tag) => (
@@ -167,6 +203,7 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
               ))}
             </div>
           )}
+
           {isSuppressed && (
             <div
               className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700"
@@ -177,15 +214,21 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
             </div>
           )}
           {moderationReason && (
-            <p className="mt-2 text-xs text-amber-500">Reason: {moderationReason}</p>
+            <p className="mt-2 text-xs text-amber-500">Context: {moderationReason}</p>
           )}
+
           <div className="mt-6 flex flex-wrap items-center gap-6 text-sm text-slate-500">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-full border border-transparent px-0 text-slate-500 transition hover:text-primary"
+              onClick={() => handleReact('appreciate')}
+              disabled={!onReact}
+            >
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
                 {numberFormatter.format(reactions)}
               </span>
               Appreciations
-            </div>
+            </button>
             <div className="flex items-center gap-2">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600">
                 {numberFormatter.format(comments)}
@@ -193,6 +236,7 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
               Comments
             </div>
           </div>
+
           {actionError && (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600" role="alert" aria-live="assertive">
               {actionError}
@@ -204,22 +248,17 @@ export default function FeedCard({ post, onModerate, onRemove, actionState }) {
   );
 }
 
-FeedCard.propTypes = {
+FeedItemCard.propTypes = {
   post: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
     title: PropTypes.string,
     body: PropTypes.string,
-    publishedAt: PropTypes.string,
     tags: PropTypes.arrayOf(PropTypes.string),
-    community: PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-      name: PropTypes.string,
-      slug: PropTypes.string
-    }),
+    publishedAt: PropTypes.string,
+    createdAt: PropTypes.string,
+    community: PropTypes.shape({ name: PropTypes.string }),
     author: PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
       name: PropTypes.string,
-      email: PropTypes.string,
       role: PropTypes.string,
       avatarUrl: PropTypes.string
     }),
@@ -231,23 +270,32 @@ FeedCard.propTypes = {
       canModerate: PropTypes.bool,
       canRemove: PropTypes.bool
     }),
-    attachments: PropTypes.arrayOf(
-      PropTypes.shape({
-        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-        type: PropTypes.string,
-        url: PropTypes.string,
-        label: PropTypes.string
-      })
-    ),
     moderation: PropTypes.shape({
       state: PropTypes.string,
-      reason: PropTypes.string
-    })
+      reason: PropTypes.string,
+      context: PropTypes.string
+    }),
+    metadata: PropTypes.object,
+    media: PropTypes.shape({
+      preview: PropTypes.shape({
+        thumbnailUrl: PropTypes.string,
+        aspectRatio: PropTypes.string
+      })
+    }),
+    isPinned: PropTypes.bool
   }).isRequired,
   onModerate: PropTypes.func,
   onRemove: PropTypes.func,
   actionState: PropTypes.shape({
     isProcessing: PropTypes.bool,
     error: PropTypes.string
-  })
+  }),
+  onReact: PropTypes.func
+};
+
+FeedItemCard.defaultProps = {
+  onModerate: null,
+  onRemove: null,
+  actionState: null,
+  onReact: null
 };
