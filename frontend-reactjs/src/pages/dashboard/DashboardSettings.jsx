@@ -13,6 +13,7 @@ import PropTypes from 'prop-types';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import SettingsLayout from '../../components/settings/SettingsLayout.jsx';
 import SettingsToggleField from '../../components/settings/SettingsToggleField.jsx';
+import SettingsAccordion from '../../components/settings/SettingsAccordion.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useOutletContext } from 'react-router-dom';
 import {
@@ -319,20 +320,31 @@ function SectionCard({
   saving = false,
   footer = null,
   actions = null,
-  id
+  id,
+  defaultOpen = true
 }) {
+  const titleNode = useMemo(() => {
+    if (typeof title === 'string') {
+      return <span className="text-lg font-semibold text-slate-900">{title}</span>;
+    }
+    return title;
+  }, [title]);
+
   return (
-    <section id={id} className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm">
-      <header className="flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <Icon className="h-6 w-6" aria-hidden="true" />
-        </div>
-        <div className="flex-1">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
-        </div>
-        {actions ? <div className="flex items-center gap-3">{actions}</div> : null}
-      </header>
+    <SettingsAccordion
+      id={id}
+      title={titleNode}
+      description={description ?? null}
+      actions={actions ?? null}
+      defaultOpen={defaultOpen}
+      leading={
+        Icon ? (
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Icon className="h-6 w-6" aria-hidden="true" />
+          </div>
+        ) : null
+      }
+    >
       <form className="flex flex-col gap-5" onSubmit={onSubmit}>
         {children}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
@@ -346,20 +358,21 @@ function SectionCard({
           </button>
         </div>
       </form>
-    </section>
+    </SettingsAccordion>
   );
 }
 
 SectionCard.propTypes = {
   icon: PropTypes.elementType.isRequired,
-  title: PropTypes.string.isRequired,
-  description: PropTypes.string,
+  title: PropTypes.oneOfType([PropTypes.string, PropTypes.node]).isRequired,
+  description: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
   children: PropTypes.node.isRequired,
   onSubmit: PropTypes.func.isRequired,
   saving: PropTypes.bool,
   footer: PropTypes.node,
   actions: PropTypes.node,
-  id: PropTypes.string
+  id: PropTypes.string,
+  defaultOpen: PropTypes.bool
 };
 
 function useSettingsSection({ token, fetcher, updater, fallback, sectionName }) {
