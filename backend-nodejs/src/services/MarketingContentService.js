@@ -2,6 +2,7 @@ import db from '../config/database.js';
 import MarketingBlockModel from '../models/MarketingBlockModel.js';
 import MarketingPlanOfferModel from '../models/MarketingPlanOfferModel.js';
 import LearnerOnboardingInviteModel from '../models/LearnerOnboardingInviteModel.js';
+import MarketingLeadModel from '../models/MarketingLeadModel.js';
 
 function normaliseArrayParam(value) {
   if (!value) {
@@ -13,6 +14,14 @@ function normaliseArrayParam(value) {
       .filter(Boolean);
   }
   return [value].filter(Boolean).map((entry) => (typeof entry === 'string' ? entry.trim() : entry));
+}
+
+function normaliseString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
 }
 
 export default class MarketingContentService {
@@ -70,6 +79,49 @@ export default class MarketingContentService {
       blocks,
       plans,
       invites
+    };
+  }
+
+  static async createMarketingLead(payload = {}) {
+    const email = normaliseString(payload.email ? String(payload.email).toLowerCase() : null);
+    if (!email) {
+      throw new Error('Email is required to capture a marketing lead');
+    }
+
+    const fullName = normaliseString(payload.fullName ?? payload.full_name);
+    const company = normaliseString(payload.company);
+    const persona = normaliseString(payload.persona);
+    const goal = normaliseString(payload.goal);
+    const ctaSource = normaliseString(payload.ctaSource ?? payload.cta_source) ?? 'home-inline';
+    const blockSlug = normaliseString(payload.blockSlug ?? payload.block_slug);
+
+    const [invites] = await Promise.all([
+      this.listActiveInvites(email)
+    ]);
+
+    const lead = await MarketingLeadModel.create({
+      email,
+      fullName,
+      company,
+      persona,
+      goal,
+      ctaSource,
+      blockSlug,
+      status: 'new',
+      metadata: {
+        ...(payload.metadata ?? {}),
+        invites: invites.map((invite) => ({
+          code: invite.code,
+          community: invite.community,
+          status: invite.status,
+          expiresAt: invite.expiresAt
+        }))
+      }
+    });
+
+    return {
+      ...lead,
+      invites: invites
     };
   }
 }

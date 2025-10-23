@@ -1,0 +1,45 @@
+<svg width="960" height="840" viewBox="0 0 960 840" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Operators collaborating inside the Edulure Flow 5 workspace</title>
+  <desc id="desc">Illustration of operators reviewing dashboards, a live classroom, and monetisation metrics across layered windows.</desc>
+  <defs>
+    <linearGradient id="heroBg" x1="120" y1="60" x2="840" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fafc" />
+      <stop offset="0.5" stop-color="#f1f5f9" />
+      <stop offset="1" stop-color="#e2e8f0" />
+    </linearGradient>
+    <linearGradient id="heroAccent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4338ca" />
+      <stop offset="1" stop-color="#22d3ee" />
+    </linearGradient>
+    <linearGradient id="heroAccent2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#f43f5e" />
+      <stop offset="1" stop-color="#f59e0b" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox">
+      <feDropShadow dx="0" dy="28" stdDeviation="26" flood-color="rgba(15,23,42,0.18)" />
+    </filter>
+  </defs>
+  <rect x="40" y="40" width="880" height="760" rx="80" fill="url(#heroBg)" />
+  <rect x="100" y="120" width="440" height="280" rx="36" fill="#ffffff" filter="url(#shadow)" />
+  <rect x="140" y="160" width="360" height="200" rx="28" fill="#0f172a" />
+  <rect x="140" y="380" width="360" height="16" rx="8" fill="#cbd5f5" opacity="0.6" />
+  <rect x="520" y="200" width="320" height="260" rx="32" fill="#ffffff" filter="url(#shadow)" />
+  <rect x="560" y="240" width="240" height="56" rx="16" fill="#f1f5f9" />
+  <rect x="560" y="312" width="240" height="24" rx="12" fill="#cbd5f5" opacity="0.8" />
+  <rect x="560" y="356" width="180" height="24" rx="12" fill="#dbeafe" opacity="0.6" />
+  <circle cx="220" cy="250" r="56" fill="#1d4ed8" opacity="0.8" />
+  <circle cx="220" cy="250" r="40" fill="#22d3ee" opacity="0.8" />
+  <circle cx="712" cy="320" r="48" fill="#f97316" opacity="0.65" />
+  <path d="M560 432h200c22 0 32 28 16 42l-68 60c-20 18-52 18-72 0l-76-68c-16-14-6-34 16-34z" fill="#eef2ff" />
+  <rect x="180" y="500" width="600" height="200" rx="36" fill="#ffffff" filter="url(#shadow)" />
+  <rect x="220" y="544" width="184" height="56" rx="18" fill="#ede9fe" />
+  <rect x="420" y="544" width="324" height="56" rx="18" fill="#ecfeff" />
+  <rect x="220" y="620" width="160" height="40" rx="12" fill="#e2e8f0" />
+  <rect x="400" y="620" width="180" height="40" rx="12" fill="#c4b5fd" opacity="0.8" />
+  <rect x="600" y="620" width="120" height="40" rx="12" fill="#facc15" opacity="0.8" />
+  <circle cx="292" cy="572" r="18" fill="#4338ca" />
+  <circle cx="452" cy="572" r="18" fill="#22d3ee" />
+  <circle cx="612" cy="572" r="18" fill="#f43f5e" />
+  <rect x="708" y="150" width="120" height="120" rx="32" fill="url(#heroAccent)" opacity="0.8" />
+  <rect x="132" y="640" width="120" height="120" rx="32" fill="url(#heroAccent2)" opacity="0.75" />
+</svg>
