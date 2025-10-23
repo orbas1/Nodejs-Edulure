@@ -24,6 +24,93 @@ function extractData(response) {
   return response?.data ?? response ?? null;
 }
 
+function normaliseAuditLog(response) {
+  const payload = response?.data ?? response ?? {};
+  return {
+    entries: Array.isArray(payload.entries) ? payload.entries : [],
+    totals: payload.totals ?? {},
+    generatedAt: payload.generatedAt ?? null
+  };
+}
+
+function normaliseComplianceAlert(alert) {
+  if (!alert || typeof alert !== 'object') {
+    return null;
+  }
+  const renewalDelta = Number(alert.renewalDeltaDays);
+  return {
+    id: alert.id ?? alert.publicId ?? null,
+    vendor: alert.vendor ?? alert.vendorName ?? null,
+    status: alert.status ?? null,
+    riskTier: alert.riskTier ?? null,
+    renewalDate: alert.renewalDate ?? null,
+    renewalDeltaDays: Number.isFinite(renewalDelta) ? renewalDelta : null,
+    ownerEmail: alert.ownerEmail ?? null,
+    severity: String(alert.severity ?? 'info').toLowerCase(),
+    summary: alert.summary ?? '',
+    href: alert.href ?? null
+  };
+}
+
+function normaliseChecklistCategory(category) {
+  if (!category || typeof category !== 'object') {
+    return null;
+  }
+  const total = Number.isFinite(Number(category.total)) ? Number(category.total) : 0;
+  const autoEvaluated = Number.isFinite(Number(category.autoEvaluated))
+    ? Number(category.autoEvaluated)
+    : 0;
+  const manual = Number.isFinite(Number(category.manual)) ? Number(category.manual) : total - autoEvaluated;
+  return {
+    id: category.id ?? category.slug ?? null,
+    label: category.label ?? category.id ?? 'Category',
+    total,
+    autoEvaluated,
+    manual,
+    defaultOwners: Array.isArray(category.defaultOwners)
+      ? category.defaultOwners.filter((owner) => typeof owner === 'string' && owner.length > 0)
+      : []
+  };
+}
+
+function normaliseOverview(response) {
+  const payload = response?.data ?? response ?? {};
+  const compliance = payload.compliance ?? {};
+  const release = payload.release ?? {};
+  const audit = payload.audit ?? {};
+
+  return {
+    compliance: {
+      alerts: Array.isArray(compliance.alerts)
+        ? compliance.alerts.map(normaliseComplianceAlert).filter(Boolean)
+        : [],
+      summary: compliance.summary ?? {}
+    },
+    release: {
+      readiness: release.readiness ?? {},
+      checklist: {
+        totalItems: Number.isFinite(Number(release.checklist?.totalItems))
+          ? Number(release.checklist.totalItems)
+          : 0,
+        autoEvaluated: Number.isFinite(Number(release.checklist?.autoEvaluated))
+          ? Number(release.checklist.autoEvaluated)
+          : 0,
+        manual: Number.isFinite(Number(release.checklist?.manual))
+          ? Number(release.checklist.manual)
+          : 0,
+        categories: Array.isArray(release.checklist?.categories)
+          ? release.checklist.categories.map(normaliseChecklistCategory).filter(Boolean)
+          : []
+      }
+    },
+    audit: {
+      totalsBySource: audit.totalsBySource ?? {},
+      totalsBySeverity: audit.totalsBySeverity ?? {},
+      generatedAt: audit.generatedAt ?? null
+    }
+  };
+}
+
 export function listCommunities({ token, params, signal } = {}) {
   assertToken(token, 'list communities');
   return httpClient
@@ -404,6 +491,30 @@ export function deletePodcastEpisode(showId, episodeId, { token, signal } = {}) 
     .then(extractData);
 }
 
+export function listAuditLog({ token, params, signal } = {}) {
+  assertToken(token, 'list audit log entries');
+  return httpClient
+    .get('/admin/control/audit-log', {
+      token,
+      params,
+      signal,
+      cache: { enabled: false }
+    })
+    .then(normaliseAuditLog);
+}
+
+export function fetchOverview({ token, params, signal } = {}) {
+  assertToken(token, 'load the admin control overview');
+  return httpClient
+    .get('/admin/control/overview', {
+      token,
+      params,
+      signal,
+      cache: { enabled: false }
+    })
+    .then(normaliseOverview);
+}
+
 const adminControlApi = {
   listCommunities,
   createCommunity,
@@ -432,7 +543,9 @@ const adminControlApi = {
   listPodcastEpisodes,
   createPodcastEpisode,
   updatePodcastEpisode,
-  deletePodcastEpisode
+  deletePodcastEpisode,
+  listAuditLog,
+  fetchOverview
 };
 
 export default adminControlApi;
