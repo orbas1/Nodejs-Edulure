@@ -29,7 +29,7 @@ export async function seed(knex) {
 
     await service.rebuild({
       trx,
-      entityTypes: ['course', 'community', 'ebook', 'tutor'],
+      entityTypes: ['courses', 'communities', 'ebooks', 'tutors'],
       reason: 'bootstrap',
       runAt: new Date()
     });

@@ -63,7 +63,7 @@ describe('SearchDocumentService', () => {
       createDbStub();
 
     const loaderDoc = {
-      entityType: 'course',
+      entityType: 'courses',
       entityId: 'course-ops',
       title: 'Operations Mastery',
       subtitle: 'Scale the modern learning platform',
@@ -74,6 +74,13 @@ describe('SearchDocumentService', () => {
         tags: ['ops'],
         languages: ['en']
       },
+      category: 'operations',
+      languageCodes: ['en'],
+      tagSlugs: ['ops'],
+      priceCurrency: 'USD',
+      priceAmountMinor: 4500,
+      ratingAverage: 4.6,
+      ratingCount: 128,
       popularityScore: 72.4567,
       freshnessScore: 88.1234,
       isActive: true,
@@ -86,12 +93,12 @@ describe('SearchDocumentService', () => {
       dbClient: db,
       loggerInstance: loggerStub,
       loaders: {
-        course: vi.fn(async () => [loaderDoc])
+        courses: vi.fn(async () => [loaderDoc])
       }
     });
 
     const runAt = new Date('2024-03-05T00:00:00Z');
-    const result = await service.rebuild({ trx: db, entityTypes: ['course'], reason: 'bootstrap', runAt });
+    const result = await service.rebuild({ trx: db, entityTypes: ['courses'], reason: 'bootstrap', runAt });
 
     expect(result.processed).toBe(1);
     expect(searchDocs).toHaveLength(1);
@@ -99,10 +106,17 @@ describe('SearchDocumentService', () => {
     expect(searchMergeMock).toHaveBeenCalled();
 
     const insertedDoc = searchDocs[0];
-    expect(insertedDoc.entity_type).toBe('course');
+    expect(insertedDoc.entity_type).toBe('courses');
     expect(insertedDoc.entity_id).toBe('course-ops');
     expect(JSON.parse(insertedDoc.keywords)).toEqual(['ops', 'platform']);
     expect(JSON.parse(insertedDoc.metadata)).toMatchObject({ category: 'operations', tags: ['ops'] });
+    expect(insertedDoc.category).toBe('operations');
+    expect(insertedDoc.language_codes).toBe('en');
+    expect(insertedDoc.tag_slugs).toBe('ops');
+    expect(insertedDoc.price_currency).toBe('USD');
+    expect(insertedDoc.price_amount_minor).toBe(4500);
+    expect(insertedDoc.rating_average).toBeCloseTo(4.6);
+    expect(insertedDoc.rating_count).toBe(128);
     expect(insertedDoc.published_at).toEqual(new Date('2024-03-01T00:00:00Z'));
     expect(insertedDoc.updated_at).toBeInstanceOf(Date);
 
@@ -111,7 +125,7 @@ describe('SearchDocumentService', () => {
     expect(queueMergeMock).toHaveBeenCalled();
 
     const queued = queueEntries[0];
-    expect(queued.entity_type).toBe('course');
+    expect(queued.entity_type).toBe('courses');
     expect(queued.entity_id).toBe('course-ops');
     expect(queued.reason).toBe('bootstrap');
     expect(queued.priority).toBe('high');

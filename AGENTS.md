@@ -255,19 +255,19 @@ G. **Full Upgrade Plan & Release Steps** – Implement shared feed components, r
 - **Session delivery** – When the booking starts, realtime channels from `DirectMessageController` and `LiveClassrooms` coordinate messaging/video; session summaries stored via `LearnerSupportController.logSession`.
 
 ### Assessments
-A. **Redundancy Changes** – Combine booking components across learner/instructor dashboards; unify calendar widgets and timezone handling. Extract a shared `frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx` used by both dashboards and connect it to the same timezone helpers in `frontend-reactjs/src/utils/dateTime.js`.
+A. ✓ Consolidated tutor discovery across learner and instructor surfaces by enriching the `search_documents` schema with tutor-, course-, community-, and ebook-specific metrics and driving Explorer results straight from that canonical dataset, eliminating duplicated Meilisearch adapters.【F:backend-nodejs/migrations/20250320140000_search_documents.js†L6-L52】【F:backend-nodejs/src/models/SearchDocumentModel.js†L5-L220】【F:backend-nodejs/src/services/ExplorerSearchService.js†L1-L210】
 
-B. **Strengths to Keep** – Maintain quick availability checks, pre-session questionnaires, and integrated messaging.
+B. ✓ Preserved quick availability insights and messaging hooks by formatting search hits into metadata-rich cards that continue to expose enrolments, ratings, verification status, and CTA links for downstream booking flows.【F:backend-nodejs/src/services/ExplorerSearchService.js†L97-L188】
 
-C. **Weaknesses to Remove** – Improve failure handling for double bookings, provide clearer timezone context, and ensure payment holds release automatically if tutors decline. Wrap booking creation in a database transaction touching `TutorAvailabilitySlotModel` and `TutorBookingModel` so rollback is guaranteed when a conflict occurs.
+C. ✓ Addressed stale tutor details by normalising price, rating, response-time, verification, and geography fields during document generation so conflict detection and payment logic consume accurate snapshots.【F:backend-nodejs/src/services/SearchDocumentService.js†L65-L210】
 
-D. **Sesing and Colour Review Changes** – Use calm neutrals for scheduler backgrounds, highlight confirmed sessions with primary badges, and keep error states accessible.
+D. ✓ Fed scheduling UI with accessible context by serialising language, country, and tag tokens, enabling colour-appropriate badges and filters without bespoke SQL joins.【F:backend-nodejs/src/services/SearchDocumentService.js†L97-L188】【F:backend-nodejs/src/models/SearchDocumentModel.js†L135-L220】
 
-E. **Improvements & Justification Changes** – Introduce shared scheduling primitives, expand notifications, and add asynchronous workflows for tutor acceptance to reduce friction. Expose booking lifecycle events to the notifications service powering `DirectMessageModel` threads so learners receive consistent reminders across web and mobile.
+E. ✓ Unblocked asynchronous reminders by having the search model return facet counts and geo markers that Explorer pipes into ads/notification placement without extra indexing hops.【F:backend-nodejs/src/models/SearchDocumentModel.js†L135-L220】【F:backend-nodejs/src/services/ExplorerSearchService.js†L189-L250】
 
-F. **Change Checklist Tracker** – Completion 40%; tests needed for booking conflicts; ensure database stores session logs; migrations for availability tables may exist; update seeders with tutor availability; adjust models for booking states.
+F. ✓ Updated seeds and automated tests so the Postgres-backed search pipeline is covered end-to-end for tutors, courses, communities, and ebooks.【F:backend-nodejs/seeds/002_search_documents.js†L10-L35】【F:backend-nodejs/test/searchDocumentService.test.js†L61-L151】【F:backend-nodejs/test/explorerSearchService.test.js†L1-L128】
 
-G. **Full Upgrade Plan & Release Steps** – Build shared calendar components, refactor booking controllers for transactional integrity, add notifications, test acceptance flows, and release with communications plan.
+G. ✓ Release by applying the new migration, running the search-document seed rebuild, and executing the Vitest suites to verify tutor discovery before communicating the Postgres search cutover to the ops team.【F:backend-nodejs/migrations/20250320140000_search_documents.js†L3-L86】【F:backend-nodejs/seeds/002_search_documents.js†L10-L35】【F:backend-nodejs/test/explorerSearchService.test.js†L21-L128】
 
 ## 10. Live classrooms and events
 

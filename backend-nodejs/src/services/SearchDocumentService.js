@@ -2,11 +2,116 @@ import db from '../config/database.js';
 import logger from '../config/logger.js';
 
 const ENTITY_PRIORITY = {
-  course: 'high',
-  community: 'normal',
-  ebook: 'low',
-  tutor: 'normal'
+  courses: 'high',
+  communities: 'normal',
+  ebooks: 'low',
+  tutors: 'normal'
 };
+
+const TOKEN_SEPARATOR = ',';
+
+function toTokenSlug(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || null;
+}
+
+function normaliseCurrency(value, fallback = 'USD') {
+  if (!value) {
+    return fallback;
+  }
+  const trimmed = String(value).trim().toUpperCase();
+  if (/^[A-Z]{3}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return fallback;
+}
+
+function normaliseInteger(value, defaultValue = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return defaultValue;
+  }
+  return Math.max(0, Math.round(numeric));
+}
+
+function normaliseDecimalValue(value, precision = 4, defaultValue = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return defaultValue;
+  }
+  const factor = 10 ** precision;
+  return Math.round(numeric * factor) / factor;
+}
+
+function toMinorUnits(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.round(numeric * 100));
+}
+
+function normaliseBoolean(value, defaultValue = false) {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  if (typeof value === 'string') {
+    const normalised = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on', 'y'].includes(normalised)) {
+      return true;
+    }
+    if (['false', '0', 'no', 'off', 'n'].includes(normalised)) {
+      return false;
+    }
+  }
+  return defaultValue;
+}
+
+function toNormalisedTokenList(values, { slug = false } = {}) {
+  const strings = toStringArray(values).map((token) => {
+    if (!token) {
+      return null;
+    }
+    if (!slug) {
+      return token.trim().toLowerCase();
+    }
+    return toTokenSlug(token);
+  });
+  return dedupeStrings(strings.filter(Boolean));
+}
+
+function serialiseTokenList(values, options) {
+  const tokens = toNormalisedTokenList(values, options);
+  if (!tokens.length) {
+    return null;
+  }
+  return tokens.join(TOKEN_SEPARATOR);
+}
+
+function parseTokenList(value) {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  return String(value)
+    .split(TOKEN_SEPARATOR)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
 
 function parseJson(value, fallback) {
   if (value === null || value === undefined) {
@@ -184,10 +289,10 @@ function buildQueueKey(entityType, entityId) {
 export class SearchDocumentService {
   constructor({ dbClient = db, loggerInstance = logger, loaders = {} } = {}) {
     const defaultLoaders = {
-      course: this.buildCourseDocuments.bind(this),
-      community: this.buildCommunityDocuments.bind(this),
-      ebook: this.buildEbookDocuments.bind(this),
-      tutor: this.buildTutorDocuments.bind(this)
+      courses: this.buildCourseDocuments.bind(this),
+      communities: this.buildCommunityDocuments.bind(this),
+      ebooks: this.buildEbookDocuments.bind(this),
+      tutors: this.buildTutorDocuments.bind(this)
     };
 
     this.db = dbClient;
@@ -289,6 +394,48 @@ export class SearchDocumentService {
     const indexedAt = toDateOrNull(document.indexedAt ?? document.indexed_at) ?? timestamp;
     const refreshedAt = toDateOrNull(document.refreshedAt ?? document.refreshed_at) ?? timestamp;
 
+    const resolvedCategory = document.category ?? metadata.category ?? metadata.categories?.[0] ?? null;
+    const resolvedLevel = document.level ?? metadata.level ?? null;
+    const languageCodes = serialiseTokenList(
+      document.languageCodes ?? document.languages ?? metadata.languages ?? [],
+      { slug: false }
+    );
+    const tagSlugs = serialiseTokenList(document.tagSlugs ?? document.tags ?? metadata.tags ?? [], { slug: true });
+    const resolvedCountry = (document.country ?? metadata.country ?? '').trim() || null;
+
+    const resolvedPrice = document.price ?? metadata.price ?? {};
+    const priceCurrency = normaliseCurrency(document.priceCurrency ?? resolvedPrice.currency);
+    const priceAmountMinor = normaliseInteger(
+      document.priceAmountMinor ?? document.price_amount_minor ?? toMinorUnits(resolvedPrice.amount),
+      0
+    );
+
+    const rating = document.rating ?? metadata.rating ?? {};
+    const ratingAverage = normaliseDecimalValue(
+      document.ratingAverage ?? document.rating_average ?? rating.average ?? 0,
+      4,
+      0
+    );
+    const ratingCount = normaliseInteger(document.ratingCount ?? document.rating_count ?? rating.count ?? 0, 0);
+
+    const memberCount = normaliseInteger(
+      document.memberCount ?? document.member_count ?? metadata.memberCount ?? 0,
+      0
+    );
+    const postCount = normaliseInteger(document.postCount ?? document.post_count ?? metadata.postCount ?? 0, 0);
+    const completedSessions = normaliseInteger(
+      document.completedSessions ?? document.completed_sessions ?? metadata.completedSessions ?? 0,
+      0
+    );
+    const responseTimeMinutes = normaliseInteger(
+      document.responseTimeMinutes ?? document.response_time_minutes ?? metadata.responseTimeMinutes ?? 0,
+      0
+    );
+    const isVerified = normaliseBoolean(
+      document.isVerified ?? document.is_verified ?? metadata.isVerified ?? metadata.verified,
+      false
+    );
+
     return {
       entity_type: resolvedEntityType.toLowerCase(),
       entity_id: String(rawEntityId),
@@ -300,6 +447,20 @@ export class SearchDocumentService {
       thumbnail_url: document.thumbnailUrl ?? document.thumbnail_url ?? null,
       keywords: JSON.stringify(keywords),
       metadata: JSON.stringify(metadata),
+      category: resolvedCategory ?? null,
+      level: resolvedLevel ?? null,
+      country: resolvedCountry,
+      language_codes: languageCodes,
+      tag_slugs: tagSlugs,
+      price_currency: priceCurrency,
+      price_amount_minor: priceAmountMinor,
+      rating_average: ratingAverage,
+      rating_count: ratingCount,
+      member_count: memberCount,
+      post_count: postCount,
+      completed_sessions: completedSessions,
+      response_time_minutes: responseTimeMinutes,
+      is_verified: isVerified,
       popularity_score: popularityScore,
       freshness_score: freshnessScore,
       is_active: document.isActive ?? document.is_active ?? true,
@@ -460,7 +621,7 @@ export class SearchDocumentService {
       ]);
 
       return {
-        entityType: 'course',
+        entityType: 'courses',
         entityId: row.id,
         entityPublicId: row.public_id ?? null,
         slug: row.slug ?? null,
@@ -469,6 +630,14 @@ export class SearchDocumentService {
         description: row.description ?? null,
         thumbnailUrl: row.thumbnail_url ?? null,
         keywords,
+        category: row.category ?? null,
+        level: row.level ?? null,
+        languageCodes: languages,
+        tagSlugs: tags,
+        priceCurrency: row.price_currency ?? 'USD',
+        priceAmountMinor: toMinorUnits(row.price_amount ?? 0),
+        ratingAverage: Number(row.rating_average ?? 0),
+        ratingCount: Number(row.rating_count ?? 0),
         metadata: {
           type: 'course',
           category: row.category ?? null,
@@ -548,7 +717,7 @@ export class SearchDocumentService {
       ]);
 
       return {
-        entityType: 'community',
+        entityType: 'communities',
         entityId: community.id,
         slug: community.slug ?? null,
         title: community.name,
@@ -556,6 +725,11 @@ export class SearchDocumentService {
         description: community.description ?? null,
         thumbnailUrl: metadata.avatarUrl ?? metadata.coverImageUrl ?? community.cover_image_url ?? null,
         keywords,
+        languageCodes: languages,
+        tagSlugs: dedupeStrings([...topics, ...tags]),
+        country: metadata.country ?? null,
+        memberCount,
+        postCount,
         metadata: {
           visibility: community.visibility,
           topics,
@@ -632,7 +806,7 @@ export class SearchDocumentService {
       const keywords = dedupeStrings([ebook.title, ebook.subtitle, tags, categories, authors, languages]);
 
       return {
-        entityType: 'ebook',
+        entityType: 'ebooks',
         entityId: ebook.id,
         entityPublicId: ebook.public_id ?? null,
         slug: ebook.slug ?? null,
@@ -641,6 +815,13 @@ export class SearchDocumentService {
         description: ebook.description ?? null,
         thumbnailUrl: coverImage,
         keywords,
+        category: categories[0] ?? null,
+        languageCodes: languages,
+        tagSlugs: tags,
+        priceCurrency: ebook.price_currency ?? 'USD',
+        priceAmountMinor: toMinorUnits(ebook.price_amount ?? 0),
+        ratingAverage: Number(ebook.rating_average ?? 0),
+        ratingCount: Number(ebook.rating_count ?? 0),
         metadata: {
           authors,
           tags,
@@ -709,7 +890,7 @@ export class SearchDocumentService {
       const keywords = dedupeStrings([tutor.display_name, tutor.headline, tutor.country, skills, languages]);
 
       return {
-        entityType: 'tutor',
+        entityType: 'tutors',
         entityId: tutor.id,
         slug: metadata.profileSlug ?? null,
         title: tutor.display_name,
@@ -717,6 +898,16 @@ export class SearchDocumentService {
         description: tutor.bio ?? null,
         thumbnailUrl: metadata.avatarUrl ?? null,
         keywords,
+        languageCodes: languages,
+        tagSlugs: skills,
+        priceCurrency: tutor.hourly_rate_currency ?? 'USD',
+        priceAmountMinor: Number(tutor.hourly_rate_amount ?? 0),
+        ratingAverage: Number(tutor.rating_average ?? 0),
+        ratingCount: Number(tutor.rating_count ?? 0),
+        completedSessions: Number(tutor.completed_sessions ?? 0),
+        responseTimeMinutes: Number(tutor.response_time_minutes ?? 0),
+        isVerified: Boolean(tutor.is_verified),
+        country: tutor.country ?? null,
         metadata: {
           userId: tutor.user_id,
           skills,
