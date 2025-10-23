@@ -61,7 +61,7 @@ export default function PerksGrid() {
           </h2>
           <p className="mt-4 text-base text-slate-600 md:text-lg">{subheading}</p>
         </div>
-        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-12 layout-grid" data-max-columns="3">
           {PERK_ITEMS.map(({ key, icon, gradient }) => {
             const title = t(`home.perks.items.${key}.title`, 'Playful moment');
             const learnersLine = t(
