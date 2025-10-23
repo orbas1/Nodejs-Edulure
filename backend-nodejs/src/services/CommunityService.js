@@ -560,10 +560,20 @@ export default class CommunityService {
       perPage: filters.perPage,
       metadata: { communityId: community.id, blockedPlacementIds }
     });
+    const pinnedRaw = await CommunityPostModel.listPinnedForCommunity(community.id, {
+      limit: Math.max(6, Number(filters.perPage ?? 10))
+    });
+    const pinned = pinnedRaw.map((post) =>
+      this.serializePost(post, community, {
+        membership,
+        actor
+      })
+    );
     return {
       items: decorated.items,
       pagination,
-      ads: decorated.ads
+      ads: decorated.ads,
+      pinned
     };
   }
 
@@ -573,6 +583,12 @@ export default class CommunityService {
     const { items, pagination } = await CommunityPostModel.paginateForUser(userId, {
       ...filters,
       query: searchQuery
+    });
+    const membershipByCommunity = new Map();
+    items.forEach((item) => {
+      if (!item?.communityId) return;
+      const role = item.viewerRole ?? null;
+      membershipByCommunity.set(item.communityId, role);
     });
     const actor = { id: userId, role: options.actorRole };
     const serialised = items.map((item) =>
@@ -588,11 +604,93 @@ export default class CommunityService {
       perPage: filters.perPage,
       metadata: { userId }
     });
+    const communityIds = items
+      .map((item) => item.communityId)
+      .filter((value) => value !== undefined && value !== null);
+    const pinnedRaw = communityIds.length
+      ? await CommunityPostModel.listPinnedForCommunities(communityIds, {
+          limitPerCommunity: Math.max(1, Math.min(Number(filters.perPage ?? 6), 4)),
+          totalLimit: Math.max(Number(filters.perPage ?? 6) * 2, 10)
+        })
+      : [];
+    const pinned = pinnedRaw.map((post) => {
+      const role = membershipByCommunity.get(post.communityId);
+      const membership = role
+        ? { role, status: 'active' }
+        : post.communityId
+          ? { role: 'member', status: 'active' }
+          : null;
+      return this.serializePost(post, undefined, {
+        membership,
+        actor
+      });
+    });
     return {
       items: decorated.items,
       pagination,
-      ads: decorated.ads
+      ads: decorated.ads,
+      pinned
     };
+  }
+
+  static async reactToPost(communityIdentifier, postId, userId, payload = {}, options = {}) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!isActiveMembership(membership) && community.visibility === 'private') {
+      const error = new Error('Community is private');
+      error.status = 403;
+      throw error;
+    }
+
+    const actor = { id: userId, role: options.actorRole };
+    const updated = await CommunityPostModel.incrementReaction(postId, payload.reaction);
+
+    if (!updated || Number(updated.communityId) !== Number(community.id)) {
+      const error = new Error('Post not found in this community');
+      error.status = 404;
+      throw error;
+    }
+
+    return this.serializePost(updated, community, {
+      membership,
+      actor
+    });
+  }
+
+  static async removeReactionFromPost(communityIdentifier, postId, userId, payload = {}, options = {}) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!isActiveMembership(membership) && community.visibility === 'private') {
+      const error = new Error('Community is private');
+      error.status = 403;
+      throw error;
+    }
+
+    const actor = { id: userId, role: options.actorRole };
+    const updated = await CommunityPostModel.decrementReaction(postId, payload.reaction);
+
+    if (!updated || Number(updated.communityId) !== Number(community.id)) {
+      const error = new Error('Post not found in this community');
+      error.status = 404;
+      throw error;
+    }
+
+    return this.serializePost(updated, community, {
+      membership,
+      actor
+    });
   }
 
   static async listResources(communityIdentifier, userId, filters = {}) {

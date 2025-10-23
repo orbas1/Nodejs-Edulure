@@ -1,5 +1,8 @@
+import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
+
+import FeedList from '../../../components/feed/FeedList.jsx';
 
 const highlightPropType = PropTypes.shape({
   id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
@@ -7,44 +10,73 @@ const highlightPropType = PropTypes.shape({
   tags: PropTypes.arrayOf(PropTypes.string).isRequired,
   headline: PropTypes.string.isRequired,
   reactions: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  comments: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired
+  comments: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  summary: PropTypes.string,
+  community: PropTypes.string
 });
 
-function HighlightCard({ highlight }) {
-  const tagsText = highlight.tags.length > 0 ? highlight.tags.join(' • ') : 'Activity';
+function mapHighlightToFeedEntry(highlight) {
+  if (!highlight || !highlight.id) {
+    return null;
+  }
+
+  const timestamp = (() => {
+    if (!highlight.time) return null;
+    const parsed = new Date(highlight.time);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  })();
+
   const reactions = Number.isFinite(Number(highlight.reactions)) ? Number(highlight.reactions) : 0;
   const comments = Number.isFinite(Number(highlight.comments)) ? Number(highlight.comments) : 0;
-  return (
-    <li className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md">
-      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">
-        <span>{highlight.time}</span>
-        <span className="truncate text-right">{tagsText}</span>
-      </div>
-      <p className="mt-3 text-sm font-semibold text-slate-900">{highlight.headline}</p>
-      <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
-        <span aria-label="Reactions">❤️ {reactions}</span>
-        <span aria-label="Comments">💬 {comments}</span>
-      </div>
-    </li>
-  );
+  const tags = Array.isArray(highlight.tags) ? highlight.tags : [];
+  const summary = highlight.summary ?? highlight.body ?? highlight.headline ?? 'Community highlight';
+
+  return {
+    kind: 'post',
+    post: {
+      id: highlight.id,
+      title: highlight.headline ?? 'Community highlight',
+      body: summary,
+      publishedAt: timestamp,
+      createdAt: timestamp,
+      tags,
+      community: highlight.community ? { name: highlight.community } : undefined,
+      author: {
+        id: highlight.authorId ?? null,
+        name: highlight.authorName ?? 'Community pulse',
+        role: highlight.authorRole ?? 'Highlights',
+        avatarUrl: highlight.authorAvatarUrl ?? null
+      },
+      stats: {
+        reactions,
+        comments
+      },
+      permissions: {
+        canModerate: false,
+        canRemove: false
+      }
+    }
+  };
 }
 
-HighlightCard.propTypes = {
-  highlight: highlightPropType.isRequired
-};
-
 export default function LearnerFeedHighlightsSection({ highlights, className }) {
-  if (!Array.isArray(highlights) || highlights.length === 0) return null;
+  const feedEntries = useMemo(() => {
+    if (!Array.isArray(highlights)) return [];
+    return highlights.map(mapHighlightToFeedEntry).filter(Boolean);
+  }, [highlights]);
+
+  if (feedEntries.length === 0) return null;
 
   return (
     <section className={clsx('dashboard-section h-full', className)}>
       <p className="dashboard-kicker">Feed highlights</p>
       <h3 className="mt-2 text-lg font-semibold text-slate-900">Signals from your communities</h3>
-      <ul className="mt-4 space-y-4">
-        {highlights.map((item) => (
-          <HighlightCard key={item.id} highlight={item} />
-        ))}
-      </ul>
+      <FeedList
+        items={feedEntries}
+        loading={false}
+        hasMore={false}
+        emptyState={<p className="text-sm text-slate-500">No highlights available.</p>}
+      />
     </section>
   );
 }

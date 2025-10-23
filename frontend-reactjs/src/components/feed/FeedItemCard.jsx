@@ -24,6 +24,26 @@ function formatRelativeTime(timestamp) {
   return date.toLocaleDateString();
 }
 
+function computeAspectPadding(aspectRatio) {
+  if (!aspectRatio) {
+    return '56.25%';
+  }
+
+  if (typeof aspectRatio === 'string' && aspectRatio.includes(':')) {
+    const [widthPart, heightPart] = aspectRatio.split(':').map((value) => Number(value));
+    if (Number.isFinite(widthPart) && Number.isFinite(heightPart) && widthPart > 0 && heightPart > 0) {
+      return `${(heightPart / widthPart) * 100}%`;
+    }
+  }
+
+  const numeric = Number(aspectRatio);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return `${(1 / numeric) * 100}%`;
+  }
+
+  return '56.25%';
+}
+
 function normaliseLinkAttachments(attachments) {
   if (!Array.isArray(attachments)) return [];
 
@@ -84,7 +104,9 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
   const moderationReason = post.moderation?.context ?? post.moderation?.reason;
   const preview = post.media?.preview;
   const previewUrl = preview?.thumbnailUrl;
-  const previewAspectRatio = preview?.aspectRatio ?? '16:9';
+  const previewAspectRatio = preview?.aspectRatio;
+  const previewPadding = computeAspectPadding(previewAspectRatio);
+  const previewBackground = preview?.dominantColor ?? '#f8fafc';
 
   const handleReact = (reaction) => {
     if (typeof onReact === 'function') {
@@ -162,7 +184,7 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
             <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
               <div
                 className="relative w-full bg-slate-100"
-                style={{ paddingBottom: `calc(100% / (${previewAspectRatio.replace(':', '/') || '16/9'}))` }}
+                style={{ paddingBottom: previewPadding, backgroundColor: previewBackground }}
               >
                 <img
                   src={previewUrl}

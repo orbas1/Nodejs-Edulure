@@ -25,6 +25,7 @@ import CommunityHero from '../components/CommunityHero.jsx';
 import CommunityResourceEditor from '../components/community/CommunityResourceEditor.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
+import useFeedInteractions from '../hooks/useFeedInteractions.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const ALL_COMMUNITIES_NODE = {
@@ -170,6 +171,7 @@ export default function Feed() {
   const [selectedCommunity, setSelectedCommunity] = useState(ALL_COMMUNITIES_NODE);
   const [activeMenuItem, setActiveMenuItem] = useState('Communities');
   const [feedItems, setFeedItems] = useState([]);
+  const [pinnedFeedItems, setPinnedFeedItems] = useState([]);
   const [feedMeta, setFeedMeta] = useState({ page: 1, perPage: 10, total: 0, pageCount: 0 });
   const [feedAdsMeta, setFeedAdsMeta] = useState(null);
   const [feedRange, setFeedRange] = useState('30d');
@@ -262,24 +264,31 @@ export default function Feed() {
   }, []);
 
   const updateFeedPost = useCallback((postId, updater) => {
-    setFeedItems((prev) =>
-      prev
+    if (!postId || typeof updater !== 'function') {
+      return;
+    }
+
+    const applyUpdate = (entries) =>
+      entries
         .map((entry) => {
-          if (entry?.kind === 'post' && entry.post?.id === postId) {
+          if (!entry) return entry;
+          if (entry.kind === 'post' && entry.post?.id === postId) {
             const nextPost = updater(entry.post);
             if (!nextPost) {
               return null;
             }
             return { ...entry, post: nextPost };
           }
-          if (!entry?.kind && entry?.id === postId) {
+          if (!entry.kind && entry.id === postId) {
             const nextPost = updater(entry);
             return nextPost || null;
           }
           return entry;
         })
-        .filter(Boolean)
-    );
+        .filter(Boolean);
+
+    setFeedItems((prev) => applyUpdate(prev));
+    setPinnedFeedItems((prev) => applyUpdate(prev));
   }, []);
 
   const resolvePostCommunityId = useCallback(
@@ -294,11 +303,65 @@ export default function Feed() {
 
   const menuState = useMemo(() => (selectedCommunity?.id === 'all' ? 'all' : 'community'), [selectedCommunity]);
 
+  const reactionAnalyticsContext = useMemo(
+    () => ({
+      surface: 'feed-page',
+      context: selectedCommunity?.id === 'all' ? 'global' : 'community',
+      range: feedRange
+    }),
+    [selectedCommunity?.id, feedRange]
+  );
+
+  const handlePostUpdate = useCallback(
+    (postId, nextPost) => {
+      updateFeedPost(postId, () => nextPost ?? null);
+    },
+    [updateFeedPost]
+  );
+
+  const { react: reactToFeedPost, reactionStates } = useFeedInteractions({
+    token,
+    analyticsContext: reactionAnalyticsContext,
+    onPostUpdated: handlePostUpdate
+  });
+
+  const combinedActionStates = useMemo(() => {
+    if (!reactionStates || Object.keys(reactionStates).length === 0) {
+      return postActions;
+    }
+    const merged = { ...postActions };
+    Object.entries(reactionStates).forEach(([postId, state]) => {
+      merged[postId] = { ...(merged[postId] ?? {}), ...state };
+    });
+    return merged;
+  }, [postActions, reactionStates]);
+
+  const combinedFeedItems = useMemo(() => {
+    const merged = [];
+    const seen = new Set();
+
+    const pushEntry = (entry) => {
+      if (!entry) return;
+      const identifier = entry.kind === 'post' ? entry.post?.id : entry?.id;
+      if (!identifier || seen.has(identifier)) {
+        return;
+      }
+      seen.add(identifier);
+      merged.push(entry);
+    };
+
+    pinnedFeedItems.forEach(pushEntry);
+    feedItems.forEach(pushEntry);
+
+    return merged;
+  }, [pinnedFeedItems, feedItems]);
+
   useEffect(() => {
     if (!token) {
       setCommunities([ALL_COMMUNITIES_NODE]);
       setSelectedCommunity(ALL_COMMUNITIES_NODE);
       setFeedItems([]);
+      setPinnedFeedItems([]);
       setFeedMeta({ page: 1, perPage: 10, total: 0, pageCount: 0 });
       setFeedAdsMeta(null);
       setFeedRange('30d');
@@ -398,6 +461,10 @@ export default function Feed() {
         const pagination = payload.pagination ?? {};
         const adsMeta = payload.ads ?? null;
 
+        if (!append) {
+          setPinnedFeedItems(Array.isArray(payload.pinned) ? payload.pinned : []);
+        }
+
         setFeedItems((prev) => (append ? [...prev, ...items] : items));
         setFeedMeta((prev) => {
           const prevTotal = append ? prev.total ?? 0 : 0;
@@ -429,6 +496,7 @@ export default function Feed() {
       } catch (error) {
         if (!append) {
           setFeedItems([]);
+          setPinnedFeedItems([]);
           setFeedInsights((prev) => ({ ...prev, analytics: null, highlights: [], generatedAt: null }));
           setFeedInsightsError(error.message ?? 'Unable to load feed insights');
         }
@@ -526,24 +594,6 @@ export default function Feed() {
       loadFeed({ page: feedMeta.page + 1, append: true });
     }
   };
-
-  const handleReactToPost = useCallback(
-    (targetPost) => {
-      if (!targetPost?.id) return;
-      updateFeedPost(targetPost.id, (existing) => {
-        if (!existing) return existing;
-        const currentReactions = Number(existing.stats?.reactions ?? 0);
-        return {
-          ...existing,
-          stats: {
-            ...existing.stats,
-            reactions: currentReactions + 1
-          }
-        };
-      });
-    },
-    [updateFeedPost]
-  );
 
   const hasCommunitiesLoaded = communities.length > 0 && !isLoadingCommunities;
   const composerCommunities = useMemo(
@@ -678,6 +728,7 @@ export default function Feed() {
       );
       setSelectedCommunity(ALL_COMMUNITIES_NODE);
       setFeedItems([]);
+      setPinnedFeedItems([]);
       setFeedMeta({ page: 1, perPage: 10, total: 0, pageCount: 0 });
       setFeedAdsMeta(null);
       setSponsorships({ blockedPlacementIds: [] });
@@ -1250,7 +1301,7 @@ export default function Feed() {
                 <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">{feedError}</div>
               ) : (
                 <FeedList
-                  items={feedItems}
+                  items={combinedFeedItems}
                   loading={isLoadingFeed}
                   loadingMore={isLoadingMore}
                   hasMore={canLoadMore}
@@ -1279,7 +1330,7 @@ export default function Feed() {
                       </div>
                     </div>
                   }
-                  actionStates={postActions}
+                  actionStates={combinedActionStates}
                   onModerate={handleModeratePost}
                   onRemove={handleRemovePost}
                   onDismissPlacement={handleDismissPlacement}
@@ -1287,7 +1338,7 @@ export default function Feed() {
                     selectedCommunity?.id !== 'all' && communityDetail?.permissions?.canManageSponsorships
                   )}
                   isManagingPlacements={isUpdatingSponsorship || isLoadingSponsorships}
-                  onReact={handleReactToPost}
+                  onReact={reactToFeedPost}
                 />
               )}
             </div>
