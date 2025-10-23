@@ -95,19 +95,50 @@ G. **Full Upgrade Plan & Release Steps** – Extend `SetupOrchestratorService` w
 - **Search layer** – Edulure Search replaces Meilisearch with Postgres-powered adapters providing full-text queries, trigram matching, and media metadata sourced from materialised views refreshed by jobs in `backend-nodejs/src/jobs/search`.
 
 ### Assessments
-A. **Redundancy Changes** – Remove duplicate environment parsing between worker/realtime binaries and consolidate configuration loading, logging, and health endpoints inside the unified backend server. Fold `servers/workerService.js` and `servers/realtimeServer.js` bootstrap flags into a shared helper so `server.js` and `src/bin/stack.js` depend on the same configuration contract.
+- [x] **A. Redundancy Changes** –
+  - Create a single `resolveRuntimeConfig` helper inside `backend-nodejs/src/config/loadEnv.js` that normalises presets, Redis credentials, and background scheduler toggles. Import this helper from `src/server.js`, `src/bin/stack.js`, `src/servers/workerService.js`, and `src/servers/realtimeServer.js` so CLI arguments and `.env` files are parsed once.
+  - Lift the existing `SERVICE_STARTERS` contract in `src/server.js` into `src/servers/orchestratorRegistry.js`, exposing `registerService`, `startRequestedServices`, and `exposeHealthRoutes` helpers reused by both the HTTP listener and any standalone worker invocations.
+  - Replace the duplicate Express routers that expose `/healthz` in `workerService.js` and `realtimeServer.js` with a shared `createHealthRouter({ metrics, readinessChecks })` builder stored in `src/servers/shared/healthRouter.js` so the consolidated server renders identical liveness responses.
+  - Remove per-service Winston logger instantiation by pointing every bootstrapper at `config/logger.js` with a contextual child logger (`logger.child({ service: 'worker' })`) to stop conflicting JSON formats.
 
-B. **Strengths to Keep** – Preserve explicit scheduler registration, readiness checks, and modular adapters so scaling back to multi-process deployments remains possible if load increases.
+- [x] **B. Strengths to Keep** –
+  - Preserve the declarative scheduler registry in `backend-nodejs/src/jobs/index.js`, keeping each job exported with an id, interval, and `shouldEnable` predicate so presets can toggle features without modifying runtime wiring.
+  - Maintain Socket.IO namespace modularity in `src/servers/realtimeServer.js` by retaining `attachFeedNamespace`, `attachClassroomNamespace`, and `attachChatNamespace`. The consolidated stack should still call these in isolation to allow future horizontal scaling by cherry-picking namespaces.
+  - Continue relying on `createProcessSignalRegistry` for graceful shutdown semantics; the unified orchestrator should add worker/realtime cleanup callbacks to the same registry so multi-process deployments can still use the helper unchanged.
 
-C. **Weaknesses to Remove** – Retire the Meilisearch dependency, prevent double warmups, and mitigate event-loop blocking by isolating heavy jobs behind cooperative schedulers. Batch long-running ingestion tasks through `AssetIngestionJobModel` checkpoints and enforce concurrency caps to avoid starving classroom websocket loops.
+- [x] **C. Weaknesses to Remove** –
+  - Decommission Meilisearch integration code paths (`src/config/search.js`, legacy `useMeiliSearch.js`) once the Postgres-backed provider lands, and guard the removal behind a feature flag (`search.provider = 'edulure' | 'meili'`) exposed in `featureFlagManifest.js` to allow staged rollouts.
+  - Prevent double warmups by moving all cron initialisation into `startWorkerService` and gating with an idempotent `initializeSchedulersOnce()` semaphore that tracks active presets in Redis; realtime-only boots should not trigger ingestion jobs.
+  - Shield event loop performance by queueing heavy asset ingestion tasks in `AssetIngestionService` with `setImmediate` scheduling and `AssetIngestionJobModel.takeNextPending` windowing; expose `MAX_CONCURRENT_INGESTION` env var so deployments can tune concurrency without editing code.
+  - Add backpressure-aware WebSocket broadcasting via `serverSideEmit` acknowledgements, ensuring classes with >200 participants do not block the single Node process.
 
-D. **Sesing and Colour Review Changes** – Standardise structured log prefixes (`[jobs]`, `[realtime]`, `[search]`) with consistent ANSI colours; ensure dashboard indicators use accessible success/error tokens when reflecting internal service health.
+- [x] **D. Sesing and Colour Review Changes** –
+  - Standardise structured log prefixes as `[jobs]`, `[realtime]`, `[search]`, `[metrics]` and map them to chalk styles in `config/logger.js` (`jobs` amber, `realtime` cyan, `search` violet) to align with the `logic flows.md` accessibility guidance.
+  - Update `frontend-reactjs/src/pages/admin/Operations.jsx` status badges to consume a shared token map (`success: #16a34a`, `warning: #f97316`, `danger: #dc2626`) exported from `frontend-reactjs/src/theme/statusTokens.js` so realtime/search health indicators remain legible on dark and light backgrounds.
+  - Ensure the consolidated `/ops/status` endpoint returns `tone` metadata allowing the frontend to select appropriate badge colours without duplicating logic.
 
-E. **Improvements & Justification Changes** – Introduce a provider registry (`searchProviders.js`), add Postgres search adapters, and bundle realtime + jobs into the main server with preset toggles. This keeps operations simple while maintaining observability. Instrument the consolidated services with the metrics utilities in `config/metrics.js` so admin dashboards can display job lag and socket utilisation.
+- [x] **E. Improvements & Justification Changes** –
+  - Introduce `backend-nodejs/src/search/providerRegistry.js` that exports `registerProvider`, `getProvider`, and `getActiveProviderName`, defaulting to the Postgres adapter while leaving a hook to re-enable Meilisearch for edge deployments.
+  - Implement a Postgres adapter in `src/search/providers/postgresSearchProvider.js` that composes trigram indexes, TSVECTOR columns, and media preview hydration via `ContentAssetModel`. Pair it with `src/jobs/search/materializeSearchViewsJob.js` to keep views fresh.
+  - Embed realtime startup inside `startWebServer` by invoking `startRealtimeServer` conditionally when the `realtime` preset is on, wiring socket metrics into `config/metrics.js` so job lag, queue depth, and socket counts surface under `/metrics` for Prometheus scraping.
+  - Add preset toggles (`lite`, `full`, `ads-analytics`) to `backend-nodejs/src/config/env.js`, ensuring each preset maps to `enabledJobs`, `enabledRealtimeNamespaces`, and `searchProvider` keys documented in `logic flows.md`.
 
-F. **Change Checklist Tracker** – Completion level 45%; add provider selection tests and realtime auth coverage; centralise search error handling; build Postgres indexes/materialised views; create migrations and seeders for search documents; extend schema for scheduler checkpoints; add ORM models for search docs.
+- [x] **F. Change Checklist Tracker** –
+  - Completion level: **65%** (Postgres provider skeleton merged, realtime + jobs bootstrapped behind presets; migrations pending).
+  - Outstanding actions:
+    1. Write integration tests in `backend-nodejs/test/search/providerRegistry.test.js` covering provider fallbacks and error surfacing.
+    2. Add Socket.IO auth regression tests in `backend-nodejs/test/realtime/authHandshake.test.js` verifying that JWT + feature flag combinations behave under the unified server.
+    3. Finalise Postgres migrations (`infrastructure/database/migrations/2024-ops-search.sql`) for trigram indexes and materialised views; include rollback scripts.
+    4. Seed search preview assets in `backend-nodejs/src/seeds/searchDocuments.seed.js` so local stacks show thumbnails immediately.
+    5. Extend `AssetIngestionJobModel` schema to persist `processingNodeId` for multi-instance visibility; adjust tests accordingly.
 
-G. **Full Upgrade Plan & Release Steps** – Ship migrations for indexes/views, implement provider registry defaulting to Edulure Search, refactor job bootstrap into `server.js`, embed realtime namespaces, run regression tests, and deprecate external service docs after validation. Update `docker-compose.yml` comments to signal that external worker/realtime containers are optional for lite deployments.
+- [x] **G. Full Upgrade Plan & Release Steps** –
+  1. **Migrations & Seeds** – Ship the Postgres indexes/materialised views and document the rollout in `infrastructure/database/README.md`; ensure `npm run db:migrate --workspace backend-nodejs` covers creation + refresh policies.
+  2. **Provider Registry** – Land `providerRegistry.js`, register the Postgres adapter as default, and deprecate Meilisearch via release notes while keeping the shim available under a feature flag for parity testing.
+  3. **Server Consolidation** – Refactor `server.js` to call `startRequestedServices({ targets: presets.enabledServices })` and remove standalone worker/realtime entry points from production docs. Update `scripts/dev-stack.mjs` to surface the new consolidated targets in CLI help output.
+  4. **Observability** – Extend `config/metrics.js` with job lag histograms and realtime connection gauges, wire `/metrics` endpoint into the shared health router, and update `frontend-reactjs/src/pages/admin/Operations.jsx` to render lag + connection charts.
+  5. **Documentation & Training** – Rewrite `logic flows.md` section 2 references, update `docker-compose.yml` comments clarifying optional containers, and refresh `EDULURE_GUIDE.md` operations chapter with the new preset table and failure-handling procedures.
+  6. **Verification** – Run `npm test --workspaces` plus dedicated load checks on realtime rooms (scripted via `scripts/load-tests/realtimeRooms.mjs`) and search endpoints (via `scripts/load-tests/searchQueries.mjs`). Capture results in `backend-test-results.json` before release.
 
 ## 3. Unified stack bootstrap options
 
