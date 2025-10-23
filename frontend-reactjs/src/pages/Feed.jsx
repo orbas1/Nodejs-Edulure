@@ -27,6 +27,7 @@ import CommunityResourceEditor from '../components/community/CommunityResourceEd
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import { fetchSystemPreferences } from '../api/learnerDashboardApi.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -211,6 +212,8 @@ export default function Feed() {
   const [isSavingResource, setIsSavingResource] = useState(false);
   const [deletingResourceId, setDeletingResourceId] = useState(null);
   const [resourceNotice, setResourceNotice] = useState(null);
+  const [adsOptOut, setAdsOptOut] = useState(false);
+  const [adsPreferenceStatus, setAdsPreferenceStatus] = useState('idle');
 
   const activeCommunity = useMemo(() => {
     if (communityDetail) {
@@ -363,6 +366,46 @@ export default function Feed() {
       isMounted = false;
     };
   }, [token]);
+
+  useEffect(() => {
+    const accessToken = session?.tokens?.accessToken;
+    if (!accessToken) {
+      setAdsOptOut(false);
+      setAdsPreferenceStatus('idle');
+      return undefined;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+    setAdsPreferenceStatus('loading');
+
+    fetchSystemPreferences({ token: accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!active) return;
+        const preferences = response?.data ?? response ?? {};
+        const adsFlag = (() => {
+          if (preferences?.preferences && typeof preferences.preferences === 'object') {
+            return Boolean(preferences.preferences.adsOptOut);
+          }
+          if (preferences?.adsOptOut !== undefined) {
+            return Boolean(preferences.adsOptOut);
+          }
+          return false;
+        })();
+        setAdsOptOut(adsFlag);
+        setAdsPreferenceStatus('success');
+      })
+      .catch(() => {
+        if (!active) return;
+        setAdsOptOut(false);
+        setAdsPreferenceStatus('error');
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [session?.tokens?.accessToken]);
 
   const loadFeed = useCallback(
     async ({ page = 1, append = false, queryOverride } = {}) => {
@@ -522,6 +565,13 @@ export default function Feed() {
   }, [selectedCommunity, token, loadFeed, loadCommunityDetail, canAccessCommunityFeed]);
 
   const canLoadMore = feedMeta.page < feedMeta.pageCount;
+  const visibleFeedItems = useMemo(() => {
+    if (!adsOptOut) {
+      return feedItems;
+    }
+    return feedItems.filter((item) => item?.kind !== 'ad');
+  }, [adsOptOut, feedItems]);
+  const displayedFeedAdsMeta = adsOptOut ? null : feedAdsMeta;
   const handleLoadMore = () => {
     if (canLoadMore) {
       loadFeed({ page: feedMeta.page + 1, append: true });
@@ -1226,10 +1276,15 @@ export default function Feed() {
                 <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">{feedError}</div>
               ) : (
                 <>
-                  {feedAdsMeta?.count > 0 && (
+                  {adsOptOut && feedAdsMeta?.count > 0 ? (
+                    <div className="rounded-3xl border border-slate-200 bg-white/80 px-4 py-3 text-xs font-medium text-slate-500">
+                      Sponsored placements are hidden based on your ad preferences.
+                    </div>
+                  ) : null}
+                  {displayedFeedAdsMeta?.count > 0 && (
                     <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
-                      Sponsored placements active · {feedAdsMeta.count}{' '}
-                      {feedAdsMeta.count === 1 ? 'campaign' : 'campaigns'} matched for your feed.
+                      Sponsored placements active · {displayedFeedAdsMeta.count}{' '}
+                      {displayedFeedAdsMeta.count === 1 ? 'campaign' : 'campaigns'} matched for your feed.
                     </div>
                   )}
                   {sponsorshipError && (
@@ -1237,7 +1292,7 @@ export default function Feed() {
                       {sponsorshipError}
                     </div>
                   )}
-                  {feedItems.map((item) => {
+                  {visibleFeedItems.map((item) => {
                     if (item?.kind === 'ad' && item.ad) {
                       return (
                         <FeedSponsoredCard

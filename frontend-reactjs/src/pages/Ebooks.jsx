@@ -1,23 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ArrowDownTrayIcon,
-  BookOpenIcon,
-  BookmarkIcon,
-  CreditCardIcon,
-  CheckCircleIcon,
-  XMarkIcon
-} from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, BookOpenIcon, BookmarkIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
 import FormStepper from '../components/forms/FormStepper.jsx';
 import adminControlApi from '../api/adminControlApi.js';
 import { createEbookPurchaseIntent, listMarketplaceEbooks } from '../api/ebookApi.js';
+import { fetchCoupon } from '../api/paymentsApi.js';
 import { requestMediaUpload } from '../api/mediaApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 import { computeFileChecksum } from '../utils/uploads.js';
+import CheckoutDialog from '../components/checkout/CheckoutDialog.jsx';
+import { computeCheckoutSummary, normaliseCouponCode, isCouponCodeValid } from '../utils/checkout.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'ebooks',
@@ -200,154 +196,6 @@ function EbookCard({ ebook, onPurchase }) {
         ) : null}
       </div>
     </article>
-  );
-}
-
-function EbookCheckoutDrawer({ ebook, open, onClose, form, onChange, onSubmit, status, pending }) {
-  if (!open || !ebook) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-end bg-slate-900/40 px-4 py-6">
-      <div className="relative w-full max-w-md rounded-4xl border border-slate-200 bg-white/95 p-6 shadow-2xl">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-rose-200 hover:text-rose-500"
-        >
-          <XMarkIcon className="h-5 w-5" />
-          <span className="sr-only">Close checkout</span>
-        </button>
-
-        <div className="flex items-center gap-3">
-          <div className="rounded-full bg-primary/10 p-2 text-primary">
-            <CreditCardIcon className="h-6 w-6" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary">Secure checkout</p>
-            <h3 className="text-xl font-semibold text-slate-900">Purchase “{ebook.title}”</h3>
-            <p className="text-xs text-slate-500">We’ll generate a payment intent with audit-ready metadata.</p>
-          </div>
-        </div>
-
-        <form className="mt-6 space-y-5" onSubmit={onSubmit}>
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Provider</label>
-            <div className="grid grid-cols-2 gap-2">
-              {['stripe', 'paypal'].map((provider) => (
-                <button
-                  key={provider}
-                  type="button"
-                  onClick={() => onChange({ ...form, provider })}
-                  className={`rounded-3xl border px-4 py-3 text-sm font-semibold capitalize transition ${
-                    form.provider === provider
-                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                      : 'border-slate-200 text-slate-600 hover:border-primary hover:text-primary'
-                  }`}
-                >
-                  {provider}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quantity</span>
-            <input
-              type="number"
-              min="1"
-              max="200"
-              value={form.quantity}
-              onChange={(event) => onChange({ ...form, quantity: Number(event.target.value) || 1 })}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              required
-            />
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Receipt email</span>
-            <input
-              type="email"
-              value={form.receiptEmail}
-              onChange={(event) => onChange({ ...form, receiptEmail: event.target.value })}
-              placeholder="finance@company.com"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Coupon code</span>
-            <input
-              type="text"
-              value={form.couponCode}
-              onChange={(event) => onChange({ ...form, couponCode: event.target.value.toUpperCase() })}
-              placeholder="LAUNCH25"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tax country</span>
-              <input
-                type="text"
-                maxLength={2}
-                value={form.taxCountry}
-                onChange={(event) => onChange({ ...form, taxCountry: event.target.value.toUpperCase() })}
-                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="US"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Region</span>
-              <input
-                type="text"
-                maxLength={3}
-                value={form.taxRegion}
-                onChange={(event) => onChange({ ...form, taxRegion: event.target.value.toUpperCase() })}
-                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="CA"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Postal</span>
-              <input
-                type="text"
-                maxLength={12}
-                value={form.taxPostalCode}
-                onChange={(event) => onChange({ ...form, taxPostalCode: event.target.value })}
-                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="94016"
-              />
-            </label>
-          </div>
-
-          <button
-            type="submit"
-            disabled={pending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark disabled:opacity-60"
-          >
-            {pending ? 'Creating checkout…' : 'Generate payment intent'}
-          </button>
-        </form>
-
-        {status ? (
-          <div
-            className={`mt-4 rounded-3xl border px-4 py-3 text-sm ${
-              status.type === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : status.type === 'error'
-                  ? 'border-rose-200 bg-rose-50 text-rose-700'
-                  : 'border-primary/30 bg-primary/10 text-primary'
-            }`}
-          >
-            {status.type === 'success' ? <CheckCircleIcon className="mr-2 inline h-4 w-4" /> : null}
-            {status.message}
-          </div>
-        ) : null}
-      </div>
-    </div>
   );
 }
 
@@ -777,7 +625,51 @@ export default function Ebooks() {
   const [checkoutStatus, setCheckoutStatus] = useState(null);
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
+  const [couponInsight, setCouponInsight] = useState({ status: 'idle', coupon: null, message: null });
   const [uploadState, setUploadState] = useState({});
+
+  const activeCoupon = couponInsight.status === 'valid' ? couponInsight.coupon : null;
+
+  const checkoutSummary = useMemo(() => {
+    if (!checkoutEbook) {
+      return null;
+    }
+    return computeCheckoutSummary({
+      unitAmountCents: checkoutEbook.priceAmountCents ?? 0,
+      quantity: checkoutForm.quantity ?? 1,
+      coupon: activeCoupon,
+      currency: checkoutEbook.priceCurrency ?? 'USD'
+    });
+  }, [checkoutEbook, checkoutForm.quantity, activeCoupon]);
+
+  const checkoutPriceLabel = useMemo(() => {
+    if (!checkoutEbook) {
+      return undefined;
+    }
+    if (checkoutEbook.priceFormatted) {
+      return checkoutEbook.priceFormatted;
+    }
+    if (typeof checkoutEbook.price === 'string') {
+      return checkoutEbook.price;
+    }
+    if (checkoutEbook.priceAmountCents != null) {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: checkoutEbook.priceCurrency ?? 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format((checkoutEbook.priceAmountCents ?? 0) / 100);
+    }
+    if (checkoutEbook.priceAmount != null) {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: checkoutEbook.priceCurrency ?? 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(Number(checkoutEbook.priceAmount));
+    }
+    return undefined;
+  }, [checkoutEbook]);
 
   const featuredEbook = useMemo(() => marketplace[0] ?? liveEbooks[0] ?? null, [marketplace, liveEbooks]);
   const ebookKeywords = useMemo(() => {
@@ -933,6 +825,62 @@ export default function Ebooks() {
   }, [session?.user?.email]);
 
   useEffect(() => {
+    if (!checkoutOpen) {
+      setCouponInsight({ status: 'idle', coupon: null, message: null });
+      return undefined;
+    }
+
+    const code = normaliseCouponCode(checkoutForm.couponCode);
+    if (!code) {
+      setCouponInsight({ status: 'idle', coupon: null, message: null });
+      return undefined;
+    }
+    if (!token) {
+      setCouponInsight({
+        status: 'invalid',
+        coupon: null,
+        message: 'Sign in to redeem coupons.'
+      });
+      return undefined;
+    }
+    if (!isCouponCodeValid(code)) {
+      setCouponInsight({
+        status: 'invalid',
+        coupon: null,
+        message: 'Coupon code format is invalid.'
+      });
+      return undefined;
+    }
+
+    if (couponInsight.status === 'valid' && couponInsight.coupon?.code === code) {
+      return undefined;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+    setCouponInsight({ status: 'checking', coupon: null, message: null });
+
+    fetchCoupon({ token, code, signal: controller.signal })
+      .then((data) => {
+        if (!active) return;
+        setCouponInsight({ status: 'valid', coupon: data, message: null });
+      })
+      .catch((error) => {
+        if (!active) return;
+        setCouponInsight({
+          status: 'invalid',
+          coupon: null,
+          message: error instanceof Error ? error.message : 'Coupon not available.'
+        });
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [checkoutOpen, checkoutForm.couponCode, token, couponInsight.status, couponInsight.coupon?.code]);
+
+  useEffect(() => {
     let active = true;
     const controller = new AbortController();
     setMarketplaceLoading(true);
@@ -1033,6 +981,7 @@ export default function Ebooks() {
         receiptEmail: current.receiptEmail || session?.user?.email || ''
       }));
       setCheckoutStatus(null);
+      setCouponInsight({ status: 'idle', coupon: null, message: null });
       setCheckoutOpen(true);
     },
     [session?.user?.email]
@@ -1041,6 +990,7 @@ export default function Ebooks() {
   const closeCheckout = useCallback(() => {
     setCheckoutOpen(false);
     setCheckoutEbook(null);
+    setCouponInsight({ status: 'idle', coupon: null, message: null });
   }, []);
 
   const handleCheckoutSubmit = useCallback(
@@ -1058,7 +1008,10 @@ export default function Ebooks() {
       try {
         const payload = {
           provider: checkoutForm.provider,
-          couponCode: checkoutForm.couponCode?.trim() || undefined,
+          couponCode: (() => {
+            const code = normaliseCouponCode(checkoutForm.couponCode);
+            return code && isCouponCodeValid(code) ? code : undefined;
+          })(),
           receiptEmail: checkoutForm.receiptEmail?.trim() || undefined,
           quantity: checkoutForm.quantity || 1
         };
@@ -1412,15 +1365,27 @@ export default function Ebooks() {
 
         <section>{adminPanel}</section>
       </div>
-      <EbookCheckoutDrawer
-        ebook={checkoutEbook}
-        open={checkoutOpen}
-        onClose={closeCheckout}
+      <CheckoutDialog
+        open={checkoutOpen && Boolean(checkoutEbook)}
+        entity={
+          checkoutEbook
+            ? {
+                badge: 'Checkout',
+                type: 'Checkout',
+                title: checkoutEbook.title,
+                subtitle: checkoutPriceLabel
+              }
+            : { badge: 'Checkout', title: 'Secure checkout' }
+        }
         form={checkoutForm}
-        onChange={setCheckoutForm}
+        onFormChange={setCheckoutForm}
         onSubmit={handleCheckoutSubmit}
+        onClose={closeCheckout}
         status={checkoutStatus}
         pending={checkoutPending}
+        providerOptions={['stripe', 'paypal']}
+        summary={checkoutSummary}
+        couponInsight={couponInsight}
       />
     </div>
   );

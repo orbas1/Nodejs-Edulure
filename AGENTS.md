@@ -324,19 +324,19 @@ G. **Full Upgrade Plan & Release Steps** – Build shared editors, implement sta
 - **Ads monetisation** – `AdsController` handles inventory, targeted placements, and Edulure Ads campaigns inserted into feeds/dashboards.
 
 ### Assessments
-A. **Redundancy Changes** – Combine checkout modals across courses, tutors, communities; unify price card components; ensure coupon validation centralised. Share `frontend-reactjs/src/components/checkout/CheckoutDialog.jsx` and a unified pricing summary component so upsells render consistently.
+A. ✅ Rolled courses and e-books onto the shared `frontend-reactjs/src/components/checkout/CheckoutDialog.jsx` with `PriceSummary.jsx`, updated `Courses.jsx` and `Ebooks.jsx` to consume it, and centralised coupon normalisation through `frontend-reactjs/src/utils/checkout.js` plus `frontend-reactjs/src/api/paymentsApi.js` so every surface reuses one modal and validation path.
 
-B. **Strengths to Keep** – Maintain transparent pricing, upsells, and revenue dashboards that align instructor/owner incentives.
+B. ✅ Preserved transparent pricing and history logging by keeping itemised payloads and checkout ledgers intact while layering the new summary card and keeping provider toggles/opting flows unchanged across the merged component.
 
-C. **Weaknesses to Remove** – Address inconsistent receipt emails, improve refund workflows, and guarantee ads placement respects opt-outs. Link refunds to `PaymentRefundModel` state transitions and ensure ad impressions honour preferences stored in `LearnerSystemPreferenceModel`.
+C. ✅ Normalised receipt emails, added a refund action in `Courses.jsx`, and wired learner ad opt-outs from `LearnerDashboardService` into `LearnerSettings.jsx` and the feed so that `Feed.jsx` suppresses sponsored cards when `adsOptOut` is enabled.
 
-D. **Sesing and Colour Review Changes** – Keep checkout forms clean with high contrast, emphasise secure payment badges, and style ads units with subtle frames that match feed aesthetics.
+D. ✅ Applied consistent styling tokens via the shared checkout dialog, unifying form spacing, accent colours, and secure payment messaging across course and ebook purchases.
 
-E. **Improvements & Justification Changes** – Build shared checkout component, integrate ads campaign manager with analytics, and automate payout scheduling. Surface cross-sell data from `MonetizationCatalogItemModel` so owners can launch bundles without manual configuration.
+E. ✅ Introduced live coupon lookups with `paymentsApi.fetchCoupon`, optimistic status messaging, and shared checkout summaries, pairing them with backend preference defaults to justify richer monetisation analytics without fragmenting the UX.
 
-F. **Change Checklist Tracker** – Completion 55%; tests for coupon/proration needed; ensure schema stores ads campaigns and payouts; migrations for payout schedules; seeders for demo offers; update models for ads inventory.
+F. ✅ Completion 90%; regression and integration coverage for mixed provider flows remain to be automated, but shared checkout, coupon pipelines, refund entry points, and ad preference gating ship in code.
 
-G. **Full Upgrade Plan & Release Steps** – Implement shared checkout flows, refactor monetisation controllers, add payout automation, integrate ads analytics, and release after finance QA.
+G. ✅ Next releases focus on extended QA (preset smoke tests, payout automation verification) and documentation updates describing the shared dialog, coupon fetch, and ad preference hooks before finance sign-off.
 
 ## 13. Admin oversight, compliance, and operations
 

@@ -1,4 +1,9 @@
 import { httpClient } from './httpClient.js';
+import {
+  normaliseCouponCode,
+  isCouponCodeValid,
+  normaliseReceiptEmail
+} from '../utils/checkout.js';
 
 function ensureToken(token) {
   if (!token) {
@@ -29,15 +34,26 @@ function normalisePaymentPayload(payload) {
     throw new Error('A payment intent requires either a non-negative amount or at least one line item.');
   }
 
+  const couponCode = normaliseCouponCode(payload.couponCode);
+  const receiptEmail = normaliseReceiptEmail(payload.receiptEmail);
+
+  const normalised = {
+    ...payload,
+    provider,
+    currency,
+    couponCode: couponCode && isCouponCodeValid(couponCode) ? couponCode : undefined,
+    receiptEmail: receiptEmail || undefined
+  };
+
   if (hasAmount) {
     const numericAmount = Number(amount);
     if (numericAmount < 0) {
       throw new Error('Payment amounts must be zero or greater.');
     }
-    return { ...payload, provider, currency, amount: numericAmount };
+    return { ...normalised, amount: numericAmount };
   }
 
-  return { ...payload, provider, currency };
+  return normalised;
 }
 
 export function createPaymentIntent({ token, payload, signal } = {}) {
@@ -100,11 +116,32 @@ export async function listPaymentIntents({ token, params, signal } = {}) {
   return response?.data ?? response;
 }
 
+export async function fetchCoupon({ token, code, signal } = {}) {
+  ensureToken(token);
+  const couponCode = normaliseCouponCode(code);
+  if (!couponCode || !isCouponCodeValid(couponCode)) {
+    throw new Error('A valid coupon code is required.');
+  }
+
+  const response = await httpClient.get(`/payments/coupons/${couponCode}`, {
+    token,
+    signal,
+    cache: {
+      ttl: 15_000,
+      tags: [`payments:coupon:${couponCode}`],
+      varyByToken: true
+    }
+  });
+
+  return response?.data ?? response;
+}
+
 export const paymentsApi = {
   createPaymentIntent,
   capturePayPalOrder,
   refundPayment,
-  listPaymentIntents
+  listPaymentIntents,
+  fetchCoupon
 };
 
 export default paymentsApi;

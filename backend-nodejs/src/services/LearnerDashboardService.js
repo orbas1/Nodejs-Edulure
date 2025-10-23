@@ -254,7 +254,8 @@ const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
     interfaceDensity: 'comfortable',
     analyticsOptIn: true,
     subtitleLanguage: 'en',
-    audioDescription: false
+    audioDescription: false,
+    adsOptOut: false
   }
 });
 
@@ -517,7 +518,11 @@ export default class LearnerDashboardService {
       audioDescription:
         rawPreferences.audioDescription !== undefined
           ? Boolean(rawPreferences.audioDescription)
-          : basePreferences.audioDescription
+          : basePreferences.audioDescription,
+      adsOptOut:
+        rawPreferences.adsOptOut !== undefined
+          ? Boolean(rawPreferences.adsOptOut)
+          : basePreferences.adsOptOut
     };
 
     const preference = await LearnerSystemPreferenceModel.upsertForUser(userId, {
