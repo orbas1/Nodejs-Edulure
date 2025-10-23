@@ -4,36 +4,21 @@ import DashboardStateMessage from '../../components/dashboard/DashboardStateMess
 import SettingsLayout from '../../components/settings/SettingsLayout.jsx';
 import SettingsToggleField from '../../components/settings/SettingsToggleField.jsx';
 import SettingsAccordion from '../../components/settings/SettingsAccordion.jsx';
+import SystemPreferencesPanel from '../../components/settings/SystemPreferencesPanel.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
+import useSystemPreferencesForm, {
+  DEFAULT_SYSTEM_FORM,
+  normaliseRecommendationPreview,
+  normaliseRecommendedTopics
+} from '../../hooks/useSystemPreferencesForm.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import {
   fetchFinanceSettings,
-  fetchSystemPreferences,
   updateFinanceSettings,
-  updateSystemPreferences,
   createFinancePurchase,
   updateFinancePurchase,
   deleteFinancePurchase
 } from '../../api/learnerDashboardApi.js';
-
-const SUPPORTED_LANGUAGES = [
-  { value: 'en', label: 'English' },
-  { value: 'fr', label: 'French' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'de', label: 'German' },
-  { value: 'pt', label: 'Portuguese' }
-];
-
-const SUPPORTED_TIMEZONES = [
-  'UTC',
-  'America/New_York',
-  'America/Los_Angeles',
-  'Europe/London',
-  'Europe/Paris',
-  'Africa/Lagos',
-  'Asia/Singapore',
-  'Australia/Sydney'
-];
 
 const PURCHASE_STATUSES = [
   { value: 'paid', label: 'Paid' },
@@ -57,107 +42,6 @@ const SUBSCRIPTION_STATUS_STYLES = {
   past_due: 'bg-rose-100 text-rose-700',
   cancelled: 'bg-slate-200 text-slate-600',
   canceled: 'bg-slate-200 text-slate-600'
-};
-
-const DEFAULT_RECOMMENDED_TOPICS = Object.freeze([
-  'community-building',
-  'learner-success',
-  'automation'
-]);
-
-const FALLBACK_RECOMMENDATION_PREVIEW = Object.freeze([
-  {
-    id: 'course-async-leadership',
-    title: 'Design async learning rituals',
-    category: 'Course',
-    descriptor: 'Course • 6 lessons',
-    imageUrl:
-      'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80'
-  },
-  {
-    id: 'community-cohort-kickoff',
-    title: 'Launch your next cohort with confidence',
-    category: 'Playbook',
-    descriptor: 'Guide • 12 steps',
-    imageUrl:
-      'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=900&q=80'
-  },
-  {
-    id: 'ops-automation',
-    title: 'Automate learner check-ins',
-    category: 'Workflow',
-    descriptor: 'Automation • 4 rules',
-    imageUrl:
-      'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?auto=format&fit=crop&w=900&q=80'
-  }
-]);
-
-const ADS_DATA_USAGE_COPY =
-  'Edulure Ads only uses engagement trends inside your academy to match sponsored resources. Disable personalisation to limit sponsors to broad categories.';
-
-function normaliseRecommendedTopics(value) {
-  if (!value) {
-    return [...DEFAULT_RECOMMENDED_TOPICS];
-  }
-  if (Array.isArray(value)) {
-    return value
-      .map((topic) => String(topic ?? '').trim())
-      .filter((topic) => topic.length > 0)
-      .slice(0, 6);
-  }
-  if (typeof value === 'string') {
-    return value
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0)
-      .slice(0, 6);
-  }
-  return [...DEFAULT_RECOMMENDED_TOPICS];
-}
-
-function normaliseRecommendationPreview(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map((item, index) => ({
-      id: item?.id ?? `recommendation-${index}`,
-      title: item?.title ?? 'Recommended resource',
-      category: item?.category ?? item?.type ?? 'Course',
-      descriptor: item?.descriptor ?? item?.subtitle ?? '',
-      imageUrl: item?.imageUrl ?? item?.coverImage ?? '',
-      route: item?.route ?? item?.href ?? null
-    }))
-    .filter((item) => Boolean(item.id) && Boolean(item.title))
-    .slice(0, 6);
-}
-
-const INTERFACE_DENSITIES = [
-  { value: 'comfortable', label: 'Comfortable' },
-  { value: 'compact', label: 'Compact' },
-  { value: 'expanded', label: 'Expanded' }
-];
-
-const DEFAULT_SYSTEM_FORM = {
-  language: 'en',
-  region: 'US',
-  timezone: 'UTC',
-  notificationsEnabled: true,
-  digestEnabled: true,
-  autoPlayMedia: false,
-  highContrast: false,
-  reducedMotion: false,
-  preferences: {
-    interfaceDensity: 'comfortable',
-    analyticsOptIn: true,
-    subtitleLanguage: 'en',
-    audioDescription: false,
-    adPersonalisation: true,
-    sponsoredHighlights: true,
-    adDataUsageAcknowledged: false,
-    recommendedTopics: DEFAULT_RECOMMENDED_TOPICS,
-    recommendationPreview: []
-  }
 };
 
 const DEFAULT_FINANCE_FORM = {
@@ -230,7 +114,6 @@ export default function LearnerSettings() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
 
-  const [systemForm, setSystemForm] = useState(DEFAULT_SYSTEM_FORM);
   const [financeForm, setFinanceForm] = useState(DEFAULT_FINANCE_FORM);
   const [purchases, setPurchases] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
@@ -238,6 +121,25 @@ export default function LearnerSettings() {
   const [purchaseForm, setPurchaseForm] = useState(DEFAULT_PURCHASE_FORM);
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+
+  const {
+    form: systemForm,
+    setForm: setSystemForm,
+    saving: systemSaving,
+    refresh: refreshSystemPreferences,
+    persist: persistSystemPreferences,
+    handleInputChange: handleSystemInputChange,
+    updateSystemToggle,
+    updatePreferenceToggle,
+    handleAdPersonalisationChange,
+    recommendationPreview,
+    recommendedTopicsInputValue,
+    adPersonalisationEnabled
+  } = useSystemPreferencesForm({
+    token,
+    onStatus: setStatusMessage,
+    onAfterSave: () => refresh?.()
+  });
 
   useEffect(() => {
     if (!settings?.system || !settings?.finance) {
@@ -280,36 +182,7 @@ export default function LearnerSettings() {
     }
   }, [error]);
 
-  const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
-
-  const handleSystemInputChange = (event) => {
-    const { name, type, checked, value } = event.target;
-    if (name.startsWith('preferences.')) {
-      const key = name.split('.')[1];
-      if (key === 'recommendedTopics') {
-        setSystemForm((previous) => ({
-          ...previous,
-          preferences: {
-            ...previous.preferences,
-            recommendedTopics: normaliseRecommendedTopics(value)
-          }
-        }));
-        return;
-      }
-      setSystemForm((previous) => ({
-        ...previous,
-        preferences: {
-          ...previous.preferences,
-          [key]: type === 'checkbox' ? checked : value
-        }
-      }));
-      return;
-    }
-    setSystemForm((previous) => ({
-      ...previous,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
+  const disableActions = useMemo(() => pendingAction !== null || systemSaving, [pendingAction, systemSaving]);
 
   const handleFinanceInputChange = (event) => {
     const { name, type, checked, value } = event.target;
@@ -349,34 +222,6 @@ export default function LearnerSettings() {
     }));
   };
 
-  const updateSystemToggle = (field, value) => {
-    setSystemForm((previous) => ({
-      ...previous,
-      [field]: value
-    }));
-  };
-
-  const updatePreferenceToggle = (field, value) => {
-    setSystemForm((previous) => ({
-      ...previous,
-      preferences: {
-        ...previous.preferences,
-        [field]: value
-      }
-    }));
-  };
-
-  const handleAdPersonalisationChange = (value) => {
-    setSystemForm((previous) => ({
-      ...previous,
-      preferences: {
-        ...previous.preferences,
-        adPersonalisation: value,
-        adDataUsageAcknowledged: value ? true : false
-      }
-    }));
-  };
-
   const statusBanner = useMemo(() => {
     if (!statusMessage) return undefined;
     const mappedType =
@@ -394,40 +239,6 @@ export default function LearnerSettings() {
       liveRegion: statusMessage.type === 'error' ? 'assertive' : 'polite'
     };
   }, [statusMessage]);
-
-  const recommendationPreview = useMemo(() => {
-    const previewItems = systemForm.preferences?.recommendationPreview ?? [];
-    if (Array.isArray(previewItems) && previewItems.length > 0) {
-      return previewItems;
-    }
-    return FALLBACK_RECOMMENDATION_PREVIEW;
-  }, [systemForm.preferences?.recommendationPreview]);
-
-  const recommendedTopicsInputValue = useMemo(() => {
-    const topics = systemForm.preferences?.recommendedTopics ?? [];
-    return Array.isArray(topics) ? topics.join(', ') : '';
-  }, [systemForm.preferences?.recommendedTopics]);
-
-  const adPersonalisationEnabled = Boolean(systemForm.preferences?.adPersonalisation);
-
-  const refreshSystemPreferences = async () => {
-    if (!token) return;
-    const response = await fetchSystemPreferences({ token }).catch(() => null);
-    if (response?.data) {
-      const payload = response.data;
-      const preferencesFromPayload = payload.preferences ?? {};
-      setSystemForm({
-        ...DEFAULT_SYSTEM_FORM,
-        ...payload,
-        preferences: {
-          ...DEFAULT_SYSTEM_FORM.preferences,
-          ...preferencesFromPayload,
-          recommendedTopics: normaliseRecommendedTopics(preferencesFromPayload.recommendedTopics),
-          recommendationPreview: normaliseRecommendationPreview(preferencesFromPayload.recommendationPreview)
-        }
-      });
-    }
-  };
 
   const refreshFinanceSettings = async () => {
     if (!token) return;
@@ -448,46 +259,12 @@ export default function LearnerSettings() {
     }
   };
 
-  const persistSystemPreferences = async () => {
-    if (!token) {
-      setStatusMessage({ type: 'error', message: 'Sign in again to update your preferences.' });
-      return;
-    }
+  const persistSystemPreferencesAction = async () => {
     try {
       setPendingAction('system');
-      setStatusMessage({ type: 'pending', message: 'Saving system preferences…' });
-      const { recommendationPreview, ...preferencesPayload } = systemForm.preferences;
-      await updateSystemPreferences({
-        token,
-        payload: {
-          language: systemForm.language,
-          region: systemForm.region,
-          timezone: systemForm.timezone,
-          notificationsEnabled: systemForm.notificationsEnabled,
-          digestEnabled: systemForm.digestEnabled,
-          autoPlayMedia: systemForm.autoPlayMedia,
-          highContrast: systemForm.highContrast,
-          reducedMotion: systemForm.reducedMotion,
-          preferences: {
-            ...preferencesPayload,
-            recommendedTopics: normaliseRecommendedTopics(preferencesPayload.recommendedTopics),
-            adDataUsageAcknowledged: preferencesPayload.adPersonalisation
-              ? true
-              : Boolean(preferencesPayload.adDataUsageAcknowledged)
-          }
-        }
-      });
-      await refreshSystemPreferences();
-      refresh?.();
-      setStatusMessage({ type: 'success', message: 'System preferences updated.' });
-    } catch (submitError) {
-      setStatusMessage({
-        type: 'error',
-        message:
-          submitError instanceof Error
-            ? submitError.message
-            : 'We could not update your system preferences. Please try again.'
-      });
+      await persistSystemPreferences();
+    } catch (_submitError) {
+      // Error messaging handled by useSystemPreferencesForm.
     } finally {
       setPendingAction(null);
     }
@@ -495,7 +272,7 @@ export default function LearnerSettings() {
 
   const handleSystemSubmit = async (event) => {
     event.preventDefault();
-    await persistSystemPreferences();
+    await persistSystemPreferencesAction();
   };
 
   const handleFinanceSubmit = async (event) => {
@@ -700,257 +477,20 @@ export default function LearnerSettings() {
         }
         status={statusBanner}
       >
-        <SettingsAccordion
-          id="learner-system-preferences"
-          title="System preferences"
-          description="Configure accessibility, localisation, and notification cadence across the learner experience."
-          actions={<span className="dashboard-kicker text-primary hidden sm:inline">Personalised</span>}
-          defaultOpen
-        >
-          <form className="space-y-6" onSubmit={handleSystemSubmit}>
-            <div className="grid gap-4 md:grid-cols-3">
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Language
-                <select
-                  name="language"
-                  value={systemForm.language}
-                  onChange={handleSystemInputChange}
-                  className="mt-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {SUPPORTED_LANGUAGES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Region
-                <input
-                  name="region"
-                  value={systemForm.region}
-                  onChange={handleSystemInputChange}
-                  className="mt-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </label>
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Time zone
-                <select
-                  name="timezone"
-                  value={systemForm.timezone}
-                  onChange={handleSystemInputChange}
-                  className="mt-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {SUPPORTED_TIMEZONES.map((zone) => (
-                    <option key={zone} value={zone}>
-                      {zone}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <SettingsToggleField
-                name="notificationsEnabled"
-                label="Email notifications"
-                description="Receive workflow, finance, and community alerts."
-                checked={systemForm.notificationsEnabled}
-                onChange={(value) => updateSystemToggle('notificationsEnabled', value)}
-                disabled={pendingAction === 'system'}
-              />
-              <SettingsToggleField
-                name="digestEnabled"
-                label="Weekly digest"
-                description="Summarise learning progress and recommendations."
-                checked={systemForm.digestEnabled}
-                onChange={(value) => updateSystemToggle('digestEnabled', value)}
-                disabled={pendingAction === 'system'}
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <SettingsToggleField
-                name="autoPlayMedia"
-                label="Auto-play media"
-                description="Automatically start videos and podcasts."
-                checked={systemForm.autoPlayMedia}
-                onChange={(value) => updateSystemToggle('autoPlayMedia', value)}
-                disabled={pendingAction === 'system'}
-              />
-              <SettingsToggleField
-                name="highContrast"
-                label="High contrast"
-                description="Enhance contrast for improved readability."
-                checked={systemForm.highContrast}
-                onChange={(value) => updateSystemToggle('highContrast', value)}
-                disabled={pendingAction === 'system'}
-              />
-              <SettingsToggleField
-                name="reducedMotion"
-                label="Reduce motion"
-                description="Minimise animations for sensitive users."
-                checked={systemForm.reducedMotion}
-                onChange={(value) => updateSystemToggle('reducedMotion', value)}
-                disabled={pendingAction === 'system'}
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Interface density
-                <select
-                  name="preferences.interfaceDensity"
-                  value={systemForm.preferences.interfaceDensity}
-                  onChange={handleSystemInputChange}
-                  className="mt-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {INTERFACE_DENSITIES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Subtitle language
-                <select
-                  name="preferences.subtitleLanguage"
-                  value={systemForm.preferences.subtitleLanguage}
-                  onChange={handleSystemInputChange}
-                  className="mt-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {SUPPORTED_LANGUAGES.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="self-stretch">
-                <SettingsToggleField
-                  name="preferences.audioDescription"
-                  label="Audio description"
-                  description="Enable descriptive narration in supported lessons."
-                  checked={Boolean(systemForm.preferences.audioDescription)}
-                  onChange={(value) => updatePreferenceToggle('audioDescription', value)}
-                  disabled={pendingAction === 'system'}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button type="submit" className="dashboard-primary-pill" disabled={pendingAction === 'system'}>
-                {pendingAction === 'system' ? 'Saving…' : 'Save system preferences'}
-              </button>
-            </div>
-          </form>
-        </SettingsAccordion>
-
-        <SettingsAccordion
-          id="learner-personalisation"
-          title="Personalisation"
-          description="Tune recommendations, analytics consent, and sponsor visibility."
-        >
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Recommended preview</h3>
-              <p className="mt-2 text-sm text-slate-600">
-                Learner dashboards surface these sample items to demonstrate how your academy will highlight relevant content.
-              </p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {recommendationPreview.map((item) => (
-                  <article
-                    key={item.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <div className="overflow-hidden rounded-xl bg-slate-100">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.title} className="h-32 w-full object-cover" />
-                      ) : (
-                        <div className="flex h-32 items-center justify-center text-xs font-medium text-slate-500">
-                          Preview
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.category}</p>
-                      <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                      {item.descriptor ? (
-                        <p className="mt-1 text-xs text-slate-500">{item.descriptor}</p>
-                      ) : null}
-                    </div>
-                    {item.route ? (
-                      <a href={item.route} className="text-xs font-semibold text-primary hover:underline">
-                        Open
-                      </a>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <SettingsToggleField
-                name="preferences.analyticsOptIn"
-                label="Analytics insights"
-                description="Share anonymous usage analytics to improve study guidance and community programming."
-                checked={Boolean(systemForm.preferences.analyticsOptIn)}
-                onChange={(value) => updatePreferenceToggle('analyticsOptIn', value)}
-                disabled={pendingAction === 'system'}
-              />
-              <SettingsToggleField
-                name="preferences.adPersonalisation"
-                label="Personalised sponsors"
-                description="Allow Edulure Ads to align sponsors with your learning interests."
-                checked={adPersonalisationEnabled}
-                onChange={handleAdPersonalisationChange}
-                disabled={pendingAction === 'system'}
-              />
-              <SettingsToggleField
-                name="preferences.sponsoredHighlights"
-                label="Sponsored highlights"
-                description="Feature partner resources inside recommendation carousels."
-                checked={Boolean(systemForm.preferences.sponsoredHighlights)}
-                onChange={(value) => updatePreferenceToggle('sponsoredHighlights', value)}
-                disabled={pendingAction === 'system'}
-              />
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-600">
-              {ADS_DATA_USAGE_COPY}
-            </div>
-
-            <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
-              Preferred recommendation topics
-              <input
-                name="preferences.recommendedTopics"
-                value={recommendedTopicsInputValue}
-                onChange={handleSystemInputChange}
-                placeholder="community-building, automation, retention"
-                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                disabled={pendingAction === 'system'}
-              />
-              <span className="text-xs text-slate-500">
-                Separate topics with commas to tailor the learning spotlight.
-              </span>
-            </label>
-
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-slate-500">
-                Saving personalisation updates applies the same system preference controls.
-              </p>
-              <button
-                type="button"
-                className="dashboard-primary-pill"
-                onClick={persistSystemPreferences}
-                disabled={disableActions}
-              >
-                {pendingAction === 'system' ? 'Saving…' : 'Save personalisation'}
-              </button>
-            </div>
-          </div>
-        </SettingsAccordion>
+        <SystemPreferencesPanel
+          form={systemForm}
+          recommendationPreview={recommendationPreview}
+          recommendedTopicsInputValue={recommendedTopicsInputValue}
+          adPersonalisationEnabled={adPersonalisationEnabled}
+          onSubmit={handleSystemSubmit}
+          onSavePersonalisation={persistSystemPreferencesAction}
+          onInputChange={handleSystemInputChange}
+          onSystemToggle={updateSystemToggle}
+          onPreferenceToggle={updatePreferenceToggle}
+          onAdPersonalisationChange={handleAdPersonalisationChange}
+          disableActions={disableActions}
+          isSaving={pendingAction === 'system' || systemSaving}
+        />
 
         <SettingsAccordion
           id="learner-finance"
