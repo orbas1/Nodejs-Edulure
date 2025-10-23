@@ -7,6 +7,7 @@ import ProductPreviewTabs from '../components/marketing/ProductPreviewTabs.jsx';
 import PlanHighlights from '../components/marketing/PlanHighlights.jsx';
 import CaseStudyGrid from '../components/marketing/CaseStudyGrid.jsx';
 import MonetizationRibbon from '../components/marketing/MonetizationRibbon.jsx';
+import ConversionPanel from '../components/marketing/ConversionPanel.jsx';
 import CommunitySpotlight from '../components/home/CommunitySpotlight.jsx';
 import PerksGrid from '../components/home/PerksGrid.jsx';
 import HomeFaq from '../components/home/HomeFaq.jsx';
@@ -437,6 +438,19 @@ export default function Home() {
 
   const monetisationAnalyticsKey = monetisationBlock?.metadata?.analyticsKey ?? 'monetization-ribbon';
 
+  const initialLeadInvites = useMemo(() => {
+    if (!marketingData || !Array.isArray(marketingData.invites)) {
+      return [];
+    }
+    return marketingData.invites;
+  }, [marketingData]);
+  const defaultLeadEmail = useMemo(() => {
+    if (!initialLeadInvites.length) {
+      return '';
+    }
+    return initialLeadInvites[0]?.email ?? '';
+  }, [initialLeadInvites]);
+
   const heroPrimaryAction = useMemo(() => {
     const base = normaliseInternalAction(heroBlock?.primaryCta, '/register', fallbackHero.primaryLabel);
     return {
@@ -622,6 +636,7 @@ export default function Home() {
         mediaCaption={heroMedia.caption}
         mediaAlt={heroMedia.alt}
       />
+      <ConversionPanel blockSlug={heroSurfaceId} defaultEmail={defaultLeadEmail} initialInvites={initialLeadInvites} />
       <CaseStudyGrid
         eyebrow={caseStudyEyebrow}
         title={caseStudyTitle}

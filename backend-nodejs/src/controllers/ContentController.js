@@ -28,6 +28,17 @@ const marketingQuerySchema = Joi.object({
   email: Joi.string().trim().email().optional()
 });
 
+const marketingLeadSchema = Joi.object({
+  email: Joi.string().trim().email().max(180).required(),
+  fullName: Joi.string().trim().max(200).allow(null, ''),
+  company: Joi.string().trim().max(200).allow(null, ''),
+  persona: Joi.string().trim().max(120).allow(null, ''),
+  goal: Joi.string().trim().max(360).allow(null, ''),
+  ctaSource: Joi.string().trim().max(120).allow(null, ''),
+  blockSlug: Joi.string().trim().max(120).allow(null, ''),
+  metadata: Joi.object().default({})
+});
+
 const progressSchema = Joi.object({
   progressPercent: Joi.number().min(0).max(100).required(),
   lastLocation: Joi.string().allow(null, '').default(null),
@@ -242,6 +253,27 @@ export default class ContentController {
         email: query.email ?? undefined
       });
       return success(res, { data: content, message: 'Marketing content fetched' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async createMarketingLead(req, res, next) {
+    try {
+      const payload = await marketingLeadSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const lead = await MarketingContentService.createMarketingLead(payload);
+      return success(res, {
+        data: lead,
+        message: 'Lead captured',
+        status: 201
+      });
     } catch (error) {
       if (error.isJoi) {
         error.status = 422;

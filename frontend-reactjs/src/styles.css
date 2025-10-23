@@ -216,6 +216,121 @@ button:focus-visible {
     color: var(--color-primary);
   }
 
+  .conversion-panel {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 65%, #0f172a 100%);
+    color: #f8fafc;
+  }
+
+  .conversion-panel__inner {
+    display: grid;
+    gap: var(--space-12);
+    align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .conversion-panel__copy h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  .conversion-panel__copy p {
+    margin-top: var(--space-3);
+    color: rgba(248, 250, 252, 0.8);
+    line-height: 1.6;
+  }
+
+  .conversion-panel__status {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+  }
+
+  .conversion-panel__status--success {
+    background: rgba(16, 185, 129, 0.16);
+    color: #bbf7d0;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+  }
+
+  .conversion-panel__status--error {
+    background: rgba(248, 113, 113, 0.18);
+    color: #fecaca;
+    border: 1px solid rgba(248, 113, 113, 0.4);
+  }
+
+  .conversion-panel__form {
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-6);
+    border-radius: var(--radius-xl);
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: var(--shadow-card);
+  }
+
+  .conversion-panel__field {
+    display: grid;
+    gap: var(--space-2);
+    font-size: 0.9rem;
+    color: rgba(248, 250, 252, 0.8);
+  }
+
+  .conversion-panel__field input,
+  .conversion-panel__field textarea {
+    width: 100%;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.6);
+    padding: var(--space-3) var(--space-4);
+    color: #f8fafc;
+    font-size: 0.95rem;
+  }
+
+  .conversion-panel__field input:focus-visible,
+  .conversion-panel__field textarea:focus-visible {
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+  }
+
+  .conversion-panel__form button {
+    justify-self: start;
+  }
+
+  .conversion-panel__invites {
+    margin-top: var(--space-10);
+    padding: var(--space-6);
+    border-radius: var(--radius-xl);
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(125, 211, 252, 0.35);
+    box-shadow: var(--shadow-card-strong);
+  }
+
+  .conversion-panel__invites h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: var(--space-3);
+  }
+
+  .conversion-panel__invites ul {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .conversion-panel__invites li {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3);
+    border-radius: var(--radius-lg);
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+
+  .conversion-panel__invites a {
+    font-size: 0.85rem;
+    color: #7dd3fc;
+  }
+
   .case-study-card__cta::after {
     content: '→';
     font-size: 0.9em;

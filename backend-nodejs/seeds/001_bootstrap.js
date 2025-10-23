@@ -151,6 +151,7 @@ export async function seed(knex) {
     await trx('marketing_plan_features').del();
     await trx('marketing_plan_offers').del();
     await trx('marketing_blocks').del();
+    await trx('marketing_leads').del();
     await trx('telemetry_lineage_runs').del();
     await trx('telemetry_freshness_monitors').del();
     await trx('telemetry_events').del();
@@ -1145,6 +1146,26 @@ export async function seed(knex) {
       metadata: JSON.stringify({ source: 'flow-five', campaign: 'beta-seed' }),
       terms_accepted: 1,
       submitted_at: trx.fn.now(),
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now()
+    });
+
+    await trx('marketing_leads').insert({
+      email: 'flow5-preview@edulure.test',
+      full_name: 'Jordan Rivera',
+      company: 'Flow 5 Collective',
+      persona: 'Community architect',
+      goal: 'Launch Flow 5 beta with sponsor pods',
+      cta_source: 'home-inline',
+      block_slug: 'flow-five-hero',
+      status: 'new',
+      metadata: JSON.stringify({
+        invites: [
+          { code: 'FLOW5-OPS-GUILD', community: { slug: 'learning-ops-guild' }, status: 'pending' },
+          { code: 'FLOW5-GROWTH-LAB', community: { slug: 'creator-growth-lab' }, status: 'pending' }
+        ],
+        utmCampaign: 'flow-five-beta'
+      }),
       created_at: trx.fn.now(),
       updated_at: trx.fn.now()
     });
