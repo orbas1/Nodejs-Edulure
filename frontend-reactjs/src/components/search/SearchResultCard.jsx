@@ -7,6 +7,7 @@ import {
   extractMetrics,
   getEntityIcon
 } from './resultFormatting.js';
+import CourseCard from '../course/CourseCard.jsx';
 
 const { CurrencyDollarIcon, StarIcon, SparklesIcon, GlobeAltIcon } = ICONS;
 
@@ -15,6 +16,45 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
   const imageUrl = extractImageUrl(hit);
   const { price, rating, enrolments, readingTime, location, availability } = extractMetrics(hit);
   const badgeLabels = buildBadgeLabels(hit);
+
+  if (entityType === 'courses') {
+    const actions = Array.isArray(hit.actions) ? hit.actions : [];
+    const primaryAction = actions[0] ?? null;
+    const secondaryAction = actions[1] ?? null;
+    const priceValue = typeof hit.price?.amount === 'number' ? hit.price.amount / 100 : price ?? null;
+    const memberCountLabel = enrolments ?? (Number.isFinite(Number(hit.metrics?.members)) ? hit.metrics.members : null);
+    return (
+      <CourseCard
+        course={{
+          title: hit.title ?? hit.name,
+          subtitle: hit.subtitle ?? hit.metrics?.subtitle,
+          description: hit.description ?? hit.summary,
+          thumbnailUrl: imageUrl,
+          instructor: hit.instructor ?? hit.instructorName ?? hit.metrics?.instructor,
+          level: hit.raw?.level ?? hit.metrics?.level,
+          deliveryFormat: hit.raw?.deliveryFormat ?? hit.metrics?.deliveryFormat,
+          tags: hit.tags ?? hit.raw?.tags ?? [],
+          rating: rating ?? hit.metrics?.rating,
+          ratingCount: hit.metrics?.ratingCount ?? hit.metrics?.reviews ?? null,
+          duration: readingTime ?? hit.metrics?.duration ?? null,
+          memberCount: memberCountLabel,
+          price: priceValue,
+          currency: hit.price?.currency ?? hit.metrics?.currency ?? 'USD',
+          progressPercent: hit.metrics?.progressPercent ?? null,
+          highlights: hit.highlights ?? [],
+          upsellBadges: Array.isArray(hit.upsellBadges)
+            ? hit.upsellBadges
+            : Array.isArray(hit.metadata?.upsellBadges)
+              ? hit.metadata.upsellBadges
+              : []
+        }}
+        primaryHref={primaryAction?.href ?? hit.url ?? undefined}
+        primaryActionLabel={primaryAction?.label ?? (primaryAction?.href ? 'View course' : undefined)}
+        secondaryHref={secondaryAction?.href ?? undefined}
+        secondaryActionLabel={secondaryAction?.label ?? undefined}
+      />
+    );
+  }
 
   return (
     <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">

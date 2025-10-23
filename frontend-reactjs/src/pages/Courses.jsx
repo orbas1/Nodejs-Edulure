@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AcademicCapIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
 import FormStepper from '../components/forms/FormStepper.jsx';
+import CourseCard from '../components/course/CourseCard.jsx';
 import adminControlApi from '../api/adminControlApi.js';
 import { searchExplorer } from '../api/explorerApi.js';
 import { listPublicCourses } from '../api/catalogueApi.js';
@@ -124,91 +124,47 @@ function toDateInput(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function formatPrice(amount, currency = 'USD') {
-  if (amount === null || amount === undefined || amount === '') {
-    return 'Free';
-  }
-  const numeric = Number(amount);
-  if (!Number.isFinite(numeric)) {
-    return `${currency} ${amount}`;
+function formatCompactNumber(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
   }
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(numeric);
+    return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(numeric);
   } catch (_error) {
-    return `${currency} ${numeric}`;
+    return String(numeric);
   }
 }
 
-function CourseHighlightCard({ course, onPurchase }) {
-  return (
-    <article className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            <AcademicCapIcon className="h-4 w-4" /> Course
-          </div>
-          <h3 className="text-2xl font-semibold text-slate-900">{course.title}</h3>
-          {course.subtitle ? <p className="text-sm font-medium text-slate-500">{course.subtitle}</p> : null}
-          {course.description ? (
-            <p className="text-sm leading-relaxed text-slate-600">{course.description}</p>
-          ) : null}
-          <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-emerald-600">
-              {course.level}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-              {course.deliveryFormat}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-primary">
-              {course.price}
-            </span>
-          </div>
-        </div>
-        {course.thumbnailUrl ? (
-          <img
-            src={course.thumbnailUrl}
-            alt={course.title}
-            className="h-32 w-32 flex-none rounded-2xl border border-slate-200 object-cover shadow-inner"
-          />
-        ) : null}
-      </div>
-      {course.skills?.length ? (
-        <div className="flex flex-wrap gap-2">
-          {course.skills.map((skill) => (
-            <span key={skill} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              #{skill}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      <div className="flex flex-wrap gap-3">
-        {course.actions?.map((action) => (
-          <a
-            key={action.label}
-            href={action.href ?? '#'}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
-          >
-            {action.label}
-          </a>
-        ))}
-        {onPurchase ? (
-          <button
-            type="button"
-            onClick={onPurchase}
-            className="inline-flex items-center gap-2 rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary hover:text-white"
-          >
-            <CreditCardIcon className="h-4 w-4" /> Purchase cohort
-          </button>
-        ) : null}
-      </div>
-    </article>
-  );
+function formatDurationMinutes(minutes) {
+  const numeric = Number(minutes);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+  if (numeric >= 60) {
+    const hours = Math.floor(numeric / 60);
+    const remaining = Math.round(numeric % 60);
+    if (remaining === 0) {
+      return `${hours} hr${hours === 1 ? '' : 's'}`;
+    }
+    return `${hours} hr${hours === 1 ? '' : 's'} ${remaining} min${remaining === 1 ? '' : 's'}`;
+  }
+  const rounded = Math.round(numeric);
+  return `${rounded} min${rounded === 1 ? '' : 's'}`;
 }
 
 function mapCatalogueCourse(course) {
   if (!course) {
     return null;
   }
+  const priceAmountCents = Number.isFinite(Number(course.priceAmount)) ? Number(course.priceAmount) : 0;
+  const tags = Array.isArray(course.tags)
+    ? course.tags
+    : Array.isArray(course.skills)
+      ? course.skills
+      : [];
+  const durationLabel = formatDurationMinutes(course.durationMinutes ?? course.duration ?? null);
+  const memberCountLabel = formatCompactNumber(course.memberCount ?? course.learners ?? course.enrolments);
   return {
     id: course.id ?? course.publicId ?? course.slug ?? course.title,
     title: course.title,
@@ -216,12 +172,20 @@ function mapCatalogueCourse(course) {
     description: course.description ?? null,
     level: course.level ?? 'beginner',
     deliveryFormat: course.deliveryFormat ?? 'self_paced',
-    price: formatPrice(course.priceAmount, course.priceCurrency ?? 'USD'),
+    priceValue: priceAmountCents ? priceAmountCents / 100 : 0,
     priceCurrency: course.priceCurrency ?? 'USD',
-    priceAmountCents: Number(course.priceAmount ?? 0),
+    priceAmountCents,
     slug: course.slug ?? null,
     thumbnailUrl: course.thumbnailUrl ?? course.heroImageUrl ?? null,
     skills: Array.isArray(course.skills) ? course.skills : [],
+    tags,
+    rating: course.rating ?? null,
+    ratingCount: course.ratingCount ?? null,
+    durationLabel,
+    memberCountLabel,
+    highlights: Array.isArray(course.highlights) ? course.highlights : [],
+    instructor: course.instructorName ?? course.instructor ?? null,
+    upsellBadges: Array.isArray(course.upsellBadges) ? course.upsellBadges : [],
     actions: [
       course.syllabusUrl
         ? { label: 'View syllabus', href: course.syllabusUrl }
@@ -1057,18 +1021,45 @@ export default function Courses() {
           }
           const hits = response.data?.results?.courses?.hits ?? [];
           setHighlightCourses(
-            hits.map((hit, index) => ({
-              id: hit.id ?? hit.slug ?? `course-${index}`,
-              title: hit.title ?? hit.name,
-              subtitle: hit.subtitle ?? hit.metrics?.subtitle,
-              description: hit.description ?? hit.summary,
-              level: hit.raw?.level ?? hit.metrics?.level ?? 'beginner',
-              deliveryFormat: hit.raw?.deliveryFormat ?? hit.metrics?.deliveryFormat ?? 'self_paced',
-              price: hit.price?.formatted ?? hit.metrics?.price ?? '$0',
-              thumbnailUrl: hit.thumbnailUrl ?? hit.heroImageUrl ?? null,
-              skills: hit.tags ?? hit.raw?.skills ?? [],
-              actions: hit.actions ?? []
-            }))
+            hits.map((hit, index) => {
+              const rawPriceAmount = hit.price?.amount ?? hit.metrics?.priceAmount ?? hit.metrics?.priceCents ?? null;
+              const priceAmountCents = Number(rawPriceAmount);
+              const priceCurrency = hit.price?.currency ?? hit.raw?.priceCurrency ?? 'USD';
+              const durationMinutes =
+                hit.metrics?.durationMinutes ?? hit.metrics?.duration ?? hit.raw?.durationMinutes ?? null;
+              const enrolments =
+                hit.metrics?.enrolments ?? hit.metrics?.members ?? hit.metrics?.learners ?? hit.raw?.enrolments ?? null;
+              const tags = Array.isArray(hit.tags)
+                ? hit.tags
+                : Array.isArray(hit.raw?.tags)
+                  ? hit.raw.tags
+                  : [];
+              const skills = Array.isArray(hit.raw?.skills) ? hit.raw.skills : tags;
+
+              return {
+                id: hit.id ?? hit.slug ?? `course-${index}`,
+                title: hit.title ?? hit.name,
+                subtitle: hit.subtitle ?? hit.metrics?.subtitle,
+                description: hit.description ?? hit.summary,
+                level: hit.raw?.level ?? hit.metrics?.level ?? 'beginner',
+                deliveryFormat: hit.raw?.deliveryFormat ?? hit.metrics?.deliveryFormat ?? 'self_paced',
+                priceValue: Number.isFinite(priceAmountCents) ? priceAmountCents / 100 : 0,
+                priceCurrency,
+                priceAmountCents: Number.isFinite(priceAmountCents) ? priceAmountCents : 0,
+                slug: hit.slug ?? hit.raw?.slug ?? null,
+                thumbnailUrl: hit.thumbnailUrl ?? hit.heroImageUrl ?? null,
+                skills,
+                tags,
+                rating: hit.metrics?.rating ?? hit.raw?.rating ?? null,
+                ratingCount: hit.metrics?.ratingCount ?? hit.metrics?.reviews ?? hit.raw?.ratingCount ?? null,
+                durationLabel: formatDurationMinutes(durationMinutes),
+                memberCountLabel: formatCompactNumber(enrolments),
+                highlights: Array.isArray(hit.highlights) ? hit.highlights : [],
+                instructor: hit.metrics?.instructor ?? hit.instructor ?? hit.instructorName ?? hit.raw?.instructor ?? null,
+                actions: Array.isArray(hit.actions) ? hit.actions : [],
+                progressPercent: hit.metrics?.progressPercent ?? null
+              };
+            })
           );
           return;
         }
@@ -1515,9 +1506,39 @@ export default function Courses() {
             <p className="text-sm font-semibold text-rose-500">{highlightError}</p>
           ) : null}
           <div className="grid gap-6 lg:grid-cols-2">
-            {highlightCourses.map((course) => (
-              <CourseHighlightCard key={course.id} course={course} onPurchase={() => openCheckout(course)} />
-            ))}
+            {highlightCourses.map((course) => {
+              const secondary = Array.isArray(course.actions) ? course.actions[0] : null;
+              const fallbackHref = secondary?.href ?? (course.slug ? `/courses/${course.slug}` : undefined);
+              const secondaryLabel = secondary?.label ?? (fallbackHref ? 'View details' : undefined);
+              return (
+                <CourseCard
+                  key={course.id}
+                  course={{
+                    title: course.title,
+                    subtitle: course.subtitle,
+                    description: course.description,
+                    thumbnailUrl: course.thumbnailUrl,
+                    instructor: course.instructor,
+                    level: course.level,
+                    deliveryFormat: course.deliveryFormat,
+                    tags: course.tags ?? course.skills ?? [],
+                    rating: course.rating,
+                    ratingCount: course.ratingCount,
+                    duration: course.durationLabel,
+                    memberCount: course.memberCountLabel,
+                    price: course.priceValue,
+                    currency: course.priceCurrency,
+                    progressPercent: course.progressPercent,
+                    highlights: course.highlights ?? [],
+                    upsellBadges: Array.isArray(course.upsellBadges) ? course.upsellBadges : []
+                  }}
+                  onPrimaryAction={() => openCheckout(course)}
+                  primaryActionLabel="Purchase cohort"
+                  secondaryHref={fallbackHref}
+                  secondaryActionLabel={secondaryLabel}
+                />
+              );
+            })}
             {!highlightLoading && highlightCourses.length === 0 ? (
               <p className="text-sm text-slate-500">
                 Sign in to load curated course highlights or publish a course using the console below.
@@ -1541,7 +1562,36 @@ export default function Courses() {
             {catalogueCourses.map((course) => {
               const mapped = mapCatalogueCourse(course);
               if (!mapped) return null;
-              return <CourseHighlightCard key={mapped.id} course={mapped} onPurchase={() => openCheckout(mapped)} />;
+              const secondary = Array.isArray(mapped.actions) ? mapped.actions[0] : null;
+              const fallbackHref = secondary?.href ?? (mapped.slug ? `/courses/${mapped.slug}` : undefined);
+              const secondaryLabel = secondary?.label ?? (fallbackHref ? 'View details' : undefined);
+              return (
+                <CourseCard
+                  key={mapped.id}
+                  course={{
+                    title: mapped.title,
+                    subtitle: mapped.subtitle,
+                    description: mapped.description,
+                    thumbnailUrl: mapped.thumbnailUrl,
+                    instructor: mapped.instructor,
+                    level: mapped.level,
+                    deliveryFormat: mapped.deliveryFormat,
+                    tags: mapped.tags ?? mapped.skills ?? [],
+                    rating: mapped.rating,
+                    ratingCount: mapped.ratingCount,
+                    duration: mapped.durationLabel,
+                    memberCount: mapped.memberCountLabel,
+                    price: mapped.priceValue,
+                    currency: mapped.priceCurrency,
+                    highlights: mapped.highlights ?? [],
+                    upsellBadges: Array.isArray(mapped.upsellBadges) ? mapped.upsellBadges : []
+                  }}
+                  onPrimaryAction={() => openCheckout(mapped)}
+                  primaryActionLabel="Purchase cohort"
+                  secondaryHref={fallbackHref}
+                  secondaryActionLabel={secondaryLabel}
+                />
+              );
             })}
             {!catalogueLoading && catalogueCourses.length === 0 ? (
               <p className="text-sm text-slate-500">No published courses yet. Check back soon.</p>

@@ -211,6 +211,33 @@ export default class MonetizationCatalogItemModel {
     return rows.map(mapRow);
   }
 
+  static async listByProductCodes(tenantId, productCodes, connection = db) {
+    if (!productCodes?.length) {
+      return [];
+    }
+    const codes = Array.from(
+      new Set(
+        productCodes
+          .map((code) => {
+            try {
+              return normaliseProductCode(code);
+            } catch (_error) {
+              return null;
+            }
+          })
+          .filter(Boolean)
+      )
+    );
+    if (!codes.length) {
+      return [];
+    }
+    const rows = await connection(TABLE)
+      .select('*')
+      .where({ tenant_id: normaliseTenantId(tenantId ?? 'global') })
+      .whereIn('product_code', codes);
+    return rows.map(mapRow);
+  }
+
   static async touchMetrics(connection = db) {
     const rows = await connection(TABLE)
       .select('status')

@@ -8,6 +8,7 @@ let app;
 let LiveClassroomModel;
 let CourseModel;
 let TutorProfileModel;
+let MonetizationCatalogItemModel;
 let listLiveClassroomsSpy;
 let countLiveClassroomsSpy;
 let listPublishedCoursesSpy;
@@ -16,11 +17,13 @@ let listVerifiedTutorsSpy;
 let countVerifiedTutorsSpy;
 let listAllTutorsSpy;
 let countAllTutorsSpy;
+let listCatalogItemsSpy;
 
 beforeAll(async () => {
   ({ default: LiveClassroomModel } = await import('../src/models/LiveClassroomModel.js'));
   ({ default: CourseModel } = await import('../src/models/CourseModel.js'));
   ({ default: TutorProfileModel } = await import('../src/models/TutorProfileModel.js'));
+  ({ default: MonetizationCatalogItemModel } = await import('../src/models/MonetizationCatalogItemModel.js'));
   const { default: catalogueRouter } = await import('../src/routes/catalogue.routes.js');
 
   listLiveClassroomsSpy = vi.spyOn(LiveClassroomModel, 'listPublic');
@@ -31,6 +34,7 @@ beforeAll(async () => {
   countVerifiedTutorsSpy = vi.spyOn(TutorProfileModel, 'countVerified');
   listAllTutorsSpy = vi.spyOn(TutorProfileModel, 'listAll');
   countAllTutorsSpy = vi.spyOn(TutorProfileModel, 'countAll');
+  listCatalogItemsSpy = vi.spyOn(MonetizationCatalogItemModel, 'listByProductCodes');
 
   app = express();
   app.use(express.json());
@@ -40,6 +44,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  listCatalogItemsSpy.mockResolvedValue([]);
 });
 
 describe('Catalogue HTTP routes', () => {
@@ -120,10 +125,24 @@ describe('Catalogue HTTP routes', () => {
         priceCurrency: 'USD',
         status: 'published',
         isPublished: true,
-        skills: ['automation']
+        skills: ['automation'],
+        metadata: {
+          upsellCatalogItems: ['growth-insiders-annual']
+        }
       }
     ]);
     countCoursesSpy.mockResolvedValue(1);
+    listCatalogItemsSpy.mockResolvedValue([
+      {
+        productCode: 'growth-insiders-annual',
+        name: 'Growth Insiders Annual',
+        description: 'Concierge support',
+        unitAmountCents: 189900,
+        currency: 'USD',
+        metadata: { badgeLabel: 'Insiders', badgeTone: 'emerald' },
+        status: 'active'
+      }
+    ]);
 
     const response = await request(app)
       .get('/api/v1/catalogue/courses')
@@ -137,9 +156,18 @@ describe('Catalogue HTTP routes', () => {
       status: 'published',
       isPublished: true
     });
+    expect(response.body.data[0].upsellBadges).toEqual([
+      expect.objectContaining({
+        productCode: 'growth-insiders-annual',
+        label: 'Insiders',
+        formattedPrice: expect.stringContaining('$'),
+        tone: 'emerald'
+      })
+    ]);
     expect(response.body.meta.pagination).toEqual({ limit: 3, offset: 6, total: 1 });
     expect(listPublishedCoursesSpy).toHaveBeenCalledWith({ limit: 3, offset: 6, search: 'revenue' });
     expect(countCoursesSpy).toHaveBeenCalledWith({ search: 'revenue', status: 'published' });
+    expect(listCatalogItemsSpy).toHaveBeenCalledWith('global', ['growth-insiders-annual']);
   });
 
   it('returns verified tutors by default and supports public listings', async () => {

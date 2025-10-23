@@ -14,6 +14,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import AssessmentQuickView from '../../components/course/AssessmentQuickView.jsx';
 import useLearnerStudyPlan from '../../hooks/useLearnerStudyPlan.js';
 
 const toneStyles = {
@@ -155,55 +156,51 @@ function AssessmentList({ title, items, emptyLabel }) {
         <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">{emptyLabel}</p>
       ) : (
         <ul className="space-y-3">
-          {items.map((item) => (
-            <li key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-primary/40 hover:shadow">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                  {item.course ? <p className="mt-1 text-xs text-slate-500">{item.course}</p> : null}
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                    {item.type ? <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">{item.type}</span> : null}
-                    {item.mode ? <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">{item.mode}</span> : null}
-                    {item.weight ? <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">{item.weight}</span> : null}
-                    {item.recommended ? (
-                      <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">
-                        {item.recommended}
-                      </span>
-                    ) : null}
-                    {item.score ? (
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 font-semibold text-emerald-700">{item.score}</span>
-                    ) : null}
-                  </div>
+          {items.map((item) => {
+            const scoreValue =
+              typeof item.score === 'string'
+                ? Number.parseFloat(item.score.replace(/[^0-9.-]/g, ''))
+                : Number(item.score);
+            const assessment = {
+              id: item.id,
+              title: item.title,
+              moduleTitle: item.course,
+              typeLabel: item.type ?? item.mode,
+              type: item.type ?? item.mode,
+              dueDate: item.due ?? item.dueDate ?? null,
+              dueLabel: item.due ?? undefined,
+              relativeDueLabel: item.dueIn ?? undefined,
+              statusLabel: item.status ?? undefined,
+              completed: typeof item.status === 'string' && item.status.toLowerCase().includes('completed'),
+              required: true,
+              attempts: item.attempts ?? null,
+              score: Number.isFinite(scoreValue) ? scoreValue : null
+            };
+            const actionLabel = item.submissionUrl ? 'Open workspace' : undefined;
+            return (
+              <li
+                key={item.id}
+                className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-primary/40 hover:shadow"
+              >
+                <AssessmentQuickView assessment={assessment} actionLabel={actionLabel} href={item.submissionUrl} />
+                {item.instructions ? (
+                  <p className="text-xs leading-relaxed text-slate-500">{item.instructions}</p>
+                ) : null}
+                {resolveStatusMessage(item.status) ? (
+                  <p className={`text-xs font-medium ${resolveStatusTone(item.status)}`}>
+                    {resolveStatusMessage(item.status)}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  {item.weight ? <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">{item.weight}</span> : null}
+                  {item.recommended ? (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">{item.recommended}</span>
+                  ) : null}
+                  <StatusBadge status={item.status} />
                 </div>
-                <div className="text-right text-xs text-slate-500">
-                  {item.dueIn ? <p className="font-semibold text-primary">{item.dueIn}</p> : null}
-                  {item.due ? <p>{item.due}</p> : null}
-                  <div className="mt-2 flex items-center justify-end gap-2">
-                    <StatusBadge status={item.status} />
-                    {item.submissionUrl ? (
-                      <a
-                        href={item.submissionUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary hover:text-white"
-                      >
-                        Open Learnspace
-                        <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-              {item.instructions ? (
-                <p className="mt-3 text-xs leading-relaxed text-slate-500">{item.instructions}</p>
-              ) : null}
-              {resolveStatusMessage(item.status) ? (
-                <p className={`mt-3 text-xs font-medium ${resolveStatusTone(item.status)}`}>
-                  {resolveStatusMessage(item.status)}
-                </p>
-              ) : null}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

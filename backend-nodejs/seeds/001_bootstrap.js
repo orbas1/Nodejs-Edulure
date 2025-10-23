@@ -2411,6 +2411,22 @@ export async function seed(knex) {
             lastSyncedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
           }
         ],
+        upsellCatalogItems: [
+          {
+            productCode: 'ops-masterclass-tutor-support',
+            label: 'Tutor concierge pods',
+            tone: 'emerald',
+            description: 'Weekly office hours and escalation rehearsal coaching.',
+            features: ['Weekly office hours', 'Escalation rehearsal support']
+          },
+          {
+            productCode: 'ops-masterclass-community-bundle',
+            label: 'Ops Guild bundle',
+            tone: 'primary',
+            description: 'Private Ops Guild briefings and launch war room access.',
+            features: ['Private briefings', 'Launch war room access']
+          }
+        ],
         reviews: [
           {
             id: 'review-launchhub',
@@ -2507,7 +2523,14 @@ export async function seed(knex) {
       position: 1,
       duration_minutes: 45,
       release_at: trx.fn.now(),
-      metadata: JSON.stringify({ format: 'presentation', keyTakeaway: 'Runbook readiness matrix' })
+      metadata: JSON.stringify({
+        format: 'presentation',
+        keyTakeaway: 'Runbook readiness matrix',
+        thumbnailUrl: 'https://cdn.edulure.com/lessons/command-center-blueprint.jpg',
+        resources: [
+          { label: 'Command center worksheet', href: 'https://cdn.edulure.com/resources/command-center-worksheet.pdf' }
+        ]
+      })
     });
 
     const [telemetryLessonId] = await trx('course_lessons').insert({
@@ -2519,7 +2542,14 @@ export async function seed(knex) {
       position: 1,
       duration_minutes: 60,
       release_at: trx.fn.now(),
-      metadata: JSON.stringify({ format: 'reading', worksheet: 'forecast-checklist' })
+      metadata: JSON.stringify({
+        format: 'reading',
+        worksheet: 'forecast-checklist',
+        thumbnailUrl: 'https://cdn.edulure.com/lessons/funnel-telemetry-preview.jpg',
+        resources: [
+          { label: 'Telemetry readiness checklist', href: 'https://cdn.edulure.com/resources/telemetry-readiness.xlsx' }
+        ]
+      })
     });
 
     await trx('course_assignments').insert({
@@ -2789,6 +2819,60 @@ export async function seed(knex) {
       revenue_account: '4000-education-services',
       deferred_revenue_account: '2050-deferred-revenue',
       metadata: JSON.stringify({ seed: true, owner: 'finance-ops' }),
+      status: 'active',
+      effective_from: trx.fn.now()
+    });
+
+    const [tutorSupportCatalogId] = await trx('monetization_catalog_items').insert({
+      public_id: crypto.randomUUID(),
+      tenant_id: 'global',
+      product_code: 'ops-masterclass-tutor-support',
+      name: 'Ops tutor concierge pods',
+      description: 'Pair the automation masterclass with weekly live tutor pods for escalation rehearsal support.',
+      pricing_model: 'flat_fee',
+      billing_interval: 'one_time',
+      revenue_recognition_method: 'immediate',
+      recognition_duration_days: 0,
+      unit_amount_cents: 49900,
+      currency: 'USD',
+      usage_metric: 'seat',
+      revenue_account: '4000-education-services',
+      deferred_revenue_account: '2050-deferred-revenue',
+      metadata: JSON.stringify({
+        seed: true,
+        owner: 'course-ops',
+        badgeLabel: 'Tutor concierge',
+        badgeTone: 'emerald',
+        landingPageUrl: 'https://commerce.edulure.test/addons/ops-masterclass-tutor-support',
+        features: ['Weekly office hours', 'Incident rehearsal coaching']
+      }),
+      status: 'active',
+      effective_from: trx.fn.now()
+    });
+
+    const [communityBundleCatalogId] = await trx('monetization_catalog_items').insert({
+      public_id: crypto.randomUUID(),
+      tenant_id: 'global',
+      product_code: 'ops-masterclass-community-bundle',
+      name: 'Ops Guild community access',
+      description: 'Unlock private Ops Guild community channels and live briefings bundled with the masterclass.',
+      pricing_model: 'flat_fee',
+      billing_interval: 'one_time',
+      revenue_recognition_method: 'immediate',
+      recognition_duration_days: 0,
+      unit_amount_cents: 29000,
+      currency: 'USD',
+      usage_metric: 'seat',
+      revenue_account: '4000-education-services',
+      deferred_revenue_account: '2050-deferred-revenue',
+      metadata: JSON.stringify({
+        seed: true,
+        owner: 'community-ops',
+        badgeLabel: 'Ops Guild bundle',
+        badgeTone: 'primary',
+        landingPageUrl: 'https://commerce.edulure.test/addons/ops-masterclass-community',
+        features: ['Private briefings', 'Launch war room access']
+      }),
       status: 'active',
       effective_from: trx.fn.now()
     });
