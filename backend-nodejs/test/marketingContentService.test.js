@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => {
   const marketingBlockList = vi.fn();
   const marketingPlanList = vi.fn();
   const onboardingInviteList = vi.fn();
+  const marketingLeadCreate = vi.fn();
   const select = vi.fn();
   const whereIn = vi.fn();
   const db = vi.fn();
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => {
     marketingBlockList,
     marketingPlanList,
     onboardingInviteList,
+    marketingLeadCreate,
     select,
     whereIn,
     db
@@ -40,6 +42,12 @@ vi.mock('../src/models/LearnerOnboardingInviteModel.js', () => ({
   }
 }));
 
+vi.mock('../src/models/MarketingLeadModel.js', () => ({
+  default: {
+    create: mocks.marketingLeadCreate
+  }
+}));
+
 let MarketingContentService;
 
 describe('MarketingContentService', () => {
@@ -51,6 +59,7 @@ describe('MarketingContentService', () => {
     mocks.marketingBlockList.mockResolvedValue([]);
     mocks.marketingPlanList.mockResolvedValue([]);
     mocks.onboardingInviteList.mockResolvedValue([]);
+    mocks.marketingLeadCreate.mockResolvedValue({ id: 99 });
 
     ({ default: MarketingContentService } = await import('../src/services/MarketingContentService.js'));
   });
@@ -178,5 +187,79 @@ describe('MarketingContentService', () => {
     expect(mocks.marketingBlockList).toHaveBeenCalledWith({ types: ['hero'] });
     expect(mocks.marketingPlanList).toHaveBeenCalledWith({ includeFeatures: true });
     expect(mocks.onboardingInviteList).toHaveBeenCalledWith('flow@edulure.test', expect.any(Object));
+  });
+
+  it('creates marketing leads and enriches metadata with invites', async () => {
+    mocks.onboardingInviteList.mockResolvedValue([
+      {
+        code: 'FLOW5-OPS-GUILD',
+        community: { slug: 'ops-guild', name: 'Operations Guild' },
+        status: 'pending',
+        expiresAt: 'future'
+      }
+    ]);
+
+    mocks.marketingLeadCreate.mockResolvedValue({
+      id: 101,
+      email: 'flow5@edulure.test',
+      metadata: {}
+    });
+
+    const result = await MarketingContentService.createMarketingLead({
+      email: ' Flow5@Edulure.test ',
+      fullName: 'Kai Watanabe',
+      company: 'Ops Guild',
+      persona: 'Operator',
+      goal: 'Launch Flow 5 beta',
+      ctaSource: 'hero-primary',
+      blockSlug: 'flow-five-hero',
+      metadata: { utmCampaign: 'flow5' }
+    });
+
+    expect(mocks.onboardingInviteList).toHaveBeenCalledWith('flow5@edulure.test', expect.any(Object));
+    expect(mocks.marketingLeadCreate).toHaveBeenCalledWith({
+      email: 'flow5@edulure.test',
+      fullName: 'Kai Watanabe',
+      company: 'Ops Guild',
+      persona: 'Operator',
+      goal: 'Launch Flow 5 beta',
+      ctaSource: 'hero-primary',
+      blockSlug: 'flow-five-hero',
+      status: 'new',
+      metadata: {
+        utmCampaign: 'flow5',
+        invites: [
+          {
+            code: 'FLOW5-OPS-GUILD',
+            community: { slug: 'ops-guild', name: 'Operations Guild' },
+            status: 'pending',
+            expiresAt: 'future'
+          }
+        ]
+      }
+    });
+    expect(result).toMatchObject({
+      id: 101,
+      email: 'flow5@edulure.test',
+      metadata: {
+        utmCampaign: 'flow5',
+        invites: [
+          {
+            code: 'FLOW5-OPS-GUILD',
+            community: { slug: 'ops-guild', name: 'Operations Guild' },
+            status: 'pending',
+            expiresAt: 'future'
+          }
+        ]
+      },
+      invites: [
+        {
+          code: 'FLOW5-OPS-GUILD',
+          community: { slug: 'ops-guild', name: 'Operations Guild' },
+          status: 'pending',
+          expiresAt: 'future'
+        }
+      ]
+    });
   });
 });

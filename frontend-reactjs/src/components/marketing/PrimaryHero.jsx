@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 
 import HomeSection from '../home/HomeSection.jsx';
+import HeroMediaPanel from './HeroMediaPanel.jsx';
 
 function resolveAction(action, type = 'link') {
   if (!action) {
@@ -23,7 +24,7 @@ function resolveAction(action, type = 'link') {
   return href ? { href, label } : null;
 }
 
-export default function PrimaryHero({ block, languageSelector, rightPanel, ...overrides }) {
+export default function PrimaryHero({ block, languageSelector, rightPanel, media, mediaAlt, mediaCaption, ...overrides }) {
   const data = block ?? {};
   const eyebrow = overrides.eyebrow ?? data.eyebrow;
   const statusLabel = overrides.statusLabel ?? data.statusLabel;
@@ -33,6 +34,14 @@ export default function PrimaryHero({ block, languageSelector, rightPanel, ...ov
   const primaryAction = overrides.primaryAction ?? resolveAction(data.primaryCta, 'link');
   const secondaryAction = overrides.secondaryAction ?? resolveAction(data.secondaryCta, 'link');
   const tertiaryAction = overrides.tertiaryAction ?? resolveAction(data.tertiaryCta, 'anchor');
+  const heroMedia = media ?? overrides.media ?? data.media ?? null;
+  const heroMediaCaption = mediaCaption ?? overrides.mediaCaption ?? heroMedia?.caption ?? data.media?.caption ?? null;
+  const heroMediaAlt = mediaAlt ?? overrides.mediaAlt ?? heroMedia?.alt ?? data.media?.alt ?? subheadline ?? '';
+  const resolvedRightPanel =
+    rightPanel ??
+    (heroMedia ? (
+      <HeroMediaPanel media={{ ...heroMedia, caption: heroMediaCaption ?? heroMedia?.caption }} fallbackAlt={heroMediaAlt} />
+    ) : null);
 
   return (
     <section className="marketing-hero">
@@ -110,7 +119,7 @@ export default function PrimaryHero({ block, languageSelector, rightPanel, ...ov
             ) : null}
           </div>
         </div>
-        <div className="relative w-full lg:w-1/2">{rightPanel}</div>
+        <div className="relative w-full lg:w-1/2">{resolvedRightPanel}</div>
       </HomeSection>
     </section>
   );
@@ -125,7 +134,8 @@ PrimaryHero.propTypes = {
     chips: PropTypes.arrayOf(PropTypes.string),
     primaryCta: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
     secondaryCta: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
-    tertiaryCta: PropTypes.oneOfType([PropTypes.string, PropTypes.object])
+    tertiaryCta: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+    media: PropTypes.object
   }),
   languageSelector: PropTypes.shape({
     desktop: PropTypes.node,
@@ -151,7 +161,10 @@ PrimaryHero.propTypes = {
     href: PropTypes.string.isRequired,
     label: PropTypes.string.isRequired,
     onClick: PropTypes.func
-  })
+  }),
+  media: PropTypes.object,
+  mediaAlt: PropTypes.string,
+  mediaCaption: PropTypes.string
 };
 
 PrimaryHero.defaultProps = {
@@ -165,5 +178,8 @@ PrimaryHero.defaultProps = {
   subheadline: undefined,
   primaryAction: null,
   secondaryAction: null,
-  tertiaryAction: null
+  tertiaryAction: null,
+  media: null,
+  mediaAlt: '',
+  mediaCaption: undefined
 };
