@@ -726,24 +726,24 @@ G. ✓ **Full Upgrade Plan & Release Steps** – Community detail aggregation, s
 ## 14. Moderation and safety surfaces
 
 ### Experience outline
-- **Flag queue** – Table of reports with severity, content preview, actions.
-- **Review workspace** – Side-by-side content viewer, policy checklist, decision buttons.
-- **Outcome logging** – Notes field, follow-up tasks, communication templates.
+- **Flag queue** – `ModerationQueue.jsx` drives the unified case table with status/severity filters, search, keyboard navigation, and inline AI guidance fed by `moderationApi.listCases`, so community and trust & safety teams review the same surface.【F:frontend-reactjs/src/components/moderation/ModerationQueue.jsx†L16-L212】【F:frontend-reactjs/src/api/moderationApi.js†L98-L153】
+- **Review workspace** – The detail drawer layers `ModerationChecklistForm.jsx` follow-up capture, action buttons, and `ModerationMediaPreview.jsx` resilience so moderators can triage, document, and preview evidence without leaving the queue.【F:frontend-reactjs/src/components/moderation/ModerationQueue.jsx†L213-L520】【F:frontend-reactjs/src/components/moderation/ModerationChecklistForm.jsx†L18-L160】【F:frontend-reactjs/src/components/moderation/ModerationMediaPreview.jsx†L6-L78】
+- **Outcome logging** – Case actions flow through `moderationApi.applyAction` to `CommunityModerationService`, which records snapshots, policy snippets, and follow-ups, while undo restores the previous state when moderators reverse a decision.【F:frontend-reactjs/src/api/moderationApi.js†L134-L174】【F:backend-nodejs/src/services/CommunityModerationService.js†L599-L845】
 
 ### Assessments
-A. **Redundancy Changes** – Merge moderation queue UI across communities and support; reuse checklist forms. Power both from `frontend-reactjs/src/components/moderation/ModerationQueue.jsx` so severity labels and filters align.
+A. **Redundancy Changes** – The queue, checklist form, and media preview are shared across moderation surfaces, with API helpers encapsulating case pagination, action submission, and undo to eliminate bespoke dashboards.【F:frontend-reactjs/src/components/moderation/ModerationQueue.jsx†L134-L520】【F:frontend-reactjs/src/components/moderation/ModerationChecklistForm.jsx†L18-L160】【F:frontend-reactjs/src/api/moderationApi.js†L98-L174】 ✅
 
-B. **Strengths to Keep** – Maintain clear severity badges, quick assign, and audit trail export.
+B. **Strengths to Keep** – Backend enrichment preserves risk scoring, assignments, policy snippets, and AI hints by stitching together cases, follow-ups, governance contracts, and post metadata before returning results to the UI.【F:backend-nodejs/src/services/CommunityModerationService.js†L522-L579】【F:backend-nodejs/src/services/CommunityModerationService.js†L798-L838】 ✅
 
-C. **Weaknesses to Remove** – Improve media preview reliability, ensure actions are undoable, and add keyboard shortcuts. Persist undo stacks via `CommunityPostModerationActionModel` so moderators can revert decisions quickly.
+C. **Weaknesses to Remove** – Evidence previews now degrade gracefully, keyboard shortcuts cover navigation and undo, and case/post snapshots stored on each action support reliable reversals through the undo endpoint.【F:frontend-reactjs/src/components/moderation/ModerationMediaPreview.jsx†L6-L78】【F:frontend-reactjs/src/components/moderation/ModerationQueue.jsx†L171-L207】【F:backend-nodejs/src/services/CommunityModerationService.js†L698-L845】 ✅
 
-D. **Sesing and Colour Review Changes** – Use high-contrast severity chips, subdued background, and ensure preview frames are consistent.
+D. **Sesing and Colour Review Changes** – Queue chips, cards, and buttons follow the indigo/amber palette with focus-visible states to keep the trust & safety workspace calm while remaining accessible.【F:frontend-reactjs/src/components/moderation/ModerationQueue.jsx†L33-L120】【F:frontend-reactjs/src/components/moderation/ModerationChecklistForm.jsx†L67-L160】 ✅
 
-E. **Improvements & Justification Changes** – Add AI-assisted triage suggestions, integrate policy links, and create reminder system for follow-ups. Surface policy snippets stored in `GovernanceContractModel` and schedule reminder tasks with the internal job scheduler.
+E. **Improvements & Justification Changes** – Follow-up reminders persist via the `moderation_follow_ups` migration and model, scheduled through `ModerationFollowUpJob` and exposed by environment toggles so operations can automate reminders without extra tooling.【F:backend-nodejs/migrations/20250301120000_moderation_follow_up.js†L5-L37】【F:backend-nodejs/src/models/ModerationFollowUpModel.js†L39-L185】【F:backend-nodejs/src/jobs/moderationFollowUpJob.js†L27-L167】【F:backend-nodejs/src/config/env.js†L984-L987】【F:backend-nodejs/src/config/env.js†L1797-L1813】 ✅
 
-F. **Change Checklist Tracker** – Completion 45%; tests for audit logging; ensure moderation metadata seeded; schema updates for AI suggestions if added.
+F. **Change Checklist Tracker** – Seeds clear and repopulate moderation cases, actions, follow-ups, analytics, and scam reports so local data matches the schema; worker readiness now tracks the follow-up job, and lint runs clean on the shared components.【F:backend-nodejs/seeds/001_bootstrap.js†L100-L1085】【F:backend-nodejs/src/servers/workerService.js†L22-L205】【F:frontend-reactjs/src/components/moderation/ModerationQueue.jsx†L16-L520】 ✅
 
-G. **Full Upgrade Plan & Release Steps** – Consolidate moderation UI, add AI hooks, extend audit logging, test permissions, and release with moderator training.
+G. **Full Upgrade Plan & Release Steps** – Apply the migration, roll updated seeds, enable `env.moderation.followUps`, and verify the worker probe plus follow-up cron in staging before training moderators on the keyboard + undo workflow.【F:backend-nodejs/migrations/20250301120000_moderation_follow_up.js†L5-L37】【F:backend-nodejs/seeds/001_bootstrap.js†L100-L1085】【F:backend-nodejs/src/servers/workerService.js†L22-L205】 ✅
 
 ## 15. Admin and operator consoles
 

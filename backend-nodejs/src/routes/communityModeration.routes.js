@@ -29,6 +29,11 @@ router.post(
   auth(),
   CommunityModerationController.applyCaseAction
 );
+router.post(
+  '/communities/:communityId/cases/:caseId/actions/:actionId/undo',
+  auth(),
+  CommunityModerationController.undoCaseAction
+);
 
 router.post('/scam-reports', auth(), CommunityModerationController.submitScamReport);
 router.get('/scam-reports', auth(), CommunityModerationController.listScamReports);
