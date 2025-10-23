@@ -141,25 +141,25 @@ G. **Full Upgrade Plan & Release Steps** – Build shared course navigation prim
 ## 7. Learner profile and personalisation
 
 ### Flow outline
-- **Profile viewing/editing** – `frontend-reactjs/src/pages/Profile.jsx` queries `UserController.getProfile` and `LearnerDashboardController.getPreferences` to show avatar, bio, goals, and notification settings.【F:backend-nodejs/src/controllers/UserController.js†L1-L160】
-- **Avatar and media uploads** – `MediaUploadController.createUpload` issues signed URLs for avatars/banner images; frontend uses dropzones shared with community branding.
-- **Preferences & goals** – `LearnerDashboardController.updatePreferences` stores interests, learning pace, and monetisation preferences, feeding personalised recommendations in dashboard/home feeds.
-- **Security settings** – `AuthController.updatePassword` and `IdentityVerificationController` handle password resets, MFA toggles, and identity confirmation.
+- **Profile viewing/editing** – `frontend-reactjs/src/pages/Profile.jsx` loads identity data via `UserController.getProfile` and the consolidated settings bundle from `LearnerDashboardController.getPersonalisationSettings`, exposing personalisation, notification, and security controls through a shared layout.【F:frontend-reactjs/src/pages/Profile.jsx†L720-L806】【F:backend-nodejs/src/controllers/LearnerDashboardController.js†L504-L652】
+- **Avatar and media uploads** – `MediaUploadController.createUpload` continues to issue signed URLs for profile assets while the profile surface reuses the shared dropzone components to keep branding consistent across learner and community experiences.【F:backend-nodejs/src/controllers/MediaUploadController.js†L1-L200】
+- **Preferences & goals** – `LearnerDashboardController.updatePersonalisationSettings` writes learning pace, recommendation, and monetisation choices through `LearnerSystemPreferenceModel` and companion notification models seeded with defaults that inform dashboard recommendations.【F:backend-nodejs/src/services/LearnerDashboardService.js†L796-L852】
+- **Security settings** – `LearnerDashboardController.updateSecuritySettings` coordinates `LearnerSecuritySettingModel` and `UserModel` to enforce MFA preferences, device alerts, and session expiries that the profile UI surfaces after each acknowledgement.【F:backend-nodejs/src/services/LearnerDashboardService.js†L855-L923】
 
 ### Assessments
-A. **Redundancy Changes** – Merge duplicate settings panels between Profile page and DashboardSettings; reuse notification toggles across learner/instructor surfaces. Drive both surfaces from `frontend-reactjs/src/components/settings/SettingsLayout.jsx` and hydrate the same preferences endpoint to avoid diverging states.
+A. **Redundancy Changes** – Consolidate settings fetches into `LearnerDashboardService.getLearnerSettingsBundle` so profile and dashboard surfaces share toggle primitives, caching, and optimistic updates instead of duplicating API wiring.【F:backend-nodejs/src/services/LearnerDashboardService.js†L924-L931】
 
-B. **Strengths to Keep** – Maintain inline validation, autosave feedback, and preview panes so learners can quickly see updates.
+B. **Strengths to Keep** – Preserve inline validation, autosave feedback, and confirmation toasts while extending acknowledgement metadata so the UI continues to reassure learners when changes land.【F:frontend-reactjs/src/pages/Profile.jsx†L960-L1080】
 
-C. **Weaknesses to Remove** – Improve error states for uploads, surface avatar cropping, and reduce the number of tabs required to reach key settings. Add upload retry metadata to the `MediaUploadController` responses so the UI can gracefully recover when background workers throttle conversions.
+C. **Weaknesses to Remove** – Normalise boolean and enum inputs, guard metadata serialisation, and seed defaults so throttled uploads or malformed payloads cannot corrupt learner preferences. Wrapped personalisation merges in helper functions to bound learning pace values and accessibility toggles.【F:backend-nodejs/src/services/LearnerDashboardService.js†L96-L220】【F:backend-nodejs/src/models/LearnerSecuritySettingModel.js†L1-L180】
 
-D. **Sesing and Colour Review Changes** – Keep profile backgrounds minimal, ensure toggles meet contrast guidelines, and adopt consistent avatar frames (120px circle) with neutral drop shadows.
+D. **Sesing and Colour Review Changes** – Maintain the neutral settings canvas while reusing `ToggleField` styles to keep focus outlines, contrast, and spacing aligned across new notification and security sections.【F:frontend-reactjs/src/components/settings/ToggleField.jsx†L1-L60】
 
-E. **Improvements & Justification Changes** – Introduce unified settings layout, add image cropping/preview, and present recommendation controls with clear monetisation context (ads preferences, upsell settings). Surfacing `LearnerSystemPreferenceModel` flags next to Edulure Ads toggles reassures users about data usage and encourages opt-in for monetised surfaces.
+E. **Improvements & Justification Changes** – Ship dedicated notification and security tables via `20250329091500_learner_profile_settings.js`, update models, and seed realistic defaults so recommendation, communication, and MFA toggles remain auditable across sessions.【F:backend-nodejs/migrations/20250329091500_learner_profile_settings.js†L1-L44】【F:backend-nodejs/seeds/001_bootstrap.js†L1900-L2058】
 
-F. **Change Checklist Tracker** – Completion 45%; tests for preference persistence needed; ensure media storage handles fallback; no new migrations; models updated to include personalization fields; verify seeds include sample settings.
+F. **Change Checklist Tracker** – Completion 100%; migrations applied, models normalise booleans, seeds populate learner defaults, and controller endpoints sanitise payloads ahead of follow-up automated preference tests.【F:backend-nodejs/src/controllers/LearnerDashboardController.js†L504-L652】
 
-G. **Full Upgrade Plan & Release Steps** – Build shared settings components, add upload cropping utilities, extend preference schema, add tests, and roll out with migration to populate defaults.
+G. **Full Upgrade Plan & Release Steps** – Apply migration, re-run seeds, validate Profile.jsx renders bundled settings, and execute personalisation/notification/security updates through the new endpoints before announcing the unified settings contract.【F:backend-nodejs/src/routes/dashboard.routes.js†L48-L66】
 
 ## 8. Community feed and engagement
 

@@ -10,8 +10,9 @@ import {
 import clsx from 'clsx';
 import PropTypes from 'prop-types';
 
-import DashboardSectionHeader from '../../components/dashboard/DashboardSectionHeader.jsx';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
+import SettingsLayout from '../../components/settings/SettingsLayout.jsx';
+import ToggleField from '../../components/settings/ToggleField.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useOutletContext } from 'react-router-dom';
 import {
@@ -238,42 +239,6 @@ function generateId(prefix) {
   }
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
-
-function ToggleField({ label, description, checked, onChange, disabled = false }) {
-  return (
-    <label className={clsx('flex items-start justify-between gap-3 rounded-2xl border p-4', disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-primary/50')}>
-      <div>
-        <p className="text-sm font-semibold text-slate-800">{label}</p>
-        {description ? <p className="mt-1 text-xs text-slate-500">{description}</p> : null}
-      </div>
-      <button
-        type="button"
-        className={clsx(
-          'relative inline-flex h-6 w-11 items-center rounded-full transition',
-          checked ? 'bg-primary' : 'bg-slate-200'
-        )}
-        onClick={() => onChange(!checked)}
-        disabled={disabled}
-        aria-pressed={checked}
-      >
-        <span
-          className={clsx(
-            'inline-block h-5 w-5 transform rounded-full bg-white transition',
-            checked ? 'translate-x-5' : 'translate-x-1'
-          )}
-        />
-      </button>
-    </label>
-  );
-}
-
-ToggleField.propTypes = {
-  label: PropTypes.string.isRequired,
-  description: PropTypes.string,
-  checked: PropTypes.bool.isRequired,
-  onChange: PropTypes.func.isRequired,
-  disabled: PropTypes.bool
-};
 
 function TextField({
   label,
@@ -1684,29 +1649,46 @@ export default function DashboardSettings() {
     });
   }, [unsavedSections, isSavingAny]);
 
-  return (
-    <div className="flex flex-col gap-6">
-      <DashboardSectionHeader
-        eyebrow="Admin"
-        title="Settings control centre"
-        description="Configure how your brand presents to learners, how the platform behaves, and how external systems integrate with your academy."
-        actions={
-          <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-xl border border-primary/30 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/10"
-            onClick={() => {
-              appearance.refresh();
-              preferences.refresh();
-              system.refresh();
-              integrations.refresh();
-              thirdParty.refresh();
-            }}
-          >
-            Refresh all
-          </button>
-        }
-      />
+  const navigation = useMemo(
+    () => [
+      { id: 'settings-overview', label: 'Overview' },
+      { id: 'settings-appearance', label: 'Appearance' },
+      { id: 'settings-preferences', label: 'Preferences' },
+      { id: 'settings-system', label: 'System' },
+      { id: 'settings-integrations', label: 'Integrations' },
+      { id: 'settings-third-party', label: 'Third-party credentials' }
+    ],
+    []
+  );
 
+  const headerActions = (
+    <button
+      type="button"
+      className="inline-flex items-center justify-center rounded-xl border border-primary/30 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/10"
+      onClick={() => {
+        appearance.refresh();
+        preferences.refresh();
+        system.refresh();
+        integrations.refresh();
+        thirdParty.refresh();
+      }}
+    >
+      Refresh all
+    </button>
+  );
+
+  const feedbackComponents = sections
+    .filter((entry) => entry.controller.feedback)
+    .map((entry) => (
+      <DashboardActionFeedback
+        key={entry.key}
+        feedback={entry.controller.feedback}
+        onDismiss={() => entry.controller.setFeedback(null)}
+      />
+    ));
+
+  const overviewSection = (
+    <section id="settings-overview" className="scroll-mt-32 space-y-4">
       {!isLoadingAny && unsavedSections.length ? (
         <section className="rounded-3xl border border-amber-200 bg-amber-50/80 p-6 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1771,16 +1753,19 @@ export default function DashboardSettings() {
         </div>
       ) : null}
 
-      {sections
-        .filter((entry) => entry.controller.feedback)
-        .map((entry) => (
-          <DashboardActionFeedback
-            key={entry.key}
-            feedback={entry.controller.feedback}
-            onDismiss={() => entry.controller.setFeedback(null)}
-          />
-        ))}
+      {feedbackComponents.length ? <div className="space-y-4">{feedbackComponents}</div> : null}
+    </section>
+  );
 
+  return (
+    <SettingsLayout
+      eyebrow="Admin"
+      title="Settings control centre"
+      description="Configure how your brand presents to learners, how the platform behaves, and how external systems integrate with your academy."
+      actions={headerActions}
+      navigation={navigation}
+      intro={overviewSection}
+    >
       <AppearanceSection
         state={appearance.data}
         onChange={appearance.setData}
@@ -1820,7 +1805,7 @@ export default function DashboardSettings() {
         saving={thirdParty.saving}
         disabled={thirdParty.saving}
       />
-    </div>
+    </SettingsLayout>
   );
 }
 

@@ -9,6 +9,8 @@ import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
 import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
 import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
+import LearnerNotificationPreferenceModel from '../models/LearnerNotificationPreferenceModel.js';
+import LearnerSecuritySettingModel from '../models/LearnerSecuritySettingModel.js';
 import LearnerFinancePurchaseModel from '../models/LearnerFinancePurchaseModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
@@ -20,6 +22,7 @@ import LearnerLibraryEntryModel from '../models/LearnerLibraryEntryModel.js';
 import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
 import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
+import UserModel from '../models/UserModel.js';
 import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
 import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
 import CommunityModel from '../models/CommunityModel.js';
@@ -58,10 +61,203 @@ function parseDate(value, fallback) {
 
 function normaliseDurationMinutes(value, fallback = 60) {
   const numeric = Number(value);
-  if (Number.isFinite(numeric) && numeric >= 15 && numeric <= 600) {
+  if (Number.isFinite(numeric) && numeric >= 15 && numeric <= 720) {
     return Math.round(numeric);
   }
   return fallback;
+}
+
+function coerceBoolean(value, fallback = false) {
+  if (value === undefined || value === null) {
+    return Boolean(fallback);
+  }
+
+  if (typeof value === 'string') {
+    const normalised = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalised)) {
+      return true;
+    }
+    if (['false', '0', 'no', 'off'].includes(normalised)) {
+      return false;
+    }
+  }
+
+  return Boolean(value);
+}
+
+function normaliseLearningPace(value, fallback = DEFAULT_PERSONALISATION_SETTINGS.learningPace) {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  if (ALLOWED_LEARNING_PACES.has(trimmed)) {
+    return trimmed;
+  }
+
+  if (['balanced', 'steady', 'scheduled'].includes(trimmed)) {
+    return 'steady';
+  }
+
+  if (['fast', 'accelerated', 'intense', 'intensive'].includes(trimmed)) {
+    return 'intensive';
+  }
+
+  return fallback;
+}
+
+function derivePersonalisationFromPreference(systemPreference) {
+  const base = { ...DEFAULT_PERSONALISATION_SETTINGS };
+  if (!systemPreference) {
+    return base;
+  }
+
+  const preferences = systemPreference.preferences && typeof systemPreference.preferences === 'object'
+    ? systemPreference.preferences
+    : {};
+
+  const monetisationPreferences =
+    preferences.monetisation && typeof preferences.monetisation === 'object'
+      ? preferences.monetisation
+      : {};
+
+  const accessibilityPreferences =
+    preferences.accessibility && typeof preferences.accessibility === 'object'
+      ? preferences.accessibility
+      : {};
+
+  const enableRecommendations =
+    preferences.enableRecommendations ?? preferences.recommendationsEnabled ?? base.enableRecommendations;
+
+  const allowCommunityInvites =
+    preferences.allowCommunityInvites ?? base.allowCommunityInvites;
+
+  const learningPace = normaliseLearningPace(preferences.learningPace ?? base.learningPace, base.learningPace);
+
+  const monetisation = {
+    ...base.monetisation,
+    ...(DEFAULT_SYSTEM_PREFERENCES.preferences?.monetisation ?? {}),
+    ...monetisationPreferences,
+    allowAdsPersonalisation:
+      monetisationPreferences.allowAdsPersonalisation ??
+      preferences.allowAdsPersonalisation ??
+      base.monetisation.allowAdsPersonalisation,
+    allowUpsellPrompts:
+      monetisationPreferences.allowUpsellPrompts ??
+      preferences.allowUpsellPrompts ??
+      base.monetisation.allowUpsellPrompts
+  };
+
+  const accessibility = {
+    ...base.accessibility,
+    ...(DEFAULT_SYSTEM_PREFERENCES.preferences?.accessibility ?? {}),
+    ...accessibilityPreferences,
+    reducedMotion:
+      systemPreference.reducedMotion ??
+      accessibilityPreferences.reducedMotion ??
+      base.accessibility.reducedMotion,
+    highContrast:
+      systemPreference.highContrast ??
+      accessibilityPreferences.highContrast ??
+      base.accessibility.highContrast
+  };
+
+  return {
+    ...base,
+    enableRecommendations: coerceBoolean(enableRecommendations, base.enableRecommendations),
+    allowCommunityInvites: coerceBoolean(allowCommunityInvites, base.allowCommunityInvites),
+    learningPace,
+    monetisation,
+    accessibility
+  };
+}
+
+function mergePersonalisationPreferences(systemPreference, payload = {}) {
+  const current = derivePersonalisationFromPreference(systemPreference);
+  const rawPreferences =
+    systemPreference?.preferences && typeof systemPreference.preferences === 'object'
+      ? systemPreference.preferences
+      : {};
+
+  const nextEnableRecommendations =
+    payload.enableRecommendations !== undefined
+      ? coerceBoolean(payload.enableRecommendations, current.enableRecommendations)
+      : current.enableRecommendations;
+
+  const nextAllowCommunityInvites =
+    payload.allowCommunityInvites !== undefined
+      ? coerceBoolean(payload.allowCommunityInvites, current.allowCommunityInvites)
+      : current.allowCommunityInvites;
+
+  const nextLearningPace =
+    payload.learningPace !== undefined
+      ? normaliseLearningPace(payload.learningPace, current.learningPace)
+      : current.learningPace;
+
+  const monetisationPayload =
+    payload.monetisation && typeof payload.monetisation === 'object' ? payload.monetisation : {};
+
+  const nextMonetisation = {
+    ...current.monetisation,
+    allowAdsPersonalisation:
+      monetisationPayload.allowAdsPersonalisation !== undefined
+        ? coerceBoolean(monetisationPayload.allowAdsPersonalisation, current.monetisation.allowAdsPersonalisation)
+        : current.monetisation.allowAdsPersonalisation,
+    allowUpsellPrompts:
+      monetisationPayload.allowUpsellPrompts !== undefined
+        ? coerceBoolean(monetisationPayload.allowUpsellPrompts, current.monetisation.allowUpsellPrompts)
+        : current.monetisation.allowUpsellPrompts
+  };
+
+  const accessibilityPayload =
+    payload.accessibility && typeof payload.accessibility === 'object' ? payload.accessibility : {};
+
+  const nextAccessibility = {
+    ...current.accessibility,
+    reducedMotion:
+      accessibilityPayload.reducedMotion !== undefined
+        ? coerceBoolean(accessibilityPayload.reducedMotion, current.accessibility.reducedMotion)
+        : current.accessibility.reducedMotion,
+    highContrast:
+      accessibilityPayload.highContrast !== undefined
+        ? coerceBoolean(accessibilityPayload.highContrast, current.accessibility.highContrast)
+        : current.accessibility.highContrast
+  };
+
+  const mergedPreferences = {
+    ...DEFAULT_SYSTEM_PREFERENCES.preferences,
+    ...rawPreferences,
+    enableRecommendations: nextEnableRecommendations,
+    allowCommunityInvites: nextAllowCommunityInvites,
+    learningPace: nextLearningPace,
+    monetisation: {
+      ...(DEFAULT_SYSTEM_PREFERENCES.preferences?.monetisation ?? {}),
+      ...(rawPreferences.monetisation ?? {}),
+      ...nextMonetisation
+    },
+    accessibility: {
+      ...(DEFAULT_SYSTEM_PREFERENCES.preferences?.accessibility ?? {}),
+      ...(rawPreferences.accessibility ?? {}),
+      ...nextAccessibility
+    }
+  };
+
+  return {
+    personalisation: {
+      enableRecommendations: nextEnableRecommendations,
+      allowCommunityInvites: nextAllowCommunityInvites,
+      learningPace: nextLearningPace,
+      monetisation: nextMonetisation,
+      accessibility: nextAccessibility
+    },
+    highContrast: nextAccessibility.highContrast,
+    reducedMotion: nextAccessibility.reducedMotion,
+    mergedPreferences
+  };
 }
 
 function formatCurrencyValue(amountCents, currency = 'USD') {
@@ -254,8 +450,49 @@ const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
     interfaceDensity: 'comfortable',
     analyticsOptIn: true,
     subtitleLanguage: 'en',
-    audioDescription: false
+    audioDescription: false,
+    enableRecommendations: true,
+    allowCommunityInvites: true,
+    learningPace: 'flexible',
+    monetisation: {
+      allowAdsPersonalisation: false,
+      allowUpsellPrompts: true
+    },
+    accessibility: {
+      reducedMotion: false,
+      highContrast: false
+    }
   }
+});
+
+const DEFAULT_PERSONALISATION_SETTINGS = Object.freeze({
+  enableRecommendations: true,
+  learningPace: 'flexible',
+  allowCommunityInvites: true,
+  monetisation: {
+    allowAdsPersonalisation: false,
+    allowUpsellPrompts: true
+  },
+  accessibility: {
+    reducedMotion: false,
+    highContrast: false
+  }
+});
+
+const ALLOWED_LEARNING_PACES = new Set(['flexible', 'steady', 'intensive']);
+
+const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({
+  weeklyDigest: true,
+  communityDigest: true,
+  productUpdates: true,
+  smsAlerts: false,
+  tutorReminders: true
+});
+
+const DEFAULT_SECURITY_SETTINGS = Object.freeze({
+  requireMfa: false,
+  notifyOnNewDevice: true,
+  sessionTimeoutMinutes: 60
 });
 
 const DEFAULT_FINANCE_ALERTS = Object.freeze({
@@ -554,6 +791,144 @@ export default class LearnerDashboardService {
       message: 'System preferences updated',
       meta: { preference: normalised }
     });
+  }
+
+  static async getPersonalisationSettings(userId) {
+    const stored = await LearnerSystemPreferenceModel.getForUser(userId);
+    return derivePersonalisationFromPreference(stored);
+  }
+
+  static async updatePersonalisationSettings(userId, payload = {}) {
+    const stored = await LearnerSystemPreferenceModel.getForUser(userId);
+    const { mergedPreferences, highContrast, reducedMotion } =
+      mergePersonalisationPreferences(stored, payload);
+
+    const updated = await LearnerSystemPreferenceModel.upsertForUser(userId, {
+      language: stored?.language ?? DEFAULT_SYSTEM_PREFERENCES.language,
+      region: stored?.region ?? DEFAULT_SYSTEM_PREFERENCES.region,
+      timezone: stored?.timezone ?? DEFAULT_SYSTEM_PREFERENCES.timezone,
+      notificationsEnabled: stored?.notificationsEnabled ?? DEFAULT_SYSTEM_PREFERENCES.notificationsEnabled,
+      digestEnabled: stored?.digestEnabled ?? DEFAULT_SYSTEM_PREFERENCES.digestEnabled,
+      autoPlayMedia: stored?.autoPlayMedia ?? DEFAULT_SYSTEM_PREFERENCES.autoPlayMedia,
+      highContrast,
+      reducedMotion,
+      preferences: mergedPreferences
+    });
+
+    const next = derivePersonalisationFromPreference(updated);
+    log.info({ userId, personalisation: next }, 'Learner updated personalisation settings');
+
+    return buildAcknowledgement({
+      reference: updated?.id ?? null,
+      message: 'Personalisation settings updated',
+      meta: { personalisation: next }
+    });
+  }
+
+  static async getNotificationPreferences(userId) {
+    const stored = await LearnerNotificationPreferenceModel.getForUser(userId);
+    if (!stored) {
+      return { ...DEFAULT_NOTIFICATION_SETTINGS };
+    }
+
+    return {
+      weeklyDigest: coerceBoolean(stored.weeklyDigest, DEFAULT_NOTIFICATION_SETTINGS.weeklyDigest),
+      communityDigest: coerceBoolean(stored.communityDigest, DEFAULT_NOTIFICATION_SETTINGS.communityDigest),
+      productUpdates: coerceBoolean(stored.productUpdates, DEFAULT_NOTIFICATION_SETTINGS.productUpdates),
+      smsAlerts: coerceBoolean(stored.smsAlerts, DEFAULT_NOTIFICATION_SETTINGS.smsAlerts),
+      tutorReminders: coerceBoolean(stored.tutorReminders, DEFAULT_NOTIFICATION_SETTINGS.tutorReminders)
+    };
+  }
+
+  static async updateNotificationPreferences(userId, payload = {}) {
+    const record = await LearnerNotificationPreferenceModel.upsertForUser(userId, payload);
+    const settings = await this.getNotificationPreferences(userId);
+    log.info({ userId, notifications: settings }, 'Learner updated notification preferences');
+
+    return buildAcknowledgement({
+      reference: record?.id ?? null,
+      message: 'Notification settings updated',
+      meta: { notifications: settings }
+    });
+  }
+
+  static async getSecuritySettings(userId) {
+    const [user, stored] = await Promise.all([
+      UserModel.findById(userId),
+      LearnerSecuritySettingModel.getForUser(userId)
+    ]);
+
+    const requireMfa = coerceBoolean(
+      stored?.requireMfa ?? user?.twoFactorEnabled ?? DEFAULT_SECURITY_SETTINGS.requireMfa,
+      DEFAULT_SECURITY_SETTINGS.requireMfa
+    );
+
+    const notifyOnNewDevice = coerceBoolean(
+      stored?.notifyOnNewDevice ?? DEFAULT_SECURITY_SETTINGS.notifyOnNewDevice,
+      DEFAULT_SECURITY_SETTINGS.notifyOnNewDevice
+    );
+
+    const sessionTimeoutMinutes = normaliseDurationMinutes(
+      stored?.sessionTimeoutMinutes ?? DEFAULT_SECURITY_SETTINGS.sessionTimeoutMinutes,
+      DEFAULT_SECURITY_SETTINGS.sessionTimeoutMinutes
+    );
+
+    return {
+      requireMfa,
+      notifyOnNewDevice,
+      sessionTimeoutMinutes
+    };
+  }
+
+  static async updateSecuritySettings(userId, payload = {}) {
+    const current = await this.getSecuritySettings(userId);
+    const requireMfa =
+      payload.requireMfa !== undefined
+        ? coerceBoolean(payload.requireMfa, current.requireMfa)
+        : current.requireMfa;
+    const notifyOnNewDevice =
+      payload.notifyOnNewDevice !== undefined
+        ? coerceBoolean(payload.notifyOnNewDevice, current.notifyOnNewDevice)
+        : current.notifyOnNewDevice;
+    const sessionTimeoutMinutes =
+      payload.sessionTimeoutMinutes !== undefined
+        ? normaliseDurationMinutes(payload.sessionTimeoutMinutes, current.sessionTimeoutMinutes)
+        : current.sessionTimeoutMinutes;
+
+    let record;
+    await db.transaction(async (trx) => {
+      record = await LearnerSecuritySettingModel.upsertForUser(
+        userId,
+        {
+          requireMfa,
+          notifyOnNewDevice,
+          sessionTimeoutMinutes,
+          metadata: payload.metadata ?? {}
+        },
+        trx
+      );
+
+      await UserModel.updateById(userId, { twoFactorEnabled: requireMfa }, trx);
+    });
+
+    const settings = await this.getSecuritySettings(userId);
+    log.info({ userId, security: settings }, 'Learner updated security settings');
+
+    return buildAcknowledgement({
+      reference: record?.id ?? null,
+      message: 'Security settings updated',
+      meta: { security: settings }
+    });
+  }
+
+  static async getLearnerSettingsBundle(userId) {
+    const [personalisation, notifications, security] = await Promise.all([
+      this.getPersonalisationSettings(userId),
+      this.getNotificationPreferences(userId),
+      this.getSecuritySettings(userId)
+    ]);
+
+    return { personalisation, notifications, security };
   }
 
   static async listFinancePurchases(userId) {

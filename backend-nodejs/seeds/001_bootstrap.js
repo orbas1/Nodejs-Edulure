@@ -121,6 +121,10 @@ export async function seed(knex) {
     await trx('user_block_list').del();
     await trx('user_mute_list').del();
     await trx('user_follows').del();
+    await trx('learner_finance_purchases').del();
+    await trx('learner_security_settings').del();
+    await trx('learner_notification_preferences').del();
+    await trx('learner_system_preferences').del();
     await trx('user_privacy_settings').del();
     await trx('community_posts').del();
     await trx('community_channels').del();
@@ -197,6 +201,10 @@ export async function seed(knex) {
     const adminVerificationRef = makeVerificationRef();
     const instructorVerificationRef = makeVerificationRef();
     const learnerVerificationRef = makeVerificationRef();
+
+    const today = new Date();
+    const fourteenDaysAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const fiveDaysAgo = new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000);
 
     const adminAvatar = await ensureSeedImage('profile-amina-diallo', {
       title: 'Amina Diallo',
@@ -1884,6 +1892,170 @@ export async function seed(knex) {
         message_permission: 'followers',
         share_activity: false,
         metadata: JSON.stringify({ reason: 'beta-tester' })
+      }
+    ]);
+
+    await trx('learner_system_preferences').insert([
+      {
+        user_id: adminId,
+        language: 'en',
+        region: 'US',
+        timezone: 'UTC',
+        notifications_enabled: true,
+        digest_enabled: false,
+        auto_play_media: false,
+        high_contrast: false,
+        reduced_motion: false,
+        preferences: JSON.stringify({
+          interfaceDensity: 'compact',
+          analyticsOptIn: true,
+          subtitleLanguage: 'en',
+          audioDescription: false,
+          enableRecommendations: true,
+          allowCommunityInvites: true,
+          learningPace: 'steady',
+          monetisation: {
+            allowAdsPersonalisation: false,
+            allowUpsellPrompts: false
+          },
+          accessibility: {
+            reducedMotion: false,
+            highContrast: false
+          }
+        })
+      },
+      {
+        user_id: instructorId,
+        language: 'ja',
+        region: 'JP',
+        timezone: 'Asia/Tokyo',
+        notifications_enabled: true,
+        digest_enabled: true,
+        auto_play_media: true,
+        high_contrast: false,
+        reduced_motion: false,
+        preferences: JSON.stringify({
+          interfaceDensity: 'compact',
+          analyticsOptIn: true,
+          subtitleLanguage: 'ja',
+          audioDescription: false,
+          enableRecommendations: true,
+          allowCommunityInvites: true,
+          learningPace: 'intensive',
+          monetisation: {
+            allowAdsPersonalisation: false,
+            allowUpsellPrompts: true
+          },
+          accessibility: {
+            reducedMotion: false,
+            highContrast: false
+          }
+        })
+      },
+      {
+        user_id: learnerId,
+        language: 'en',
+        region: 'GB',
+        timezone: 'Europe/London',
+        notifications_enabled: true,
+        digest_enabled: true,
+        auto_play_media: false,
+        high_contrast: false,
+        reduced_motion: false,
+        preferences: JSON.stringify({
+          interfaceDensity: 'comfortable',
+          analyticsOptIn: true,
+          subtitleLanguage: 'en',
+          audioDescription: false,
+          enableRecommendations: true,
+          allowCommunityInvites: true,
+          learningPace: 'flexible',
+          monetisation: {
+            allowAdsPersonalisation: false,
+            allowUpsellPrompts: true
+          },
+          accessibility: {
+            reducedMotion: false,
+            highContrast: false
+          }
+        })
+      }
+    ]);
+
+    await trx('learner_notification_preferences').insert([
+      {
+        user_id: adminId,
+        weekly_digest: true,
+        community_digest: true,
+        product_updates: true,
+        sms_alerts: false,
+        tutor_reminders: false,
+        metadata: JSON.stringify({ channels: ['email'] })
+      },
+      {
+        user_id: instructorId,
+        weekly_digest: false,
+        community_digest: true,
+        product_updates: true,
+        sms_alerts: true,
+        tutor_reminders: true,
+        metadata: JSON.stringify({ channels: ['email', 'sms'] })
+      },
+      {
+        user_id: learnerId,
+        weekly_digest: true,
+        community_digest: true,
+        product_updates: false,
+        sms_alerts: true,
+        tutor_reminders: true,
+        metadata: JSON.stringify({ timezone: 'Europe/London' })
+      }
+    ]);
+
+    await trx('learner_security_settings').insert([
+      {
+        user_id: adminId,
+        require_mfa: true,
+        notify_on_new_device: true,
+        session_timeout_minutes: 45,
+        metadata: JSON.stringify({ enforcedBy: 'platform-policy' })
+      },
+      {
+        user_id: instructorId,
+        require_mfa: true,
+        notify_on_new_device: true,
+        session_timeout_minutes: 60,
+        metadata: JSON.stringify({ backupCodesIssued: true })
+      },
+      {
+        user_id: learnerId,
+        require_mfa: false,
+        notify_on_new_device: true,
+        session_timeout_minutes: 90,
+        metadata: JSON.stringify({ preferredChannel: 'email' })
+      }
+    ]);
+
+    await trx('learner_finance_purchases').insert([
+      {
+        user_id: learnerId,
+        reference: 'SUB-2024-001',
+        description: 'Annual Growth Operator subscription',
+        amount_cents: 12900,
+        currency: 'USD',
+        status: 'paid',
+        purchased_at: fourteenDaysAgo,
+        metadata: JSON.stringify({ channel: 'dashboard', plan: 'growth-annual' })
+      },
+      {
+        user_id: learnerId,
+        reference: 'COURSE-REVOPS-001',
+        description: 'Revenue Operations Intensive cohort',
+        amount_cents: 5800,
+        currency: 'USD',
+        status: 'paid',
+        purchased_at: fiveDaysAgo,
+        metadata: JSON.stringify({ channel: 'checkout', includesCommunity: true })
       }
     ]);
 
