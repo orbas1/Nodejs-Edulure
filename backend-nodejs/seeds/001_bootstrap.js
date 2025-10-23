@@ -105,6 +105,7 @@ export async function seed(knex) {
     await trx('learner_payment_methods').del();
     await trx('learner_billing_contacts').del();
     await trx('learner_system_preferences').del();
+    await trx('learner_course_goals').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flag_tenant_states').del();
     await trx('feature_flags').del();
@@ -2178,6 +2179,28 @@ export async function seed(knex) {
         metadata: JSON.stringify({ lastLocation: 'section-2', note: 'Review telemetry thresholds' })
       }
     ]);
+
+    const automationGoalDueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    await trx('learner_course_goals').insert({
+      goal_uuid: crypto.randomUUID(),
+      user_id: learnerId,
+      course_id: opsAutomationCourseId,
+      enrollment_id: opsEnrollmentId,
+      title: 'Ship automation capstone',
+      status: 'in-progress',
+      is_active: true,
+      priority: 2,
+      target_lessons: 12,
+      remaining_lessons: 5,
+      focus_minutes_per_week: 180,
+      progress_percent: 46.5,
+      due_date: automationGoalDueDate,
+      metadata: JSON.stringify({
+        target: 'Complete automation toolkit',
+        nextStep: 'Resume lesson 3',
+        surface: 'seed'
+      })
+    });
 
     const [opsStrategistRoleId] = await trx('community_role_definitions').insert({
       community_id: opsCommunityId,

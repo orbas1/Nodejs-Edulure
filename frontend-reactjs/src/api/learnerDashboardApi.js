@@ -91,6 +91,15 @@ export async function createCourseGoal({ token, courseId, payload, signal } = {}
   );
 }
 
+export async function submitLearnerSurvey({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/feedback/surveys', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
 export async function resumeEbook({ token, ebookId, signal } = {}) {
   ensureToken(token);
   if (!ebookId) {

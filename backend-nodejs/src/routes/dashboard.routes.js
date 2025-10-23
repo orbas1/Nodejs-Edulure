@@ -1,5 +1,6 @@
 import DashboardController from '../controllers/DashboardController.js';
 import LearnerDashboardController from '../controllers/LearnerDashboardController.js';
+import LearnerFeedbackController from '../controllers/LearnerFeedbackController.js';
 import auth from '../middleware/auth.js';
 import { createApiRouter } from './routerFactory.js';
 
@@ -23,6 +24,7 @@ router.post(
 );
 router.get('/learner/courses/progress', auth(), LearnerDashboardController.listCourseProgress);
 router.post('/learner/courses/:courseId/goals', auth(), LearnerDashboardController.createCourseGoal);
+router.post('/learner/feedback/surveys', auth(), LearnerFeedbackController.submitSurvey);
 router.post('/learner/ebooks/:ebookId/resume', auth(), LearnerDashboardController.resumeEbook);
 router.post('/learner/ebooks/:ebookId/share', auth(), LearnerDashboardController.shareEbook);
 router.post('/learner/ebooks', auth(), LearnerDashboardController.createLibraryEntry);

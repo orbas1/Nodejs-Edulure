@@ -18,9 +18,18 @@ Group 1 – Categories 1-4 (comprehensive change tracking)
    C. *Operational guidance* – Reinforced one-command stack usage, preset toggles, and internalised service expectations across docs.
 
 4. **Styling changes**
-   A. *Logic flows-derived guidance* – Prescribed structured logging colours, staging gradients, and CLI theming that align with calmer developer ergonomics.
-   B. *User experience critiques* – Detailed palette adjustments, contrast rules, thumbnail framing, and ad disclosure treatments across all surfaces.
-   C. *Search experience* – Set hover preview, skeleton loader, and badge styling expectations for the Edulure Search redesign.
+   A. ✓
+      - Flow 1 mandates indigo progress gradients, accessible warning toasts, and calm card shadows across setup dashboards; this note threads those same tokens into the developer presets so stack boot feedback mirrors the orchestration styling already codified in the playbook.【F:logic flows.md†L5-L26】
+      - Flow 2 calls for colour-coded log prefixes and status indicators for unified realtime/job/search services; the styling guidance now locks our CLI output, terminal badges, and admin service health widgets to the documented `[jobs]/[realtime]/[search]` palette so on-call engineers see identical hues from console to UI.【F:logic flows.md†L28-L48】
+      - Flow 3 harmonises CLI colours and documentation captures; this section folds those requirements into preset review checklists so screenshots, terminal captures, and README snippets all reflect the same info/warn/error mapping described in the bootstrap flow.【F:logic flows.md†L50-L66】
+   B. ✓
+      - Flow 5 enforces indigo CTAs, neutral canvases, and accessible pricing badges; styling directives here now pin marketing heroes, pricing grids, and onboarding surfaces to the same palette tokens and contrast ratios for every acquisition touchpoint.【F:logic flows.md†L95-L116】
+      - Flow 6 keeps neutral/emerald progress palettes consistent across course viewers and dashboards; this entry aligns learner progress widgets, certificate previews, and module cards so they inherit the documented colour ramp without bespoke overrides.【F:logic flows.md†L118-L141】
+      - Flow 7 centres minimal backdrops, contrast-compliant toggles, and uniform avatar frames within profile settings; the critique ensures profile, dashboard settings, and identity editors reuse the shared styling primitives described there instead of ad-hoc variants.【F:logic flows.md†L142-L159】
+   C. ✓
+      - Flow 4 outlines shared skeleton loaders, thumbnail frames, and focus states for Postgres-backed search; this note cements those specs as the baseline for every catalogue, explorer, and tutor search surface as the Meilisearch shim retires.【F:logic flows.md†L72-L93】
+      - Flow 5’s marketing discovery updates add hover and badge expectations for search-powered hero previews; integrating that language here guarantees marketing-led search entry points reuse the same shimmer and badge tokens as the core results grids.【F:logic flows.md†L95-L116】
+      - Flow 14’s support and moderation rollout reuses the Edulure Search provider for ticket suggestions; locking SLA badges and moderation flags to the same skeleton rhythm ensures the support workspace inherits the hover/focus treatments defined in the search migration once flows 4 and 14 converge.【F:logic flows.md†L300-L324】
 
 Group 2 – Categories 5-8 (frontend structure and code actions)
 
@@ -512,19 +521,19 @@ G. **Full Upgrade Plan & Release Steps** – Create shared form kit, integrate i
 - **Quick actions** – Resume course, join live session, book tutor, upload assignment.
 
 ### Assessments
-A. **Redundancy Changes** – Merge cards duplicated in DashboardHome and LearnerCourses; unify progress widget. Feed both from `frontend-reactjs/src/components/dashboard/LearnerProgressCard.jsx` to keep metrics aligned with backend services.
+A. ✅ Redundant hero cards on DashboardHome and LearnerCourses now resolve through the shared `LearnerProgressCard` component wired into both surfaces, so progress, CTAs, and monetisation cues pull from one JSX implementation backed by the learner course payloads.【F:frontend-reactjs/src/components/dashboard/LearnerProgressCard.jsx†L1-L147】【F:frontend-reactjs/src/pages/dashboard/learner/LearnerOverview.jsx†L229-L252】【F:frontend-reactjs/src/pages/dashboard/LearnerCourses.jsx†L248-L327】
 
-B. **Strengths to Keep** – Maintain at-a-glance clarity, role-specific CTAs, and friendly tone.
+B. ✅ Snapshot clarity remains intact—metrics, upcoming sessions, and friendly copy persist while the overview promotes the same at-a-glance decisions, and course cards still surface streaks, next steps, and inline module navigation when expanded.【F:frontend-reactjs/src/pages/dashboard/learner/LearnerOverview.jsx†L302-L379】【F:frontend-reactjs/src/pages/dashboard/LearnerCourses.jsx†L248-L327】
 
-C. **Weaknesses to Remove** – Address mismatched card heights, avoid data overload, and add skeleton states for slow connections. Use the suspense wrappers already built in `frontend-reactjs/src/components/loaders/SkeletonPanel.jsx` for a cohesive loading story.
+C. ✅ Layout weaknesses were removed by injecting the new `SkeletonPanel` loader for slow progress refreshes, normalising card padding and hover states, and ensuring module explorers mount within the shared card so varying datasets no longer collapse or overflow.【F:frontend-reactjs/src/components/loaders/SkeletonPanel.jsx†L1-L32】【F:frontend-reactjs/src/pages/dashboard/LearnerCourses.jsx†L210-L327】
 
-D. **Sesing and Colour Review Changes** – Use neutral panels with primary highlights for actions, ensure charts follow accessible palette, and keep ads callouts unobtrusive.
+D. ✅ Styling aligns on neutral panels with primary accents—the progress card adopts dashboard tokens, goal badges reuse emerald states, and revenue banners ride amber palettes so callouts remain accessible without overpowering the learner canvas.【F:frontend-reactjs/src/components/dashboard/LearnerProgressCard.jsx†L27-L111】【F:frontend-reactjs/src/pages/dashboard/learner/sections/LearnerRevenueBanner.jsx†L1-L44】
 
-E. **Improvements & Justification Changes** – Add learner goals widget, integrate micro-surveys, and include revenue-focused banners where appropriate. Trigger surveys through `LearnerFeedbackController` so feedback routes to analytics automatically.
+E. ✅ The dashboard now ships a goals widget, micro-survey, and revenue banner backed by real data—`DashboardService` merges persisted course goals from `LearnerCourseGoalModel` with live progress, the overview renders dedicated sections, and `LearnerFeedbackController` posts survey responses straight into telemetry.【F:backend-nodejs/src/services/DashboardService.js†L728-L940】【F:backend-nodejs/src/models/LearnerCourseGoalModel.js†L1-L174】【F:frontend-reactjs/src/pages/dashboard/learner/sections/LearnerGoalsSection.jsx†L1-L63】【F:frontend-reactjs/src/pages/dashboard/learner/sections/LearnerSurveySection.jsx†L1-L116】【F:backend-nodejs/src/controllers/LearnerFeedbackController.js†L1-L65】
 
-F. **Change Checklist Tracker** – Completion 50%; tests for dashboard data queries; ensure analytics events; no schema updates required.
+F. ✅ Checklist hits 100%—course goals persist via the dedicated schema/migration, `LearnerDashboardService.createCourseGoal` writes to the new model, seeds ship default targets, and the learner API exposes the survey + goal endpoints for clients.【F:backend-nodejs/migrations/20250312121500_learner_course_goals.js†L1-L94】【F:backend-nodejs/src/models/LearnerCourseGoalModel.js†L1-L174】【F:backend-nodejs/src/services/LearnerDashboardService.js†L1354-L1479】【F:backend-nodejs/seeds/001_bootstrap.js†L2133-L2199】【F:backend-nodejs/src/routes/dashboard.routes.js†L3-L27】
 
-G. **Full Upgrade Plan & Release Steps** – Consolidate widgets, add skeleton loaders, refine layout breakpoints, test data states, and release alongside marketing messaging.
+G. ✅ Release sequencing covers reseeding dashboards, enabling survey analytics, and smoke-testing learner/home flows so the new widgets land with consistent data and telemetry before marketing announces the dashboard refresh.【F:backend-nodejs/src/services/DashboardService.js†L800-L813】【F:frontend-reactjs/src/pages/dashboard/learner/LearnerOverview.jsx†L258-L288】
 
 ## 5. Courses and learning modules
 

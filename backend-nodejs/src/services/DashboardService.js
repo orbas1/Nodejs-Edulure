@@ -15,6 +15,7 @@ import LearnerAffiliatePayoutModel from '../models/LearnerAffiliatePayoutModel.j
 import LearnerAdCampaignModel from '../models/LearnerAdCampaignModel.js';
 import InstructorApplicationModel from '../models/InstructorApplicationModel.js';
 import LearnerLibraryEntryModel from '../models/LearnerLibraryEntryModel.js';
+import LearnerCourseGoalModel from '../models/LearnerCourseGoalModel.js';
 import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
 import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
@@ -492,12 +493,29 @@ function coercePositiveInteger(value) {
   return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : 0;
 }
 
+function formatGoalStatus(status) {
+  switch ((status ?? '').toLowerCase()) {
+    case 'completed':
+      return 'Completed';
+    case 'in-progress':
+      return 'On track';
+    case 'at-risk':
+      return 'Needs attention';
+    case 'on-hold':
+      return 'On hold';
+    case 'planned':
+    default:
+      return 'Planned';
+  }
+}
+
 export function buildLearnerDashboard({
   user: _user,
   now = new Date(),
   enrollments = [],
   courses = [],
   courseProgress = [],
+  courseGoals = [],
   assignments = [],
   tutorBookings = [],
   tutorAvailability: _tutorAvailability = [],
@@ -622,6 +640,93 @@ export function buildLearnerDashboard({
     progressByEnrollment.set(entry.enrollmentId, record);
   });
 
+  const storedGoalMap = new Map();
+  const storedGoalsNormalised = [];
+  const rawCourseGoals = Array.isArray(courseGoals) ? courseGoals : [];
+  rawCourseGoals
+    .filter((goal) => goal && goal.courseId)
+    .forEach((goal) => {
+      if (goal.isActive === false) {
+        return;
+      }
+
+      const courseId = goal.courseId;
+      const course = courseMap.get(courseId) ?? null;
+      const dueDate = normaliseDate(goal.dueDate ?? goal.metadata?.dueDate);
+      const progressPercent = Number.isFinite(Number(goal.progressPercent))
+        ? Math.max(0, Math.min(100, Math.round(Number(goal.progressPercent))))
+        : null;
+      const remainingLessons = Number.isFinite(Number(goal.remainingLessons))
+        ? Math.max(0, Math.round(Number(goal.remainingLessons)))
+        : null;
+      const focusMinutesPerWeek = Number.isFinite(Number(goal.focusMinutesPerWeek))
+        ? Math.max(0, Math.round(Number(goal.focusMinutesPerWeek)))
+        : null;
+      const priority = Number.isFinite(Number(goal.priority))
+        ? Math.max(0, Math.round(Number(goal.priority)))
+        : 0;
+
+      const statusKey = typeof goal.status === 'string' ? goal.status.toLowerCase() : null;
+      const statusLabel = statusKey ? formatGoalStatus(statusKey) : null;
+
+      const normalisedGoal = {
+        id: goal.goalUuid ?? goal.id ?? `goal-${courseId}`,
+        courseId,
+        title: goal.title ?? (course?.title ? `Complete ${course.title}` : 'Learning goal'),
+        subtitle:
+          goal.subtitle ??
+          goal.metadata?.subtitle ??
+          (remainingLessons != null
+            ? `${remainingLessons} lesson${remainingLessons === 1 ? '' : 's'} remaining`
+            : null),
+        statusKey,
+        status: statusLabel,
+        statusLabel,
+        remainingLessons,
+        focusMinutesPerWeek,
+        dueDate: dueDate ? dueDate.toISOString() : null,
+        dueLabel: dueDate ? formatRelativeDay(dueDate, now) : goal.metadata?.dueLabel ?? null,
+        progressPercent,
+        nextStep: goal.metadata?.nextStep ?? goal.metadata?.suggestedAction ?? null,
+        priority,
+        metadata: goal.metadata ?? {}
+      };
+
+      storedGoalMap.set(courseId, normalisedGoal);
+      storedGoalsNormalised.push(normalisedGoal);
+    });
+
+  const mergeGoals = (baseGoal, storedGoal) => {
+    if (!storedGoal) {
+      return baseGoal;
+    }
+
+    const progressPercent = Number.isFinite(Number(storedGoal.progressPercent))
+      ? Math.max(0, Math.min(100, Math.round(Number(storedGoal.progressPercent))))
+      : baseGoal.progressPercent;
+
+    const statusKey = storedGoal.statusKey ?? storedGoal.status ?? baseGoal.statusKey ?? null;
+    const statusLabel = statusKey ? formatGoalStatus(statusKey) : baseGoal.statusLabel ?? baseGoal.status;
+
+    return {
+      ...baseGoal,
+      ...storedGoal,
+      statusKey,
+      status: statusLabel,
+      statusLabel,
+      dueDate: storedGoal.dueDate ?? baseGoal.dueDate,
+      dueLabel: storedGoal.dueLabel ?? baseGoal.dueLabel,
+      progressPercent,
+      focusMinutesPerWeek: storedGoal.focusMinutesPerWeek ?? baseGoal.focusMinutesPerWeek,
+      remainingLessons: storedGoal.remainingLessons ?? baseGoal.remainingLessons,
+      nextStep: storedGoal.nextStep ?? baseGoal.nextStep,
+      priority: storedGoal.priority ?? baseGoal.priority,
+      metadata: { ...(baseGoal.metadata ?? {}), ...(storedGoal.metadata ?? {}) }
+    };
+  };
+
+  const usedStoredGoalCourseIds = new Set();
+
   const learningPace = buildLearningPace(completionEntries, now);
   const streak = calculateLearningStreak(completionEntries, now);
 
@@ -683,6 +788,8 @@ export function buildLearnerDashboard({
     }
   ];
 
+  const computedGoalsByCourse = new Map();
+
   const activeCourses = activeEnrollments.map((enrollment) => {
     const course = courseMap.get(enrollment.courseId);
     const progress = progressByEnrollment.get(enrollment.id) ?? {
@@ -698,10 +805,58 @@ export function buildLearnerDashboard({
       ? Math.round((completedLessons / totalLessons) * 100)
       : 0;
     const nextLesson = totalLessons && completedLessons < totalLessons ? `Lesson ${completedLessons + 1}` : null;
+    const lastCompletedAt = progress.lastCompletedAt instanceof Date ? progress.lastCompletedAt : null;
+    const lastTouchedLabel = lastCompletedAt ? formatRelativeDay(lastCompletedAt, now) : null;
     const instructorRecord = course?.instructorId ? instructorDirectoryMap.get(course.instructorId) : null;
     const instructorName = instructorRecord
       ? resolveName(instructorRecord.firstName, instructorRecord.lastName, instructorRecord.email)
       : course?.metadata?.instructorName ?? (course?.instructorId ? `Instructor #${course.instructorId}` : 'Instructor');
+
+    const remainingLessons = Math.max(totalLessons - completedLessons, 0);
+    const focusMinutesPerWeek = remainingLessons
+      ? Math.max(45, Math.min(240, remainingLessons * 45))
+      : 45;
+    const targetDays = remainingLessons ? Math.max(remainingLessons * 3, 7) : 7;
+    const dueDate = new Date(now.getTime() + targetDays * DAY_IN_MS);
+    const baseStatusKey =
+      progressPercent >= 100
+        ? 'completed'
+        : remainingLessons <= 2 || progressPercent >= 60
+          ? 'in-progress'
+          : 'at-risk';
+
+    const baseStatusLabel = formatGoalStatus(baseStatusKey);
+
+    const baseGoal = {
+      id: `goal-${enrollment.publicId ?? enrollment.id}`,
+      courseId: enrollment.courseId,
+      title: course?.title ? `Complete ${course.title}` : 'Course completion goal',
+      subtitle:
+        remainingLessons
+          ? `${remainingLessons} lesson${remainingLessons === 1 ? '' : 's'} remaining`
+          : 'Maintain your streak this week',
+      statusKey: baseStatusKey,
+      status: baseStatusLabel,
+      statusLabel: baseStatusLabel,
+      remainingLessons,
+      focusMinutesPerWeek,
+      dueDate: dueDate.toISOString(),
+      dueLabel: formatRelativeDay(dueDate, now),
+      progressPercent: Math.max(0, Math.min(100, Math.round(progressPercent))),
+      nextStep:
+        remainingLessons > 0
+          ? `Resume lesson ${completedLessons + 1}`
+          : 'Celebrate your progress',
+      priority: remainingLessons > 3 && progressPercent < 60 ? 1 : 0,
+      metadata: { suggestedAction: remainingLessons > 0 ? 'resume-course' : 'reflect-win' }
+    };
+
+    const storedGoal = storedGoalMap.get(enrollment.courseId) ?? null;
+    const mergedGoal = mergeGoals(baseGoal, storedGoal);
+    if (storedGoal) {
+      usedStoredGoalCourseIds.add(enrollment.courseId);
+    }
+    computedGoalsByCourse.set(enrollment.courseId, mergedGoal);
 
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
@@ -709,10 +864,26 @@ export function buildLearnerDashboard({
       title: course?.title ?? `Course ${enrollment.courseId}`,
       status: enrollment.status,
       progress: Math.max(0, Math.min(100, progressPercent)),
+      progressPercent: Math.max(0, Math.min(100, progressPercent)),
       instructor: instructorName,
-      nextLesson
+      nextLesson,
+      completedLessons,
+      totalLessons,
+      lastTouchedAt: lastCompletedAt ? lastCompletedAt.toISOString() : null,
+      lastTouchedLabel,
+      goalStatus: mergedGoal.statusLabel ?? mergedGoal.status ?? baseGoal.statusLabel,
+      goal: mergedGoal
     };
   });
+
+  const learnerGoals = activeEnrollments
+    .map((enrollment) => computedGoalsByCourse.get(enrollment.courseId))
+    .filter(Boolean);
+
+  const orphanGoals = storedGoalsNormalised.filter(
+    (goal) => !usedStoredGoalCourseIds.has(goal.courseId)
+  );
+  const learnerGoalsCombined = [...learnerGoals, ...orphanGoals];
 
   const recommendedCourses = courses
     .filter((course) => !activeEnrollments.some((enrollment) => enrollment.courseId === course.id))
@@ -730,6 +901,67 @@ export function buildLearnerDashboard({
     courseMap,
     now
   });
+
+  const totalInvoiceCents = normalisedInvoices.reduce(
+    (sum, invoice) => sum + Number(invoice.amountCents ?? 0),
+    0
+  );
+  const referralCreditCents = Math.max(1500, Math.round(totalInvoiceCents * 0.08));
+  const primaryCourse = activeCourses[0] ?? null;
+  const coursePromotions = primaryCourse
+    ? [
+        {
+          id: `learner-referral-${primaryCourse.courseId ?? primaryCourse.id}`,
+          courseId: primaryCourse.courseId ?? primaryCourse.id ?? null,
+          headline: `Earn ${formatCurrency(referralCreditCents)} in learning credits`,
+          body: `Invite a peer to ${primaryCourse.title} and unlock tutoring bonuses when they enrol.`,
+          actionLabel: 'Share invite link',
+          actionHref: '/dashboard/learner/growth'
+        }
+      ]
+    : [];
+
+  if (coursePromotions.length) {
+    const promotionByCourseId = new Map(
+      coursePromotions.map((promotion) => [promotion.courseId ?? primaryCourse?.courseId ?? primaryCourse?.id, promotion])
+    );
+    activeCourses.forEach((course) => {
+      const promotion = promotionByCourseId.get(course.courseId ?? course.id);
+      if (promotion) {
+        course.revenueOpportunity = promotion;
+      }
+    });
+  }
+
+  const microSurvey = (() => {
+    if (!primaryCourse && learnerGoalsCombined.length === 0) {
+      return null;
+    }
+    const leadGoal = learnerGoalsCombined[0] ?? null;
+    const remainingLessons = leadGoal?.remainingLessons ?? 0;
+    return {
+      id: 'learner-dashboard-confidence-weekly',
+      question: 'How confident do you feel about completing your next lessons this week?',
+      description: remainingLessons
+        ? `You have ${remainingLessons} lesson${remainingLessons === 1 ? '' : 's'} queued for the week.`
+        : 'Keep momentum going by reinforcing what you learned.',
+      options: [
+        { value: 'ahead', label: 'Ahead of plan', description: 'I could take on more this week.' },
+        { value: 'on-track', label: 'On track', description: 'Pacing feels right.' },
+        { value: 'need-support', label: 'I need support', description: 'I could use tips or a tutor.' }
+      ],
+      ctaLabel: 'Share update',
+      thankYouMessage: 'Thanks! We will adjust your dashboard tips right away.',
+      channel: 'learner-dashboard',
+      surface: 'dashboard.home',
+      scale: { ahead: 5, 'on-track': 3, 'need-support': 1 },
+      courseContext: primaryCourse
+        ? { courseId: primaryCourse.courseId ?? primaryCourse.id, title: primaryCourse.title }
+        : null,
+      suggestedAction: remainingLessons > 0 ? 'resume-course' : 'capture-win',
+      secondaryAction: { label: 'Adjust goals', href: '/dashboard/courses' }
+    };
+  })();
 
   const communityEngagement = communityMemberships.map((community) => {
     const members = coercePositiveInteger(community.stats?.members ?? community.stats?.memberCount ?? 0);
@@ -2025,8 +2257,10 @@ export function buildLearnerDashboard({
     },
     courses: {
       active: activeCourses,
+      goals: learnerGoalsCombined,
       recommendations: recommendedCourses,
-      orders: courseOrders
+      orders: courseOrders,
+      promotions: coursePromotions
     },
     calendar: calendarEvents,
     tutorBookings: {
@@ -2064,6 +2298,9 @@ export function buildLearnerDashboard({
       communities: communitySettings,
       system: systemSettings,
       finance: financeSettings
+    },
+    feedback: {
+      microSurvey
     }
   };
 
@@ -4626,6 +4863,7 @@ export default class DashboardService {
           enrollments,
           courses,
           courseProgress,
+          courseGoals: learnerCourseGoals,
           assignments: courseWorkspaceInput?.assignments ?? [],
           tutorBookings,
           tutorAvailability,
@@ -4796,6 +5034,7 @@ export default class DashboardService {
     let multiRoleCommunitySnapshot;
     let libraryEntries = [];
     let learnerFieldServiceWorkspace = null;
+    let learnerCourseGoals = [];
 
     try {
       const [
@@ -4852,6 +5091,7 @@ export default class DashboardService {
 
       communityMemberships = memberships ?? [];
       libraryEntries = await LearnerLibraryEntryModel.listByUserId(user.id);
+      learnerCourseGoals = await LearnerCourseGoalModel.listActiveByUserId(user.id);
       const courseIds = Array.from(new Set(learnerEnrollments.map((enrollment) => enrollment.courseId).filter(Boolean)));
       const learnerCourses = courseIds.length ? await CourseModel.listByIds(courseIds) : [];
       const learnerAssignments = courseIds.length ? await CourseAssignmentModel.listByCourseIds(courseIds) : [];
@@ -4972,6 +5212,7 @@ export default class DashboardService {
           enrollments: learnerEnrollments,
           courses: [...learnerCourses, ...recommendedCourses],
           courseProgress: learnerProgress,
+          courseGoals: learnerCourseGoals,
           assignments: learnerAssignments,
           instructorDirectory,
           tutorBookings: learnerBookings,

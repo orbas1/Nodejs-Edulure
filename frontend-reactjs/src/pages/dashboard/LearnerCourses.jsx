@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
-import CourseProgressBar from '../../components/course/CourseProgressBar.jsx';
+import LearnerProgressCard from '../../components/dashboard/LearnerProgressCard.jsx';
 import { CourseModuleNavigator } from '../../components/course/CourseModuleNavigator.jsx';
 import usePersistentCollection from '../../hooks/usePersistentCollection.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
@@ -183,15 +183,48 @@ export default function LearnerCourses() {
     return map;
   }, [courseProgressSummaries]);
 
+  const goalsByCourseId = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(data?.goals)) {
+      data.goals.forEach((goal) => {
+        if (!goal) {
+          return;
+        }
+        const key = goal.courseId ?? goal.id ?? null;
+        if (key) {
+          map.set(key, goal);
+        }
+      });
+    }
+    return map;
+  }, [data?.goals]);
+
+  const revenueByCourseId = useMemo(() => {
+    const map = new Map();
+    const promotions = Array.isArray(data?.promotions) ? data.promotions : [];
+    promotions.forEach((promotion) => {
+      if (!promotion) {
+        return;
+      }
+      const key = promotion.courseId ?? promotion.id ?? null;
+      if (key) {
+        map.set(key, promotion);
+      }
+    });
+    return map;
+  }, [data?.promotions]);
+
   const enrichedCourses = useMemo(
     () =>
       activeCourses.map((course) => {
         const summary = progressByCourseId.get(course.id);
-        const rawProgress = summary?.progressPercent ?? course.progress ?? 0;
+        const goal = goalsByCourseId.get(course.courseId ?? course.id) ?? null;
+        const promotion = revenueByCourseId.get(course.courseId ?? course.id) ?? null;
+        const rawProgress = summary?.progressPercent ?? course.progress ?? goal?.progressPercent ?? 0;
         const progressPercent = Number.isFinite(Number(rawProgress))
           ? Math.max(0, Math.min(100, Number(rawProgress)))
           : 0;
-        let nextLessonLabel = course.nextLesson ?? 'Keep your streak going';
+        let nextLessonLabel = course.nextLesson ?? goal?.nextStep ?? 'Keep your streak going';
         if (summary?.nextLesson) {
           const moduleTitle = Array.isArray(summary.modules)
             ? summary.modules.find((module) => module.id === summary.nextLesson.moduleId)?.title ?? null
@@ -202,6 +235,8 @@ export default function LearnerCourses() {
         }
         return {
           ...course,
+          goal,
+          revenueOpportunity: promotion,
           progressPercent,
           nextLessonLabel,
           completedLessons: summary?.completedLessons ?? course.completedLessons ?? null,
@@ -210,8 +245,10 @@ export default function LearnerCourses() {
           summaryNextLesson: summary?.nextLesson ?? null
         };
       }),
-    [activeCourses, progressByCourseId]
+    [activeCourses, goalsByCourseId, progressByCourseId, revenueByCourseId]
   );
+
+  const showProgressSkeletons = progressLoading && enrichedCourses.length === 0;
 
   const resetOrderForm = useCallback(() => {
     setOrderForm({
@@ -451,69 +488,93 @@ export default function LearnerCourses() {
           ) : null}
         </div>
         <div className="mt-4 space-y-4">
-          {enrichedCourses.map((course) => {
-            const expanded = expandedCourseId === course.id;
-            return (
-              <div
-                key={course.id}
-                className="dashboard-card-muted p-5 transition hover:border-primary/40 hover:bg-primary/5"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="dashboard-kicker">{course.status}</p>
-                    <p className="mt-1 text-lg font-semibold text-slate-900">{course.title}</p>
-                    <p className="text-xs text-slate-600">With {course.instructor}</p>
-                    {course.goalStatus ? (
-                      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                        Goal · {course.goalStatus}
+          {showProgressSkeletons
+            ? Array.from({ length: Math.max(1, Math.min(3, activeCourses.length || 2)) }).map((_, index) => (
+                <LearnerProgressCard key={`progress-skeleton-${index}`} loading />
+              ))
+            : enrichedCourses.map((course) => {
+                const expanded = expandedCourseId === course.id;
+                const goal = course.goal ?? null;
+                const revenue = course.revenueOpportunity
+                  ? {
+                      headline:
+                        course.revenueOpportunity.headline ??
+                        course.revenueOpportunity.title ??
+                        'Unlock learner rewards',
+                      caption:
+                        course.revenueOpportunity.caption ??
+                        course.revenueOpportunity.body ??
+                        null,
+                      action:
+                        course.revenueOpportunity.actionLabel && course.revenueOpportunity.actionHref
+                          ? {
+                              label: course.revenueOpportunity.actionLabel,
+                              href: course.revenueOpportunity.actionHref
+                            }
+                          : course.revenueOpportunity.action?.label && course.revenueOpportunity.action?.href
+                            ? {
+                                label: course.revenueOpportunity.action.label,
+                                href: course.revenueOpportunity.action.href
+                              }
+                            : null
+                    }
+                  : null;
+
+                const goalPayload = goal
+                  ? {
+                      statusLabel: goal.status ?? goal.statusLabel ?? null,
+                      dueLabel: goal.dueLabel ?? goal.dueDate ?? null,
+                      focusMinutesPerWeek: Number.isFinite(Number(goal.focusMinutesPerWeek))
+                        ? Number(goal.focusMinutesPerWeek)
+                        : null,
+                      nextStep: goal.nextStep ?? goal.upNext ?? null
+                    }
+                  : null;
+
+                return (
+                  <LearnerProgressCard
+                    key={course.id}
+                    title={course.title}
+                    status={course.status}
+                    instructor={course.instructor}
+                    progressPercent={course.progressPercent}
+                    nextLabel={course.nextLessonLabel}
+                    goal={goalPayload}
+                    revenue={revenue}
+                    primaryAction={{
+                      label: 'Open course',
+                      onClick: () => handleOpenCourse(course.id),
+                      disabled: disableActions
+                    }}
+                    secondaryAction={{
+                      label: expanded ? 'Hide modules' : 'View modules',
+                      onClick: () => toggleExpandedCourse(course.id),
+                      disabled: disableActions
+                    }}
+                    meta={
+                      progressLastUpdatedAt
+                        ? { lastUpdatedLabel: formatRelativeTimestamp(progressLastUpdatedAt) }
+                        : null
+                    }
+                  >
+                    {course.completedLessons != null && course.totalLessons != null ? (
+                      <p className="text-xs text-slate-500">
+                        {course.completedLessons}/{course.totalLessons} lessons completed
                       </p>
                     ) : null}
-                  </div>
-                  <div className="text-right text-sm text-slate-600">
-                    <p>{Math.round(course.progressPercent)}% complete</p>
-                    <p className="text-xs text-slate-500">Next: {course.nextLessonLabel}</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                  <button
-                    type="button"
-                    className="dashboard-primary-pill px-3 py-1"
-                    onClick={() => handleOpenCourse(course.id)}
-                  >
-                    Open course
-                  </button>
-                  <button
-                    type="button"
-                    className="dashboard-pill px-3 py-1"
-                    onClick={() => toggleExpandedCourse(course.id)}
-                  >
-                    {expanded ? 'Hide modules' : 'View modules'}
-                  </button>
-                </div>
-                <CourseProgressBar
-                  value={course.progressPercent}
-                  className="mt-4"
-                  tone={course.progressPercent >= 100 ? 'emerald' : 'primary'}
-                  srLabel={`Progress for ${course.title}`}
-                />
-                {course.completedLessons != null && course.totalLessons != null ? (
-                  <p className="mt-2 text-xs text-slate-500">
-                    {course.completedLessons}/{course.totalLessons} lessons completed
-                  </p>
-                ) : null}
-                {expanded ? (
-                  <div className="mt-4 space-y-4">
-                    <CourseModuleNavigator
-                      modules={course.modules}
-                      activeLessonId={course.summaryNextLesson?.id ?? null}
-                      emptyLabel="Modules will appear here once this course publishes its curriculum."
-                      onLessonSelect={() => handleOpenCourse(course.id)}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+                    {expanded ? (
+                      <div className="mt-4 space-y-4">
+                        <CourseModuleNavigator
+                          modules={course.modules}
+                          activeLessonId={course.summaryNextLesson?.id ?? null}
+                          emptyLabel="Modules will appear here once this course publishes its curriculum."
+                          onLessonSelect={() => handleOpenCourse(course.id)}
+                        />
+                      </div>
+                    ) : null}
+                  </LearnerProgressCard>
+                );
+              })}
         </div>
       </section>
 
