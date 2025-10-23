@@ -2,22 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('startWebServer', () => {
   let startWebServer;
-  let ensureDatabaseConnection;
-  let startCoreInfrastructure;
+  let createServiceRuntime;
+  let resolveRuntimeToggles;
+  let startBackgroundJobs;
+  let attachRealtimeGateway;
   let readiness;
+  let runtimeDispose;
   let registerReadinessProbe;
   let httpServer;
-  let closeDatabase;
-  let stopInfrastructure;
+  let jobRunnerStop;
+  let realtimeAttachment;
 
   beforeEach(async () => {
     vi.resetModules();
-
-    closeDatabase = vi.fn().mockResolvedValue();
-    ensureDatabaseConnection = vi.fn().mockResolvedValue({ close: closeDatabase });
-
-    stopInfrastructure = vi.fn().mockResolvedValue();
-    startCoreInfrastructure = vi.fn().mockResolvedValue({ stop: stopInfrastructure });
 
     readiness = {
       markPending: vi.fn(),
@@ -27,11 +24,44 @@ describe('startWebServer', () => {
       snapshot: vi.fn(() => ({ status: 'ok' }))
     };
 
+    runtimeDispose = vi.fn();
     registerReadinessProbe = vi.fn();
+    jobRunnerStop = vi.fn().mockResolvedValue();
+    realtimeAttachment = {
+      markListening: vi.fn(),
+      stop: vi.fn().mockResolvedValue()
+    };
+
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      fatal: vi.fn(),
+      child: vi.fn(() => logger)
+    };
+
+    createServiceRuntime = vi.fn(async () => ({
+      readiness,
+      registry: {
+        add: vi.fn(),
+        cleanup: vi.fn()
+      },
+      logger,
+      dispose: runtimeDispose
+    }));
+
+    resolveRuntimeToggles = vi.fn(() => ({
+      enableJobs: true,
+      enableRealtime: true,
+      jobGroups: 'all',
+      preset: 'full'
+    }));
+
+    startBackgroundJobs = vi.fn(async () => ({ stop: jobRunnerStop }));
+    attachRealtimeGateway = vi.fn(async () => realtimeAttachment);
 
     const createServer = vi.fn(() => httpServer);
     httpServer = {
-      listening: true,
       once: vi.fn((event, handler) => {
         if (event === 'error') {
           httpServer.__errorHandler = handler;
@@ -45,14 +75,6 @@ describe('startWebServer', () => {
       })
     };
 
-    const logger = {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      fatal: vi.fn(),
-      child: vi.fn(() => logger)
-    };
-
     vi.doMock('node:http', () => ({
       default: { createServer },
       createServer
@@ -61,18 +83,22 @@ describe('startWebServer', () => {
       default: vi.fn(),
       registerReadinessProbe
     }));
-    vi.doMock('../src/bootstrap/bootstrap.js', () => ({
-      ensureDatabaseConnection,
-      startCoreInfrastructure
-    }));
     vi.doMock('../src/config/env.js', () => ({
       env: { services: { web: { port: 4000 } } }
     }));
-    vi.doMock('../src/config/logger.js', () => ({
-      default: logger
+    vi.doMock('../src/servers/runtimeEnvironment.js', () => ({
+      createServiceRuntime
     }));
-    vi.doMock('../src/observability/readiness.js', () => ({
-      createReadinessTracker: vi.fn(() => readiness)
+    vi.doMock('../src/servers/runtimeToggles.js', () => ({
+      default: resolveRuntimeToggles,
+      resolveRuntimeToggles
+    }));
+    vi.doMock('../src/servers/workerRoutines.js', () => ({
+      BACKGROUND_JOB_TARGETS: ['asset-ingestion'],
+      startBackgroundJobs
+    }));
+    vi.doMock('../src/servers/realtimeGateway.js', () => ({
+      default: attachRealtimeGateway
     }));
 
     ({ startWebServer } = await import('../src/servers/webServer.js'));
@@ -82,36 +108,56 @@ describe('startWebServer', () => {
     vi.clearAllMocks();
   });
 
-  it('starts and stops the web server with dependency cleanup', async () => {
+  it('starts web server with embedded jobs and realtime when enabled', async () => {
     const instance = await startWebServer({ withSignalHandlers: false });
 
-    expect(ensureDatabaseConnection).toHaveBeenCalledWith({ runMigrations: true, readiness });
-    expect(startCoreInfrastructure).toHaveBeenCalledWith({ readiness });
+    expect(createServiceRuntime).toHaveBeenCalledWith({
+      serviceName: 'web-service',
+      readinessTargets: [
+        'database',
+        'feature-flags',
+        'runtime-config',
+        'search-cluster',
+        'http-server',
+        'socket-gateway',
+        'asset-ingestion'
+      ],
+      runMigrations: true
+    });
     expect(registerReadinessProbe).toHaveBeenCalledWith(expect.any(Function));
+    expect(startBackgroundJobs).toHaveBeenCalledWith({ readiness, logger: expect.any(Object) });
+    expect(attachRealtimeGateway).toHaveBeenCalledWith({ httpServer, readiness, logger: expect.any(Object) });
     expect(httpServer.listen).toHaveBeenCalledWith(4000, expect.any(Function));
+    expect(realtimeAttachment.markListening).toHaveBeenCalledWith(4000);
 
     await instance.stop();
 
     expect(httpServer.close).toHaveBeenCalled();
-    expect(stopInfrastructure).toHaveBeenCalled();
-    expect(closeDatabase).toHaveBeenCalled();
-    expect(readiness.markDegraded).toHaveBeenCalledWith('http-server', 'Stopped');
+    expect(jobRunnerStop).toHaveBeenCalled();
+    expect(realtimeAttachment.stop).toHaveBeenCalledWith('manual');
+    expect(runtimeDispose).toHaveBeenCalledWith({ reason: 'manual', exitProcess: false, exitCode: 0 });
   });
 
-  it('bubbles database initialisation failures', async () => {
-    const dbError = new Error('db offline');
-    ensureDatabaseConnection.mockRejectedValue(dbError);
+  it('marks jobs and realtime as disabled when toggles are off', async () => {
+    resolveRuntimeToggles.mockReturnValue({
+      enableJobs: false,
+      enableRealtime: false,
+      jobGroups: 'core',
+      preset: 'lite'
+    });
 
-    await expect(startWebServer({ withSignalHandlers: false })).rejects.toThrow(dbError);
+    const instance = await startWebServer({ withSignalHandlers: false });
 
-    expect(readiness.markFailed).toHaveBeenCalledWith('database', dbError);
-    expect(startCoreInfrastructure).not.toHaveBeenCalled();
-    expect(closeDatabase).not.toHaveBeenCalled();
+    expect(readiness.markDegraded).toHaveBeenCalledWith('asset-ingestion', 'Background jobs disabled by preset');
+    expect(readiness.markDegraded).toHaveBeenCalledWith('socket-gateway', 'Realtime gateway disabled by preset');
+    expect(startBackgroundJobs).not.toHaveBeenCalled();
+    expect(attachRealtimeGateway).not.toHaveBeenCalled();
+
+    await instance.stop();
   });
 
-  it('rolls back on HTTP server start failure', async () => {
+  it('cleans up runtime when HTTP server fails to start', async () => {
     const listenError = new Error('bind failure');
-
     httpServer.listen.mockImplementation(() => {
       httpServer.__errorHandler?.(listenError);
     });
@@ -119,7 +165,8 @@ describe('startWebServer', () => {
     await expect(startWebServer({ withSignalHandlers: false })).rejects.toThrow(listenError);
 
     expect(readiness.markFailed).toHaveBeenCalledWith('http-server', listenError);
-    expect(stopInfrastructure).toHaveBeenCalled();
-    expect(closeDatabase).toHaveBeenCalled();
+    expect(jobRunnerStop).toHaveBeenCalled();
+    expect(realtimeAttachment.stop).toHaveBeenCalledWith('startup-failure');
+    expect(runtimeDispose).toHaveBeenCalledWith({ reason: 'startup-failure' });
   });
 });
