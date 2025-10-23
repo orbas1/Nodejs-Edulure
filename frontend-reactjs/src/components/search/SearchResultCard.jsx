@@ -6,6 +6,7 @@ import {
   CalendarDaysIcon,
   CurrencyDollarIcon,
   GlobeAltIcon,
+  SparklesIcon,
   StarIcon,
   UserCircleIcon,
   UsersIcon
@@ -67,10 +68,39 @@ export default function SearchResultCard({ entityType, hit }) {
     hit.coverImageUrl ??
     hit.thumbnailUrl ??
     hit.avatarUrl ??
+    hit.previewImage ??
+    hit.preview?.image ??
+    hit.media?.[0]?.url ??
+    hit.assets?.[0]?.url ??
     hit.raw?.coverImageUrl ??
     hit.raw?.thumbnailUrl ??
     hit.raw?.avatarUrl ??
+    hit.raw?.previewImage ??
+    hit.raw?.media?.[0]?.url ??
     null;
+
+  const badgeLabels = [];
+  const monetisationTag =
+    hit.monetisationTag ??
+    hit.monetisation?.tag ??
+    hit.badges?.find((badge) => badge.type === 'sponsored')?.label ??
+    (hit.isSponsored ? 'Sponsored' : null);
+  if (monetisationTag) {
+    badgeLabels.push({ label: monetisationTag, tone: 'amber' });
+  }
+
+  if (hit.featured || hit.badges?.some((badge) => badge.type === 'featured')) {
+    badgeLabels.push({ label: 'Featured', tone: 'indigo' });
+  }
+
+  if (hit.badges?.length) {
+    hit.badges
+      .filter((badge) => badge.type !== 'featured' && badge.type !== 'sponsored')
+      .slice(0, 3)
+      .forEach((badge) => {
+        badgeLabels.push({ label: badge.label ?? badge.type, tone: 'slate' });
+      });
+  }
 
   return (
     <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
@@ -92,12 +122,39 @@ export default function SearchResultCard({ entityType, hit }) {
           <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary shadow-sm">
             <Icon className="h-4 w-4" /> {entityType.replace('-', ' ')}
           </div>
+          {badgeLabels.length ? (
+            <div className="absolute right-4 top-4 flex flex-col items-end gap-2">
+              {badgeLabels.map((badge, index) => (
+                <span
+                  key={`${entityType}-${badge.label}-${index}`}
+                  className={
+                    badge.tone === 'amber'
+                      ? 'inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-600 shadow-sm'
+                      : badge.tone === 'indigo'
+                        ? 'inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-600 shadow-sm'
+                        : 'inline-flex items-center gap-1 rounded-full bg-slate-900/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm'
+                  }
+                >
+                  <SparklesIcon className="h-3.5 w-3.5" /> {badge.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-col gap-4">
           <div>
             <h3 className="text-2xl font-semibold text-slate-900">{hit.title ?? hit.name}</h3>
             {hit.subtitle ? <p className="mt-1 text-sm font-medium text-slate-500">{hit.subtitle}</p> : null}
             {hit.description ? <p className="mt-3 text-sm leading-relaxed text-slate-600">{hit.description}</p> : null}
+            {hit.highlights?.length ? (
+              <ul className="mt-3 flex flex-wrap gap-2 text-xs text-primary">
+                {hit.highlights.slice(0, 4).map((highlight) => (
+                  <li key={highlight} className="rounded-full bg-primary/5 px-3 py-1 font-semibold">
+                    {highlight}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           {hit.tags?.length ? (
             <div className="flex flex-wrap gap-2">
@@ -184,6 +241,19 @@ SearchResultCard.propTypes = {
     metrics: PropTypes.object,
     raw: PropTypes.object,
     geo: PropTypes.object,
+    media: PropTypes.array,
+    assets: PropTypes.array,
+    preview: PropTypes.object,
+    previewImage: PropTypes.string,
+    monetisation: PropTypes.shape({ tag: PropTypes.string }),
+    monetisationTag: PropTypes.string,
+    badges: PropTypes.arrayOf(
+      PropTypes.shape({
+        type: PropTypes.string,
+        label: PropTypes.string
+      })
+    ),
+    highlights: PropTypes.arrayOf(PropTypes.string),
     actions: PropTypes.arrayOf(
       PropTypes.shape({
         id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),

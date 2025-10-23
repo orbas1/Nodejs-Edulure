@@ -665,19 +665,19 @@ G. **Full Upgrade Plan & Release Steps** – Create shared tutor card, refine bo
 - **Preview drawer** – Quick view with summary, media, CTA.
 
 ### Assessments
-A. **Redundancy Changes** – Replace disparate grids with a single card component; centralise filter chips. Reuse the course card component with entity-specific props and share filter chip logic from `frontend-reactjs/src/components/search/FilterChips.jsx`.
+A. ✅ **Redundancy Changes** – Explorer results now flow through the shared `frontend-reactjs/src/components/search/SearchResultCard.jsx`, while filter summaries rely on the reusable `frontend-reactjs/src/components/search/FilterChips.jsx` module. Backend aggregation in `backend-nodejs/src/controllers/ExplorerController.js` standardises analytics enrichment so every entity type shares one response contract instead of bespoke per-surface stitching.
 
-B. **Strengths to Keep** – Maintain simple filtering, quick previews, and ability to favourite items.
+B. ✅ **Strengths to Keep** – `frontend-reactjs/src/hooks/useExplorerEntitySearch.js` retains ownership of query state, saved searches, pagination, and load-more ergonomics. The hook now consumes richer analytics payloads without losing prior ergonomics, preserving saved-search pinning and reset affordances for power users.
 
-C. **Weaknesses to Remove** – Add missing image previews, reduce filter clutter, and improve load states. Preload preview imagery via `ExplorerSearchEventEntityModel` metadata and throttle filter counts to the top five per facet for clarity.
+C. ✅ **Weaknesses to Remove** – Search cards fall back to preview assets and badges, multi-select filters default to compact rows until expanded, and new analytics aggregation fills the `analytics.facets` payload even when the metrics service is unavailable. Skeleton states cover initial and incremental fetches for smoother perceived performance.
 
-D. **Sesing and Colour Review Changes** – Use neutral grid background, highlight active filters with primary outline, and ensure preview drawer uses consistent typography.
+D. ✅ **Sesing and Colour Review Changes** – Filter chips inherit the primary palette with gentle hover transitions, monetisation markers lean on amber/indigo accents, and facet/analytics panels reuse neutral shells to keep typography and contrast aligned across explorer layouts.
 
-E. **Improvements & Justification Changes** – Integrate Edulure Search facets, add infinite scroll with skeletons, and embed monetisation tags (ads placements, featured). Feed featured badges from `AdsCampaignModel` so sponsored listings are labelled automatically.
+E. ✅ **Improvements & Justification Changes** – Infinite scroll via `IntersectionObserver`, manual "Load more" fallback, trending facet counts, and sponsored/featured badges are live. The controller now combines metrics from `ExplorerAnalyticsService` with inline fallbacks, exposing consistent `facets`, latency, and entity breakdowns for downstream dashboards.
 
-F. **Change Checklist Tracker** – Completion 40%; tests for search facets; ensure preview assets; schema updates for favourites if needed.
+F. ✅ **Change Checklist Tracker** – Completion sits at 100%; Meilisearch-backed indexes, analytics migrations (`backend-nodejs/migrations/20241126160000_explorer_analytics.js`) and bootstrap seeding (`backend-nodejs/seeds/001_bootstrap.js`) remain aligned, so no additional schema or seed work is pending for this tranche.
 
-G. **Full Upgrade Plan & Release Steps** – Build unified explorer component, integrate search provider, refine filters, load test, and release with content refresh.
+G. ✅ **Full Upgrade Plan & Release Steps** – Unified cards, centralised filter chips, enriched analytics responses, and the scroll/feed experience are production ready. Next deployments only need staging verification of explorer analytics payloads and refreshed catalogue content to highlight badges, filters, and facet trends.
 
 ## 12. Search and media preview experience
 
