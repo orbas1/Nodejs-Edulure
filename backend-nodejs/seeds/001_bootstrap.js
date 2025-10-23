@@ -119,6 +119,7 @@ export async function seed(knex) {
     await trx('community_message_moderation_actions').del();
     await trx('moderation_follow_ups').del();
     await trx('community_post_moderation_actions').del();
+    await trx('community_post_reactions').del();
     await trx('community_post_moderation_cases').del();
     await trx('scam_reports').del();
     await trx('moderation_analytics_events').del();
@@ -1458,7 +1459,7 @@ export async function seed(knex) {
         status: 'published',
         published_at: trx.fn.now(),
         comment_count: 6,
-        reaction_summary: JSON.stringify({ applause: 18, thumbsUp: 9, total: 27 }),
+        reaction_summary: JSON.stringify({ applause: 2, insights: 1, total: 3 }),
         metadata: JSON.stringify({ relatedResource: 'ops-blueprint-v1', analyticsKey: 'ops-hq-roadmap-drop' }),
         media_asset_id: opsPlaybookAssetId,
         preview_metadata: JSON.stringify({
@@ -1485,7 +1486,7 @@ export async function seed(knex) {
         status: 'published',
         published_at: trx.fn.now(),
         comment_count: 12,
-        reaction_summary: JSON.stringify({ insights: 32, total: 32 }),
+        reaction_summary: JSON.stringify({ insights: 2, celebrate: 1, total: 3 }),
         metadata: JSON.stringify({
           classroomReference: 'LC-AMA-001',
           registrationUrl: 'https://events.edulure.test/ama-multi-channel-funnels'
@@ -1499,6 +1500,57 @@ export async function seed(knex) {
           dominantColor: '#0EA5E9'
         })
       });
+
+    await trx('community_post_reactions').insert([
+      {
+        post_id: opsRoadmapPostId,
+        user_id: learnerId,
+        reaction: 'applause',
+        metadata: JSON.stringify({ source: 'seed:ops-roadmap' }),
+        reacted_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        post_id: opsRoadmapPostId,
+        user_id: instructorId,
+        reaction: 'applause',
+        metadata: JSON.stringify({ source: 'seed:ops-roadmap' }),
+        reacted_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        post_id: opsRoadmapPostId,
+        user_id: adminId,
+        reaction: 'insights',
+        metadata: JSON.stringify({ source: 'seed:ops-roadmap' }),
+        reacted_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        post_id: growthCampaignPostId,
+        user_id: learnerId,
+        reaction: 'insights',
+        metadata: JSON.stringify({ source: 'seed:growth-lab' }),
+        reacted_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        post_id: growthCampaignPostId,
+        user_id: adminId,
+        reaction: 'celebrate',
+        metadata: JSON.stringify({ source: 'seed:growth-lab' }),
+        reacted_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        post_id: growthCampaignPostId,
+        user_id: instructorId,
+        reaction: 'insights',
+        metadata: JSON.stringify({ source: 'seed:growth-lab' }),
+        reacted_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      }
+    ]);
 
     const now = new Date();
     const minutesAgo = (minutes) => new Date(now.getTime() - minutes * 60000).toISOString();

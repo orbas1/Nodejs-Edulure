@@ -28,8 +28,10 @@ import CommunityMemberDirectory from '../components/community/CommunityMemberDir
 import CommunityEventSchedule from '../components/community/CommunityEventSchedule.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
+import useFeedInteractions from '../hooks/useFeedInteractions.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
+import { preloadImage } from '../utils/mediaCache.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -499,6 +501,7 @@ export default function Communities() {
   const [feedItems, setFeedItems] = useState([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [feedError, setFeedError] = useState(null);
+  const [feedActionStates, setFeedActionStates] = useState({});
 
   const [activeExperience, setActiveExperience] = useState('live');
 
@@ -620,6 +623,7 @@ export default function Communities() {
       setResourcesMeta({ ...DEFAULT_RESOURCES_META });
       setResourcesError(null);
       setFeedItems([]);
+      setFeedActionStates({});
       setFeedError(null);
       setJoinError(null);
       setLeaveError(null);
@@ -717,6 +721,7 @@ export default function Communities() {
     async (communityId) => {
       if (!token || !canAccessCommunityFeed) {
         setFeedItems([]);
+        setFeedActionStates({});
         return;
       }
 
@@ -724,16 +729,78 @@ export default function Communities() {
       setFeedError(null);
       try {
         const response = await fetchCommunityFeed({ communityId, token, page: 1, perPage: 5 });
-        setFeedItems(response.data ?? []);
+        const nextItems = Array.isArray(response.data) ? response.data : [];
+        const pinnedMedia = Array.isArray(response.meta?.prefetch?.pinnedMedia)
+          ? response.meta.prefetch.pinnedMedia
+          : [];
+        setFeedItems(nextItems);
+        setFeedActionStates({});
+        if (pinnedMedia.length) {
+          pinnedMedia.forEach((entry) => {
+            const previewMeta = entry?.previewMetadata ?? {};
+            const candidateUrl = previewMeta.thumbnailUrl ?? entry?.asset?.metadata?.thumbnailUrl;
+            if (candidateUrl) {
+              preloadImage(candidateUrl);
+            }
+          });
+        }
       } catch (error) {
         setFeedItems([]);
+        setFeedActionStates({});
         setFeedError(error.message ?? 'Unable to load community feed');
       } finally {
-        setIsLoadingFeed(false);
+      setIsLoadingFeed(false);
+    }
+  },
+  [token, canAccessCommunityFeed]
+);
+
+  const updateFeedActionState = useCallback((postId, updates) => {
+    setFeedActionStates((prev) => {
+      if (updates === null) {
+        const nextState = { ...prev };
+        delete nextState[postId];
+        return nextState;
       }
-    },
-    [token, canAccessCommunityFeed]
-  );
+      const current = prev[postId] ?? {};
+      return {
+        ...prev,
+        [postId]: { ...current, ...updates }
+      };
+    });
+  }, []);
+
+  const updateFeedPost = useCallback((postId, updater) => {
+    setFeedItems((prev) =>
+      prev
+        .map((entry) => {
+          if (!entry) return entry;
+          if (entry.kind === 'post' && entry.post?.id === postId) {
+            const nextPost = updater(entry.post);
+            if (!nextPost) {
+              return null;
+            }
+            return { ...entry, post: nextPost };
+          }
+          if (!entry.kind && entry.id === postId) {
+            const nextPost = updater(entry);
+            return nextPost || null;
+          }
+          return entry;
+        })
+        .filter(Boolean)
+    );
+  }, []);
+
+  const { handleReact: handleReactToPost } = useFeedInteractions({
+    token,
+    onPostReplace: updateFeedPost,
+    onActionStateChange: updateFeedActionState,
+    resolveMetadata: () => ({
+      context: 'community',
+      communityId: selectedCommunityId && selectedCommunityId !== 'all' ? selectedCommunityId : undefined
+    })
+  });
 
   useEffect(() => {
     if (!selectedCommunityId) return;
@@ -743,6 +810,7 @@ export default function Communities() {
       setResourcesMeta({ ...DEFAULT_RESOURCES_META });
       setResourcesError(null);
       setFeedItems([]);
+      setFeedActionStates({});
       setIsLoadingFeed(false);
       setFeedError(null);
       return;
@@ -1227,6 +1295,7 @@ export default function Communities() {
       setResources([]);
       setResourcesMeta({ ...DEFAULT_RESOURCES_META });
       setFeedItems([]);
+      setFeedActionStates({});
       setFeedError(null);
     } catch (error) {
       setLeaveError(error.message ?? 'Unable to leave this community right now.');
@@ -1306,7 +1375,9 @@ export default function Communities() {
                 items={feedItems}
                 loading={isLoadingFeed}
                 emptyState={<p className="text-sm text-slate-500">No live updates published yet.</p>}
+                actionStates={feedActionStates}
                 hasMore={false}
+                onReact={handleReactToPost}
               />
             )}
           </div>

@@ -25,6 +25,8 @@ import CommunityHero from '../components/CommunityHero.jsx';
 import CommunityResourceEditor from '../components/community/CommunityResourceEditor.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
+import useFeedInteractions from '../hooks/useFeedInteractions.js';
+import { preloadImage } from '../utils/mediaCache.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const ALL_COMMUNITIES_NODE = {
@@ -282,6 +284,16 @@ export default function Feed() {
     );
   }, []);
 
+  const { handleReact: handleReactToPost } = useFeedInteractions({
+    token,
+    onPostReplace: updateFeedPost,
+    onActionStateChange: updatePostActionState,
+    resolveMetadata: (post) => ({
+      context: selectedCommunity?.id === 'all' ? 'global' : 'community',
+      communityId: resolvePostCommunityId(post) ?? undefined
+    })
+  });
+
   const resolvePostCommunityId = useCallback(
     (post) => {
       if (selectedCommunity?.id && selectedCommunity.id !== 'all') {
@@ -397,6 +409,7 @@ export default function Feed() {
         const items = payload.items ?? [];
         const pagination = payload.pagination ?? {};
         const adsMeta = payload.ads ?? null;
+        const pinnedMedia = Array.isArray(payload.prefetch?.pinnedMedia) ? payload.prefetch.pinnedMedia : [];
 
         setFeedItems((prev) => (append ? [...prev, ...items] : items));
         setFeedMeta((prev) => {
@@ -413,6 +426,16 @@ export default function Feed() {
           };
         });
         setFeedAdsMeta(adsMeta);
+
+        if (pinnedMedia.length) {
+          pinnedMedia.forEach((entry) => {
+            const previewMeta = entry?.previewMetadata ?? {};
+            const candidateUrl = previewMeta.thumbnailUrl ?? entry?.asset?.metadata?.thumbnailUrl;
+            if (candidateUrl) {
+              preloadImage(candidateUrl);
+            }
+          });
+        }
 
         if (!append) {
           const nextRange = payload.range?.key ?? feedRange;
@@ -526,24 +549,6 @@ export default function Feed() {
       loadFeed({ page: feedMeta.page + 1, append: true });
     }
   };
-
-  const handleReactToPost = useCallback(
-    (targetPost) => {
-      if (!targetPost?.id) return;
-      updateFeedPost(targetPost.id, (existing) => {
-        if (!existing) return existing;
-        const currentReactions = Number(existing.stats?.reactions ?? 0);
-        return {
-          ...existing,
-          stats: {
-            ...existing.stats,
-            reactions: currentReactions + 1
-          }
-        };
-      });
-    },
-    [updateFeedPost]
-  );
 
   const hasCommunitiesLoaded = communities.length > 0 && !isLoadingCommunities;
   const composerCommunities = useMemo(

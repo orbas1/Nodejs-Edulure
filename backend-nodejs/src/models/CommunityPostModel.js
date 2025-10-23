@@ -92,6 +92,24 @@ function normaliseTags(tags) {
   return [];
 }
 
+function normaliseReactionSummary(summary) {
+  if (!summary || typeof summary !== 'object') {
+    return {};
+  }
+
+  return Object.entries(summary).reduce((acc, [key, value]) => {
+    const reactionKey = typeof key === 'string' ? key.trim().toLowerCase() : null;
+    const numeric = Number(value);
+    if (!reactionKey || !Number.isFinite(numeric)) {
+      return acc;
+    }
+    return {
+      ...acc,
+      [reactionKey]: Math.max(0, Math.trunc(numeric))
+    };
+  }, {});
+}
+
 function toDomain(record) {
   if (!record) return null;
   return {
@@ -287,6 +305,55 @@ export default class CommunityPostModel {
 
     await connection('community_posts').where({ id }).update(payload);
     return this.findById(id, connection);
+  }
+
+  static async updateReactionSummary(id, summary = {}, connection = db) {
+    const reactions = normaliseReactionSummary(summary);
+    const total = Object.values(reactions).reduce((sum, value) => sum + Number(value ?? 0), 0);
+    const payload = {
+      reaction_summary: JSON.stringify({ ...reactions, total }),
+      updated_at: connection.fn.now()
+    };
+
+    await connection('community_posts').where({ id }).update(payload);
+    return this.findById(id, connection);
+  }
+
+  static async listPinnedMedia(communityId, { limit = 5 } = {}, connection = db) {
+    if (!communityId) {
+      return [];
+    }
+
+    const resolvedLimit = Math.min(Math.max(Number(limit) || 5, 1), 20);
+    const rows = await connection('community_posts as cp')
+      .leftJoin('content_assets as ca', 'cp.media_asset_id', 'ca.id')
+      .select([
+        'cp.id',
+        'cp.media_asset_id as mediaAssetId',
+        'cp.preview_metadata as previewMetadata',
+        'ca.public_id as assetPublicId',
+        'ca.mime_type as assetMimeType',
+        'ca.metadata as assetMetadata'
+      ])
+      .where('cp.community_id', communityId)
+      .andWhere('cp.status', 'published')
+      .andWhereNull('cp.deleted_at')
+      .andWhereNotNull('cp.pinned_at')
+      .orderBy('cp.pinned_at', 'desc')
+      .limit(resolvedLimit);
+
+    return rows.map((row) => ({
+      id: row.id,
+      mediaAssetId: row.mediaAssetId ?? null,
+      previewMetadata: parseJson(row.previewMetadata, {}),
+      asset: row.assetPublicId
+        ? {
+            publicId: row.assetPublicId,
+            mimeType: row.assetMimeType ?? null,
+            metadata: parseJson(row.assetMetadata, {})
+          }
+        : null
+    }));
   }
 
   static async paginateForCommunity(communityId, filters = {}, connection = db) {
