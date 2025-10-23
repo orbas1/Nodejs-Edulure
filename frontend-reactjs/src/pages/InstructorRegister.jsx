@@ -1,10 +1,25 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import AuthCard from '../components/AuthCard.jsx';
-import FormField from '../components/FormField.jsx';
+import AuthForm from '../components/auth/AuthForm.jsx';
 import { httpClient } from '../api/httpClient.js';
 import useOnboardingForm from '../hooks/useOnboardingForm.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import { buildOnboardingDraftPayload, calculateOnboardingCompletion, validateOnboardingState } from '../utils/validation/onboarding.js';
+
+const AUTO_SAVE_DELAY_MS = 1200;
+
+const INSTRUCTOR_PROOF_ENTRIES = [
+  {
+    id: 'cohort-architect',
+    quote: '“The application captured everything we needed—portfolio links, cohort goals, even marketing campaigns—in one pass.”',
+    attribution: 'Lead Instructor · Cohort Architect Guild'
+  },
+  {
+    id: 'studio-growth',
+    quote: '“Edulure surfaced the right learners as soon as we submitted the form. Our waitlist converted within days.”',
+    attribution: 'Founder · Studio Growth Lab'
+  }
+];
 
 function buildInstructorMetadata(cleaned, existingMetadata) {
   return {
@@ -17,6 +32,19 @@ function buildInstructorMetadata(cleaned, existingMetadata) {
     marketingSource: cleaned.marketingSource || undefined,
     marketingCampaign: cleaned.marketingCampaign || undefined
   };
+}
+
+function resolveAutoSaveMessage(status) {
+  switch (status) {
+    case 'saving':
+      return 'Saving your application draft…';
+    case 'saved':
+      return 'Application auto-saved. You can return to finish later.';
+    case 'error':
+      return 'Auto-save failed. We will retry after your next edit.';
+    default:
+      return 'Auto-save keeps your instructor application synced to your profile.';
+  }
 }
 
 export default function InstructorRegister() {
@@ -33,10 +61,18 @@ export default function InstructorRegister() {
   });
 
   const overrides = useMemo(() => ({ role: 'instructor' }), []);
-  const { formState, errors, setErrors, updateField, validate } = useOnboardingForm('instructor', overrides);
+  const { formState, errors, setErrors, updateField } = useOnboardingForm('instructor', overrides);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle');
+  const autoSaveTimer = useRef(null);
+  const lastDraftSignature = useRef(null);
+
+  const onboardingProgress = useMemo(
+    () => calculateOnboardingCompletion('instructor', formState),
+    [formState]
+  );
 
   const clearFieldError = useCallback(
     (field) => {
@@ -67,12 +103,49 @@ export default function InstructorRegister() {
     clearFieldError('termsAccepted');
   };
 
+  useEffect(() => {
+    if (isSubmitting) {
+      return undefined;
+    }
+    if (!formState.email || !formState.firstName) {
+      return undefined;
+    }
+
+    const draftPayload = buildOnboardingDraftPayload('instructor', formState);
+    const signature = JSON.stringify(draftPayload);
+    if (signature === lastDraftSignature.current) {
+      return undefined;
+    }
+
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+    }
+
+    autoSaveTimer.current = setTimeout(async () => {
+      setAutoSaveStatus('saving');
+      try {
+        await httpClient.post('/dashboard/learner/onboarding/bootstrap', draftPayload);
+        lastDraftSignature.current = signature;
+        setAutoSaveStatus('saved');
+      } catch (_err) {
+        setAutoSaveStatus('error');
+      }
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => {
+      if (autoSaveTimer.current) {
+        clearTimeout(autoSaveTimer.current);
+      }
+    };
+  }, [formState, isSubmitting]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
     setSuccess(null);
 
-    const validation = validate();
+    const validation = validateOnboardingState('instructor', formState);
+    setErrors(validation.errors);
     if (!validation.isValid) {
       setError('Please review the highlighted fields.');
       return;
@@ -111,147 +184,182 @@ export default function InstructorRegister() {
   };
 
   return (
-    <AuthCard
+    <AuthForm
       title="Become an Edulure instructor"
       subtitle="Join the roster of expert educators shaping the next generation of communities and courses."
+      onSubmit={handleSubmit}
+      submitLabel={isSubmitting ? 'Submitting…' : 'Submit application'}
+      busy={isSubmitting}
+      error={error}
+      success={success}
+      socialProof={INSTRUCTOR_PROOF_ENTRIES}
+      progress={{
+        progress: onboardingProgress.progress,
+        label: `${onboardingProgress.completed} of ${onboardingProgress.total} sections complete`
+      }}
+      footer={resolveAutoSaveMessage(autoSaveStatus)}
+      actions={
+        <span>
+          Looking for the learner experience?{' '}
+          <a href="/register" className="font-semibold text-primary">
+            Go back to learner signup
+          </a>
+        </span>
+      }
     >
-      <form className="space-y-6" onSubmit={handleSubmit}>
-        {error ? <p className="form-banner form-banner--error">{error}</p> : null}
-        {success ? <p className="form-banner form-banner--success">{success}</p> : null}
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            label="First name"
-            name="firstName"
-            placeholder="Jordan"
-            value={formState.firstName}
-            onChange={handleChange}
-            error={errors.firstName}
-          />
-          <FormField
-            label="Last name"
-            name="lastName"
-            placeholder="Rivera"
-            value={formState.lastName}
-            onChange={handleChange}
-            required={false}
-          />
-        </div>
-        <FormField
-          label="Email address"
-          type="email"
-          name="email"
-          placeholder="you@studio.com"
-          value={formState.email}
+      <div className="grid gap-4 md:grid-cols-2">
+        <AuthForm.Field
+          label="First name"
+          name="firstName"
+          placeholder="Jordan"
+          value={formState.firstName}
           onChange={handleChange}
-          error={errors.email}
+          error={errors.firstName}
         />
-        <FormField
-          label="Professional headline"
-          name="headline"
-          placeholder="Growth Strategist & Operator"
-          value={formState.headline}
+        <AuthForm.Field
+          label="Last name"
+          name="lastName"
+          placeholder="Rivera"
+          value={formState.lastName}
           onChange={handleChange}
           required={false}
         />
-        <FormField
-          label="Portfolio or website"
-          name="portfolio"
-          placeholder="https://yourportfolio.com"
-          value={formState.portfolio}
-          onChange={handleChange}
+      </div>
+      <AuthForm.Field
+        label="Email address"
+        type="email"
+        name="email"
+        placeholder="you@studio.com"
+        value={formState.email}
+        onChange={handleChange}
+        error={errors.email}
+      />
+      <AuthForm.Field
+        label="Professional headline"
+        name="headline"
+        placeholder="Growth Strategist & Operator"
+        value={formState.headline}
+        onChange={handleChange}
+        required={false}
+      />
+      <AuthForm.Field
+        label="Portfolio or website"
+        name="portfolio"
+        placeholder="https://yourportfolio.com"
+        value={formState.portfolio}
+        onChange={handleChange}
+        required={false}
+      />
+      <AuthForm.Field
+        label="Areas of expertise"
+        name="expertise"
+        placeholder="Community design, Funnel strategy"
+        value={formState.expertise}
+        onChange={handleChange}
+        required={false}
+      />
+      <AuthForm.Field
+        label="Audience size"
+        name="audience"
+        placeholder="Email list, social reach, membership numbers"
+        value={formState.audience}
+        onChange={handleChange}
+        required={false}
+      />
+      <AuthForm.Field
+        label="Tell us about your learners"
+        name="persona"
+        placeholder="Creators, operators, community architects"
+        value={formState.persona}
+        onChange={handleChange}
+        required={false}
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <AuthForm.Field
+          label="Your goals"
+          name="goalsInput"
+          placeholder="Launch Flow 5 masterclass, grow recurring revenue"
           required={false}
-        />
-        <FormField
-          label="Areas of expertise"
-          name="expertise"
-          placeholder="Community design, Funnel strategy"
-          value={formState.expertise}
-          onChange={handleChange}
-          required={false}
-        />
-        <FormField
-          label="Audience size"
-          name="audience"
-          placeholder="Email list, social reach, membership numbers"
-          value={formState.audience}
-          onChange={handleChange}
-          required={false}
-        />
-        <FormField
-          label="Tell us about your learners"
-          name="persona"
-          placeholder="Creators, operators, community architects"
-          value={formState.persona}
-          onChange={handleChange}
-          required={false}
-        />
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            label="Your goals"
-            name="goalsInput"
-            placeholder="Launch Flow 5 masterclass, grow recurring revenue"
-            required={false}
-            helper="Separate each goal with a comma or new line."
-          >
-            <textarea
-              name="goalsInput"
-              value={formState.goalsInput}
-              onChange={handleChange}
-              className="form-field__input min-h-[120px] resize-y"
-            />
-          </FormField>
-          <FormField
-            label="Invitation codes"
-            name="inviteCodes"
-            placeholder="FLOW5-GROWTH-LAB"
-            required={false}
-            helper="Paste any invite codes so we can connect you to the right cohort."
-          >
-            <textarea
-              name="inviteCodes"
-              value={formState.inviteCodes}
-              onChange={handleChange}
-              className="form-field__input min-h-[120px] resize-y"
-            />
-          </FormField>
-        </div>
-        <FormField
-          label="Learner interests"
-          name="interestsInput"
-          placeholder="Sponsor onboarding, analytics, live cohorts"
-          required={false}
-          helper="Separate each interest with a comma or new line."
+          helper="Separate each goal with a comma or new line."
         >
           <textarea
-            name="interestsInput"
-            value={formState.interestsInput}
+            name="goalsInput"
+            value={formState.goalsInput}
             onChange={handleChange}
             className="form-field__input min-h-[120px] resize-y"
           />
-        </FormField>
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            label="How did you hear about Edulure?"
-            name="marketingSource"
-            placeholder="Referral, conference, newsletter"
-            value={formState.marketingSource}
+        </AuthForm.Field>
+        <AuthForm.Field
+          label="Invitation codes"
+          name="inviteCodes"
+          placeholder="FLOW5-OPS-GUILD"
+          required={false}
+          helper="Paste any invite codes you've received to automatically connect communities."
+        >
+          <textarea
+            name="inviteCodes"
+            value={formState.inviteCodes}
             onChange={handleChange}
-            required={false}
+            className="form-field__input min-h-[120px] resize-y"
           />
-          <FormField
-            label="Campaign or creator"
-            name="marketingCampaign"
-            placeholder="Flow 5 beta, Creator Growth Lab"
-            value={formState.marketingCampaign}
-            onChange={handleChange}
-            required={false}
-          />
-        </div>
+        </AuthForm.Field>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <AuthForm.Field
+          label="Estimated weekly time commitment"
+          name="timeCommitment"
+          placeholder="4h/week"
+          value={formState.timeCommitment}
+          onChange={handleChange}
+          required={false}
+        />
+        <AuthForm.Field
+          label="Preferred onboarding path"
+          name="onboardingPath"
+          placeholder="Community-first, course-first, etc."
+          value={formState.onboardingPath}
+          onChange={handleChange}
+          required={false}
+        />
+      </div>
+      <AuthForm.Field
+        label="Areas of interest"
+        name="interestsInput"
+        placeholder="Live cohorts, sponsor onboarding, analytics"
+        required={false}
+        helper="Separate each interest with a comma or new line."
+      >
+        <textarea
+          name="interestsInput"
+          value={formState.interestsInput}
+          onChange={handleChange}
+          className="form-field__input min-h-[120px] resize-y"
+        />
+      </AuthForm.Field>
+      <div className="grid gap-4 md:grid-cols-2">
+        <AuthForm.Field
+          label="How did you hear about Edulure?"
+          name="marketingSource"
+          placeholder="Referral, conference, newsletter"
+          value={formState.marketingSource}
+          onChange={handleChange}
+          required={false}
+        />
+        <AuthForm.Field
+          label="Campaign or creator"
+          name="marketingCampaign"
+          placeholder="Flow 5 beta, Creator Growth Lab"
+          value={formState.marketingCampaign}
+          onChange={handleChange}
+          required={false}
+        />
+      </div>
+      <div className="form-section space-y-3">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <p className="text-sm font-semibold text-slate-700">Marketing updates</p>
             <p className="form-field__helper">
-              Opt in to receive teaching resources, Flow 5 updates, and instructor community invites.
+              Opt in to receive onboarding tips, launch playbooks, and instructor monetisation case studies.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -275,36 +383,29 @@ export default function InstructorRegister() {
             </span>
           </div>
         </div>
-        <label className="flex items-start gap-3 text-sm text-slate-600">
-          <input
-            type="checkbox"
-            className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-            checked={formState.termsAccepted}
-            onChange={handleTermsChange}
-          />
-          <span>
-            I agree to the Edulure{' '}
-            <a href="/terms" className="font-semibold text-primary" target="_blank" rel="noreferrer">
-              terms of use
-            </a>{' '}
-            and{' '}
-            <a href="/privacy" className="font-semibold text-primary" target="_blank" rel="noreferrer">
-              privacy policy
-            </a>
-            .
-            {errors.termsAccepted ? (
-              <span className="form-field__error ml-2 inline-block align-middle">{errors.termsAccepted}</span>
-            ) : null}
-          </span>
-        </label>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="cta-button cta-button--primary w-full disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSubmitting ? 'Submitting…' : 'Submit instructor application'}
-        </button>
-      </form>
-    </AuthCard>
+      </div>
+      <label className="flex items-start gap-3 text-sm text-slate-600">
+        <input
+          type="checkbox"
+          className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+          checked={formState.termsAccepted}
+          onChange={handleTermsChange}
+        />
+        <span>
+          I agree to the Edulure{' '}
+          <a href="/terms" className="font-semibold text-primary" target="_blank" rel="noreferrer">
+            terms of use
+          </a>{' '}
+          and{' '}
+          <a href="/privacy" className="font-semibold text-primary" target="_blank" rel="noreferrer">
+            privacy policy
+          </a>
+          .
+          {errors.termsAccepted ? (
+            <span className="form-field__error ml-2 inline-block align-middle">{errors.termsAccepted}</span>
+          ) : null}
+        </span>
+      </label>
+    </AuthForm>
   );
 }

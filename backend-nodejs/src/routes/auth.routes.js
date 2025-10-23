@@ -2,7 +2,9 @@ import AuthController from '../controllers/AuthController.js';
 import auth from '../middleware/auth.js';
 import { createApiRouter } from './routerFactory.js';
 
-const router = createApiRouter({ allowedMethods: ['POST'] });
+const router = createApiRouter({ allowedMethods: ['GET', 'POST'] });
+
+router.get('/password-policy', AuthController.describePasswordPolicy);
 
 router.post('/register', AuthController.register);
 router.post('/login', AuthController.login);

@@ -8,6 +8,7 @@ import { getActiveJwtKey } from '../config/jwtKeyStore.js';
 import UserModel from '../models/UserModel.js';
 import UserSessionModel from '../models/UserSessionModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import LearnerOnboardingResponseModel from '../models/LearnerOnboardingResponseModel.js';
 import { emailVerificationService } from './EmailVerificationService.js';
 import { sessionRegistry } from './SessionRegistry.js';
 import TwoFactorService from './TwoFactorService.js';
@@ -286,6 +287,8 @@ export default class AuthService {
           trx
         );
       }
+
+      await LearnerOnboardingResponseModel.linkUser(payload.email, payload.role, user.id, trx);
 
       const verification = await emailVerificationService.issueVerification(user, context, trx);
 
