@@ -312,6 +312,74 @@ function normaliseFieldServiceAttachments(value) {
   return attachments;
 }
 
+function normaliseFieldServicePreferenceTags(value) {
+  if (!value) {
+    return [];
+  }
+  const list = Array.isArray(value) ? value : String(value).split(',');
+  const seen = new Set();
+  return list
+    .map((entry) => String(entry ?? '').trim())
+    .filter((entry) => entry.length > 0)
+    .filter((entry) => {
+      const key = entry.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+function normaliseFieldServiceUpsellOffers(value) {
+  if (!value) {
+    return [];
+  }
+  const list = Array.isArray(value) ? value : [value];
+  return list
+    .map((entry, index) => {
+      if (!entry) return null;
+      if (typeof entry === 'string') {
+        return { id: `upsell-${index}`, title: entry, cta: 'View details', href: null };
+      }
+      if (typeof entry === 'object') {
+        return {
+          id: entry.id ?? `upsell-${index}`,
+          title: entry.title ?? entry.label ?? 'Follow-up',
+          cta: entry.cta ?? entry.action ?? null,
+          href: entry.href ?? entry.url ?? null
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function normaliseFieldServiceReminderInputs(value) {
+  if (!value) {
+    return [];
+  }
+  const list = Array.isArray(value) ? value : [value];
+  return list
+    .map((entry, index) => {
+      if (!entry) return null;
+      if (typeof entry === 'string') {
+        return { id: `reminder-${index}`, label: entry };
+      }
+      if (typeof entry === 'object') {
+        const sendAt = entry.sendAt ?? entry.send_at ?? entry.time ?? null;
+        return {
+          id: entry.id ?? `reminder-${index}`,
+          label: entry.label ?? entry.title ?? 'Reminder',
+          sendAt,
+          status: entry.status ?? null
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
 async function buildFieldServiceAssignment({ userId, order, connection = db }) {
   if (!order) return null;
   const [events, providers] = await Promise.all([
@@ -1375,6 +1443,37 @@ export default class LearnerDashboardService {
       attachments
     };
 
+    if (payload.supportChannel) {
+      metadata.supportChannel = payload.supportChannel.trim();
+    }
+    if (payload.briefUrl) {
+      metadata.briefUrl = payload.briefUrl.trim();
+    }
+    if (payload.equipment) {
+      metadata.equipment = payload.equipment.trim();
+    }
+    if (payload.debriefHost) {
+      metadata.debriefHost = payload.debriefHost.trim();
+    }
+    if (payload.debriefAt) {
+      metadata.debriefAt = payload.debriefAt;
+    }
+    if (payload.followUpChannel) {
+      metadata.followUpChannel = payload.followUpChannel;
+    }
+    const preferenceTags = normaliseFieldServicePreferenceTags(payload.preferenceTags ?? metadata.preferenceTags);
+    if (preferenceTags.length) {
+      metadata.preferenceTags = preferenceTags;
+    }
+    const upsellOffers = normaliseFieldServiceUpsellOffers(payload.upsellOffers ?? metadata.upsellOffers);
+    if (upsellOffers.length) {
+      metadata.upsellOffers = upsellOffers;
+    }
+    const reminderInputs = normaliseFieldServiceReminderInputs(payload.reminders ?? metadata.reminders);
+    if (reminderInputs.length) {
+      metadata.reminders = reminderInputs;
+    }
+
     return db.transaction(async (trx) => {
       const order = await FieldServiceOrderModel.createAssignment(
         {
@@ -1436,6 +1535,23 @@ export default class LearnerDashboardService {
     const updatePayload = { ...candidatePayload };
     delete updatePayload.metadata;
 
+    if (updatePayload.preferenceTags !== undefined) {
+      metadataOverrides.preferenceTags = normaliseFieldServicePreferenceTags(updatePayload.preferenceTags);
+      delete updatePayload.preferenceTags;
+    }
+    if (updatePayload.upsellOffers !== undefined) {
+      metadataOverrides.upsellOffers = normaliseFieldServiceUpsellOffers(updatePayload.upsellOffers);
+      delete updatePayload.upsellOffers;
+    }
+    if (updatePayload.reminders !== undefined) {
+      metadataOverrides.reminders = normaliseFieldServiceReminderInputs(updatePayload.reminders);
+      delete updatePayload.reminders;
+    }
+    if (updatePayload.followUpChannel !== undefined) {
+      metadataOverrides.followUpChannel = updatePayload.followUpChannel ?? null;
+      delete updatePayload.followUpChannel;
+    }
+
     const clientTimestamp = rawClientUpdatedAt ?? lastKnownUpdate ?? expectedUpdatedAt ?? null;
     const clientUpdatedAt = (() => {
       if (!clientTimestamp) return null;
@@ -1487,6 +1603,24 @@ export default class LearnerDashboardService {
     }
     if (updatePayload.debriefAt !== undefined || metadataOverrides.debriefAt !== undefined) {
       metadata.debriefAt = updatePayload.debriefAt ?? metadataOverrides.debriefAt ?? null;
+    }
+    if (metadataOverrides.preferenceTags !== undefined) {
+      metadata.preferenceTags = Array.isArray(metadataOverrides.preferenceTags)
+        ? metadataOverrides.preferenceTags
+        : normaliseFieldServicePreferenceTags(metadataOverrides.preferenceTags);
+    }
+    if (metadataOverrides.upsellOffers !== undefined) {
+      metadata.upsellOffers = Array.isArray(metadataOverrides.upsellOffers)
+        ? metadataOverrides.upsellOffers
+        : normaliseFieldServiceUpsellOffers(metadataOverrides.upsellOffers);
+    }
+    if (metadataOverrides.reminders !== undefined) {
+      metadata.reminders = Array.isArray(metadataOverrides.reminders)
+        ? metadataOverrides.reminders
+        : normaliseFieldServiceReminderInputs(metadataOverrides.reminders);
+    }
+    if (metadataOverrides.followUpChannel !== undefined) {
+      metadata.followUpChannel = metadataOverrides.followUpChannel;
     }
 
     const providedFields = Object.entries(updatePayload)

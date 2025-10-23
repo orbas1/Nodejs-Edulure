@@ -25,6 +25,10 @@ import {
   closeFieldServiceAssignment
 } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { get, set } from 'idb-keyval';
+import StatusChip from '../../components/status/StatusChip.jsx';
+import ScheduleGrid from '../../components/schedule/ScheduleGrid.jsx';
+import registerFieldServicesWorker from '../../utils/registerFieldServicesWorker.js';
 
 const toneClasses = {
   success: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
@@ -44,26 +48,12 @@ const riskClasses = {
   default: 'bg-slate-50 text-slate-600 ring-slate-200'
 };
 
-const statusBadgeClasses = {
-  completed: 'bg-emerald-500/10 text-emerald-700 ring-emerald-200',
-  dispatched: 'bg-primary/10 text-primary-dark ring-primary/20',
-  en_route: 'bg-sky-100 text-sky-700 ring-sky-200',
-  on_site: 'bg-purple-100 text-purple-700 ring-purple-200',
-  investigating: 'bg-amber-50 text-amber-700 ring-amber-200',
-  cancelled: 'bg-slate-100 text-slate-600 ring-slate-200',
-  pending: 'bg-slate-100 text-slate-600 ring-slate-200'
-};
-
 function resolveToneClasses(tone) {
   return toneClasses[tone] ?? toneClasses.muted;
 }
 
 function resolveRiskClasses(riskLevel) {
   return riskClasses[riskLevel] ?? riskClasses.default;
-}
-
-function resolveStatusClasses(status) {
-  return statusBadgeClasses[status] ?? statusBadgeClasses.pending;
 }
 
 function formatDateTime(value) {
@@ -80,12 +70,46 @@ function formatDateTime(value) {
   }
 }
 
+function toDateTimeLocal(isoString) {
+  if (!isoString) {
+    return '';
+  }
+  try {
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+      date.getMinutes()
+    )}`;
+  } catch (error) {
+    return '';
+  }
+}
+
+function toIsoTimestamp(localValue) {
+  if (!localValue) {
+    return null;
+  }
+  try {
+    const date = new Date(localValue);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    return date.toISOString();
+  } catch (error) {
+    return null;
+  }
+}
+
 function hydrateAssignment(raw) {
   if (!raw || typeof raw !== 'object') {
     return null;
   }
 
   const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
+  const preferencesSource = raw.preferences && typeof raw.preferences === 'object' ? raw.preferences : {};
   const attachmentsSource = Array.isArray(raw.attachments)
     ? raw.attachments
     : Array.isArray(metadata.attachments)
@@ -104,6 +128,54 @@ function hydrateAssignment(raw) {
   const debriefAt = debriefAtValue instanceof Date ? debriefAtValue.toISOString() : debriefAtValue ?? null;
   const lastUpdate = raw.lastUpdate ?? raw.updatedAt ?? null;
   const owner = raw.owner ?? metadata.owner ?? null;
+  const preferences = {
+    tags: Array.isArray(preferencesSource.tags)
+      ? preferencesSource.tags
+      : Array.isArray(metadata.preferenceTags)
+        ? metadata.preferenceTags
+        : [],
+    followUpChannel: preferencesSource.followUpChannel ?? metadata.followUpChannel ?? null
+  };
+  const upsellOffers = (Array.isArray(raw.upsellOffers) ? raw.upsellOffers : metadata.upsellOffers ?? [])
+    .map((offer, index) => {
+      if (!offer) return null;
+      if (typeof offer === 'string') {
+        return { id: `${raw.id ?? 'assignment'}-upsell-${index}`, title: offer, cta: null, href: null };
+      }
+      if (typeof offer === 'object') {
+        return {
+          id: offer.id ?? `${raw.id ?? 'assignment'}-upsell-${index}`,
+          title: offer.title ?? offer.label ?? 'Follow-up',
+          cta: offer.cta ?? offer.action ?? null,
+          href: offer.href ?? offer.url ?? null
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+  const reminders = (Array.isArray(raw.reminders) ? raw.reminders : metadata.reminders ?? [])
+    .map((reminder, index) => {
+      if (!reminder) return null;
+      const sendAt = reminder.sendAt ?? reminder.send_at ?? null;
+      return {
+        id: reminder.id ?? `${raw.id ?? 'assignment'}-reminder-${index}`,
+        label: reminder.label ?? reminder.title ?? 'Reminder',
+        sendAt,
+        sendAtLabel: reminder.sendAtLabel ?? (sendAt ? formatDateTime(sendAt) : null),
+        status: reminder.status ?? 'scheduled'
+      };
+    })
+    .filter(Boolean);
+  const routePreviewSource = raw.routePreview ?? metadata.routePreview ?? null;
+  const routePreview =
+    routePreviewSource && typeof routePreviewSource === 'object'
+      ? {
+          distanceKm: routePreviewSource.distanceKm ?? null,
+          estimatedDurationMinutes: routePreviewSource.estimatedDurationMinutes ?? null,
+          summary: routePreviewSource.summary ?? null,
+          departureWindow: routePreviewSource.departureWindow ?? null
+        }
+      : null;
 
   return {
     ...raw,
@@ -119,7 +191,11 @@ function hydrateAssignment(raw) {
     scheduledAtRaw: scheduledRaw,
     scheduledAt: raw.scheduledAt ?? scheduledRaw,
     lastUpdate,
-    lastUpdateLabel: raw.lastUpdateLabel ?? (lastUpdate ? formatDateTime(lastUpdate) : null)
+    lastUpdateLabel: raw.lastUpdateLabel ?? (lastUpdate ? formatDateTime(lastUpdate) : null),
+    preferences,
+    upsellOffers,
+    reminders,
+    routePreview
   };
 }
 
@@ -157,6 +233,68 @@ function FieldServices() {
   const [assignmentPriorityFilter, setAssignmentPriorityFilter] = useState('all');
   const [operationsRange, setOperationsRange] = useState('30');
   const [conflictDialog, setConflictDialog] = useState(null);
+  const [offline, setOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [cachedWorkspace, setCachedWorkspace] = useState(null);
+  const [loadingCachedWorkspace, setLoadingCachedWorkspace] = useState(true);
+
+  useEffect(() => {
+    registerFieldServicesWorker();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const handleOnline = () => setOffline(false);
+    const handleOffline = () => setOffline(true);
+    setOffline(!navigator.onLine);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const stored = await get('edulure:field-services:workspace');
+        if (active && stored) {
+          setCachedWorkspace(stored);
+        }
+      } finally {
+        if (active) {
+          setLoadingCachedWorkspace(false);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!workspace) {
+      return;
+    }
+    const serialisable = {
+      ...workspace,
+      summary: workspace.summary ?? null,
+      assignments: Array.isArray(workspace.assignments) ? workspace.assignments : [],
+      timeline: Array.isArray(workspace.timeline) ? workspace.timeline : [],
+      incidents: Array.isArray(workspace.incidents) ? workspace.incidents : [],
+      providers: Array.isArray(workspace.providers) ? workspace.providers : [],
+      map: workspace.map ?? null,
+      lastUpdated: workspace.lastUpdated ?? null
+    };
+    setCachedWorkspace(serialisable);
+    set('edulure:field-services:workspace', serialisable).catch(() => {});
+  }, [workspace]);
+
+  const activeWorkspace = workspace ?? cachedWorkspace;
+  const usingCachedWorkspace = !workspace && Boolean(cachedWorkspace);
 
   const allowedRoles = useMemo(() => new Set(['learner', 'instructor']), []);
   if (!allowedRoles.has(role)) {
@@ -169,25 +307,72 @@ function FieldServices() {
     );
   }
 
-  if (!workspace) {
+  if (!activeWorkspace) {
+    const description = offline
+      ? 'You are offline. We are loading the last cached itineraries for your crews.'
+      : loadingCachedWorkspace
+        ? 'We are synchronising field service data. Refresh once operations syncs complete.'
+        : "We couldn't find any service assignments linked to your Learnspace. Refresh the dashboard once operations syncs complete.";
     return (
       <DashboardStateMessage
         title="Field service data not yet available"
-        description="We couldn't find any service assignments linked to your Learnspace. Refresh the dashboard once operations syncs complete."
-        actionLabel="Refresh"
-        onAction={() => refresh?.()}
+        description={description}
+        actionLabel={offline ? undefined : 'Refresh'}
+        onAction={offline ? undefined : () => refresh?.()}
       />
     );
   }
 
-  const summaryCards = workspace.summary?.cards ?? [];
+  const summaryCards = activeWorkspace.summary?.cards ?? [];
   const assignments = assignmentsState;
-  const incidents = workspace.incidents ?? [];
-  const timeline = workspace.timeline ?? [];
-  const providers = workspace.providers ?? [];
-  const mapView = workspace.map ?? null;
-  const lastUpdatedLabel = formatDateTime(workspace.summary?.updatedAt ?? workspace.lastUpdated);
+  const incidents = activeWorkspace.incidents ?? [];
+  const timeline = activeWorkspace.timeline ?? [];
+  const providers = activeWorkspace.providers ?? [];
+  const mapView = activeWorkspace.map ?? null;
+  const lastUpdatedLabel = formatDateTime(activeWorkspace.summary?.updatedAt ?? activeWorkspace.lastUpdated);
   const disableActions = pendingAction !== null;
+  const defaultLocationLabel = assignments.length
+    ? assignments[0]?.location?.label ?? assignments[0]?.customer?.name ?? 'Flexible coverage'
+    : 'Flexible coverage';
+  const scheduleSlots = useMemo(() => {
+    if (!Array.isArray(providers) || providers.length === 0) {
+      return [];
+    }
+    const now = new Date();
+    const slots = [];
+    providers.slice(0, 4).forEach((provider, providerIndex) => {
+      const startBase = new Date(now.getTime() + providerIndex * 60 * 60 * 1000);
+      const activeAssignments = Number(provider.metrics?.activeAssignments ?? 0);
+      const capacityBaseline = Math.max(0, 4 - activeAssignments);
+      const providerStatus = capacityBaseline <= 0
+        ? 'full'
+        : activeAssignments >= 3
+          ? 'busy'
+          : capacityBaseline <= 1
+            ? 'filling'
+            : 'available';
+      for (let offset = 0; offset < 2; offset += 1) {
+        const start = new Date(startBase.getTime() + offset * 2 * 60 * 60 * 1000);
+        const end = new Date(start.getTime() + 60 * 60 * 1000);
+        slots.push({
+          id: `${provider.id ?? provider.name ?? 'provider'}-${offset}`,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          provider: { id: provider.id, name: provider.name },
+          capacity: Math.max(0, capacityBaseline - offset),
+          location: provider.location?.label ?? defaultLocationLabel,
+          status: providerStatus,
+          notes:
+            provider.metrics?.averageEtaMinutes != null
+              ? `Avg ETA ${provider.metrics.averageEtaMinutes} min`
+              : undefined,
+          timezone: provider.location?.timezone ?? undefined
+        });
+      }
+    });
+    return slots.slice(0, 6);
+  }, [providers, defaultLocationLabel]);
+  const selectedScheduleIso = toIsoTimestamp(assignmentForm.scheduledFor);
 
   const filteredAssignments = useMemo(() => {
     const search = assignmentSearchTerm.trim().toLowerCase();
@@ -261,11 +446,15 @@ function FieldServices() {
   }, [assignmentsState, operationsRange]);
 
   useEffect(() => {
-    const assignments = Array.isArray(workspace.assignments)
-      ? workspace.assignments.map((assignment) => hydrateAssignment(assignment)).filter(Boolean)
+    if (!activeWorkspace) {
+      setAssignmentsState([]);
+      return;
+    }
+    const assignments = Array.isArray(activeWorkspace.assignments)
+      ? activeWorkspace.assignments.map((assignment) => hydrateAssignment(assignment)).filter(Boolean)
       : [];
     setAssignmentsState(assignments);
-  }, [workspace.assignments]);
+  }, [activeWorkspace]);
 
   const resetAssignmentForm = useCallback(() => {
     setAssignmentForm({
@@ -328,6 +517,23 @@ function FieldServices() {
   const handleAssignmentFormChange = useCallback((event) => {
     const { name, value } = event.target;
     setAssignmentForm((current) => ({ ...current, [name]: value }));
+  }, []);
+
+  const handleScheduleSlotSelect = useCallback((slot) => {
+    if (!slot) {
+      return;
+    }
+    const localValue = toDateTimeLocal(slot.start);
+    setAssignmentForm((current) => ({
+      ...current,
+      scheduledFor: localValue,
+      owner: current.owner ? current.owner : slot.provider?.name ?? current.owner,
+      location: current.location || slot.location || current.location
+    }));
+  }, []);
+
+  const handleScheduleSlotClear = useCallback(() => {
+    setAssignmentForm((current) => ({ ...current, scheduledFor: '' }));
   }, []);
 
   const handleAssignmentAttachmentChange = useCallback((index, value) => {
@@ -908,6 +1114,19 @@ function FieldServices() {
         </div>
       </div>
 
+      {offline ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+          {usingCachedWorkspace
+            ? `Offline mode — showing cached itineraries from ${lastUpdatedLabel}.`
+            : 'Offline mode — scheduling updates will sync once you reconnect.'}
+        </div>
+      ) : null}
+      {!offline && usingCachedWorkspace ? (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
+          Viewing cached field data captured at {lastUpdatedLabel}. Refresh to fetch live telemetry.
+        </div>
+      ) : null}
+
       <section className="dashboard-section">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1048,14 +1267,7 @@ function FieldServices() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={clsx(
-                            'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset',
-                            resolveStatusClasses(assignment.status)
-                          )}
-                        >
-                          <span>{assignment.statusLabel}</span>
-                        </span>
+                        <StatusChip status={assignment.status} label={assignment.statusLabel} size="sm" />
                         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           {assignment.priority}
                         </span>
@@ -1089,6 +1301,17 @@ function FieldServices() {
                         <div className="rounded-2xl border border-slate-200 bg-white/70 p-3 text-xs text-slate-600">
                           <p className="font-semibold text-slate-700">Field notes</p>
                           <p className="mt-1 leading-relaxed">{assignment.fieldNotes}</p>
+                        </div>
+                      ) : null}
+                      {assignment.routePreview ? (
+                        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-xs text-primary-dark">
+                          <p className="font-semibold text-primary">Route preview</p>
+                          <p className="mt-1">{assignment.routePreview.summary}</p>
+                          {assignment.routePreview.departureWindow ? (
+                            <p className="mt-1 text-[11px] uppercase tracking-wide text-primary/80">
+                              Depart after {assignment.routePreview.departureWindow}
+                            </p>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -1157,6 +1380,41 @@ function FieldServices() {
                           </div>
                         ) : null}
                       </div>
+                      {Array.isArray(assignment.reminders) && assignment.reminders.length ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-700">
+                          <p className="text-xs font-semibold uppercase tracking-wide">Automated reminders</p>
+                          <ul className="mt-2 space-y-1">
+                            {assignment.reminders.map((reminder) => (
+                              <li key={reminder.id} className="flex items-center justify-between gap-2">
+                                <span>{reminder.label}</span>
+                                <StatusChip
+                                  status={reminder.status ?? 'scheduled'}
+                                  label={reminder.sendAtLabel ?? formatDateTime(reminder.sendAt)}
+                                  tone="warning"
+                                  size="sm"
+                                />
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {Array.isArray(assignment.upsellOffers) && assignment.upsellOffers.length ? (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-700">
+                          <p className="text-xs font-semibold uppercase tracking-wide">Suggested follow-ups</p>
+                          <ul className="mt-2 space-y-1 text-emerald-800">
+                            {assignment.upsellOffers.map((offer) => (
+                              <li key={offer.id} className="flex items-center justify-between gap-2">
+                                <span className="font-semibold">{offer.title}</span>
+                                {offer.cta ? (
+                                  <a href={offer.href ?? '#'} className="text-emerald-700 hover:underline">
+                                    {offer.cta}
+                                  </a>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
@@ -1629,6 +1887,14 @@ function FieldServices() {
                       className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </label>
+                  <ScheduleGrid
+                    slots={scheduleSlots}
+                    value={selectedScheduleIso}
+                    onSelect={handleScheduleSlotSelect}
+                    onClear={handleScheduleSlotClear}
+                    title="Recommended deployment windows"
+                    hint="Blends tutor and live technician availability for optimal coverage."
+                  />
                   <label className="block text-sm font-medium text-slate-900">
                     Support channel (optional)
                     <input

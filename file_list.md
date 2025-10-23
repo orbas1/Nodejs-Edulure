@@ -845,7 +845,6 @@ This document lists all files in the repository, grouped by their top-level dire
 - `frontend-reactjs/src/components/dashboard/DashboardStateMessage.jsx`
 - `frontend-reactjs/src/components/dashboard/MetricCard.jsx`
 - `frontend-reactjs/src/components/dashboard/VerificationStatusCard.jsx`
-- `frontend-reactjs/src/components/FeatureGrid.jsx`
 - `frontend-reactjs/src/components/FeedCard.jsx`
 - `frontend-reactjs/src/components/FeedComposer.jsx`
 - `frontend-reactjs/src/components/FeedSponsoredCard.jsx`
@@ -876,9 +875,7 @@ This document lists all files in the repository, grouped by their top-level dire
 - `frontend-reactjs/src/components/SearchBar.jsx`
 - `frontend-reactjs/src/components/SkewedMenu.jsx`
 - `frontend-reactjs/src/components/SocialSignOn.jsx`
-- `frontend-reactjs/src/components/StatsBar.jsx`
 - `frontend-reactjs/src/components/status/ServiceHealthBanner.jsx`
-- `frontend-reactjs/src/components/Testimonials.jsx`
 - `frontend-reactjs/src/components/TopBar.jsx`
 - `frontend-reactjs/src/config/communityPolicy.js`
 - `frontend-reactjs/src/context/AuthContext.jsx`
