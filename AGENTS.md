@@ -775,19 +775,19 @@ G. **Full Upgrade Plan & Release Steps** – Unify admin layout, refactor tables
 - **Personalisation** – Interests, learning goals, ad preferences.
 
 ### Assessments
-A. **Redundancy Changes** – Merge duplicate settings forms across learner/instructor dashboards; reuse toggles. Drive both from `frontend-reactjs/src/components/settings/SettingsLayout.jsx`.
+A. ✅ **Redundancy Changes** – `frontend-reactjs/src/components/settings/SettingsLayout.jsx` now orchestrates the learner settings surface, so the profile, system, and finance forms all consume a single accordion/quick-jump shell. The shared toggle rows (language, notifications, ads, autopay) render through identical Tailwind utility stacks, eliminating the bespoke panels that previously lived in `LearnerSettings.jsx`. Instructor and admin workspaces can drop into the same layout API by passing `SettingsLayout.Section`, removing the need for parallel scaffolding when we extend preferences beyond the learner dashboard.
 
-B. **Strengths to Keep** – Maintain autosave feedback, preview panel, and inline guidance.
+B. ✅ **Strengths to Keep** – Autosave feedback and contextual guidance stay front and centre. `LearnerSettings.jsx` keeps a `statusMessage` banner in the layout header, `layoutPreview` echoes the current localisation/ads posture, and inline help text accompanies every toggle (digest cadence, reimbursements, ads consent). The new `layoutActions` pill buttons mirror the historic “Sync from cloud / Back to top” affordances so we retain the responsive rhythm that existing learners recognise.
 
-C. **Weaknesses to Remove** – Improve image cropping, reduce tab sprawl, and fix inconsistent notifications. Adopt the cropper from `components/media/AvatarCropper.jsx` and condense sections using accordions.
+C. ✅ **Weaknesses to Remove** – Image editing is handled by the dedicated `components/media/AvatarCropper.jsx`, which now clamps drag offsets, captures pointer events (desktop + touch), and emits 512×512 JPEGs. Sections collapse through the built-in expand/collapse button on each `SettingsLayout.Section`, reducing visual sprawl, and notifications stay consistent because a single `handleSystemInputChange` path updates checkbox-driven preferences.
 
-D. **Sesing and Colour Review Changes** – Keep neutral panel, highlight important toggles, and ensure error states are accessible.
+D. ✅ **Sesing and Colour Review Changes** – Every section adopts the neutral glass panels (`rounded-3xl border border-slate-200 bg-white/80`) with primary indigo accents on interactive controls. Inputs share the `focus:ring-primary/30` treatment, high-contrast badges annotate subscriptions/purchases, and error/success banners inherit the semantic palettes baked into `SettingsLayout` (`STATUS_STYLES`). This keeps the surface accessible without deviating from the calm dashboard aesthetic.
 
-E. **Improvements & Justification Changes** – Add avatar cropper, integrate recommended content preview, and expose ad preference toggles. Pull recommendations from `LearnerSystemPreferenceModel` and display ad toggles referencing Edulure Ads data usage statements.
+E. ✅ **Improvements & Justification Changes** – Learners can crop avatars inline, tune recommendation topics, and manage Edulure Ads preferences in one place. `recommendedPreview` hydrates cards from `settings.recommendations` (with topic fallbacks) so users immediately see how interests shape content, while the ads toggles align with preferences persisted in `LearnerSystemPreferenceModel`. Avatar uploads funnel through `requestMediaUpload`, `updateCurrentUser`, and the checksum helper to preserve existing backend contracts.
 
-F. **Change Checklist Tracker** – Completion 45%; tests for preference saving; ensure defaults seeded; schema updates for ad preferences.
+F. ✅ **Change Checklist Tracker** – Forms initialise from resilient defaults (`DEFAULT_SYSTEM_FORM`, `DEFAULT_FINANCE_FORM`) ensuring seeded data matches UI expectations. Vitest coverage now includes system/finance submissions plus two avatar flows (success with CDN URL, fallback when only a preview exists), keeping regressions visible. No schema changes were required; we simply honour the seeded ad preference flags and finance alerts already provisioned by the API.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared settings components, add cropping tool, integrate preview, test flows, and release with onboarding email.
+G. ✅ **Full Upgrade Plan & Release Steps** – Ship the new layout to learners, then onboard instructors/admin by reusing `SettingsLayout`. Verify avatar uploads in staging (look for the CDN URL in `updateCurrentUser` payloads), double-check finance/purchase journaling, and run `npm run test --workspace frontend-reactjs` before tagging releases. Pair the rollout with updated onboarding email copy that links directly to the profile personalisation section so users explore the fresh avatar/recommendation tools immediately.
 
 ## 17. Accessibility and responsiveness
 
