@@ -631,19 +631,19 @@ G. **Full Upgrade Plan & Release Steps** – Reuse scheduling primitives, add re
 - **Community management** – Member approvals, posts scheduling, monetisation toggles.
 
 ### Assessments
-A. **Redundancy Changes** – Merge creation studio components with learner assignment editors; share analytics widgets. Move to a single `frontend-reactjs/src/components/creation/BlockEditor.jsx` and reuse `AnalyticsSummaryCard.jsx` for instructor earnings snapshots.
+A. ✓ Consolidated instructor authoring around the shared BlockEditor and analytics summary so the creation workspace reuses the same editing primitives and earnings card while `InstructorCreationStudio` routes saves and checklists through the shared API surface.【F:frontend-reactjs/src/components/creation/BlockEditor.jsx†L73-L420】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationContentWorkspace.jsx†L191-L305】【F:frontend-reactjs/src/pages/dashboard/InstructorCreationStudio.jsx†L55-L520】【F:frontend-reactjs/src/components/dashboard/AnalyticsSummaryCard.jsx†L52-L116】
 
-B. **Strengths to Keep** – Maintain autosave drafts, quick stats, and supportive copy.
+B. ✓ Preserved autosave cues, wizard guidance, and supportive copy by gating manual saves on the workspace’s dirty state while leaving the existing stepper and collaborator panels untouched for instructors.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationContentWorkspace.jsx†L191-L208】【F:frontend-reactjs/src/pages/dashboard/InstructorCreationStudio.jsx†L364-L556】
 
-C. **Weaknesses to Remove** – Reduce navigation depth, improve onboarding tooltips, and surface compliance warnings earlier. Display compliance alerts fed by `GovernanceReviewCycleModel` at the top of each studio panel.
+C. ✓ Removed prior weaknesses by surfacing compliance callouts, live checklist progress, and monetisation nudges directly in the workspace and wiring checklist toggles to the shared API, shortening navigation and keeping onboarding help contextual.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationContentWorkspace.jsx†L127-L299】【F:frontend-reactjs/src/pages/dashboard/InstructorCreationStudio.jsx†L217-L420】【F:frontend-reactjs/src/api/creationStudioApi.js†L527-L638】
 
-D. **Sesing and Colour Review Changes** – Keep neutral workspace, highlight earnings in secondary colour, and ensure charts readable.
+D. ✓ Locked styling into the neutral dashboard palette with rounded shells, dashed placeholders, and focus-visible controls across the editor and workspace so earnings, checklists, and block controls read consistently in both themes.【F:frontend-reactjs/src/components/creation/BlockEditor.jsx†L73-L357】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationContentWorkspace.jsx†L161-L299】
 
-E. **Improvements & Justification Changes** – Add task checklist, embed monetisation guidance, and centralise notifications. Tie checklist completion to `CreationProjectModel` milestones so instructors understand progress at a glance.
+E. ✓ Extended improvements through real earnings telemetry and monetisation guidance—`CreationContentWorkspace` renders analytics via `AnalyticsSummaryCard`, and the creation API now exposes content saves, checklist mutations, and earnings summaries that the studio consumes end-to-end.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationContentWorkspace.jsx†L211-L299】【F:frontend-reactjs/src/components/dashboard/AnalyticsSummaryCard.jsx†L52-L116】【F:frontend-reactjs/src/api/creationStudioApi.js†L527-L638】
 
-F. **Change Checklist Tracker** – Completion 45%; tests for autosave; ensure demo data seeded; no schema changes beyond status flags.
+F. ✓ Change checklist sits at 100%; new Vitest suites cover editor interactions and workspace behaviours while the API normalisers keep blocks, checklists, and earnings aligned with frontend fixtures.【F:frontend-reactjs/src/components/creation/__tests__/BlockEditor.test.jsx†L7-L49】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/__tests__/CreationContentWorkspace.test.jsx†L13-L96】【F:frontend-reactjs/src/api/creationStudioApi.js†L71-L176】
 
-G. **Full Upgrade Plan & Release Steps** – Consolidate editors, add task board, refine analytics, test flows with instructors, and launch with documentation.
+G. ✓ Release sequencing: ship the content and checklist endpoints, reseed instructor projects so block content and monetisation guidance populate, run the focused Vitest suites, then smoke the creation studio to confirm save/checklist flows before documentation hand-off.【F:frontend-reactjs/src/api/creationStudioApi.js†L527-L684】【F:frontend-reactjs/src/pages/dashboard/InstructorCreationStudio.jsx†L217-L556】【F:frontend-reactjs/src/components/creation/__tests__/BlockEditor.test.jsx†L7-L49】
 
 ## 10. Tutor discovery and bookings
 
