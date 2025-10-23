@@ -1,5 +1,7 @@
 import PropTypes from 'prop-types';
 
+import AvatarCropper from '../media/AvatarCropper.jsx';
+
 function SocialLinkFields({ index, link, onChange, onRemove, disableRemove }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4">
@@ -163,17 +165,16 @@ export default function ProfileIdentityEditor({
             />
           </label>
         </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <label className="flex flex-col text-sm font-medium text-slate-700">
-            Avatar image URL
-            <input
-              type="url"
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <AvatarCropper
+              label="Avatar image"
+              helperText="Upload a square image or paste a URL and adjust the crop to keep your face centred. The cropped version powers your profile, feed posts, and community badges."
               value={form.avatarUrl ?? ''}
-              onChange={(event) => onFieldChange('avatarUrl', event.target.value)}
-              placeholder="https://"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              onChange={(nextValue) => onFieldChange('avatarUrl', nextValue)}
+              onReset={() => onFieldChange('avatarUrl', '')}
             />
-          </label>
+          </div>
           <label className="flex flex-col text-sm font-medium text-slate-700">
             Banner image URL
             <input

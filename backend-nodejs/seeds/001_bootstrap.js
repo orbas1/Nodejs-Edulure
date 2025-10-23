@@ -100,6 +100,11 @@ export async function seed(knex) {
     await trx('payment_ledger_entries').del();
     await trx('payment_refunds').del();
     await trx('payment_intents').del();
+    await trx('learner_finance_purchases').del();
+    await trx('learner_financial_profiles').del();
+    await trx('learner_payment_methods').del();
+    await trx('learner_billing_contacts').del();
+    await trx('learner_system_preferences').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flag_tenant_states').del();
     await trx('feature_flags').del();
@@ -241,6 +246,144 @@ export async function seed(knex) {
         location: 'Lisbon, PT',
         avatar_url: learnerAvatar.url,
         metadata: JSON.stringify({ role: 'learner', pronouns: 'she/her' })
+      }
+    ]);
+
+    const learnerRecommendationPreview = [
+      {
+        id: 'course-async-leadership',
+        title: 'Design async learning rituals',
+        category: 'Course',
+        descriptor: 'Course • 6 lessons',
+        imageUrl: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80'
+      },
+      {
+        id: 'community-cohort-kickoff',
+        title: 'Launch your next cohort with confidence',
+        category: 'Playbook',
+        descriptor: 'Guide • 12 steps',
+        imageUrl: 'https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=900&q=80'
+      },
+      {
+        id: 'ops-automation',
+        title: 'Automate learner check-ins',
+        category: 'Workflow',
+        descriptor: 'Automation • 4 rules',
+        imageUrl: 'https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?auto=format&fit=crop&w=900&q=80'
+      }
+    ];
+
+    await trx('learner_system_preferences').insert({
+      user_id: learnerId,
+      language: 'en',
+      region: 'US',
+      timezone: 'America/New_York',
+      notifications_enabled: true,
+      digest_enabled: true,
+      auto_play_media: false,
+      high_contrast: false,
+      reduced_motion: false,
+      preferences: JSON.stringify({
+        interfaceDensity: 'comfortable',
+        analyticsOptIn: true,
+        subtitleLanguage: 'en',
+        audioDescription: false,
+        adPersonalisation: true,
+        sponsoredHighlights: true,
+        adDataUsageAcknowledged: true,
+        recommendedTopics: ['community-building', 'learner-success', 'automation'],
+        recommendationPreview: learnerRecommendationPreview
+      })
+    });
+
+    const financeDocuments = [
+      {
+        name: 'W-9 tax form',
+        url: 'https://cdn.edulure.test/docs/seed-w9.pdf',
+        uploadedAt: new Date('2024-01-10T10:30:00Z').toISOString()
+      }
+    ];
+
+    await trx('learner_financial_profiles').insert({
+      user_id: learnerId,
+      auto_pay_enabled: true,
+      reserve_target_cents: 250000,
+      preferences: JSON.stringify({
+        currency: 'USD',
+        taxId: 'US-22-1234567',
+        invoiceDelivery: 'email',
+        payoutSchedule: 'monthly',
+        expensePolicyUrl: 'https://cdn.edulure.test/docs/expense-policy.pdf',
+        alerts: {
+          sendEmail: true,
+          sendSms: false,
+          escalationEmail: 'finance-alerts@edulure.test',
+          notifyThresholdPercent: 80
+        },
+        reimbursements: {
+          enabled: true,
+          instructions: 'Submit receipts within 30 days via the finance workspace.'
+        },
+        documents: financeDocuments
+      })
+    });
+
+    await trx('learner_payment_methods').insert([
+      {
+        user_id: learnerId,
+        label: 'Academy Visa',
+        brand: 'visa',
+        last4: '4242',
+        expiry: '12/26',
+        is_primary: true,
+        metadata: JSON.stringify({ provider: 'stripe', fingerprint: 'pm_card_visa' })
+      },
+      {
+        user_id: learnerId,
+        label: 'Innovation Mastercard',
+        brand: 'mastercard',
+        last4: '4444',
+        expiry: '08/27',
+        is_primary: false,
+        metadata: JSON.stringify({ provider: 'stripe', fingerprint: 'pm_card_mastercard' })
+      }
+    ]);
+
+    await trx('learner_billing_contacts').insert({
+      user_id: learnerId,
+      name: 'Edulure Finance Desk',
+      email: 'finance@edulure.test',
+      phone: '+1-415-555-0123',
+      company: 'Edulure Collective',
+      metadata: JSON.stringify({ preferredChannel: 'email', role: 'controller' })
+    });
+
+    await trx('learner_finance_purchases').insert([
+      {
+        user_id: learnerId,
+        reference: 'INV-100',
+        description: 'Growth Insiders Annual membership',
+        amount_cents: 205092,
+        currency: 'USD',
+        status: 'paid',
+        purchased_at: new Date('2024-01-12T14:45:00Z'),
+        metadata: JSON.stringify({
+          receiptUrl: 'https://cdn.edulure.test/receipts/inv-100.pdf',
+          memo: 'Annual membership including analytics add-on'
+        })
+      },
+      {
+        user_id: learnerId,
+        reference: 'INV-205',
+        description: 'Mentorship intensive stipend',
+        amount_cents: 89000,
+        currency: 'USD',
+        status: 'pending',
+        purchased_at: new Date('2024-02-05T09:15:00Z'),
+        metadata: JSON.stringify({
+          receiptUrl: 'https://cdn.edulure.test/receipts/inv-205.pdf',
+          memo: 'Awaiting mentor invoice reconciliation'
+        })
       }
     ]);
 

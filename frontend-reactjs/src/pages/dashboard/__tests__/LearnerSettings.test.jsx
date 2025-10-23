@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,7 +54,12 @@ describe('<LearnerSettings />', () => {
             interfaceDensity: 'comfortable',
             analyticsOptIn: true,
             subtitleLanguage: 'en',
-            audioDescription: false
+            audioDescription: false,
+            adPersonalisation: true,
+            sponsoredHighlights: true,
+            adDataUsageAcknowledged: false,
+            recommendedTopics: ['community-building'],
+            recommendationPreview: []
           }
         },
         finance: {
@@ -132,7 +137,12 @@ describe('<LearnerSettings />', () => {
           interfaceDensity: 'comfortable',
           analyticsOptIn: true,
           subtitleLanguage: 'en',
-          audioDescription: false
+          audioDescription: false,
+          adPersonalisation: true,
+          sponsoredHighlights: true,
+          adDataUsageAcknowledged: false,
+          recommendedTopics: ['community-building'],
+          recommendationPreview: []
         }
       }
     });
@@ -159,12 +169,17 @@ describe('<LearnerSettings />', () => {
     });
   });
 
-  it('renders learner settings with prefilled values', () => {
+  it('renders learner settings with prefilled values', async () => {
     render(<LearnerSettings />);
 
     expect(screen.getByRole('heading', { level: 1, name: /settings/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/^language$/i)).toHaveValue('en');
-    expect(screen.getByLabelText(/preferred currency/i)).toHaveValue('USD');
+
+    const viewer = userEvent.setup();
+    const financeAccordionToggle = screen.getByRole('button', { name: /finance settings/i });
+    await viewer.click(financeAccordionToggle);
+
+    expect(await screen.findByLabelText(/preferred currency/i)).toHaveValue('USD');
     expect(screen.getByRole('table')).toBeInTheDocument();
   });
 
@@ -187,15 +202,21 @@ describe('<LearnerSettings />', () => {
     const user = userEvent.setup();
     render(<LearnerSettings />);
 
-    const [openPurchaseModalButton] = screen.getAllByRole('button', { name: /log purchase/i });
+    await user.click(screen.getByRole('button', { name: /finance settings/i }));
+
+    const openPurchaseModalButton = screen.getByTestId('learner-finance-open-purchase');
     await user.click(openPurchaseModalButton);
-    await user.clear(screen.getByLabelText(/^reference$/i));
-    await user.type(screen.getByLabelText(/^reference$/i), 'INV-200');
-    await user.type(screen.getByLabelText(/^description$/i), 'Scholarships');
-    await user.clear(screen.getByLabelText(/^amount$/i));
-    await user.type(screen.getByLabelText(/^amount$/i), '2500');
-    const [, submitPurchaseButton] = screen.getAllByRole('button', { name: /log purchase/i });
-    await user.click(submitPurchaseButton);
+
+    const dialog = await screen.findByRole('dialog');
+    const dialogUtils = within(dialog);
+
+    await user.clear(dialogUtils.getByLabelText(/^reference$/i));
+    await user.type(dialogUtils.getByLabelText(/^reference$/i), 'INV-200');
+    await user.type(dialogUtils.getByLabelText(/^description$/i), 'Scholarships');
+    await user.clear(dialogUtils.getByLabelText(/^amount$/i));
+    await user.type(dialogUtils.getByLabelText(/^amount$/i), '2500');
+
+    await user.click(dialogUtils.getByRole('button', { name: /log purchase/i }));
 
     await waitFor(() => {
       expect(createFinancePurchaseMock).toHaveBeenCalledWith({
@@ -215,8 +236,12 @@ describe('<LearnerSettings />', () => {
     const user = userEvent.setup();
     render(<LearnerSettings />);
 
-    await user.clear(screen.getByLabelText(/reserve target/i));
-    await user.type(screen.getByLabelText(/reserve target/i), '600');
+    await user.click(screen.getByRole('button', { name: /finance settings/i }));
+
+    const reserveInput = await screen.findByLabelText(/reserve target/i);
+    await user.clear(reserveInput);
+    await user.type(reserveInput, '600');
+
     await user.click(screen.getByRole('checkbox', { name: /sms alerts/i }));
     await user.click(screen.getByRole('button', { name: /save finance settings/i }));
 
@@ -244,6 +269,6 @@ describe('<LearnerSettings />', () => {
 
     render(<LearnerSettings />);
 
-    expect(screen.getByText(/Learner Learnspace required/i)).toBeInTheDocument();
+    expect(screen.getByText(/Learner workspace required/i)).toBeInTheDocument();
   });
 });
