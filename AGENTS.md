@@ -753,19 +753,19 @@ G. **Full Upgrade Plan & Release Steps** – Consolidate moderation UI, add AI h
 - **Integrations hub** – API keys, webhooks, partner apps.
 
 ### Assessments
-A. **Redundancy Changes** – Merge similar tables across admin pages; share summary cards. Base all dashboards on `frontend-reactjs/src/layouts/AdminShell.jsx` and reuse summary cards defined in `AdminSummaryCard.jsx`.
+A. **Redundancy Changes** – `frontend-reactjs/src/pages/Admin.jsx` now threads every section through the shared `AdminShell` groups, and surfaces from bookings, calendar, courses, ebooks, growth, revenue-ops, ads, and revenue (`frontend-reactjs/src/pages/admin/sections/*.jsx`) all render their KPIs with `AdminSummaryCard`, eliminating bespoke grid/layout code across the console. ✓
 
-B. **Strengths to Keep** – Maintain crisp data density, export buttons, and contextual alerts.
+B. **Strengths to Keep** – Action affordances remain intact: `AdminRevenueSection` still exposes the export button and saved-view toggles, approvals continue to call `reviewVerificationCase`, and tools/operations panels surface runtime toggles, so high-signal KPIs, CSV exports, and deep links behave exactly as operators expect within the new shell. ✓
 
-C. **Weaknesses to Remove** – Reduce navigation complexity, add inline explanations, and improve empty states. Show inline helper text sourced from `AdminControlController` metadata and surface empty-state prompts tied to feature flags.
+C. **Weaknesses to Remove** – `NAVIGATION_STRUCTURE` in `Admin.jsx` regroups navigation into control, revenue, and integrations hubs, runtime-configured helper copy flows through `useRuntimeConfig`, and sections add explicit empty states (e.g. payment health fallback text, bookings placeholders) so sparse telemetry no longer strands operators without guidance. ✓
 
-D. **Sesing and Colour Review Changes** – Use neutral backgrounds, emphasise warnings, and keep charts accessible.
+D. **Sesing and Colour Review Changes** – `AdminShell` standardises slate backdrops, translucent white panels, and deterministic status badge tones while downstream cards reuse the same typography and spacing, keeping charts legible and contrast-compliant throughout the console. ✓
 
-E. **Improvements & Justification Changes** – Introduce task list, integrate help links, and support saved views. Render saved views from `ReportingPaymentsRevenueDailyView.js` queries and embed help links to the operations handbook stored in `docs/operations`.
+E. **Improvements & Justification Changes** – Revenue saved views run end-to-end: `/analytics/bi/revenue/saved-views` is registered in `analytics.routes.js`/`BusinessIntelligenceController`, the service aggregates Postgres reporting views from migration `20250301113000_reporting_views.js` via the `Reporting*` models, seeds in `backend-nodejs/seeds/001_bootstrap.js` populate courses/communities/payment intents so the views hydrate, and handbook links draw from `docs/operations/README.md`. ✓
 
-F. **Change Checklist Tracker** – Completion 50%; tests for permissions; ensure seed data for admin metrics; schema updates for saved views.
+F. **Change Checklist Tracker** – Completion 100%; unit and HTTP tests (`backend-nodejs/test/businessIntelligenceService.test.js`, `backend-nodejs/test/analyticsBiHttpRoutes.test.js`) cover the service and routes, reporting views align with the schema, seeds remain compatible with the models, and every admin section renders through `AdminShell` + `AdminSummaryCard` with no pending TODOs. ✓
 
-G. **Full Upgrade Plan & Release Steps** – Unify admin layout, refactor tables, add saved views, test RBAC, and deploy with admin documentation.
+G. **Full Upgrade Plan & Release Steps** – Run the reporting view migration, reseed via the backend workspace so saved views populate, smoke-test admin RBAC against `/analytics/bi/revenue/saved-views`, export finance-ready reports, and ship the console update alongside the operations handbook so operators understand the regrouped navigation. ✓
 
 ## 16. Settings, profiles, and personalisation
 

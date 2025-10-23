@@ -73,37 +73,73 @@ describe('BusinessIntelligenceService', () => {
       { communityId: 1, name: 'Global Cohort', posts: 24, comments: 120, publicPosts: 18, eventPosts: 3 }
     ]);
 
-    paymentsReportingModel.fetchDailySummaries.mockResolvedValue([
-      {
-        date: '2025-03-01',
-        currency: 'USD',
-        grossVolumeCents: 82000,
-        recognisedVolumeCents: 76000,
-        discountCents: 2000,
-        taxCents: 6000,
-        refundedCents: 3000,
-        totalIntents: 48,
-        succeededIntents: 42
-      }
-    ]);
+    paymentsReportingModel.fetchDailySummaries
+      .mockResolvedValueOnce([
+        {
+          date: '2025-03-01',
+          currency: 'USD',
+          grossVolumeCents: 82000,
+          recognisedVolumeCents: 76000,
+          discountCents: 2000,
+          taxCents: 6000,
+          refundedCents: 3000,
+          totalIntents: 48,
+          succeededIntents: 42
+        },
+        {
+          date: '2025-03-01',
+          currency: 'EUR',
+          grossVolumeCents: 54000,
+          recognisedVolumeCents: 50000,
+          discountCents: 1500,
+          taxCents: 4000,
+          refundedCents: 2000,
+          totalIntents: 30,
+          succeededIntents: 26
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          date: '2025-02-24',
+          currency: 'USD',
+          grossVolumeCents: 65000,
+          recognisedVolumeCents: 60000,
+          discountCents: 2500,
+          taxCents: 4500,
+          refundedCents: 2000,
+          totalIntents: 38,
+          succeededIntents: 33
+        },
+        {
+          date: '2025-02-24',
+          currency: 'EUR',
+          grossVolumeCents: 40000,
+          recognisedVolumeCents: 36000,
+          discountCents: 1200,
+          taxCents: 3200,
+          refundedCents: 1500,
+          totalIntents: 24,
+          succeededIntents: 20
+        }
+      ]);
     paymentsReportingModel.fetchTotals
       .mockResolvedValueOnce({
-        grossVolumeCents: 220000,
-        recognisedVolumeCents: 205000,
-        discountCents: 7000,
-        taxCents: 12500,
-        refundedCents: 9000,
-        totalIntents: 150,
-        succeededIntents: 136
+        grossVolumeCents: 136000,
+        recognisedVolumeCents: 126000,
+        discountCents: 3500,
+        taxCents: 10000,
+        refundedCents: 5000,
+        totalIntents: 78,
+        succeededIntents: 68
       })
       .mockResolvedValueOnce({
-        grossVolumeCents: 180000,
-        recognisedVolumeCents: 168000,
-        discountCents: 6000,
-        taxCents: 11200,
-        refundedCents: 6000,
-        totalIntents: 132,
-        succeededIntents: 120
+        grossVolumeCents: 105000,
+        recognisedVolumeCents: 96000,
+        discountCents: 3700,
+        taxCents: 7700,
+        refundedCents: 3500,
+        totalIntents: 62,
+        succeededIntents: 53
       });
 
     featureFlagModel.allWithOverrides.mockResolvedValue([
@@ -156,8 +192,8 @@ describe('BusinessIntelligenceService', () => {
     expect(overview.timeframe.range).toBe('7d');
     expect(overview.scorecard.enrollments.total).toBe(120);
     expect(overview.scorecard.enrollments.change.absolute).toBe(30);
-    expect(overview.scorecard.netRevenue.cents).toBe(196000);
-    expect(overview.scorecard.netRevenue.change.absolute).toBe(32000);
+    expect(overview.scorecard.netRevenue.cents).toBe(121000);
+    expect(overview.scorecard.netRevenue.change.absolute).toBe(27750);
     expect(overview.scorecard.communityEngagement.posts.total).toBe(60);
     expect(overview.scorecard.communityEngagement.posts.change.absolute).toBe(12);
     expect(overview.revenueByCurrency[0].currency).toBe('USD');
@@ -165,6 +201,36 @@ describe('BusinessIntelligenceService', () => {
     expect(overview.experiments[0]).toMatchObject({ experimentId: 'exp-123', status: 'active' });
     expect(overview.dataQuality.status).toBe('warning');
     expect(overview.dataQuality.pipelines).toHaveLength(2);
+  });
+
+  it('returns saved revenue views aggregated by currency and range', async () => {
+    const savedViews = await service.getRevenueSavedViews({ range: '30d', tenantId: 'tenant-ops' });
+
+    expect(savedViews.tenantId).toBe('tenant-ops');
+    expect(savedViews.range).toBe('30d');
+    expect(savedViews.views).toHaveLength(3);
+
+    const overall = savedViews.views.find((view) => view.id === 'overall-30d');
+    expect(overall).toBeDefined();
+    expect(overall.totals.grossVolumeCents).toBe(136000);
+    expect(overall.change.grossVolume.absolute).toBe(31000);
+    expect(overall.breakdown.currencies).toHaveLength(2);
+
+    const usdView = savedViews.views.find((view) => view.id.startsWith('currency-usd'));
+    expect(usdView).toBeDefined();
+    expect(usdView.currency).toBe('USD');
+    expect(usdView.totals.grossVolumeCents).toBe(82000);
+    expect(usdView.change.grossVolume.absolute).toBe(17000);
+    expect(usdView.change.recognisedVolume.absolute).toBe(16000);
+    expect(usdView.intents.totalIntents).toBe(48);
+
+    const usdBreakdown = usdView.breakdown.currencies[0];
+    expect(usdBreakdown.share).toBeCloseTo(60.29, 2);
+
+    const eurView = savedViews.views.find((view) => view.id.startsWith('currency-eur'));
+    expect(eurView.totals.grossVolumeCents).toBe(54000);
+    expect(eurView.change.grossVolume.absolute).toBe(14000);
+    expect(eurView.intents.succeededIntents).toBe(26);
   });
 
   afterEach(() => {

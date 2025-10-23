@@ -32,3 +32,15 @@ export async function recordExplorerInteraction(payload, { token } = {}) {
   }
   return httpClient.post('/analytics/explorer/interactions', payload, { token });
 }
+
+export async function fetchRevenueSavedViews({ range = '30d', token, signal } = {}) {
+  assertToken(token, 'load revenue saved views');
+  return httpClient.get('/analytics/bi/revenue/saved-views', {
+    params: { range },
+    token,
+    signal,
+    cache: createListCacheConfig(`analytics:bi:revenue:saved-views:${range}`, {
+      ttl: 60_000
+    })
+  });
+}
