@@ -1,15 +1,15 @@
 import Joi from 'joi';
 
-import {
-  setupOrchestratorService,
-  DEFAULT_SETUP_TASK_SEQUENCE
-} from '../services/SetupOrchestratorService.js';
+import { setupOrchestratorService } from '../services/SetupOrchestratorService.js';
 import { success } from '../utils/httpResponse.js';
 
 const startSchema = Joi.object({
   tasks: Joi.array()
     .items(Joi.string().valid(...setupOrchestratorService.listTaskIds()))
     .min(1)
+    .optional(),
+  preset: Joi.string()
+    .valid(...setupOrchestratorService.listPresetIds())
     .optional(),
   envConfig: Joi.object({
     backend: Joi.object().pattern(/^[A-Z0-9_]+$/, Joi.string().allow('', null)).optional(),
@@ -20,18 +20,21 @@ const startSchema = Joi.object({
 });
 
 export default class SetupController {
+  static buildSnapshot() {
+    return {
+      state: setupOrchestratorService.getStatus(),
+      tasks: setupOrchestratorService.describeTasks(),
+      presets: setupOrchestratorService.describePresets(),
+      defaults: setupOrchestratorService.describeDefaults(),
+      history: setupOrchestratorService.getRecentRuns()
+    };
+  }
+
   static async getStatus(_req, res) {
-    const state = setupOrchestratorService.getStatus();
     return success(res, {
       status: 200,
       message: 'Setup status retrieved',
-      data: {
-        state,
-        tasks: setupOrchestratorService.describeTasks(),
-        defaults: {
-          sequence: DEFAULT_SETUP_TASK_SEQUENCE
-        }
-      }
+      data: SetupController.buildSnapshot()
     });
   }
 
@@ -52,6 +55,42 @@ export default class SetupController {
         error.details = error.details.map((detail) => detail.message);
       }
       return next(error);
+    }
+  }
+
+  static streamEvents(req, res, next) {
+    try {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders?.();
+
+      const sendSnapshot = () => {
+        const snapshot = SetupController.buildSnapshot();
+        res.write(`event: state\n`);
+        res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+      };
+
+      sendSnapshot();
+
+      const listener = () => {
+        sendSnapshot();
+      };
+
+      const heartbeat = setInterval(() => {
+        res.write(`event: heartbeat\n`);
+        res.write(`data: "${new Date().toISOString()}"\n\n`);
+      }, 15_000);
+
+      setupOrchestratorService.on('state', listener);
+
+      req.on('close', () => {
+        clearInterval(heartbeat);
+        setupOrchestratorService.off('state', listener);
+        res.end();
+      });
+    } catch (error) {
+      next(error);
     }
   }
 }

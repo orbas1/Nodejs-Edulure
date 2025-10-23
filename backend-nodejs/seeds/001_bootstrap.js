@@ -148,6 +148,8 @@ export async function seed(knex) {
     await trx('telemetry_consent_ledger').del();
     await trx('release_gate_results').del();
     await trx('release_runs').del();
+    await trx('setup_run_tasks').del();
+    await trx('setup_runs').del();
     await trx('release_checklist_items').del();
     await trx('domain_event_dispatch_queue').del();
     await trx('domain_events').del();
@@ -4870,6 +4872,86 @@ export async function seed(knex) {
         notes: 'Change advisory board met, awaiting CAB minutes upload.',
         evidence_url: 'https://change.edulure.com/tickets/CHG-2048',
         last_evaluated_at: trx.fn.now()
+      }
+    ]);
+
+    const setupRunPublicId = crypto.randomUUID();
+    const setupRunMetadata = {
+      taskOrder: ['environment', 'database', 'search', 'backend', 'frontend'],
+      preset: 'lite'
+    };
+
+    await trx('setup_runs').insert({
+      public_id: setupRunPublicId,
+      preset_id: 'lite',
+      status: 'succeeded',
+      started_at: new Date('2025-04-18T08:45:00Z'),
+      completed_at: new Date('2025-04-18T08:53:45Z'),
+      heartbeat_at: new Date('2025-04-18T08:53:45Z'),
+      last_error: null,
+      metadata: JSON.stringify(setupRunMetadata)
+    });
+
+    const setupRunRow = await trx('setup_runs')
+      .select('id')
+      .where({ public_id: setupRunPublicId })
+      .first();
+
+    await trx('setup_run_tasks').insert([
+      {
+        run_id: setupRunRow.id,
+        task_id: 'environment',
+        label: 'Write environment configuration',
+        order_index: 0,
+        status: 'succeeded',
+        logs: JSON.stringify(['Wrote backend-nodejs/.env.local', 'Wrote frontend-reactjs/.env.local']),
+        error: JSON.stringify({}),
+        started_at: new Date('2025-04-18T08:45:00Z'),
+        completed_at: new Date('2025-04-18T08:45:05Z')
+      },
+      {
+        run_id: setupRunRow.id,
+        task_id: 'database',
+        label: 'Install database schema',
+        order_index: 1,
+        status: 'succeeded',
+        logs: JSON.stringify(['Ran db:install and applied all migrations', 'Seeded baseline data set']),
+        error: JSON.stringify({}),
+        started_at: new Date('2025-04-18T08:45:05Z'),
+        completed_at: new Date('2025-04-18T08:48:12Z')
+      },
+      {
+        run_id: setupRunRow.id,
+        task_id: 'search',
+        label: 'Provision search cluster',
+        order_index: 2,
+        status: 'succeeded',
+        logs: JSON.stringify(['Provisioned local Meilisearch instance with lite indexes']),
+        error: JSON.stringify({}),
+        started_at: new Date('2025-04-18T08:48:12Z'),
+        completed_at: new Date('2025-04-18T08:49:30Z')
+      },
+      {
+        run_id: setupRunRow.id,
+        task_id: 'backend',
+        label: 'Validate backend build',
+        order_index: 3,
+        status: 'succeeded',
+        logs: JSON.stringify(['npm run lint --workspace backend-nodejs passed with 0 warnings']),
+        error: JSON.stringify({}),
+        started_at: new Date('2025-04-18T08:49:30Z'),
+        completed_at: new Date('2025-04-18T08:51:10Z')
+      },
+      {
+        run_id: setupRunRow.id,
+        task_id: 'frontend',
+        label: 'Build frontend assets',
+        order_index: 4,
+        status: 'succeeded',
+        logs: JSON.stringify(['Built frontend-reactjs assets using Vite']),
+        error: JSON.stringify({}),
+        started_at: new Date('2025-04-18T08:51:10Z'),
+        completed_at: new Date('2025-04-18T08:53:45Z')
       }
     ]);
 
