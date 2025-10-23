@@ -28,6 +28,14 @@ vi.mock('../src/utils/httpResponse.js', () => {
 vi.mock('../src/config/env.js', () => ({
   __esModule: true,
   env: {
+    logging: { serviceName: 'test-suite' },
+    observability: {
+      metrics: {
+        enabled: false,
+        allowedIps: [],
+        pushGateway: { url: null, auth: null }
+      }
+    },
     directMessages: {
       threads: { maxPageSize: 50, defaultPageSize: 20 },
       messages: { maxPageSize: 100, defaultPageSize: 30 }
@@ -35,7 +43,7 @@ vi.mock('../src/config/env.js', () => ({
   }
 }));
 
-const complianceServiceMock = {
+const complianceServiceMock = vi.hoisted(() => ({
   listDsrRequests: vi.fn(),
   assignDsrRequest: vi.fn(),
   updateDsrStatus: vi.fn(),
@@ -43,7 +51,7 @@ const complianceServiceMock = {
   createConsentRecord: vi.fn(),
   revokeConsent: vi.fn(),
   fetchPolicyTimeline: vi.fn()
-};
+}));
 
 vi.mock('../src/services/ComplianceService.js', () => ({
   __esModule: true,
@@ -187,7 +195,8 @@ vi.mock('../src/services/EnvironmentParityService.js', () => ({
 
 const explorerSearchServiceMock = {
   getSupportedEntities: vi.fn(() => ['course', 'community']),
-  search: vi.fn()
+  search: vi.fn(),
+  suggest: vi.fn()
 };
 
 vi.mock('../src/services/ExplorerSearchService.js', () => ({
@@ -677,6 +686,35 @@ describe('ExplorerController', () => {
     const res = createRes();
 
     await ExplorerController.search(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    const error = next.mock.calls.at(-1)[0];
+    expect(error.status).toBe(422);
+  });
+
+  it('returns suggestions for trimmed query input', async () => {
+    explorerSearchServiceMock.suggest.mockResolvedValue({ query: 'design', items: [{ id: 'course-1' }] });
+    const req = createRequest({ query: { query: '  design ', limit: '5', entityTypes: ['course'] } });
+    const res = createRes();
+
+    await ExplorerController.suggest(req, res, next);
+
+    expect(explorerSearchServiceMock.suggest).toHaveBeenCalledWith({
+      query: 'design',
+      entityTypes: ['course'],
+      limit: 5
+    });
+    expect(success).toHaveBeenCalledWith(
+      res,
+      expect.objectContaining({ message: 'Search suggestions generated' })
+    );
+  });
+
+  it('enforces suggestion validation rules', async () => {
+    const req = createRequest({ query: { query: '' } });
+    const res = createRes();
+
+    await ExplorerController.suggest(req, res, next);
 
     expect(next).toHaveBeenCalled();
     const error = next.mock.calls.at(-1)[0];

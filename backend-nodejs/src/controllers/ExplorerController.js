@@ -48,6 +48,17 @@ const updateSavedSearchSchema = Joi.object({
   lastUsedAt: Joi.date()
 }).min(1);
 
+const suggestionSchema = Joi.object({
+  query: Joi.string().trim().min(1).required(),
+  entityTypes: Joi.alternatives()
+    .try(
+      Joi.array().items(Joi.string().valid(...SUPPORTED_ENTITIES)).min(1),
+      Joi.string().valid(...SUPPORTED_ENTITIES)
+    )
+    .optional(),
+  limit: Joi.number().integer().min(1).max(25).default(8)
+});
+
 export default class ExplorerController {
   static async search(req, res, next) {
     try {
@@ -198,6 +209,38 @@ export default class ExplorerController {
         message: 'Saved search deleted'
       });
     } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async suggest(req, res, next) {
+    try {
+      const payload = await suggestionSchema.validateAsync(req.query, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const entityTypes = Array.isArray(payload.entityTypes)
+        ? payload.entityTypes
+        : payload.entityTypes
+          ? [payload.entityTypes]
+          : undefined;
+
+      const suggestions = await explorerSearchService.suggest({
+        query: payload.query,
+        entityTypes,
+        limit: payload.limit
+      });
+
+      return success(res, {
+        data: suggestions,
+        message: 'Search suggestions generated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
       return next(error);
     }
   }
