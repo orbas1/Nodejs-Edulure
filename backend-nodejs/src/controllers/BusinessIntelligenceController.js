@@ -9,6 +9,12 @@ const overviewSchema = z.object({
     .default('30d')
 });
 
+const revenueSavedViewsSchema = z.object({
+  range: z
+    .enum(['7d', '30d', '90d'])
+    .default('30d')
+});
+
 function resolveTenantId(req) {
   if (req.headers['x-tenant-id']) {
     return String(req.headers['x-tenant-id']).trim();
@@ -28,6 +34,20 @@ export default class BusinessIntelligenceController {
       return success(res, {
         data: overview,
         message: 'Executive analytics overview generated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async getRevenueSavedViews(req, res, next) {
+    try {
+      const { range } = await revenueSavedViewsSchema.parseAsync(req.query ?? {});
+      const tenantId = resolveTenantId(req);
+      const savedViews = await businessIntelligenceService.getRevenueSavedViews({ range, tenantId });
+      return success(res, {
+        data: savedViews,
+        message: 'Revenue saved views generated'
       });
     } catch (error) {
       return next(error);

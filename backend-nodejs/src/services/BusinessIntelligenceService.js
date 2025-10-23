@@ -371,6 +371,194 @@ export class BusinessIntelligenceService {
       dataQuality
     };
   }
+
+  async getRevenueSavedViews({ range = '30d', tenantId = 'global' } = {}) {
+    const { start, end, previousStart, previousEnd } = this.resolveRange(range);
+
+    const emptyTotals = {
+      grossVolumeCents: 0,
+      recognisedVolumeCents: 0,
+      discountCents: 0,
+      taxCents: 0,
+      refundedCents: 0,
+      totalIntents: 0,
+      succeededIntents: 0
+    };
+
+    const [
+      currentDaily,
+      previousDaily,
+      currentTotalsRaw,
+      previousTotalsRaw
+    ] = await Promise.all([
+      this.safeCall(
+        () => this.paymentsReportingModel.fetchDailySummaries({ start, end }),
+        [],
+        'Failed to load revenue daily summaries for saved views'
+      ),
+      this.safeCall(
+        () => this.paymentsReportingModel.fetchDailySummaries({ start: previousStart, end: previousEnd }),
+        [],
+        'Failed to load historical revenue daily summaries for saved views'
+      ),
+      this.safeCall(
+        () => this.paymentsReportingModel.fetchTotals({ start, end }),
+        emptyTotals,
+        'Failed to load revenue totals for saved views'
+      ),
+      this.safeCall(
+        () => this.paymentsReportingModel.fetchTotals({ start: previousStart, end: previousEnd }),
+        emptyTotals,
+        'Failed to load historical revenue totals for saved views'
+      )
+    ]);
+
+    const currentTotals = normaliseTotals(currentTotalsRaw);
+    const previousTotals = normaliseTotals(previousTotalsRaw);
+
+    const currentBreakdown = resolveCurrencyBreakdown(currentDaily);
+    const previousBreakdown = resolveCurrencyBreakdown(previousDaily);
+    const previousByCurrency = new Map(previousBreakdown.map((entry) => [entry.currency, entry]));
+
+    const breakdownWithShare = buildCurrencyShare(
+      currentBreakdown,
+      currentTotals.grossVolumeCents
+    );
+
+    const views = [];
+
+    views.push({
+      id: `overall-${range}`,
+      title: 'All revenue',
+      tenantId,
+      currency:
+        breakdownWithShare.length === 1 ? breakdownWithShare[0].currency : 'MULTI',
+      totals: currentTotals,
+      change: {
+        grossVolume: buildDelta(currentTotals.grossVolumeCents, previousTotals.grossVolumeCents),
+        recognisedVolume: buildDelta(
+          currentTotals.recognisedVolumeCents,
+          previousTotals.recognisedVolumeCents
+        )
+      },
+      breakdown: {
+        currencies: breakdownWithShare.map((entry) => ({
+          currency: entry.currency,
+          grossVolumeCents: entry.grossVolumeCents,
+          recognisedVolumeCents: entry.recognisedVolumeCents,
+          discountCents: entry.discountCents,
+          taxCents: entry.taxCents,
+          refundedCents: entry.refundedCents,
+          totalIntents: entry.totalIntents,
+          succeededIntents: entry.succeededIntents,
+          share: entry.share
+        }))
+      },
+      intents: {
+        totalIntents: currentTotals.totalIntents,
+        succeededIntents: currentTotals.succeededIntents
+      },
+      timeframe: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        comparisonStart: previousStart.toISOString(),
+        comparisonEnd: previousEnd.toISOString(),
+        range
+      }
+    });
+
+    currentBreakdown.forEach((entry) => {
+      const previousEntry = previousByCurrency.get(entry.currency) ?? {
+        grossVolumeCents: 0,
+        recognisedVolumeCents: 0,
+        discountCents: 0,
+        refundedCents: 0,
+        totalIntents: 0,
+        succeededIntents: 0
+      };
+
+      views.push({
+        id: `currency-${entry.currency?.toLowerCase?.() ?? 'unknown'}-${range}`,
+        title: `${entry.currency ?? 'Unknown'} revenue`,
+        tenantId,
+        currency: entry.currency ?? 'USD',
+        totals: {
+          grossVolumeCents: Number(entry.grossVolumeCents ?? 0),
+          recognisedVolumeCents: Number(entry.recognisedVolumeCents ?? 0),
+          discountCents: Number(entry.discountCents ?? 0),
+          taxCents: Number(entry.taxCents ?? 0),
+          refundedCents: Number(entry.refundedCents ?? 0),
+          totalIntents: Number(entry.totalIntents ?? 0),
+          succeededIntents: Number(entry.succeededIntents ?? 0)
+        },
+        change: {
+          grossVolume: buildDelta(
+            Number(entry.grossVolumeCents ?? 0),
+            Number(previousEntry.grossVolumeCents ?? 0)
+          ),
+          recognisedVolume: buildDelta(
+            Number(entry.recognisedVolumeCents ?? 0),
+            Number(previousEntry.recognisedVolumeCents ?? 0)
+          )
+        },
+        breakdown: {
+          currencies: [
+            {
+              currency: entry.currency ?? 'USD',
+              grossVolumeCents: Number(entry.grossVolumeCents ?? 0),
+              recognisedVolumeCents: Number(entry.recognisedVolumeCents ?? 0),
+              discountCents: Number(entry.discountCents ?? 0),
+              taxCents: Number(entry.taxCents ?? 0),
+              refundedCents: Number(entry.refundedCents ?? 0),
+              totalIntents: Number(entry.totalIntents ?? 0),
+              succeededIntents: Number(entry.succeededIntents ?? 0),
+              share: 100
+            }
+          ]
+        },
+        intents: {
+          totalIntents: Number(entry.totalIntents ?? 0),
+          succeededIntents: Number(entry.succeededIntents ?? 0)
+        },
+        timeframe: {
+          start: start.toISOString(),
+          end: end.toISOString(),
+          comparisonStart: previousStart.toISOString(),
+          comparisonEnd: previousEnd.toISOString(),
+          range
+        }
+      });
+    });
+
+    return {
+      tenantId,
+      range,
+      views
+    };
+  }
+}
+
+function normaliseTotals(totals = {}) {
+  return {
+    grossVolumeCents: Number(totals.grossVolumeCents ?? 0),
+    recognisedVolumeCents: Number(totals.recognisedVolumeCents ?? 0),
+    discountCents: Number(totals.discountCents ?? 0),
+    taxCents: Number(totals.taxCents ?? 0),
+    refundedCents: Number(totals.refundedCents ?? 0),
+    totalIntents: Number(totals.totalIntents ?? 0),
+    succeededIntents: Number(totals.succeededIntents ?? 0)
+  };
+}
+
+function buildCurrencyShare(entries = [], grandTotal) {
+  const total = Number.isFinite(grandTotal) && grandTotal > 0
+    ? grandTotal
+    : entries.reduce((acc, entry) => acc + Number(entry.grossVolumeCents ?? 0), 0);
+
+  return entries.map((entry) => ({
+    ...entry,
+    share: total > 0 ? Number(((Number(entry.grossVolumeCents ?? 0) / total) * 100).toFixed(2)) : 0
+  }));
 }
 
 const businessIntelligenceService = new BusinessIntelligenceService();

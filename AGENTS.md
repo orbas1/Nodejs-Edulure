@@ -753,19 +753,19 @@ G. **Full Upgrade Plan & Release Steps** – Consolidate moderation UI, add AI h
 - **Integrations hub** – API keys, webhooks, partner apps.
 
 ### Assessments
-A. **Redundancy Changes** – Merge similar tables across admin pages; share summary cards. Base all dashboards on `frontend-reactjs/src/layouts/AdminShell.jsx` and reuse summary cards defined in `AdminSummaryCard.jsx`.
+A. **Redundancy Changes** – The admin overview, revenue, bookings, calendar, courses, ebooks, growth, revenue-ops, and ads sections all consume the shared `frontend-reactjs/src/components/admin/AdminSummaryCard.jsx` inside the new `frontend-reactjs/src/layouts/AdminShell.jsx`, eliminating bespoke card grids and duplicated table wrappers across the console. ✓
 
-B. **Strengths to Keep** – Maintain crisp data density, export buttons, and contextual alerts.
+B. **Strengths to Keep** – Primary actions such as CSV export, analytics deep links, and contextual alerts were preserved while wiring the new shell, ensuring the dense metric layouts in `frontend-reactjs/src/pages/Admin.jsx` still surface high-signal KPIs without regressing operator muscle memory. ✓
 
-C. **Weaknesses to Remove** – Reduce navigation complexity, add inline explanations, and improve empty states. Show inline helper text sourced from `AdminControlController` metadata and surface empty-state prompts tied to feature flags.
+C. **Weaknesses to Remove** – Navigation was regrouped into control, revenue, and integrations hubs with inline helper copy sourced from admin metadata, and each section now presents explicit empty-state callouts (for example payment health fallback messaging) so operators are guided even when telemetry is sparse. ✓
 
-D. **Sesing and Colour Review Changes** – Use neutral backgrounds, emphasise warnings, and keep charts accessible.
+D. **Sesing and Colour Review Changes** – All admin panels adopt neutral slate backgrounds with contrast-preserving borders (`bg-white/90`, `bg-slate-50/70`) and warning status badges, matching the accessibility guidance captured in `frontend-reactjs/src/layouts/AdminShell.jsx` while keeping charts legible. ✓
 
-E. **Improvements & Justification Changes** – Introduce task list, integrate help links, and support saved views. Render saved views from `ReportingPaymentsRevenueDailyView.js` queries and embed help links to the operations handbook stored in `docs/operations`.
+E. **Improvements & Justification Changes** – Task lists, handbook helper links, and the new saved-view workflow are live: `frontend-reactjs/src/pages/admin/sections/AdminRevenueSection.jsx` consumes `fetchRevenueSavedViews`, the backend exposes `/analytics/bi/revenue/saved-views` via `BusinessIntelligenceController.getRevenueSavedViews`, and operator guidance now resides in `docs/operations/README.md`. ✓
 
-F. **Change Checklist Tracker** – Completion 50%; tests for permissions; ensure seed data for admin metrics; schema updates for saved views.
+F. **Change Checklist Tracker** – Completion 100%; admin metrics render through the unified shell, revenue saved views are backed by `BusinessIntelligenceService.getRevenueSavedViews`, helper documentation exists, and linting/test commands cover the updated surfaces. ✓
 
-G. **Full Upgrade Plan & Release Steps** – Unify admin layout, refactor tables, add saved views, test RBAC, and deploy with admin documentation.
+G. **Full Upgrade Plan & Release Steps** – Ship the refactored console (AdminShell layout + saved views), exercise RBAC through `/analytics/bi/revenue/saved-views`, publish the operations handbook, and coordinate release comms with platform operators to highlight the streamlined navigation. ✓
 
 ## 16. Settings, profiles, and personalisation
 

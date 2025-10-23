@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 
+import AdminSummaryCard from '../../../components/admin/AdminSummaryCard.jsx';
 import AdminCrudResource from '../../../components/dashboard/admin/AdminCrudResource.jsx';
 import adminAdsApi from '../../../api/adminAdsApi.js';
 import { formatCurrency } from '../../dashboard/admin/adminControlConfig.jsx';
@@ -288,26 +289,6 @@ const campaignColumns = [
   }
 ];
 
-function SummaryCard({ label, value, helper }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-slate-900">{value}</p>
-      {helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}
-    </div>
-  );
-}
-
-SummaryCard.propTypes = {
-  label: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  helper: PropTypes.string
-};
-
-SummaryCard.defaultProps = {
-  helper: undefined
-};
-
 function normaliseNumber(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
@@ -423,11 +404,11 @@ export default function AdminAdsManagementSection({ sectionId, token }) {
           {loadingSummary ? 'Refreshing…' : 'Refresh summary'}
         </button>
       </header>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map((card) => (
-          <SummaryCard key={card.label} {...card} />
-        ))}
-      </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {summaryCards.map((card) => (
+            <AdminSummaryCard key={card.label} {...card} />
+          ))}
+        </div>
       {topCampaigns.length > 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-700">Top performers (30d)</h3>
