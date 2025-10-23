@@ -3601,7 +3601,12 @@ export async function seed(knex) {
         renewal_date: '2025-07-01',
         termination_notice_date: '2025-04-01',
         obligations: JSON.stringify(vendorContractObligations),
-        metadata: JSON.stringify({ classification: 'critical', regions: ['US', 'EU'] }),
+        metadata: JSON.stringify({
+          classification: 'critical',
+          regions: ['US', 'EU'],
+          runbookUrl: 'https://ops.edulure.com/runbooks/shieldguard-penetration-testing',
+          docUrl: 'https://ops.edulure.com/contracts/shieldguard-security.pdf'
+        }),
         last_renewal_evaluated_at: trx.fn.now(),
         next_governance_check_at: trx.fn.now()
       },
@@ -3618,7 +3623,12 @@ export async function seed(knex) {
         renewal_date: '2025-04-15',
         termination_notice_date: '2025-03-01',
         obligations: JSON.stringify(dataProcessingObligations),
-        metadata: JSON.stringify({ classification: 'sensitive', processorType: 'CDP' }),
+        metadata: JSON.stringify({
+          classification: 'sensitive',
+          processorType: 'CDP',
+          runbookUrl: 'https://ops.edulure.com/runbooks/cloudsignal-cdp-governance',
+          docUrl: 'https://ops.edulure.com/contracts/cloudsignal-cdp-dpa.pdf'
+        }),
         last_renewal_evaluated_at: trx.fn.now(),
         next_governance_check_at: trx.fn.now()
       },
@@ -3635,7 +3645,11 @@ export async function seed(knex) {
         renewal_date: '2025-01-05',
         termination_notice_date: '2024-11-01',
         obligations: JSON.stringify(communicationsObligations),
-        metadata: JSON.stringify({ deliverables: ['roadmap-briefings', 'executive-townhalls'] }),
+        metadata: JSON.stringify({
+          deliverables: ['roadmap-briefings', 'executive-townhalls'],
+          runbookUrl: 'https://ops.edulure.com/runbooks/brightwave-communications',
+          docUrl: 'https://ops.edulure.com/contracts/brightwave-communications.pdf'
+        }),
         last_renewal_evaluated_at: trx.fn.now(),
         next_governance_check_at: trx.fn.now()
       }

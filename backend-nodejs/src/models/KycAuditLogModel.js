@@ -1,12 +1,36 @@
 import db from '../config/database.js';
 
+function parseJson(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+  if (typeof value === 'object') {
+    return value;
+  }
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function mapRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    ...row,
+    metadata: parseJson(row.metadata, {})
+  };
+}
+
 const BASE_COLUMNS = [
   'kal.id',
   'kal.verification_id as verificationId',
   'kal.actor_id as actorId',
   'kal.action',
-  'kal.notes',
-  'kal.metadata',
+  'kal.notes as notes',
+  'kal.metadata as metadata',
   'kal.created_at as createdAt'
 ];
 
@@ -25,11 +49,12 @@ export default class KycAuditLogModel {
   }
 
   static async findById(id, connection = db) {
-    return connection('kyc_audit_logs as kal').select(BASE_COLUMNS).where('kal.id', id).first();
+    const row = await connection('kyc_audit_logs as kal').select(BASE_COLUMNS).where('kal.id', id).first();
+    return mapRow(row);
   }
 
   static async listForVerification(verificationId, connection = db) {
-    return connection('kyc_audit_logs as kal')
+    const rows = await connection('kyc_audit_logs as kal')
       .leftJoin('users as actor', 'actor.id', 'kal.actor_id')
       .select([
         ...BASE_COLUMNS,
@@ -39,11 +64,12 @@ export default class KycAuditLogModel {
       ])
       .where('kal.verification_id', verificationId)
       .orderBy('kal.created_at', 'desc');
+    return rows.map(mapRow);
   }
 
   static async listRecent({ limit = 25 } = {}, connection = db) {
     const safeLimit = Math.max(1, Math.min(200, Number.parseInt(limit, 10) || 25));
-    return connection('kyc_audit_logs as kal')
+    const rows = await connection('kyc_audit_logs as kal')
       .leftJoin('users as actor', 'actor.id', 'kal.actor_id')
       .select([
         ...BASE_COLUMNS,
@@ -53,5 +79,6 @@ export default class KycAuditLogModel {
       ])
       .orderBy('kal.created_at', 'desc')
       .limit(safeLimit);
+    return rows.map(mapRow);
   }
 }
