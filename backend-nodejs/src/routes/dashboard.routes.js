@@ -47,6 +47,23 @@ router.get('/learner/financial/invoices/:invoiceId/download', auth(), LearnerDas
 router.put('/learner/financial/preferences', auth(), LearnerDashboardController.updateBillingPreferences);
 router.get('/learner/settings/system', auth(), LearnerDashboardController.getSystemPreferences);
 router.put('/learner/settings/system', auth(), LearnerDashboardController.updateSystemPreferences);
+router.get(
+  '/learner/settings/personalisation',
+  auth(),
+  LearnerDashboardController.getPersonalisationSettings
+);
+router.put(
+  '/learner/settings/personalisation',
+  auth(),
+  LearnerDashboardController.updatePersonalisationSettings
+);
+router.put(
+  '/learner/settings/notifications',
+  auth(),
+  LearnerDashboardController.updateNotificationSettings
+);
+router.get('/learner/settings/security', auth(), LearnerDashboardController.getSecuritySettings);
+router.put('/learner/settings/security', auth(), LearnerDashboardController.updateSecuritySettings);
 router.get('/learner/settings/finance', auth(), LearnerDashboardController.getFinanceSettings);
 router.put('/learner/settings/finance', auth(), LearnerDashboardController.updateFinanceSettings);
 router.post('/learner/settings/finance/purchases', auth(), LearnerDashboardController.createFinancePurchase);

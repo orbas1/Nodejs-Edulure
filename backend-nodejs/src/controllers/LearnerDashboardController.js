@@ -501,6 +501,161 @@ export default class LearnerDashboardController {
     }
   }
 
+  static async getPersonalisationSettings(req, res, next) {
+    try {
+      const bundle = await LearnerDashboardService.getLearnerSettingsBundle(req.user.id);
+      return success(res, {
+        data: bundle,
+        message: 'Learner settings retrieved'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
+  static async updatePersonalisationSettings(req, res, next) {
+    try {
+      const body = sanitiseBody(req.body ?? {});
+      const payload = {};
+
+      const enableRecommendations = normaliseBooleanField(body.enableRecommendations);
+      if (enableRecommendations !== undefined) {
+        payload.enableRecommendations = enableRecommendations;
+      }
+
+      const allowCommunityInvites = normaliseBooleanField(body.allowCommunityInvites);
+      if (allowCommunityInvites !== undefined) {
+        payload.allowCommunityInvites = allowCommunityInvites;
+      }
+
+      const learningPace = optionalStringField(body.learningPace, 32);
+      if (learningPace !== undefined) {
+        payload.learningPace = learningPace;
+      }
+
+      if (isPlainObject(body.monetisation)) {
+        const monetisation = {};
+        const allowAds = normaliseBooleanField(body.monetisation.allowAdsPersonalisation);
+        if (allowAds !== undefined) {
+          monetisation.allowAdsPersonalisation = allowAds;
+        }
+        const allowUpsell = normaliseBooleanField(body.monetisation.allowUpsellPrompts);
+        if (allowUpsell !== undefined) {
+          monetisation.allowUpsellPrompts = allowUpsell;
+        }
+        if (Object.keys(monetisation).length > 0) {
+          payload.monetisation = monetisation;
+        }
+      }
+
+      if (isPlainObject(body.accessibility)) {
+        const accessibility = {};
+        const reducedMotion = normaliseBooleanField(body.accessibility.reducedMotion);
+        if (reducedMotion !== undefined) {
+          accessibility.reducedMotion = reducedMotion;
+        }
+        const highContrast = normaliseBooleanField(body.accessibility.highContrast);
+        if (highContrast !== undefined) {
+          accessibility.highContrast = highContrast;
+        }
+        if (Object.keys(accessibility).length > 0) {
+          payload.accessibility = accessibility;
+        }
+      }
+
+      const acknowledgement = await LearnerDashboardService.updatePersonalisationSettings(
+        req.user.id,
+        payload
+      );
+      return success(res, {
+        data: acknowledgement.meta?.personalisation ?? acknowledgement,
+        message: acknowledgement.message ?? 'Personalisation settings updated'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
+  static async updateNotificationSettings(req, res, next) {
+    try {
+      const body = sanitiseBody(req.body ?? {});
+      const payload = {};
+
+      const weeklyDigest = normaliseBooleanField(body.weeklyDigest);
+      if (weeklyDigest !== undefined) payload.weeklyDigest = weeklyDigest;
+      const communityDigest = normaliseBooleanField(body.communityDigest);
+      if (communityDigest !== undefined) payload.communityDigest = communityDigest;
+      const productUpdates = normaliseBooleanField(body.productUpdates);
+      if (productUpdates !== undefined) payload.productUpdates = productUpdates;
+      const smsAlerts = normaliseBooleanField(body.smsAlerts);
+      if (smsAlerts !== undefined) payload.smsAlerts = smsAlerts;
+      const tutorReminders = normaliseBooleanField(body.tutorReminders);
+      if (tutorReminders !== undefined) payload.tutorReminders = tutorReminders;
+
+      if ('metadata' in body) {
+        payload.metadata = normaliseMetadataField(body.metadata);
+      }
+
+      const acknowledgement = await LearnerDashboardService.updateNotificationPreferences(
+        req.user.id,
+        payload
+      );
+      return success(res, {
+        data: acknowledgement.meta?.notifications ?? acknowledgement,
+        message: acknowledgement.message ?? 'Notification settings updated'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
+  static async getSecuritySettings(req, res, next) {
+    try {
+      const settings = await LearnerDashboardService.getSecuritySettings(req.user.id);
+      return success(res, {
+        data: settings,
+        message: 'Security settings retrieved'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
+  static async updateSecuritySettings(req, res, next) {
+    try {
+      const body = sanitiseBody(req.body ?? {});
+      const payload = {};
+
+      const requireMfa = normaliseBooleanField(body.requireMfa);
+      if (requireMfa !== undefined) payload.requireMfa = requireMfa;
+
+      const notifyOnNewDevice = normaliseBooleanField(body.notifyOnNewDevice);
+      if (notifyOnNewDevice !== undefined) payload.notifyOnNewDevice = notifyOnNewDevice;
+
+      const sessionTimeout = optionalNumberField(body.sessionTimeoutMinutes, 'Session timeout', {
+        min: 15,
+        max: 720,
+        integer: true
+      });
+      if (sessionTimeout !== undefined) payload.sessionTimeoutMinutes = sessionTimeout;
+
+      if ('metadata' in body) {
+        payload.metadata = normaliseMetadataField(body.metadata);
+      }
+
+      const acknowledgement = await LearnerDashboardService.updateSecuritySettings(
+        req.user.id,
+        payload
+      );
+      return success(res, {
+        data: acknowledgement.meta?.security ?? acknowledgement,
+        message: acknowledgement.message ?? 'Security settings updated'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
   static async getFinanceSettings(req, res, next) {
     try {
       const settings = await LearnerDashboardService.getFinanceSettings(req.user.id);
