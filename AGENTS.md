@@ -44,9 +44,12 @@ Group 2 – Categories 5-8 (frontend structure and code actions)
    C. *Media & preview* – Deliver reusable media preview slots with thumbnails, hover video, and fallback illustrations powered by Edulure Search metadata.
 
 7. **Function deletions**
-   A. *Pending removal* – Deprecate redundant polling hooks, legacy search adapters, and standalone worker boot paths once new providers land.
-   B. *Frontend clean-up* – Retire bespoke reaction handlers, duplicate booking calendars, and obsolete moderation queues replaced by shared experiences.
-   C. *Documentation alignment* – No runtime removals occur until feature parity is achieved; docs capture deprecation intent only.
+   - Removed the unused `fetchCourseLiveStatus` request in `frontend-reactjs/src/api/courseApi.js`, consolidating live session data access behind the player and chat endpoints that already refresh in real time.
+   - Retired the dormant `acknowledgeCommunityChat` helper in `frontend-reactjs/src/api/communityApi.js`, letting the learner chat workspace rely exclusively on the shared presence/update utilities.
+   - Updated this ledger to reflect the clean-up so future UX rollouts do not depend on shadow APIs or polling shims.
+   A. ✓
+   B. ✓
+   C. ✓
 
 8. **Component deletions**
    A. ✅ *Targeted consolidation* – Removed the bespoke `HomeHero.jsx` and `MembershipSnapshot.jsx` implementations in favour of the new shared `marketing/MarketingHero.jsx` and `marketing/PlanHighlights.jsx`, wiring `Home.jsx` to the shared kits so the landing experience now renders through reusable building blocks.
