@@ -719,6 +719,53 @@ describe('LearnerDashboardService', () => {
     expect(acknowledgement.meta.financeSettings.subscriptions).toHaveLength(1);
   });
 
+  it('normalises stored finance preferences when returning settings', async () => {
+    mocks.financialProfileModel.findByUserId.mockResolvedValue({
+      id: 11,
+      userId: 42,
+      autoPayEnabled: '1',
+      reserveTargetCents: '300500',
+      preferences: {
+        currency: 'usd',
+        taxId: '  TAX-123  ',
+        invoiceDelivery: '  email+portal  ',
+        payoutSchedule: '  weekly  ',
+        expensePolicyUrl: '  https://example.com/policy  ',
+        alerts: { sendEmail: 'false', sendSms: 'true', notifyThresholdPercent: 150 },
+        reimbursements: { enabled: 'yes', instructions: '  Submit via portal  ' },
+        documents: [
+          { name: '   Form 1099 ', url: ' https://example.com/form.pdf ', uploadedAt: '2024-02-01T00:00:00Z' },
+          { url: '   ' },
+          null
+        ]
+      }
+    });
+    mocks.financePurchaseModel.listByUserId.mockResolvedValue([]);
+    mocks.communitySubscriptionModel.listByUser.mockResolvedValue([]);
+
+    const settings = await LearnerDashboardService.getFinanceSettings(42);
+
+    expect(settings.profile.currency).toBe('USD');
+    expect(settings.profile.taxId).toBe('TAX-123');
+    expect(settings.profile.invoiceDelivery).toBe('email+portal');
+    expect(settings.profile.payoutSchedule).toBe('weekly');
+    expect(settings.profile.expensePolicyUrl).toBe('https://example.com/policy');
+    expect(settings.profile.reserveTargetCents).toBe(300500);
+    expect(settings.profile.reserveTarget).toBe(3005);
+    expect(settings.alerts).toEqual(
+      expect.objectContaining({ sendEmail: false, sendSms: true, notifyThresholdPercent: 100, escalationEmail: null })
+    );
+    expect(settings.reimbursements).toEqual({ enabled: true, instructions: 'Submit via portal' });
+    expect(settings.documents).toHaveLength(1);
+    expect(settings.documents[0]).toEqual(
+      expect.objectContaining({
+        name: 'Form 1099',
+        url: 'https://example.com/form.pdf',
+        uploadedAt: '2024-02-01T00:00:00Z'
+      })
+    );
+  });
+
   it('creates a finance purchase and normalises values', async () => {
     financePurchaseModel.create.mockResolvedValue({
       id: 7,

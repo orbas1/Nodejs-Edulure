@@ -52,6 +52,7 @@ export default function SettingsToggleField({
             }
           }}
           aria-pressed={checked}
+          aria-label={label}
           aria-controls={controlId}
           disabled={disabled}
         >
