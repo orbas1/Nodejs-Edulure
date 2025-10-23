@@ -243,6 +243,28 @@ export async function seed(knex) {
       active_live_room: null
     });
 
+    const [flowPreviewUserId] = await trx('users').insert({
+      first_name: 'Jordan',
+      last_name: 'Rivera',
+      email: 'flow5-preview@edulure.test',
+      password_hash: passwordHash,
+      role: 'instructor',
+      email_verified_at: null,
+      failed_login_attempts: 0,
+      last_login_at: null,
+      password_changed_at: null,
+      dashboard_preferences: JSON.stringify({ pinnedNavigation: ['instructor-onboarding'] }),
+      unread_community_count: 0,
+      pending_payouts: 0,
+      active_live_room: null,
+      two_factor_enabled: 0,
+      two_factor_secret: null,
+      two_factor_enrolled_at: null,
+      two_factor_last_verified_at: null,
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now()
+    });
+
     const adminVerificationRef = makeVerificationRef();
     const instructorVerificationRef = makeVerificationRef();
     const learnerVerificationRef = makeVerificationRef();
@@ -1043,6 +1065,7 @@ export async function seed(knex) {
       }),
       metadata: JSON.stringify({ source: 'flow-five', campaign: 'beta-seed' }),
       terms_accepted: 1,
+      user_id: flowPreviewUserId,
       submitted_at: trx.fn.now(),
       created_at: trx.fn.now(),
       updated_at: trx.fn.now()
