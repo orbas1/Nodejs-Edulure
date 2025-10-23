@@ -5,15 +5,18 @@ import {
   ExclamationTriangleIcon,
   ShieldCheckIcon,
   SparklesIcon,
-  UsersIcon
+  UsersIcon,
+  WifiIcon
 } from '@heroicons/react/24/outline';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { createCommunityLiveDonation } from '../../api/communityApi.js';
 import { checkInToLiveSession, joinLiveSession } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import ScheduleGrid from '../../components/scheduling/ScheduleGrid.jsx';
+import { enqueueLiveSessionAction, flushLiveSessionQueue } from '../../utils/liveSessionQueue.js';
 
 function ReadinessBadge({ status }) {
   const base = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide';
@@ -36,6 +39,8 @@ function SessionCard({ session, onAction, pending, onDonate }) {
   const security = session.security ?? {};
   const whiteboard = session.whiteboard ?? null;
   const facilitators = Array.isArray(session.facilitators) ? session.facilitators : [];
+  const attendance = session.attendance ?? {};
+  const attendanceSummary = Number.isFinite(Number(attendance.total)) ? Number(attendance.total) : null;
 
   return (
     <article className="dashboard-card space-y-5 p-5">
@@ -108,6 +113,16 @@ function SessionCard({ session, onAction, pending, onDonate }) {
             <p className="text-sm text-slate-700">
               {security.waitingRoom ? 'Waiting room enforced' : 'Direct entry'} ·{' '}
               {security.passcodeRequired ? 'Passcode required' : 'No passcode'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3">
+          <WifiIcon className="h-5 w-5 text-primary" aria-hidden="true" />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Attendance</p>
+            <p className="text-sm text-slate-700">
+              {attendanceSummary !== null ? `${attendanceSummary} checkpoint${attendanceSummary === 1 ? '' : 's'}` : 'No checkpoints yet'}
+              {attendance.lastRecordedLabel ? ` • ${attendance.lastRecordedLabel}` : ''}
             </p>
           </div>
         </div>
@@ -339,6 +354,8 @@ export default function LearnerLiveClasses() {
   const [donationSession, setDonationSession] = useState(null);
   const [donationSubmitting, setDonationSubmitting] = useState(false);
   const [donationStatus, setDonationStatus] = useState(null);
+  const activeRef = useRef([]);
+  const upcomingRef = useRef([]);
 
   const { data, loading, error } = useMemo(() => {
     const section = dashboard?.liveClassrooms;
@@ -352,6 +369,11 @@ export default function LearnerLiveClasses() {
     return { data: section ?? null, loading: false, error: null };
   }, [dashboard?.liveClassrooms]);
 
+  useEffect(() => {
+    activeRef.current = Array.isArray(data?.active) ? data.active : [];
+    upcomingRef.current = Array.isArray(data?.upcoming) ? data.upcoming : [];
+  }, [data?.active, data?.upcoming]);
+
   const handleSessionAction = useCallback(
     async (sessionItem, action) => {
       if (!token) {
@@ -363,19 +385,52 @@ export default function LearnerLiveClasses() {
       setStatusMessage({ type: 'pending', message: `Connecting to ${sessionItem.title}…` });
       try {
         const api = action === 'check-in' ? checkInToLiveSession : joinLiveSession;
+        const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+        if (offline) {
+          enqueueLiveSessionAction({ sessionId: sessionItem.id, action });
+          setStatusMessage({
+            type: 'warning',
+            message: `We saved your ${action === 'check-in' ? 'check-in' : 'join'} for ${sessionItem.title}. It will retry when you are back online.`
+          });
+          return;
+        }
         const response = await api({ token, sessionId: sessionItem.id });
         setStatusMessage({ type: 'success', message: response?.message ?? 'Live session action completed.' });
       } catch (sessionError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            sessionError instanceof Error ? sessionError.message : 'We were unable to complete that session action.'
-        });
+        const offlineLikely =
+          sessionError instanceof TypeError || (typeof navigator !== 'undefined' && navigator.onLine === false);
+        if (offlineLikely) {
+          enqueueLiveSessionAction({ sessionId: sessionItem.id, action });
+          setStatusMessage({
+            type: 'warning',
+            message: `Connection issues detected. We'll retry the ${action === 'check-in' ? 'check-in' : 'join'} for ${sessionItem.title} shortly.`
+          });
+        } else {
+          setStatusMessage({
+            type: 'error',
+            message:
+              sessionError instanceof Error ? sessionError.message : 'We were unable to complete that session action.'
+          });
+        }
       } finally {
         setPendingSessionId(null);
       }
     },
     [token]
+  );
+
+  const handleGridSelect = useCallback(
+    (event) => {
+      const target = [...activeRef.current, ...upcomingRef.current].find((item) => item.id === event.id);
+      if (!target) {
+        return;
+      }
+      const action = target.callToAction?.action;
+      if (action) {
+        handleSessionAction(target, action);
+      }
+    },
+    [handleSessionAction]
   );
 
   const handleDonationOpen = useCallback((sessionItem) => {
@@ -431,6 +486,46 @@ export default function LearnerLiveClasses() {
     setDonationSubmitting(false);
   }, []);
 
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+    let cancelled = false;
+
+    const executeFlush = async () => {
+      const shouldFlush = typeof navigator === 'undefined' || navigator.onLine !== false;
+      if (!shouldFlush) {
+        return;
+      }
+      const results = await flushLiveSessionQueue({
+        token,
+        executor: async ({ sessionId, action, token: entryToken }) => {
+          const api = action === 'check-in' ? checkInToLiveSession : joinLiveSession;
+          await api({ token: entryToken ?? token, sessionId });
+        }
+      });
+      if (!cancelled && results.some((result) => result.status === 'fulfilled')) {
+        setStatusMessage({ type: 'success', message: 'Queued live session actions synced successfully.' });
+        refresh?.();
+      }
+    };
+
+    executeFlush();
+
+    if (typeof window !== 'undefined') {
+      const onlineHandler = () => executeFlush();
+      window.addEventListener('online', onlineHandler);
+      return () => {
+        cancelled = true;
+        window.removeEventListener('online', onlineHandler);
+      };
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, refresh]);
+
   if (loading) {
     return (
       <DashboardStateMessage
@@ -470,6 +565,17 @@ export default function LearnerLiveClasses() {
   const groups = Array.isArray(data.groups) ? data.groups : [];
   const whiteboardSnapshots = Array.isArray(data.whiteboard?.snapshots) ? data.whiteboard.snapshots : [];
   const readiness = Array.isArray(data.whiteboard?.readiness) ? data.whiteboard.readiness : [];
+  const scheduleEvents = [...active, ...upcoming].map((sessionItem) => ({
+    id: sessionItem.id,
+    title: sessionItem.title,
+    stage: sessionItem.stage,
+    status: sessionItem.status,
+    startAt: sessionItem.startAt,
+    endAt: sessionItem.endAt,
+    timezone: sessionItem.timezone,
+    occupancy: sessionItem.occupancy,
+    attendance: sessionItem.attendance
+  }));
 
   return (
     <>
@@ -511,6 +617,20 @@ export default function LearnerLiveClasses() {
           )}
         </div>
       </section>
+
+      {scheduleEvents.length > 0 && (
+        <section className="dashboard-section">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Shared schedule</h2>
+              <p className="text-sm text-slate-600">View the same grid instructors use to coordinate classrooms.</p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <ScheduleGrid events={scheduleEvents} showAttendance onSelect={handleGridSelect} />
+          </div>
+        </section>
+      )}
 
       <section className="space-y-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -664,7 +784,9 @@ export default function LearnerLiveClasses() {
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : statusMessage.type === 'error'
                 ? 'border-rose-200 bg-rose-50 text-rose-700'
-                : 'border-primary/20 bg-primary/5 text-primary'
+                : statusMessage.type === 'warning'
+                  ? 'border-amber-200 bg-amber-50 text-amber-700'
+                  : 'border-primary/20 bg-primary/5 text-primary'
           }`}
         >
           {statusMessage.message}

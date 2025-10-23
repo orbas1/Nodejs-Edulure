@@ -5,11 +5,13 @@ import {
   ExclamationTriangleIcon,
   ShieldCheckIcon,
   SparklesIcon,
-  UsersIcon
+  UsersIcon,
+  WifiIcon
 } from '@heroicons/react/24/outline';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import ScheduleGrid from '../../components/scheduling/ScheduleGrid.jsx';
 import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
 function ReadinessBadge({ status }) {
@@ -30,11 +32,13 @@ function SessionCard({ session }) {
   const security = session.security ?? {};
   const whiteboard = session.whiteboard ?? null;
   const support = session.support ?? {};
+  const attendance = session.attendance ?? {};
 
   const capacityLabel = occupancy.capacity
     ? `${occupancy.reserved ?? 0}/${occupancy.capacity} seats`
     : `${occupancy.reserved ?? 0} learners`;
   const occupancyRate = typeof occupancy.rate === 'number' ? occupancy.rate : null;
+  const attendanceSummary = Number.isFinite(Number(attendance.total)) ? Number(attendance.total) : null;
 
   return (
     <article className="dashboard-card space-y-5 p-5">
@@ -101,6 +105,16 @@ function SessionCard({ session }) {
             </p>
           </div>
         </div>
+        <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3">
+          <WifiIcon className="h-5 w-5 text-primary" aria-hidden="true" />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Attendance</p>
+            <p className="text-sm text-slate-700">
+              {attendanceSummary !== null ? `${attendanceSummary} checkpoint${attendanceSummary === 1 ? '' : 's'}` : 'No checkpoints yet'}
+              {attendance.lastRecordedLabel ? ` • ${attendance.lastRecordedLabel}` : ''}
+            </p>
+          </div>
+        </div>
       </div>
 
       {whiteboard && (whiteboard.template || whiteboard.url) && (
@@ -161,6 +175,17 @@ function InstructorLiveClasses() {
   const groups = Array.isArray(data.groups) ? data.groups : [];
   const whiteboardSnapshots = Array.isArray(data.whiteboard?.snapshots) ? data.whiteboard.snapshots : [];
   const readiness = Array.isArray(data.whiteboard?.readiness) ? data.whiteboard.readiness : [];
+  const scheduleEvents = [...active, ...upcoming].map((session) => ({
+    id: session.id,
+    title: session.title,
+    stage: session.stage,
+    status: session.status,
+    startAt: session.startAt,
+    endAt: session.endAt,
+    timezone: session.timezone,
+    occupancy: session.occupancy,
+    attendance: session.attendance
+  }));
 
   return (
     <div className="space-y-8">
@@ -199,6 +224,22 @@ function InstructorLiveClasses() {
           )}
         </div>
       </section>
+
+      {scheduleEvents.length > 0 && (
+        <section className="dashboard-section">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Schedule overview</h2>
+              <p className="text-sm text-slate-600">
+                Shared availability grid reused across tutor and live classroom workflows.
+              </p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <ScheduleGrid events={scheduleEvents} showAttendance />
+          </div>
+        </section>
+      )}
 
       {active.length > 0 && (
         <section className="space-y-4">

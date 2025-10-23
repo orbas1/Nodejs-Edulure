@@ -1779,6 +1779,37 @@ export function buildLearnerDashboard({
       url: whiteboardMeta.url ?? null
     };
 
+    const attendanceCheckpointsRaw = Array.isArray(metadata.attendanceCheckpoints)
+      ? metadata.attendanceCheckpoints
+      : [];
+    const attendanceCheckpoints = attendanceCheckpointsRaw
+      .slice(-5)
+      .map((checkpoint, index) => {
+        const recordedAtIso = checkpoint.recordedAt ?? checkpoint.timestamp ?? null;
+        const recordedAtDate = recordedAtIso ? new Date(recordedAtIso) : null;
+        return {
+          id:
+            checkpoint.id ??
+            `${session.id ?? session.publicId ?? crypto.randomUUID?.() ?? 'checkpoint'}-${index}`,
+          type: checkpoint.type ?? 'attendance',
+          source: checkpoint.source ?? null,
+          userId: checkpoint.userId ?? null,
+          recordedAt: recordedAtDate ? recordedAtDate.toISOString() : null,
+          recordedLabel: recordedAtDate ? formatRelativeDay(recordedAtDate, now) : null
+        };
+      });
+
+    const attendanceAnalytics = metadata.attendanceAnalytics ?? {};
+    const lastRawCheckpoint =
+      attendanceCheckpointsRaw.length > 0
+        ? attendanceCheckpointsRaw[attendanceCheckpointsRaw.length - 1]
+        : null;
+    const lastRecordedIso = attendanceAnalytics.lastRecordedAt ?? lastRawCheckpoint?.recordedAt ?? null;
+    const lastRecordedDate = lastRecordedIso ? new Date(lastRecordedIso) : null;
+    const attendanceTotal = Number.isFinite(Number(attendanceAnalytics.total))
+      ? Number(attendanceAnalytics.total)
+      : attendanceCheckpointsRaw.length;
+
     const breakoutRooms = Array.isArray(metadata.breakoutRooms)
       ? metadata.breakoutRooms.map((room, index) => ({
           name: room?.name ?? `Room ${index + 1}`,
@@ -1850,6 +1881,12 @@ export function buildLearnerDashboard({
       startAt,
       endAt,
       metadata,
+      attendance: {
+        total: attendanceTotal,
+        lastRecordedAt: lastRecordedDate ? lastRecordedDate.toISOString() : null,
+        lastRecordedLabel: lastRecordedDate ? formatRelativeDay(lastRecordedDate, now) : null,
+        checkpoints: attendanceCheckpoints
+      },
       whiteboardSnapshots: sessionSnapshots,
       readiness: readinessStatuses
     };
@@ -1871,6 +1908,17 @@ export function buildLearnerDashboard({
   const averageFillRate = fillRates.length
     ? Math.round(fillRates.reduce((sum, value) => sum + value, 0) / fillRates.length)
     : 0;
+  const totalAttendancePings = liveSessionsDetailed.reduce(
+    (sum, session) => sum + (session.attendance?.total ?? 0),
+    0
+  );
+  const mostRecentAttendanceIso = liveSessionsDetailed
+    .map((session) => session.attendance?.lastRecordedAt)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+  const mostRecentAttendanceLabel = mostRecentAttendanceIso
+    ? formatRelativeDay(new Date(mostRecentAttendanceIso), now)
+    : null;
 
   const liveMetrics = [
     {
@@ -1890,6 +1938,12 @@ export function buildLearnerDashboard({
       value: `${uniqueCommunities.size}`,
       change: `${communityMemberships.length} total`,
       trend: uniqueCommunities.size ? 'up' : 'neutral'
+    },
+    {
+      label: 'Attendance pings',
+      value: `${totalAttendancePings}`,
+      change: mostRecentAttendanceLabel ? `Latest ${mostRecentAttendanceLabel}` : 'Awaiting attendees',
+      trend: totalAttendancePings ? 'up' : 'neutral'
     }
   ];
 

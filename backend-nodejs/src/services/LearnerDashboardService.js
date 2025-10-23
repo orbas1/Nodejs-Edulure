@@ -24,6 +24,7 @@ import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
 import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
 import CommunityModel from '../models/CommunityModel.js';
 import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
+import LiveClassroomModel from '../models/LiveClassroomModel.js';
 
 const log = logger.child({ service: 'LearnerDashboardService' });
 
@@ -1774,6 +1775,16 @@ export default class LearnerDashboardService {
 
   static async joinLiveSession(userId, sessionId) {
     log.info({ userId, sessionId }, 'Learner joined live session');
+    try {
+      await LiveClassroomModel.appendAttendanceCheckpointByPublicId(sessionId, {
+        type: 'join',
+        userId,
+        source: 'learner',
+        metadata: { channel: 'dashboard' }
+      });
+    } catch (error) {
+      log.warn({ err: error, userId, sessionId }, 'Failed to record join attendance checkpoint');
+    }
     return buildAcknowledgement({
       reference: sessionId,
       message: 'Live session joined'
@@ -1783,6 +1794,16 @@ export default class LearnerDashboardService {
   static async checkInToLiveSession(userId, sessionId) {
     const checkInId = generateReference('checkin');
     log.info({ userId, sessionId, checkInId }, 'Learner checked in to live session');
+    try {
+      await LiveClassroomModel.appendAttendanceCheckpointByPublicId(sessionId, {
+        type: 'check-in',
+        userId,
+        source: 'learner',
+        metadata: { acknowledgement: checkInId }
+      });
+    } catch (error) {
+      log.warn({ err: error, userId, sessionId, checkInId }, 'Failed to record check-in attendance checkpoint');
+    }
     return buildAcknowledgement({
       reference: checkInId,
       message: 'Live session check-in recorded',

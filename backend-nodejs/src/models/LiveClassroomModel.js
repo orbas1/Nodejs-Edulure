@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import slugify from 'slugify';
 
 import db from '../config/database.js';
@@ -104,6 +105,27 @@ function deserialize(row) {
           registeredAt: toDate(row.registeredAt)
         }
       : null
+  };
+}
+
+function createCheckpointId() {
+  try {
+    return randomUUID();
+  } catch (_error) {
+    return `checkpoint-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+function normaliseCheckpoint(checkpoint = {}) {
+  const recordedAt = checkpoint.recordedAt ? new Date(checkpoint.recordedAt) : new Date();
+  const safeRecordedAt = Number.isNaN(recordedAt.getTime()) ? new Date() : recordedAt;
+  return {
+    id: checkpoint.id ?? createCheckpointId(),
+    type: checkpoint.type ?? 'attendance',
+    source: checkpoint.source ?? 'learner',
+    userId: checkpoint.userId ?? null,
+    recordedAt: safeRecordedAt.toISOString(),
+    metadata: checkpoint.metadata ?? null
   };
 }
 
@@ -316,5 +338,74 @@ export default class LiveClassroomModel {
   static async deleteById(id, connection = db) {
     await connection('live_classroom_registrations').where({ classroom_id: id }).del();
     await connection(TABLE).where({ id }).del();
+  }
+
+  static async findByPublicId(publicId, connection = db) {
+    if (!publicId) {
+      return null;
+    }
+
+    const row = await connection(`${TABLE} as lc`)
+      .leftJoin('communities as comm', 'lc.community_id', 'comm.id')
+      .leftJoin('live_classroom_registrations as reg', function joinReg() {
+        this.on('reg.classroom_id', '=', 'lc.id');
+      })
+      .select(BASE_COLUMNS)
+      .where('lc.public_id', publicId)
+      .first();
+
+    return deserialize(row);
+  }
+
+  static async appendAttendanceCheckpointByPublicId(publicId, checkpoint, connection = db) {
+    if (!publicId) {
+      return null;
+    }
+
+    const classroom = await this.findByPublicId(publicId, connection);
+    if (!classroom) {
+      return null;
+    }
+
+    const metadata = { ...(classroom.metadata ?? {}) };
+    const checkpoints = Array.isArray(metadata.attendanceCheckpoints)
+      ? metadata.attendanceCheckpoints.slice()
+      : [];
+
+    const entry = normaliseCheckpoint(checkpoint);
+    checkpoints.push(entry);
+
+    const MAX_ENTRIES = 50;
+    const trimmed = checkpoints.slice(-MAX_ENTRIES);
+
+    const analytics = metadata.attendanceAnalytics ?? {};
+    const total = Number.isFinite(Number(analytics.total))
+      ? Number(analytics.total) + 1
+      : trimmed.length;
+
+    const nextAnalytics = {
+      ...analytics,
+      total,
+      lastRecordedAt: entry.recordedAt,
+      lastRecordedBy: entry.userId ?? analytics.lastRecordedBy ?? null
+    };
+
+    const nextMetadata = {
+      ...metadata,
+      attendanceCheckpoints: trimmed,
+      attendanceAnalytics: nextAnalytics
+    };
+
+    await connection(TABLE)
+      .where({ id: classroom.id })
+      .update({
+        metadata: JSON.stringify(nextMetadata),
+        updated_at: connection.fn.now()
+      });
+
+    return {
+      attendanceCheckpoints: trimmed,
+      attendanceAnalytics: nextAnalytics
+    };
   }
 }
