@@ -12,6 +12,10 @@ import LearnerSafetySection from './sections/LearnerSafetySection.jsx';
 import LearnerUpcomingSection from './sections/LearnerUpcomingSection.jsx';
 import LearnerBlogSection from './sections/LearnerBlogSection.jsx';
 import LearnerProfileEditor from './sections/LearnerProfileEditor.jsx';
+import LearnerGoalsSection from './sections/LearnerGoalsSection.jsx';
+import LearnerSurveyPrompt from './sections/LearnerSurveyPrompt.jsx';
+import LearnerMonetizationSection from './sections/LearnerMonetizationSection.jsx';
+import SkeletonPanel from '../../../components/loaders/SkeletonPanel.jsx';
 
 function normaliseSectionKey(name) {
   return name?.toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -222,6 +226,83 @@ function normaliseBlog(blog) {
   };
 }
 
+function normaliseGoals(goalsSource) {
+  const source = goalsSource ?? {};
+  const collections = [
+    Array.isArray(source) ? source : null,
+    Array.isArray(source.items) ? source.items : null,
+    Array.isArray(source.list) ? source.list : null,
+    Array.isArray(source.goals) ? source.goals : null
+  ].filter(Boolean);
+  const flattened = collections.flat();
+  const goals = flattened
+    .filter((entry) => entry && (entry.title || entry.name))
+    .map((entry) => ({
+      id: entry.id ?? entry.goalId ?? entry.slug ?? entry.title ?? entry.name,
+      title: entry.title ?? entry.name ?? 'Learning goal',
+      description: entry.description ?? entry.summary ?? '',
+      progress: entry.progress ?? entry.completion ?? 0,
+      dueDate: entry.dueDate ?? entry.targetDate ?? null,
+      tags: Array.isArray(entry.tags) ? entry.tags : Array.isArray(entry.labels) ? entry.labels : []
+    }));
+  const summary = source.summary ?? source.headline ?? null;
+  return { goals, summary };
+}
+
+function normaliseSurveyPrompt(source) {
+  if (!source) return null;
+  if (Array.isArray(source)) {
+    const nextSurvey = source.find((entry) => !entry?.completed && !entry?.dismissed) ?? source[0];
+    return normaliseSurveyPrompt(nextSurvey);
+  }
+  const id = source.id ?? source.surveyId ?? source.slug;
+  if (!id) return null;
+  return {
+    id,
+    title: source.title ?? source.headline ?? 'Share quick feedback',
+    question: source.question ?? source.prompt ?? source.subtitle ?? '',
+    scaleLabels: Array.isArray(source.scaleLabels)
+      ? source.scaleLabels
+      : Array.isArray(source.labels)
+        ? source.labels
+        : [],
+    tags: Array.isArray(source.tags) ? source.tags : [],
+    location: source.location ?? 'learner-dashboard',
+    context: source.context ?? {}
+  };
+}
+
+function normaliseMonetization(data) {
+  const source = data ?? {};
+  const spotlight = source.spotlight
+    ? {
+        title: source.spotlight.title ?? source.spotlight.headline ?? 'Grow with premium bundles',
+        description:
+          source.spotlight.description ?? source.spotlight.summary ??
+          'Surface monetisation opportunities that match your interests.'
+      }
+    : source.summary
+      ? { title: source.summary.title ?? 'Grow with premium bundles', description: source.summary.description ?? '' }
+      : null;
+  const offers = source.offers ?? source.recommendations ?? [];
+  const normalisedOffers = Array.isArray(offers)
+    ? offers.map((offer) => ({
+        id: offer.id ?? offer.slug ?? offer.title,
+        title: offer.title ?? 'Premium offer',
+        description: offer.description ?? offer.summary ?? '',
+        ctaLabel: offer.ctaLabel ?? offer.cta ?? 'View details',
+        ctaHref: offer.ctaHref ?? offer.href ?? offer.url ?? '#',
+        badge: offer.badge ?? offer.tier ?? null
+      }))
+    : [];
+
+  return {
+    spotlight,
+    offers: normalisedOffers,
+    hasContent: Boolean(spotlight) || normalisedOffers.length > 0
+  };
+}
+
 export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   const metricsSource = dashboard?.metrics;
   const analytics = dashboard?.analytics ?? {};
@@ -252,10 +333,33 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
     ? Number(notificationsSource.total)
     : notifications.length;
   const blog = useMemo(() => normaliseBlog(dashboard?.blog), [dashboard?.blog]);
+  const goalsData = useMemo(
+    () =>
+      normaliseGoals(
+        dashboard?.goals ?? dashboard?.analytics?.goals ?? profile?.goals ?? dashboard?.learningGoals ?? null
+      ),
+    [dashboard?.analytics?.goals, dashboard?.goals, dashboard?.learningGoals, profile?.goals]
+  );
+  const surveyPrompt = useMemo(
+    () =>
+      normaliseSurveyPrompt(
+        dashboard?.feedback?.surveys ?? dashboard?.feedback?.survey ?? dashboard?.surveys ?? profile?.surveys ?? null
+      ),
+    [dashboard?.feedback?.survey, dashboard?.feedback?.surveys, dashboard?.surveys, profile?.surveys]
+  );
+  const monetization = useMemo(
+    () => normaliseMonetization(dashboard?.monetization ?? profile?.monetization ?? null),
+    [dashboard?.monetization, profile?.monetization]
+  );
   const privacySettings = settings.privacy ?? null;
   const messagingSettings = settings.messaging ?? null;
   const followerSummary = dashboard?.followers ?? null;
   const unreadMessages = notificationsSource.unreadMessages ?? 0;
+
+  const isDashboardLoading = Boolean(dashboard?.meta?.loading);
+  const isProfileLoading = Boolean(profile?.meta?.loading);
+  const isAnalyticsLoading = Boolean(analytics?.loading);
+  const isLoading = isDashboardLoading || isProfileLoading || isAnalyticsLoading;
 
   const canViewMetrics = accessControl.canView('learner-metrics');
   const canViewProfile = accessControl.canView('learner-profile');
@@ -268,10 +372,13 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   const canViewFeed = accessControl.canView('feed-highlights');
   const canViewSafety = accessControl.canView('safety-controls');
   const canViewBlog = accessControl.canView('blog');
+  const canViewGoals = accessControl.canView('learner-goals');
+  const canViewSurvey = accessControl.canView('feedback-prompt');
+  const canViewMonetization = accessControl.canView('monetization-banner');
 
   return (
     <div className="space-y-10">
-      {canViewMetrics ? <LearnerMetricsSection metrics={metrics} /> : null}
+      {canViewMetrics ? <LearnerMetricsSection metrics={metrics} loading={isLoading} /> : null}
 
       {(canViewProfile || canViewPace || canViewCommunity) && (
         <section className="grid gap-6 xl:grid-cols-7">
@@ -294,6 +401,46 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
       {canViewVerification ? (
         <VerificationStatusCard verification={profile?.verification ?? null} onRefresh={onRefresh} />
       ) : null}
+
+      {(canViewGoals || (canViewSurvey && surveyPrompt) || (canViewMonetization && monetization.hasContent)) && (
+        <section className="grid gap-6 xl:grid-cols-3">
+          {canViewGoals
+            ? isLoading && goalsData.goals.length === 0
+              ? (
+                  <SkeletonPanel key="goals" isLoading hasHeading />
+                )
+              : (
+                  <LearnerGoalsSection
+                    key="goals"
+                    goals={goalsData.goals}
+                    summary={goalsData.summary ?? 'Track progress across your personalised targets.'}
+                    className="xl:col-span-2"
+                  />
+                )
+            : null}
+          {canViewSurvey ? (
+            <LearnerSurveyPrompt
+              key="survey"
+              survey={surveyPrompt}
+              loading={isLoading && !surveyPrompt}
+              onDismiss={() => onRefresh?.()}
+            />
+          ) : null}
+          {canViewMonetization
+            ? isLoading && !monetization.hasContent
+              ? (
+                  <SkeletonPanel key="monetization" isLoading hasHeading variant="muted" />
+                )
+              : (
+                  <LearnerMonetizationSection
+                    key="monetization"
+                    spotlight={monetization.spotlight}
+                    offers={monetization.offers}
+                  />
+                )
+            : null}
+        </section>
+      )}
 
       {(canViewUpcoming || canViewNotifications) && (
         <section className="grid gap-6 xl:grid-cols-3">

@@ -2,11 +2,85 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import LearnerProgressCard from '../../components/dashboard/LearnerProgressCard.jsx';
+import SkeletonPanel from '../../components/loaders/SkeletonPanel.jsx';
 import usePersistentCollection from '../../hooks/usePersistentCollection.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
-import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboardApi.js';
+import {
+  createCourseGoal,
+  exportTutorSchedule
+} from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useMountedRef from '../../hooks/useMountedRef.js';
+import LearnerSurveyPrompt from './learner/sections/LearnerSurveyPrompt.jsx';
+import LearnerMonetizationSection from './learner/sections/LearnerMonetizationSection.jsx';
+import LearnerGoalsSection from './learner/sections/LearnerGoalsSection.jsx';
+
+function normaliseSurveyPrompt(source) {
+  if (!source) return null;
+  if (Array.isArray(source)) {
+    const next = source.find((entry) => !entry?.completed && !entry?.dismissed) ?? source[0];
+    return normaliseSurveyPrompt(next);
+  }
+  const id = source.id ?? source.surveyId ?? source.slug;
+  if (!id) return null;
+  return {
+    id,
+    title: source.title ?? source.headline ?? 'Share quick feedback',
+    question: source.question ?? source.prompt ?? source.subtitle ?? '',
+    scaleLabels: Array.isArray(source.scaleLabels)
+      ? source.scaleLabels
+      : Array.isArray(source.labels)
+        ? source.labels
+        : [],
+    tags: Array.isArray(source.tags) ? source.tags : [],
+    location: source.location ?? 'learner-dashboard',
+    context: source.context ?? {}
+  };
+}
+
+function normaliseMonetization(data) {
+  const source = data ?? {};
+  const spotlight = source.spotlight
+    ? {
+        title: source.spotlight.title ?? source.spotlight.headline ?? 'Grow with premium bundles',
+        description:
+          source.spotlight.description ?? source.spotlight.summary ??
+          'Promote premium communities, tutoring, and resource bundles.'
+      }
+    : source.summary
+      ? { title: source.summary.title ?? 'Grow with premium bundles', description: source.summary.description ?? '' }
+      : null;
+  const offers = Array.isArray(source.offers) ? source.offers : Array.isArray(source.recommendations) ? source.recommendations : [];
+  return {
+    spotlight,
+    offers,
+    hasContent: Boolean(spotlight) || offers.length > 0
+  };
+}
+
+function normaliseGoals(goalsSource) {
+  const source = goalsSource ?? {};
+  const list = Array.isArray(source)
+    ? source
+    : Array.isArray(source.items)
+      ? source.items
+      : Array.isArray(source.goals)
+        ? source.goals
+        : [];
+  const goals = list
+    .filter((entry) => entry && (entry.title || entry.name))
+    .map((entry) => ({
+      id: entry.id ?? entry.goalId ?? entry.slug ?? entry.title ?? entry.name,
+      title: entry.title ?? entry.name ?? 'Learning goal',
+      description: entry.description ?? entry.summary ?? '',
+      progress: entry.progress ?? entry.completion ?? 0,
+      dueDate: entry.dueDate ?? entry.targetDate ?? null,
+      tags: Array.isArray(entry.tags) ? entry.tags : []
+    }));
+  const summary = source.summary ?? source.headline ?? null;
+  return { goals, summary };
+}
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -19,6 +93,7 @@ export default function LearnerCourses() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
   const mounted = useMountedRef();
+  const isLoading = Boolean(loading);
 
   const storageKey = useMemo(
     () => `edulure.learner.orders.v1:${session?.user?.id ?? 'anonymous'}`,
@@ -92,16 +167,7 @@ export default function LearnerCourses() {
     );
   }
 
-  if (loading) {
-    return (
-      <DashboardStateMessage
-        title="Loading learner courses"
-        description="We are pulling your programmes, cohorts, and personalised recommendations."
-      />
-    );
-  }
-
-  if (!data) {
+  if (!data && !isLoading) {
     return (
       <DashboardStateMessage
         title="Learner courses not available"
@@ -112,7 +178,7 @@ export default function LearnerCourses() {
     );
   }
 
-  const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
+  const disableActions = useMemo(() => pendingAction !== null || isLoading, [pendingAction, isLoading]);
   const ordersSorted = useMemo(() => {
     return [...orders].sort((a, b) => {
       const aTime = new Date(a.purchaseDate ?? a.createdAt ?? 0).getTime();
@@ -120,6 +186,35 @@ export default function LearnerCourses() {
       return bTime - aTime;
     });
   }, [orders]);
+
+  const placeholderCourses = useMemo(
+    () => Array.from({ length: 3 }).map((_, index) => ({ id: `course-placeholder-${index}` })),
+    []
+  );
+  const placeholderRecommendations = useMemo(
+    () => Array.from({ length: 2 }).map((_, index) => ({ id: `recommendation-placeholder-${index}` })),
+    []
+  );
+  const displayActiveCourses = useMemo(
+    () => (isLoading ? placeholderCourses : activeCourses),
+    [activeCourses, isLoading, placeholderCourses]
+  );
+  const displayRecommendations = useMemo(
+    () => (isLoading ? placeholderRecommendations : recommendations),
+    [isLoading, placeholderRecommendations, recommendations]
+  );
+  const goalsData = useMemo(
+    () => normaliseGoals(data?.goals ?? data?.learningGoals ?? []),
+    [data?.goals, data?.learningGoals]
+  );
+  const surveyPrompt = useMemo(
+    () => normaliseSurveyPrompt(data?.survey ?? data?.feedback?.survey ?? data?.feedback?.surveys ?? null),
+    [data?.feedback?.survey, data?.feedback?.surveys, data?.survey]
+  );
+  const monetization = useMemo(
+    () => normaliseMonetization(data?.monetization ?? null),
+    [data?.monetization]
+  );
 
   const resetOrderForm = useCallback(() => {
     setOrderForm({
@@ -200,6 +295,16 @@ export default function LearnerCourses() {
     setOrderFeedback('Order history cleared.');
     resetOrderForm();
   }, [resetOrders, resetOrderForm]);
+
+  const handleOpenCourse = useCallback(
+    (course) => {
+      if (!course?.id) {
+        return;
+      }
+      navigate(`${course.id}`);
+    },
+    [navigate]
+  );
 
   const handleCreateGoal = useCallback(async () => {
     if (!token) {
@@ -313,39 +418,28 @@ export default function LearnerCourses() {
       <section className="dashboard-section">
         <h2 className="text-lg font-semibold text-slate-900">Active programs</h2>
         <div className="mt-5 space-y-4">
-          {activeCourses.map((course) => (
-            <button
-              key={course.id}
-              type="button"
-              onClick={() => navigate(`${course.id}`)}
-              className="w-full text-left"
-            >
-              <div className="dashboard-card-muted p-5 transition hover:border-primary/40 hover:bg-primary/5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="dashboard-kicker">{course.status}</p>
-                    <p className="mt-1 text-lg font-semibold text-slate-900">{course.title}</p>
-                    <p className="text-xs text-slate-600">With {course.instructor}</p>
-                    {course.goalStatus ? (
-                      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                        Goal · {course.goalStatus}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="text-right text-sm text-slate-600">
-                    <p>{course.progress}% complete</p>
-                    <p className="text-xs text-slate-500">Next: {course.nextLesson}</p>
-                  </div>
-                </div>
-                <div className="mt-4 h-2 rounded-full bg-slate-200">
-                  <div
-                    className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
-                    style={{ width: `${course.progress}%` }}
+          {displayActiveCourses.length ? (
+            displayActiveCourses.map((course, index) => (
+              <SkeletonPanel
+                key={course.id ?? `course-${index}`}
+                isLoading={isLoading}
+                variant="muted"
+                className="transition hover:border-primary/40 hover:bg-primary/5"
+                hasHeading
+              >
+                {!isLoading ? (
+                  <LearnerProgressCard
+                    course={course}
+                    onResume={!disableActions ? () => handleOpenCourse(course) : undefined}
+                    onViewDetails={!disableActions ? () => handleOpenCourse(course) : undefined}
+                    compact
                   />
-                </div>
-              </div>
-            </button>
-          ))}
+                ) : null}
+              </SkeletonPanel>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">Add a course or community program to see progress here.</p>
+          )}
         </div>
       </section>
 
@@ -355,28 +449,63 @@ export default function LearnerCourses() {
             <h2 className="text-lg font-semibold text-slate-900">Personalized recommendations</h2>
             <p className="text-sm text-slate-600">Based on your momentum, communities, and mentor sessions.</p>
           </div>
-          <button type="button" className="dashboard-pill">
+          <button type="button" className="dashboard-pill" disabled={isLoading}>
             Adjust filters
           </button>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {recommendations.map((rec) => (
-            <div key={rec.id} className="dashboard-card-muted p-5">
-              <p className="dashboard-kicker">Rating {rec.rating}</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{rec.title}</p>
-              <p className="mt-2 text-sm text-slate-600">{rec.summary}</p>
-              <div className="mt-5 flex items-center gap-3 text-xs text-slate-600">
-                <button type="button" className="dashboard-pill px-3 py-1">
-                  Preview syllabus
-                </button>
-                <button type="button" className="dashboard-pill px-3 py-1">
-                  Add to queue
-                </button>
-              </div>
-            </div>
-          ))}
+          {displayRecommendations.length ? (
+            displayRecommendations.map((rec, index) => (
+              <SkeletonPanel key={rec.id ?? `rec-${index}`} isLoading={isLoading} variant="muted">
+                {!isLoading ? (
+                  <div className="flex h-full flex-col justify-between">
+                    <div>
+                      <p className="dashboard-kicker">{rec.rating ? `Rating ${rec.rating}` : 'Recommended for you'}</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-900">{rec.title}</p>
+                      <p className="mt-2 text-sm text-slate-600">{rec.summary}</p>
+                    </div>
+                    <div className="mt-5 flex items-center gap-3 text-xs text-slate-600">
+                      <button type="button" className="dashboard-pill px-3 py-1" disabled={disableActions}>
+                        Preview syllabus
+                      </button>
+                      <button type="button" className="dashboard-pill px-3 py-1" disabled={disableActions}>
+                        Add to queue
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </SkeletonPanel>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">Complete lessons to unlock refreshed recommendations.</p>
+          )}
         </div>
       </section>
+
+      {(goalsData.goals.length || surveyPrompt || monetization.hasContent) && (
+        <section className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+          {goalsData.goals.length ? (
+            <LearnerGoalsSection
+              goals={goalsData.goals}
+              summary={goalsData.summary ?? 'Track the milestones you set across courses and cohorts.'}
+              className="lg:col-span-2"
+            />
+          ) : null}
+          {surveyPrompt ? (
+            <LearnerSurveyPrompt
+              survey={surveyPrompt}
+              loading={isLoading && !surveyPrompt}
+              onDismiss={() => refresh?.()}
+            />
+          ) : null}
+          {monetization.hasContent ? (
+            <LearnerMonetizationSection
+              spotlight={monetization.spotlight}
+              offers={monetization.offers}
+            />
+          ) : null}
+        </section>
+      )}
 
       <section className="dashboard-section">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
