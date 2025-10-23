@@ -113,6 +113,51 @@ export async function fetchAggregatedFeed({ token, page = 1, perPage = 10, postT
   return mapResponse(response);
 }
 
+export async function reactToCommunityPost({ communityId, postId, token, reaction = 'appreciate' }) {
+  assertToken(token, 'react to a community post');
+  assertId(communityId, 'Community id');
+  assertId(postId, 'Post id');
+
+  const response = await httpClient.post(
+    `/communities/${communityId}/posts/${postId}/reactions`,
+    { reaction },
+    {
+      token,
+      cache: createInvalidationConfig([
+        `community:${communityId}:feed`,
+        `community:${communityId}:detail`,
+        'communities:aggregatedFeed'
+      ])
+    }
+  );
+
+  return mapResponse(response);
+}
+
+export async function removeCommunityPostReaction({
+  communityId,
+  postId,
+  token,
+  reaction = 'appreciate'
+}) {
+  assertToken(token, 'remove a community post reaction');
+  assertId(communityId, 'Community id');
+  assertId(postId, 'Post id');
+
+  const response = await httpClient.request(`/communities/${communityId}/posts/${postId}/reactions`, {
+    method: 'DELETE',
+    body: { reaction },
+    token,
+    cache: createInvalidationConfig([
+      `community:${communityId}:feed`,
+      `community:${communityId}:detail`,
+      'communities:aggregatedFeed'
+    ])
+  });
+
+  return mapResponse(response);
+}
+
 export async function fetchCommunityResources({ communityId, token, limit = 6, offset = 0, resourceType }) {
   assertToken(token, 'load community resources');
   assertId(communityId, 'Community id');

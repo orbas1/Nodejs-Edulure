@@ -22,6 +22,8 @@ router.post('/:communityId/join', auth(), CommunityController.join);
 router.post('/:communityId/leave', auth(), CommunityController.leave);
 router.post('/:communityId/posts/:postId/moderate', auth(), CommunityController.moderatePost);
 router.delete('/:communityId/posts/:postId', auth(), CommunityController.removePost);
+router.post('/:communityId/posts/:postId/reactions', auth(), CommunityController.reactToPost);
+router.delete('/:communityId/posts/:postId/reactions', auth(), CommunityController.removeReaction);
 router.get('/:communityId/sponsorships', auth(), CommunityController.listSponsorshipPlacements);
 router.put('/:communityId/sponsorships', auth(), CommunityController.updateSponsorshipPlacements);
 router.get('/:communityId/resources', auth(), CommunityController.listResources);

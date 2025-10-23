@@ -145,6 +145,22 @@ function clamp(value, { min = 1, max = 100, defaultValue = 10 } = {}) {
   return Math.min(Math.max(Math.trunc(numeric), min), max);
 }
 
+function sanitiseReactionName(name) {
+  if (!name && name !== 0) {
+    return 'appreciate';
+  }
+  const text = String(name).trim().toLowerCase();
+  return text || 'appreciate';
+}
+
+function clampNonNegative(value) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.round(numeric));
+}
+
 export default class CommunityPostModel {
   static toDomain(record) {
     return toDomain(record);
@@ -416,5 +432,132 @@ export default class CommunityPostModel {
         pageCount: total ? Math.ceil(total / perPage) : 0
       }
     };
+  }
+
+  static async listPinnedForCommunity(communityId, { limit = 10 } = {}, connection = db) {
+    if (!communityId) {
+      return [];
+    }
+
+    const rows = await connection('community_posts as cp')
+      .leftJoin('community_channels as cc', 'cp.channel_id', 'cc.id')
+      .leftJoin('users as u', 'cp.author_id', 'u.id')
+      .leftJoin('content_assets as ca', 'cp.media_asset_id', 'ca.id')
+      .select([...POST_COLUMNS, ...AUTHOR_COLUMNS, ...CHANNEL_COLUMNS, ...ASSET_COLUMNS])
+      .where('cp.community_id', communityId)
+      .andWhere('cp.status', 'published')
+      .andWhereNull('cp.deleted_at')
+      .andWhereNotNull('cp.pinned_at')
+      .orderBy('cp.pinned_at', 'desc')
+      .limit(Math.max(1, Math.min(Number(limit) || 10, 25)));
+
+    return rows.map((row) => toDomain(row));
+  }
+
+  static async listPinnedForCommunities(
+    communityIds,
+    { limitPerCommunity = 2, totalLimit = 12 } = {},
+    connection = db
+  ) {
+    if (!Array.isArray(communityIds) || communityIds.length === 0) {
+      return [];
+    }
+
+    const uniqueIds = Array.from(new Set(communityIds.map((id) => Number(id)).filter((id) => Number.isInteger(id))));
+    if (!uniqueIds.length) {
+      return [];
+    }
+
+    const perCommunityLimit = Math.max(1, Math.min(Number(limitPerCommunity) || 2, 5));
+    const overallLimit = Math.max(perCommunityLimit, Math.min(Number(totalLimit) || 12, 40));
+
+    const rows = await connection('community_posts as cp')
+      .leftJoin('community_channels as cc', 'cp.channel_id', 'cc.id')
+      .leftJoin('users as u', 'cp.author_id', 'u.id')
+      .leftJoin('content_assets as ca', 'cp.media_asset_id', 'ca.id')
+      .leftJoin('communities as c', 'cp.community_id', 'c.id')
+      .select([
+        ...POST_COLUMNS,
+        ...AUTHOR_COLUMNS,
+        ...CHANNEL_COLUMNS,
+        ...ASSET_COLUMNS,
+        'c.name as communityName',
+        'c.slug as communitySlug'
+      ])
+      .whereIn('cp.community_id', uniqueIds)
+      .andWhere('cp.status', 'published')
+      .andWhereNull('cp.deleted_at')
+      .andWhereNotNull('cp.pinned_at')
+      .orderBy('cp.community_id', 'asc')
+      .orderBy('cp.pinned_at', 'desc')
+      .limit(overallLimit);
+
+    const counts = new Map();
+    const filtered = [];
+
+    for (const row of rows) {
+      const communityId = row.communityId ?? row.community_id;
+      const current = counts.get(communityId) ?? 0;
+      if (current >= perCommunityLimit) {
+        continue;
+      }
+      counts.set(communityId, current + 1);
+      filtered.push(toDomain(row));
+    }
+
+    return filtered;
+  }
+
+  static async applyReactionDelta(postId, reaction, delta, connection = db) {
+    if (!postId || !delta) {
+      return this.findById(postId, connection);
+    }
+
+    const reactionName = sanitiseReactionName(reaction);
+
+    return connection.transaction(async (trx) => {
+      const row = await trx('community_posts').where({ id: postId }).forUpdate().first();
+      if (!row) {
+        const error = new Error('Community post not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const summary = parseJson(row.reaction_summary, {});
+      const currentTotal = clampNonNegative(summary.total ?? Object.values(summary).reduce((sum, value) => {
+        return typeof value === 'number' ? sum + value : sum;
+      }, 0));
+      const currentReaction = clampNonNegative(summary[reactionName]);
+
+      const nextReaction = clampNonNegative(currentReaction + delta);
+      const tentativeTotal = clampNonNegative(currentTotal + delta);
+      const otherKeys = Object.keys(summary).filter((key) => key !== reactionName && key !== 'total');
+
+      const nextSummary = { ...summary, [reactionName]: nextReaction };
+
+      const recomputedTotal = otherKeys.reduce((sum, key) => {
+        const value = Number(summary[key]);
+        return Number.isFinite(value) && value > 0 ? sum + value : sum;
+      }, nextReaction);
+
+      nextSummary.total = clampNonNegative(Math.max(tentativeTotal, recomputedTotal));
+
+      await trx('community_posts')
+        .where({ id: postId })
+        .update({
+          reaction_summary: JSON.stringify(nextSummary),
+          updated_at: trx.fn.now()
+        });
+
+      return this.findById(postId, trx);
+    });
+  }
+
+  static incrementReaction(postId, reaction, connection = db) {
+    return this.applyReactionDelta(postId, reaction, 1, connection);
+  }
+
+  static decrementReaction(postId, reaction, connection = db) {
+    return this.applyReactionDelta(postId, reaction, -1, connection);
   }
 }

@@ -51,7 +51,7 @@ export default function FeedList({
 }) {
   const resolvedItems = Array.isArray(items) ? items.map(NormaliseEntry).filter(Boolean) : [];
 
-  if (loading && !loadingMore) {
+  if (loading && !loadingMore && resolvedItems.length === 0) {
     return (
       <div className={className}>
         <SkeletonCard />

@@ -107,6 +107,17 @@ export default class LiveFeedService {
       : null;
 
     const items = base.items.map((entry) => enrichFeedItem(entry, base.context));
+    const pinned = Array.isArray(base.pinned)
+      ? base.pinned.map((entry) => {
+          if (!entry) {
+            return null;
+          }
+          if (entry.kind === 'post' && entry.post) {
+            return enrichFeedItem(entry, base.context);
+          }
+          return enrichFeedItem({ kind: 'post', post: entry }, base.context);
+        }).filter(Boolean)
+      : [];
 
     return {
       context: base.context,
@@ -120,6 +131,7 @@ export default class LiveFeedService {
       pagination: base.pagination,
       ads: base.ads,
       items,
+      pinned,
       highlights,
       analytics
     };

@@ -139,6 +139,10 @@ const sponsorshipUpdateSchema = Joi.object({
   blockedPlacementIds: Joi.array().items(Joi.string().max(120)).default([])
 });
 
+const reactionSchema = Joi.object({
+  reaction: Joi.string().trim().max(40).default('appreciate')
+});
+
 export default class CommunityController {
   static async listForUser(req, res, next) {
     try {
@@ -208,7 +212,7 @@ export default class CommunityController {
         data: result.items,
         pagination: result.pagination,
         message: 'Community feed fetched',
-        meta: { ads: result.ads }
+        meta: { ads: result.ads, pinned: result.pinned }
       });
     } catch (error) {
       if (error.isJoi) {
@@ -229,7 +233,7 @@ export default class CommunityController {
         data: result.items,
         pagination: result.pagination,
         message: 'Personalised feed fetched',
-        meta: { ads: result.ads }
+        meta: { ads: result.ads, pinned: result.pinned }
       });
     } catch (error) {
       if (error.isJoi) {
@@ -477,6 +481,65 @@ export default class CommunityController {
         message: 'Resource removed'
       });
     } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async reactToPost(req, res, next) {
+    try {
+      const payload = await reactionSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const post = await CommunityService.reactToPost(
+        req.params.communityId,
+        req.params.postId,
+        req.user.id,
+        payload,
+        { actorRole: req.user.role }
+      );
+      return success(res, {
+        data: post,
+        message: 'Reaction recorded',
+        status: 201
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async removeReaction(req, res, next) {
+    try {
+      const source =
+        req.body && Object.keys(req.body).length > 0
+          ? req.body
+          : req.query && Object.keys(req.query).length > 0
+            ? req.query
+            : {};
+      const payload = await reactionSchema.validateAsync(source, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const post = await CommunityService.removeReactionFromPost(
+        req.params.communityId,
+        req.params.postId,
+        req.user.id,
+        payload,
+        { actorRole: req.user.role }
+      );
+      return success(res, {
+        data: post,
+        message: 'Reaction removed'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
       return next(error);
     }
   }

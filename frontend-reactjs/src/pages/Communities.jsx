@@ -17,6 +17,7 @@ import {
 } from '../api/communityApi.js';
 import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
+import FeedComposer from '../components/feed/Composer.jsx';
 import FeedList from '../components/feed/FeedList.jsx';
 import CommunityInteractiveSuite from '../components/community/CommunityInteractiveSuite.jsx';
 import CommunityCrudManager from '../components/community/CommunityCrudManager.jsx';
@@ -28,6 +29,7 @@ import CommunityMemberDirectory from '../components/community/CommunityMemberDir
 import CommunityEventSchedule from '../components/community/CommunityEventSchedule.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
+import useFeedInteractions from '../hooks/useFeedInteractions.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 
@@ -497,6 +499,7 @@ export default function Communities() {
   const [resourcesError, setResourcesError] = useState(null);
 
   const [feedItems, setFeedItems] = useState([]);
+  const [pinnedFeedItems, setPinnedFeedItems] = useState([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [feedError, setFeedError] = useState(null);
 
@@ -620,6 +623,7 @@ export default function Communities() {
       setResourcesMeta({ ...DEFAULT_RESOURCES_META });
       setResourcesError(null);
       setFeedItems([]);
+      setPinnedFeedItems([]);
       setFeedError(null);
       setJoinError(null);
       setLeaveError(null);
@@ -717,6 +721,7 @@ export default function Communities() {
     async (communityId) => {
       if (!token || !canAccessCommunityFeed) {
         setFeedItems([]);
+        setPinnedFeedItems([]);
         return;
       }
 
@@ -724,9 +729,15 @@ export default function Communities() {
       setFeedError(null);
       try {
         const response = await fetchCommunityFeed({ communityId, token, page: 1, perPage: 5 });
-        setFeedItems(response.data ?? []);
+        const items = response.data ?? [];
+        const pinned = Array.isArray(response.meta?.pinned)
+          ? response.meta.pinned.map((post) => ({ kind: 'post', post }))
+          : [];
+        setFeedItems(items);
+        setPinnedFeedItems(pinned);
       } catch (error) {
         setFeedItems([]);
+        setPinnedFeedItems([]);
         setFeedError(error.message ?? 'Unable to load community feed');
       } finally {
         setIsLoadingFeed(false);
@@ -743,6 +754,7 @@ export default function Communities() {
       setResourcesMeta({ ...DEFAULT_RESOURCES_META });
       setResourcesError(null);
       setFeedItems([]);
+      setPinnedFeedItems([]);
       setIsLoadingFeed(false);
       setFeedError(null);
       return;
@@ -853,6 +865,83 @@ export default function Communities() {
     communityPodcasts,
     leaderboardEntries
   ]);
+
+  const updateFeedPost = useCallback((postId, updater) => {
+    if (!postId || typeof updater !== 'function') {
+      return;
+    }
+
+    const applyUpdate = (entries) =>
+      entries
+        .map((entry) => {
+          if (!entry) return entry;
+          if (entry.kind === 'post' && entry.post?.id === postId) {
+            const nextPost = updater(entry.post);
+            if (!nextPost) {
+              return null;
+            }
+            return { ...entry, post: nextPost };
+          }
+          if (!entry.kind && entry.id === postId) {
+            const nextPost = updater(entry);
+            return nextPost || null;
+          }
+          return entry;
+        })
+        .filter(Boolean);
+
+    setFeedItems((prev) => applyUpdate(prev));
+    setPinnedFeedItems((prev) => applyUpdate(prev));
+  }, []);
+
+  const reactionAnalyticsContext = useMemo(
+    () => ({
+      surface: 'communities-feed',
+      communityId: selectedCommunity?.id ?? selectedCommunityId ?? 'all'
+    }),
+    [selectedCommunity?.id, selectedCommunityId]
+  );
+
+  const handleFeedPostUpdate = useCallback(
+    (postId, nextPost) => {
+      updateFeedPost(postId, () => nextPost ?? null);
+    },
+    [updateFeedPost]
+  );
+
+  const { react: reactToCommunityFeedPost, reactionStates } = useFeedInteractions({
+    token,
+    analyticsContext: reactionAnalyticsContext,
+    onPostUpdated: handleFeedPostUpdate
+  });
+
+  const combinedFeedItems = useMemo(() => {
+    const merged = [];
+    const seen = new Set();
+
+    const pushEntry = (entry) => {
+      if (!entry) return;
+      const normalised = entry.kind === 'post' || entry.kind === 'ad' ? entry : { kind: 'post', post: entry };
+      const identifier = normalised.kind === 'post' ? normalised.post?.id : normalised.ad?.placementId ?? normalised.ad?.id;
+      if (!identifier || seen.has(identifier)) {
+        return;
+      }
+      seen.add(identifier);
+      merged.push(normalised);
+    };
+
+    pinnedFeedItems.forEach(pushEntry);
+    feedItems.forEach(pushEntry);
+
+    return merged;
+  }, [pinnedFeedItems, feedItems]);
+
+  const composerCommunities = useMemo(() => {
+    if (!communityDetail || selectedCommunityId === 'all') {
+      return [];
+    }
+    return [communityDetail];
+  }, [communityDetail, selectedCommunityId]);
 
   const subscriptionPlans = useMemo(() => {
     if (paywallTiers.length > 0) {
@@ -1227,6 +1316,7 @@ export default function Communities() {
       setResources([]);
       setResourcesMeta({ ...DEFAULT_RESOURCES_META });
       setFeedItems([]);
+      setPinnedFeedItems([]);
       setFeedError(null);
     } catch (error) {
       setLeaveError(error.message ?? 'Unable to leave this community right now.');
@@ -1299,14 +1389,29 @@ export default function Communities() {
         disabled: !canAccessCommunityFeed,
         render: () => (
           <div className="space-y-4">
+            {composerCommunities.length > 0 ? (
+              <FeedComposer
+                communities={composerCommunities}
+                defaultCommunityId={communityDetail?.id}
+                disabled={isLoadingFeed || !canAccessCommunityFeed}
+                onPostCreated={() => {
+                  if (communityDetail?.id) {
+                    loadFeed(communityDetail.id);
+                  }
+                }}
+              />
+            ) : null}
             {feedError ? (
               <p className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{feedError}</p>
             ) : (
               <FeedList
-                items={feedItems}
+                items={combinedFeedItems}
                 loading={isLoadingFeed}
+                loadingMore={false}
                 emptyState={<p className="text-sm text-slate-500">No live updates published yet.</p>}
                 hasMore={false}
+                actionStates={reactionStates}
+                onReact={reactToCommunityFeedPost}
               />
             )}
           </div>
@@ -1337,7 +1442,18 @@ export default function Communities() {
         )
       }
     ],
-    [resolvedDetail.classrooms, canAccessCommunityFeed, feedItems, feedError, isLoadingFeed]
+    [
+      resolvedDetail.classrooms,
+      canAccessCommunityFeed,
+      combinedFeedItems,
+      feedError,
+      isLoadingFeed,
+      composerCommunities,
+      reactionStates,
+      reactToCommunityFeedPost,
+      communityDetail?.id,
+      loadFeed
+    ]
   );
 
   const ratingsBreakdown = useMemo(() => Object.entries(resolvedDetail.ratings.breakdown), [resolvedDetail.ratings.breakdown]);
