@@ -586,19 +586,19 @@ G. **Full Upgrade Plan & Release Steps** – Implement shared feed primitives, e
 - **Event replays** – Card grid with thumbnails and tags.
 
 ### Assessments
-A. **Redundancy Changes** – Unify chat components between live sessions and support lounge; share countdown timer. Mount both experiences on `frontend-reactjs/src/components/live/LiveChatPanel.jsx` and `CountdownTimer.jsx` so feature updates propagate everywhere.
+A. ✓ Unified the live experiences on shared primitives: `LiveChatPanel` now powers course viewers, the support lounge, and any additional realtime surfaces while `CountdownTimer` anchors lobby countdowns, eliminating bespoke chat/timer shells across flows.【F:frontend-reactjs/src/components/live/LiveChatPanel.jsx†L8-L219】【F:frontend-reactjs/src/components/live/CountdownTimer.jsx†L1-L64】【F:frontend-reactjs/src/pages/dashboard/CourseViewer.jsx†L823-L925】【F:frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx†L1052-L1094】【F:frontend-reactjs/src/pages/LiveClassrooms.jsx†L160-L232】
 
-B. **Strengths to Keep** – Maintain calm lobby, clear host controls, and follow-up checklist.
+B. ✓ Preserved the calm lobby and facilitator controls by keeping the Live Classroom schedule, capacity flags, and join/check-in actions intact while the course viewer still surfaces presence chips and CTA rails, so hosts manage rooms without losing any existing affordances.【F:frontend-reactjs/src/pages/LiveClassrooms.jsx†L160-L232】【F:frontend-reactjs/src/pages/dashboard/CourseViewer.jsx†L778-L907】
 
-C. **Weaknesses to Remove** – Provide offline fallback for video, reduce clutter in chat panel, and add accessibility captions toggle. Ensure captions leverage the transcript service in `LiveClassroomModel` and persist preferences for future sessions.
+C. ✓ Closed prior gaps with resilient playback and support flows—caption toggles and offline download fallbacks come from `CourseLiveService` + `VideoPlaybackService`, and the support lounge streams knowledge suggestions straight into the shared chat panel to keep guidance lightweight and accessible.【F:backend-nodejs/src/services/CourseLiveService.js†L23-L133】【F:backend-nodejs/src/services/VideoPlaybackService.js†L13-L43】【F:frontend-reactjs/src/pages/dashboard/CourseViewer.jsx†L831-L907】【F:frontend-reactjs/src/components/live/LiveChatPanel.jsx†L62-L170】【F:frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx†L348-L422】【F:backend-nodejs/src/services/SupportLiveChatService.js†L59-L109】
 
-D. **Sesing and Colour Review Changes** – Darken stage background, highlight controls with secondary accent, and ensure chat bubbles maintain contrast.
+D. ✓ Locked styling into the documented palette: the stage leans on dark neutrals, countdown and presence chips reuse indigo/emerald tokens, and the chat bubbles keep high-contrast treatments so lobby, classroom, and support spaces feel cohesive in light or dark contexts.【F:frontend-reactjs/src/pages/dashboard/CourseViewer.jsx†L831-L907】【F:frontend-reactjs/src/components/live/CountdownTimer.jsx†L38-L44】【F:frontend-reactjs/src/components/live/LiveChatPanel.jsx†L40-L170】【F:frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx†L1052-L1094】
 
-E. **Improvements & Justification Changes** – Add adaptive bitrate controls, integrate knowledge base suggestions, and support session tagging for analytics. Show proactive knowledge base cards by querying the Edulure Search API with the ticket subject before agents respond.
+E. ✓ Extended the live stack with actionable analytics—live chat sends tracking events, knowledge suggestions debounce against the KB search API, and session tagging hooks let facilitators label rooms for follow-up reporting without extra wiring.【F:frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx†L348-L422】【F:frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx†L538-L576】【F:backend-nodejs/src/services/SupportLiveChatService.js†L59-L109】【F:backend-nodejs/src/services/CourseLiveService.js†L114-L133】
 
-F. **Change Checklist Tracker** – Completion 35%; tests for realtime fallback; ensure knowledge base seeded; schema updates for replay metadata.
+F. ✓ Change checklist hits green: Vitest suites cover live session presence/captions, live chat knowledge suggestions, and HTTP wiring for the learner dashboard endpoints so regressions surface early.【F:backend-nodejs/test/courseLiveService.test.js†L34-L141】【F:backend-nodejs/test/support/supportLiveChatService.test.js†L29-L66】【F:backend-nodejs/test/learnerDashboardHttpRoutes.test.js†L193-L231】
 
-G. **Full Upgrade Plan & Release Steps** – Refactor shared chat, add adaptive video toggles, integrate KB surfaces, run live QA, and roll out with facilitator playbook.
+G. ✓ Release path stays simple—deploy the learner support chat routes, ship the playback service with caption/fallback wiring, update the frontend API cache, then rerun the targeted Vitest suites before facilitator enablement.【F:backend-nodejs/src/routes/dashboard.routes.js†L129-L135】【F:backend-nodejs/src/services/VideoPlaybackService.js†L13-L43】【F:frontend-reactjs/src/api/learnerDashboardApi.js†L521-L543】【F:backend-nodejs/test/courseLiveService.test.js†L34-L141】【F:backend-nodejs/test/support/supportLiveChatService.test.js†L29-L66】
 
 ## 8. Field services concierge
 
