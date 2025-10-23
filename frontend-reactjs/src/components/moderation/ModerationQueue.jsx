@@ -135,7 +135,6 @@ export default function ModerationQueue({
   cases,
   loading,
   error,
-  pagination,
   filters,
   onFiltersChange,
   onRefresh,
@@ -152,11 +151,6 @@ export default function ModerationQueue({
   const [activeAction, setActiveAction] = useState('approve');
   const [submittingAction, setSubmittingAction] = useState(false);
   const [undoing, setUndoing] = useState(false);
-
-  const selectedItem = useMemo(
-    () => cases.find((item) => item.id === selectedCaseId) ?? null,
-    [cases, selectedCaseId]
-  );
 
   useEffect(() => {
     if (!selectedCaseId && cases.length) {
@@ -555,12 +549,6 @@ ModerationQueue.propTypes = {
   ),
   loading: PropTypes.bool,
   error: PropTypes.instanceOf(Error),
-  pagination: PropTypes.shape({
-    page: PropTypes.number,
-    perPage: PropTypes.number,
-    total: PropTypes.number,
-    pageCount: PropTypes.number
-  }),
   filters: PropTypes.object,
   onFiltersChange: PropTypes.func,
   onRefresh: PropTypes.func,
@@ -576,7 +564,6 @@ ModerationQueue.defaultProps = {
   cases: [],
   loading: false,
   error: null,
-  pagination: null,
   filters: {},
   onFiltersChange: null,
   onRefresh: null,

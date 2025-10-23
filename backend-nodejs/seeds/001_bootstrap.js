@@ -109,6 +109,11 @@ export async function seed(knex) {
     await trx('community_podcast_episodes').del();
     await trx('community_webinars').del();
     await trx('community_message_moderation_actions').del();
+    await trx('moderation_follow_ups').del();
+    await trx('community_post_moderation_actions').del();
+    await trx('community_post_moderation_cases').del();
+    await trx('scam_reports').del();
+    await trx('moderation_analytics_events').del();
     await trx('community_message_reactions').del();
     await trx('community_channel_members').del();
     await trx('community_messages').del();
@@ -837,6 +842,247 @@ export async function seed(knex) {
           registrationUrl: 'https://events.edulure.test/ama-multi-channel-funnels'
         })
       });
+
+    const now = new Date();
+    const minutesAgo = (minutes) => new Date(now.getTime() - minutes * 60000).toISOString();
+    const minutesFromNow = (minutes) => new Date(now.getTime() + minutes * 60000).toISOString();
+
+    const opsCaseMetadata = {
+      summary: 'Review automation roadmap update for release guardrails before broad publish.',
+      flags: [
+        {
+          actorId: learnerId,
+          reason: 'Missing disclosure around automation safety net.',
+          riskScore: 58,
+          flaggedAt: minutesAgo(95),
+          tags: ['policy:safety', 'automation']
+        }
+      ],
+      riskHistory: [
+        { riskScore: 32, recordedAt: minutesAgo(240), source: 'automated_detection' },
+        { riskScore: 58, recordedAt: minutesAgo(95), source: 'user_report' }
+      ],
+      notes: [
+        {
+          authorId: adminId,
+          body: 'Ops pod gathering context from last automation retro.',
+          createdAt: minutesAgo(60)
+        }
+      ]
+    };
+
+    const [opsModerationCaseId] = await trx('community_post_moderation_cases').insert({
+      community_id: opsCommunityId,
+      post_id: opsRoadmapPostId,
+      reporter_id: learnerId,
+      assigned_to: adminId,
+      status: 'in_review',
+      severity: 'medium',
+      flagged_source: 'user_report',
+      reason: 'Member asked for disclosure on automation guardrail changes before rollout.',
+      risk_score: 58,
+      metadata: JSON.stringify(opsCaseMetadata)
+    });
+
+    await trx('community_posts')
+      .where({ id: opsRoadmapPostId })
+      .update({
+        moderation_state: 'under_review',
+        moderation_metadata: JSON.stringify({
+          lastCaseId: opsModerationCaseId,
+          riskScore: 58,
+          flags: opsCaseMetadata.flags,
+          summary: opsCaseMetadata.summary
+        }),
+        last_moderated_at: trx.fn.now()
+      });
+
+    const [opsFlagActionId] = await trx('community_post_moderation_actions').insert({
+      case_id: opsModerationCaseId,
+      actor_id: learnerId,
+      action: 'flagged',
+      notes: 'Raised by automation beta participant requesting disclosure update.',
+      metadata: JSON.stringify({
+        evidence: [
+          {
+            type: 'screenshot',
+            value: 'https://cdn.edulure.test/moderation/ops-roadmap-flag.png'
+          }
+        ],
+        riskScore: 58,
+        flaggedSource: 'user_report'
+      })
+    });
+
+    const [opsAssignActionId] = await trx('community_post_moderation_actions').insert({
+      case_id: opsModerationCaseId,
+      actor_id: adminId,
+      action: 'assigned',
+      notes: 'Assigning to trust & safety lead to confirm messaging.',
+      metadata: JSON.stringify({ assignedTo: adminId, previousActionId: opsFlagActionId })
+    });
+
+    await trx('moderation_follow_ups').insert({
+      case_id: opsModerationCaseId,
+      action_id: opsAssignActionId,
+      assigned_to: adminId,
+      status: 'pending',
+      due_at: minutesFromNow(90),
+      metadata: JSON.stringify({
+        reason: 'Confirm automation guardrail disclosure note was added to the roadmap.',
+        requestedBy: adminId,
+        createdAt: minutesAgo(55)
+      })
+    });
+
+    const growthCaseMetadata = {
+      summary: 'Automated scan flagged AMA invite for aggressive ROI claim. Reviewing before reschedule.',
+      flags: [
+        {
+          actorId: adminId,
+          reason: 'ROI claim exceeds compliance threshold without citation.',
+          riskScore: 72,
+          flaggedAt: minutesAgo(180),
+          tags: ['policy:ads', 'compliance']
+        }
+      ],
+      riskHistory: [
+        { riskScore: 48, recordedAt: minutesAgo(200), source: 'automated_detection' },
+        { riskScore: 72, recordedAt: minutesAgo(150), source: 'manual_review' }
+      ],
+      notes: [
+        {
+          authorId: instructorId,
+          body: 'Updated script to remove aggressive ROI language, pending approval to restore.',
+          createdAt: minutesAgo(40)
+        }
+      ]
+    };
+
+    const [growthModerationCaseId] = await trx('community_post_moderation_cases').insert({
+      community_id: growthCommunityId,
+      post_id: growthCampaignPostId,
+      reporter_id: adminId,
+      assigned_to: instructorId,
+      status: 'suppressed',
+      severity: 'high',
+      flagged_source: 'automated_detection',
+      reason: 'Automated policy scan flagged ROI language requiring compliance review.',
+      risk_score: 72,
+      metadata: JSON.stringify(growthCaseMetadata),
+      escalated_at: minutesAgo(150),
+      resolved_at: minutesAgo(30),
+      resolved_by: adminId
+    });
+
+    await trx('community_posts')
+      .where({ id: growthCampaignPostId })
+      .update({
+        moderation_state: 'suppressed',
+        moderation_metadata: JSON.stringify({
+          lastCaseId: growthModerationCaseId,
+          riskScore: 72,
+          flags: growthCaseMetadata.flags,
+          summary: growthCaseMetadata.summary,
+          suppressedAt: minutesAgo(30)
+        }),
+        last_moderated_at: trx.fn.now()
+      });
+
+    const [growthFlagActionId] = await trx('community_post_moderation_actions').insert({
+      case_id: growthModerationCaseId,
+      actor_id: adminId,
+      action: 'flagged',
+      notes: 'Compliance automation escalated ROI claim for review.',
+      metadata: JSON.stringify({
+        riskScore: 72,
+        flaggedSource: 'automated_detection',
+        policyTags: ['ads', 'claims'],
+        aiSummary:
+          'ROI claim exceeds allowed threshold without supporting data. Suggest editing copy before republishing.'
+      })
+    });
+
+    const [growthSuppressActionId] = await trx('community_post_moderation_actions').insert({
+      case_id: growthModerationCaseId,
+      actor_id: adminId,
+      action: 'suppressed',
+      notes: 'Temporarily suppressing AMA announcement until copy is updated.',
+      metadata: JSON.stringify({
+        previousActionId: growthFlagActionId,
+        suppressedUntil: minutesFromNow(180),
+        restoreHint: 'Confirm updated copy removes ROI claim and cite customer examples.'
+      })
+    });
+
+    await trx('community_post_moderation_actions').insert({
+      case_id: growthModerationCaseId,
+      actor_id: instructorId,
+      action: 'comment',
+      notes: 'Drafted revised announcement copy removing ROI language.',
+      metadata: JSON.stringify({ relatedResource: 'doc://campaign-lab-ama-rewrite' })
+    });
+
+    await trx('moderation_follow_ups').insert({
+      case_id: growthModerationCaseId,
+      action_id: growthSuppressActionId,
+      assigned_to: instructorId,
+      status: 'completed',
+      due_at: minutesAgo(25),
+      completed_at: minutesAgo(10),
+      metadata: JSON.stringify({
+        reason: 'Provide updated AMA copy for approval before restoring.',
+        requestedBy: adminId,
+        completedBy: instructorId,
+        notes: 'Updated script shared with compliance in the moderation thread.'
+      })
+    });
+
+    await trx('moderation_analytics_events').insert([
+      {
+        community_id: opsCommunityId,
+        entity_type: 'community_post',
+        entity_id: String(opsRoadmapPostId),
+        event_type: 'moderation.case.opened',
+        risk_score: 58,
+        metrics: JSON.stringify({ pendingFollowUps: 1, severity: 'medium' }),
+        source: 'manual',
+        occurred_at: minutesAgo(90)
+      },
+      {
+        community_id: growthCommunityId,
+        entity_type: 'community_post',
+        entity_id: String(growthCampaignPostId),
+        event_type: 'moderation.case.suppressed',
+        risk_score: 72,
+        metrics: JSON.stringify({ followUpsCompleted: 1, severity: 'high' }),
+        source: 'automated',
+        occurred_at: minutesAgo(30)
+      }
+    ]);
+
+    await trx('scam_reports').insert({
+      reporter_id: learnerId,
+      entity_type: 'community',
+      entity_id: String(growthCommunityId),
+      community_id: growthCommunityId,
+      status: 'investigating',
+      risk_score: 62,
+      reason: 'Members received suspicious affiliate invitations referencing the AMA.',
+      description:
+        'Two members reported unsolicited DMs linking to off-platform checkout pages claiming guaranteed ROI.',
+      metadata: JSON.stringify({
+        relatedCaseId: growthModerationCaseId,
+        evidence: [
+          {
+            type: 'url',
+            value: 'https://malicious.edulure.test/rogue-affiliate-campaign'
+          }
+        ],
+        tags: ['affiliate', 'spam']
+      }),
+      handled_by: adminId
+    });
 
     const [opsBlueprintResourceId] = await trx('community_resources').insert({
         community_id: opsCommunityId,
