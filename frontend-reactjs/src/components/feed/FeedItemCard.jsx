@@ -82,9 +82,24 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
   const avatarUrl = post.author?.avatarUrl;
   const linkAttachments = normaliseLinkAttachments(post.metadata?.attachments);
   const moderationReason = post.moderation?.context ?? post.moderation?.reason;
+  const moderationReviewContext = post.moderation?.reviewContext ?? null;
   const preview = post.media?.preview;
   const previewUrl = preview?.thumbnailUrl;
   const previewAspectRatio = preview?.aspectRatio ?? '16:9';
+  const viewerReactions = Array.isArray(post.viewer?.reactions) ? post.viewer.reactions : [];
+  const defaultReactionKey = 'appreciate';
+  const hasReacted = viewerReactions.includes(defaultReactionKey);
+  const resolvedReactionCount = Number.isFinite(Number(reactions)) ? Number(reactions) : 0;
+  const resolvedAspectRatio = useMemo(() => {
+    if (!previewAspectRatio || typeof previewAspectRatio !== 'string') {
+      return 16 / 9;
+    }
+    const [w, h] = previewAspectRatio.split(':').map((value) => Number(value));
+    if (Number.isFinite(w) && Number.isFinite(h) && h > 0) {
+      return w / h;
+    }
+    return 16 / 9;
+  }, [previewAspectRatio]);
 
   const handleReact = (reaction) => {
     if (typeof onReact === 'function') {
@@ -93,7 +108,7 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
   };
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <article className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:shadow-md">
       <div className="flex flex-wrap items-start gap-4">
         {avatarUrl && !isAvatarBroken ? (
           <img
@@ -121,11 +136,14 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
                   </span>
                 ) : null}
               </div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                {post.author?.role ?? 'Member'}
-                {communityName && <span className="ml-1 text-slate-300">•</span>}
-                {communityName && <span className="ml-1 text-slate-500">{communityName}</span>}
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <span>{post.author?.role ?? 'Member'}</span>
+                {communityName ? (
+                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                    {communityName}
+                  </span>
+                ) : null}
+              </div>
             </div>
             <div className="flex flex-col items-end gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-primary">{publishedLabel}</span>
@@ -159,17 +177,9 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
           <p className="mt-3 break-words text-sm leading-6 text-slate-700">{bodyCopy}</p>
 
           {previewUrl ? (
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-              <div
-                className="relative w-full bg-slate-100"
-                style={{ paddingBottom: `calc(100% / (${previewAspectRatio.replace(':', '/') || '16/9'}))` }}
-              >
-                <img
-                  src={previewUrl}
-                  alt={post.title ?? 'Post preview'}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                />
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+              <div className="relative w-full" style={{ aspectRatio: resolvedAspectRatio }}>
+                <img src={previewUrl} alt={post.title ?? 'Post preview'} className="h-full w-full object-cover" loading="lazy" />
               </div>
             </div>
           ) : null}
@@ -216,18 +226,26 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
           {moderationReason && (
             <p className="mt-2 text-xs text-amber-500">Context: {moderationReason}</p>
           )}
+          {moderationReviewContext && (
+            <p className="mt-1 text-xs text-amber-500">Escalation: {moderationReviewContext}</p>
+          )}
 
           <div className="mt-6 flex flex-wrap items-center gap-6 text-sm text-slate-500">
             <button
               type="button"
-              className="flex items-center gap-2 rounded-full border border-transparent px-0 text-slate-500 transition hover:text-primary"
-              onClick={() => handleReact('appreciate')}
-              disabled={!onReact}
+              className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition ${
+                hasReacted
+                  ? 'border-primary/50 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 text-primary shadow-inner'
+                  : 'border-transparent bg-gradient-to-r from-slate-50 via-white to-slate-50 text-slate-500 hover:border-primary/40 hover:text-primary'
+              }`}
+              onClick={() => handleReact(defaultReactionKey)}
+              disabled={!onReact || isProcessing}
+              aria-pressed={hasReacted}
             >
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
-                {numberFormatter.format(reactions)}
+                {numberFormatter.format(resolvedReactionCount)}
               </span>
-              Appreciations
+              {hasReacted ? 'Appreciated' : 'Appreciate'}
             </button>
             <div className="flex items-center gap-2">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600">
@@ -273,7 +291,8 @@ FeedItemCard.propTypes = {
     moderation: PropTypes.shape({
       state: PropTypes.string,
       reason: PropTypes.string,
-      context: PropTypes.string
+      context: PropTypes.string,
+      reviewContext: PropTypes.string
     }),
     metadata: PropTypes.object,
     media: PropTypes.shape({
@@ -282,7 +301,11 @@ FeedItemCard.propTypes = {
         aspectRatio: PropTypes.string
       })
     }),
-    isPinned: PropTypes.bool
+    isPinned: PropTypes.bool,
+    viewer: PropTypes.shape({
+      reactions: PropTypes.arrayOf(PropTypes.string),
+      hasReacted: PropTypes.bool
+    })
   }).isRequired,
   onModerate: PropTypes.func,
   onRemove: PropTypes.func,

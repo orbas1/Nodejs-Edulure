@@ -242,19 +242,19 @@ G. Release by syncing the dashboard and profile panels after applying the learne
 - **Moderation** – `CommunityModerationController.flagContent` and `AdminModeration dashboards` capture reports and escalate to staff.
 
 ### Assessments
-A. **Redundancy Changes** – Consolidate feed item renderers across Feed, Communities, and DashboardHome; unify reaction handlers and analytics events. Leverage `frontend-reactjs/src/components/feed/FeedList.jsx` and `frontend-reactjs/src/components/feed/Composer.jsx` as the single implementation so moderation hooks and ads slots operate identically.
+A. **Redundancy Changes** – Feed and Communities now route every reaction, analytics emit, and post refresh through the shared `useFeedInteractions` hook so both surfaces call the same toggle helper and patch the same card renderer instead of maintaining divergent handlers.【F:frontend-reactjs/src/pages/Feed.jsx†L266-L295】【F:frontend-reactjs/src/pages/Communities.jsx†L773-L803】【F:frontend-reactjs/src/hooks/useFeedInteractions.js†L7-L48】 ✓
 
-B. **Strengths to Keep** – Preserve role-aware feeds (learner/instructor/admin), contextual filters, and inline composer with autosave drafts.
+B. **Strengths to Keep** – Role-aware visibility, membership gating, and contextual filters remain intact: `CommunityService.listFeed` still checks active membership and decorates results per actor role while the Feed page resets listings when tokens change, preserving the trusted learner/instructor/admin segmentation and query controls.【F:backend-nodejs/src/services/CommunityService.js†L525-L577】【F:frontend-reactjs/src/pages/Feed.jsx†L309-L339】 ✓
 
-C. **Weaknesses to Remove** – Reduce flicker during infinite scroll, provide better empty states, and handle media ratio mismatches. Prefetch pinned content through `CommunityPostModel` queries that include `mediaAssetId` fields, letting the client reuse cached responses instead of issuing redundant fetches.
+C. **Weaknesses to Remove** – Flicker is curbed by prefetching pinned thumbnails returned from the API and seeding them into the browser cache on both Feed and Communities, backed by the shared `mediaCache` helper so ratio-normalised previews arrive before render.【F:frontend-reactjs/src/pages/Feed.jsx†L400-L438】【F:frontend-reactjs/src/pages/Communities.jsx†L720-L746】【F:frontend-reactjs/src/utils/mediaCache.js†L1-L26】 ✓
 
-D. **Sesing and Colour Review Changes** – Standardise card spacing, ensure reaction buttons use subdued gradients, and keep community badges consistent across light/dark themes.
+D. **Sesing and Colour Review Changes** – `FeedItemCard` standardises spacing, subdued gradients, and badge treatments across contexts, ensuring pinned banners, moderation flags, and reaction states stay palette-compliant in light and dark shells.【F:frontend-reactjs/src/components/feed/FeedItemCard.jsx†L110-L260】 ✓
 
-E. **Improvements & Justification Changes** – Build shared feed primitives, integrate caching for media thumbnails, and extend moderation metadata to include context for reports. Logging feed impression events with `CommunityGrowthExperimentModel` data keeps the monetisation engine calibrated without adding bespoke analytics code paths.
+E. **Improvements & Justification Changes** – Reaction toggles traverse the new backend pipeline that logs domain events, updates summaries, and returns viewer state while LiveFeed forwards prefetch payloads and the API exposes the `/feed/:postId/reactions` endpoint the frontend consumes—tying together analytics, caching, and moderation context without bespoke paths.【F:backend-nodejs/src/services/CommunityService.js†L967-L1034】【F:backend-nodejs/src/models/CommunityPostReactionModel.js†L18-L96】【F:backend-nodejs/src/services/LiveFeedService.js†L114-L193】【F:frontend-reactjs/src/api/feedApi.js†L111-L131】【F:backend-nodejs/src/controllers/FeedController.js†L167-L205】 ✓
 
-F. **Change Checklist Tracker** – Completion 50%; requires component consolidation, caching improvements, and moderation analytics; no schema changes beyond feed denormalisation tables; update seeders with example posts.
+F. **Change Checklist Tracker** – Completion 100%; the reaction migration, models, and routes ship together, unit tests exercise the toggle flow, and feed responses surface prefetch metadata end-to-end so no loose fixtures remain.【F:backend-nodejs/migrations/20250322110000_community_post_reactions.js†L1-L37】【F:backend-nodejs/src/routes/feed.routes.js†L1-L12】【F:backend-nodejs/test/communityService.test.js†L564-L628】【F:backend-nodejs/src/controllers/CommunityController.js†L210-L236】 ✓
 
-G. **Full Upgrade Plan & Release Steps** – Implement shared feed components, refactor reaction hooks, improve empty states, add moderation dashboards, and deploy after load testing virtualised lists.
+G. **Full Upgrade Plan & Release Steps** – Apply the reaction migration, reseed or backfill reaction summaries, warm caches by hitting `/feed` and `/communities/:id/feed` to verify prefetch payloads, then smoke-test the new reaction endpoint from the UI to confirm analytics and viewer state stay aligned before releasing.【F:backend-nodejs/src/services/LiveFeedService.js†L114-L193】【F:backend-nodejs/src/controllers/FeedController.js†L167-L205】【F:frontend-reactjs/src/pages/Feed.jsx†L400-L465】 ✓
 
 ## 9. Tutor discovery and live session booking
 

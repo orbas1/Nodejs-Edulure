@@ -8,6 +8,7 @@ import CommunityMemberPointModel from '../models/CommunityMemberPointModel.js';
 import CommunityModel from '../models/CommunityModel.js';
 import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import CommunityPostModel from '../models/CommunityPostModel.js';
+import CommunityPostReactionModel from '../models/CommunityPostReactionModel.js';
 import CommunityResourceModel from '../models/CommunityResourceModel.js';
 import CommunityRoleDefinitionModel from '../models/CommunityRoleDefinitionModel.js';
 import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
@@ -547,10 +548,15 @@ export default class CommunityService {
       ...filters,
       query: searchQuery
     });
+    const postIds = items.map((item) => item.id);
+    const viewerReactions = actor.id
+      ? await CommunityPostReactionModel.listForPosts(postIds, actor.id)
+      : new Map();
     const serialised = items.map((item) =>
       this.serializePost(item, community, {
         membership,
-        actor
+        actor,
+        viewerReactions: viewerReactions.get(item.id)
       })
     );
     const decorated = await AdsPlacementService.decorateFeed({
@@ -560,10 +566,14 @@ export default class CommunityService {
       perPage: filters.perPage,
       metadata: { communityId: community.id, blockedPlacementIds }
     });
+    const pinnedMedia = await CommunityPostModel.listPinnedMedia(community.id, { limit: 6 });
     return {
       items: decorated.items,
       pagination,
-      ads: decorated.ads
+      ads: decorated.ads,
+      prefetch: {
+        pinnedMedia: pinnedMedia.map((entry) => ({ ...entry, communityId: community.id }))
+      }
     };
   }
 
@@ -575,10 +585,15 @@ export default class CommunityService {
       query: searchQuery
     });
     const actor = { id: userId, role: options.actorRole };
+    const postIds = items.map((item) => item.id);
+    const viewerReactions = actor.id
+      ? await CommunityPostReactionModel.listForPosts(postIds, actor.id)
+      : new Map();
     const serialised = items.map((item) =>
       this.serializePost(item, undefined, {
         membership: item.viewerRole ? { role: item.viewerRole, status: 'active' } : null,
-        actor
+        actor,
+        viewerReactions: viewerReactions.get(item.id)
       })
     );
     const decorated = await AdsPlacementService.decorateFeed({
@@ -588,10 +603,28 @@ export default class CommunityService {
       perPage: filters.perPage,
       metadata: { userId }
     });
+    const communityIds = serialised
+      .map((post) => post.community?.id)
+      .filter((value) => value !== undefined && value !== null);
+    const uniqueCommunityIds = [...new Set(communityIds.map((value) => Number(value)))].filter((value) =>
+      Number.isFinite(value)
+    );
+    const pinnedMediaGroups = await Promise.all(
+      uniqueCommunityIds.map(async (communityId) => ({
+        communityId,
+        entries: await CommunityPostModel.listPinnedMedia(communityId, { limit: 3 })
+      }))
+    );
+    const pinnedMedia = pinnedMediaGroups.flatMap(({ communityId, entries }) =>
+      entries.map((entry) => ({ ...entry, communityId }))
+    );
     return {
       items: decorated.items,
       pagination,
-      ads: decorated.ads
+      ads: decorated.ads,
+      prefetch: {
+        pinnedMedia
+      }
     };
   }
 
@@ -929,6 +962,77 @@ export default class CommunityService {
     });
 
     return this.serializePost(updated, community, { membership, actorRole: options.actorRole });
+  }
+
+  static async togglePostReaction(postId, userId, reaction, options = {}) {
+    const reactionKey = typeof reaction === 'string' ? reaction.trim().toLowerCase() : '';
+    if (!reactionKey) {
+      const error = new Error('Reaction type is required');
+      error.status = 422;
+      throw error;
+    }
+
+    return db.transaction(async (trx) => {
+      const post = await CommunityPostModel.findById(postId, trx);
+      if (!post || post.status !== 'published') {
+        const error = new Error('Post not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const membership = await CommunityMemberModel.findMembership(post.communityId, userId, trx);
+      if (!isActiveMembership(membership)) {
+        const error = new Error('You need an active membership to react to posts');
+        error.status = 403;
+        throw error;
+      }
+
+      const actor = { id: userId, role: options.actorRole };
+      const toggled = await CommunityPostReactionModel.toggle(
+        {
+          postId: post.id,
+          userId,
+          reaction: reactionKey,
+          metadata: options.metadata
+        },
+        trx
+      );
+
+      const summary = await CommunityPostReactionModel.summarise(post.id, trx);
+      const updated = await CommunityPostModel.updateReactionSummary(post.id, summary, trx);
+      const viewerReactions = await CommunityPostReactionModel.listForPosts([post.id], userId, trx);
+      const community = post.communityId
+        ? { id: post.communityId, name: post.communityName, slug: post.communitySlug }
+        : undefined;
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_post',
+          entityId: post.id,
+          eventType: toggled.active
+            ? 'community.post.reaction.added'
+            : 'community.post.reaction.removed',
+          payload: {
+            communityId: post.communityId,
+            reaction: reactionKey
+          },
+          performedBy: userId
+        },
+        trx
+      );
+
+      const serialized = this.serializePost(updated, community, {
+        membership,
+        actor,
+        viewerReactions: viewerReactions.get(post.id)
+      });
+
+      return {
+        post: serialized,
+        reaction: reactionKey,
+        active: toggled.active
+      };
+    });
   }
 
   static async createResource(communityIdentifier, userId, payload) {
@@ -1641,6 +1745,13 @@ export default class CommunityService {
     const actor = context.actor ?? {};
     const canModerate = canModerateMembership(membership, actor.role);
     const canRemove = canModerate || actor.id === post.authorId;
+    const viewerReactionSet =
+      context.viewerReactions instanceof Set
+        ? context.viewerReactions
+        : Array.isArray(context.viewerReactions)
+          ? new Set(context.viewerReactions)
+          : new Set();
+    const viewerReactions = Array.from(viewerReactionSet).filter(Boolean);
 
     const preview = {
       thumbnailUrl: previewMetadata.thumbnailUrl ?? assetMetadata.thumbnailUrl ?? null,
@@ -1701,12 +1812,18 @@ export default class CommunityService {
           ? moderationMetadata.riskHistory
           : [],
         notes: moderationMetadata.notes ?? [],
-        context: moderationMetadata.context ?? null
+        context: moderationMetadata.context ?? null,
+        caseId: moderationMetadata.caseId ?? moderationMetadata.case_id ?? null,
+        reviewContext: moderationMetadata.reviewContext ?? moderationMetadata.review_context ?? null
       },
       metadata,
       permissions: {
         canModerate,
         canRemove
+      },
+      viewer: {
+        reactions: viewerReactions,
+        hasReacted: viewerReactions.length > 0
       }
     };
   }

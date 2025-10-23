@@ -102,9 +102,12 @@ export default class LiveFeedService {
       ? await this.composeHighlights({ actor, context: base.context, limit: 4 })
       : [];
 
-    const analytics = includeAnalytics
-      ? await this.computeAnalytics({ actor, base, range: rangeWindow })
-      : null;
+    let analytics = null;
+    if (includeAnalytics) {
+      analytics = await this.computeAnalytics({ actor, base, range: rangeWindow });
+    } else {
+      await this.computeAnalytics({ actor, base, range: rangeWindow });
+    }
 
     const items = base.items.map((entry) => enrichFeedItem(entry, base.context));
 
@@ -119,6 +122,7 @@ export default class LiveFeedService {
       generatedAt: new Date().toISOString(),
       pagination: base.pagination,
       ads: base.ads,
+      prefetch: base.prefetch ?? {},
       items,
       highlights,
       analytics
