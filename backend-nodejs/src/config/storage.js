@@ -22,6 +22,10 @@ export const storageLimits = {
   maxUploadBytes: env.storage.maxUploadBytes
 };
 
+export const storageRetries = {
+  upload: env.storage.uploadRetry
+};
+
 export const localStorageConfig = {
   root: env.storage.localRoot,
   publicUrl: env.storage.localPublicUrl,
@@ -66,7 +70,8 @@ export const storageDescriptor = {
   ttls: storageTtls,
   limits: storageLimits,
   cdnUrl: env.storage.cdnUrl,
-  local: localStorageConfig
+  local: localStorageConfig,
+  retry: storageRetries
 };
 
 export default r2Client;

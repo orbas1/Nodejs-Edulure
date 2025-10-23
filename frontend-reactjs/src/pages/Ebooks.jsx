@@ -351,6 +351,38 @@ function EbookCheckoutDrawer({ ebook, open, onClose, form, onChange, onSubmit, s
   );
 }
 
+function formatRetryAdvice(retry) {
+  if (!retry || typeof retry !== 'object') {
+    return null;
+  }
+
+  const delayMs = Number(retry.recommendedDelayMs ?? retry.baseDelayMs ?? 0);
+  const attempts = Number(retry.maxAttempts ?? retry.maxRetryAttempts ?? 0);
+  const strategy = typeof retry.strategy === 'string' ? retry.strategy.replace(/[_-]+/g, ' ') : null;
+
+  if (!delayMs && !attempts) {
+    return null;
+  }
+
+  const delaySeconds = delayMs ? Math.max(1, Math.round(delayMs / 1000)) : null;
+  const parts = [];
+  if (delaySeconds) {
+    parts.push(`we'll retry in about ${delaySeconds} second${delaySeconds === 1 ? '' : 's'}`);
+  }
+  if (attempts) {
+    parts.push(`up to ${attempts} time${attempts === 1 ? '' : 's'}`);
+  }
+
+  const retrySummary = parts.length ? parts.join(' and ') : null;
+  const strategySuffix = strategy ? ` using ${strategy} backoff` : '';
+
+  if (!retrySummary) {
+    return null;
+  }
+
+  return `If processing stalls ${retrySummary}${strategySuffix}.`;
+}
+
 function EbookForm({
   form,
   onChange,
@@ -607,6 +639,9 @@ function EbookForm({
             {coverUpload.error ? (
               <p className="text-xs font-semibold text-rose-600">{coverUpload.error}</p>
             ) : null}
+            {coverUpload.retryAdvice ? (
+              <p className="text-xs font-medium text-slate-500">{coverUpload.retryAdvice}</p>
+            ) : null}
             {form.coverImageUrl ? (
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
                 <a
@@ -647,6 +682,9 @@ function EbookForm({
             {sampleUpload.error ? (
               <p className="text-xs font-semibold text-rose-600">{sampleUpload.error}</p>
             ) : null}
+            {sampleUpload.retryAdvice ? (
+              <p className="text-xs font-medium text-slate-500">{sampleUpload.retryAdvice}</p>
+            ) : null}
             {form.sampleDownloadUrl ? (
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
                 <a
@@ -686,6 +724,9 @@ function EbookForm({
             ) : null}
             {audioUpload.error ? (
               <p className="text-xs font-semibold text-rose-600">{audioUpload.error}</p>
+            ) : null}
+            {audioUpload.retryAdvice ? (
+              <p className="text-xs font-medium text-slate-500">{audioUpload.retryAdvice}</p>
             ) : null}
             {form.audiobookUrl ? (
               <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
@@ -850,12 +891,15 @@ export default function Ebooks() {
       updateUploadState(field, {
         status: 'uploading',
         error: null,
-        filename: file.name
+        filename: file.name,
+        retry: null,
+        retryAdvice: null
       });
 
+      let instruction;
       try {
         const checksum = await computeFileChecksum(file);
-        const instruction = await requestMediaUpload({
+        instruction = await requestMediaUpload({
           token,
           payload: {
             kind,
@@ -883,6 +927,8 @@ export default function Ebooks() {
         const uploadedUrl = instruction.file?.publicUrl ?? null;
         const storageKey = instruction.file?.storageKey ?? null;
         const resolvedValue = uploadedUrl ?? storageKey ?? '';
+        const retryMetadata = instruction.upload?.retry ?? instruction.retry ?? null;
+        const retryAdvice = formatRetryAdvice(retryMetadata);
 
         setForm((current) => ({
           ...current,
@@ -895,13 +941,19 @@ export default function Ebooks() {
           url: uploadedUrl,
           filename: file.name,
           storageKey,
-          visibility: instruction.file?.visibility ?? null
+          visibility: instruction.file?.visibility ?? null,
+          retry: retryMetadata,
+          retryAdvice
         });
       } catch (uploadError) {
         const message = uploadError?.message ?? 'Failed to upload file.';
+        const retryMetadata = instruction?.upload?.retry ?? instruction?.retry ?? null;
+        const retryAdvice = formatRetryAdvice(retryMetadata);
         updateUploadState(field, {
           status: 'error',
-          error: message
+          error: message,
+          retry: retryMetadata,
+          retryAdvice
         });
       }
     },
@@ -919,7 +971,10 @@ export default function Ebooks() {
         error: null,
         url: null,
         filename: null,
-        storageKey: null
+        storageKey: null,
+        visibility: null,
+        retry: null,
+        retryAdvice: null
       });
     },
     [updateUploadState, setForm]
