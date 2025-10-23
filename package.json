@@ -16,6 +16,7 @@
   "scripts": {
     "preinstall": "node ./scripts/verify-node-version.mjs",
     "bootstrap": "npm install --workspaces",
+    "dev:stack": "node ./scripts/dev-stack.mjs",
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
