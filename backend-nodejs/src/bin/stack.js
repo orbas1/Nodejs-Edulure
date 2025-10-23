@@ -1,25 +1,55 @@
 import logger from '../config/logger.js';
 import { bootstrapServices } from '../server.js';
+import { getJobFeatureSnapshot } from '../config/featureFlags.js';
 
-const preset = process.env.SERVICE_PRESET ?? 'lite';
-const hasCustomTargets = Boolean(process.env.SERVICE_TARGET);
+import {
+  derivePresetConfiguration,
+  normalizeJobGroupInput,
+  normalizeTargetInput,
+  parsePresetCli
+} from '../../../scripts/lib/processSupervisor.mjs';
 
-if (!hasCustomTargets) {
-  if (preset === 'full' || preset === 'analytics') {
-    process.env.SERVICE_TARGET = 'web,worker,realtime';
+const cliOptions = parsePresetCli(process.argv.slice(2));
+const featureSnapshot = getJobFeatureSnapshot();
+
+const explicitTargets = normalizeTargetInput(cliOptions.serviceTarget ?? process.env.SERVICE_TARGET);
+const explicitJobGroups = normalizeJobGroupInput(cliOptions.serviceJobGroups ?? process.env.SERVICE_JOB_GROUPS);
+const requestedPreset = process.env.SERVICE_PRESET ?? cliOptions.preset;
+
+const configuration = derivePresetConfiguration(requestedPreset, {
+  featureSnapshot,
+  explicitTargets,
+  explicitJobGroups
+});
+
+process.env.SERVICE_PRESET = configuration.preset;
+
+if (!explicitTargets?.length) {
+  process.env.SERVICE_TARGET = configuration.env.SERVICE_TARGET;
+}
+
+if (!explicitJobGroups?.length) {
+  if (configuration.env.SERVICE_JOB_GROUPS) {
+    process.env.SERVICE_JOB_GROUPS = configuration.env.SERVICE_JOB_GROUPS;
   } else {
-    process.env.SERVICE_TARGET = 'web';
+    delete process.env.SERVICE_JOB_GROUPS;
   }
 }
 
-if (preset === 'lite') {
-  process.env.SERVICE_JOB_GROUPS = process.env.SERVICE_JOB_GROUPS ?? 'core';
-}
+logger.info(
+  {
+    preset: configuration.preset,
+    targets: process.env.SERVICE_TARGET,
+    jobGroups: process.env.SERVICE_JOB_GROUPS,
+    features: featureSnapshot
+  },
+  'Resolved stack bootstrap configuration'
+);
 
 bootstrapServices()
   .then(() => {
     logger.info({
-      preset,
+      preset: configuration.preset,
       targets: process.env.SERVICE_TARGET,
       jobGroups: process.env.SERVICE_JOB_GROUPS
     }, 'Stack services bootstrapped');

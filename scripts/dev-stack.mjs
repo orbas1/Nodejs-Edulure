@@ -1,170 +1,139 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
 import process from 'node:process';
 
-const spawnedProcesses = [];
-let shuttingDown = false;
+import {
+  createProcessSupervisor,
+  derivePresetConfiguration,
+  normalizeJobGroupInput,
+  normalizeTargetInput,
+  parsePresetCli
+} from './lib/processSupervisor.mjs';
 
-function runCommandOnce(label, command, args, options = {}) {
-  const spawnOptions = {
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-    ...options
-  };
+import { getJobFeatureSnapshot } from '../backend-nodejs/src/config/featureFlags.js';
 
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, spawnOptions);
+const DEFAULT_BACKEND_HEALTH_URL = process.env.DEV_STACK_BACKEND_HEALTH_URL ?? 'http://localhost:3000/health';
+const DEFAULT_FRONTEND_HEALTH_URL = process.env.DEV_STACK_FRONTEND_HEALTH_URL ?? 'http://localhost:5173';
 
-    child.on('exit', (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      const reason = signal ? `${label} exited via signal ${signal}` : `${label} exited with code ${code}`;
-      reject(new Error(reason));
+async function checkBackendReadiness(url = DEFAULT_BACKEND_HEALTH_URL) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal
     });
+    clearTimeout(timeout);
 
-    child.on('error', (error) => {
-      reject(error);
-    });
-  });
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      payload = null;
+    }
+
+    return {
+      status: response.ok ? 'ready' : 'pending',
+      ok: response.ok,
+      message: payload?.message ?? payload?.status ?? `HTTP ${response.status}`
+    };
+  } catch (error) {
+    return { status: 'pending', message: error.name === 'AbortError' ? 'Timed out waiting for health probe' : error.message };
+  }
 }
 
-function spawnPersistent(label, command, args, options = {}) {
-  const spawnOptions = {
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-    ...options
-  };
-
-  const child = spawn(command, args, spawnOptions);
-  spawnedProcesses.push({ label, child });
-
-  child.on('exit', (code, signal) => {
-    if (shuttingDown) {
-      return;
-    }
-
-    shuttingDown = true;
-    const reason = signal ? `${label} stopped via signal ${signal}` : `${label} exited with code ${code}`;
-    console.error(`[dev-stack] ${reason}`);
-    stopAll({ except: child }).finally(() => {
-      process.exit(code ?? (signal ? 0 : 1));
-    });
-  });
-
-  child.on('error', (error) => {
-    if (shuttingDown) {
-      return;
-    }
-    shuttingDown = true;
-    console.error(`[dev-stack] ${label} failed to spawn`, error);
-    stopAll({ except: child }).finally(() => {
-      process.exit(1);
-    });
-  });
-}
-
-async function stopAll({ except } = {}) {
-  const terminationPromises = spawnedProcesses.map(({ label, child }) => {
-    if (child === except) {
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      if (child.exitCode !== null || child.signalCode !== null) {
-        resolve();
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        if (child.exitCode === null && child.signalCode === null) {
-          child.kill('SIGKILL');
-        }
-      }, 5000);
-
-      child.once('exit', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-
-      child.kill('SIGINT');
-    });
-  });
-
-  await Promise.allSettled(terminationPromises);
+async function checkFrontendReadiness(url = DEFAULT_FRONTEND_HEALTH_URL) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch(url, { method: 'GET', signal: controller.signal });
+    clearTimeout(timeout);
+    return {
+      status: response.ok ? 'ready' : 'pending',
+      ok: response.ok,
+      message: `HTTP ${response.status}`
+    };
+  } catch (error) {
+    return { status: 'pending', message: error.name === 'AbortError' ? 'Timed out waiting for frontend dev server' : error.message };
+  }
 }
 
 async function main() {
   const args = process.argv.slice(2);
-  const skipDbInstall = args.includes('--skip-db-install');
-  const skipFrontend = args.includes('--skip-frontend');
+  const cliOptions = parsePresetCli(args);
+  const supervisor = createProcessSupervisor({ name: 'dev-stack', logFormat: cliOptions.logFormat });
 
-  const backendEnv = { ...process.env };
+  const featureSnapshot = getJobFeatureSnapshot();
+  const explicitTargets = normalizeTargetInput(cliOptions.serviceTarget ?? process.env.SERVICE_TARGET);
+  const explicitJobGroups = normalizeJobGroupInput(cliOptions.serviceJobGroups ?? process.env.SERVICE_JOB_GROUPS);
 
-  const presetArg = args.find((arg) => arg.startsWith('--preset='));
-  const preset = presetArg ? presetArg.split('=')[1] ?? 'lite' : 'lite';
-  backendEnv.SERVICE_PRESET = preset;
+  const presetConfiguration = derivePresetConfiguration(cliOptions.preset, {
+    featureSnapshot,
+    explicitTargets,
+    explicitJobGroups
+  });
 
-  const serviceTargetArg = args.find((arg) => arg.startsWith('--service-target='));
-  if (serviceTargetArg) {
-    const [, value] = serviceTargetArg.split('=', 2);
-    if (value) {
-      backendEnv.SERVICE_TARGET = value;
-    }
+  const backendEnv = { ...process.env, SERVICE_PRESET: presetConfiguration.preset };
+
+  if (explicitTargets?.length) {
+    backendEnv.SERVICE_TARGET = explicitTargets.join(',');
+  } else {
+    backendEnv.SERVICE_TARGET = presetConfiguration.env.SERVICE_TARGET;
   }
 
-  if (!backendEnv.SERVICE_TARGET) {
-    if (preset === 'full') {
-      backendEnv.SERVICE_TARGET = 'web,worker,realtime';
-    } else if (preset === 'analytics') {
-      backendEnv.SERVICE_TARGET = 'web,worker,realtime';
-      backendEnv.SERVICE_JOB_GROUPS = backendEnv.SERVICE_JOB_GROUPS ?? 'core,analytics';
-    } else {
-      backendEnv.SERVICE_TARGET = 'web';
-      backendEnv.SERVICE_JOB_GROUPS = backendEnv.SERVICE_JOB_GROUPS ?? 'core';
-    }
+  if (explicitJobGroups?.length) {
+    backendEnv.SERVICE_JOB_GROUPS = explicitJobGroups.join(',');
+  } else if (presetConfiguration.env.SERVICE_JOB_GROUPS) {
+    backendEnv.SERVICE_JOB_GROUPS = presetConfiguration.env.SERVICE_JOB_GROUPS;
+  } else {
+    delete backendEnv.SERVICE_JOB_GROUPS;
   }
+
+  supervisor.logger.info('Resolved stack configuration', {
+    preset: presetConfiguration.preset,
+    targets: backendEnv.SERVICE_TARGET,
+    jobGroups: backendEnv.SERVICE_JOB_GROUPS,
+    features: featureSnapshot
+  });
 
   try {
-    if (!skipDbInstall) {
-      console.log('[dev-stack] Installing and migrating database (backend-nodejs db:install)');
-      await runCommandOnce(
-        'database install',
-        'npm',
-        ['--workspace', 'backend-nodejs', 'run', 'db:install'],
-        { env: process.env }
-      );
+    if (!cliOptions.skipDbInstall) {
+      await supervisor.runOnce('database install', 'npm', ['--workspace', 'backend-nodejs', 'run', 'db:install'], {
+        env: process.env
+      });
     }
   } catch (error) {
-    console.error('[dev-stack] Database preparation failed:', error.message ?? error);
+    supervisor.logger.error('Database preparation failed', { error: error.message });
+    await supervisor.stopAll({ signal: 'SIGINT', code: 1 });
     process.exit(1);
   }
 
-  console.log(`[dev-stack] Launching backend preset "${preset}" with SERVICE_TARGET=${backendEnv.SERVICE_TARGET}`);
+  supervisor.spawnPersistent(
+    'backend',
+    'npm',
+    ['--workspace', 'backend-nodejs', 'run', 'dev:stack'],
+    {
+      spawnOptions: { env: backendEnv },
+      readinessCheck: () => checkBackendReadiness(),
+      readinessIntervalMs: 7000
+    }
+  );
 
-  spawnPersistent('backend stack', 'npm', ['--workspace', 'backend-nodejs', 'run', 'dev:stack'], { env: backendEnv });
-
-  if (!skipFrontend) {
-    spawnPersistent('frontend dev server', 'npm', ['--workspace', 'frontend-reactjs', 'run', 'dev']);
+  if (!cliOptions.skipFrontend) {
+    supervisor.spawnPersistent(
+      'frontend',
+      'npm',
+      ['--workspace', 'frontend-reactjs', 'run', 'dev'],
+      {
+        readinessCheck: () => checkFrontendReadiness(),
+        readinessIntervalMs: 7000
+      }
+    );
   }
 
-  const handleSignal = (signal) => {
-    if (shuttingDown) {
-      return;
-    }
-    shuttingDown = true;
-    console.log(`[dev-stack] Received ${signal}, shutting down child processes...`);
-    stopAll().finally(() => {
-      process.exit(0);
-    });
-  };
-
-  ['SIGINT', 'SIGTERM'].forEach((signal) => {
-    process.on(signal, () => handleSignal(signal));
-  });
+  supervisor.attachCommandInterface();
+  supervisor.registerSignalHandlers();
 }
 
 main();

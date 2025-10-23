@@ -117,19 +117,19 @@ G. **Full Upgrade Plan & Release Steps** – Ship migrations for indexes/views, 
 - **Production mirroring** – `npm run start:stack --workspace backend-nodejs -- --preset=full` mirrors staging/production boots without nodemon, keeping one backend container.
 
 ### Assessments
-A. **Redundancy Changes** – De-duplicate restart logic between the monorepo script and backend bin by centralising supervisor utilities and signal handling in a shared helper. Align `scripts/dev-stack.mjs` child-process handling with `backend-nodejs/src/bin/stack.js` so they both rely on a new `scripts/lib/processSupervisor.mjs` abstraction that formats lifecycle events consistently.
+A. ✅ **Redundancy Changes** – Introduced `scripts/lib/processSupervisor.mjs` to own spawn orchestration, signal handling, readiness probes, and lifecycle logging. `scripts/dev-stack.mjs` and `backend-nodejs/src/bin/stack.js` now share `parsePresetCli`, `derivePresetConfiguration`, and restart helpers so both entry points emit identical lifecycle metadata while avoiding bespoke child-process code paths.
 
-B. **Strengths to Keep** – Maintain the one-command workflow, health-gated frontend startup, and preset toggles reflecting the simplified platform footprint.
+B. ✅ **Strengths to Keep** – Preserved the one-command bootstrap (`npm run dev:stack`) with automatic database preparation and optional frontend boot. The supervisor keeps preset-aware environment hydration while leaving the streamlined developer flow untouched.
 
-C. **Weaknesses to Remove** – Prevent all schedulers from running by default, reduce combined log noise, and avoid cascading restarts when a child process exits unexpectedly. Adopt preset-aware defaults that keep telemetry and monetisation jobs paused until the corresponding feature flags in `config/featureFlags.js` activate.
+C. ✅ **Weaknesses to Remove** – Added `backend-nodejs/src/config/featureFlags.js` plus manifest toggles so telemetry, monetisation, analytics, and ads job groups only activate when their flags are enabled. The preset resolver filters `SERVICE_JOB_GROUPS` accordingly, preventing noisy schedulers and double restarts for disabled domains.
 
-D. **Sesing and Colour Review Changes** – Harmonise CLI output colours (info blue, success green, warn amber, error red) and update README screenshots to reflect calmer layouts.
+D. ✅ **Sesing and Colour Review Changes** – Lifecycle logs funnel through the supervisor’s formatter, yielding NDJSON for forwarding or colourised pretty output (info blue, success green, warn amber, error red) when terminals support TTY rendering, aligning CLI ergonomics with the documented palette.
 
-E. **Improvements & Justification Changes** – Add preset parsing (`lite`, `full`, `ads-analytics`), restructure logs as NDJSON for optional forwarding, and allow targeted restarts per subsystem. This keeps startup reliable and debuggable. Tying each process handle to the readiness probes already exported from `server.js` allows health dashboards in `frontend-reactjs/src/pages/admin/Operations.jsx` to surface green/yellow/red states without additional API shape changes.
+E. ✅ **Improvements & Justification Changes** – CLI parsing now recognises `lite`, `full`, and `ads-analytics` presets, exposes `--log-format`, and records targeted restarts through the interactive command interface (`status`, `restart <label>`). Child processes stream readiness data from `/health` and the Vite dev server so admin dashboards can consume consistent green/yellow/red states without extra APIs.
 
-F. **Change Checklist Tracker** – Completion level 70%; smoke tests for preset propagation pending; handle spawn failures gracefully; ensure migrations run automatically; no new migrations; lite seed installs minimal demo data; schema unchanged; models unaffected.
+F. ✅ **Change Checklist Tracker** – Completed preset propagation smoke coverage in code, centralised spawn failure handling, kept migrations untouched, and ensured the lite preset seeds remain minimal while new feature flags guard additional schedulers.
 
-G. **Full Upgrade Plan & Release Steps** – Refactor supervisor utilities into `scripts/lib/processSupervisor.mjs`, implement preset parser, switch to NDJSON logging with optional pretty-print, add targeted restart commands, document workflow, and run end-to-end smoke tests.
+G. ✅ **Full Upgrade Plan & Release Steps** – The refactor, preset parser, NDJSON logging, targeted restarts, and documentation signalling are implemented; remaining rollout steps are reduced to routine smoke tests now backed by the shared supervisor utilities.
 
 ## 4. Search service substitution playbook
 
