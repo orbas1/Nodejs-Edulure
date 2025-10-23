@@ -16,6 +16,7 @@ import LearnerProfileEditor from './sections/LearnerProfileEditor.jsx';
 import LearnerGoalsSection from './sections/LearnerGoalsSection.jsx';
 import LearnerSurveySection from './sections/LearnerSurveySection.jsx';
 import LearnerRevenueBanner from './sections/LearnerRevenueBanner.jsx';
+import LearnerQuickActionsSection from './sections/LearnerQuickActionsSection.jsx';
 
 function normaliseSectionKey(name) {
   return name?.toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -159,6 +160,94 @@ function normaliseUpcoming(upcoming) {
       action: event.action ?? 'View details',
       href: sanitiseActionLink(event.href ?? event.url ?? event.actionUrl ?? event.ctaUrl)
     }));
+}
+
+function normaliseQuickActions({ progressCards, upcoming, dashboard }) {
+  const actions = [];
+
+  const primaryCourse = Array.isArray(dashboard?.courses?.active)
+    ? dashboard.courses.active[0]
+    : null;
+  const resumeCard = Array.isArray(progressCards) && progressCards.length > 0 ? progressCards[0] : null;
+  if (resumeCard) {
+    const fallbackCourseHref = primaryCourse?.courseId
+      ? `/dashboard/learner/courses?courseId=${encodeURIComponent(primaryCourse.courseId)}`
+      : '/dashboard/learner/courses';
+    const resumeHref = sanitiseActionLink(resumeCard.primaryAction?.href) ?? fallbackCourseHref;
+    actions.push({
+      id: `resume-${resumeCard.id ?? 'course'}`,
+      label: 'Resume course',
+      description: resumeCard.title ? `Continue ${resumeCard.title}` : 'Pick up where you left off.',
+      href: resumeHref,
+      ctaLabel: resumeCard.primaryAction?.label ?? 'Resume'
+    });
+  }
+
+  const liveEvent = Array.isArray(upcoming)
+    ? upcoming.find((event) => {
+        const type = (event.type ?? '').toLowerCase();
+        return ['live', 'class', 'session', 'workshop', 'webinar'].some((keyword) => type.includes(keyword));
+      })
+    : null;
+
+  if (liveEvent) {
+    actions.push({
+      id: `join-${liveEvent.id}`,
+      label: 'Join live session',
+      description: liveEvent.title,
+      href: liveEvent.href ?? '/dashboard/learner/live-classes',
+      ctaLabel: liveEvent.action ?? 'Join now'
+    });
+  } else {
+    actions.push({
+      id: 'join-live-session',
+      label: 'Join live session',
+      description: 'Open the live classroom lobby for today\'s events.',
+      href: '/dashboard/learner/live-classes',
+      ctaLabel: 'Open lobby'
+    });
+  }
+
+  actions.push({
+    id: 'book-tutor',
+    label: 'Book a tutor',
+    description: 'Schedule time with a mentor to stay on track.',
+    href: '/dashboard/learner/bookings',
+    ctaLabel: 'Book session'
+  });
+
+  const assignmentSummary = dashboard?.courses?.assignments ?? dashboard?.assignments ?? null;
+  let assignmentDescription = 'Submit coursework or upload supporting files.';
+  if (Array.isArray(assignmentSummary?.upcoming) && assignmentSummary.upcoming.length > 0) {
+    const nextAssignment = assignmentSummary.upcoming[0];
+    const courseTitle = nextAssignment.course ?? nextAssignment.courseTitle ?? null;
+    const dueLabelRaw = nextAssignment.dueLabel ?? nextAssignment.dueDate ?? null;
+    let dueLabel = null;
+    if (typeof dueLabelRaw === 'string' && dueLabelRaw.trim()) {
+      const parsedDate = new Date(dueLabelRaw);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        dueLabel = parsedDate.toLocaleDateString();
+      } else {
+        dueLabel = dueLabelRaw;
+      }
+    }
+    assignmentDescription = [
+      courseTitle ? `Submit ${courseTitle}` : null,
+      dueLabel ? `due ${dueLabel}` : null
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  actions.push({
+    id: 'upload-assignment',
+    label: 'Upload assignment',
+    description: assignmentDescription,
+    href: '/dashboard/learner/assessments',
+    ctaLabel: 'Open workspace'
+  });
+
+  return actions;
 }
 
 function normaliseFeedHighlights(highlights) {
@@ -440,6 +529,15 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
     () => normalisePromotion(dashboard?.courses?.promotions?.[0] ?? dashboard?.promotions?.[0]),
     [dashboard?.courses?.promotions, dashboard?.promotions]
   );
+  const quickActions = useMemo(
+    () =>
+      normaliseQuickActions({
+        progressCards,
+        upcoming,
+        dashboard
+      }),
+    [dashboard, progressCards, upcoming]
+  );
   const privacySettings = settings.privacy ?? null;
   const messagingSettings = settings.messaging ?? null;
   const followerSummary = dashboard?.followers ?? null;
@@ -489,6 +587,8 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
           ))}
         </section>
       ) : null}
+
+      {quickActions.length ? <LearnerQuickActionsSection actions={quickActions} /> : null}
 
       {canViewMetrics ? <LearnerMetricsSection metrics={metrics} /> : null}
 
