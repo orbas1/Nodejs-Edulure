@@ -619,6 +619,31 @@ const ROUTE_DEFINITIONS = [
     runbookUrl: 'https://runbooks.edulure.internal/payments-service-outage'
   },
   {
+    name: 'acquisition',
+    capability: 'marketing-ops',
+    description: 'Acquisition metadata powering marketing heroes, plan comparisons, and contextual upsells.',
+    basePath: '/acquisition',
+    flagKey: 'platform.api.v1.acquisition',
+    defaultState: 'enabled',
+    fallbackStatus: 200,
+    disabledMessage: 'Acquisition surfaces are disabled for this deployment.',
+    audience: 'public',
+    owners: ['growth-marketing'],
+    serviceTier: 'standard',
+    tags: ['api', 'v1', 'marketing'],
+    rbac: {
+      strategy: 'public',
+      defaultRole: 'public',
+      allowedRoles: ['public'],
+      elevatedRoles: []
+    },
+    cors: {
+      allowedMethods: ['GET']
+    },
+    statusPageComponent: 'api-acquisition',
+    runbookUrl: 'https://runbooks.edulure.internal/acquisition-metadata-outage'
+  },
+  {
     name: 'compliance',
     capability: 'data-governance',
     description: 'GDPR, consent management, and incident governance endpoints.',

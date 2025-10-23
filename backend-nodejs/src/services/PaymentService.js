@@ -7,6 +7,7 @@ import PaymentCouponModel from '../models/PaymentCouponModel.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
 import PaymentLedgerEntryModel from '../models/PaymentLedgerEntryModel.js';
 import PaymentRefundModel from '../models/PaymentRefundModel.js';
+import AcquisitionPlanModel from '../models/AcquisitionPlanModel.js';
 import { trackPaymentCaptureMetrics, trackPaymentRefundMetrics } from '../observability/metrics.js';
 import {
   onPaymentSucceeded as handleCommunityPaymentSucceeded,
@@ -466,6 +467,88 @@ class PaymentService {
         discountApplied: discount,
         calculatedAt: new Date().toISOString()
       }
+    };
+  }
+
+  static async createCheckoutSession({ planSlug, planId, addons = [], userId, entity, metadata = {} }) {
+    const plans = await AcquisitionPlanModel.listPlans();
+    const addonLibrary = await AcquisitionPlanModel.listAddons();
+
+    const normalise = (value) => (value ? String(value).trim().toLowerCase() : null);
+    const targetSlug = normalise(planSlug);
+    const targetId = normalise(planId);
+
+    const plan = plans.find((candidate) => {
+      const candidateSlug = normalise(candidate.slug);
+      const candidateId = normalise(candidate.id);
+      return (
+        (targetSlug && candidateSlug === targetSlug) ||
+        (targetId && (candidateId === targetId || candidateSlug === targetId))
+      );
+    });
+
+    if (!plan) {
+      const error = new Error('Requested plan not found.');
+      error.status = 404;
+      throw error;
+    }
+
+    const addonIdentifiers = Array.isArray(addons) ? addons.map(normalise) : [];
+    const selectedAddons = addonIdentifiers
+      .map((identifier) =>
+        addonLibrary.find((addon) => {
+          const addonSlug = normalise(addon.slug);
+          const addonId = normalise(addon.id);
+          return identifier && (addonSlug === identifier || addonId === identifier);
+        })
+      )
+      .filter(Boolean);
+
+    const optionalAddons = addonLibrary.filter((addon) => {
+      if (!addon.optional) {
+        return false;
+      }
+      if (addon.planInternalId && addon.planInternalId !== plan.internalId) {
+        return false;
+      }
+      return true;
+    });
+
+    const upsellDescriptors = optionalAddons
+      .filter((addon) => addon.upsellDescriptor)
+      .map((addon) => ({ id: addon.id, slug: addon.slug, description: addon.upsellDescriptor }));
+
+    const summariseAddon = (addon) => ({
+      id: addon.id,
+      slug: addon.slug,
+      name: addon.name,
+      description: addon.description,
+      amountCents: addon.amountCents,
+      currency: addon.currency,
+      interval: addon.interval,
+      optional: addon.optional,
+      upsellDescriptor: addon.upsellDescriptor
+    });
+
+    return {
+      plan: {
+        id: plan.id,
+        slug: plan.slug,
+        name: plan.name,
+        description: plan.description,
+        amountCents: plan.amountCents,
+        currency: plan.currency,
+        interval: plan.interval,
+        bestValue: plan.bestValue,
+        badge: plan.badge,
+        features: plan.features
+      },
+      addons: selectedAddons.map(summariseAddon),
+      optionalAddons: optionalAddons.map(summariseAddon),
+      upsellDescriptors,
+      entity: entity ?? null,
+      metadata,
+      userId
     };
   }
 

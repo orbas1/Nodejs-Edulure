@@ -60,6 +60,14 @@ const paymentIntentSchema = Joi.object({
   escrow: escrowSchema.optional()
 });
 
+const checkoutSessionSchema = Joi.object({
+  planSlug: Joi.string().trim().max(120).optional(),
+  planId: Joi.string().trim().max(120).optional(),
+  addons: Joi.array().items(Joi.string().trim().max(120)).default([]),
+  entity: entitySchema.optional(),
+  metadata: Joi.object().default({})
+}).or('planSlug', 'planId');
+
 const refundSchema = Joi.object({
   amount: Joi.number().integer().min(1).optional(),
   reason: Joi.string().trim().max(180).allow('', null).optional()
@@ -98,6 +106,31 @@ export default class PaymentController {
         data: result,
         message: 'Payment intent created',
         status: 201
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async createCheckoutSession(req, res, next) {
+    try {
+      const payload = await checkoutSessionSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const session = await PaymentService.createCheckoutSession({
+        ...payload,
+        userId: req.user?.id ?? null
+      });
+
+      return success(res, {
+        data: session,
+        message: 'Checkout session prepared'
       });
     } catch (error) {
       if (error.isJoi) {

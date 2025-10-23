@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react';
 
+import { pushAnalyticsEvent } from '../lib/analytics.js';
+
 const DEFAULT_BASE_URL = 'https://www.edulure.com';
 const STRUCTURED_DATA_ELEMENT_ID = 'edulure-structured-data';
 
@@ -67,23 +69,6 @@ function normaliseStructuredData(structuredData) {
     return JSON.stringify(structuredData);
   } catch (_error) {
     return null;
-  }
-}
-
-function pushAnalyticsEvent(eventPayload) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  if (!eventPayload) {
-    return;
-  }
-  try {
-    if (!Array.isArray(window.dataLayer)) {
-      window.dataLayer = [];
-    }
-    window.dataLayer.push(eventPayload);
-  } catch (_error) {
-    // Silently ignore analytics push failures to avoid impacting UX.
   }
 }
 

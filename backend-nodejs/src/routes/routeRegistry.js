@@ -34,6 +34,7 @@ import mediaRoutes from './media.routes.js';
 import setupRoutes from './setup.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 import { buildRouteRegistry } from './registryValidator.js';
+import acquisitionRoutes from './acquisition.routes.js';
 
 const routerMap = {
   auth: authRoutes,
@@ -69,7 +70,8 @@ const routerMap = {
   release: releaseRoutes,
   catalogue: catalogueRoutes,
   media: mediaRoutes,
-  setup: setupRoutes
+  setup: setupRoutes,
+  acquisition: acquisitionRoutes
 };
 
 export const apiRouteRegistry = buildRouteRegistry({

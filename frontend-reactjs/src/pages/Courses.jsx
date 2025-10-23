@@ -6,9 +6,12 @@ import FormStepper from '../components/forms/FormStepper.jsx';
 import adminControlApi from '../api/adminControlApi.js';
 import { searchExplorer } from '../api/explorerApi.js';
 import { listPublicCourses } from '../api/catalogueApi.js';
-import { createPaymentIntent } from '../api/paymentsApi.js';
+import { createCheckoutSession, createPaymentIntent } from '../api/paymentsApi.js';
 import { requestMediaUpload } from '../api/mediaApi.js';
 import CourseCard from '../components/courses/CourseCard.jsx';
+import PrimaryHero from '../components/marketing/PrimaryHero.jsx';
+import PlanComparison from '../components/marketing/PlanComparison.jsx';
+import { listAcquisitionPlans } from '../api/acquisitionApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
@@ -138,10 +141,83 @@ function formatPrice(amount, currency = 'USD') {
   }
 }
 
-function CourseCheckoutDrawer({ course, open, onClose, form, onChange, onSubmit, status, pending }) {
+function formatPlanPrice(amountCents, currency = 'USD', interval = 'month') {
+  if (amountCents === null || amountCents === undefined) {
+    return 'Contact us';
+  }
+  try {
+    const formatted = new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(
+      Math.max(0, Number(amountCents) / 100)
+    );
+    const cadence = interval && interval !== 'one_time' ? `/${interval.replace('_', ' ')}` : '';
+    return `${formatted}${cadence}`.trim();
+  } catch (_error) {
+    return `${currency} ${Math.max(0, Number(amountCents) / 100)}`;
+  }
+}
+
+const DEFAULT_HERO_CONFIG = Object.freeze({
+  title: 'Compare cohort-ready learning plans',
+  subtitle:
+    'Bundle asynchronous libraries, live cohorts, and instructor support into the right subscription for your team. Optional community add-ons keep engagement high without locking you in.',
+  badge: 'Course catalogue',
+  chips: ['Live cohorts', 'Async companions', 'Enterprise-ready controls'],
+  primaryCta: { label: 'Compare plans', href: '#course-plans', analytics: { label: 'courses_compare', action: 'click' } },
+  secondaryCta: {
+    label: 'Talk to sales',
+    href: 'mailto:sales@edulure.com',
+    analytics: { label: 'courses_sales', action: 'click' }
+  },
+  tertiaryCta: {
+    label: 'Download overview',
+    href: '/assets/catalogue-overview.pdf',
+    analytics: { label: 'courses_overview', action: 'click' }
+  }
+});
+
+function CourseCheckoutDrawer({
+  course,
+  open,
+  onClose,
+  form,
+  onChange,
+  onSubmit,
+  status,
+  pending,
+  plan,
+  optionalAddons,
+  selectedAddons,
+  onToggleAddon,
+  sessionStatus,
+  sessionLoading,
+  upsellDescriptors
+}) {
   if (!open || !course) {
     return null;
   }
+
+  const addonSelection = new Set((selectedAddons ?? []).map((value) => String(value).toLowerCase()));
+
+  const resolveNoticeClasses = (type = 'info') => {
+    const base = 'mt-4 rounded-3xl border px-4 py-3 text-sm transition-colors';
+    switch (type) {
+      case 'success':
+        return `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
+      case 'error':
+        return `${base} border-rose-200 bg-rose-50 text-rose-600`;
+      case 'pending':
+        return `${base} border-primary/30 bg-primary/10 text-primary`;
+      default:
+        return `${base} border-slate-200 bg-slate-100 text-slate-600`;
+    }
+  };
+
+  const addonItems = Array.isArray(optionalAddons)
+    ? optionalAddons.filter((addon) => addon && (addon.optional ?? true))
+    : [];
+  const descriptorItems = Array.isArray(upsellDescriptors)
+    ? upsellDescriptors.filter((descriptor) => descriptor && descriptor.description)
+    : [];
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-end bg-slate-900/40 px-4 py-6">
@@ -164,6 +240,101 @@ function CourseCheckoutDrawer({ course, open, onClose, form, onChange, onSubmit,
             <p className="text-xs text-slate-500">{course.title}</p>
           </div>
         </div>
+
+        {plan ? (
+          <div className="mt-6 rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-inner">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Recommended plan</p>
+                <h4 className="text-base font-semibold text-slate-900">{plan.name}</h4>
+                {plan.badge ? (
+                  <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-700">
+                    {plan.badge}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-sm font-semibold text-primary">
+                {formatPlanPrice(plan.amountCents, plan.currency ?? 'USD', plan.interval ?? 'month')}
+              </p>
+            </div>
+            {plan.description ? <p className="mt-2 text-sm text-slate-600">{plan.description}</p> : null}
+            {Array.isArray(plan.features) && plan.features.length ? (
+              <ul className="mt-3 space-y-2 text-xs text-slate-500">
+                {plan.features.slice(0, 4).map((feature) => (
+                  <li key={feature} className="flex items-start gap-2">
+                    <span className="mt-1 inline-flex h-3 w-3 items-center justify-center rounded-full bg-primary/20 text-[0.5rem] font-semibold text-primary">
+                      ✓
+                    </span>
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {sessionStatus ? (
+          <div className={resolveNoticeClasses(sessionStatus.type)}>
+            {sessionStatus.type === 'success' ? <CheckCircleIcon className="mr-2 inline h-4 w-4" /> : null}
+            {sessionStatus.message}
+          </div>
+        ) : null}
+
+        {descriptorItems.length ? (
+          <div className="mt-4 rounded-3xl border border-dashed border-primary/30 bg-primary/5 p-4 text-xs text-slate-600">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-primary">Why consider add-ons</p>
+            <ul className="mt-2 space-y-2">
+              {descriptorItems.map((descriptor) => (
+                <li key={descriptor.id ?? descriptor.slug} className="flex items-start gap-2">
+                  <span className="mt-1 inline-flex h-2 w-2 items-center justify-center rounded-full bg-primary" />
+                  <span>{descriptor.description}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {addonItems.length ? (
+          <div className="mt-4 space-y-3 rounded-3xl border border-slate-200 bg-white/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Optional add-ons</p>
+            <div className="space-y-3">
+              {addonItems.map((addon) => {
+                const identifier = addon.slug ?? addon.id;
+                const selected = identifier
+                  ? addonSelection.has(String(identifier).toLowerCase())
+                  : false;
+                return (
+                  <label
+                    key={identifier ?? addon.name}
+                    className={`flex cursor-pointer items-start gap-3 rounded-3xl border px-4 py-3 transition ${
+                      selected
+                        ? 'border-primary bg-primary/5 text-slate-900 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-primary/40 hover:bg-primary/5 hover:text-slate-900'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      checked={selected}
+                      onChange={() => (identifier ? onToggleAddon?.(identifier) : null)}
+                      disabled={!identifier || sessionLoading}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">{addon.name}</p>
+                      {addon.description ? <p className="mt-1 text-xs text-slate-500">{addon.description}</p> : null}
+                      {addon.upsellDescriptor ? (
+                        <p className="mt-1 text-[0.65rem] uppercase tracking-[0.3em] text-primary/70">{addon.upsellDescriptor}</p>
+                      ) : null}
+                    </div>
+                    <span className="text-sm font-semibold text-primary">
+                      +{formatPlanPrice(addon.amountCents, addon.currency ?? 'USD', addon.interval ?? 'one_time')}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         <form className="mt-6 space-y-5" onSubmit={onSubmit}>
           <div className="space-y-2">
@@ -267,15 +438,7 @@ function CourseCheckoutDrawer({ course, open, onClose, form, onChange, onSubmit,
         </form>
 
         {status ? (
-          <div
-            className={`mt-4 rounded-3xl border px-4 py-3 text-sm ${
-              status.type === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : status.type === 'error'
-                  ? 'border-rose-200 bg-rose-50 text-rose-700'
-                  : 'border-primary/30 bg-primary/10 text-primary'
-            }`}
-          >
+          <div className={resolveNoticeClasses(status.type)}>
             {status.type === 'success' ? <CheckCircleIcon className="mr-2 inline h-4 w-4" /> : null}
             {status.message}
           </div>
@@ -307,6 +470,15 @@ function mapCatalogueCourse(course) {
   const tags = normalizeCourseTags(metadata, course);
   const { rating, ratingCount } = normalizeCourseRating(course, metadata);
   const progress = normalizeCourseProgress(course, metadata);
+  const planMetadata = metadata.plan ?? metadata.planSlug ?? metadata.planId ?? metadata.pricingPlan ?? null;
+  const planSlug =
+    typeof planMetadata === 'string'
+      ? planMetadata
+      : planMetadata?.slug ?? planMetadata?.planSlug ?? planMetadata?.id ?? null;
+  const planId =
+    typeof planMetadata === 'object'
+      ? planMetadata?.id ?? planMetadata?.publicId ?? null
+      : null;
   const metaActions = [];
   if (metadata.actions) {
     const entries = Array.isArray(metadata.actions) ? metadata.actions : [metadata.actions];
@@ -364,6 +536,8 @@ function mapCatalogueCourse(course) {
     nextLesson: course.nextLesson ?? metadata.nextLesson ?? preview.title ?? null,
     goalStatus: course.goalStatus ?? metadata.goalStatus ?? null,
     durationMinutes: metadata.durationMinutes ?? course.durationMinutes ?? null,
+    planSlug: planSlug ? String(planSlug) : null,
+    planId: planId ? String(planId) : null,
     secondaryActions
   };
 }
@@ -877,6 +1051,11 @@ export default function Courses() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [acquisitionPlans, setAcquisitionPlans] = useState([]);
+  const [acquisitionAddons, setAcquisitionAddons] = useState([]);
+  const [acquisitionHero, setAcquisitionHero] = useState(null);
+  const [acquisitionLoading, setAcquisitionLoading] = useState(false);
+  const [acquisitionError, setAcquisitionError] = useState(null);
   const [form, setForm] = useState(() => createEmptyForm());
   const [mode, setMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
@@ -891,11 +1070,15 @@ export default function Courses() {
     couponCode: '',
     taxCountry: 'US',
     taxRegion: '',
-    taxPostalCode: ''
+    taxPostalCode: '',
+    addons: []
   }));
   const [checkoutStatus, setCheckoutStatus] = useState(null);
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
+  const [checkoutSession, setCheckoutSession] = useState(null);
+  const [checkoutSessionStatus, setCheckoutSessionStatus] = useState(null);
+  const [checkoutSessionLoading, setCheckoutSessionLoading] = useState(false);
   const [uploadState, setUploadState] = useState({});
 
   const featuredCourse = useMemo(() => highlightCourses[0] ?? null, [highlightCourses]);
@@ -1049,6 +1232,57 @@ export default function Courses() {
       receiptEmail: session?.user?.email ?? current.receiptEmail ?? ''
     }));
   }, [session?.user?.email]);
+
+  const handleToggleAddon = useCallback((identifier) => {
+    if (!identifier) {
+      return;
+    }
+    setCheckoutForm((current) => {
+      const currentAddons = Array.isArray(current.addons)
+        ? current.addons.map((value) => String(value))
+        : [];
+      const lowerIdentifier = String(identifier).toLowerCase();
+      const exists = currentAddons.some((value) => value.toLowerCase() === lowerIdentifier);
+      const next = exists
+        ? currentAddons.filter((value) => value.toLowerCase() !== lowerIdentifier)
+        : [...currentAddons, String(identifier)];
+      return { ...current, addons: next };
+    });
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    setAcquisitionLoading(true);
+    setAcquisitionError(null);
+
+    listAcquisitionPlans({ signal: controller.signal })
+      .then((data) => {
+        if (!active) return;
+        const payload = data ?? {};
+        const plans = Array.isArray(payload) ? payload : payload.plans;
+        setAcquisitionPlans(Array.isArray(plans) ? plans : []);
+        setAcquisitionAddons(Array.isArray(payload.addons) ? payload.addons : []);
+        setAcquisitionHero(payload.hero ?? null);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setAcquisitionPlans([]);
+        setAcquisitionAddons([]);
+        setAcquisitionHero(null);
+        setAcquisitionError(err.message ?? 'Unable to load catalogue plans');
+      })
+      .finally(() => {
+        if (active) {
+          setAcquisitionLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1262,9 +1496,13 @@ export default function Courses() {
         taxCountry: current.taxCountry || 'US',
         taxRegion: '',
         taxPostalCode: '',
-        receiptEmail: current.receiptEmail || session?.user?.email || ''
+        receiptEmail: current.receiptEmail || session?.user?.email || '',
+        addons: []
       }));
       setCheckoutStatus(null);
+      setCheckoutSession(null);
+      setCheckoutSessionStatus(null);
+      setCheckoutSessionLoading(false);
       setCheckoutOpen(true);
     },
     [session?.user?.email]
@@ -1273,7 +1511,238 @@ export default function Courses() {
   const closeCheckout = useCallback(() => {
     setCheckoutCourse(null);
     setCheckoutOpen(false);
+    setCheckoutSession(null);
+    setCheckoutSessionStatus(null);
+    setCheckoutSessionLoading(false);
   }, []);
+
+  const heroConfig = useMemo(() => {
+    const mergeCta = (candidate, fallback) => {
+      if (!candidate) return fallback;
+      return { ...fallback, ...candidate };
+    };
+
+    const meta = acquisitionHero ?? {};
+    return {
+      title: meta.title ?? DEFAULT_HERO_CONFIG.title,
+      subtitle: meta.subtitle ?? DEFAULT_HERO_CONFIG.subtitle,
+      badge: meta.badge ?? DEFAULT_HERO_CONFIG.badge,
+      chips:
+        Array.isArray(meta.chips) && meta.chips.length ? meta.chips : DEFAULT_HERO_CONFIG.chips,
+      primaryCta: mergeCta(meta.primaryCta, DEFAULT_HERO_CONFIG.primaryCta),
+      secondaryCta: mergeCta(meta.secondaryCta, DEFAULT_HERO_CONFIG.secondaryCta),
+      tertiaryCta: mergeCta(meta.tertiaryCta, DEFAULT_HERO_CONFIG.tertiaryCta)
+    };
+  }, [acquisitionHero]);
+
+  const heroMedia = useMemo(() => {
+    const featured = acquisitionPlans[0];
+    if (!featured) {
+      return (
+        <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 text-sm text-slate-600 shadow-xl">
+          {acquisitionLoading
+            ? 'Loading plan insights…'
+            : 'Plan insights will appear once catalogue plans are published.'}
+          {acquisitionError ? (
+            <p className="mt-2 text-xs font-semibold text-rose-500">{acquisitionError}</p>
+          ) : null}
+        </div>
+      );
+    }
+
+    const interval =
+      featured.interval ??
+      featured.billingInterval ??
+      featured.cadence ??
+      featured.cycle ??
+      'month';
+    const amount =
+      featured.amountCents ??
+      featured.priceCents ??
+      featured.amount ??
+      featured.price ??
+      null;
+    const currency = featured.currency ?? 'USD';
+
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Featured plan</p>
+        <h3 className="mt-2 text-xl font-semibold text-slate-900">{featured.name ?? 'Growth Studio'}</h3>
+        {featured.description ? (
+          <p className="mt-2 text-sm text-slate-600">{featured.description}</p>
+        ) : null}
+        <div className="mt-4 flex items-baseline gap-2">
+          <span className="text-3xl font-semibold text-primary">
+            {formatPlanPrice(amount, currency, interval)}
+          </span>
+          {interval ? (
+            <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+              {interval.replace('_', ' ')}
+            </span>
+          ) : null}
+        </div>
+        {Array.isArray(featured.features) && featured.features.length ? (
+          <ul className="mt-4 space-y-2 text-sm text-slate-600">
+            {featured.features.slice(0, 3).map((feature) => (
+              <li key={feature} className="flex items-start gap-2">
+                <CheckCircleIcon className="mt-0.5 h-4 w-4 text-emerald-500" />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {acquisitionAddons.length ? (
+          <p className="mt-4 text-xs text-slate-500">
+            {`Popular add-on: ${acquisitionAddons[0].name} (${formatPlanPrice(
+              acquisitionAddons[0].amountCents,
+              acquisitionAddons[0].currency ?? currency,
+              acquisitionAddons[0].interval ?? 'one_time'
+            )})`}
+          </p>
+        ) : null}
+      </div>
+    );
+  }, [acquisitionPlans, acquisitionAddons, acquisitionLoading, acquisitionError]);
+
+  const recommendedPlan = useMemo(() => {
+    if (!acquisitionPlans.length) {
+      return null;
+    }
+    const courseIdentifiers = [checkoutCourse?.planSlug, checkoutCourse?.planId]
+      .map((value) => (value ? String(value).toLowerCase() : null))
+      .filter(Boolean);
+    if (courseIdentifiers.length) {
+      const matched = acquisitionPlans.find((plan) => {
+        const slug = plan.slug ? String(plan.slug).toLowerCase() : null;
+        const id = plan.id ? String(plan.id).toLowerCase() : null;
+        return courseIdentifiers.some((identifier) => identifier === slug || identifier === id);
+      });
+      if (matched) {
+        return matched;
+      }
+    }
+    const bestValue = acquisitionPlans.find((plan) => plan.bestValue);
+    return bestValue ?? acquisitionPlans[0] ?? null;
+  }, [acquisitionPlans, checkoutCourse?.planId, checkoutCourse?.planSlug]);
+
+  const availableOptionalAddons = useMemo(() => {
+    if (checkoutSession?.optionalAddons?.length) {
+      return checkoutSession.optionalAddons;
+    }
+    if (!acquisitionAddons.length) {
+      return [];
+    }
+    if (!recommendedPlan) {
+      return acquisitionAddons.filter((addon) => addon && addon.optional !== false);
+    }
+    const planSlug = recommendedPlan.slug ? String(recommendedPlan.slug).toLowerCase() : null;
+    const planId = recommendedPlan.id ? String(recommendedPlan.id).toLowerCase() : null;
+    return acquisitionAddons.filter((addon) => {
+      if (!addon || addon.optional === false) {
+        return false;
+      }
+      if (!addon.planSlug) {
+        return true;
+      }
+      const addonPlan = String(addon.planSlug).toLowerCase();
+      return addonPlan === planSlug || addonPlan === planId;
+    });
+  }, [checkoutSession?.optionalAddons, acquisitionAddons, recommendedPlan]);
+
+  const checkoutUpsellDescriptors = useMemo(() => {
+    if (checkoutSession?.upsellDescriptors?.length) {
+      return checkoutSession.upsellDescriptors;
+    }
+    return availableOptionalAddons
+      .filter((addon) => addon && addon.upsellDescriptor)
+      .map((addon) => ({
+        id: addon.id,
+        slug: addon.slug,
+        description: addon.upsellDescriptor
+      }));
+  }, [checkoutSession?.upsellDescriptors, availableOptionalAddons]);
+
+  const sessionPlan = checkoutSession?.plan ?? recommendedPlan ?? null;
+
+  useEffect(() => {
+    if (!checkoutOpen || !checkoutCourse) {
+      setCheckoutSession(null);
+      setCheckoutSessionStatus(null);
+      setCheckoutSessionLoading(false);
+      return;
+    }
+
+    if (!token) {
+      setCheckoutSession(null);
+      setCheckoutSessionStatus({
+        type: 'info',
+        message: 'Sign in to preview plan add-ons and upsell guidance.'
+      });
+      setCheckoutSessionLoading(false);
+      return;
+    }
+
+    if (!recommendedPlan) {
+      setCheckoutSession(null);
+      setCheckoutSessionStatus(null);
+      setCheckoutSessionLoading(false);
+      return;
+    }
+
+    const planIdentifier = recommendedPlan.slug ?? recommendedPlan.id;
+    if (!planIdentifier) {
+      setCheckoutSession(null);
+      setCheckoutSessionStatus(null);
+      setCheckoutSessionLoading(false);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    setCheckoutSessionLoading(true);
+    setCheckoutSessionStatus({
+      type: 'pending',
+      message: `Preparing ${recommendedPlan.name} plan details…`
+    });
+
+    createCheckoutSession({
+      token,
+      payload: {
+        planSlug: planIdentifier,
+        metadata: {
+          courseId: checkoutCourse.id,
+          courseSlug: checkoutCourse.slug ?? null
+        }
+      },
+      signal: controller.signal
+    })
+      .then((session) => {
+        if (!active) return;
+        setCheckoutSession(session ?? null);
+        setCheckoutSessionStatus(null);
+      })
+      .catch((error) => {
+        if (!active || isAbortError(error)) {
+          return;
+        }
+        setCheckoutSession(null);
+        setCheckoutSessionStatus({
+          type: 'error',
+          message: error.message ?? 'Unable to prepare checkout session.'
+        });
+      })
+      .finally(() => {
+        if (active) {
+          setCheckoutSessionLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [checkoutOpen, checkoutCourse, recommendedPlan, token]);
 
   const handleCheckoutSubmit = useCallback(
     async (event) => {
@@ -1289,6 +1758,47 @@ export default function Courses() {
       setCheckoutStatus({ type: 'pending', message: `Creating checkout for ${checkoutCourse.title}…` });
       try {
         const quantity = checkoutForm.quantity || 1;
+        const selectedAddonSlugs = Array.isArray(checkoutForm.addons)
+          ? Array.from(new Set(checkoutForm.addons.map((value) => String(value).toLowerCase())))
+          : [];
+        const planForCheckout = checkoutSession?.plan ?? recommendedPlan ?? null;
+        const addonCatalogue = [
+          ...(Array.isArray(checkoutSession?.optionalAddons) ? checkoutSession.optionalAddons : []),
+          ...(Array.isArray(checkoutSession?.addons) ? checkoutSession.addons : []),
+          ...availableOptionalAddons
+        ];
+        const addonLookup = new Map();
+        addonCatalogue.forEach((addon) => {
+          if (!addon) return;
+          const key = addon.slug ?? addon.id;
+          if (!key) return;
+          const canonical = String(key).toLowerCase();
+          if (!addonLookup.has(canonical)) {
+            addonLookup.set(canonical, addon);
+          }
+        });
+        const addonLineItems = selectedAddonSlugs
+          .map((slug) => addonLookup.get(slug))
+          .filter(Boolean)
+          .map((addon) => ({
+            id: addon.id ?? addon.slug ?? addon.name,
+            name: addon.name,
+            description: addon.description ?? undefined,
+            unitAmount: addon.amountCents ?? 0,
+            quantity: 1,
+            metadata: {
+              addonSlug: addon.slug ?? addon.id ?? null,
+              optional: addon.optional !== false
+            }
+          }));
+        const addonTotal = addonLineItems.reduce(
+          (total, item) => total + (item.unitAmount ?? 0) * (item.quantity ?? 1),
+          0
+        );
+        const metadataPlanSlug =
+          planForCheckout?.slug ?? planForCheckout?.id ?? recommendedPlan?.slug ?? recommendedPlan?.id ?? null;
+        const metadataPlanName = planForCheckout?.name ?? recommendedPlan?.name ?? null;
+
         const payload = {
           provider: checkoutForm.provider,
           currency: checkoutCourse.priceCurrency ?? 'USD',
@@ -1307,13 +1817,26 @@ export default function Courses() {
           ],
           couponCode: checkoutForm.couponCode?.trim() || undefined,
           receiptEmail: checkoutForm.receiptEmail?.trim() || undefined,
+          metadata: {
+            planSlug: metadataPlanSlug ?? undefined,
+            planName: metadataPlanName ?? undefined,
+            addons: addonLineItems.map((item) => item.metadata?.addonSlug ?? item.id)
+          },
           entity: {
             id: checkoutCourse.id,
             type: 'course',
             name: checkoutCourse.title,
-            description: checkoutCourse.subtitle ?? checkoutCourse.description ?? undefined
+            description: checkoutCourse.subtitle ?? checkoutCourse.description ?? undefined,
+            metadata: {
+              planSlug: metadataPlanSlug ?? null,
+              planName: metadataPlanName ?? null,
+              addons: addonLineItems.map((item) => item.metadata?.addonSlug ?? item.id)
+            }
           }
         };
+        if (addonLineItems.length) {
+          payload.items = [...payload.items, ...addonLineItems];
+        }
         if (checkoutForm.taxCountry) {
           payload.tax = {
             country: checkoutForm.taxCountry,
@@ -1343,7 +1866,9 @@ export default function Courses() {
             clientSecret: payment.clientSecret ?? null,
             createdAt: new Date().toISOString(),
             currency: payload.currency,
-            amount: (checkoutCourse.priceAmountCents ?? 0) * quantity
+            amount: (checkoutCourse.priceAmountCents ?? 0) * quantity + addonTotal,
+            planName: metadataPlanName,
+            addons: addonLineItems.map((item) => item.name)
           },
           ...history.slice(0, 9)
         ]);
@@ -1356,7 +1881,14 @@ export default function Courses() {
         setCheckoutPending(false);
       }
     },
-    [checkoutCourse, checkoutForm, token]
+    [
+      availableOptionalAddons,
+      checkoutCourse,
+      checkoutForm,
+      checkoutSession,
+      recommendedPlan,
+      token
+    ]
   );
 
   const resetForm = useCallback(() => {
@@ -1568,8 +2100,47 @@ export default function Courses() {
   ]);
 
   return (
-    <div className="bg-slate-100 pb-24 pt-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6">
+    <div className="bg-slate-100">
+      <PrimaryHero
+        surface="courses-hero"
+        variant="light"
+        title={heroConfig.title}
+        subtitle={heroConfig.subtitle}
+        badge={heroConfig.badge}
+        chips={heroConfig.chips}
+        primaryCta={heroConfig.primaryCta}
+        secondaryCta={heroConfig.secondaryCta}
+        tertiaryCta={heroConfig.tertiaryCta}
+        media={heroMedia}
+        analytics={{ hero: 'courses', plan_count: acquisitionPlans.length }}
+      />
+      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6 pb-24 pt-10">
+        <section id="course-plans" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-slate-900">{acquisitionHero?.planTitle ?? 'Compare plans'}</h2>
+            {acquisitionLoading ? (
+              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Refreshing…</span>
+            ) : null}
+          </div>
+          {acquisitionHero?.planDescription ? (
+            <p className="text-sm text-slate-600">{acquisitionHero.planDescription}</p>
+          ) : (
+            <p className="text-sm text-slate-600">
+              Select the plan that matches your cohort mix. Upsell descriptors call out optional add-ons so you can scale at your
+              own pace.
+            </p>
+          )}
+          {acquisitionError && !acquisitionPlans.length ? (
+            <p className="text-sm font-semibold text-rose-500">{acquisitionError}</p>
+          ) : null}
+          <PlanComparison
+            title={acquisitionHero?.planComparisonTitle ?? 'Learning plans'}
+            description={acquisitionHero?.planComparisonDescription ?? ''}
+            plans={acquisitionPlans}
+            addons={acquisitionAddons}
+          />
+        </section>
+
         <section className="space-y-10">
           <ExplorerSearchSection {...EXPLORER_CONFIG} />
         </section>
@@ -1720,6 +2291,13 @@ export default function Courses() {
         onSubmit={handleCheckoutSubmit}
         status={checkoutStatus}
         pending={checkoutPending}
+        plan={sessionPlan}
+        optionalAddons={availableOptionalAddons}
+        selectedAddons={Array.isArray(checkoutForm.addons) ? checkoutForm.addons : []}
+        onToggleAddon={handleToggleAddon}
+        sessionStatus={checkoutSessionStatus}
+        sessionLoading={checkoutSessionLoading}
+        upsellDescriptors={checkoutUpsellDescriptors}
       />
     </div>
   );

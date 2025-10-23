@@ -5,6 +5,7 @@ import FormField from '../components/FormField.jsx';
 import SocialSignOn from '../components/SocialSignOn.jsx';
 import { API_BASE_URL, httpClient } from '../api/httpClient.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import { validateRegisterForm } from '../utils/validation/onboarding.js';
 
 const SOCIAL_ROUTES = {
   google: '/auth/oauth/google',
@@ -108,48 +109,21 @@ export default function Register() {
     setSuccess(null);
     setTwoFactorEnrollment(null);
 
-    if (formState.password !== formState.confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    if (!agreeToTerms) {
-      setError('You must accept the terms to create an account.');
-      return;
-    }
-
-    const ageValue = formState.age.trim();
-    const age = ageValue ? Number.parseInt(ageValue, 10) : undefined;
-    if (ageValue && Number.isNaN(age)) {
-      setError('Age must be a number.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
+      const { valid, errors, normalized } = validateRegisterForm(formState);
+
+      if (!agreeToTerms) {
+        throw new Error('You must accept the terms to create an account.');
+      }
+
+      if (!valid) {
+        const [firstError] = Object.values(errors);
+        throw new Error(firstError ?? 'Please resolve the highlighted form issues.');
+      }
+
       const requestBody = {
-        firstName: formState.firstName,
-        lastName: formState.lastName,
-        email: formState.email,
-        password: formState.password,
-        role: formState.role,
-        ...(age ? { age } : {}),
-        ...(() => {
-          const normalizedAddress = Object.entries(formState.address ?? {}).reduce(
-            (acc, [key, fieldValue]) => {
-              if (typeof fieldValue !== 'string') {
-                return acc;
-              }
-              const trimmed = fieldValue.trim();
-              if (trimmed) {
-                acc[key] = trimmed;
-              }
-              return acc;
-            },
-            {}
-          );
-          return Object.keys(normalizedAddress).length ? { address: normalizedAddress } : {};
-        })(),
+        ...normalized,
         twoFactor: { enabled: twoFactorLocked ? true : twoFactorEnabled }
       };
       const response = await httpClient.post('/auth/register', requestBody);

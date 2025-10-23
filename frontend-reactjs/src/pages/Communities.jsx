@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { SparklesIcon, UserGroupIcon, UsersIcon } from '@heroicons/react/24/solid';
-import { ArrowPathIcon, ChevronRightIcon, MapIcon, PlayCircleIcon } from '@heroicons/react/24/outline';
+import { UsersIcon } from '@heroicons/react/24/solid';
+import { ChevronRightIcon, PlayCircleIcon } from '@heroicons/react/24/outline';
 
 import {
   fetchCommunities,
@@ -27,6 +27,7 @@ import CommunityAboutPanel from '../components/community/CommunityAboutPanel.jsx
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import PrimaryHero from '../components/marketing/PrimaryHero.jsx';
 import { isAbortError } from '../utils/errors.js';
 
 const ALL_COMMUNITIES_NODE = {
@@ -635,6 +636,55 @@ export default function Communities() {
   const recordedSessions = resolvedDetail.classrooms.recorded ?? [];
   const liveStage = resolvedDetail.classrooms.liveClassroom ?? null;
   const leaderboardEntries = resolvedDetail.leaderboard ?? [];
+
+  const heroChips = useMemo(
+    () => [
+      `${numberFormatter.format(resolvedDetail.stats.members)} members`,
+      `${resolvedDetail.stats.posts} posts`,
+      `${resolvedDetail.membershipMap.totalCountries} countries`
+    ],
+    [resolvedDetail.membershipMap.totalCountries, resolvedDetail.stats.members, resolvedDetail.stats.posts]
+  );
+
+  const communityHeroMedia = useMemo(() => {
+    const nextLive = liveSessions[0] ?? null;
+    const nextRecorded = recordedSessions[0] ?? null;
+    const durationLabel = nextLive?.durationMinutes ? `${nextLive.durationMinutes} mins` : 'Flexible duration';
+    const upcomingLabel = nextLive ? `${formatDate(nextLive.startsAt)} · ${durationLabel}` : 'Schedule your first live jam';
+
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Programming snapshot</p>
+        <div className="mt-4 space-y-4 text-sm text-slate-600">
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Next live session</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              {nextLive ? nextLive.title : 'No live cohorts scheduled'}
+            </p>
+            <p className="text-xs text-slate-500">{upcomingLabel}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Async library</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              {recordedSessions.length ? `${recordedSessions.length} recordings ready` : 'Add your first recording'}
+            </p>
+            {nextRecorded ? (
+              <p className="text-xs text-slate-500">Latest drop: {nextRecorded.title}</p>
+            ) : null}
+          </div>
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Membership spread</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              {resolvedDetail.membershipMap.totalCountries} countries active
+            </p>
+            <p className="text-xs text-slate-500">
+              Top region: {resolvedDetail.membershipMap.clusters[0]?.region ?? 'Global'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }, [liveSessions, recordedSessions, resolvedDetail.membershipMap]);
   const communityEvents = communityDetail?.events ?? [];
   const communityPodcasts = communityDetail?.podcasts ?? [];
 
@@ -1234,54 +1284,59 @@ export default function Communities() {
     <div className="bg-gradient-to-b from-primary/5 via-white to-white">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-8">
-          <section className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl backdrop-blur">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-col gap-4">
-                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-                  <SparklesIcon className="h-4 w-4" /> Community intelligence hub
-                </span>
-                <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">{resolvedDetail.name}</h1>
-                <p className="max-w-2xl text-sm leading-6 text-slate-600">{resolvedDetail.description}</p>
-                <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
-                    <UserGroupIcon className="h-4 w-4" /> {numberFormatter.format(resolvedDetail.stats.members)} members
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
-                    <ArrowPathIcon className="h-4 w-4" /> {resolvedDetail.stats.posts} posts
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
-                    <MapIcon className="h-4 w-4" /> {resolvedDetail.membershipMap.totalCountries} countries
-                  </span>
-                </div>
-              </div>
-              <div className="flex flex-col items-start gap-4">
-                <CommunitySwitcher
-                  communities={communities}
-                  selected={selectedCommunity}
-                  onSelect={setSelectedCommunity}
-                  disabled={isLoadingCommunities}
-                />
-                <p className="text-xs text-slate-500">
-                  Manage membership, joining, and community insights from the right-hand control panel.
-                </p>
-              </div>
+        <PrimaryHero
+          surface="communities-hero"
+          variant="light"
+          title={resolvedDetail.name}
+          subtitle={resolvedDetail.description}
+          badge="Community intelligence hub"
+          chips={heroChips}
+          primaryCta={{
+            label: resolvedDetail.membership?.status === 'member' ? 'Open community feed' : 'Request access',
+            href: '#community-feed',
+            analytics: { label: 'communities_primary', action: 'click' }
+          }}
+          secondaryCta={{
+            label: 'Explore resources',
+            href: '#community-resources',
+            analytics: { label: 'communities_resources', action: 'click' }
+          }}
+          tertiaryCta={{
+            label: 'Download briefing',
+            href: '#community-briefing',
+            analytics: { label: 'communities_briefing', action: 'click' }
+          }}
+          media={communityHeroMedia}
+          footer={
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <CommunitySwitcher
+                communities={communities}
+                selected={selectedCommunity}
+                onSelect={setSelectedCommunity}
+                disabled={isLoadingCommunities}
+              />
+              <p className="text-xs text-slate-500">
+                Manage membership, joining, and community insights from the right-hand control panel.
+              </p>
             </div>
-            {communitiesError && (
-              <p className="mt-6 rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{communitiesError}</p>
-            )}
-            {detailError && (
-              <p className="mt-6 rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{detailError}</p>
-            )}
-            {resourcesError && (
-              <p className="mt-6 rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{resourcesError}</p>
-            )}
-          </section>
+          }
+          analytics={{ hero: 'communities', members: resolvedDetail.stats.members }}
+        />
+        {communitiesError && (
+          <p className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{communitiesError}</p>
+        )}
+        {detailError && (
+          <p className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{detailError}</p>
+        )}
+        {resourcesError && (
+          <p className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{resourcesError}</p>
+        )}
 
-          <CommunityCrudManager />
+        <CommunityCrudManager />
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),380px]">
             <div className="space-y-6">
-              <div className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl">
+              <div id="community-feed" className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl">
                 <div className="flex flex-col gap-6 lg:flex-row">
                   <div className="lg:w-1/2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-primary">Ratings & reviews</p>
@@ -1471,6 +1526,7 @@ export default function Communities() {
               />
 
               <div
+                id="community-briefing"
                 className="overflow-hidden rounded-4xl border border-slate-200 bg-cover bg-center shadow-xl"
                 style={{ backgroundImage: `url(${resolvedDetail.coverImageUrl})` }}
               >
@@ -1492,7 +1548,7 @@ export default function Communities() {
                 </div>
               </div>
 
-              <div className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl">
+              <div id="community-resources" className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl">
                 <h2 className="text-lg font-semibold text-slate-900">Operational profile</h2>
                 <p className="mt-2 text-sm text-slate-600">
                   Enterprise snapshot blending membership health, curated resources, and operational metadata.

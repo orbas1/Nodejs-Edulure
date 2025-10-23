@@ -8,13 +8,12 @@ import {
   saveInstructorApplication,
   submitInstructorApplication
 } from '../../api/learnerDashboardApi.js';
+import { validateInstructorApplication } from '../../utils/validation/onboarding.js';
 
 const DAY_OPTIONS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const FORMAT_OPTIONS = ['Live cohort', 'Async cohort', 'On-demand library', 'Workshops', 'Office hours'];
 
 const STORAGE_KEY_PREFIX = 'edulure::instructor-application::';
-
-const MIN_MOTIVATION_LENGTH = 30;
 
 const formatRelativeTimestamp = (value) => {
   if (!value) {
@@ -40,81 +39,11 @@ const formatRelativeTimestamp = (value) => {
   return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'} ago`;
 };
 
-const looksLikeUrl = (value) => {
-  if (!value) return false;
-  try {
-    const parsed = new URL(value);
-    return Boolean(parsed.protocol && parsed.host);
-  } catch (error) {
-    return false;
-  }
-};
-
 const buildStorageKey = (userId) => `${STORAGE_KEY_PREFIX}${userId ?? 'anonymous'}`;
 
 function computeStepErrors(formState, stepId) {
-  const errors = {};
-  if (!formState) {
-    return errors;
-  }
-
-  const trimmedMotivation = formState.motivation?.trim() ?? '';
-  const experienceYears = Number(formState.experienceYears ?? 0);
-  const focus = formState.teachingFocus?.trim() ?? '';
-  const trimmedPortfolio = formState.portfolioUrl?.trim() ?? '';
-
-  const ensureMotivation = () => {
-    if (trimmedMotivation.length < MIN_MOTIVATION_LENGTH) {
-      errors.motivation = `Share at least ${MIN_MOTIVATION_LENGTH} characters about your motivation.`;
-    }
-    if (Number.isNaN(experienceYears) || experienceYears < 0) {
-      errors.experienceYears = 'Add your years of experience as a non-negative number.';
-    }
-    if (!focus) {
-      errors.teachingFocus = 'List at least one teaching focus area.';
-    }
-  };
-
-  const ensurePortfolio = () => {
-    if (!trimmedPortfolio) {
-      errors.portfolioUrl = 'Add a portfolio or flagship cohort URL.';
-    } else if (!looksLikeUrl(trimmedPortfolio)) {
-      errors.portfolioUrl = 'Provide a valid https:// URL so reviewers can verify your work.';
-    }
-  };
-
-  const ensureAvailability = () => {
-    if (!formState.availabilityTimezone?.trim()) {
-      errors.availabilityTimezone = 'Confirm your primary timezone.';
-    }
-    if (!Array.isArray(formState.availabilityPreferredDays) || formState.availabilityPreferredDays.length === 0) {
-      errors.availabilityPreferredDays = 'Select at least one day you can host cohorts.';
-    }
-    if (!Array.isArray(formState.availabilitySessionFormats) || formState.availabilitySessionFormats.length === 0) {
-      errors.availabilitySessionFormats = 'Choose at least one delivery format you support.';
-    }
-  };
-
-  switch (stepId) {
-    case 'motivation':
-      ensureMotivation();
-      break;
-    case 'portfolio':
-      ensurePortfolio();
-      break;
-    case 'availability':
-      ensureAvailability();
-      break;
-    case 'review':
-      ensureMotivation();
-      ensurePortfolio();
-      ensureAvailability();
-      break;
-    default:
-      break;
-  }
-
-  return errors;
+  const { errors } = validateInstructorApplication(formState, { step: stepId });
+  return errors ?? {};
 }
 
 const STEPS = [
@@ -123,13 +52,6 @@ const STEPS = [
   { id: 'availability', title: 'Availability & delivery', description: 'Confirm when and how you want to run cohorts.', stage: 'logistics' },
   { id: 'review', title: 'Review & submit', description: 'Finalise details and submit to the partnerships team.', stage: 'review' }
 ];
-
-function parseCommaSeparated(value) {
-  return value
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-}
 
 function parseMultiline(value) {
   return value
@@ -346,24 +268,14 @@ export default function BecomeInstructor() {
     setStatusMessage(null);
   }, []);
 
-  const buildPayload = useCallback(
-    () => ({
+  const buildPayload = useCallback(() => {
+    const { normalized } = validateInstructorApplication(form, { step: 'review' });
+    return {
       status: form.status ?? 'draft',
       stage: currentStep.stage,
-      motivation: form.motivation?.trim() || null,
-      experienceYears: Number(form.experienceYears || 0),
-      teachingFocus: parseCommaSeparated(form.teachingFocus),
-      portfolioUrl: form.portfolioUrl?.trim() || null,
-      marketingAssets: parseMultiline(form.marketingAssets),
-      availability: {
-        timezone: form.availabilityTimezone?.trim() || null,
-        notes: form.availabilityNotes?.trim() || null,
-        preferredDays: form.availabilityPreferredDays,
-        sessionFormats: form.availabilitySessionFormats
-      }
-    }),
-    [currentStep.stage, form]
-  );
+      ...normalized
+    };
+  }, [currentStep.stage, form]);
 
   const handleSave = useCallback(
     async (options = {}) => {
