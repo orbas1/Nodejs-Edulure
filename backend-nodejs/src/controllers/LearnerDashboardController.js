@@ -1,4 +1,5 @@
 import LearnerDashboardService from '../services/LearnerDashboardService.js';
+import LearnerProgressService from '../services/LearnerProgressService.js';
 import { success } from '../utils/httpResponse.js';
 
 const MAX_STRING_LENGTH = 2048;
@@ -363,6 +364,20 @@ function normaliseServiceError(error) {
 }
 
 export default class LearnerDashboardController {
+  static async listCourseProgress(req, res, next) {
+    try {
+      const progress = await LearnerProgressService.listProgressForUser(req.user?.id);
+      return success(res, {
+        data: progress,
+        message: progress.courseSummaries?.length
+          ? 'Learner course progress retrieved'
+          : 'No active course enrollments yet'
+      });
+    } catch (error) {
+      return next(normaliseServiceError(error));
+    }
+  }
+
   static async createPaymentMethod(req, res, next) {
     try {
       const body = sanitiseBody(req.body);

@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import CourseProgressBar from '../../components/course/CourseProgressBar.jsx';
+import { CourseModuleNavigator } from '../../components/course/CourseModuleNavigator.jsx';
 import usePersistentCollection from '../../hooks/usePersistentCollection.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboardApi.js';
+import useLearnerProgress from '../../hooks/useLearnerProgress.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useMountedRef from '../../hooks/useMountedRef.js';
 
@@ -12,6 +15,22 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD'
 });
+
+function formatRelativeTimestamp(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const diffSeconds = Math.round((Date.now() - date.getTime()) / 1000);
+  if (diffSeconds <= 30) return 'just now';
+  if (diffSeconds < 120) return 'about a minute ago';
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} minutes ago`;
+  if (diffSeconds < 7200) return 'about an hour ago';
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} hours ago`;
+  if (diffSeconds < 172800) return 'yesterday';
+  return `${Math.floor(diffSeconds / 86400)} days ago`;
+}
 
 export default function LearnerCourses() {
   const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('courses');
@@ -38,6 +57,7 @@ export default function LearnerCourses() {
   const [recommendations, setRecommendations] = useState([]);
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const [expandedCourseId, setExpandedCourseId] = useState(null);
   const [orderForm, setOrderForm] = useState({
     title: '',
     amount: '',
@@ -47,11 +67,32 @@ export default function LearnerCourses() {
   });
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [orderFeedback, setOrderFeedback] = useState(null);
+  const {
+    progress: courseProgressSummaries,
+    loading: progressLoading,
+    error: progressError,
+    refresh: refreshLearnerProgress,
+    stale: progressStale,
+    lastUpdatedAt: progressLastUpdatedAt,
+    source: progressSource
+  } = useLearnerProgress();
 
   useEffect(() => {
     setActiveCourses(Array.isArray(data?.active) ? data.active : []);
     setRecommendations(Array.isArray(data?.recommendations) ? data.recommendations : []);
   }, [data]);
+
+  useEffect(() => {
+    if (!expandedCourseId) {
+      return;
+    }
+    const exists = Array.isArray(activeCourses)
+      ? activeCourses.some((course) => course?.id === expandedCourseId)
+      : false;
+    if (!exists) {
+      setExpandedCourseId(null);
+    }
+  }, [activeCourses, expandedCourseId]);
 
   useEffect(() => {
     if (!Array.isArray(data?.orders) || data.orders.length === 0) {
@@ -73,6 +114,15 @@ export default function LearnerCourses() {
       });
     }
   }, [error]);
+
+  useEffect(() => {
+    if (progressError) {
+      setStatusMessage({
+        type: 'warning',
+        message: progressError.message ?? 'Progress data may be out of date. Refresh to try again.'
+      });
+    }
+  }, [progressError]);
 
   useEffect(() => {
     if (!orderFeedback) {
@@ -120,6 +170,48 @@ export default function LearnerCourses() {
       return bTime - aTime;
     });
   }, [orders]);
+
+  const progressByCourseId = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(courseProgressSummaries)) {
+      courseProgressSummaries.forEach((summary) => {
+        if (summary?.courseId) {
+          map.set(summary.courseId, summary);
+        }
+      });
+    }
+    return map;
+  }, [courseProgressSummaries]);
+
+  const enrichedCourses = useMemo(
+    () =>
+      activeCourses.map((course) => {
+        const summary = progressByCourseId.get(course.id);
+        const rawProgress = summary?.progressPercent ?? course.progress ?? 0;
+        const progressPercent = Number.isFinite(Number(rawProgress))
+          ? Math.max(0, Math.min(100, Number(rawProgress)))
+          : 0;
+        let nextLessonLabel = course.nextLesson ?? 'Keep your streak going';
+        if (summary?.nextLesson) {
+          const moduleTitle = Array.isArray(summary.modules)
+            ? summary.modules.find((module) => module.id === summary.nextLesson.moduleId)?.title ?? null
+            : null;
+          nextLessonLabel = moduleTitle
+            ? `${moduleTitle} · ${summary.nextLesson.title}`
+            : summary.nextLesson.title ?? nextLessonLabel;
+        }
+        return {
+          ...course,
+          progressPercent,
+          nextLessonLabel,
+          completedLessons: summary?.completedLessons ?? course.completedLessons ?? null,
+          totalLessons: summary?.totalLessons ?? course.totalLessons ?? null,
+          modules: Array.isArray(summary?.modules) ? summary.modules : [],
+          summaryNextLesson: summary?.nextLesson ?? null
+        };
+      }),
+    [activeCourses, progressByCourseId]
+  );
 
   const resetOrderForm = useCallback(() => {
     setOrderForm({
@@ -201,6 +293,18 @@ export default function LearnerCourses() {
     resetOrderForm();
   }, [resetOrders, resetOrderForm]);
 
+  const handleOpenCourse = useCallback(
+    (courseId) => {
+      if (!courseId) return;
+      navigate(`${courseId}`);
+    },
+    [navigate]
+  );
+
+  const toggleExpandedCourse = useCallback((courseId) => {
+    setExpandedCourseId((current) => (current === courseId ? null : courseId));
+  }, []);
+
   const handleCreateGoal = useCallback(async () => {
     if (!token) {
       setStatusMessage({ type: 'error', message: 'Sign in again to create a new learning goal.' });
@@ -281,6 +385,20 @@ export default function LearnerCourses() {
     }
   }, [mounted, token]);
 
+  const progressSnapshotLabel = progressLastUpdatedAt ? formatRelativeTimestamp(progressLastUpdatedAt) : null;
+  const progressUsingCache = progressSource !== 'network' && progressSource !== 'initial';
+  let progressStatusMessage = null;
+  if (progressUsingCache) {
+    progressStatusMessage = progressSnapshotLabel
+      ? `Showing offline snapshot from ${progressSnapshotLabel}. Refresh to sync.`
+      : 'Showing offline snapshot stored on this device. Refresh to sync.';
+  } else if (progressStale && progressSnapshotLabel) {
+    progressStatusMessage = `Progress snapshot from ${progressSnapshotLabel}. Refresh if you worked offline.`;
+  } else if (progressSnapshotLabel) {
+    progressStatusMessage = `Progress synced ${progressSnapshotLabel}.`;
+  }
+  const progressStatusTone = progressUsingCache || progressStale ? 'text-amber-600' : 'text-slate-400';
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -311,16 +429,35 @@ export default function LearnerCourses() {
       </div>
 
       <section className="dashboard-section">
-        <h2 className="text-lg font-semibold text-slate-900">Active programs</h2>
-        <div className="mt-5 space-y-4">
-          {activeCourses.map((course) => (
-            <button
-              key={course.id}
-              type="button"
-              onClick={() => navigate(`${course.id}`)}
-              className="w-full text-left"
-            >
-              <div className="dashboard-card-muted p-5 transition hover:border-primary/40 hover:bg-primary/5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-slate-900">Active programs</h2>
+          <button
+            type="button"
+            className="dashboard-pill px-3 py-1 text-xs font-semibold"
+            onClick={() => refreshLearnerProgress()}
+            disabled={progressLoading}
+          >
+            {progressLoading ? 'Syncing…' : 'Refresh progress'}
+          </button>
+        </div>
+        <div className="mt-3 space-y-1 text-xs">
+          <p className="text-slate-500">
+            {progressLoading
+              ? 'Updating lesson completions…'
+              : `Tracking ${enrichedCourses.length} active ${enrichedCourses.length === 1 ? 'program' : 'programs'}.`}
+          </p>
+          {progressStatusMessage ? (
+            <p className={progressStatusTone}>{progressStatusMessage}</p>
+          ) : null}
+        </div>
+        <div className="mt-4 space-y-4">
+          {enrichedCourses.map((course) => {
+            const expanded = expandedCourseId === course.id;
+            return (
+              <div
+                key={course.id}
+                className="dashboard-card-muted p-5 transition hover:border-primary/40 hover:bg-primary/5"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="dashboard-kicker">{course.status}</p>
@@ -333,19 +470,50 @@ export default function LearnerCourses() {
                     ) : null}
                   </div>
                   <div className="text-right text-sm text-slate-600">
-                    <p>{course.progress}% complete</p>
-                    <p className="text-xs text-slate-500">Next: {course.nextLesson}</p>
+                    <p>{Math.round(course.progressPercent)}% complete</p>
+                    <p className="text-xs text-slate-500">Next: {course.nextLessonLabel}</p>
                   </div>
                 </div>
-                <div className="mt-4 h-2 rounded-full bg-slate-200">
-                  <div
-                    className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
-                    style={{ width: `${course.progress}%` }}
-                  />
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    className="dashboard-primary-pill px-3 py-1"
+                    onClick={() => handleOpenCourse(course.id)}
+                  >
+                    Open course
+                  </button>
+                  <button
+                    type="button"
+                    className="dashboard-pill px-3 py-1"
+                    onClick={() => toggleExpandedCourse(course.id)}
+                  >
+                    {expanded ? 'Hide modules' : 'View modules'}
+                  </button>
                 </div>
+                <CourseProgressBar
+                  value={course.progressPercent}
+                  className="mt-4"
+                  tone={course.progressPercent >= 100 ? 'emerald' : 'primary'}
+                  srLabel={`Progress for ${course.title}`}
+                />
+                {course.completedLessons != null && course.totalLessons != null ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    {course.completedLessons}/{course.totalLessons} lessons completed
+                  </p>
+                ) : null}
+                {expanded ? (
+                  <div className="mt-4 space-y-4">
+                    <CourseModuleNavigator
+                      modules={course.modules}
+                      activeLessonId={course.summaryNextLesson?.id ?? null}
+                      emptyLabel="Modules will appear here once this course publishes its curriculum."
+                      onLessonSelect={() => handleOpenCourse(course.id)}
+                    />
+                  </div>
+                ) : null}
               </div>
-            </button>
-          ))}
+            );
+          })}
         </div>
       </section>
 

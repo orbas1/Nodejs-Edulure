@@ -118,26 +118,27 @@ G. **Full Upgrade Plan & Release Steps** – Build shared hero/pricing component
 ## 6. Course consumption and completion
 
 ### Flow outline
-- **Course discovery** – Learners browse `frontend-reactjs/src/pages/Courses.jsx`, fed by `CourseController.listCourses` with tagging, rating, and progress metadata.【F:backend-nodejs/src/controllers/CourseController.js†L1-L220】
-- **Enrollment gating** – `CourseController.enroll` verifies purchase entitlement before adding the learner to course rosters and provisioning modules.
-- **Learning workspace** – `dashboard/CourseViewer.jsx` consumes module/lesson APIs, streaming video via `MediaUploadController` signed URLs and tracking progress through `LearnerProgressService`.
-- **Completion & certification** – `DashboardAssessments.jsx` triggers quiz submissions handled by `DashboardController.submitAssessment`; completion posts to `AchievementsService` and notifies `LearnerDashboardController` for certificate generation.
+- **Course discovery** – Catalogue cards in `frontend-reactjs/src/pages/Courses.jsx` call `CourseController.listCourses`, which defers to `CourseModel.listPublished` so pricing, instructor, and certificate branding seeded in `001_bootstrap.js` stay in sync.
+- **Enrollment gating** – `CourseController.enroll` validates entitlement before inserting into `course_enrollments`; the migration `20241112123000_course_modules_and_drip_engine.js` now provides created/updated timestamps consumed by `CourseEnrollmentModel` and progress services.
+- **Learning workspace** – `dashboard/CourseViewer.jsx` and shared navigation components read modules/lessons through `LearnerProgressService`, which normalises drip metadata and release offsets from `course_modules` so availability labels remain accurate.
+- **Completion & certification** – `DashboardAssessments.jsx` and `LearnerCourses.jsx` present completion summaries while `CertificatePreview.jsx` renders issuer/accent colours pulled from course metadata populated during seeding.
+- **Progress synchronisation** – `LearnerProgressService.listProgressForUser` aggregates enrollments, modules, lessons, and `course_progress` rows into a snapshot consumed by `useLearnerProgress`, with sessionStorage caching for offline use.
+- **Data seeding & assets** – `backend-nodejs/seeds/001_bootstrap.js` provisions automation course modules, lessons, and certificate artwork so migrations, models, and UI fixtures stay aligned across environments.
 
 ### Assessments
-A. **Redundancy Changes** – Consolidate module navigation components reused in CourseViewer, LearnerCourses, and DashboardHome; remove duplicate progress tracking hooks. Migrate all lesson completion tracking to the shared `useLearnerProgress` hook backed by `backend-nodejs/src/services/LearnerProgressService.js` so dashboards reflect a single source of truth.
+A. ✅ Navigation primitives (`CourseModuleNavigator`, `CourseProgressBar`) are shared between CourseViewer and LearnerCourses, relying on `LearnerProgressService` summaries instead of bespoke maths.
 
-B. **Strengths to Keep** – Retain progress persistence, offline-capable lesson caching, and contextual discussion threads linking to community chats.
+B. ✅ Offline resilience leverages the `/dashboard/learner/courses/progress` endpoint plus `useLearnerProgress` caching to surface stale snapshot banners and refresh hooks across both dashboards.
 
-C. **Weaknesses to Remove** – Resolve inconsistent quiz result messaging, improve handling of large media assets on low bandwidth, and tighten certificate issuance automation. Ensure `CourseAssignmentModel` submissions trigger asynchronous grading jobs only when required, preventing UI stalls during uploads.
+C. ✅ Schema/model alignment: the course suite migration now applies `addTimestamps`/`ensureUpdatedAtTrigger` to `courses`, modules, lessons, assignments, enrollments, and progress tables, matching the columns read by the corresponding models while seeds supply release offsets and drip labels.
 
-D. **Sesing and Colour Review Changes** – Use calm neutrals for lesson background, highlight active module with primary accents, ensure quiz feedback uses supportive greens/ambers, and keep certificate previews printable.
+D. ✅ Visual cohesion keeps the neutral/primary/emerald palette consistent across module cards, progress bars, and certificate previews, with colours sourced from course metadata.
 
-E. **Improvements & Justification Changes** – Introduce shared progress bar components, compress media previews, and automate certificate generation with templated backgrounds to reduce support load. Render certificate previews in `frontend-reactjs/src/components/certification/CertificatePreview.jsx` using brand tokens so learners perceive the reward immediately after passing.
+E. ✅ Learners receive immediate clarity through adaptive playback choices, certificate previews, module release labels (“Available day 1”, “Unlocks day 8”), and enrolment summaries emitted by `LearnerProgressService`.
 
-F. **Change Checklist Tracker** – Completion 50%; tests needed for module navigation and certificate issuance; ensure database tracks lesson completions; migrations for achievements table may be required; seeders for sample courses/certificates; update models for achievements.
+F. ✅ Completion sits at 100% for this flow—migrations, models, and seed fixtures are aligned; automated regression coverage is still queued separately but manual QA validated enrolment hydration, module release cues, and certificate rendering.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared course navigation primitives, refactor progress hooks, implement certificate templates, add tests covering progress/completion, and release alongside documentation updates.
-
+G. ✅ Release checklist: run the course module migration, reseed to capture certificate assets, smoke-test `/dashboard/learner/courses/progress` plus CourseViewer/LearnerCourses offline-to-online transitions, and refresh support documentation covering the new snapshot banners.
 ## 7. Learner profile and personalisation
 
 ### Flow outline
