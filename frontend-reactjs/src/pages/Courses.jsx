@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AcademicCapIcon, CheckCircleIcon, CreditCardIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, CreditCardIcon, PlayCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
 import FormStepper from '../components/forms/FormStepper.jsx';
@@ -8,11 +8,21 @@ import { searchExplorer } from '../api/explorerApi.js';
 import { listPublicCourses } from '../api/catalogueApi.js';
 import { createPaymentIntent } from '../api/paymentsApi.js';
 import { requestMediaUpload } from '../api/mediaApi.js';
+import CourseCard from '../components/courses/CourseCard.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 import { computeFileChecksum } from '../utils/uploads.js';
+import {
+  normalizeCourseDownloads,
+  normalizeCoursePreview,
+  normalizeCourseProgress,
+  normalizeCourseRating,
+  normalizeCourseTags,
+  normalizeUpsellBadges,
+  parseCourseMetadata
+} from '../utils/courseResources.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'courses',
@@ -102,14 +112,7 @@ function parseListField(value) {
 }
 
 function parseMetadata(value) {
-  if (!value) return {};
-  if (typeof value === 'object') return value;
-  try {
-    const parsed = JSON.parse(value);
-    return typeof parsed === 'object' && parsed !== null ? parsed : {};
-  } catch (_error) {
-    return {};
-  }
+  return parseCourseMetadata(value);
 }
 
 function toDateInput(value) {
@@ -133,72 +136,6 @@ function formatPrice(amount, currency = 'USD') {
   } catch (_error) {
     return `${currency} ${numeric}`;
   }
-}
-
-function CourseHighlightCard({ course, onPurchase }) {
-  return (
-    <article className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            <AcademicCapIcon className="h-4 w-4" /> Course
-          </div>
-          <h3 className="text-2xl font-semibold text-slate-900">{course.title}</h3>
-          {course.subtitle ? <p className="text-sm font-medium text-slate-500">{course.subtitle}</p> : null}
-          {course.description ? (
-            <p className="text-sm leading-relaxed text-slate-600">{course.description}</p>
-          ) : null}
-          <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-emerald-600">
-              {course.level}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-              {course.deliveryFormat}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-primary">
-              {course.price}
-            </span>
-          </div>
-        </div>
-        {course.thumbnailUrl ? (
-          <img
-            src={course.thumbnailUrl}
-            alt={course.title}
-            className="h-32 w-32 flex-none rounded-2xl border border-slate-200 object-cover shadow-inner"
-          />
-        ) : null}
-      </div>
-      {course.skills?.length ? (
-        <div className="flex flex-wrap gap-2">
-          {course.skills.map((skill) => (
-            <span key={skill} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              #{skill}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      <div className="flex flex-wrap gap-3">
-        {course.actions?.map((action) => (
-          <a
-            key={action.label}
-            href={action.href ?? '#'}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
-          >
-            {action.label}
-          </a>
-        ))}
-        {onPurchase ? (
-          <button
-            type="button"
-            onClick={onPurchase}
-            className="inline-flex items-center gap-2 rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary hover:text-white"
-          >
-            <CreditCardIcon className="h-4 w-4" /> Purchase cohort
-          </button>
-        ) : null}
-      </div>
-    </article>
-  );
 }
 
 function CourseCheckoutDrawer({ course, open, onClose, form, onChange, onSubmit, status, pending }) {
@@ -352,27 +289,82 @@ function mapCatalogueCourse(course) {
   if (!course) {
     return null;
   }
+  const metadata = parseCourseMetadata(course.metadata);
+  const preview = normalizeCoursePreview(metadata, {
+    previewUrl: course.previewUrl ?? course.promoVideoUrl ?? course.trailerUrl ?? null,
+    previewThumbnailUrl: course.previewThumbnailUrl ?? course.thumbnailUrl ?? course.heroImageUrl ?? null,
+    nextLesson: course.nextLesson ?? metadata.nextLesson ?? null,
+    previewDuration: course.previewDuration,
+    previewAction: course.previewAction
+  });
+  const downloads = normalizeCourseDownloads(metadata, {
+    downloads: course.downloads,
+    resources: course.resources,
+    attachments: course.attachments,
+    syllabusUrl: course.syllabusUrl
+  });
+  const upsellBadges = normalizeUpsellBadges(metadata, course);
+  const tags = normalizeCourseTags(metadata, course);
+  const { rating, ratingCount } = normalizeCourseRating(course, metadata);
+  const progress = normalizeCourseProgress(course, metadata);
+  const metaActions = [];
+  if (metadata.actions) {
+    const entries = Array.isArray(metadata.actions) ? metadata.actions : [metadata.actions];
+    entries.forEach((entry, index) => {
+      if (!entry) return;
+      if (typeof entry === 'string') {
+        metaActions.push({ label: entry, href: course.slug ? `/courses/${course.slug}` : undefined });
+        return;
+      }
+      if (typeof entry === 'object') {
+        metaActions.push({
+          label: entry.label ?? entry.title ?? `Action ${index + 1}`,
+          href: entry.href ?? entry.url ?? undefined,
+          onClick: entry.onClick,
+          icon: entry.icon
+        });
+      }
+    });
+  }
+  const secondaryActions = [
+    course.syllabusUrl ? { label: 'View syllabus', href: course.syllabusUrl } : null,
+    course.promoVideoUrl
+      ? { label: 'Watch trailer', href: course.promoVideoUrl, icon: PlayCircleIcon }
+      : null,
+    ...metaActions
+  ].filter((action) => action && (action.href || action.onClick));
+
   return {
     id: course.id ?? course.publicId ?? course.slug ?? course.title,
     title: course.title,
-    subtitle: course.summary ?? course.category ?? 'Course',
-    description: course.description ?? null,
-    level: course.level ?? 'beginner',
-    deliveryFormat: course.deliveryFormat ?? 'self_paced',
+    subtitle: course.summary ?? metadata.subtitle ?? course.category ?? 'Course',
+    description: course.description ?? metadata.description ?? null,
+    level: course.level ?? metadata.level ?? 'beginner',
+    deliveryFormat: course.deliveryFormat ?? metadata.deliveryFormat ?? 'self_paced',
     price: formatPrice(course.priceAmount, course.priceCurrency ?? 'USD'),
     priceCurrency: course.priceCurrency ?? 'USD',
     priceAmountCents: Number(course.priceAmount ?? 0),
     slug: course.slug ?? null,
-    thumbnailUrl: course.thumbnailUrl ?? course.heroImageUrl ?? null,
+    status: course.status ?? metadata.status ?? null,
+    thumbnailUrl:
+      course.thumbnailUrl ?? course.heroImageUrl ?? metadata.thumbnailUrl ?? preview.thumbnailUrl ?? null,
+    heroImageUrl: course.heroImageUrl ?? metadata.heroImageUrl ?? preview.thumbnailUrl ?? null,
+    previewThumbnailUrl: preview.thumbnailUrl,
+    previewTitle: preview.title,
+    previewUrl: preview.url,
+    previewDuration: preview.duration,
+    previewAction: preview.action,
     skills: Array.isArray(course.skills) ? course.skills : [],
-    actions: [
-      course.syllabusUrl
-        ? { label: 'View syllabus', href: course.syllabusUrl }
-        : null,
-      course.promoVideoUrl
-        ? { label: 'Watch trailer', href: course.promoVideoUrl }
-        : null
-    ].filter(Boolean)
+    tags,
+    downloads,
+    upsellBadges,
+    rating,
+    ratingCount,
+    progress,
+    nextLesson: course.nextLesson ?? metadata.nextLesson ?? preview.title ?? null,
+    goalStatus: course.goalStatus ?? metadata.goalStatus ?? null,
+    durationMinutes: metadata.durationMinutes ?? course.durationMinutes ?? null,
+    secondaryActions
   };
 }
 
@@ -1083,20 +1075,71 @@ export default function Courses() {
             throw new Error(response?.message ?? 'Search failed');
           }
           const hits = response.data?.results?.courses?.hits ?? [];
-          setHighlightCourses(
-            hits.map((hit, index) => ({
-              id: hit.id ?? hit.slug ?? `course-${index}`,
-              title: hit.title ?? hit.name,
-              subtitle: hit.subtitle ?? hit.metrics?.subtitle,
-              description: hit.description ?? hit.summary,
-              level: hit.raw?.level ?? hit.metrics?.level ?? 'beginner',
-              deliveryFormat: hit.raw?.deliveryFormat ?? hit.metrics?.deliveryFormat ?? 'self_paced',
-              price: hit.price?.formatted ?? hit.metrics?.price ?? '$0',
-              thumbnailUrl: hit.thumbnailUrl ?? hit.heroImageUrl ?? null,
-              skills: hit.tags ?? hit.raw?.skills ?? [],
-              actions: hit.actions ?? []
-            }))
-          );
+          const items = hits
+            .map((hit, index) => {
+              const priceAmount =
+                hit.price?.value ??
+                hit.price?.amount ??
+                hit.metrics?.price?.value ??
+                hit.metrics?.price ??
+                hit.raw?.priceAmount ??
+                hit.raw?.price ??
+                0;
+              const metadata = hit.raw?.metadata ?? hit.metadata ?? {};
+              const canonical = {
+                id: hit.id ?? hit.slug ?? `course-${index}`,
+                title: hit.title ?? hit.name ?? `Course ${index + 1}`,
+                summary: hit.subtitle ?? hit.metrics?.subtitle ?? metadata.subtitle ?? null,
+                description: hit.description ?? hit.summary ?? metadata.description ?? null,
+                level: hit.raw?.level ?? hit.metrics?.level ?? metadata.level ?? 'beginner',
+                deliveryFormat:
+                  hit.raw?.deliveryFormat ??
+                  hit.metrics?.deliveryFormat ??
+                  metadata.deliveryFormat ??
+                  'self_paced',
+                priceAmount,
+                priceCurrency:
+                  hit.price?.currency ??
+                  hit.metrics?.price?.currency ??
+                  hit.raw?.priceCurrency ??
+                  metadata.priceCurrency ??
+                  'USD',
+                slug: hit.slug ?? hit.raw?.slug ?? null,
+                thumbnailUrl: hit.thumbnailUrl ?? hit.imageUrl ?? hit.heroImageUrl ?? null,
+                heroImageUrl: hit.heroImageUrl ?? null,
+                skills: hit.tags ?? hit.raw?.skills ?? metadata.skills ?? [],
+                metadata,
+                status: hit.metrics?.status ?? hit.raw?.status ?? metadata.status ?? 'Highlighted',
+                nextLesson: hit.metrics?.nextLesson ?? hit.raw?.nextLesson ?? metadata.nextLesson ?? null,
+                promoVideoUrl:
+                  hit.raw?.promoVideoUrl ?? metadata.promoVideoUrl ?? hit.previewUrl ?? metadata.previewUrl ?? null,
+                downloads: hit.raw?.downloads ?? metadata.downloads ?? null,
+                resources: hit.raw?.resources ?? metadata.resources ?? null,
+                attachments: hit.raw?.attachments ?? metadata.attachments ?? null,
+                progress: hit.metrics?.progress ?? metadata.progress ?? null,
+                ratingAverage: hit.metrics?.rating?.average ?? hit.raw?.rating?.average ?? metadata.ratingAverage ?? null,
+                ratingCount: hit.metrics?.rating?.count ?? hit.raw?.rating?.count ?? metadata.ratingCount ?? null
+              };
+              const mapped = mapCatalogueCourse(canonical);
+              if (!mapped) {
+                return null;
+              }
+              if (Array.isArray(hit.actions) && hit.actions.length) {
+                const existingLabels = new Set((mapped.secondaryActions ?? []).map((action) => action.label));
+                const additional = hit.actions
+                  .map((action, actionIndex) => ({
+                    label: action.label ?? action.title ?? `Link ${actionIndex + 1}`,
+                    href: action.href ?? action.url ?? null
+                  }))
+                  .filter((action) => action.label && action.href && !existingLabels.has(action.label));
+                if (additional.length) {
+                  mapped.secondaryActions = [...(mapped.secondaryActions ?? []), ...additional];
+                }
+              }
+              return mapped;
+            })
+            .filter(Boolean);
+          setHighlightCourses(items);
           return;
         }
         throw Object.assign(new Error('Authentication required for personalised highlights'), { status: 401 });
@@ -1543,7 +1586,18 @@ export default function Courses() {
           ) : null}
           <div className="grid gap-6 lg:grid-cols-2">
             {highlightCourses.map((course) => (
-              <CourseHighlightCard key={course.id} course={course} onPurchase={() => openCheckout(course)} />
+              <CourseCard
+                key={course.id}
+                course={course}
+                variant="catalogue"
+                onSelect={() => openCheckout(course)}
+                primaryAction={{
+                  label: 'Purchase cohort',
+                  icon: CreditCardIcon,
+                  onClick: () => openCheckout(course)
+                }}
+                secondaryActions={course.secondaryActions ?? []}
+              />
             ))}
             {!highlightLoading && highlightCourses.length === 0 ? (
               <p className="text-sm text-slate-500">
@@ -1568,7 +1622,20 @@ export default function Courses() {
             {catalogueCourses.map((course) => {
               const mapped = mapCatalogueCourse(course);
               if (!mapped) return null;
-              return <CourseHighlightCard key={mapped.id} course={mapped} onPurchase={() => openCheckout(mapped)} />;
+              return (
+                <CourseCard
+                  key={mapped.id}
+                  course={mapped}
+                  variant="catalogue"
+                  onSelect={() => openCheckout(mapped)}
+                  primaryAction={{
+                    label: 'Purchase cohort',
+                    icon: CreditCardIcon,
+                    onClick: () => openCheckout(mapped)
+                  }}
+                  secondaryActions={mapped.secondaryActions ?? []}
+                />
+              );
             })}
             {!catalogueLoading && catalogueCourses.length === 0 ? (
               <p className="text-sm text-slate-500">No published courses yet. Check back soon.</p>
