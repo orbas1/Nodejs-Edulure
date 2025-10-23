@@ -113,6 +113,18 @@ describe('SearchBar', () => {
     expect(handleChange).toHaveBeenCalledWith('', null);
     expect(handleClear).toHaveBeenCalled();
   });
+
+  it('invokes keyboard handlers when provided', async () => {
+    const user = userEvent.setup();
+    const handleKeyDown = vi.fn();
+
+    render(<SearchBar onKeyDown={handleKeyDown} />);
+
+    const input = screen.getByRole('searchbox');
+    await user.type(input, '{ArrowDown}');
+
+    expect(handleKeyDown).toHaveBeenCalled();
+  });
 });
 
 describe('SkewedMenu', () => {

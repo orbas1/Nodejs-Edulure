@@ -20,6 +20,101 @@ function parseMetadata(value) {
   return typeof value === 'object' && value !== null ? value : {};
 }
 
+function serialiseMetadata(value) {
+  if (!value || typeof value !== 'object') {
+    return EMPTY_METADATA;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch (_error) {
+    return EMPTY_METADATA;
+  }
+}
+
+function pickUrl(...candidates) {
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    const value = typeof candidate === 'string' ? candidate.trim() : null;
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function normalisePreviewDigest(entries, { entityType, metricDate }) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return [];
+  }
+
+  const timestamp = metricDate instanceof Date ? metricDate.toISOString() : new Date(metricDate).toISOString();
+  const normalised = [];
+  for (const entry of entries) {
+    if (!entry) {
+      continue;
+    }
+    const entityId = entry.entityId ?? entry.id;
+    const trimmedId = typeof entityId === 'string' ? entityId.trim() : String(entityId ?? '').trim();
+    if (!trimmedId) {
+      continue;
+    }
+
+    const previewUrl = pickUrl(entry.previewUrl, entry.url, entry.mediaUrl);
+    const thumbnailUrl = pickUrl(entry.thumbnailUrl, entry.posterUrl, entry.imageUrl);
+    if (!previewUrl && !thumbnailUrl) {
+      continue;
+    }
+
+    const previewType = entry.previewType ?? entry.type ?? (previewUrl && previewUrl.endsWith('.mp4') ? 'video' : 'image');
+    const metrics = entry.metrics && typeof entry.metrics === 'object' ? entry.metrics : null;
+
+    normalised.push({
+      entityId: trimmedId,
+      entityType: entry.entityType ?? entityType,
+      previewUrl: previewUrl ?? null,
+      previewType,
+      thumbnailUrl: thumbnailUrl ?? null,
+      title: entry.title ?? null,
+      subtitle: entry.subtitle ?? null,
+      metrics,
+      source: entry.source ?? 'search-result',
+      capturedAt: entry.capturedAt ?? timestamp
+    });
+  }
+
+  return normalised;
+}
+
+function mergePreviewDigests(existingEntries = [], incomingEntries = [], limit = 30) {
+  const merged = new Map();
+  incomingEntries.forEach((entry) => {
+    if (!entry || !entry.entityId) {
+      return;
+    }
+    merged.set(entry.entityId, entry);
+  });
+
+  existingEntries.forEach((entry) => {
+    if (!entry || !entry.entityId) {
+      return;
+    }
+    if (!merged.has(entry.entityId)) {
+      merged.set(entry.entityId, entry);
+    }
+  });
+
+  const result = [];
+  for (const value of merged.values()) {
+    result.push(value);
+    if (result.length >= limit) {
+      break;
+    }
+  }
+  return result;
+}
+
 function toDomain(row) {
   if (!row) {
     return null;
@@ -108,7 +203,8 @@ export default class ExplorerSearchDailyMetricModel {
       isZeroResult,
       displayedHits,
       totalHits,
-      latencyMs
+      latencyMs,
+      previewDigest
     },
     connection = db
   ) {
@@ -118,12 +214,22 @@ export default class ExplorerSearchDailyMetricModel {
     const displayedDelta = toNonNegativeInteger(displayedHits);
     const totalDelta = toNonNegativeInteger(totalHits);
     const latency = toLatency(latencyMs);
+    const digestEntries = normalisePreviewDigest(previewDigest, {
+      entityType: normalisedEntityType,
+      metricDate: date
+    });
+    const digestTimestamp = digestEntries.length ? new Date().toISOString() : null;
 
     return withTransaction(connection, async (trx) => {
       const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
       const existing = await applyForUpdate(existingQuery).first();
 
       if (existing) {
+        const existingMetadata = parseMetadata(existing.metadata);
+        if (digestEntries.length) {
+          existingMetadata.previews = mergePreviewDigests(existingMetadata.previews, digestEntries);
+          existingMetadata.lastDigestAt = digestTimestamp;
+        }
         const currentSearches = Math.max(0, Number(existing.searches ?? 0));
         const searches = currentSearches + 1;
         const zeroResults = Math.max(0, Number(existing.zero_results ?? 0)) + zeroDelta;
@@ -141,11 +247,18 @@ export default class ExplorerSearchDailyMetricModel {
             displayed_results: displayedResults,
             total_results: totalResults,
             average_latency_ms: averageLatencyMs,
+            metadata: serialiseMetadata(existingMetadata),
             updated_at: trx.fn.now()
           });
 
         const row = await trx(TABLE).where({ id: existing.id }).first();
         return toDomain(row);
+      }
+
+      const metadata = {};
+      if (digestEntries.length) {
+        metadata.previews = mergePreviewDigests([], digestEntries);
+        metadata.lastDigestAt = digestTimestamp;
       }
 
       const payload = {
@@ -158,7 +271,7 @@ export default class ExplorerSearchDailyMetricModel {
         clicks: 0,
         conversions: 0,
         average_latency_ms: latency,
-        metadata: EMPTY_METADATA
+        metadata: serialiseMetadata(metadata)
       };
 
       const [id] = await trx(TABLE).insert(payload);
@@ -263,5 +376,62 @@ export default class ExplorerSearchDailyMetricModel {
       });
     }
     return results;
+  }
+
+  static async getRecentPreviewDigest(entityType, { since, limit = 30 } = {}, connection = db) {
+    const normalisedEntityType = normaliseEntityType(entityType);
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 30, 60));
+
+    const query = connection(TABLE)
+      .select('metadata', 'metric_date as metricDate', 'updated_at as updatedAt')
+      .where('entity_type', normalisedEntityType)
+      .orderBy('metric_date', 'desc')
+      .limit(safeLimit * 2);
+
+    if (since) {
+      query.andWhere('metric_date', '>=', normaliseDate(since));
+    }
+
+    const rows = await query;
+    const combined = new Map();
+
+    for (const row of rows) {
+      const metadata = parseMetadata(row.metadata);
+      const previews = Array.isArray(metadata.previews) ? metadata.previews : [];
+      const capturedAt = metadata.lastDigestAt ?? row.updatedAt ?? row.metricDate;
+
+      for (const entry of previews) {
+        const entityId = typeof entry?.entityId === 'string' ? entry.entityId.trim() : String(entry?.entityId ?? '').trim();
+        if (!entityId || combined.has(entityId)) {
+          continue;
+        }
+        const previewUrl = pickUrl(entry.previewUrl, entry.url, entry.mediaUrl);
+        const thumbnailUrl = pickUrl(entry.thumbnailUrl, entry.posterUrl, entry.imageUrl);
+        if (!previewUrl && !thumbnailUrl) {
+          continue;
+        }
+        combined.set(entityId, {
+          entityId,
+          entityType: entry.entityType ?? normalisedEntityType,
+          previewUrl: previewUrl ?? null,
+          previewType: entry.previewType ?? entry.type ?? (previewUrl && previewUrl.endsWith('.mp4') ? 'video' : 'image'),
+          thumbnailUrl: thumbnailUrl ?? null,
+          title: entry.title ?? null,
+          subtitle: entry.subtitle ?? null,
+          metrics: entry.metrics ?? null,
+          capturedAt: entry.capturedAt ?? capturedAt ?? null,
+          source: entry.source ?? 'metrics'
+        });
+        if (combined.size >= safeLimit) {
+          break;
+        }
+      }
+
+      if (combined.size >= safeLimit) {
+        break;
+      }
+    }
+
+    return combined;
   }
 }

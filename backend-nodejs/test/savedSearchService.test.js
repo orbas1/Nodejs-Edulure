@@ -135,4 +135,43 @@ describe('SavedSearchService', () => {
     expect(builder.where).toHaveBeenCalledWith({ id: 11, user_id: 9 });
     expect(builder.update).toHaveBeenCalledWith({ last_used_at: expect.any(Date) });
   });
+
+  it('returns pinned and recent suggestions filtered by entity type', async () => {
+    savedSearchModelMock.listByUser.mockResolvedValueOnce([
+      {
+        id: 1,
+        name: 'Pinned automation',
+        query: 'automation',
+        entityTypes: ['courses'],
+        isPinned: true,
+        lastUsedAt: '2025-02-20T10:00:00.000Z',
+        updatedAt: '2025-02-21T09:00:00.000Z'
+      },
+      {
+        id: 2,
+        name: 'Growth loops',
+        query: 'growth',
+        entityTypes: ['courses'],
+        isPinned: false,
+        lastUsedAt: '2025-02-22T08:00:00.000Z',
+        updatedAt: '2025-02-22T08:00:00.000Z'
+      },
+      {
+        id: 3,
+        name: 'Community moderation',
+        query: 'moderation',
+        entityTypes: ['communities'],
+        isPinned: false,
+        lastUsedAt: '2025-02-21T08:00:00.000Z',
+        updatedAt: '2025-02-21T08:00:00.000Z'
+      }
+    ]);
+
+    const suggestions = await service.listSuggestions({ userId: 42, entityTypes: ['courses'], limit: 2 });
+
+    expect(savedSearchModelMock.listByUser).toHaveBeenCalledWith(42, knex);
+    expect(suggestions).toHaveLength(2);
+    expect(suggestions[0]).toMatchObject({ id: 1, isPinned: true });
+    expect(suggestions[1]).toMatchObject({ id: 2, query: 'growth' });
+  });
 });

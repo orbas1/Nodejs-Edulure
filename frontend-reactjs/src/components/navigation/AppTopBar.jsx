@@ -10,7 +10,7 @@ import {
   RectangleStackIcon
 } from '@heroicons/react/24/outline';
 
-import SearchBar from '../SearchBar.jsx';
+import GlobalSearchBar from '../search/GlobalSearchBar.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
 import UserMenu from './UserMenu.jsx';
 import { buildFocusOrder } from '../../navigation/routes.js';
@@ -128,13 +128,11 @@ export default function AppTopBar({
         </nav>
         {showSearch ? (
           <div className="hidden flex-1 lg:block">
-            <SearchBar
+            <GlobalSearchBar
               value={searchValue}
               onChange={onSearchChange}
-              onSubmit={(event, value) => onSearchSubmit?.(value ?? event?.target?.value ?? '')}
-              placeholder="Search courses, tutors, communities…"
+              onSubmit={(query, context) => onSearchSubmit?.(query ?? '', context)}
               loading={searchLoading}
-              ariaLabel="Search across Edulure"
             />
           </div>
         ) : null}
@@ -239,13 +237,11 @@ export default function AppTopBar({
       </div>
       {showSearch ? (
         <div className="border-t border-slate-100 px-4 py-3 lg:hidden">
-          <SearchBar
+          <GlobalSearchBar
             value={searchValue}
             onChange={onSearchChange}
-            onSubmit={(event, value) => onSearchSubmit?.(value ?? event?.target?.value ?? '')}
-            placeholder="Search courses, tutors, communities…"
+            onSubmit={(query, context) => onSearchSubmit?.(query ?? '', context)}
             loading={searchLoading}
-            ariaLabel="Search across Edulure"
           />
         </div>
       ) : null}

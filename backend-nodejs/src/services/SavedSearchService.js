@@ -95,6 +95,47 @@ export class SavedSearchService {
       generatedAt: new Date().toISOString()
     };
   }
+
+  async listSuggestions({ userId, entityTypes = [], limit = 6 } = {}) {
+    const resolvedLimit = Math.max(1, Math.min(Number(limit) || 6, 12));
+    if (!userId) {
+      return [];
+    }
+
+    const searches = await this.model.listByUser(userId, this.db);
+    if (!searches.length) {
+      return [];
+    }
+
+    const entityFilter = Array.isArray(entityTypes)
+      ? entityTypes.map((entry) => (typeof entry === 'string' ? entry.trim().toLowerCase() : null)).filter(Boolean)
+      : [];
+
+    const filtered = entityFilter.length
+      ? searches.filter((item) =>
+          Array.isArray(item.entityTypes) && item.entityTypes.some((type) => entityFilter.includes(type?.toLowerCase()))
+        )
+      : searches;
+
+    const pinned = filtered.filter((item) => item.isPinned);
+    const nonPinned = filtered.filter((item) => !item.isPinned);
+
+    const sortedPinned = pinned.sort((a, b) => new Date(b.updatedAt ?? 0) - new Date(a.updatedAt ?? 0));
+    const sortedRecent = nonPinned.sort((a, b) =>
+      new Date(b.lastUsedAt ?? b.updatedAt ?? 0) - new Date(a.lastUsedAt ?? a.updatedAt ?? 0)
+    );
+
+    const suggestions = [...sortedPinned, ...sortedRecent].slice(0, resolvedLimit);
+    return suggestions.map((item) => ({
+      id: item.id,
+      name: item.name,
+      query: item.query ?? '',
+      entityTypes: item.entityTypes ?? [],
+      isPinned: Boolean(item.isPinned),
+      lastUsedAt: item.lastUsedAt ?? null,
+      updatedAt: item.updatedAt ?? null
+    }));
+  }
 }
 
 export const savedSearchService = new SavedSearchService();

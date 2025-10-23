@@ -159,11 +159,21 @@ describe('ExplorerAnalyticsService', () => {
       expect.any(Object)
     );
     expect(dailyMetricModel.incrementForEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'all', displayedHits: 10, totalHits: 20 }),
+      expect.objectContaining({
+        entityType: 'all',
+        displayedHits: 10,
+        totalHits: 20,
+        previewDigest: expect.any(Array)
+      }),
       expect.any(Object)
     );
     expect(dailyMetricModel.incrementForEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'courses', displayedHits: 6, totalHits: 12 }),
+      expect.objectContaining({
+        entityType: 'courses',
+        displayedHits: 6,
+        totalHits: 12,
+        previewDigest: expect.any(Array)
+      }),
       expect.any(Object)
     );
     expect(metrics.recordExplorerSearchEvent).toHaveBeenCalledTimes(2);

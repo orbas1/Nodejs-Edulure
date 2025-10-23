@@ -28,6 +28,9 @@ vi.mock('../src/utils/httpResponse.js', () => {
 vi.mock('../src/config/env.js', () => ({
   __esModule: true,
   env: {
+    nodeEnv: 'test',
+    logging: { serviceName: 'edulure-backend' },
+    observability: { metrics: { allowedIps: ['127.0.0.1'] } },
     directMessages: {
       threads: { maxPageSize: 50, defaultPageSize: 20 },
       messages: { maxPageSize: 100, defaultPageSize: 30 }
@@ -35,7 +38,7 @@ vi.mock('../src/config/env.js', () => ({
   }
 }));
 
-const complianceServiceMock = {
+const complianceServiceMock = vi.hoisted(() => ({
   listDsrRequests: vi.fn(),
   assignDsrRequest: vi.fn(),
   updateDsrStatus: vi.fn(),
@@ -43,14 +46,14 @@ const complianceServiceMock = {
   createConsentRecord: vi.fn(),
   revokeConsent: vi.fn(),
   fetchPolicyTimeline: vi.fn()
-};
+}));
 
 vi.mock('../src/services/ComplianceService.js', () => ({
   __esModule: true,
   default: vi.fn(() => complianceServiceMock)
 }));
 
-const assetServiceMock = {
+const assetServiceMock = vi.hoisted(() => ({
   createUploadSession: vi.fn(),
   confirmUpload: vi.fn(),
   listAssets: vi.fn(),
@@ -61,61 +64,61 @@ const assetServiceMock = {
   getProgress: vi.fn(),
   analytics: vi.fn(),
   updateMetadata: vi.fn()
-};
+}));
 
 vi.mock('../src/services/AssetService.js', () => ({
   __esModule: true,
   default: assetServiceMock
 }));
 
-const videoPlaybackServiceMock = {
+const videoPlaybackServiceMock = vi.hoisted(() => ({
   getPlaybackSession: vi.fn(() => ({ playback: { url: 'https://example.com/stream' } }))
-};
+}));
 
 vi.mock('../src/services/VideoPlaybackService.js', () => ({
   __esModule: true,
   default: videoPlaybackServiceMock
 }));
 
-const courseLiveServiceMock = {
+const courseLiveServiceMock = vi.hoisted(() => ({
   getPresence: vi.fn(() => ({ viewers: 10 })),
   listMessages: vi.fn(),
   postMessage: vi.fn()
-};
+}));
 
 vi.mock('../src/services/CourseLiveService.js', () => ({
   __esModule: true,
   default: courseLiveServiceMock
 }));
 
-const realtimeServiceMock = { broadcastCourseMessage: vi.fn() };
+const realtimeServiceMock = vi.hoisted(() => ({ broadcastCourseMessage: vi.fn() }));
 
 vi.mock('../src/services/RealtimeService.js', () => ({
   __esModule: true,
   default: realtimeServiceMock
 }));
 
-const courseAccessServiceMock = {
+const courseAccessServiceMock = vi.hoisted(() => ({
   ensureCourseAccess: vi.fn()
-};
+}));
 
 vi.mock('../src/services/CourseAccessService.js', () => ({
   __esModule: true,
   default: courseAccessServiceMock
 }));
 
-const creationStudioServiceMock = {
+const creationStudioServiceMock = vi.hoisted(() => ({
   listProjects: vi.fn()
-};
+}));
 
 vi.mock('../src/services/CreationStudioService.js', () => ({
   __esModule: true,
   default: creationStudioServiceMock
 }));
 
-const creationAnalyticsServiceMock = {
+const creationAnalyticsServiceMock = vi.hoisted(() => ({
   getSummary: vi.fn()
-};
+}));
 
 vi.mock('../src/services/CreationAnalyticsService.js', () => ({
   __esModule: true,
@@ -127,29 +130,29 @@ vi.mock('../src/services/CreationRecommendationService.js', () => ({
   default: {}
 }));
 
-const dashboardServiceMock = {
+const dashboardServiceMock = vi.hoisted(() => ({
   getDashboardForUser: vi.fn()
-};
+}));
 
 vi.mock('../src/services/DashboardService.js', () => ({
   __esModule: true,
   default: dashboardServiceMock
 }));
 
-const directMessageServiceMock = {
+const directMessageServiceMock = vi.hoisted(() => ({
   listThreads: vi.fn(),
   createThread: vi.fn(),
   listMessages: vi.fn(),
   sendMessage: vi.fn(),
   markRead: vi.fn()
-};
+}));
 
 vi.mock('../src/services/DirectMessageService.js', () => ({
   __esModule: true,
   default: directMessageServiceMock
 }));
 
-const ebookServiceMock = {
+const ebookServiceMock = vi.hoisted(() => ({
   createListing: vi.fn(),
   updateListing: vi.fn(),
   setPublicationState: vi.fn(),
@@ -157,79 +160,98 @@ const ebookServiceMock = {
   listMarketplace: vi.fn(),
   getDetails: vi.fn(),
   purchase: vi.fn()
-};
+}));
 
 vi.mock('../src/services/EbookService.js', () => ({
   __esModule: true,
   default: ebookServiceMock
 }));
 
-const enablementServiceMock = {
+const enablementServiceMock = vi.hoisted(() => ({
   listArticles: vi.fn(),
   getArticle: vi.fn(),
   getCapabilityMatrix: vi.fn(),
   refreshCache: vi.fn()
-};
+}));
 
 vi.mock('../src/services/EnablementContentService.js', () => ({
   __esModule: true,
   default: enablementServiceMock
 }));
 
-const environmentParityServiceMock = {
+const environmentParityServiceMock = vi.hoisted(() => ({
   generateReport: vi.fn()
-};
+}));
 
 vi.mock('../src/services/EnvironmentParityService.js', () => ({
   __esModule: true,
   default: environmentParityServiceMock
 }));
 
-const explorerSearchServiceMock = {
-  getSupportedEntities: vi.fn(() => ['course', 'community']),
+const explorerSearchServiceMock = vi.hoisted(() => ({
+  getSupportedEntities: vi.fn(() => ['courses', 'communities', 'ebooks', 'tutors']),
   search: vi.fn()
-};
+}));
 
 vi.mock('../src/services/ExplorerSearchService.js', () => ({
   __esModule: true,
   default: explorerSearchServiceMock
 }));
 
-const explorerAnalyticsServiceMock = {
+const explorerAnalyticsServiceMock = vi.hoisted(() => ({
   recordSearchExecution: vi.fn()
-};
+}));
 
 vi.mock('../src/services/ExplorerAnalyticsService.js', () => ({
   __esModule: true,
   default: explorerAnalyticsServiceMock
 }));
 
-const savedSearchServiceMock = {
+const savedSearchServiceMock = vi.hoisted(() => ({
   touchUsage: vi.fn(() => Promise.resolve()),
   list: vi.fn(),
+  listSuggestions: vi.fn(),
   get: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
   delete: vi.fn()
-};
+}));
 
 vi.mock('../src/services/SavedSearchService.js', () => ({
   __esModule: true,
   default: savedSearchServiceMock
 }));
 
-const liveFeedServiceMock = {
+const explorerSearchDailyMetricModelMock = vi.hoisted(() => ({
+  getRecentPreviewDigest: vi.fn()
+}));
+
+vi.mock('../src/models/ExplorerSearchDailyMetricModel.js', () => ({
+  __esModule: true,
+  default: explorerSearchDailyMetricModelMock
+}));
+
+const explorerSearchEventModelMock = vi.hoisted(() => ({
+  topQueries: vi.fn()
+}));
+
+vi.mock('../src/models/ExplorerSearchEventModel.js', () => ({
+  __esModule: true,
+  default: explorerSearchEventModelMock
+}));
+
+const liveFeedServiceMock = vi.hoisted(() => ({
   getFeed: vi.fn(),
   getAnalytics: vi.fn(),
   getPlacements: vi.fn()
-};
+}));
 
 vi.mock('../src/services/LiveFeedService.js', () => ({
   __esModule: true,
   default: liveFeedServiceMock
 }));
 
-const governanceStakeholderServiceMock = {
+const governanceStakeholderServiceMock = vi.hoisted(() => ({
   getOverview: vi.fn(),
   listContracts: vi.fn(),
   updateContract: vi.fn(),
@@ -240,14 +262,14 @@ const governanceStakeholderServiceMock = {
   listCommunications: vi.fn(),
   scheduleCommunication: vi.fn(),
   recordCommunicationMetrics: vi.fn()
-};
+}));
 
 vi.mock('../src/services/GovernanceStakeholderService.js', () => ({
   __esModule: true,
   default: governanceStakeholderServiceMock
 }));
 
-const identityVerificationServiceMock = {
+const identityVerificationServiceMock = vi.hoisted(() => ({
   getVerificationSummaryForUser: vi.fn(),
   requestUpload: vi.fn(),
   attachDocument: vi.fn(),
@@ -255,7 +277,7 @@ const identityVerificationServiceMock = {
   reviewVerification: vi.fn(),
   listAuditTrail: vi.fn(),
   getAdminOverview: vi.fn()
-};
+}));
 
 vi.mock('../src/services/IdentityVerificationService.js', () => ({
   __esModule: true,
@@ -268,38 +290,38 @@ vi.mock('../src/config/logger.js', () => ({
   logger: { error: vi.fn(), child: () => ({ error: vi.fn(), warn: vi.fn() }) }
 }));
 
-const instructorBookingServiceMock = {
+const instructorBookingServiceMock = vi.hoisted(() => ({
   listBookings: vi.fn(),
   createBooking: vi.fn(),
   updateBooking: vi.fn(),
   cancelBooking: vi.fn()
-};
+}));
 
 vi.mock('../src/services/InstructorBookingService.js', () => ({
   __esModule: true,
   default: instructorBookingServiceMock
 }));
 
-const instructorOrchestrationServiceMock = {
+const instructorOrchestrationServiceMock = vi.hoisted(() => ({
   generateCourseOutline: vi.fn(),
   importFromNotion: vi.fn(),
   syncFromLms: vi.fn(),
   routeTutorRequest: vi.fn(),
   sendMentorInvite: vi.fn(),
   exportPricing: vi.fn()
-};
+}));
 
 vi.mock('../src/services/InstructorOrchestrationService.js', () => ({
   __esModule: true,
   default: instructorOrchestrationServiceMock
 }));
 
-const instructorSchedulingServiceMock = {
+const instructorSchedulingServiceMock = vi.hoisted(() => ({
   listRoster: vi.fn(),
   createSlot: vi.fn(),
   updateSlot: vi.fn(),
   deleteSlot: vi.fn()
-};
+}));
 
 vi.mock('../src/services/InstructorSchedulingService.js', () => ({
   __esModule: true,
@@ -646,7 +668,7 @@ describe('ExplorerController', () => {
     const req = createRequest({
       body: {
         query: 'design',
-        entityTypes: ['course'],
+        entityTypes: ['courses'],
         savedSearchId: 10,
         filters: { level: 'beginner' },
         globalFilters: {},
@@ -681,6 +703,61 @@ describe('ExplorerController', () => {
     expect(next).toHaveBeenCalled();
     const error = next.mock.calls.at(-1)[0];
     expect(error.status).toBe(422);
+  });
+
+  it('returns search suggestions with trending queries and previews', async () => {
+    savedSearchServiceMock.listSuggestions.mockResolvedValueOnce([
+      {
+        id: 11,
+        name: 'Pinned ops',
+        query: 'automation',
+        entityTypes: ['courses'],
+        isPinned: true
+      }
+    ]);
+    explorerSearchEventModelMock.topQueries.mockResolvedValueOnce([
+      { query: 'growth', searches: 14 }
+    ]);
+    explorerSearchDailyMetricModelMock.getRecentPreviewDigest.mockResolvedValueOnce(
+      new Map([
+        [
+          'course-1',
+          {
+            entityId: 'course-1',
+            thumbnailUrl: 'https://cdn.edulure.com/courses/course-1.jpg'
+          }
+        ]
+      ])
+    );
+
+    const req = createRequest({
+      user: { id: 7 },
+      query: { entityTypes: ['courses'], limit: '2' }
+    });
+    const res = createRes();
+
+    await ExplorerController.searchSuggestions(req, res, next);
+
+    expect(savedSearchServiceMock.listSuggestions).toHaveBeenCalledWith({
+      userId: 7,
+      entityTypes: ['courses'],
+      limit: 2
+    });
+    expect(explorerSearchDailyMetricModelMock.getRecentPreviewDigest).toHaveBeenCalledWith(
+      'courses',
+      expect.objectContaining({ limit: 4 })
+    );
+    expect(success).toHaveBeenCalledWith(
+      res,
+      expect.objectContaining({
+        message: 'Explorer search suggestions fetched',
+        data: expect.objectContaining({
+          savedSearches: expect.any(Array),
+          trendingQueries: expect.any(Array),
+          previewDigest: expect.objectContaining({ courses: expect.any(Array) })
+        })
+      })
+    );
   });
 });
 

@@ -50,3 +50,13 @@ export async function deleteSavedSearch(id, { token } = {}) {
     ])
   });
 }
+
+export async function getExplorerSearchSuggestions(params = {}, { token, signal } = {}) {
+  assertToken(token, 'fetch explorer search suggestions');
+  return httpClient.get('/explorer/search/suggestions', {
+    token,
+    params,
+    signal,
+    cache: createListCacheConfig(`explorer:search-suggestions:${token}`, { ttl: 20_000 })
+  });
+}

@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { useState } from 'react';
 import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline';
 import CommunitySwitcher from './CommunitySwitcher.jsx';
-import SearchBar from './SearchBar.jsx';
+import GlobalSearchBar from './search/GlobalSearchBar.jsx';
 import LanguageSelector from './navigation/LanguageSelector.jsx';
 
 export default function TopBar({
@@ -25,21 +25,18 @@ export default function TopBar({
   const [localSearchValue, setLocalSearchValue] = useState('');
   const resolvedSearchValue = searchValue ?? localSearchValue;
 
-  const handleSearchChange = (value, event) => {
+  const handleSearchChange = (nextValue) => {
     if (typeof onSearchChange === 'function') {
-      onSearchChange(value, event);
+      onSearchChange(nextValue);
     }
     if (searchValue === undefined) {
-      setLocalSearchValue(value);
+      setLocalSearchValue(nextValue);
     }
   };
 
-  const handleSearchSubmit = (event) => {
+  const handleSearchSubmit = (query) => {
     if (typeof onSearchSubmit === 'function') {
-      const formValue = event?.target?.search?.value;
-      const rawValue = searchValue ?? localSearchValue ?? formValue ?? '';
-      const trimmedValue = (formValue ?? rawValue ?? '').trim();
-      onSearchSubmit(trimmedValue);
+      onSearchSubmit((query ?? '').trim());
     }
   };
 
@@ -72,12 +69,11 @@ export default function TopBar({
         )}
       </div>
       <div className="w-full sm:flex-1">
-        <SearchBar
+        <GlobalSearchBar
           value={resolvedSearchValue}
           onChange={handleSearchChange}
-          onSubmit={handleSearchSubmit}
+          onSubmit={(query) => handleSearchSubmit(query)}
           loading={isSearching}
-          placeholder="Search the Edulure network"
         />
       </div>
       <div className="flex items-center justify-end gap-3 text-slate-500">

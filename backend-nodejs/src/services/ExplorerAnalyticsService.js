@@ -65,6 +65,27 @@ function serialiseEntityRecord(entityType, entityResult) {
   const displayedHits = Number(entityResult.displayedHits ?? entityResult.hits?.length ?? 0);
   const totalHits = Number(entityResult.totalHits ?? entityResult.total ?? 0);
   const processingTimeMs = Number(entityResult.processingTimeMs ?? entityResult.processingTime ?? 0);
+  const previewDigest = Array.isArray(entityResult.hits)
+    ? entityResult.hits
+        .map((hit) => ({
+          entityId: hit?.entityId ?? hit?.id ?? hit?.raw?.entityId ?? null,
+          entityType,
+          previewUrl: hit?.previewMedia?.url ?? hit?.raw?.previewMedia?.url ?? null,
+          previewType: hit?.previewMedia?.type ?? hit?.raw?.previewMedia?.type ?? null,
+          thumbnailUrl:
+            hit?.thumbnailUrl ??
+            hit?.previewMedia?.posterUrl ??
+            hit?.raw?.thumbnailUrl ??
+            hit?.raw?.metadata?.thumbnailUrl ??
+            null,
+          title: hit?.title ?? hit?.raw?.title ?? null,
+          subtitle: hit?.subtitle ?? hit?.raw?.subtitle ?? null,
+          metrics: hit?.metrics ?? null,
+          capturedAt: new Date().toISOString()
+        }))
+        .filter((entry) => entry.entityId && (entry.previewUrl || entry.thumbnailUrl))
+        .slice(0, 10)
+    : [];
   return {
     entityType,
     totalHits,
@@ -76,7 +97,8 @@ function serialiseEntityRecord(entityType, entityResult) {
       page: entityResult.page ?? 1,
       perPage: entityResult.perPage ?? displayedHits,
       markers: entityResult.markers ?? []
-    }
+    },
+    previewDigest
   };
 }
 
@@ -101,6 +123,7 @@ export class ExplorerAnalyticsService {
     const entityRecords = entitySummaries.map(({ entityType, result }) =>
       serialiseEntityRecord(entityType, result)
     );
+    const combinedPreviewDigest = entityRecords.flatMap((record) => record.previewDigest ?? []);
     const totalResults = sum(entityRecords.map((record) => record.totalHits));
     const totalDisplayed = sum(entityRecords.map((record) => record.displayedHits));
     const overallLatency = Number(latencyMs ?? 0);
@@ -138,7 +161,8 @@ export class ExplorerAnalyticsService {
           isZeroResult,
           displayedHits: totalDisplayed,
           totalHits: totalResults,
-          latencyMs: overallLatency
+          latencyMs: overallLatency,
+          previewDigest: combinedPreviewDigest
         },
         trx
       );
@@ -151,7 +175,8 @@ export class ExplorerAnalyticsService {
             isZeroResult: record.isZeroResult,
             displayedHits: record.displayedHits,
             totalHits: record.totalHits,
-            latencyMs: record.processingTimeMs
+            latencyMs: record.processingTimeMs,
+            previewDigest: record.previewDigest
           },
           trx
         );

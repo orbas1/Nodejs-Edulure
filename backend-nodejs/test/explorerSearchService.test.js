@@ -13,6 +13,26 @@ const adsServiceMock = {
   placementsForSearch: vi.fn(async () => ({ items: [] }))
 };
 
+const previewMetricModelMock = {
+  getRecentPreviewDigest: vi.fn(async (entity) => {
+    if (entity === 'tutors') {
+      return new Map([
+        [
+          'tutor-ava',
+          {
+            entityId: 'tutor-ava',
+            previewType: 'image',
+            thumbnailUrl: 'https://cdn.example.com/tutor-ava.jpg',
+            previewUrl: null,
+            capturedAt: '2025-01-01T00:00:00.000Z'
+          }
+        ]
+      ]);
+    }
+    return new Map();
+  })
+};
+
 describe('ExplorerSearchService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -22,7 +42,8 @@ describe('ExplorerSearchService', () => {
     const service = new ExplorerSearchService({
       documentModel: documentModelMock,
       adsService: adsServiceMock,
-      loggerInstance: loggerStub
+      loggerInstance: loggerStub,
+      previewMetricModel: previewMetricModelMock
     });
 
     expect(service.getSupportedEntities()).toEqual(['courses', 'tutors']);
@@ -118,12 +139,15 @@ describe('ExplorerSearchService', () => {
     expect(result.results.tutors.hits[0]).toMatchObject({
       title: 'Ava Sinclair',
       actions: [{ href: '/tutors/ava-sinclair' }],
-      metrics: { isVerified: true }
+      metrics: { isVerified: true },
+      thumbnailUrl: 'https://cdn.example.com/tutor-ava.jpg'
     });
 
     expect(adsServiceMock.placementsForSearch).toHaveBeenCalledWith({
       query: 'ops',
       entities: ['courses', 'tutors']
     });
+    expect(previewMetricModelMock.getRecentPreviewDigest).toHaveBeenCalledWith('courses', expect.any(Object));
+    expect(previewMetricModelMock.getRecentPreviewDigest).toHaveBeenCalledWith('tutors', expect.any(Object));
   });
 });

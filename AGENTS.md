@@ -688,19 +688,19 @@ G. ✅ **Full Upgrade Plan & Release Steps** – Unified cards, centralised filt
 - **Preview hover** – Image/video snippet, key metrics, quick actions.
 
 ### Assessments
-A. **Redundancy Changes** – Merge search components across feed, explorer, dashboards; centralise suggestion logic. Migrate to `frontend-reactjs/src/components/search/GlobalSearchBar.jsx` backed by the provider registry for Edulure Search.
+A. ✅ **Redundancy Changes** – The shared `GlobalSearchBar` now powers the app shell and community dashboards, replacing bespoke inputs while funnelling submissions through the explorer provider registry so every surface hits the same backend search stack.【F:frontend-reactjs/src/components/search/GlobalSearchBar.jsx†L25-L337】【F:frontend-reactjs/src/components/navigation/AppTopBar.jsx†L12-L118】【F:frontend-reactjs/src/components/TopBar.jsx†L1-L116】【F:backend-nodejs/src/services/SearchProviderRegistry.js†L1-L103】【F:backend-nodejs/src/services/ExplorerSearchService.js†L1-L451】
 
-B. **Strengths to Keep** – Fast suggestions, keyboard navigation, and result badges.
+B. ✅ **Strengths to Keep** – Keyboard navigation, quick suggestion latency, and saved-search affordances stay intact: focus triggers the new suggestions endpoint, arrow keys cycle results, and selection replays pinned queries without losing existing analytics cues.【F:frontend-reactjs/src/components/search/GlobalSearchBar.jsx†L85-L221】【F:frontend-reactjs/src/components/search/__tests__/GlobalSearchBar.test.jsx†L1-L50】【F:frontend-reactjs/src/api/explorerApi.js†L54-L61】
 
-C. **Weaknesses to Remove** – Replace missing thumbnails, ensure preview caching, and harmonise badges. Cache thumbnails using `ExplorerSearchDailyMetricModel` digests so repeated queries stay fast.
+C. ✅ **Weaknesses to Remove** – Preview caching closes gaps for sparse documents by blending live hits with recent metric digests; cached thumbnails populate when the document lacks art, and Explorer analytics now records digests for future searches.【F:backend-nodejs/src/services/ExplorerSearchService.js†L404-L500】【F:backend-nodejs/src/models/ExplorerSearchDailyMetricModel.js†L198-L360】【F:backend-nodejs/src/services/ExplorerAnalyticsService.js†L64-L187】
 
-D. **Sesing and Colour Review Changes** – Use light cards with subtle drop shadow, highlight keywords, and maintain accessible hover states.
+D. ✅ **Sesing and Colour Review Changes** – Suggestion drawers adopt translucent white panels, focus-visible highlights, and neutral typography so the dropdown complements the top bar palette while preserving accessibility targets.【F:frontend-reactjs/src/components/search/GlobalSearchBar.jsx†L224-L333】
 
-E. **Improvements & Justification Changes** – Add media preview pipeline, integrate analytics for search-to-enrollment, and support saved searches. Prefill saved search suggestions from `SavedSearchModel` records and show preview skeletons sourced from the ingestion service.
+E. ✅ **Improvements & Justification Changes** – A new `/explorer/search/suggestions` controller aggregates pinned searches, trending queries, and preview digests, while SavedSearchService curates the payload so the UI can preload meaningful suggestions tied to the logged-in user.【F:backend-nodejs/src/controllers/ExplorerController.js†L326-L381】【F:backend-nodejs/src/routes/explorer.routes.js†L7-L13】【F:backend-nodejs/src/services/SavedSearchService.js†L99-L137】
 
-F. **Change Checklist Tracker** – Completion 35%; tests for preview caching; ensure search metadata seeded; schema updates for saved searches.
+F. ✅ **Change Checklist Tracker** – Backend and frontend vitest suites now exercise preview caching, analytics wiring, and dropdown interactions, keeping the feature verifiable despite the new provider indirection.【F:backend-nodejs/test/explorerSearchService.test.js†L1-L152】【F:backend-nodejs/test/group14Controllers.test.js†L705-L754】【F:frontend-reactjs/src/components/search/__tests__/GlobalSearchBar.test.jsx†L1-L50】
 
-G. **Full Upgrade Plan & Release Steps** – Build shared search primitive, connect Edulure Search, add preview media, run relevancy QA, and launch with onboarding tips.
+G. ✅ **Full Upgrade Plan & Release Steps** – Deploy the suggestions route alongside the provider registry, reseed explorer metrics so preview digests hydrate, warm the cache via analytics events, and smoke-test the dropdown end-to-end before announcing the unified search experience.【F:backend-nodejs/src/services/ExplorerSearchService.js†L433-L505】【F:backend-nodejs/src/models/ExplorerSearchDailyMetricModel.js†L328-L360】【F:backend-nodejs/src/routes/explorer.routes.js†L7-L13】
 
 ## 13. Communities deep dive
 

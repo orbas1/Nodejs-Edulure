@@ -3,11 +3,21 @@ import Joi from 'joi';
 import explorerSearchService from '../services/ExplorerSearchService.js';
 import explorerAnalyticsService from '../services/ExplorerAnalyticsService.js';
 import savedSearchService from '../services/SavedSearchService.js';
+import ExplorerSearchDailyMetricModel from '../models/ExplorerSearchDailyMetricModel.js';
+import ExplorerSearchEventModel from '../models/ExplorerSearchEventModel.js';
 import { success } from '../utils/httpResponse.js';
 
 const SUPPORTED_ENTITIES = explorerSearchService.getSupportedEntities();
 
 const flexibleObjectSchema = Joi.object().unknown(true);
+
+const suggestionSchema = Joi.object({
+  entityTypes: Joi.array()
+    .items(Joi.string().valid(...SUPPORTED_ENTITIES))
+    .min(1)
+    .default(SUPPORTED_ENTITIES),
+  limit: Joi.number().integer().min(1).max(12).default(6)
+});
 
 function normaliseFacetEntries(rawCounts) {
   if (!rawCounts) {
@@ -303,6 +313,71 @@ export default class ExplorerController {
           analytics: analyticsPayload
         },
         message: 'Explorer results fetched'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async searchSuggestions(req, res, next) {
+    try {
+      const payload = await suggestionSchema.validateAsync(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const savedSearches = await savedSearchService.listSuggestions({
+        userId: req.user?.id,
+        entityTypes: payload.entityTypes,
+        limit: payload.limit
+      });
+
+      let trendingQueries = [];
+      try {
+        trendingQueries = await ExplorerSearchEventModel.topQueries({
+          since: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14),
+          limit: Math.max(payload.limit, 5)
+        });
+      } catch (eventError) {
+        req.log?.warn({ err: eventError }, 'Failed to load explorer trending queries');
+      }
+
+      const previewDigest = {};
+      try {
+        const digestEntries = await Promise.all(
+          payload.entityTypes.map(async (entity) => {
+            const digest = await ExplorerSearchDailyMetricModel.getRecentPreviewDigest(entity, {
+              limit: payload.limit * 2
+            });
+            return [entity, Array.from(digest.values())];
+          })
+        );
+        digestEntries.forEach(([entity, entries]) => {
+          if (entries.length) {
+            previewDigest[entity] = entries;
+          }
+        });
+      } catch (digestError) {
+        req.log?.warn({ err: digestError }, 'Failed to load explorer preview digest');
+      }
+
+      const trending = trendingQueries
+        .filter((entry) => entry?.query)
+        .slice(0, payload.limit)
+        .map((entry) => ({ query: entry.query, searches: entry.searches ?? 0 }));
+
+      return success(res, {
+        data: {
+          generatedAt: new Date().toISOString(),
+          savedSearches,
+          trendingQueries: trending,
+          previewDigest
+        },
+        message: 'Explorer search suggestions fetched'
       });
     } catch (error) {
       if (error.isJoi) {

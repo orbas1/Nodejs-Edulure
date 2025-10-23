@@ -194,4 +194,64 @@ describe('ExplorerSearchDailyMetricModel', () => {
       )
     ).rejects.toThrow('Explorer search metrics require a non-empty entity type');
   });
+
+  it('stores preview digests and exposes cached entries', async () => {
+    await ExplorerSearchDailyMetricModel.incrementForEvent(
+      {
+        metricDate: '2025-03-01T12:00:00Z',
+        entityType: 'tutors',
+        displayedHits: 3,
+        totalHits: 6,
+        latencyMs: 140,
+        previewDigest: [
+          {
+            entityId: 'tutor-1',
+            thumbnailUrl: 'https://cdn.edulure.com/tutors/tutor-1.jpg',
+            title: 'Tutor One'
+          }
+        ]
+      },
+      connection
+    );
+
+    await ExplorerSearchDailyMetricModel.incrementForEvent(
+      {
+        metricDate: '2025-03-02T08:00:00Z',
+        entityType: 'tutors',
+        displayedHits: 2,
+        totalHits: 4,
+        latencyMs: 90,
+        previewDigest: [
+          {
+            entityId: 'tutor-1',
+            thumbnailUrl: 'https://cdn.edulure.com/tutors/tutor-1-updated.jpg',
+            title: 'Tutor One'
+          },
+          {
+            entityId: 'tutor-2',
+            previewUrl: 'https://cdn.edulure.com/tutors/tutor-2-preview.mp4',
+            previewType: 'video',
+            title: 'Tutor Two'
+          }
+        ]
+      },
+      connection
+    );
+
+    const digest = await ExplorerSearchDailyMetricModel.getRecentPreviewDigest(
+      'tutors',
+      { limit: 5 },
+      connection
+    );
+
+    expect(digest.get('tutor-1')).toMatchObject({
+      entityId: 'tutor-1',
+      thumbnailUrl: 'https://cdn.edulure.com/tutors/tutor-1-updated.jpg'
+    });
+    expect(digest.get('tutor-2')).toMatchObject({
+      entityId: 'tutor-2',
+      previewUrl: 'https://cdn.edulure.com/tutors/tutor-2-preview.mp4',
+      previewType: 'video'
+    });
+  });
 });

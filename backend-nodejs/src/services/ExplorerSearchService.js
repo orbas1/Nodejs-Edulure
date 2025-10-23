@@ -2,6 +2,9 @@ import logger from '../config/logger.js';
 import { buildBounds, resolveCountryCoordinates } from '../utils/geo.js';
 import AdsPlacementService from './AdsPlacementService.js';
 import SearchDocumentModel, { SUPPORTED_ENTITIES as MODEL_SUPPORTED_ENTITIES } from '../models/SearchDocumentModel.js';
+import ExplorerSearchDailyMetricModel from '../models/ExplorerSearchDailyMetricModel.js';
+import { createSearchProviderRegistry } from './SearchProviderRegistry.js';
+import { createDatabaseSearchProvider } from './search/DatabaseSearchProvider.js';
 
 const ENTITY_CONFIG = {
   communities: {
@@ -94,6 +97,113 @@ function deriveGeo(entity, hit) {
   };
 }
 
+function pickFirstUrl(...candidates) {
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    const value = typeof candidate === 'string' ? candidate.trim() : null;
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function resolvePreviewMedia(hit) {
+  const previewCandidate =
+    hit.preview ??
+    hit.previewMedia ??
+    hit.metadata?.preview ??
+    hit.metadata?.previewMedia ??
+    null;
+
+  const thumbnail = pickFirstUrl(hit.thumbnailUrl, hit.metadata?.thumbnailUrl, hit.metadata?.imageUrl);
+  if (previewCandidate && typeof previewCandidate === 'object') {
+    const previewUrl = pickFirstUrl(
+      previewCandidate.url,
+      previewCandidate.src,
+      previewCandidate.href,
+      previewCandidate.previewUrl
+    );
+    const posterUrl = pickFirstUrl(
+      previewCandidate.poster,
+      previewCandidate.posterUrl,
+      previewCandidate.thumbnail,
+      previewCandidate.thumbnailUrl,
+      thumbnail
+    );
+
+    if (previewUrl || posterUrl) {
+      const meta = {};
+      if (previewCandidate.duration) {
+        const numericDuration = Number(previewCandidate.duration);
+        if (Number.isFinite(numericDuration) && numericDuration > 0) {
+          meta.duration = numericDuration;
+        }
+      }
+      if (previewCandidate.aspectRatio || previewCandidate.ratio) {
+        meta.aspectRatio = previewCandidate.aspectRatio ?? previewCandidate.ratio;
+      }
+
+      return {
+        type: previewCandidate.type ?? (previewUrl && previewUrl.endsWith('.mp4') ? 'video' : 'image'),
+        url: previewUrl ?? posterUrl ?? null,
+        posterUrl: posterUrl ?? previewUrl ?? null,
+        fromCache: Boolean(previewCandidate.fromCache ?? previewCandidate.cached ?? false),
+        meta: Object.keys(meta).length ? meta : null
+      };
+    }
+  }
+
+  if (thumbnail) {
+    return {
+      type: 'image',
+      url: thumbnail,
+      posterUrl: thumbnail,
+      fromCache: false
+    };
+  }
+
+  return null;
+}
+
+function applyPreviewEnhancements(document, cachedPreview) {
+  if (!cachedPreview) {
+    return document;
+  }
+
+  const target = document;
+  const cachedThumbnail = pickFirstUrl(cachedPreview.thumbnailUrl, cachedPreview.posterUrl);
+  const cachedUrl = pickFirstUrl(cachedPreview.previewUrl, cachedPreview.url, cachedThumbnail);
+
+  if (!target.thumbnailUrl && cachedThumbnail) {
+    target.thumbnailUrl = cachedThumbnail;
+  }
+
+  if (!target.previewMedia && cachedUrl) {
+    target.previewMedia = {
+      type: cachedPreview.previewType ?? (cachedPreview.previewUrl ? 'video' : 'image'),
+      url: cachedUrl,
+      posterUrl: cachedThumbnail ?? cachedUrl,
+      fromCache: true,
+      meta: cachedPreview.metrics ?? null
+    };
+  } else if (target.previewMedia && !target.previewMedia.posterUrl && cachedThumbnail) {
+    target.previewMedia.posterUrl = cachedThumbnail;
+  }
+
+  const metadata = { ...(target.previewMetadata ?? {}) };
+  metadata.cachedFrom = cachedPreview.capturedAt ?? metadata.cachedFrom ?? null;
+  metadata.cacheSource = cachedPreview.source ?? metadata.cacheSource ?? 'metrics';
+  if (cachedPreview.metrics) {
+    metadata.metrics = cachedPreview.metrics;
+  }
+  target.previewMetadata = metadata;
+
+  return target;
+}
+
 function formatDocument(entity, hit) {
   const base = {
     id: hit.entityId,
@@ -114,8 +224,25 @@ function formatDocument(entity, hit) {
     actions: [],
     tags: [],
     metrics: {},
-    geo: null
+    geo: null,
+    previewMedia: null,
+    previewMetadata: null
   };
+
+  base.previewMedia = resolvePreviewMedia(hit);
+  if (base.previewMedia) {
+    const metadata = { source: base.previewMedia.fromCache ? 'cache' : 'document' };
+    if (base.previewMedia.meta?.aspectRatio) {
+      metadata.aspectRatio = base.previewMedia.meta.aspectRatio;
+    }
+    if (base.previewMedia.meta?.duration) {
+      metadata.duration = base.previewMedia.meta.duration;
+    }
+    base.previewMetadata = metadata;
+    if (!base.previewMedia.meta) {
+      delete base.previewMedia.meta;
+    }
+  }
 
   switch (entity) {
     case 'communities': {
@@ -193,30 +320,52 @@ export class ExplorerSearchService {
   constructor({
     documentModel = SearchDocumentModel,
     adsService = AdsPlacementService,
-    loggerInstance = logger
+    loggerInstance = logger,
+    providerRegistry = null,
+    previewMetricModel = ExplorerSearchDailyMetricModel
   } = {}) {
-    this.model = documentModel;
     this.adsService = adsService;
     this.logger = loggerInstance;
+    this.previewMetricModel = previewMetricModel;
+    this.providerRegistry = providerRegistry ??
+      createSearchProviderRegistry([
+        (registry) =>
+          registry.register(
+            'database',
+            createDatabaseSearchProvider({ documentModel }),
+            { defaultProvider: true }
+          )
+      ]);
   }
 
   getSupportedEntities() {
-    return this.model.getSupportedEntities();
+    const supported = this.providerRegistry.getSupportedEntities();
+    if (!supported.length) {
+      return [...MODEL_SUPPORTED_ENTITIES];
+    }
+    return supported;
   }
 
   normaliseEntityTypes(entities) {
+    const supportedEntities = this.getSupportedEntities();
     if (!Array.isArray(entities) || !entities.length) {
-      return MODEL_SUPPORTED_ENTITIES;
+      return supportedEntities;
     }
     const filtered = entities
       .map((entry) => (typeof entry === 'string' ? entry.trim().toLowerCase() : null))
-      .filter((entry) => entry && MODEL_SUPPORTED_ENTITIES.includes(entry));
-    return filtered.length ? filtered : MODEL_SUPPORTED_ENTITIES;
+      .filter((entry) => entry && supportedEntities.includes(entry));
+    return filtered.length ? filtered : supportedEntities;
   }
 
   buildFilters(entity, filters = {}, globalFilters = {}) {
     const merged = { ...globalFilters };
-    const entityFilters = filters?.[entity] ?? filters ?? {};
+    const supportedEntities = this.getSupportedEntities();
+    const looksLikeEntityMap =
+      filters &&
+      typeof filters === 'object' &&
+      !Array.isArray(filters) &&
+      Object.keys(filters).some((key) => supportedEntities.includes(key));
+    const entityFilters = looksLikeEntityMap ? filters?.[entity] ?? {} : filters ?? {};
     for (const [key, value] of Object.entries(entityFilters)) {
       if (value === undefined || value === null) {
         continue;
@@ -242,10 +391,14 @@ export class ExplorerSearchService {
     return ENTITY_CONFIG[entity]?.defaultSort ?? null;
   }
 
-  async searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }) {
+  async searchEntity(
+    entity,
+    { query, page, perPage, filters, globalFilters, sort, includeFacets },
+    { previewCache } = {}
+  ) {
     const effectiveFilters = this.buildFilters(entity, filters, globalFilters);
     const sortDirective = this.resolveSort(entity, sort);
-    const result = await this.model.search(entity, {
+    const result = await this.providerRegistry.search(entity, {
       query,
       filters: effectiveFilters,
       sort: sortDirective,
@@ -254,7 +407,18 @@ export class ExplorerSearchService {
       includeFacets
     });
 
-    const hits = result.hits.map((hit) => formatDocument(entity, hit));
+    const resolvedPreviewCache = previewCache instanceof Map ? previewCache : new Map();
+    const hits = result.hits
+      .map((hit) => formatDocument(entity, hit))
+      .map((hit) => {
+        if (resolvedPreviewCache.size) {
+          const cached = resolvedPreviewCache.get(String(hit.entityId));
+          if (cached) {
+            return applyPreviewEnhancements(hit, cached);
+          }
+        }
+        return hit;
+      });
     const markers = hits.map((hit) => hit.geo).filter(Boolean);
 
     return {
@@ -283,9 +447,14 @@ export class ExplorerSearchService {
     includeFacets = true
   } = {}) {
     const resolvedEntities = this.normaliseEntityTypes(entityTypes);
+    const previewCache = await this.loadPreviewCache(resolvedEntities);
 
     const tasks = resolvedEntities.map((entity) =>
-      this.searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets })
+      this.searchEntity(
+        entity,
+        { query, page, perPage, filters, globalFilters, sort, includeFacets },
+        { previewCache: previewCache.get(entity) }
+      )
     );
 
     const results = await Promise.all(tasks);
@@ -316,6 +485,25 @@ export class ExplorerSearchService {
       },
       adsPlacements
     };
+  }
+
+  async loadPreviewCache(entities) {
+    if (!entities?.length || !this.previewMetricModel?.getRecentPreviewDigest) {
+      return new Map();
+    }
+
+    const tasks = entities.map(async (entity) => {
+      try {
+        const digest = await this.previewMetricModel.getRecentPreviewDigest(entity, { limit: 30 });
+        return [entity, digest];
+      } catch (error) {
+        this.logger?.warn?.({ err: error, entity }, 'Failed to load explorer preview digest');
+        return [entity, new Map()];
+      }
+    });
+
+    const entries = await Promise.all(tasks);
+    return new Map(entries);
   }
 }
 
