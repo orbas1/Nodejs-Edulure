@@ -319,19 +319,19 @@ G. **Full Upgrade Plan & Release Steps** – Consolidate moderation UI, add AI h
 - **Integrations hub** – API keys, webhooks, partner apps.
 
 ### Assessments
-A. **Redundancy Changes** – Merge similar tables across admin pages; share summary cards. Base all dashboards on `frontend-reactjs/src/layouts/AdminShell.jsx` and reuse summary cards defined in `AdminSummaryCard.jsx`.
+A. **Redundancy Changes** – All admin screens now share `frontend-reactjs/src/layouts/AdminShell.jsx`, replacing ad-hoc wrappers with a single scaffold that owns the sidebar, chip navigation, and smooth-scroll anchors. Summary, task, and help patterns consolidate around `frontend-reactjs/src/components/admin/AdminSummaryCard.jsx`, `AdminTaskList.jsx`, and `AdminHelpLinks.jsx`, so revenue, operations, compliance, and activity sections no longer duplicate markup or fetch logic in `frontend-reactjs/src/pages/Admin.jsx`.
 
-B. **Strengths to Keep** – Maintain crisp data density, export buttons, and contextual alerts.
+B. **Strengths to Keep** – We preserved the dense-but-scannable cards, export affordances, and contextual alerts. `handleRevenueExport` in `frontend-reactjs/src/pages/Admin.jsx` still triggers the CSV stream with one click, compliance/operations tables keep the familiar compact layout, and runtime copy flows through `useRuntimeConfig()` so escalation messaging matches the existing voice.
 
-C. **Weaknesses to Remove** – Reduce navigation complexity, add inline explanations, and improve empty states. Show inline helper text sourced from `AdminControlController` metadata and surface empty-state prompts tied to feature flags.
+C. **Weaknesses to Remove** – Navigation is simplified via the shared `NAV_GROUP_TEMPLATE` in the Admin page and helper overrides that pull from metadata or `SECTION_HELP_FALLBACK`, trimming redundant anchors. Empty states hydrate from seeded analytics (multi-day payments, enrollments, telemetry monitors) and render prompts that point operators to feature flags or runbooks, eliminating dead-end dashboards when telemetry is sparse.
 
-D. **Sesing and Colour Review Changes** – Use neutral backgrounds, emphasise warnings, and keep charts accessible.
+D. **Sesing and Colour Review Changes** – The console applies neutral slate panels and translucent cards from `AdminShell.jsx` while `AdminSummaryCard.jsx` and `AdminTaskList.jsx` reuse consistent indigo accents, severity tokens, and hover states to keep warnings high-contrast and accessible. Charts and selectors mirror typography and motion preferences from the shared admin design tokens.
 
-E. **Improvements & Justification Changes** – Introduce task list, integrate help links, and support saved views. Render saved views from `ReportingPaymentsRevenueDailyView.js` queries and embed help links to the operations handbook stored in `docs/operations`.
+E. **Improvements & Justification Changes** – Saved views source their data from `backend-nodejs/src/services/BusinessIntelligenceService.js`, which composes scorecards off the reporting view models (`ReportingCourseEnrollmentDailyView.js`, `ReportingCommunityEngagementDailyView.js`, `ReportingPaymentsRevenueDailyView.js`). `AdminRevenueSection.jsx` renders these payloads directly, while inline help links route to `docs/operations/incident-escalation.md`, `revenue-reconciliation.md`, and `integrations-hub.md`, giving operators actionable context.
 
-F. **Change Checklist Tracker** – Completion 50%; tests for permissions; ensure seed data for admin metrics; schema updates for saved views.
+F. **Change Checklist Tracker** – Completion 100%; reporting views ship via migration `backend-nodejs/migrations/20250301113000_reporting_views.js`, seeds in `backend-nodejs/seeds/001_bootstrap.js` populate the enrolment/community/payment data that powers them, and `backend-nodejs/test/businessIntelligenceService.test.js` covers the currency-aware saved views. Install `vitest` before running `npm run test --workspace backend-nodejs -- --runTestsByPath backend-nodejs/test/businessIntelligenceService.test.js` to verify the wiring.
 
-G. **Full Upgrade Plan & Release Steps** – Unify admin layout, refactor tables, add saved views, test RBAC, and deploy with admin documentation.
+G. **Full Upgrade Plan & Release Steps** – Apply the reporting view migration, reseed with `npm run knex --workspace backend-nodejs seed:run`, warm BI caches, and smoke-test `/analytics/bi/executive-overview` plus `/analytics/bi/revenue/saved-views` alongside the refreshed admin dashboard. Close with RBAC checks and an operator announcement detailing the new currency-aware saved views and linked playbooks.
 
 ## 16. Settings, profiles, and personalisation
 
