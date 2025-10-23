@@ -25,6 +25,70 @@ export const featureFlagManifest = [
     ]
   },
   {
+    key: 'platform.jobs.telemetry',
+    name: 'Background Jobs – Telemetry Export',
+    description: 'Enables telemetry aggregation and export jobs that ship analytics events to downstream systems.',
+    enabled: false,
+    killSwitch: false,
+    rolloutStrategy: 'boolean',
+    environments: ['development', 'staging', 'production'],
+    metadata: {
+      owner: 'Data Platform',
+      tags: ['jobs', 'telemetry'],
+      escalationChannel: '#data-platform',
+      runbook: 'https://runbooks.edulure.internal/data/telemetry-jobs',
+      docs: 'https://docs.edulure.internal/platform/telemetry-jobs'
+    }
+  },
+  {
+    key: 'platform.jobs.monetisation',
+    name: 'Background Jobs – Monetisation Reconciliation',
+    description: 'Gates the monetisation reconciliation and payout preparation schedulers executed by the worker service.',
+    enabled: false,
+    killSwitch: false,
+    rolloutStrategy: 'boolean',
+    environments: ['development', 'staging', 'production'],
+    metadata: {
+      owner: 'Revenue Operations',
+      tags: ['jobs', 'revenue'],
+      escalationChannel: '#revenue-ops',
+      runbook: 'https://runbooks.edulure.internal/revenue/monetisation-jobs',
+      docs: 'https://docs.edulure.internal/platform/monetisation-jobs'
+    }
+  },
+  {
+    key: 'platform.jobs.analytics',
+    name: 'Background Jobs – Analytics Pipelines',
+    description: 'Controls analytics aggregation and warehousing jobs that hydrate dashboards and campaign insights.',
+    enabled: false,
+    killSwitch: false,
+    rolloutStrategy: 'boolean',
+    environments: ['development', 'staging', 'production'],
+    metadata: {
+      owner: 'Insights Engineering',
+      tags: ['jobs', 'analytics'],
+      escalationChannel: '#insights-eng',
+      runbook: 'https://runbooks.edulure.internal/insights/analytics-jobs',
+      docs: 'https://docs.edulure.internal/platform/analytics-jobs'
+    }
+  },
+  {
+    key: 'platform.jobs.ads',
+    name: 'Background Jobs – Ads Delivery',
+    description: 'Gates ads pacing, budget reconciliation, and campaign eligibility schedulers.',
+    enabled: false,
+    killSwitch: false,
+    rolloutStrategy: 'boolean',
+    environments: ['development', 'staging', 'production'],
+    metadata: {
+      owner: 'Ads Platform',
+      tags: ['jobs', 'ads'],
+      escalationChannel: '#ads-platform',
+      runbook: 'https://runbooks.edulure.internal/ads/campaign-jobs',
+      docs: 'https://docs.edulure.internal/platform/ads-jobs'
+    }
+  },
+  {
     key: 'platform.api.v1.users',
     name: 'Platform API v1 – User Management',
     description: 'Enables account profile, preference, and impersonation APIs for operator tooling.',
