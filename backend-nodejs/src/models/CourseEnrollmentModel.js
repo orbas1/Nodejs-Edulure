@@ -12,6 +12,9 @@ const BASE_COLUMNS = [
   'started_at as startedAt',
   'completed_at as completedAt',
   'last_accessed_at as lastAccessedAt',
+  'certificate_template_id as certificateTemplateId',
+  'certificate_issued_at as certificateIssuedAt',
+  'certificate_url as certificateUrl',
   'metadata',
   'created_at as createdAt',
   'updated_at as updatedAt'
@@ -56,6 +59,37 @@ export default class CourseEnrollmentModel {
     return rows.map((row) => this.deserialize(row));
   }
 
+  static async findByCourseAndUser(courseId, userId, connection = db) {
+    if (!courseId || !userId) {
+      return null;
+    }
+    const record = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where('course_id', courseId)
+      .andWhere('user_id', userId)
+      .first();
+    return record ? this.deserialize(record) : null;
+  }
+
+  static async updateById(id, payload, connection = db) {
+    if (!id) {
+      throw new Error('Enrollment identifier missing for update');
+    }
+    await connection(TABLE)
+      .where('id', id)
+      .update({
+        ...payload,
+        updated_at: connection.fn.now()
+      });
+    return this.findById(id, connection);
+  }
+
+  static async findById(id, connection = db) {
+    if (!id) return null;
+    const record = await connection(TABLE).select(BASE_COLUMNS).where('id', id).first();
+    return record ? this.deserialize(record) : null;
+  }
+
   static deserialize(record) {
     return {
       ...record,
@@ -64,6 +98,7 @@ export default class CourseEnrollmentModel {
       startedAt: toDate(record.startedAt),
       completedAt: toDate(record.completedAt),
       lastAccessedAt: toDate(record.lastAccessedAt),
+      certificateIssuedAt: toDate(record.certificateIssuedAt),
       createdAt: toDate(record.createdAt),
       updatedAt: toDate(record.updatedAt)
     };

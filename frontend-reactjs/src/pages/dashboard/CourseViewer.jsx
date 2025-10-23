@@ -5,7 +5,10 @@ import { fetchCoursePlayer, fetchCourseLiveChat, postCourseLiveChat } from '../.
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useRealtime } from '../../context/RealtimeContext.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import CourseOutlineNav from '../../components/course/CourseOutlineNav.jsx';
+import CourseProgressMeter from '../../components/course/CourseProgressMeter.jsx';
 import { useLearnerDashboardContext } from '../../hooks/useLearnerDashboard.js';
+import useLearnerProgress from '../../hooks/useLearnerProgress.js';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -117,6 +120,13 @@ export default function CourseViewer() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const { socket } = useRealtime();
+  const {
+    outline,
+    loading: progressLoading,
+    error: progressError,
+    updateLessonProgress,
+    updatingLesson
+  } = useLearnerProgress(courseId);
   const [playerSession, setPlayerSession] = useState(null);
   const [playerError, setPlayerError] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
@@ -124,6 +134,8 @@ export default function CourseViewer() {
   const [chatSending, setChatSending] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [presence, setPresence] = useState({ totalViewers: 0, viewers: [] });
+  const [activeLessonSlug, setActiveLessonSlug] = useState(null);
+  const [progressFeedback, setProgressFeedback] = useState(null);
   const messagesEndRef = useRef(null);
 
   const appendChatMessage = useCallback((message) => {
@@ -225,6 +237,30 @@ export default function CourseViewer() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  useEffect(() => {
+    if (!modules.length) {
+      if (activeLessonSlug) {
+        setActiveLessonSlug(null);
+      }
+      return;
+    }
+
+    const flatLessons = modules.flatMap((module) => module.lessons ?? []);
+    const hasActive = flatLessons.some((lesson) => lesson.slug === activeLessonSlug);
+    if (!hasActive) {
+      const firstInteractive = flatLessons.find((lesson) => lesson.status !== 'scheduled') ?? flatLessons[0];
+      setActiveLessonSlug(firstInteractive?.slug ?? null);
+    }
+  }, [modules, activeLessonSlug]);
+
+  useEffect(() => {
+    if (!progressFeedback?.message) {
+      return undefined;
+    }
+    const timeout = window.setTimeout(() => setProgressFeedback(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [progressFeedback]);
+
   const handleSendChat = async () => {
     const trimmed = chatInput.trim();
     if (!trimmed || !token || !courseId) return;
@@ -251,28 +287,77 @@ export default function CourseViewer() {
     }
   };
 
+  const handleSelectLesson = useCallback((lesson) => {
+    if (!lesson?.slug) return;
+    setActiveLessonSlug(lesson.slug);
+  }, []);
+
+  const handleToggleLessonComplete = useCallback(
+    async (lesson, nextCompleted) => {
+      if (!lesson?.slug) return;
+      try {
+        await updateLessonProgress(lesson.slug, {
+          completed: nextCompleted,
+          progressPercent: nextCompleted ? 100 : 0,
+          progressSource: 'manual'
+        });
+        setProgressFeedback({
+          type: 'success',
+          message: nextCompleted ? 'Lesson marked as complete.' : 'Lesson marked as incomplete.'
+        });
+      } catch (error) {
+        setProgressFeedback({
+          type: 'error',
+          message: error.message ?? 'Unable to update lesson progress.'
+        });
+      }
+    },
+    [updateLessonProgress]
+  );
+
   const presencePreview = useMemo(() => presence.viewers?.slice?.(0, 3) ?? [], [presence]);
   const extraViewers = Math.max(0, (presence.totalViewers ?? 0) - presencePreview.length);
 
-  const modules = useMemo(
-    () => (Array.isArray(course?.modules) ? course.modules : []),
-    [course?.modules]
-  );
-  const nextLessonDetail = course?.nextLessonDetail ?? null;
-  const completedLessonsCount = modules.reduce(
-    (total, module) => total + (module.progress?.completedLessons ?? 0),
-    0
-  );
-  const totalLessonsCount = modules.reduce(
-    (total, module) => total + (module.progress?.totalLessons ?? 0),
-    0
-  );
+  const modules = useMemo(() => {
+    if (Array.isArray(outline?.modules)) {
+      return outline.modules;
+    }
+    if (Array.isArray(course?.modules)) {
+      return course.modules;
+    }
+    return [];
+  }, [outline?.modules, course?.modules]);
+
+  const computedNextLesson = useMemo(() => {
+    for (const module of modules) {
+      if (module?.nextLesson) {
+        return {
+          moduleTitle: module.title,
+          lessonTitle: module.nextLesson.title,
+          status: module.nextLesson.status,
+          releaseAt: module.nextLesson.releaseAt
+        };
+      }
+    }
+    return null;
+  }, [modules]);
+
+  const nextLessonDetail = computedNextLesson ?? course?.nextLessonDetail ?? null;
+
+  const completedLessonsCount =
+    outline?.totals?.completedLessons ??
+    modules.reduce((total, module) => total + (module.progress?.completedLessons ?? 0), 0);
+
+  const totalLessonsCount =
+    outline?.totals?.lessonCount ??
+    modules.reduce((total, module) => total + (module.progress?.totalLessons ?? 0), 0);
 
   const courseStartDate = useMemo(() => {
-    if (!course?.startedAt) return null;
-    const parsed = new Date(course.startedAt);
+    const source = outline?.enrollment?.startedAt ?? course?.startedAt;
+    if (!source) return null;
+    const parsed = new Date(source);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }, [course?.startedAt]);
+  }, [outline?.enrollment?.startedAt, course?.startedAt]);
 
   const lessonCatalogue = useMemo(
     () =>
@@ -377,7 +462,16 @@ export default function CourseViewer() {
     () => lessonCatalogue.some((lesson) => lesson.type === 'refresher'),
     [lessonCatalogue]
   );
-  const courseProgress = course?.progress ?? 0;
+  const courseProgress = useMemo(() => {
+    if (outline?.totals?.progressPercent != null) {
+      const numeric = Number(outline.totals.progressPercent);
+      if (Number.isFinite(numeric)) {
+        return Math.max(0, Math.min(100, Math.round(numeric * 10) / 10));
+      }
+    }
+    const fallback = Number(course?.progress ?? 0);
+    return Number.isFinite(fallback) ? fallback : 0;
+  }, [outline?.totals?.progressPercent, course?.progress]);
 
   const insightCards = useMemo(
     () => [
@@ -452,26 +546,6 @@ export default function CourseViewer() {
       </div>
     );
   }
-
-  const formatLessonAvailability = (lesson) => {
-    if (lesson.completed) {
-      return 'Completed';
-    }
-    if (lesson.status === 'scheduled') {
-      if (!lesson.releaseAt) {
-        return 'Scheduled';
-      }
-      const releaseDate = new Date(lesson.releaseAt);
-      return `Unlocks ${releaseDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
-    }
-    return 'Ready to start';
-  };
-
-  const lessonStatusTone = (lesson) => {
-    if (lesson.completed) return 'text-emerald-600';
-    if (lesson.status === 'scheduled') return 'text-amber-500';
-    return 'text-primary';
-  };
 
   return (
     <div className="space-y-8">
@@ -636,94 +710,41 @@ export default function CourseViewer() {
           <p className="mt-2 text-sm text-slate-600">
             Navigate cohorts with confidence. Lesson states update instantly as you wrap activities or as modules unlock.
           </p>
-          {modules.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500">
-              Modules for this program will appear here once your instructor publishes the curriculum.
-            </div>
-          ) : (
-            <div className="mt-6 space-y-4">
-              {modules.map((module, index) => (
-                <div key={module.id ?? `module-${index}`} className="dashboard-card-muted space-y-4 p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="dashboard-kicker">Module {index + 1}</p>
-                      <p className="text-sm font-semibold text-slate-900">{module.title}</p>
-                      <p className="text-xs text-slate-500">{module.releaseLabel}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {module.progress?.completionPercent ?? 0}%
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {module.progress
-                          ? `${module.progress.completedLessons}/${module.progress.totalLessons} lessons`
-                          : 'No lessons yet'}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    {module.nextLesson ? (
-                      <p className="text-xs font-semibold text-primary">
-                        Next lesson · {module.nextLesson.title}
-                        {module.nextLesson.status === 'scheduled' && module.nextLesson.releaseAt
-                          ? ` • Unlocks ${new Date(module.nextLesson.releaseAt).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric'
-                            })}`
-                          : ''}
-                      </p>
-                    ) : (
-                      <p className="text-xs font-semibold text-emerald-600">Module complete</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    {(module.lessons ?? []).slice(0, 4).map((lesson) => (
-                      <div
-                        key={lesson.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{lesson.title}</p>
-                          <p className="text-xs text-slate-500">{formatLessonAvailability(lesson)}</p>
-                        </div>
-                        <span className={`text-xs font-semibold ${lessonStatusTone(lesson)}`}>
-                          {lesson.completed ? 'Done' : lesson.status === 'scheduled' ? 'Scheduled' : 'Ready'}
-                        </span>
-                      </div>
-                    ))}
-                    {module.lessons?.length > 4 ? (
-                      <p className="text-xs text-slate-400">+{module.lessons.length - 4} more lessons</p>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {progressError ? (
+            <p className="mt-4 rounded-2xl bg-red-50 px-4 py-2 text-xs font-semibold text-red-600" role="alert">
+              {progressError.message ?? 'Unable to load course progress.'}
+            </p>
+          ) : null}
+          {progressFeedback?.message ? (
+            <p
+              className={`mt-4 rounded-2xl px-4 py-2 text-xs font-semibold ${
+                progressFeedback.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-primary/10 text-primary'
+              }`}
+              role={progressFeedback.type === 'error' ? 'alert' : undefined}
+            >
+              {progressFeedback.message}
+            </p>
+          ) : null}
+          {progressLoading ? (
+            <p className="mt-4 text-xs text-slate-400">Refreshing lesson progress…</p>
+          ) : null}
+          <div className="mt-6">
+            <CourseOutlineNav
+              modules={modules}
+              activeLessonSlug={activeLessonSlug}
+              updatingLesson={updatingLesson}
+              onSelectLesson={handleSelectLesson}
+              onToggleLessonComplete={handleToggleLessonComplete}
+            />
+          </div>
         </div>
         <div className="space-y-6">
-          <div className="dashboard-section">
-            <h2 className="text-lg font-semibold text-slate-900">Progress</h2>
-            <p className="mt-2 text-sm text-slate-600">{course.progress}% complete</p>
-            <div className="mt-4 h-2 rounded-full bg-slate-200">
-              <div className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark" style={{ width: `${course.progress}%` }} />
-            </div>
-            <p className="mt-3 text-xs text-slate-500">
-              {completedLessonsCount} of {totalLessonsCount} lessons wrapped
-            </p>
-            {nextLessonDetail ? (
-              <p className="mt-2 text-xs text-primary">
-                Next action: {nextLessonDetail.moduleTitle} · {nextLessonDetail.lessonTitle}
-                {nextLessonDetail.status === 'scheduled' && nextLessonDetail.releaseAt
-                  ? ` • Unlocks ${new Date(nextLessonDetail.releaseAt).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric'
-                    })}`
-                  : ''}
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-emerald-600">You&apos;ve completed the learning path.</p>
-            )}
-          </div>
+          <CourseProgressMeter
+            progressPercent={courseProgress}
+            completedLessons={completedLessonsCount}
+            totalLessons={totalLessonsCount}
+            certificate={outline?.certificate}
+          />
           <div className="dashboard-section">
             <h2 className="text-lg font-semibold text-slate-900">Resources</h2>
             <ul className="mt-4 space-y-2 text-sm text-slate-600">

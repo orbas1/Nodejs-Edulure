@@ -87,6 +87,8 @@ export async function seed(knex) {
     await trx('ebook_chapters').del();
     await trx('ebooks').del();
     await trx('course_progress').del();
+    await trx('learner_achievements').del();
+    await trx('achievement_templates').del();
     await trx('course_enrollments').del();
     await trx('course_assignments').del();
     await trx('course_lessons').del();
@@ -1190,6 +1192,16 @@ export async function seed(knex) {
       })
     });
 
+    const completionCertificateSlug = 'course-completion-classic';
+    const [courseCertificateTemplateId] = await trx('achievement_templates').insert({
+      slug: completionCertificateSlug,
+      name: 'Course Completion (Classic)',
+      description: 'Awarded to learners who complete every lesson in a course.',
+      type: 'course_completion',
+      certificate_background_url: 'https://cdn.edulure.test/certificates/backgrounds/classic.png',
+      metadata: JSON.stringify({ accentColor: '#4f46e5', signature: 'Amina Diallo' })
+    });
+
     const [opsModuleKickoffId] = await trx('course_modules').insert({
       course_id: opsAutomationCourseId,
       title: 'Launch Command Center',
@@ -1272,13 +1284,19 @@ export async function seed(knex) {
       metadata: JSON.stringify({ submissionType: 'upload', requiresReview: true })
     });
 
+    const opsEnrollmentPublicId = crypto.randomUUID();
+    const opsCertificateUrl = `https://cdn.edulure.test/certificates/${completionCertificateSlug}/${opsEnrollmentPublicId}.pdf`;
     const [opsEnrollmentId] = await trx('course_enrollments').insert({
-      public_id: crypto.randomUUID(),
+      public_id: opsEnrollmentPublicId,
       course_id: opsAutomationCourseId,
       user_id: learnerId,
-      status: 'active',
-      progress_percent: 46.5,
+      status: 'completed',
+      progress_percent: 100,
       started_at: trx.fn.now(),
+      completed_at: trx.fn.now(),
+      certificate_template_id: courseCertificateTemplateId,
+      certificate_issued_at: trx.fn.now(),
+      certificate_url: opsCertificateUrl,
       metadata: JSON.stringify({ cohort: '2024-Q4', enrollmentSource: 'seed' })
     });
 
@@ -1289,16 +1307,36 @@ export async function seed(knex) {
         completed: true,
         completed_at: trx.fn.now(),
         progress_percent: 100,
+        progress_source: 'manual',
+        progress_metadata: JSON.stringify({ completionSource: 'seed-script' }),
         metadata: JSON.stringify({ completionSource: 'web' })
       },
       {
         enrollment_id: opsEnrollmentId,
         lesson_id: telemetryLessonId,
-        completed: false,
-        progress_percent: 25,
+        completed: true,
+        completed_at: trx.fn.now(),
+        progress_percent: 100,
+        progress_source: 'manual',
+        progress_metadata: JSON.stringify({ completionSource: 'seed-script' }),
         metadata: JSON.stringify({ lastLocation: 'section-2', note: 'Review telemetry thresholds' })
       }
     ]);
+
+    await trx('learner_achievements').insert({
+      user_id: learnerId,
+      course_id: opsAutomationCourseId,
+      template_id: courseCertificateTemplateId,
+      status: 'awarded',
+      issued_at: trx.fn.now(),
+      certificate_url: opsCertificateUrl,
+      progress_snapshot: JSON.stringify({
+        progressPercent: 100,
+        completedLessons: 2,
+        totalLessons: 2
+      }),
+      metadata: JSON.stringify({ enrollmentId: opsEnrollmentId })
+    });
 
     const [opsStrategistRoleId] = await trx('community_role_definitions').insert({
       community_id: opsCommunityId,

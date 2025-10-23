@@ -1,15 +1,16 @@
 import db from '../config/database.js';
 
-const TABLE = 'course_modules';
+const TABLE = 'achievement_templates';
 
 const BASE_COLUMNS = [
   'id',
-  'course_id as courseId',
-  'title',
   'slug',
-  'position',
-  'release_offset_days as releaseOffsetDays',
+  'name',
+  'description',
+  'type',
+  'certificate_background_url as certificateBackgroundUrl',
   'metadata',
+  'is_active as isActive',
   'created_at as createdAt',
   'updated_at as updatedAt'
 ];
@@ -33,30 +34,30 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export default class CourseModuleModel {
-  static async listByCourseIds(courseIds, connection = db) {
-    if (!courseIds?.length) return [];
-    const rows = await connection(TABLE)
+export default class AchievementTemplateModel {
+  static async findBySlug(slug, connection = db) {
+    if (!slug) return null;
+    const record = await connection(TABLE)
       .select(BASE_COLUMNS)
-      .whereIn('course_id', courseIds)
-      .orderBy('course_id', 'asc')
-      .orderBy('position', 'asc');
-    return rows.map((row) => this.deserialize(row));
-  }
-
-  static async listByCourseId(courseId, connection = db) {
-    if (!courseId) return [];
-    const rows = await connection(TABLE)
-      .select(BASE_COLUMNS)
-      .where('course_id', courseId)
-      .orderBy('position', 'asc');
-    return rows.map((row) => this.deserialize(row));
+      .where('slug', slug)
+      .andWhere('is_active', true)
+      .first();
+    return record ? this.deserialize(record) : null;
   }
 
   static async findById(id, connection = db) {
     if (!id) return null;
     const record = await connection(TABLE).select(BASE_COLUMNS).where('id', id).first();
     return record ? this.deserialize(record) : null;
+  }
+
+  static async listActiveByType(type, connection = db) {
+    const query = connection(TABLE).select(BASE_COLUMNS).where('is_active', true);
+    if (type) {
+      query.andWhere('type', type);
+    }
+    const rows = await query.orderBy('name', 'asc');
+    return rows.map((row) => this.deserialize(row));
   }
 
   static deserialize(record) {

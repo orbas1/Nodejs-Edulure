@@ -41,3 +41,25 @@ export function postCourseLiveChat(courseId, payload, { token } = {}) {
   });
 }
 
+export function fetchCourseProgress(courseId, { token, signal } = {}) {
+  assertToken(token, 'load course progress');
+  assertId(courseId, 'Course id');
+  return httpClient.get(`/courses/${courseId}/progress`, {
+    token,
+    signal,
+    cache: createListCacheConfig(`course:${courseId}:progress`, { ttl: 5_000 })
+  });
+}
+
+export function updateCourseLessonProgress(courseId, lessonSlug, payload, { token } = {}) {
+  assertToken(token, 'update course progress');
+  assertId(courseId, 'Course id');
+  if (!lessonSlug) {
+    throw new Error('Lesson slug is required');
+  }
+  return httpClient.post(`/courses/${courseId}/progress/lessons/${lessonSlug}`, payload, {
+    token,
+    cache: createInvalidationConfig(`course:${courseId}:progress`)
+  });
+}
+

@@ -48,6 +48,36 @@ export default class CourseLessonModel {
     return rows.map((row) => this.deserialize(row));
   }
 
+  static async listByModuleIds(moduleIds, connection = db) {
+    if (!moduleIds?.length) return [];
+    const rows = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .whereIn('module_id', moduleIds)
+      .orderBy('module_id', 'asc')
+      .orderBy('position', 'asc');
+    return rows.map((row) => this.deserialize(row));
+  }
+
+  static async findBySlug(courseId, lessonSlug, connection = db) {
+    if (!courseId || !lessonSlug) {
+      return null;
+    }
+
+    const record = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where('course_id', courseId)
+      .andWhere('slug', lessonSlug)
+      .first();
+
+    return record ? this.deserialize(record) : null;
+  }
+
+  static async findById(id, connection = db) {
+    if (!id) return null;
+    const record = await connection(TABLE).select(BASE_COLUMNS).where('id', id).first();
+    return record ? this.deserialize(record) : null;
+  }
+
   static deserialize(record) {
     return {
       ...record,

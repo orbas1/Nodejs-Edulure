@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import CourseProgressMeter from '../../components/course/CourseProgressMeter.jsx';
 import usePersistentCollection from '../../hooks/usePersistentCollection.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboardApi.js';
@@ -47,6 +48,15 @@ export default function LearnerCourses() {
   });
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [orderFeedback, setOrderFeedback] = useState(null);
+  const primaryCourse = activeCourses[0] ?? null;
+  const primaryCompletedLessons = Number(
+    primaryCourse?.completedLessons ?? primaryCourse?.lessonsCompleted ?? 0
+  );
+  const primaryTotalLessons = Number(
+    primaryCourse?.totalLessons ??
+      primaryCourse?.lessonsTotal ??
+      (primaryCompletedLessons > 0 ? primaryCompletedLessons : 0)
+  );
 
   useEffect(() => {
     setActiveCourses(Array.isArray(data?.active) ? data.active : []);
@@ -207,7 +217,6 @@ export default function LearnerCourses() {
       return;
     }
 
-    const [primaryCourse] = activeCourses;
     if (!primaryCourse) {
       setStatusMessage({ type: 'error', message: 'Enroll in a course to create a learning goal.' });
       return;
@@ -247,7 +256,7 @@ export default function LearnerCourses() {
         setPendingAction(null);
       }
     }
-  }, [activeCourses, mounted, setActiveCourses, token]);
+  }, [activeCourses, mounted, primaryCourse, setActiveCourses, token]);
 
   const handleSyncCalendar = useCallback(async () => {
     if (!token) {
@@ -312,6 +321,16 @@ export default function LearnerCourses() {
 
       <section className="dashboard-section">
         <h2 className="text-lg font-semibold text-slate-900">Active programs</h2>
+        {primaryCourse ? (
+          <div className="mt-5">
+            <CourseProgressMeter
+              progressPercent={Number(primaryCourse.progress ?? 0)}
+              completedLessons={primaryCompletedLessons}
+              totalLessons={primaryTotalLessons}
+              certificate={primaryCourse.certificate}
+            />
+          </div>
+        ) : null}
         <div className="mt-5 space-y-4">
           {activeCourses.map((course) => (
             <button
