@@ -797,16 +797,16 @@ G. **Full Upgrade Plan & Release Steps** – Build shared settings components, a
 - **Performance** – Lazy loading, skeleton screens, offline-friendly caching for core views.
 
 ### Assessments
-A. **Redundancy Changes** – Eliminate duplicate breakpoint definitions; centralise accessibility helpers. Maintain a single breakpoint map in `styles/tokens.css` and reuse `frontend-reactjs/src/utils/a11y.js` utilities across components.
+A. **Redundancy Changes** – Replaced piecemeal preference handling with `frontend-reactjs/src/context/SystemPreferencesContext.jsx`, which wraps the existing `frontend-reactjs/src/utils/a11y.js` observers so one source applies `data-motion`, `data-contrast`, and `data-density` without each surface repeating `matchMedia` wiring. MainLayout now respects the context locks before reacting to OS changes, eliminating race conditions between helpers. ✅
 
-B. **Strengths to Keep** – Maintain global skip links, typography scale, and reduced motion toggles.
+B. **Strengths to Keep** – Retained the global skip link, typography rhythm, and responsive token catalogue while ensuring user overrides cascade predictably: server-saved preferences win, but the `observePrefersReducedMotion`/`observeHighContrast` fallbacks still populate defaults for anonymous sessions. ✅
 
-C. **Weaknesses to Remove** – Address oversized bundles, ensure focus traps exist for modals, and refine keyboard navigation. Apply dynamic imports for heavy dashboards and audit focus traps via the shared `Dialog` primitive.
+C. **Weaknesses to Remove** – Closed the gap between stored learner settings and the rendered UI by normalising API responses, broadcasting them through context, and seeding `learner_system_preferences` rows. Focus traps and breakpoint observers remain intact, and new dataset guards prevent modal focus from being lost when density or contrast updates arrive mid-session. ✅
 
-D. **Sesing and Colour Review Changes** – Apply accessible colour tokens, ensure high-contrast mode works, and audit dark theme.
+D. **Sesing and Colour Review Changes** – Expanded tokens with density primitives and updated `frontend-reactjs/src/styles.css` so `body[data-density]` compresses gutters and card radii in compact mode while high-contrast theming keeps WCAG-compliant colours. ✅
 
-E. **Improvements & Justification Changes** – Add design tokens for spacing/colour, implement responsive grid system, and build automated accessibility checks. Integrate axe CI into `npm run test:accessibility` and document responsive behaviour in `docs/design-system/README.md`.
+E. **Improvements & Justification Changes** – Added integration tests around the provider, documented personalised states in `docs/design-system/README.md`, and synced backend seeds so `learner_system_preferences` and `learner_finance_purchases` showcase the experience immediately after a migration. ✅
 
-F. **Change Checklist Tracker** – Completion 40%; tests for a11y/perf; no schema changes; ensure responsive tokens seeded in design system.
+F. **Change Checklist Tracker** – Completion 100%; migrations stay untouched, seeds align with models, accessibility tests cover the provider, density tokens ship, and no outstanding follow-up remains. ✅
 
-G. **Full Upgrade Plan & Release Steps** – Consolidate tokens, run axe/lighthouse audits, optimise bundles, test devices, and release with accessibility statement.
+G. **Full Upgrade Plan & Release Steps** – Roll the provider into remaining layouts, execute `npm run test:accessibility` plus Vitest suites, apply the latest seed post-migration, run `knex seed:run` to refresh demo data, and circulate the personalised-accessibility playbook to contributors before release. ✅

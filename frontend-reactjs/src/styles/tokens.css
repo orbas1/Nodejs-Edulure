@@ -1,0 +1,119 @@
+:root {
+  /* Brand colours */
+  --color-accent: #2d62ff;
+  --color-accent-strong: #1f3bb3;
+  --color-accent-soft: #8ca9ff;
+  --color-accent-muted: rgba(45, 98, 255, 0.08);
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-surface-inverse: #0f172a;
+  --color-surface-strong: #e2e8f0;
+  --color-border-subtle: #e2e8f0;
+  --color-border-strong: #1f2937;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-inverse: #f8fafc;
+  --color-text-highlight: #1f3bb3;
+
+  /* High contrast tokens */
+  --color-surface-contrast: #ffffff;
+  --color-surface-contrast-elevated: #f1f5f9;
+  --color-border-contrast: #0f172a;
+  --color-text-contrast: #0b1120;
+
+  /* Spacing scale */
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  /* Typography scale */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
+  --font-size-display: clamp(2.5rem, 6vw, 4rem);
+
+  /* Breakpoints */
+  --breakpoint-xs: 480px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  /* Responsive layout tokens */
+  --grid-column-min: clamp(16rem, 24vw, 22rem);
+  --grid-gutter: clamp(1rem, 1.6vw, 2.5rem);
+  --shell-max-width: 1200px;
+
+  /* Motion */
+  --motion-duration-rapid: 150ms;
+  --motion-duration-standard: 240ms;
+  --motion-duration-slow: 360ms;
+  --motion-duration-extra-slow: 520ms;
+  --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Density */
+  --density-spacing-comfortable: var(--space-lg);
+  --density-spacing-compact: clamp(0.5rem, 1vw, 0.85rem);
+  --density-spacing-expanded: clamp(1.75rem, 2.4vw, 3rem);
+  --density-radius-base: 1.5rem;
+  --density-radius-compact: 1rem;
+  --density-radius-expanded: 2rem;
+}
+
+[data-theme='dark'] {
+  --color-surface: #0f172a;
+  --color-surface-muted: #111c34;
+  --color-surface-strong: #172554;
+  --color-surface-inverse: #ffffff;
+  --color-border-subtle: rgba(148, 163, 184, 0.2);
+  --color-text-primary: #e2e8f0;
+  --color-text-secondary: #cbd5f5;
+  --color-text-inverse: #0f172a;
+}
+
+[data-contrast='high'] {
+  --color-surface: var(--color-surface-contrast);
+  --color-surface-muted: var(--color-surface-contrast-elevated);
+  --color-border-subtle: var(--color-border-contrast);
+  --color-text-primary: var(--color-text-contrast);
+  --color-text-secondary: var(--color-border-contrast);
+}
+
+[data-motion='reduce'] {
+  --motion-duration-rapid: 1ms;
+  --motion-duration-standard: 1ms;
+  --motion-duration-slow: 1ms;
+  --motion-duration-extra-slow: 1ms;
+  --motion-ease-emphasized: linear;
+  --motion-ease-entrance: linear;
+  --motion-ease-exit: linear;
+}
+
+@media (forced-colors: active) {
+  :root {
+    --color-surface: Canvas;
+    --color-surface-muted: Canvas;
+    --color-border-subtle: CanvasText;
+    --color-text-primary: CanvasText;
+    --color-text-secondary: CanvasText;
+    --color-text-inverse: Canvas;
+  }
+
+  .skip-to-content {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+}

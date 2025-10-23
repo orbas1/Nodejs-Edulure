@@ -14,6 +14,46 @@ const incidentEncryptionKey = process.env.SECURITY_INCIDENT_ENCRYPTION_KEY
   ? Buffer.from(process.env.SECURITY_INCIDENT_ENCRYPTION_KEY, 'hex')
   : crypto.createHash('sha256').update('edulure-security-seed-key').digest();
 
+const DEFAULT_SYSTEM_PREFERENCE_ROW = Object.freeze({
+  language: 'en',
+  region: 'US',
+  timezone: 'UTC',
+  notifications_enabled: true,
+  digest_enabled: true,
+  auto_play_media: false,
+  high_contrast: false,
+  reduced_motion: false,
+  preferences: {
+    interfaceDensity: 'comfortable',
+    analyticsOptIn: true,
+    subtitleLanguage: 'en',
+    audioDescription: false
+  }
+});
+
+const buildSystemPreferenceRow = (userId, overrides = {}) => {
+  const preferenceOverrides = overrides.preferences ?? {};
+  const rowOverrides = { ...overrides };
+  delete rowOverrides.preferences;
+
+  return {
+    user_id: userId,
+    language: rowOverrides.language ?? DEFAULT_SYSTEM_PREFERENCE_ROW.language,
+    region: rowOverrides.region ?? DEFAULT_SYSTEM_PREFERENCE_ROW.region,
+    timezone: rowOverrides.timezone ?? DEFAULT_SYSTEM_PREFERENCE_ROW.timezone,
+    notifications_enabled:
+      rowOverrides.notifications_enabled ?? DEFAULT_SYSTEM_PREFERENCE_ROW.notifications_enabled,
+    digest_enabled: rowOverrides.digest_enabled ?? DEFAULT_SYSTEM_PREFERENCE_ROW.digest_enabled,
+    auto_play_media: rowOverrides.auto_play_media ?? DEFAULT_SYSTEM_PREFERENCE_ROW.auto_play_media,
+    high_contrast: rowOverrides.high_contrast ?? DEFAULT_SYSTEM_PREFERENCE_ROW.high_contrast,
+    reduced_motion: rowOverrides.reduced_motion ?? DEFAULT_SYSTEM_PREFERENCE_ROW.reduced_motion,
+    preferences: JSON.stringify({
+      ...DEFAULT_SYSTEM_PREFERENCE_ROW.preferences,
+      ...preferenceOverrides
+    })
+  };
+};
+
 const sealSensitive = (value) => {
   if (!value) {
     return null;
@@ -92,6 +132,8 @@ export async function seed(knex) {
     await trx('course_lessons').del();
     await trx('course_modules').del();
     await trx('courses').del();
+    await trx('learner_finance_purchases').del();
+    await trx('learner_system_preferences').del();
     await trx('community_affiliate_payouts').del();
     await trx('community_subscriptions').del();
     await trx('community_paywall_tiers').del();
@@ -193,6 +235,49 @@ export async function seed(knex) {
       last_login_at: trx.fn.now(),
       password_changed_at: trx.fn.now()
     });
+
+    await trx('learner_system_preferences').insert([
+      buildSystemPreferenceRow(adminId, {
+        high_contrast: true,
+        preferences: { interfaceDensity: 'expanded', analyticsOptIn: false }
+      }),
+      buildSystemPreferenceRow(instructorId, {
+        timezone: 'America/Los_Angeles',
+        preferences: { interfaceDensity: 'comfortable', subtitleLanguage: 'ja', analyticsOptIn: true }
+      }),
+      buildSystemPreferenceRow(learnerId, {
+        reduced_motion: true,
+        high_contrast: true,
+        preferences: { interfaceDensity: 'compact', audioDescription: true }
+      })
+    ]);
+
+    await trx('learner_finance_purchases').insert([
+      {
+        user_id: learnerId,
+        reference: 'INV-100',
+        description: 'Foundations cohort bundle',
+        amount_cents: 9900,
+        currency: 'USD',
+        status: 'paid',
+        purchased_at: trx.fn.now(),
+        metadata: JSON.stringify({ receiptUrl: 'https://cdn.edulure.test/invoices/inv-100.pdf' }),
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        user_id: learnerId,
+        reference: 'INV-120',
+        description: 'Community add-on pass',
+        amount_cents: 4900,
+        currency: 'USD',
+        status: 'paid',
+        purchased_at: trx.fn.now(),
+        metadata: JSON.stringify({ receiptUrl: 'https://cdn.edulure.test/invoices/inv-120.pdf' }),
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      }
+    ]);
 
     const adminVerificationRef = makeVerificationRef();
     const instructorVerificationRef = makeVerificationRef();

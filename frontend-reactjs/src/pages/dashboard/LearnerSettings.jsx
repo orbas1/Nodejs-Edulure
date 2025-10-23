@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useSystemPreferences } from '../../context/SystemPreferencesContext.jsx';
 import {
   fetchFinanceSettings,
   fetchSystemPreferences,
@@ -144,10 +145,23 @@ function toInputDateTime(value) {
   }
 }
 
+function normaliseSystemPayload(payload = {}) {
+  return {
+    ...DEFAULT_SYSTEM_FORM,
+    ...payload,
+    preferences: {
+      ...DEFAULT_SYSTEM_FORM.preferences,
+      ...(payload?.preferences ?? {})
+    }
+  };
+}
+
 export default function LearnerSettings() {
   const { isLearner, section: settings, loading, error, refresh } = useLearnerDashboardSection('settings');
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const { setPreferences: syncSystemPreferences, refresh: refreshSystemPreferenceContext } =
+    useSystemPreferences();
 
   const [systemForm, setSystemForm] = useState(DEFAULT_SYSTEM_FORM);
   const [financeForm, setFinanceForm] = useState(DEFAULT_FINANCE_FORM);
@@ -162,15 +176,11 @@ export default function LearnerSettings() {
     if (!settings?.system || !settings?.finance) {
       return;
     }
-    const normalisedSystem = {
-      ...DEFAULT_SYSTEM_FORM,
-      ...settings.system,
-      preferences: {
-        ...DEFAULT_SYSTEM_FORM.preferences,
-        ...(settings.system.preferences ?? {})
-      }
-    };
+    const normalisedSystem = normaliseSystemPayload(settings.system);
     setSystemForm(normalisedSystem);
+    if (typeof syncSystemPreferences === 'function') {
+      syncSystemPreferences(normalisedSystem);
+    }
 
     const normalisedFinance = {
       ...DEFAULT_FINANCE_FORM,
@@ -187,7 +197,7 @@ export default function LearnerSettings() {
     setFinanceForm(normalisedFinance);
     setPurchases(Array.isArray(settings.finance.purchases) ? settings.finance.purchases : []);
     setSubscriptions(Array.isArray(settings.finance.subscriptions) ? settings.finance.subscriptions : []);
-  }, [settings?.system, settings?.finance]);
+  }, [settings?.system, settings?.finance, syncSystemPreferences]);
 
   useEffect(() => {
     if (error) {
@@ -255,19 +265,23 @@ export default function LearnerSettings() {
   };
 
   const refreshSystemPreferences = async () => {
-    if (!token) return;
-    const response = await fetchSystemPreferences({ token }).catch(() => null);
-    if (response?.data) {
-      const payload = response.data;
-      setSystemForm({
-        ...DEFAULT_SYSTEM_FORM,
-        ...payload,
-        preferences: {
-          ...DEFAULT_SYSTEM_FORM.preferences,
-          ...(payload.preferences ?? {})
-        }
-      });
+    if (!token) return null;
+    let payload = null;
+    if (typeof refreshSystemPreferenceContext === 'function') {
+      payload = await refreshSystemPreferenceContext();
+    } else {
+      const response = await fetchSystemPreferences({ token });
+      payload = response?.data ?? null;
     }
+    if (!payload) {
+      return null;
+    }
+    const normalised = normaliseSystemPayload(payload);
+    setSystemForm(normalised);
+    if (typeof syncSystemPreferences === 'function') {
+      syncSystemPreferences(normalised);
+    }
+    return normalised;
   };
 
   const refreshFinanceSettings = async () => {

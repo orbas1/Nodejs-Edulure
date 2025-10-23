@@ -9,6 +9,7 @@ import { RuntimeConfigProvider } from './context/RuntimeConfigContext.jsx';
 import { DashboardProvider } from './context/DashboardContext.jsx';
 import { RealtimeProvider } from './context/RealtimeContext.jsx';
 import { ServiceHealthProvider } from './context/ServiceHealthContext.jsx';
+import { SystemPreferencesProvider } from './context/SystemPreferencesContext.jsx';
 
 function resolveRouterBasename(baseUrl = '/') {
   if (!baseUrl || baseUrl === '/' || baseUrl === './') {
@@ -39,15 +40,17 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter basename={routerBasename === '/' ? undefined : routerBasename}>
       <LanguageProvider>
         <AuthProvider>
-          <RuntimeConfigProvider>
-            <ServiceHealthProvider>
-              <RealtimeProvider>
-                <DashboardProvider>
-                  <App />
-                </DashboardProvider>
-              </RealtimeProvider>
-            </ServiceHealthProvider>
-          </RuntimeConfigProvider>
+          <SystemPreferencesProvider>
+            <RuntimeConfigProvider>
+              <ServiceHealthProvider>
+                <RealtimeProvider>
+                  <DashboardProvider>
+                    <App />
+                  </DashboardProvider>
+                </RealtimeProvider>
+              </ServiceHealthProvider>
+            </RuntimeConfigProvider>
+          </SystemPreferencesProvider>
         </AuthProvider>
       </LanguageProvider>
     </BrowserRouter>

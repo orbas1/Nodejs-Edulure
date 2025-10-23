@@ -13,6 +13,7 @@ const updateFinancePurchaseMock = vi.hoisted(() => vi.fn());
 const deleteFinancePurchaseMock = vi.hoisted(() => vi.fn());
 const fetchSystemPreferencesMock = vi.hoisted(() => vi.fn());
 const fetchFinanceSettingsMock = vi.hoisted(() => vi.fn());
+const useSystemPreferencesMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../hooks/useLearnerDashboard.js', () => ({
   useLearnerDashboardSection: useLearnerDashboardSectionMock
@@ -20,6 +21,10 @@ vi.mock('../../../hooks/useLearnerDashboard.js', () => ({
 
 vi.mock('../../../context/AuthContext.jsx', () => ({
   useAuth: useAuthMock
+}));
+
+vi.mock('../../../context/SystemPreferencesContext.jsx', () => ({
+  useSystemPreferences: useSystemPreferencesMock
 }));
 
 vi.mock('../../../api/learnerDashboardApi.js', () => ({
@@ -104,6 +109,30 @@ describe('<LearnerSettings />', () => {
       }
     });
     useAuthMock.mockReturnValue({ session: { tokens: { accessToken: 'token-123' } } });
+    const systemPreferenceState = {
+      language: 'en',
+      region: 'US',
+      timezone: 'UTC',
+      notificationsEnabled: true,
+      digestEnabled: true,
+      autoPlayMedia: false,
+      highContrast: false,
+      reducedMotion: false,
+      preferences: {
+        interfaceDensity: 'comfortable',
+        analyticsOptIn: true,
+        subtitleLanguage: 'en',
+        audioDescription: false
+      }
+    };
+    const refreshPreferencesMock = vi.fn().mockResolvedValue(systemPreferenceState);
+    useSystemPreferencesMock.mockReturnValue({
+      preferences: systemPreferenceState,
+      loading: false,
+      error: null,
+      refresh: refreshPreferencesMock,
+      setPreferences: vi.fn()
+    });
     updateSystemPreferencesMock.mockResolvedValue({ message: 'System preferences updated' });
     updateFinanceSettingsMock.mockResolvedValue({ message: 'Finance settings updated' });
     createFinancePurchaseMock.mockResolvedValue({
