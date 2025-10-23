@@ -4,7 +4,7 @@ Group 1 – Categories 1-4 (comprehensive change tracking)
 
 1. **All changes**
    A. *Logic flows* – Expanded `logic flows.md` to sixteen flows covering platform setup, service consolidation, search migration, learner journeys, instructor publishing, monetisation, admin oversight, support, ads, and analytics with A–G assessments for each scenario.
-   B. *User experience* – Rewrote `user experience.md` so every surface from navigation through accessibility carries the same A–G analysis, detailing component requirements, styling, imagery, monetisation hooks, and rollout plans.
+   B. ✅
    C. *Enablement docs* – Ledger now mirrors the updated documentation, emphasising the simplified runtime (frontend, backend, database) and the Edulure-first search/realtime stack.
 
 2. **Redundancies**

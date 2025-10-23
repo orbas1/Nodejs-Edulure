@@ -5,25 +5,33 @@ This blueprint defines how Edulure should feel: Skool-style community energy pai
 ## 1. Global shell and navigation
 
 ### Experience outline
-- **Header bar** – Compact top navigation with logo, primary tabs (Feed, Courses, Communities, Tutors, Library), quick-create button, and avatar menu.
-- **Sidebar** – Contextual nav on dashboards with role-aware sections (Learner, Instructor, Admin) and collapsible groups.
-- **Notifications & quick actions** – Bell icon reveals notifications; plus button surfaces create actions for posts, courses, events.
-- **Responsive behaviour** – Mobile collapses nav into bottom tab bar with floating action button for creation.
+- **Header bar** – Compact top navigation with logo, primary tabs (Feed, Courses, Communities, Tutors, Library), quick-create button, and avatar menu. The header embeds global search, unread indicators, and context-aware CTAs (e.g., "Launch classroom" when a live session is in progress) without requiring a second toolbar.
+  - Badge counts and presence pills hydrate from the session context in `frontend-reactjs/src/context/RealtimePresenceContext.jsx`, keeping the shell aware of live rooms and unread discussions.
+  - The top-level `AppShell` layout exposes slots for partner branding or seasonal campaigns so marketing can toggle promotions without reworking navigation.
+- **Sidebar** – Contextual nav on dashboards with role-aware sections (Learner, Instructor, Admin) and collapsible groups. Each group is derived from the `navigation/routes.js` manifest so dashboards, analytics, and support areas stay synchronised with route-level permissions.
+  - Collapsed sidebar mode still surfaces tooltips and keyboard shortcuts, mirroring the desktop productivity tools learners and instructors already use.
+  - Inline status chips (e.g., invoice overdue, campaign running) reuse the shared `StatusPill` primitive to avoid bespoke styling per dashboard.
+- **Notifications & quick actions** – Bell icon reveals notifications; plus button surfaces create actions for posts, courses, events. The notification panel shows batched updates grouped by surface (communities, courses, payouts) with infinite scroll and quick-dismiss affordances.
+  - Quick-create uses the shared modal stack so launching a post or booking from any page keeps validation, autosave, and analytics consistent.
+  - Inline preference toggles allow users to mute certain notification categories without leaving the panel, persisting to `UserPreferenceController.updateNotificationChannels`.
+- **Responsive behaviour** – Mobile collapses nav into bottom tab bar with floating action button for creation. Tablet layouts adopt a hybrid with a condensed sidebar and sticky header search to preserve discoverability.
+  - Breakpoints align with the design tokens declared in `frontend-reactjs/src/styles/tokens.css`, ensuring paddings and tap targets scale with pixel density.
+  - The mobile FAB opens a sheet-style menu for creation actions, matching the gesture patterns in the live chat and booking flows.
 
 ### Assessments
-A. **Redundancy Changes** – Remove duplicate nav components between `layouts/AppShell.jsx` and `layouts/DashboardShell.jsx`; unify notification drawers. Centralise header rendering inside `frontend-reactjs/src/components/navigation/TopBar.jsx` so badges, presence indicators, and monetisation shortcuts stay aligned.
+A. **Redundancy Changes** – Remove duplicate nav components between `layouts/AppShell.jsx` and `layouts/DashboardShell.jsx`; unify notification drawers. Centralise header rendering inside a new `frontend-reactjs/src/components/navigation/AppTopBar.jsx` so badges, presence indicators, monetisation shortcuts, and language selector logic originate from one component tree. The drawer experience should live in `AppNotificationPanel.jsx`, consumed by both learner and admin shells, with analytics fired via `frontend-reactjs/src/lib/analytics.js`.
 
-B. **Strengths to Keep** – Keep concise nav labels, avatar quick menu, and responsive collapse patterns that mimic Skool simplicity.
+B. **Strengths to Keep** – Keep concise nav labels, avatar quick menu, and responsive collapse patterns that mimic Skool simplicity. Preserve the deterministic route structure so query caching, breadcrumbs, and deep links continue to work during SSR/CSR transitions, and maintain the avatar status dot and quick-switch menu learners already rely on for class hopping.
 
-C. **Weaknesses to Remove** – Reduce icon inconsistency, improve keyboard focus order, and eliminate redundant breadcrumbs when sidebar already signals context. Map keyboard focus to the order defined in `navigation/routes.js` so screen reader announcements match visual hierarchy.
+C. **Weaknesses to Remove** – Reduce icon inconsistency, improve keyboard focus order, and eliminate redundant breadcrumbs when sidebar already signals context. Map keyboard focus to the order defined in `navigation/routes.js` so screen reader announcements match visual hierarchy, and wire skip links to land inside the main content landmarks. Harmonise tooltip labels with localisation strings to avoid mismatched copy between keyboard and pointer users.
 
-D. **Sesing and Colour Review Changes** – Use the primary indigo for active states, neutral slate backgrounds, and 1px dividers; ensure hover/focus outlines meet contrast guidelines.
+D. **Sesing and Colour Review Changes** – Use the primary indigo for active states, neutral slate backgrounds, and 1px dividers; ensure hover/focus outlines meet contrast guidelines. Introduce semantic colour tokens (`--nav-active`, `--nav-muted`, `--nav-alert`) referenced by both CSS modules and Tailwind utilities so dark-mode and high-contrast variants stay unified. Apply 16px minimum target sizes and 12px spacing rhythm to align with accessibility heuristics.
 
-E. **Improvements & Justification Changes** – Introduce a shared navigation primitive, add personalization for pinning sections, and integrate monetisation badges (ads manager, payouts) to highlight revenue features. Persist pinned links through `UserPreferenceController.updateNavigation` so the shell reflects learner, instructor, or owner priorities automatically.
+E. **Improvements & Justification Changes** – Introduce a shared navigation primitive, add personalization for pinning sections, and integrate monetisation badges (ads manager, payouts) to highlight revenue features. Persist pinned links through `UserPreferenceController.updateNavigation` so the shell reflects learner, instructor, or owner priorities automatically, and surface campaign slots that hydrate from `AdsCampaignModel` so monetisation real estate can be rotated without code pushes.
 
-F. **Change Checklist Tracker** – Completion 55%; tests for focus management needed; no database changes; ensure analytics events update; assets share tokens.
+F. **Change Checklist Tracker** – Completion 55%; remaining tasks include: implementing unified analytics events for navigation impressions, adding focus-trap tests for drawers, and seeding demo data for notification categories. No database migrations required beyond user preference extensions; ensure design tokens match the shared set in `styles/tokens.css`.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared nav components, refactor layouts to consume them, audit keyboard navigation, update theme tokens, and release after responsive QA.
+G. **Full Upgrade Plan & Release Steps** – Build shared nav components, refactor layouts to consume them, audit keyboard navigation, update theme tokens, and release after responsive QA. Sequence: (1) land `AppTopBar` + `AppSidebar` with shared contexts, (2) migrate dashboard and marketing shells, (3) run accessibility sweeps (axe + manual), (4) document personalization controls in `docs/navigation.md`, and (5) ship with announcement banner toggled via feature flags for gradual rollout.
 
 ## 2. Marketing site surfaces
 
