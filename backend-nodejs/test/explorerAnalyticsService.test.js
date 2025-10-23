@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
     incrementForEvent: vi.fn(),
     incrementClicks: vi.fn(),
     aggregateRange: vi.fn(),
-    listBetween: vi.fn()
+    listBetween: vi.fn(),
+    appendPreviewDigests: vi.fn(),
+    listPreviewDigests: vi.fn()
   },
   interactionModel: {
     recordInteraction: vi.fn()
@@ -169,6 +171,68 @@ describe('ExplorerAnalyticsService', () => {
     expect(metrics.recordExplorerSearchEvent).toHaveBeenCalledTimes(2);
     expect(result.totalResults).toBe(20);
     expect(result.entitySummaries).toHaveLength(2);
+  });
+
+  it('stores preview digests when supplied', async () => {
+    const createdEvent = {
+      id: 22,
+      eventUuid: 'preview-event',
+      createdAt: new Date('2024-05-19T00:00:00.000Z')
+    };
+    eventModel.create.mockResolvedValue(createdEvent);
+    eventEntityModel.createMany.mockResolvedValue([
+      { entityType: 'courses', isZeroResult: false }
+    ]);
+
+    const service = new ExplorerAnalyticsService({ loggerInstance: { warn: vi.fn(), info: vi.fn() } });
+
+    await service.recordSearchExecution({
+      query: 'design',
+      entitySummaries: [
+        {
+          entityType: 'courses',
+          result: {
+            totalHits: 4,
+            displayedHits: 2,
+            processingTimeMs: 40
+          }
+        }
+      ],
+      userId: 3,
+      sessionId: 'session-preview',
+      latencyMs: 40,
+      previewDigests: [
+        {
+          entityType: 'courses',
+          previews: [
+            {
+              entityId: 'course-123',
+              title: 'Course 123',
+              thumbnailUrl: 'https://cdn.test/course.jpg'
+            }
+          ]
+        },
+        {
+          entityType: 'all',
+          previews: [
+            {
+              entityId: 'course-123',
+              title: 'Course 123',
+              thumbnailUrl: 'https://cdn.test/course.jpg'
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(dailyMetricModel.appendPreviewDigests).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: 'all' }),
+      expect.any(Object)
+    );
+    expect(dailyMetricModel.appendPreviewDigests).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: 'courses' }),
+      expect.any(Object)
+    );
   });
 
   it('records explorer interactions and increments click metrics', async () => {

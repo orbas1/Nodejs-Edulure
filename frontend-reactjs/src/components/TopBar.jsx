@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import { useState } from 'react';
 import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline';
 import CommunitySwitcher from './CommunitySwitcher.jsx';
-import SearchBar from './SearchBar.jsx';
+import GlobalSearchBar from './search/GlobalSearchBar.jsx';
 import LanguageSelector from './navigation/LanguageSelector.jsx';
 
 export default function TopBar({
@@ -14,6 +14,7 @@ export default function TopBar({
   searchValue,
   onSearchChange,
   onSearchSubmit,
+  onSuggestionSelect,
   isSearching = false,
   messageCount = 0,
   notificationCount = 0,
@@ -34,13 +35,24 @@ export default function TopBar({
     }
   };
 
-  const handleSearchSubmit = (event) => {
-    if (typeof onSearchSubmit === 'function') {
-      const formValue = event?.target?.search?.value;
-      const rawValue = searchValue ?? localSearchValue ?? formValue ?? '';
-      const trimmedValue = (formValue ?? rawValue ?? '').trim();
-      onSearchSubmit(trimmedValue);
+  const handleSearchSubmit = (submittedValue) => {
+    if (typeof onSearchSubmit !== 'function') {
+      return;
     }
+    const rawValue = submittedValue ?? searchValue ?? localSearchValue ?? '';
+    const trimmedValue = (rawValue ?? '').trim();
+    if (trimmedValue.length === 0) {
+      return;
+    }
+    onSearchSubmit(trimmedValue);
+  };
+
+  const handleSuggestionSelect = (suggestion) => {
+    if (!suggestion) return;
+    if (searchValue === undefined && suggestion.query) {
+      setLocalSearchValue(suggestion.query);
+    }
+    return onSuggestionSelect?.(suggestion);
   };
 
   const handleOpenMessages = () => {
@@ -72,10 +84,11 @@ export default function TopBar({
         )}
       </div>
       <div className="w-full sm:flex-1">
-        <SearchBar
+        <GlobalSearchBar
           value={resolvedSearchValue}
           onChange={handleSearchChange}
           onSubmit={handleSearchSubmit}
+          onSuggestionSelect={handleSuggestionSelect}
           loading={isSearching}
           placeholder="Search the Edulure network"
         />
@@ -139,6 +152,7 @@ TopBar.propTypes = {
   searchValue: PropTypes.string,
   onSearchChange: PropTypes.func,
   onSearchSubmit: PropTypes.func,
+  onSuggestionSelect: PropTypes.func,
   isSearching: PropTypes.bool,
   messageCount: PropTypes.number,
   notificationCount: PropTypes.number,

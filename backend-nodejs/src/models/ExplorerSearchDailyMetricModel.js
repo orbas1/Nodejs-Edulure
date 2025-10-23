@@ -2,6 +2,7 @@ import db from '../config/database.js';
 
 const TABLE = 'explorer_search_daily_metrics';
 const EMPTY_METADATA = '{}';
+const DEFAULT_PREVIEW_LIMIT = 8;
 
 function parseMetadata(value) {
   if (!value) {
@@ -18,6 +19,114 @@ function parseMetadata(value) {
   }
 
   return typeof value === 'object' && value !== null ? value : {};
+}
+
+function normaliseBadge(badge) {
+  if (!badge) {
+    return null;
+  }
+  if (typeof badge === 'string') {
+    const trimmed = badge.trim();
+    return trimmed ? { label: trimmed } : null;
+  }
+  if (typeof badge !== 'object') {
+    return null;
+  }
+  const label = badge.label ?? badge.name ?? badge.type ?? null;
+  if (!label) {
+    return null;
+  }
+  const trimmed = String(label).trim();
+  if (!trimmed) {
+    return null;
+  }
+  const tone = badge.tone ?? badge.variant ?? null;
+  return tone ? { label: trimmed, tone: String(tone) } : { label: trimmed };
+}
+
+function normalisePreviewDigest(preview, entityType) {
+  if (!preview) {
+    return null;
+  }
+
+  const identifier =
+    preview.entityId ?? preview.entityPublicId ?? preview.id ?? preview.slug ?? null;
+  if (!identifier) {
+    return null;
+  }
+
+  const titleCandidate =
+    preview.title ?? preview.name ?? preview.headline ?? preview.label ?? null;
+  if (!titleCandidate) {
+    return null;
+  }
+  const title = String(titleCandidate).trim();
+  if (!title) {
+    return null;
+  }
+
+  const subtitleCandidate =
+    preview.subtitle ?? preview.description ?? preview.previewSummary ?? null;
+  const subtitle = subtitleCandidate ? String(subtitleCandidate).trim() : null;
+  const thumbnailUrl =
+    preview.previewImageUrl ??
+    preview.thumbnailUrl ??
+    preview.avatarUrl ??
+    preview.coverImageUrl ??
+    preview.media?.[0]?.url ??
+    preview.assets?.[0]?.url ??
+    null;
+
+  const ratingAverage =
+    preview.rating?.average ?? preview.metrics?.rating?.average ?? null;
+  const ratingCount = preview.rating?.count ?? preview.metrics?.rating?.count ?? null;
+  const priceCurrency = preview.price?.currency ?? preview.metrics?.price?.currency ?? null;
+  const priceAmountMinor =
+    preview.price?.amountMinor ?? preview.metrics?.price?.amountMinor ?? null;
+  const monetisationTag =
+    preview.monetisationTag ?? preview.monetisation?.tag ?? preview.sponsorshipTag ?? null;
+
+  const badges = Array.isArray(preview.badges)
+    ? preview.badges.map(normaliseBadge).filter(Boolean).slice(0, 3)
+    : [];
+
+  return {
+    id: String(identifier),
+    entityType: entityType ?? preview.entityType ?? null,
+    title,
+    subtitle: subtitle && subtitle.length ? subtitle : null,
+    thumbnailUrl: thumbnailUrl ?? null,
+    ratingAverage: ratingAverage !== undefined && ratingAverage !== null ? Number(ratingAverage) : null,
+    ratingCount: ratingCount !== undefined && ratingCount !== null ? Number(ratingCount) : null,
+    priceCurrency: priceCurrency ?? null,
+    priceAmountMinor:
+      priceAmountMinor !== undefined && priceAmountMinor !== null
+        ? Number(priceAmountMinor)
+        : null,
+    monetisationTag: monetisationTag ?? null,
+    badges,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function mergePreviewDigests(existing = [], incoming = [], limit = DEFAULT_PREVIEW_LIMIT) {
+  const merged = new Map();
+
+  for (const preview of incoming) {
+    if (!preview?.id) {
+      continue;
+    }
+    merged.set(preview.id, preview);
+  }
+
+  for (const preview of existing) {
+    if (!preview?.id || merged.has(preview.id)) {
+      continue;
+    }
+    merged.set(preview.id, preview);
+  }
+
+  return Array.from(merged.values()).slice(0, limit);
 }
 
 function toDomain(row) {
@@ -263,5 +372,98 @@ export default class ExplorerSearchDailyMetricModel {
       });
     }
     return results;
+  }
+
+  static async appendPreviewDigests(
+    { metricDate, entityType, previews, limit = DEFAULT_PREVIEW_LIMIT },
+    connection = db
+  ) {
+    if (!Array.isArray(previews) || !previews.length) {
+      return null;
+    }
+
+    const date = normaliseDate(metricDate);
+    const normalisedEntityType = normaliseEntityType(entityType);
+    const sanitisedPreviews = previews
+      .map((preview) => normalisePreviewDigest(preview, normalisedEntityType))
+      .filter(Boolean);
+
+    if (!sanitisedPreviews.length) {
+      return null;
+    }
+
+    return withTransaction(connection, async (trx) => {
+      const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
+      const existing = await applyForUpdate(existingQuery).first();
+
+      if (!existing) {
+        const payload = {
+          metric_date: date,
+          entity_type: normalisedEntityType,
+          searches: 0,
+          zero_results: 0,
+          displayed_results: 0,
+          total_results: 0,
+          clicks: 0,
+          conversions: 0,
+          average_latency_ms: 0,
+          metadata: JSON.stringify({ previewDigests: sanitisedPreviews.slice(0, limit) })
+        };
+
+        const [id] = await trx(TABLE).insert(payload);
+        const row = await trx(TABLE).where({ id }).first();
+        return toDomain(row);
+      }
+
+      const metadata = parseMetadata(existing.metadata);
+      const stored = Array.isArray(metadata.previewDigests) ? metadata.previewDigests : [];
+      const merged = mergePreviewDigests(stored, sanitisedPreviews, limit);
+      const nextMetadata = { ...metadata, previewDigests: merged };
+
+      await trx(TABLE)
+        .where({ id: existing.id })
+        .update({ metadata: JSON.stringify(nextMetadata) });
+
+      return toDomain({ ...existing, metadata: JSON.stringify(nextMetadata) });
+    });
+  }
+
+  static async listPreviewDigests(
+    { since, entityTypes, limit = DEFAULT_PREVIEW_LIMIT } = {},
+    connection = db
+  ) {
+    const query = connection(TABLE).select('*');
+    const sinceDate = since ? normaliseDate(since) : null;
+    if (sinceDate) {
+      query.andWhere('metric_date', '>=', sinceDate);
+    }
+    if (Array.isArray(entityTypes) && entityTypes.length) {
+      query.whereIn('entity_type', entityTypes.map((type) => normaliseEntityType(type)));
+    }
+    query.orderBy('searches', 'desc');
+
+    const rows = await query.limit(Math.max(limit * 2, limit + 4));
+
+    const collected = [];
+    for (const row of rows) {
+      const metadata = parseMetadata(row.metadata);
+      const digests = Array.isArray(metadata.previewDigests) ? metadata.previewDigests : [];
+      for (const digest of digests) {
+        if (!digest?.id) {
+          continue;
+        }
+        collected.push({
+          entityType: row.entity_type,
+          metricDate: row.metric_date,
+          searches: Number(row.searches ?? 0),
+          digest
+        });
+        if (collected.length >= limit) {
+          return collected.slice(0, limit);
+        }
+      }
+    }
+
+    return collected.slice(0, limit);
   }
 }

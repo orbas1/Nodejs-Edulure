@@ -78,6 +78,30 @@ export default function MainLayout() {
     [navigate]
   );
 
+  const handleSuggestionSelect = useCallback(
+    (suggestion) => {
+      if (!suggestion) {
+        return false;
+      }
+      trackNavigationSelect('global-search-suggestion', {
+        origin: 'main-shell',
+        type: suggestion.type,
+        label: suggestion.label
+      });
+      if (suggestion.target?.entityType && suggestion.target?.entityId) {
+        navigate(
+          `/explorer?entity=${encodeURIComponent(suggestion.target.entityType)}&highlight=${encodeURIComponent(suggestion.target.entityId)}`
+        );
+        return false;
+      }
+      if (suggestion.query) {
+        handleSearchSubmit(suggestion.query);
+      }
+      return false;
+    },
+    [handleSearchSubmit, navigate]
+  );
+
   const handleOpenNotifications = useCallback(() => {
     setNotificationsOpen(true);
     notifications.forEach((notification) => {
@@ -110,6 +134,7 @@ export default function MainLayout() {
         searchValue={searchTerm}
         onSearchChange={(value) => setSearchTerm(value)}
         onSearchSubmit={handleSearchSubmit}
+        onSuggestionSelect={handleSuggestionSelect}
         searchLoading={false}
         notificationCount={notificationCount}
         presence={presence}
