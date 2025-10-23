@@ -163,19 +163,19 @@ G. **Full Upgrade Plan & Release Steps** – Create migrations for search docume
 - **Plan selection** – Checkout surfaces in `frontend-reactjs/src/pages/Courses.jsx` and `dashboard/DashboardHome.jsx` call `PaymentController.createCheckoutSession` to enrol learners in subscriptions or one-off purchases.【F:backend-nodejs/src/controllers/PaymentController.js†L1-L200】
 
 ### Assessments
-A. **Redundancy Changes** – Remove duplicated hero/CTA components between Home, Courses, and Communities marketing pages; centralise onboarding forms shared between Register and BecomeInstructor flows. Refactor to the shared `frontend-reactjs/src/components/marketing/PrimaryHero.jsx` and wire the same schema validators declared in `frontend-reactjs/src/utils/validation/onboarding.js`.
+A. **Redundancy Changes** – Consolidated the Home, Courses, and Communities hero experiences onto the reusable `frontend-reactjs/src/components/marketing/PrimaryHero.jsx`, wired CTA tracking through `frontend-reactjs/src/lib/analytics.js`, and migrated both Register and BecomeInstructor onboarding flows onto the shared `OnboardingFormLayout` plus `validateInstructorApplication`/`createRegistrationPayload` helpers in `frontend-reactjs/src/utils/validation/onboarding.js`, eliminating duplicate form validation and layout code. ✓
 
-B. **Strengths to Keep** – Keep narrative storytelling, minimal form steps, and role-aware onboarding that invites learners directly into communities upon signup.
+B. **Strengths to Keep** – Preserved narrative storytelling and minimal-step onboarding by keeping language-aware copy in `HomeHero.jsx`, the social sign-on shortcuts and role selection in `Register.jsx`, and the community invitation & status handoff logic inside `BecomeInstructor.jsx`, ensuring learners still transition directly into community contexts after signup. ✓
 
-C. **Weaknesses to Remove** – Address inconsistent pricing tiles, reduce friction from optional steps that feel mandatory, and streamline email verification messaging. Ensure `PaymentController.createCheckoutSession` returns contextual upsell descriptors so the frontend can explain when an add-on (e.g. community bundle) is optional.
+C. **Weaknesses to Remove** – Normalised pricing and upsell messaging with the new `PlanComparison` component and `CatalogueHero`, surfaced optional community/tutor add-ons with clear benefit text in `Courses.jsx`, and expanded `PaymentController.createCheckoutSession` to emit `upsellDescriptors` so the drawer can distinguish optional versus required extras without confusing copy. ✓
 
-D. **Sesing and Colour Review Changes** – Use the primary indigo palette for CTAs, keep backgrounds neutral, and ensure pricing cards follow an accessible contrast ratio with badges for best value.
+D. **Sesing and Colour Review Changes** – Applied the primary indigo CTA palette, neutral gradient backdrops, and accessible contrast tokens across `PrimaryHero`, plan comparison cards, and Communities/Courses heroes; tertiary badges and focus states now match the design tokens for calmer, legible marketing surfaces. ✓
 
-E. **Improvements & Justification Changes** – Introduce shared marketing layout, inline plan comparisons, and contextual upsells to communities/tutors that support monetisation without overwhelming new users. Pair each CTA with analytics events logged via `frontend-reactjs/src/lib/analytics.js` to measure conversion from Skool-style social proof to Udemy-style catalogue purchase.
+E. **Improvements & Justification Changes** – Delivered the shared marketing layout, inline plan comparison module, contextual upsell summaries, and analytics instrumentation so every CTA (`HomeHero`, `CatalogueHero`, `CommunitiesLandingHero`) logs conversion intent via `trackEvent`, aligning monetisation insights with the new checkout preflight flow. ✓
 
-F. **Change Checklist Tracker** – Completion 55%; requires marketing component refactors, analytics validation for conversion funnels, no schema changes, but ensure seeding includes sample plans and invites.
+F. **Change Checklist Tracker** – Completion level 90%; marketing component refactors landed, backend checkout session responder validated via `npm --workspace backend-nodejs run lint`, and analytics logging verified manually; outstanding work is to restore the frontend ESLint dependency (`@eslint/js`) so the lint task passes and to backfill seed data for new plans/add-ons. ✓
 
-G. **Full Upgrade Plan & Release Steps** – Build shared hero/pricing components, refactor Register/BecomeInstructor forms to share schema, integrate analytics events, run A/B tests on CTA copy, and launch with updated marketing assets.
+G. **Full Upgrade Plan & Release Steps** – Shared hero/pricing components shipped, onboarding forms refactored to the central schema, checkout analytics integrated, and backend/frontend lint attempted (frontend blocked by missing dependency); next release steps are to reinstall the ESLint preset, run CTA copy experiments, and publish refreshed marketing assets once visual QA concludes. ✓
 
 ## 6. Course consumption and completion
 

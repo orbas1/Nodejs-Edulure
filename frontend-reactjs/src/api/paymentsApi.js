@@ -52,6 +52,20 @@ export function createPaymentIntent({ token, payload, signal } = {}) {
     .then((response) => response?.data ?? null);
 }
 
+export function createCheckoutSession({ token, payload, signal } = {}) {
+  ensureToken(token);
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Checkout details are required to start a session');
+  }
+
+  return httpClient
+    .post('/payments/checkout-session', payload, {
+      token,
+      signal
+    })
+    .then((response) => response?.data ?? null);
+}
+
 export function capturePayPalOrder({ token, paymentId, signal } = {}) {
   ensureToken(token);
   if (!paymentId) {
@@ -102,6 +116,7 @@ export async function listPaymentIntents({ token, params, signal } = {}) {
 
 export const paymentsApi = {
   createPaymentIntent,
+  createCheckoutSession,
   capturePayPalOrder,
   refundPayment,
   listPaymentIntents

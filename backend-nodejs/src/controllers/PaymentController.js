@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import Joi from 'joi';
 
 import PaymentCouponModel from '../models/PaymentCouponModel.js';
@@ -14,11 +15,39 @@ const lineItemSchema = Joi.object({
   metadata: Joi.object().optional()
 });
 
+const checkoutPrimaryItemSchema = lineItemSchema.keys({
+  name: Joi.string().max(120).required(),
+  quantity: Joi.number().integer().min(1).max(100).default(1)
+});
+
+const checkoutAddonSchema = lineItemSchema.keys({
+  id: Joi.string().max(120).required(),
+  name: Joi.string().max(120).required(),
+  optional: Joi.boolean().default(true),
+  recommended: Joi.boolean().default(false),
+  benefit: Joi.string().max(180).allow('', null).optional(),
+  currency: Joi.string().length(3).uppercase().optional(),
+  quantity: Joi.number().integer().min(1).max(100).default(1)
+});
+
 const entitySchema = Joi.object({
   id: Joi.string().max(120).required(),
   type: Joi.string().max(60).required(),
   name: Joi.string().max(120).optional(),
   description: Joi.string().max(255).optional()
+});
+
+const checkoutContextSchema = Joi.object({
+  hasActiveCommunityAccess: Joi.boolean().optional()
+}).default({});
+
+const checkoutSessionSchema = Joi.object({
+  currency: Joi.string().length(3).uppercase().required(),
+  primaryItem: checkoutPrimaryItemSchema.required(),
+  addons: Joi.array().items(checkoutAddonSchema).default([]),
+  entity: entitySchema.required(),
+  context: checkoutContextSchema,
+  metadata: Joi.object().optional()
 });
 
 const paypalSchema = Joi.object({
@@ -98,6 +127,88 @@ export default class PaymentController {
         data: result,
         message: 'Payment intent created',
         status: 201
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async createCheckoutSession(req, res, next) {
+    try {
+      const payload = await checkoutSessionSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const { primaryItem, addons, currency, entity, context, metadata } = payload;
+      const primaryQuantity = primaryItem.quantity ?? 1;
+      const primaryUnitAmount = primaryItem.unitAmount ?? 0;
+      const subtotal = primaryUnitAmount * primaryQuantity;
+
+      const normalizedAddons = addons.map((addon) => {
+        const quantity = addon.quantity ?? 1;
+        const unitAmount = addon.unitAmount ?? 0;
+        return {
+          id: addon.id,
+          name: addon.name,
+          description: addon.description ?? '',
+          unitAmount,
+          quantity,
+          optional: addon.optional !== false,
+          recommended: Boolean(addon.recommended),
+          benefit: addon.benefit ?? null,
+          currency: addon.currency ?? currency,
+          metadata: addon.metadata ?? {},
+          totalAmount: unitAmount * quantity
+        };
+      });
+
+      const requiredAddons = normalizedAddons.filter((addon) => addon.optional === false);
+      const optionalAddons = normalizedAddons.filter((addon) => addon.optional !== false);
+
+      const requiredAddonsTotal = requiredAddons.reduce((sum, addon) => sum + addon.totalAmount, 0);
+      const optionalAddonsTotal = optionalAddons.reduce((sum, addon) => sum + addon.totalAmount, 0);
+
+      const upsellDescriptors = optionalAddons.map((addon) => ({
+        addonId: addon.id,
+        title: addon.name,
+        description: addon.description,
+        optional: true,
+        recommended: addon.recommended,
+        benefit:
+          addon.benefit ??
+          (addon.recommended
+            ? 'Most cohorts activate this bundle to boost engagement.'
+            : 'Optional upgrade to extend the learning experience.'),
+        price: addon.unitAmount,
+        currency: addon.currency ?? currency
+      }));
+
+      const sessionId = `chk_${randomUUID()}`;
+
+      return success(res, {
+        data: {
+          sessionId,
+          currency,
+          entity,
+          context,
+          metadata: metadata ?? {},
+          primaryItem: {
+            ...primaryItem,
+            quantity: primaryQuantity,
+            totalAmount: subtotal
+          },
+          addons: normalizedAddons,
+          subtotal,
+          total: subtotal + requiredAddonsTotal,
+          optionalUpsellTotal: optionalAddonsTotal,
+          upsellDescriptors
+        },
+        message: 'Checkout session initialised'
       });
     } catch (error) {
       if (error.isJoi) {
