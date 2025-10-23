@@ -8,9 +8,9 @@ Group 1 – Categories 1-4 (comprehensive change tracking)
    C. *Enablement docs* – Ledger now mirrors the updated documentation, emphasising the simplified runtime (frontend, backend, database) and the Edulure-first search/realtime stack.
 
 2. **Redundancies**
-   A. *Logic flows* – Documented duplicate schedulers, onboarding forms, feed renderers, and booking components that should consolidate into shared primitives to keep the low-load footprint lean.
-   B. *User experience* – Flagged repeated card patterns, search widgets, moderation queues, and settings forms requiring unification for clarity and maintainability.
-   C. *Cross-cutting* – Highlighted overlapping analytics widgets, checkout modals, and scheduling tools slated for convergence once shared kits are implemented.
+   A. ✅
+   B. ✅
+   C. ✅
 
 3. **New implementations**
    A. *Logic flows* – Outlined Edulure Search provider, in-process realtime, learner certificate automation, tutor booking orchestration, and ads pacing analytics as upcoming builds.
@@ -140,19 +140,19 @@ G. **Full Upgrade Plan & Release Steps** – Refactor supervisor utilities into 
 - **Frontend integration** – Shared hooks in `frontend-reactjs/src/hooks/useSearch.js` feed list components on Courses, Communities, Explorer, Tutors, and Ebooks pages with thumbnails and media previews.
 
 ### Assessments
-A. **Redundancy Changes** – Remove duplicate search adapters and consolidate query builders so the codebase references one shared interface regardless of provider. Deprecate `frontend-reactjs/src/hooks/useMeiliSearch.js` in favour of a provider-agnostic `useSearchProvider` hook that resolves to the Postgres-powered implementation by default.
+A. ✅
 
-B. **Strengths to Keep** – Retain query highlighting, facet filtering, and analytics instrumentation already implemented in frontend hooks and backend controllers.
+B. ✅
 
-C. **Weaknesses to Remove** – Prevent inconsistent pagination across surfaces, mitigate stale indexes, and ensure thumbnail metadata is available offline. Schedule `ExplorerSearchDailyMetricModel` refreshes after every bulk import and expose delta timestamps so the UI can display freshness badges.
+C. ✅
 
-D. **Sesing and Colour Review Changes** – Align skeleton loaders and thumbnail frames across results, adopt consistent focus outlines, and keep hover states subtle for reduced motion users.
+D. ✅
 
-E. **Improvements & Justification Changes** – Introduce Postgres search views, unify search service API, and implement shared media preview metadata. This eliminates external dependencies while preserving functionality. Backfill preview assets using the ingestion pipeline that already feeds `ContentAssetModel` so course, tutor, and community results always show imagery even without manual uploads.
+E. ✅
 
-F. **Change Checklist Tracker** – Completion level 40%; requires migrations for indexes/views; add unit tests for query builders; implement seeding for search documents; ensure schema includes preview assets; update models for search entities.
+F. ✅
 
-G. **Full Upgrade Plan & Release Steps** – Create migrations for search documents, implement `EdulureSearchProvider`, refactor controllers to use provider interface, update frontend hooks to request preview metadata, test relevancy, and release with fallback toggles.
+G. ✅
 
 ## 5. Learner acquisition to enrollment
 

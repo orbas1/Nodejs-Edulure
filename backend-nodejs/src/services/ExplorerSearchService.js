@@ -1,81 +1,16 @@
 import logger from '../config/logger.js';
-import { recordSearchOperation } from '../observability/metrics.js';
-import { INDEX_DEFINITIONS, searchClusterService } from './SearchClusterService.js';
-import { buildBounds, resolveCountryCoordinates } from '../utils/geo.js';
+import getSearchProvider from './search/searchProviders.js';
+import { SUPPORTED_ENTITIES } from './search/entityConfig.js';
 import AdsPlacementService from './AdsPlacementService.js';
 
-const ENTITY_CONFIG = {
-  communities: {
-    facets: ['visibility', 'category', 'timezone', 'country', 'languages', 'tags'],
-    sorts: {
-      trending: ['desc(trendScore)'],
-      members: ['desc(memberCount)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'trending'
-  },
-  courses: {
-    facets: ['category', 'level', 'deliveryFormat', 'languages', 'price.currency', 'tags'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      newest: ['desc(releaseAt)'],
-      priceLow: ['asc(price.amount)'],
-      priceHigh: ['desc(price.amount)']
-    },
-    defaultSort: 'relevance'
-  },
-  ebooks: {
-    facets: ['categories', 'languages', 'price.currency', 'tags'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      newest: ['desc(releaseAt)'],
-      readingTime: ['asc(readingTimeMinutes)']
-    },
-    defaultSort: 'relevance'
-  },
-  tutors: {
-    facets: ['languages', 'skills', 'country', 'isVerified'],
-    sorts: {
-      relevance: [],
-      rating: ['desc(rating.average)', 'desc(rating.count)'],
-      priceLow: ['asc(hourlyRate.amount)'],
-      priceHigh: ['desc(hourlyRate.amount)'],
-      responseTime: ['asc(responseTimeMinutes)']
-    },
-    defaultSort: 'relevance'
-  },
-  profiles: {
-    facets: ['role', 'languages', 'country', 'communities', 'badges'],
-    sorts: {
-      relevance: [],
-      followers: ['desc(followerCount)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'relevance'
-  },
-  ads: {
-    facets: ['status', 'objective', 'targeting.audiences', 'targeting.locations'],
-    sorts: {
-      performance: ['desc(performanceScore)', 'desc(ctr)'],
-      spend: ['desc(spend.total)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'performance'
-  },
-  events: {
-    facets: ['type', 'status', 'timezone', 'isTicketed', 'price.currency'],
-    sorts: {
-      upcoming: ['asc(startAt)'],
-      newest: ['desc(createdAt)']
-    },
-    defaultSort: 'upcoming'
+function sanitiseArray(values) {
+  if (!Array.isArray(values)) {
+    return [];
   }
-};
-
-const SUPPORTED_ENTITIES = Object.keys(ENTITY_CONFIG);
-const INDEX_UIDS = new Map(INDEX_DEFINITIONS.map((definition) => [definition.name, definition.uid]));
+  return values
+    .map((value) => (typeof value === 'string' ? value.trim() : value))
+    .filter((value) => value !== null && value !== undefined && value !== '');
+}
 
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
@@ -110,145 +45,19 @@ function formatRating(rating) {
   return `${average}★${count}`;
 }
 
-function sanitiseArray(values) {
-  if (!Array.isArray(values)) {
-    return [];
-  }
-  return values
-    .map((value) => (typeof value === 'string' ? value.trim() : value))
-    .filter((value) => value !== null && value !== undefined && value !== '');
-}
-
-function mergeFilterValue(baseValue, overrideValue) {
-  if (overrideValue === undefined || overrideValue === null) {
-    return baseValue;
-  }
-  if (Array.isArray(baseValue) && Array.isArray(overrideValue)) {
-    return overrideValue.length ? overrideValue : baseValue;
-  }
-  if (typeof baseValue === 'object' && typeof overrideValue === 'object' && !Array.isArray(baseValue)) {
-    return { ...baseValue, ...overrideValue };
-  }
-  return overrideValue;
-}
-
-function encodeValue(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === 'boolean') {
-    return value ? 'true' : 'false';
-  }
-  if (value instanceof Date) {
-    return `"${value.toISOString()}"`;
-  }
-  return `"${String(value).replace(/"/g, '\\"')}"`;
-}
-
-function buildFilterClauses(filters) {
-  if (!filters || typeof filters !== 'object') {
-    return null;
-  }
-  const clauses = [];
-  for (const [attribute, rawValue] of Object.entries(filters)) {
-    if (rawValue === null || rawValue === undefined || rawValue === '') {
-      continue;
-    }
-    if (Array.isArray(rawValue)) {
-      const values = sanitiseArray(rawValue);
-      if (!values.length) {
-        continue;
-      }
-      const encoded = values.map((value) => encodeValue(value)).filter((value) => value !== null);
-      if (!encoded.length) {
-        continue;
-      }
-      clauses.push(`${attribute} IN [${encoded.join(', ')}]`);
-      continue;
-    }
-    if (typeof rawValue === 'object') {
-      const { min, max, equals, not } = rawValue;
-      if (min !== undefined && min !== null) {
-        const encodedMin = encodeValue(min);
-        if (encodedMin !== null) {
-          clauses.push(`${attribute} >= ${encodedMin}`);
-        }
-      }
-      if (max !== undefined && max !== null) {
-        const encodedMax = encodeValue(max);
-        if (encodedMax !== null) {
-          clauses.push(`${attribute} <= ${encodedMax}`);
-        }
-      }
-      if (equals !== undefined && equals !== null) {
-        const encodedEquals = encodeValue(equals);
-        if (encodedEquals !== null) {
-          clauses.push(`${attribute} = ${encodedEquals}`);
-        }
-      }
-      if (not !== undefined && not !== null) {
-        const encodedNot = encodeValue(not);
-        if (encodedNot !== null) {
-          clauses.push(`${attribute} != ${encodedNot}`);
-        }
-      }
-      continue;
-    }
-    if (typeof rawValue === 'boolean') {
-      clauses.push(`${attribute} = ${rawValue ? 'true' : 'false'}`);
-      continue;
-    }
-    const encoded = encodeValue(rawValue);
-    if (encoded !== null) {
-      clauses.push(`${attribute} = ${encoded}`);
-    }
-  }
-  return clauses.length ? clauses : null;
-}
-
 function deriveGeo(entity, hit) {
-  if (!hit) {
+  if (!hit || typeof hit !== 'object') {
     return null;
   }
-  if (entity === 'communities') {
-    const country = hit.country ?? hit.metadata?.country ?? null;
-    const resolved = resolveCountryCoordinates(country);
-    if (resolved) {
-      return {
-        latitude: resolved.latitude,
-        longitude: resolved.longitude,
-        label: hit.name,
-        country: resolved.code,
-        context: 'community'
-      };
-    }
+  const geo = hit.geo ?? hit.raw?.geo ?? {};
+  if (typeof geo.lat === 'number' && typeof geo.lng === 'number') {
+    return geo;
   }
-  if (entity === 'tutors') {
-    const resolved = resolveCountryCoordinates(hit.country ?? hit.metadata?.country ?? null);
-    if (resolved) {
-      return {
-        latitude: resolved.latitude,
-        longitude: resolved.longitude,
-        label: hit.displayName,
-        country: resolved.code,
-        context: 'tutor'
-      };
-    }
+  if (entity === 'communities' && geo?.latitude && geo?.longitude) {
+    return { lat: Number(geo.latitude), lng: Number(geo.longitude) };
   }
-  if (entity === 'events') {
-    const resolved = resolveCountryCoordinates(hit.country ?? hit.communityCountry ?? null);
-    if (resolved) {
-      return {
-        latitude: resolved.latitude,
-        longitude: resolved.longitude,
-        label: hit.title,
-        country: resolved.code,
-        context: 'event'
-      };
-    }
+  if (entity === 'events' && geo?.lat && geo?.lng) {
+    return { lat: Number(geo.lat), lng: Number(geo.lng) };
   }
   return null;
 }
@@ -346,7 +155,11 @@ function formatHit(entity, hit) {
     }
     case 'profiles': {
       base.title = hit.displayName;
-      base.subtitle = [hit.headline, hit.role, formatNumber(hit.followerCount) && `${formatNumber(hit.followerCount)} followers`]
+      base.subtitle = [
+        hit.headline,
+        hit.role,
+        hit.followerCount ? `${formatNumber(hit.followerCount)} followers` : null
+      ]
         .filter(Boolean)
         .join(' · ');
       base.description = hit.bio?.slice(0, 160) ?? null;
@@ -394,148 +207,81 @@ function formatHit(entity, hit) {
 }
 
 export class ExplorerSearchService {
-  constructor({ clusterService = searchClusterService, loggerInstance = logger } = {}) {
-    this.clusterService = clusterService;
+  constructor({ provider = getSearchProvider(), loggerInstance = logger } = {}) {
+    this.provider = provider;
     this.logger = loggerInstance;
   }
 
   getSupportedEntities() {
+    if (typeof this.provider.getSupportedEntities === 'function') {
+      return this.provider.getSupportedEntities();
+    }
     return SUPPORTED_ENTITIES;
   }
 
   normaliseEntityTypes(entities) {
     if (!entities || !Array.isArray(entities) || !entities.length) {
-      return SUPPORTED_ENTITIES;
+      return this.getSupportedEntities();
     }
+    const supported = new Set(this.getSupportedEntities());
     const filtered = entities
       .map((entry) => (typeof entry === 'string' ? entry.trim().toLowerCase() : null))
-      .filter((entry) => entry && SUPPORTED_ENTITIES.includes(entry));
-    return filtered.length ? filtered : SUPPORTED_ENTITIES;
-  }
-
-  buildSort(entity, sortPreference) {
-    const config = ENTITY_CONFIG[entity];
-    if (!config) {
-      return undefined;
-    }
-    if (!sortPreference || (Array.isArray(sortPreference) && sortPreference.length === 0)) {
-      const defaultKey = config.defaultSort;
-      const defaultSort = config.sorts[defaultKey];
-      return defaultSort && defaultSort.length ? defaultSort : undefined;
-    }
-    if (typeof sortPreference === 'string') {
-      if (config.sorts[sortPreference]) {
-        const candidate = config.sorts[sortPreference];
-        return candidate && candidate.length ? candidate : undefined;
-      }
-      if (sortPreference.includes(':')) {
-        return [sortPreference];
-      }
-    }
-    if (Array.isArray(sortPreference)) {
-      return sortPreference;
-    }
-    if (typeof sortPreference === 'object' && sortPreference.field) {
-      const direction = sortPreference.direction ?? 'asc';
-      return [`${sortPreference.field}:${direction}`];
-    }
-    return undefined;
-  }
-
-  buildFilters(entity, filters = {}, globalFilters = {}) {
-    const merged = { ...globalFilters };
-    const entityFilters = filters?.[entity] ?? filters ?? {};
-    for (const [key, value] of Object.entries(entityFilters)) {
-      merged[key] = mergeFilterValue(merged[key], value);
-    }
-    return merged;
-  }
-
-  async searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }) {
-    const indexUid = INDEX_UIDS.get(entity);
-    if (!indexUid) {
-      throw new Error(`Explorer search index missing for entity "${entity}"`);
-    }
-    const client = this.clusterService.searchClient;
-    if (!client) {
-      const error = new Error('Search cluster is not initialised');
-      error.status = 503;
-      throw error;
-    }
-
-    const index = client.index(indexUid);
-    const effectiveFilters = this.buildFilters(entity, filters, globalFilters);
-    const meiliFilters = buildFilterClauses(effectiveFilters);
-    const sortDirectives = this.buildSort(entity, sort?.[entity] ?? sort);
-    const facets = includeFacets ? ENTITY_CONFIG[entity].facets : undefined;
-
-    const searchOptions = {
-      offset: (page - 1) * perPage,
-      limit: perPage,
-      filter: meiliFilters ?? undefined,
-      facets,
-      sort: sortDirectives && sortDirectives.length ? sortDirectives : undefined
-    };
-
-    const result = await recordSearchOperation('explorer_query', () => index.search(query ?? '', searchOptions));
-
-    const hits = Array.isArray(result.hits) ? result.hits.map((hit) => formatHit(entity, hit)) : [];
-    const markers = hits.map((hit) => hit.geo).filter(Boolean);
-    return {
-      entity,
-      hits,
-      rawHits: result.hits,
-      totalHits: result.estimatedTotalHits ?? hits.length,
-      processingTimeMs: result.processingTimeMs ?? 0,
-      query: result.query,
-      page,
-      perPage,
-      sort: sortDirectives,
-      filter: meiliFilters,
-      facets: result.facetDistribution ?? {},
-      markers
-    };
+      .filter((entry) => entry && supported.has(entry));
+    return filtered.length ? filtered : this.getSupportedEntities();
   }
 
   async search({
     query,
     entityTypes,
-    page = 1,
-    perPage = 10,
-    filters = {},
-    globalFilters = {},
-    sort = {},
+    page,
+    perPage,
+    filters,
+    globalFilters,
+    sort,
     includeFacets = true
   } = {}) {
     const resolvedEntities = this.normaliseEntityTypes(entityTypes);
-    const tasks = resolvedEntities.map((entity) =>
-      this.searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets })
-    );
+    const providerResult = await this.provider.search({
+      query,
+      entityTypes: resolvedEntities,
+      page,
+      perPage,
+      filters,
+      globalFilters,
+      sort,
+      includeFacets
+    });
 
-    const results = await Promise.all(tasks);
-    const byEntity = Object.fromEntries(results.map((result) => [result.entity, result]));
-    const allMarkers = results.flatMap((result) => result.markers);
-    const bounds = buildBounds(allMarkers);
+    const results = {};
+    for (const entity of resolvedEntities) {
+      const entityResult = providerResult.results?.[entity] ?? {
+        entity,
+        hits: [],
+        totalHits: 0,
+        facets: {},
+        markers: []
+      };
+      const rawHits = entityResult.hits ?? [];
+      results[entity] = {
+        ...entityResult,
+        hits: rawHits.map((hit) => formatHit(entity, hit)),
+        rawHits
+      };
+    }
 
     const adsPlacements = await AdsPlacementService.placementsForSearch({
-      query,
+      query: providerResult.query,
       entities: resolvedEntities
     });
 
     return {
-      query,
-      page,
-      perPage,
+      query: providerResult.query,
+      page: providerResult.page,
+      perPage: providerResult.perPage,
       entities: resolvedEntities,
-      results: byEntity,
-      totals: resolvedEntities.reduce((acc, entity) => {
-        acc[entity] = byEntity[entity]?.totalHits ?? 0;
-        return acc;
-      }, {}),
-      markers: {
-        items: allMarkers,
-        bounds
-      },
+      results,
+      totals: providerResult.totals ?? {},
+      markers: providerResult.markers ?? { items: [], bounds: null },
       adsPlacements
     };
   }

@@ -148,56 +148,22 @@ Set `MONETIZATION_RECONCILIATION_TENANTS` to a comma-separated allow list when o
 
 ### Explorer search environment
 
-The explorer, recommendation, and ads surfaces rely on a hardened Meilisearch cluster. Configure the following variables to
-provision the cluster and secure API access:
+Explorer, recommendation, and ads surfaces now query the Postgres-backed `search_documents` table through the bundled database search provider. Configure the runtime with:
 
-- `MEILISEARCH_HOSTS` – comma-separated list of primary/admin hosts (include protocol and port).
-- `MEILISEARCH_REPLICA_HOSTS` – optional replica nodes for failover during write operations.
-- `MEILISEARCH_SEARCH_HOSTS` – read endpoints consumed by web/mobile clients. Defaults to the union of primary + replica hosts.
-- `MEILISEARCH_ADMIN_API_KEY` – admin/master API key used for index provisioning and security audits. Store in a secret manager.
-- `MEILISEARCH_SEARCH_API_KEY` – read-only key distributed to clients. The backend will refuse to start if this key has write
-  permissions.
-- `MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS` – cadence for cluster health monitoring and Prometheus reporting.
-- `MEILISEARCH_REQUEST_TIMEOUT_MS` – timeout for administrative calls (index bootstrap, health checks, snapshots).
-- `MEILISEARCH_INDEX_PREFIX` – isolates indexes per environment/tenant (`edulure`, `edulure-staging`, etc.).
-- `MEILISEARCH_ALLOWED_IPS` – IP/CIDR list exposed to operations for allow-listing reverse proxies hitting the cluster.
+- `SEARCH_PROVIDER` – provider key (`database` is the default).
+- `SEARCH_DEFAULT_PAGE_SIZE` / `SEARCH_MAX_PAGE_SIZE` – Explorer pagination defaults and caps.
+- `SEARCH_INGESTION_BATCH_SIZE` – rows fetched per entity batch (default `500`).
+- `SEARCH_INGESTION_CONCURRENCY` – how many entity pipelines run in parallel (default `2`).
+- `SEARCH_INGESTION_DELETE_BEFORE_REINDEX` – when `true` (default) a full rebuild clears existing documents before backfilling.
+- `SEARCH_INGESTION_SCHEDULE` / `SEARCH_INGESTION_TIMEZONE` – cron expression + timezone for scheduled refreshes.
 
-Bootstrap or audit the cluster at any time with:
+The worker starts `RefreshSearchDocumentsJob`, which invokes `SearchIngestionService.fullReindex()` on the configured cadence to hydrate search documents for communities, courses, tutors, ads, and supporting entities. Trigger a manual refresh from a REPL or deployment script with:
 
 ```bash
-npm run search:provision
-# Append --snapshot to trigger a Meilisearch snapshot once indexes are synchronised
-npm run search:provision -- --snapshot
+node --eval "import('./src/services/SearchIngestionService.js').then(({ default: svc }) => svc.fullReindex())"
 ```
 
-The command ensures explorer indexes exist with production settings, verifies API key privileges, runs live health checks across
-primary/replica/read nodes, and (optionally) requests a snapshot for off-site backups. Prometheus now exposes
-`edulure_search_operation_duration_seconds`, `edulure_search_node_health`, and `edulure_search_index_ready` so alerting can
-detect unhealthy nodes or drifted index definitions.
-
-Explorer ingestion is orchestrated by `SearchIngestionService`. Configure the following to tune throughput and retention:
-
-- `SEARCH_INGESTION_BATCH_SIZE` – number of records fetched per entity batch (default `500`).
-- `SEARCH_INGESTION_CONCURRENCY` – how many indexes to process in parallel during a reindex (default `2`).
-- `SEARCH_INGESTION_DELETE_BEFORE_REINDEX` – when `true` (default) a full rebuild clears existing documents before ingestion;
-  incremental runs (`--since`) always append/update in place regardless of this flag.
-
-Trigger a full or incremental rebuild with:
-
-```bash
-# Full rebuild (deletes and repopulates every explorer index)
-npm run search:reindex
-
-# Incremental sync – only reindex documents changed in the last 24 hours
-npm run search:reindex -- --since="2024-11-01T00:00:00Z"
-
-# Focus on specific indexes (e.g. courses + ads)
-npm run search:reindex -- --indexes=courses,ads
-```
-
-Successful runs emit Prometheus metrics `edulure_search_ingestion_duration_seconds`,
-`edulure_search_ingestion_documents_total`, `edulure_search_ingestion_errors_total`, and
-`edulure_search_ingestion_last_run_timestamp` so dashboards and alerts can track coverage, throughput, and failure causes.
+Prometheus now focuses on database signals: `edulure_search_operation_duration_seconds`, `edulure_search_ingestion_duration_seconds`, `edulure_search_ingestion_documents_total`, `edulure_search_ingestion_errors_total`, and `edulure_search_ingestion_last_run_timestamp`. Pair these with scheduler gauges (`edulure_scheduler_job_running`, `edulure_scheduler_job_duration_seconds`) to ensure the ingestion loop remains healthy.
 
 ### Payments & finance environment
 

@@ -44,6 +44,24 @@ const httpRequestErrors = new promClient.Counter({
   labelNames: ['method', 'route', 'status_code']
 });
 
+const schedulerJobDurationSeconds = new promClient.Gauge({
+  name: 'edulure_scheduler_job_duration_seconds',
+  help: 'Duration of the most recent background job execution in seconds',
+  labelNames: ['job']
+});
+
+const schedulerJobRunning = new promClient.Gauge({
+  name: 'edulure_scheduler_job_running',
+  help: 'Flag indicating if a background job is currently running',
+  labelNames: ['job']
+});
+
+const realtimeActiveConnections = new promClient.Gauge({
+  name: 'edulure_realtime_active_connections',
+  help: 'Number of active realtime connections grouped by scope',
+  labelNames: ['scope']
+});
+
 const featureGateDecisionsTotal = new promClient.Counter({
   name: 'edulure_feature_flag_gate_decisions_total',
   help: 'Feature flag gate outcomes for API routes',
@@ -225,27 +243,9 @@ const governanceCommunicationStatusGauge = new promClient.Gauge({
 
 const searchOperationDurationSeconds = new promClient.Histogram({
   name: 'edulure_search_operation_duration_seconds',
-  help: 'Duration histogram for Meilisearch administrative operations',
+  help: 'Duration histogram for Edulure search provider database operations',
   labelNames: ['operation', 'status'],
   buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5]
-});
-
-const searchNodeHealthGauge = new promClient.Gauge({
-  name: 'edulure_search_node_health',
-  help: 'Health state of Meilisearch nodes (1 healthy, 0 unhealthy)',
-  labelNames: ['host', 'role']
-});
-
-const searchNodeLastCheckGauge = new promClient.Gauge({
-  name: 'edulure_search_node_last_check_timestamp',
-  help: 'Unix timestamp of the last successful Meilisearch healthcheck per node',
-  labelNames: ['host', 'role']
-});
-
-const searchIndexReadyGauge = new promClient.Gauge({
-  name: 'edulure_search_index_ready',
-  help: 'Indicates whether explorer indexes are provisioned (1 ready, 0 pending)',
-  labelNames: ['index']
 });
 
 const searchIngestionDurationSeconds = new promClient.Histogram({
@@ -353,9 +353,6 @@ registry.registerMetric(telemetryExportEventsTotal);
 registry.registerMetric(telemetryExportDurationSeconds);
 registry.registerMetric(telemetryFreshnessLagSeconds);
 registry.registerMetric(searchOperationDurationSeconds);
-registry.registerMetric(searchNodeHealthGauge);
-registry.registerMetric(searchNodeLastCheckGauge);
-registry.registerMetric(searchIndexReadyGauge);
 registry.registerMetric(searchIngestionDurationSeconds);
 registry.registerMetric(searchIngestionDocumentsTotal);
 registry.registerMetric(searchIngestionErrorsTotal);
@@ -599,6 +596,27 @@ export async function recordStorageOperation(operation, visibility, handler) {
   }
 }
 
+export function observeSchedulerDuration(job, durationSeconds) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+  schedulerJobDurationSeconds.set({ job }, durationSeconds);
+}
+
+export function setSchedulerActive(job, value) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+  schedulerJobRunning.set({ job }, value);
+}
+
+export function setRealtimeConnections(scope, value) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+  realtimeActiveConnections.set({ scope }, value);
+}
+
 export async function recordSearchOperation(operation, handler) {
   if (!env.observability.metrics.enabled) {
     return handler();
@@ -613,25 +631,6 @@ export async function recordSearchOperation(operation, handler) {
     endTimer({ operation, status: 'error' });
     throw error;
   }
-}
-
-export function updateSearchNodeHealth({ host, role, healthy }) {
-  if (!env.observability.metrics.enabled) {
-    return;
-  }
-
-  searchNodeHealthGauge.set({ host, role }, healthy ? 1 : 0);
-  if (healthy) {
-    searchNodeLastCheckGauge.set({ host, role }, Date.now() / 1000);
-  }
-}
-
-export function updateSearchIndexStatus(index, ready) {
-  if (!env.observability.metrics.enabled) {
-    return;
-  }
-
-  searchIndexReadyGauge.set({ index }, ready ? 1 : 0);
 }
 
 export function recordSearchIngestionRun({ index, documentCount, durationSeconds, status, error }) {

@@ -32,8 +32,6 @@
     "audit:dependencies": "npm audit --audit-level=moderate",
     "security:rotate-jwt": "node scripts/rotate-jwt-keys.js",
     "storage:provision": "node scripts/provision-r2-buckets.js",
-    "search:provision": "node scripts/provision-search-cluster.js",
-    "search:reindex": "node scripts/reindex-search-indexes.js",
     "docs:build": "node scripts/build-openapi-specs.js --clean",
     "db:erd": "node scripts/generate-erd.js"
   },
@@ -61,7 +59,6 @@
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "marked": "^16.4.1",
-    "meilisearch": "^0.37.0",
     "mime-types": "^2.1.35",
     "mysql2": "^3.9.7",
     "node-cron": "^3.0.3",

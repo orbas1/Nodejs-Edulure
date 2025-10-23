@@ -48,10 +48,13 @@ const BACKEND_FIELD_GROUPS = [
   },
   {
     title: 'Search',
-    description: 'Meilisearch cluster configuration for explorer and mail search.',
+    description: 'Database search provider configuration for explorer and mail search.',
     fields: [
-      { key: 'MEILISEARCH_HOSTS', label: 'Hosts', placeholder: 'http://127.0.0.1:7700' },
-      { key: 'MEILISEARCH_API_KEY', label: 'API key', placeholder: 'masterKey' }
+      { key: 'SEARCH_PROVIDER', label: 'Provider', placeholder: 'database' },
+      { key: 'SEARCH_DEFAULT_PAGE_SIZE', label: 'Default page size', placeholder: '10' },
+      { key: 'SEARCH_MAX_PAGE_SIZE', label: 'Max page size', placeholder: '50' },
+      { key: 'SEARCH_INGESTION_SCHEDULE', label: 'Ingestion schedule', placeholder: '*/30 * * * *' },
+      { key: 'SEARCH_INGESTION_TIMEZONE', label: 'Ingestion timezone', placeholder: 'UTC' }
     ]
   }
 ];

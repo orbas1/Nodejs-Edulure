@@ -233,7 +233,7 @@ export const featureFlagManifest = [
   {
     key: 'platform.api.v1.explorer',
     name: 'Platform API v1 – Search & Discovery',
-    description: 'Gates Explorer search, browse, and recommendation endpoints backed by Meilisearch.',
+    description: 'Gates Explorer search, browse, and recommendation endpoints backed by the database search provider.',
     enabled: true,
     killSwitch: false,
     rolloutStrategy: 'boolean',

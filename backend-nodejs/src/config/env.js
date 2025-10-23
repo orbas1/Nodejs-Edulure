@@ -577,41 +577,6 @@ function normalizeStatementDescriptor(descriptor) {
   return sanitized ? sanitized.toUpperCase() : null;
 }
 
-function normalizeHost(value) {
-  if (!value) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!/^https?:\/\//i.test(trimmed)) {
-    throw new Error(`Invalid Meilisearch host "${value}" – hosts must include http(s):// prefix.`);
-  }
-
-  return trimmed.replace(/\/+$/, '');
-}
-
-function parseHostList(value, { allowEmpty = false } = {}) {
-  const hosts = parseCsv(value ?? '')
-    .map((entry) => {
-      try {
-        return normalizeHost(entry);
-      } catch (error) {
-        if (allowEmpty) {
-          console.warn('Ignoring invalid Meilisearch host entry', { host: entry, reason: error.message });
-          return null;
-        }
-        throw error;
-      }
-    })
-    .filter(Boolean);
-
-  if (!hosts.length && !allowEmpty) {
-    throw new Error('At least one Meilisearch host must be configured.');
-  }
-
-  return Array.from(new Set(hosts));
-}
-
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -994,23 +959,9 @@ const envSchema = z
     SOCIAL_RECOMMENDATION_MAX_RESULTS: z.coerce.number().int().min(1).max(100).default(12),
     SOCIAL_RECOMMENDATION_REFRESH_MINUTES: z.coerce.number().int().min(5).max(24 * 60 * 7).default(360),
     SOCIAL_MUTE_DEFAULT_DURATION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
-    MEILISEARCH_HOSTS: z.string().min(1),
-    MEILISEARCH_REPLICA_HOSTS: z.string().optional(),
-    MEILISEARCH_SEARCH_HOSTS: z.string().optional(),
-    MEILISEARCH_ADMIN_API_KEY: z.string().min(16),
-    MEILISEARCH_SEARCH_API_KEY: z.string().min(16),
-    MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS: z.coerce
-      .number()
-      .int()
-      .min(10)
-      .max(3600)
-      .default(30),
-    MEILISEARCH_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(500).max(60000).default(5000),
-    MEILISEARCH_INDEX_PREFIX: z
-      .string()
-      .regex(/^[a-z0-9_-]+$/i, 'MEILISEARCH_INDEX_PREFIX may only contain letters, numbers, underscores, and dashes.')
-      .optional(),
-    MEILISEARCH_ALLOWED_IPS: z.string().optional(),
+    SEARCH_PROVIDER: z.string().default('database'),
+    SEARCH_DEFAULT_PAGE_SIZE: z.coerce.number().int().min(1).max(100).default(10),
+    SEARCH_MAX_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(50),
     TWILIO_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
     TWILIO_ACCOUNT_SID: z.string().min(10).optional(),
     TWILIO_AUTH_TOKEN: z.string().min(10).optional(),
@@ -1024,6 +975,8 @@ const envSchema = z
     SEARCH_INGESTION_BATCH_SIZE: z.coerce.number().int().min(25).max(2000).default(500),
     SEARCH_INGESTION_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
     SEARCH_INGESTION_DELETE_BEFORE_REINDEX: z.coerce.boolean().default(true),
+    SEARCH_INGESTION_SCHEDULE: z.string().default('*/30 * * * *'),
+    SEARCH_INGESTION_TIMEZONE: z.string().default('UTC'),
     BOOTSTRAP_MAX_RETRIES: z.coerce.number().int().min(1).max(10).default(5),
     BOOTSTRAP_RETRY_DELAY_MS: z.coerce.number().int().min(100).max(60000).default(2000),
     ENVIRONMENT_NAME: z.string().min(2).default(process.env.NODE_ENV ?? 'development'),
@@ -1147,11 +1100,11 @@ const envSchema = z
       });
     }
 
-    if (value.MEILISEARCH_ADMIN_API_KEY === value.MEILISEARCH_SEARCH_API_KEY) {
+    if (value.SEARCH_DEFAULT_PAGE_SIZE > value.SEARCH_MAX_PAGE_SIZE) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['MEILISEARCH_SEARCH_API_KEY'],
-        message: 'MEILISEARCH_SEARCH_API_KEY must be different from the admin API key.'
+        path: ['SEARCH_DEFAULT_PAGE_SIZE'],
+        message: 'SEARCH_DEFAULT_PAGE_SIZE cannot exceed SEARCH_MAX_PAGE_SIZE.'
       });
     }
   });
@@ -1164,34 +1117,6 @@ if (!parsed.success) {
 }
 
 const raw = parsed.data;
-
-let meilisearchHosts;
-let meilisearchReplicaHosts;
-let meilisearchSearchHosts;
-
-const allowMissingMeilisearchHosts = raw.NODE_ENV !== 'production';
-
-try {
-  meilisearchHosts = parseHostList(raw.MEILISEARCH_HOSTS, { allowEmpty: allowMissingMeilisearchHosts });
-  meilisearchReplicaHosts = parseHostList(raw.MEILISEARCH_REPLICA_HOSTS, { allowEmpty: true });
-  const defaultSearchHosts = [raw.MEILISEARCH_HOSTS, raw.MEILISEARCH_REPLICA_HOSTS]
-    .filter(Boolean)
-    .join(',');
-  meilisearchSearchHosts = parseHostList(
-    raw.MEILISEARCH_SEARCH_HOSTS ?? defaultSearchHosts,
-    { allowEmpty: allowMissingMeilisearchHosts }
-  );
-} catch (error) {
-  if (!allowMissingMeilisearchHosts) {
-    console.error('Invalid Meilisearch host configuration', error.message);
-    throw error;
-  }
-
-  console.warn('Disabling Meilisearch integration due to host configuration issues', error.message);
-  meilisearchHosts = [];
-  meilisearchReplicaHosts = meilisearchReplicaHosts ?? [];
-  meilisearchSearchHosts = [];
-}
 
 const defaultCurrency = raw.PAYMENTS_DEFAULT_CURRENCY.toUpperCase();
 const allowedCurrencies = Array.from(
@@ -1211,7 +1136,6 @@ const corsOrigins = parseOriginList(raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL);
 
 const metricsAllowedIps = parseCsv(raw.METRICS_ALLOWED_IPS ?? '');
 const redactedFields = parseCsv(raw.LOG_REDACTED_FIELDS ?? '');
-const searchAllowedIps = parseCsv(raw.MEILISEARCH_ALLOWED_IPS ?? '');
 const configuredTwoFactorRoles = parseCsv(raw.TWO_FACTOR_REQUIRED_ROLES ?? '');
 const normalizedTwoFactorRoles = (configuredTwoFactorRoles.length > 0
   ? configuredTwoFactorRoles
@@ -1801,19 +1725,15 @@ export const env = {
     }
   },
   search: {
-    adminHosts: meilisearchHosts,
-    replicaHosts: meilisearchReplicaHosts,
-    searchHosts: meilisearchSearchHosts,
-    adminApiKey: raw.MEILISEARCH_ADMIN_API_KEY,
-    searchApiKey: raw.MEILISEARCH_SEARCH_API_KEY,
-    healthcheckIntervalMs: raw.MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS * 1000,
-    requestTimeoutMs: raw.MEILISEARCH_REQUEST_TIMEOUT_MS,
-    indexPrefix: raw.MEILISEARCH_INDEX_PREFIX ?? 'edulure',
-    allowedIps: searchAllowedIps,
+    provider: raw.SEARCH_PROVIDER ?? 'database',
+    defaultPageSize: Math.min(raw.SEARCH_DEFAULT_PAGE_SIZE, raw.SEARCH_MAX_PAGE_SIZE),
+    maxPageSize: raw.SEARCH_MAX_PAGE_SIZE,
     ingestion: {
       batchSize: raw.SEARCH_INGESTION_BATCH_SIZE,
       concurrency: raw.SEARCH_INGESTION_CONCURRENCY,
-      deleteBeforeReindex: raw.SEARCH_INGESTION_DELETE_BEFORE_REINDEX
+      deleteBeforeReindex: raw.SEARCH_INGESTION_DELETE_BEFORE_REINDEX,
+      schedule: raw.SEARCH_INGESTION_SCHEDULE,
+      timezone: raw.SEARCH_INGESTION_TIMEZONE
     }
   },
   dataGovernance: {
