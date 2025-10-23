@@ -184,9 +184,9 @@ export default function Register() {
       subtitle="Tell us about yourself so we can tailor onboarding for your communities, instructors, and learners."
     >
       <div className="space-y-8">
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          {error ? <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
-          {success ? <p className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{success}</p> : null}
+        <form className="form-section space-y-6" onSubmit={handleSubmit}>
+          {error ? <p className="form-banner form-banner--error">{error}</p> : null}
+          {success ? <p className="form-banner form-banner--success">{success}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <FormField
               label="First name"
@@ -219,7 +219,7 @@ export default function Register() {
               name="role"
               value={formState.role}
               onChange={handleChange}
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="form-field__input"
             >
               {ROLE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -227,7 +227,7 @@ export default function Register() {
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-xs text-slate-500">{ADMIN_REQUEST_NOTE}</p>
+            <p className="form-field__helper">{ADMIN_REQUEST_NOTE}</p>
           </FormField>
           <FormField
             label="Age"
@@ -239,10 +239,10 @@ export default function Register() {
             min="16"
             required={false}
           />
-          <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white/90 px-5 py-5 shadow-inner">
+          <div className="form-section space-y-3">
             <div>
               <p className="text-sm font-semibold text-slate-700">Address (optional)</p>
-              <p className="text-xs text-slate-500">Provide as much detail as possible to help us tailor regional onboarding.</p>
+              <p className="form-field__helper">Provide as much detail as possible to help us tailor regional onboarding.</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
@@ -314,11 +314,11 @@ export default function Register() {
             placeholder="Re-enter your password"
             required
           />
-          <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white/90 px-5 py-5 shadow-inner">
+          <div className="form-section space-y-3">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-slate-700">Multi-factor authentication</p>
-                <p className="text-xs text-slate-500">
+                <p className="form-field__helper">
                   Secure your account with email-delivered one-time passcodes.{" "}
                   {twoFactorLocked
                     ? ' This role requires multi-factor authentication on every sign in.'
@@ -351,23 +351,23 @@ export default function Register() {
               </div>
             </div>
             {!twoFactorLocked && !twoFactorEnabled ? (
-              <p className="text-xs text-slate-400">
+              <p className="form-field__helper">
                 Turn this on to have email one-time codes enabled right after registration.
               </p>
             ) : null}
           </div>
           {twoFactorEnrollment?.enabled ? (
-            <div className="space-y-4 rounded-3xl border border-primary/30 bg-white/90 px-6 py-6 shadow-card ring-1 ring-primary/10">
+            <div className="form-section space-y-4 border border-primary/30 ring-1 ring-primary/15">
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-primary">Email codes are ready</p>
-                <p className="text-xs text-slate-500">
+                <p className="form-field__helper">
                   We will send a six-digit security code to {formState.email || 'your email'} on every sign in. Check your inbox (and spam folder) when prompted.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+                className="cta-button cta-button--primary w-full"
               >
                 Proceed to secure login
               </button>
@@ -395,7 +395,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-primary/40"
+            className="cta-button cta-button--primary w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? 'Creating account…' : 'Launch Learnspace'}
           </button>
