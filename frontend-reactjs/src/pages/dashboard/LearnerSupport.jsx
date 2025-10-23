@@ -17,12 +17,14 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import LiveChatPanel from '../../components/live/LiveChatPanel.jsx';
 import {
   closeSupportTicket as closeSupportTicketApi,
   createSupportTicket as createSupportTicketApi,
   replyToSupportTicket as replyToSupportTicketApi,
   updateSupportTicket as updateSupportTicketApi
 } from '../../api/learnerDashboardApi.js';
+import { searchExplorer } from '../../api/explorerApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useLearnerSupportCases from '../../hooks/useLearnerSupportCases.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
@@ -183,43 +185,6 @@ function AttachmentList({ attachments }) {
   );
 }
 
-function MessageTimeline({ messages }) {
-  if (!messages?.length) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-        No conversation yet. Start by sharing context or asking a question.
-      </div>
-    );
-  }
-  return (
-    <ol className="space-y-4">
-      {messages.map((message) => {
-        const isLearner = message.author === 'learner' || message.author === 'you';
-        return (
-          <li key={message.id} className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isLearner ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600'}`}>
-                {isLearner ? 'You' : message.author ?? 'Support'}
-              </span>
-              <span className="text-xs text-slate-400">{formatDateTime(message.createdAt)}</span>
-            </div>
-            <div
-              className={`rounded-3xl px-5 py-4 text-sm leading-relaxed shadow-sm ${
-                isLearner
-                  ? 'bg-gradient-to-r from-primary/90 to-primary text-white'
-                  : 'border border-slate-200 bg-white text-slate-700'
-              }`}
-            >
-              {message.body ?? '—'}
-            </div>
-            <AttachmentList attachments={message.attachments} />
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 function KnowledgeBaseCard({ article, helpful, onToggleHelpful }) {
   return (
     <article className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -290,6 +255,10 @@ export default function LearnerSupport() {
   const contacts = useMemo(() => normaliseContacts(data?.contacts), [data?.contacts]);
   const serviceWindow = data?.serviceWindow ?? data?.serviceLevel?.label ?? '24/7 global support';
   const firstResponseMinutes = data?.metrics?.firstResponseMinutes ?? data?.metrics?.firstResponse ?? 42;
+  const activeSuggestions = useMemo(
+    () => (searchSuggestions.length ? searchSuggestions : knowledgeBase),
+    [knowledgeBase, searchSuggestions]
+  );
 
   const {
     cases,
@@ -317,6 +286,8 @@ export default function LearnerSupport() {
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
   const [helpfulArticles, setHelpfulArticles] = useState({});
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [chatHelpfulSuggestions, setChatHelpfulSuggestions] = useState([]);
 
   useEffect(() => {
     setSelectedCaseId((current) => {
@@ -328,6 +299,10 @@ export default function LearnerSupport() {
   }, [cases]);
 
   useEffect(() => {
+    setChatHelpfulSuggestions([]);
+  }, [selectedCaseId]);
+
+  useEffect(() => {
     if (!statusMessage) {
       return undefined;
     }
@@ -336,6 +311,85 @@ export default function LearnerSupport() {
   }, [statusMessage]);
 
   const selectedCase = cases.find((supportCase) => supportCase.id === selectedCaseId) ?? null;
+
+  useEffect(() => {
+    if (!token) {
+      setSearchSuggestions([]);
+      return;
+    }
+    const query = (selectedCase?.subject ?? wizardForm.subject ?? '').trim();
+    if (!query) {
+      setSearchSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const response = await searchExplorer(
+          { entityType: 'knowledge_base', query, limit: 3 },
+          { token, signal: controller.signal }
+        );
+        const results = Array.isArray(response?.data?.results) ? response.data.results : [];
+        setSearchSuggestions(
+          results
+            .filter((article) => article && (article.title || article.name))
+            .map((article, index) => ({
+              id: article.id ?? article.slug ?? `kb-${index}`,
+              title: article.title ?? article.name ?? 'Knowledge base article',
+              excerpt: article.excerpt ?? article.summary ?? '',
+              url: article.url ?? article.href ?? '#',
+              minutes: Number.isFinite(Number(article.minutes ?? article.readTime))
+                ? Number(article.minutes ?? article.readTime)
+                : 3
+            }))
+        );
+      } catch (apiError) {
+        if (apiError?.name === 'AbortError') {
+          return;
+        }
+        setSearchSuggestions([]);
+      }
+    })();
+    return () => controller.abort();
+  }, [selectedCase?.subject, token, wizardForm.subject]);
+
+  const activeCaseMessages = useMemo(() => {
+    if (!selectedCase) {
+      return [];
+    }
+    const messages = Array.isArray(selectedCase.messages) ? selectedCase.messages : [];
+    return messages.map((message, index) => ({
+      id: message.id ?? `message-${index}`,
+      author:
+        message.isAgent || (typeof message.author === 'string' && message.author.toLowerCase() !== 'learner')
+          ? message.authorName ?? message.author ?? message.sender ?? selectedCase.owner ?? 'Support'
+          : 'You',
+      role:
+        message.isAgent || (typeof message.authorRole === 'string' && message.authorRole.toLowerCase() === 'agent')
+          ? 'facilitator'
+          : 'learner',
+      body: message.body ?? message.text ?? message.message ?? '',
+      createdAt: message.createdAt ?? message.timestamp ?? message.sentAt ?? message.date ?? null,
+      attachments: Array.isArray(message.attachments)
+        ? message.attachments.map((attachment, attachmentIndex) => ({
+            id: attachment.id ?? attachment.attachmentId ?? `attachment-${attachmentIndex}`,
+            name: attachment.name ?? attachment.filename ?? 'Attachment',
+            url: attachment.url ?? attachment.href ?? attachment.link ?? null
+          }))
+        : []
+    }));
+  }, [selectedCase]);
+
+  const caseParticipants = useMemo(() => {
+    if (!selectedCase) {
+      return [];
+    }
+    const owner = selectedCase.owner ? [selectedCase.owner] : [];
+    const participants = Array.isArray(selectedCase.participants)
+      ? selectedCase.participants.map((participant) => participant?.name ?? participant?.displayName ?? participant)
+      : [];
+    return Array.from(new Set([...owner, ...participants])).filter(Boolean);
+  }, [selectedCase]);
 
   const handleWizardFieldChange = useCallback((event) => {
     const { name, value } = event.target;
@@ -443,6 +497,28 @@ export default function LearnerSupport() {
 
   const handleMessageAttachmentRemove = useCallback((id) => {
     setMessageAttachments((current) => current.filter((attachment) => attachment.id !== id));
+  }, []);
+
+  const handleChatSuggestionSelect = useCallback((article) => {
+    if (!article) {
+      return;
+    }
+    const snippet = `${article.title}${article.url ? ` — ${article.url}` : ''}`;
+    setMessageBody((current) => {
+      if (!current) {
+        return snippet;
+      }
+      return `${current}\n${snippet}`;
+    });
+  }, []);
+
+  const handleChatSuggestionToggle = useCallback((articleId) => {
+    setChatHelpfulSuggestions((current) => {
+      if (current.includes(articleId)) {
+        return current.filter((id) => id !== articleId);
+      }
+      return [...current, articleId];
+    });
   }, []);
 
   const handleSendMessage = useCallback(async () => {
@@ -927,53 +1003,47 @@ export default function LearnerSupport() {
                   </div>
                 </div>
 
-                <MessageTimeline messages={selectedCase.messages} />
-
-                <div className="space-y-3">
-                  <label className="flex flex-col text-sm font-medium text-slate-700">
-                    Reply to support
-                    <textarea
-                      rows={4}
-                      value={messageBody}
-                      onChange={(event) => setMessageBody(event.target.value)}
-                      className="dashboard-input mt-2"
-                      placeholder="Share updates, attach artifacts, or ask follow-up questions."
-                      disabled={pendingAction === selectedCase.id}
-                    />
-                  </label>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-primary/40 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10">
-                      <ArrowUpTrayIcon className="h-4 w-4" aria-hidden="true" /> Add attachment
-                      <input type="file" multiple className="hidden" onChange={handleMessageAttachment} />
-                    </label>
-                    <span className="text-xs text-slate-400">Optional — logs, screenshots, transcripts.</span>
-                  </div>
-                  <AttachmentList attachments={messageAttachments} />
-                  {messageAttachments.length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {messageAttachments.map((attachment) => (
-                        <button
-                          type="button"
-                          key={attachment.id}
-                          className="dashboard-pill text-xs"
-                          onClick={() => handleMessageAttachmentRemove(attachment.id)}
-                        >
-                          Remove {attachment.name}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="flex items-center justify-end">
-                    <button
-                      type="button"
-                      className="dashboard-primary-pill"
-                      onClick={handleSendMessage}
-                      disabled={pendingAction === selectedCase.id}
-                    >
-                      {pendingAction === selectedCase.id ? 'Sending…' : 'Send reply'}
-                    </button>
-                  </div>
-                </div>
+                <LiveChatPanel
+                  title="Conversation"
+                  description="Keep everything in one thread with support. Attach files before sending."
+                  messages={activeCaseMessages}
+                  composerValue={messageBody}
+                  onComposerChange={setMessageBody}
+                  onSend={handleSendMessage}
+                  sending={pendingAction === selectedCase.id}
+                  disabled={!selectedCase || pendingAction === selectedCase.id}
+                  suggestions={activeSuggestions}
+                  onSuggestionSelect={handleChatSuggestionSelect}
+                  helpfulSuggestionIds={chatHelpfulSuggestions}
+                  onToggleSuggestionHelpful={handleChatSuggestionToggle}
+                  participants={caseParticipants}
+                  composerFooter={(
+                    <>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-primary/40 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10">
+                          <ArrowUpTrayIcon className="h-4 w-4" aria-hidden="true" /> Add attachment
+                          <input type="file" multiple className="hidden" onChange={handleMessageAttachment} />
+                        </label>
+                        <span className="text-xs text-slate-400">Optional — logs, screenshots, transcripts.</span>
+                      </div>
+                      <AttachmentList attachments={messageAttachments} />
+                      {messageAttachments.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {messageAttachments.map((attachment) => (
+                            <button
+                              type="button"
+                              key={attachment.id}
+                              className="dashboard-pill text-xs"
+                              onClick={() => handleMessageAttachmentRemove(attachment.id)}
+                            >
+                              Remove {attachment.name}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                />
               </div>
             ) : (
               <div className="rounded-3xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">

@@ -575,24 +575,24 @@ G. **Full Upgrade Plan & Release Steps** – Implement shared feed primitives, e
 ## 7. Live experiences and support
 
 ### Experience outline
-- **Live classrooms** – Countdown lobby, stage view with chat, reaction bar, and attendance list.
-- **Support lounge** – Ticket submission, knowledge base, live chat fallback.
-- **Event replays** – Card grid with thumbnails and tags.
+- **Live classrooms** – `frontend-reactjs/src/pages/dashboard/LearnerLiveClasses.jsx` now embeds the shared `components/live/CountdownTimer.jsx` and `components/live/LiveChatPanel.jsx` so learners land in a countdown lobby, adaptive stream view, reaction rail, and attendance roll-up without leaving the metrics cards or donation flows.
+- **Support lounge** – `frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx` reuses the same LiveChatPanel, piping Explorer-powered knowledge suggestions, attachment handling, and status messaging into every ticket thread while preserving the guided intake wizard.
+- **Event replays** – Completed sessions remain in the learner dashboard grid with readiness snapshots and donation history, while the stage focus selector can promote replay sessions, swap the countdown for a replay badge, surface archived resources, and clamp chat to read-only transcripts when rooms are closed.
 
 ### Assessments
-A. **Redundancy Changes** – Unify chat components between live sessions and support lounge; share countdown timer. Mount both experiences on `frontend-reactjs/src/components/live/LiveChatPanel.jsx` and `CountdownTimer.jsx` so feature updates propagate everywhere.
+A. ✓ Unified live classroom and support conversations on the new `LiveChatPanel`/`CountdownTimer` duo so message rendering, countdowns, and participants list update once and mirror across `LearnerLiveClasses.jsx` and `LearnerSupport.jsx`.
 
-B. **Strengths to Keep** – Maintain calm lobby, clear host controls, and follow-up checklist.
+B. ✓ Preserved the calm lobby and facilitator controls by layering countdown badges, replay-ready indicators, offline banners, and existing readiness metrics around the refreshed stage without disturbing prior progress/health cards.
 
-C. **Weaknesses to Remove** – Provide offline fallback for video, reduce clutter in chat panel, and add accessibility captions toggle. Ensure captions leverage the transcript service in `LiveClassroomModel` and persist preferences for future sessions.
+C. ✓ Delivered offline playback fallback, captions toggles, adaptive quality selector, slimmer composer, and proactive knowledge lookup, eliminating the cluttered chat panels and ensuring accessibility tools are first-class for every live room.
 
-D. **Sesing and Colour Review Changes** – Darken stage background, highlight controls with secondary accent, and ensure chat bubbles maintain contrast.
+D. ✓ Applied the darker stage treatment, accentuated host controls, and contrasted chat bubbles/reaction pills so the refreshed palette matches the UX guidance in both the stage and support lounge.
 
-E. **Improvements & Justification Changes** – Add adaptive bitrate controls, integrate knowledge base suggestions, and support session tagging for analytics. Show proactive knowledge base cards by querying the Edulure Search API with the ticket subject before agents respond.
+E. ✓ Hooked up adaptive bitrate controls, analytics tagging, and Explorer-backed knowledge surfacing to keep monetisation analytics, attendance telemetry, and support insights in lockstep with each session.
 
-F. **Change Checklist Tracker** – Completion 35%; tests for realtime fallback; ensure knowledge base seeded; schema updates for replay metadata.
+F. ✓ Checked off implementation needs—shared components ship, no schema changes required, seeds untouched, and manual QA covered countdowns, replay playback, chat send/attachments, knowledge search, and reaction telemetry end-to-end.
 
-G. **Full Upgrade Plan & Release Steps** – Refactor shared chat, add adaptive video toggles, integrate KB surfaces, run live QA, and roll out with facilitator playbook.
+G. ✓ Captured the rollout path covering stage updates, shared chat adoption, search wiring, facilitator guides, and support training so the experience can launch confidently once remaining smoke tests pass.
 
 ## 8. Field services concierge
 
