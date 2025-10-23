@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import clsx from 'clsx';
 
 import HomeSection from '../home/HomeSection.jsx';
 
@@ -12,7 +13,7 @@ export default function PlanHighlights({
   disclaimer
 }) {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white">
+    <section className="marketing-hero marketing-shell">
       <div className="absolute left-1/4 top-0 h-64 w-64 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" aria-hidden="true" />
       <div className="absolute bottom-10 right-10 h-72 w-72 translate-x-1/2 rounded-full bg-fuchsia-500/20 blur-[140px]" aria-hidden="true" />
       <HomeSection className="relative flex flex-col gap-16">
@@ -27,11 +28,13 @@ export default function PlanHighlights({
           {plans.map((plan) => (
             <article
               key={plan.id}
-              className={`relative flex h-full flex-col justify-between rounded-[2.5rem] border ${
-                plan.border ?? 'border-white/15'
-              } bg-gradient-to-br ${plan.accent ?? 'from-primary/20 via-transparent to-white/10'} p-8 backdrop-blur-xl ${
+              className={clsx(
+                'marketing-card relative flex h-full flex-col justify-between p-8',
+                'bg-gradient-to-br',
+                plan.accent ?? 'from-primary/20 via-transparent to-white/10',
+                plan.border ?? 'border-white/15',
                 plan.shadow ?? 'shadow-[0_32px_84px_-42px_rgba(15,23,42,0.65)]'
-              }`}
+              )}
             >
               {plan.icon ? (
                 <div className="absolute inset-x-6 -top-6 flex justify-center">
@@ -69,6 +72,7 @@ export default function PlanHighlights({
           {cta ? (
             <Link
               to={cta.to}
+              onClick={cta.onClick}
               className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 font-semibold transition hover:border-white/60 hover:bg-white/20"
             >
               {cta.icon ? <span aria-hidden="true">{cta.icon}</span> : null}
@@ -103,7 +107,8 @@ PlanHighlights.propTypes = {
   cta: PropTypes.shape({
     to: PropTypes.string.isRequired,
     label: PropTypes.string.isRequired,
-    icon: PropTypes.node
+    icon: PropTypes.node,
+    onClick: PropTypes.func
   }),
   disclaimer: PropTypes.string
 };

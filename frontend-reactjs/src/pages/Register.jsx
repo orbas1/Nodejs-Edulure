@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+
 import AuthCard from '../components/AuthCard.jsx';
 import FormField from '../components/FormField.jsx';
 import SocialSignOn from '../components/SocialSignOn.jsx';
 import { API_BASE_URL, httpClient } from '../api/httpClient.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import useOnboardingForm from '../hooks/useOnboardingForm.js';
 
 const SOCIAL_ROUTES = {
   google: '/auth/oauth/google',
@@ -20,41 +22,55 @@ const ROLE_OPTIONS = [
 
 const ENFORCED_TWO_FACTOR_ROLES = new Set();
 const ADMIN_REQUEST_NOTE =
-  'Need administrator access? Contact your organisation\'s Edulure operations representative to provision it securely.';
+  "Need administrator access? Contact your organisation's Edulure operations representative to provision it securely.";
 
 const passwordHint = 'Use at least 12 characters with upper, lower, number, and symbol.';
+
+function pruneAddress(address) {
+  if (!address || typeof address !== 'object') {
+    return undefined;
+  }
+  const cleaned = Object.entries(address).reduce((acc, [key, value]) => {
+    if (typeof value !== 'string') {
+      return acc;
+    }
+    const trimmed = value.trim();
+    if (trimmed) {
+      acc[key] = trimmed;
+    }
+    return acc;
+  }, {});
+  return Object.keys(cleaned).length ? cleaned : undefined;
+}
 
 export default function Register() {
   const navigate = useNavigate();
   const defaultRole = ROLE_OPTIONS[0]?.value ?? 'instructor';
-  const [formState, setFormState] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: defaultRole,
-    age: '',
-    address: {
-      streetAddress: '',
-      addressLine2: '',
-      town: '',
-      city: '',
-      country: '',
-      postcode: ''
-    }
-  });
-  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const onboardingOverrides = useMemo(() => ({ role: defaultRole }), [defaultRole]);
+  const {
+    formState,
+    errors,
+    setErrors,
+    updateField,
+    updateAddressField,
+    validate
+  } = useOnboardingForm('learner', onboardingOverrides);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(ENFORCED_TWO_FACTOR_ROLES.has(defaultRole));
-  const [twoFactorLocked, setTwoFactorLocked] = useState(ENFORCED_TWO_FACTOR_ROLES.has(defaultRole));
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(
+    ENFORCED_TWO_FACTOR_ROLES.has(defaultRole)
+  );
+  const [twoFactorLocked, setTwoFactorLocked] = useState(
+    ENFORCED_TWO_FACTOR_ROLES.has(defaultRole)
+  );
   const [twoFactorEnrollment, setTwoFactorEnrollment] = useState(null);
 
   usePageMetadata({
     title: 'Create your Edulure account',
-    description: 'Register to access Edulure courses, communities, live classrooms, and analytics dashboards with built-in security controls.',
+    description:
+      'Register to access Edulure courses, communities, live classrooms, and analytics dashboards with built-in security controls.',
     canonicalPath: '/register',
     robots: 'noindex, nofollow',
     analytics: {
@@ -80,9 +96,24 @@ export default function Register() {
     [oauthBase]
   );
 
+  const clearFieldError = useCallback(
+    (field) => {
+      setErrors((prev) => {
+        if (!prev || !prev[field]) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    },
+    [setErrors]
+  );
+
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setFormState((prev) => ({ ...prev, [name]: value }));
+    updateField(name, value);
+    clearFieldError(name);
     if (name === 'role') {
       const enforced = ENFORCED_TWO_FACTOR_ROLES.has(value);
       setTwoFactorLocked(enforced);
@@ -93,13 +124,16 @@ export default function Register() {
 
   const handleAddressChange = (event) => {
     const { name, value } = event.target;
-    setFormState((prev) => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        [name]: value
-      }
-    }));
+    updateAddressField(name, value);
+  };
+
+  const toggleMarketingOptIn = () => {
+    updateField('marketingOptIn', !formState.marketingOptIn);
+  };
+
+  const handleTermsChange = (event) => {
+    updateField('termsAccepted', event.target.checked);
+    clearFieldError('termsAccepted');
   };
 
   const handleSubmit = async (event) => {
@@ -108,51 +142,60 @@ export default function Register() {
     setSuccess(null);
     setTwoFactorEnrollment(null);
 
-    if (formState.password !== formState.confirmPassword) {
-      setError('Passwords do not match.');
+    const validation = validate();
+    if (!validation.isValid) {
+      setError('Please review the highlighted fields.');
       return;
     }
 
-    if (!agreeToTerms) {
-      setError('You must accept the terms to create an account.');
-      return;
+    const { bootstrapPayload, registerPayload, cleaned } = validation;
+    const address = pruneAddress(cleaned.address);
+    const metadata = {
+      ...bootstrapPayload.metadata,
+      ...(cleaned.age ? { age: cleaned.age } : {}),
+      ...(address ? { address } : {}),
+      persona: cleaned.persona || undefined,
+      marketingOptIn: cleaned.marketingOptIn
+    };
+    const preferences = {
+      ...bootstrapPayload.preferences,
+      marketingOptIn: cleaned.marketingOptIn,
+      ...(cleaned.timeCommitment ? { timeCommitment: cleaned.timeCommitment } : {}),
+      ...(cleaned.onboardingPath ? { onboardingPath: cleaned.onboardingPath } : {}),
+      ...(cleaned.interests?.length ? { interests: cleaned.interests } : {})
+    };
+
+    const onboardingPayload = {
+      ...bootstrapPayload,
+      metadata,
+      preferences
+    };
+
+    if (!onboardingPayload.invites?.length) {
+      delete onboardingPayload.invites;
     }
 
-    const ageValue = formState.age.trim();
-    const age = ageValue ? Number.parseInt(ageValue, 10) : undefined;
-    if (ageValue && Number.isNaN(age)) {
-      setError('Age must be a number.');
-      return;
-    }
-
-    setIsSubmitting(true);
     try {
-      const requestBody = {
-        firstName: formState.firstName,
-        lastName: formState.lastName,
-        email: formState.email,
-        password: formState.password,
-        role: formState.role,
-        ...(age ? { age } : {}),
-        ...(() => {
-          const normalizedAddress = Object.entries(formState.address ?? {}).reduce(
-            (acc, [key, fieldValue]) => {
-              if (typeof fieldValue !== 'string') {
-                return acc;
-              }
-              const trimmed = fieldValue.trim();
-              if (trimmed) {
-                acc[key] = trimmed;
-              }
-              return acc;
-            },
-            {}
-          );
-          return Object.keys(normalizedAddress).length ? { address: normalizedAddress } : {};
-        })(),
+      setIsSubmitting(true);
+      await httpClient.post('/dashboard/learner/onboarding/bootstrap', onboardingPayload);
+
+      const finalRegisterPayload = {
+        ...registerPayload,
+        role: cleaned.role,
         twoFactor: { enabled: twoFactorLocked ? true : twoFactorEnabled }
       };
-      const response = await httpClient.post('/auth/register', requestBody);
+
+      if (cleaned.age) {
+        finalRegisterPayload.age = cleaned.age;
+      }
+      if (address) {
+        finalRegisterPayload.address = address;
+      }
+      if ('marketingOptIn' in finalRegisterPayload) {
+        delete finalRegisterPayload.marketingOptIn;
+      }
+
+      const response = await httpClient.post('/auth/register', finalRegisterPayload);
       const result = response?.data ?? {};
       setTwoFactorEnrollment(result.twoFactor ?? null);
       if (result.twoFactor?.enabled) {
@@ -184,9 +227,9 @@ export default function Register() {
       subtitle="Tell us about yourself so we can tailor onboarding for your communities, instructors, and learners."
     >
       <div className="space-y-8">
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          {error ? <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
-          {success ? <p className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{success}</p> : null}
+        <form className="form-section space-y-6" onSubmit={handleSubmit}>
+          {error ? <p className="form-banner form-banner--error">{error}</p> : null}
+          {success ? <p className="form-banner form-banner--success">{success}</p> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <FormField
               label="First name"
@@ -194,6 +237,7 @@ export default function Register() {
               placeholder="Alex"
               value={formState.firstName}
               onChange={handleChange}
+              error={errors.firstName}
               required
             />
             <FormField
@@ -202,7 +246,7 @@ export default function Register() {
               placeholder="Morgan"
               value={formState.lastName}
               onChange={handleChange}
-              required
+              required={false}
             />
           </div>
           <FormField
@@ -212,14 +256,23 @@ export default function Register() {
             placeholder="you@company.com"
             value={formState.email}
             onChange={handleChange}
+            error={errors.email}
             required
           />
-          <FormField label="Role" name="role">
+          <FormField
+            label="What best describes you?"
+            name="persona"
+            placeholder="Community architect, Learning ops lead, etc."
+            value={formState.persona}
+            onChange={handleChange}
+            required={false}
+          />
+          <FormField label="Role" name="role" error={errors.role}>
             <select
               name="role"
               value={formState.role}
               onChange={handleChange}
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="form-field__input"
             >
               {ROLE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -227,7 +280,7 @@ export default function Register() {
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-xs text-slate-500">{ADMIN_REQUEST_NOTE}</p>
+            <p className="form-field__helper">{ADMIN_REQUEST_NOTE}</p>
           </FormField>
           <FormField
             label="Age"
@@ -238,11 +291,12 @@ export default function Register() {
             onChange={handleChange}
             min="16"
             required={false}
+            error={errors.age}
           />
-          <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white/90 px-5 py-5 shadow-inner">
+          <div className="form-section space-y-3">
             <div>
               <p className="text-sm font-semibold text-slate-700">Address (optional)</p>
-              <p className="text-xs text-slate-500">Provide as much detail as possible to help us tailor regional onboarding.</p>
+              <p className="form-field__helper">Provide as much detail as possible to help us tailor regional onboarding.</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
@@ -295,6 +349,116 @@ export default function Register() {
               />
             </div>
           </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              label="Your goals"
+              name="goalsInput"
+              placeholder="Launch Flow 5, grow community revenue, etc."
+              required={false}
+              helper="Separate each goal with a comma or new line."
+            >
+              <textarea
+                name="goalsInput"
+                value={formState.goalsInput}
+                onChange={handleChange}
+                className="form-field__input min-h-[120px] resize-y"
+              />
+            </FormField>
+            <FormField
+              label="Invitation codes"
+              name="inviteCodes"
+              placeholder="FLOW5-OPS-GUILD"
+              required={false}
+              helper="Paste any invite codes you've received to automatically connect communities."
+            >
+              <textarea
+                name="inviteCodes"
+                value={formState.inviteCodes}
+                onChange={handleChange}
+                className="form-field__input min-h-[120px] resize-y"
+              />
+            </FormField>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              label="Estimated weekly time commitment"
+              name="timeCommitment"
+              placeholder="4h/week"
+              value={formState.timeCommitment}
+              onChange={handleChange}
+              required={false}
+            />
+            <FormField
+              label="Preferred onboarding path"
+              name="onboardingPath"
+              placeholder="Community-first, course-first, etc."
+              value={formState.onboardingPath}
+              onChange={handleChange}
+              required={false}
+            />
+          </div>
+          <FormField
+            label="Areas of interest"
+            name="interestsInput"
+            placeholder="Live cohorts, sponsor onboarding, analytics"
+            required={false}
+            helper="Separate each interest with a comma or new line."
+          >
+            <textarea
+              name="interestsInput"
+              value={formState.interestsInput}
+              onChange={handleChange}
+              className="form-field__input min-h-[120px] resize-y"
+            />
+          </FormField>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              label="How did you hear about Edulure?"
+              name="marketingSource"
+              placeholder="Referral, conference, newsletter"
+              value={formState.marketingSource}
+              onChange={handleChange}
+              required={false}
+            />
+            <FormField
+              label="Campaign or creator"
+              name="marketingCampaign"
+              placeholder="Flow 5 beta, Creator Growth Lab"
+              value={formState.marketingCampaign}
+              onChange={handleChange}
+              required={false}
+            />
+          </div>
+          <div className="form-section space-y-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-700">Marketing updates</p>
+                <p className="form-field__helper">
+                  Opt in to receive onboarding tips, Flow 5 experiments, and community launch playbooks by email.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formState.marketingOptIn}
+                  onClick={toggleMarketingOptIn}
+                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
+                    formState.marketingOptIn ? 'bg-primary' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition ${
+                      formState.marketingOptIn ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-xs font-semibold text-slate-600">
+                  {formState.marketingOptIn ? 'Subscribed' : 'Not now'}
+                </span>
+              </div>
+            </div>
+          </div>
           <FormField
             label="Password"
             type="password"
@@ -304,6 +468,7 @@ export default function Register() {
             placeholder="Create a secure password"
             required
             helper={passwordHint}
+            error={errors.password}
           />
           <FormField
             label="Confirm password"
@@ -313,13 +478,14 @@ export default function Register() {
             onChange={handleChange}
             placeholder="Re-enter your password"
             required
+            error={errors.confirmPassword}
           />
-          <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white/90 px-5 py-5 shadow-inner">
+          <div className="form-section space-y-3">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-slate-700">Multi-factor authentication</p>
-                <p className="text-xs text-slate-500">
-                  Secure your account with email-delivered one-time passcodes.{" "}
+                <p className="form-field__helper">
+                  Secure your account with email-delivered one-time passcodes.
                   {twoFactorLocked
                     ? ' This role requires multi-factor authentication on every sign in.'
                     : ' Opt in now to receive sign-in codes by email whenever you log in.'}
@@ -351,23 +517,23 @@ export default function Register() {
               </div>
             </div>
             {!twoFactorLocked && !twoFactorEnabled ? (
-              <p className="text-xs text-slate-400">
+              <p className="form-field__helper">
                 Turn this on to have email one-time codes enabled right after registration.
               </p>
             ) : null}
           </div>
           {twoFactorEnrollment?.enabled ? (
-            <div className="space-y-4 rounded-3xl border border-primary/30 bg-white/90 px-6 py-6 shadow-card ring-1 ring-primary/10">
+            <div className="form-section space-y-4 border border-primary/30 ring-1 ring-primary/15">
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-primary">Email codes are ready</p>
-                <p className="text-xs text-slate-500">
+                <p className="form-field__helper">
                   We will send a six-digit security code to {formState.email || 'your email'} on every sign in. Check your inbox (and spam folder) when prompted.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+                className="cta-button cta-button--primary w-full"
               >
                 Proceed to secure login
               </button>
@@ -377,8 +543,8 @@ export default function Register() {
             <input
               type="checkbox"
               className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-              checked={agreeToTerms}
-              onChange={(event) => setAgreeToTerms(event.target.checked)}
+              checked={formState.termsAccepted}
+              onChange={handleTermsChange}
             />
             <span>
               I agree to the Edulure{' '}
@@ -390,12 +556,15 @@ export default function Register() {
                 privacy policy
               </a>
               .
+              {errors.termsAccepted ? (
+                <span className="form-field__error ml-2 inline-block align-middle">{errors.termsAccepted}</span>
+              ) : null}
             </span>
           </label>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-primary/40"
+            className="cta-button cta-button--primary w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? 'Creating account…' : 'Launch Learnspace'}
           </button>

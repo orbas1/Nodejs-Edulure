@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import clsx from 'clsx';
 
 import { useLanguage } from '../context/LanguageContext.jsx';
@@ -13,11 +14,40 @@ import TutorArcade from '../components/home/TutorArcade.jsx';
 import CoursesAdventure from '../components/home/CoursesAdventure.jsx';
 import EbookShowcase from '../components/home/EbookShowcase.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import useMarketingContent from '../hooks/useMarketingContent.js';
 import communitiesPreview from '../assets/home/preview/communities.svg';
 import coursesPreview from '../assets/home/preview/courses.svg';
 import liveEventsPreview from '../assets/home/preview/live-events.svg';
 import libraryPreview from '../assets/home/preview/library.svg';
 import { usePrefersReducedMotion } from '../utils/a11y.js';
+import { trackEvent } from '../lib/analytics.js';
+
+function formatPlanPrice(priceCents, currency = 'USD', billingInterval = 'monthly') {
+  const amount = Number.isFinite(priceCents) ? priceCents : 0;
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency
+  });
+  const price = formatter.format(Math.max(0, amount) / 100);
+  if (!billingInterval || billingInterval === 'lifetime') {
+    return billingInterval === 'lifetime' ? `${price} lifetime` : price;
+  }
+  const intervalLabel = billingInterval === 'annual' ? 'year' : 'month';
+  return `${price} / ${intervalLabel}`;
+}
+
+function normaliseInternalAction(action, fallbackTo, fallbackLabel) {
+  const destination = typeof action?.to === 'string' && action.to.startsWith('/') ? action.to : fallbackTo;
+  const label = action?.label ?? action?.text ?? fallbackLabel;
+  return { to: destination, label: label || fallbackLabel };
+}
+
+function normaliseExternalAction(action, fallbackHref, fallbackLabel) {
+  const hrefCandidate = action?.href ?? action?.to;
+  const href = typeof hrefCandidate === 'string' && hrefCandidate.length > 0 ? hrefCandidate : fallbackHref;
+  const label = action?.label ?? action?.text ?? fallbackLabel;
+  return { href, label: label || fallbackLabel };
+}
 
 const HERO_CHIP_KEYS = [
   { key: 'home.hero.chips.communities', fallback: 'Communities' },
@@ -198,16 +228,85 @@ export default function Home() {
     }
   });
 
-  const heroChips = HERO_CHIP_KEYS.map(({ key, fallback }) => t(key, fallback));
-  const heroData = {
-    eyebrow: t('home.hero.eyebrow', 'Learning community & marketplace'),
-    status: t('home.hero.status', 'Built for cohort-based learning'),
-    headline: t('home.hero.headline', 'Learn, teach, and build together.'),
-    subheadline: t('home.hero.subhead', 'Swap playbooks, host live jams, and grow with peers on Edulure.'),
-    primaryLabel: t('home.hero.ctaPrimary', 'Get started'),
-    secondaryLabel: t('home.hero.ctaSecondary', 'Preview the community'),
-    instructorLabel: t('home.hero.instructorPill', "I'm an instructor")
-  };
+  const { data: marketingData } = useMarketingContent();
+
+  const fallbackHero = useMemo(
+    () => ({
+      eyebrow: t('home.hero.eyebrow', 'Learning community & marketplace'),
+      statusLabel: t('home.hero.status', 'Built for cohort-based learning'),
+      headline: t('home.hero.headline', 'Learn, teach, and build together.'),
+      subheadline: t('home.hero.subhead', 'Swap playbooks, host live jams, and grow with peers on Edulure.'),
+      primaryLabel: t('home.hero.ctaPrimary', 'Get started'),
+      secondaryLabel: t('home.hero.ctaSecondary', 'Preview the community'),
+      tertiaryLabel: t('home.hero.instructorPill', "I'm an instructor")
+    }),
+    [t]
+  );
+
+  const fallbackHeroChips = useMemo(
+    () => HERO_CHIP_KEYS.map(({ key, fallback }) => t(key, fallback)),
+    [t]
+  );
+
+  const heroBlock = useMemo(() => {
+    if (!marketingData?.blocks?.length) {
+      return null;
+    }
+    return marketingData.blocks.find((block) => block.blockType === 'hero') ?? null;
+  }, [marketingData]);
+
+  const heroSurfaceId = heroBlock?.slug ?? 'home-fallback-hero';
+
+  const heroEyebrow = heroBlock?.eyebrow ?? fallbackHero.eyebrow;
+  const heroStatusLabel = heroBlock?.statusLabel ?? fallbackHero.statusLabel;
+  const heroHeadline = heroBlock?.title ?? fallbackHero.headline;
+  const heroSubheadline = heroBlock?.subtitle ?? fallbackHero.subheadline;
+  const heroChips = heroBlock?.chips?.length ? heroBlock.chips : fallbackHeroChips;
+
+  const heroPrimaryAction = useMemo(() => {
+    const base = normaliseInternalAction(heroBlock?.primaryCta, '/register', fallbackHero.primaryLabel);
+    return {
+      ...base,
+      onClick: () =>
+        trackEvent('marketing:hero_cta', {
+          surface: 'home',
+          action: 'primary',
+          blockSlug: heroSurfaceId,
+          destination: base.to,
+          label: base.label
+        })
+    };
+  }, [heroBlock?.primaryCta, fallbackHero.primaryLabel, heroSurfaceId]);
+
+  const heroSecondaryAction = useMemo(() => {
+    const base = normaliseInternalAction(heroBlock?.secondaryCta, '/feed', fallbackHero.secondaryLabel);
+    return {
+      ...base,
+      onClick: () =>
+        trackEvent('marketing:hero_cta', {
+          surface: 'home',
+          action: 'secondary',
+          blockSlug: heroSurfaceId,
+          destination: base.to,
+          label: base.label
+        })
+    };
+  }, [heroBlock?.secondaryCta, fallbackHero.secondaryLabel, heroSurfaceId]);
+
+  const heroTertiaryAction = useMemo(() => {
+    const base = normaliseExternalAction(heroBlock?.tertiaryCta, '#instructor', fallbackHero.tertiaryLabel);
+    return {
+      ...base,
+      onClick: () =>
+        trackEvent('marketing:hero_cta', {
+          surface: 'home',
+          action: 'tertiary',
+          blockSlug: heroSurfaceId,
+          destination: base.href,
+          label: base.label
+        })
+    };
+  }, [heroBlock?.tertiaryCta, fallbackHero.tertiaryLabel, heroSurfaceId]);
 
   const previewTabs = PREVIEW_TAB_CONFIG.map((tab) => {
     const highlights = HIGHLIGHT_KEYS.map((highlightKey, index) =>
@@ -228,55 +327,123 @@ export default function Home() {
     };
   });
 
-  const planCards = PLAN_CONFIG.map((plan) => {
-    const heading = t(`home.membership.plans.${plan.id}.title`, 'Channel title');
-    const tagline = t(`home.membership.plans.${plan.id}.tagline`, 'Standard commission structure for this channel.');
-    const price = t(`home.membership.plans.${plan.id}.price`, 'Flat commission rate');
-    const features = [];
+  const marketingPlanCards = useMemo(() => {
+    if (!marketingData?.plans?.length) {
+      return [];
+    }
+    return marketingData.plans.map((plan) => {
+      const accent = plan.metadata?.accent ?? {};
+      const features = [];
+      let icon = plan.metadata?.icon ?? null;
 
-    for (let index = 0; index < MAX_PLAN_FEATURES; index += 1) {
-      const translationKey = `home.membership.plans.${plan.id}.features.${index}`;
-      const feature = t(translationKey);
-      if (feature === translationKey) {
-        break;
+      if (Array.isArray(plan.features)) {
+        for (const feature of plan.features) {
+          if (features.length >= MAX_PLAN_FEATURES) {
+            break;
+          }
+          if (!icon && feature?.metadata?.icon) {
+            icon = feature.metadata.icon;
+          }
+          if (feature?.label) {
+            features.push(feature.label);
+          }
+        }
       }
-      features.push(feature);
-    }
 
-    if (features.length === 0) {
-      features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
-    }
+      if (features.length === 0) {
+        features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
+      }
 
-    const note = t(
-      `home.membership.plans.${plan.id}.note`,
-      'Applies automatically across this revenue channel.'
-    );
+      return {
+        id: plan.publicId ?? String(plan.id),
+        icon,
+        accent: accent.gradient ?? undefined,
+        border: accent.border ?? undefined,
+        shadow: accent.shadow ?? undefined,
+        heading: plan.headline ?? plan.name,
+        tagline: plan.tagline ?? null,
+        price: formatPlanPrice(plan.priceCents, plan.currency, plan.billingInterval),
+        features,
+        note: plan.upsell?.descriptor ?? null
+      };
+    });
+  }, [marketingData, t]);
 
-    return {
-      ...plan,
-      heading,
-      tagline,
-      price,
-      features,
-      note
-    };
-  });
+  const fallbackPlanCards = useMemo(() => {
+    return PLAN_CONFIG.map((plan) => {
+      const heading = t(`home.membership.plans.${plan.id}.title`, 'Channel title');
+      const tagline = t(
+        `home.membership.plans.${plan.id}.tagline`,
+        'Standard commission structure for this channel.'
+      );
+      const price = t(`home.membership.plans.${plan.id}.price`, 'Flat commission rate');
+      const features = [];
+
+      for (let index = 0; index < MAX_PLAN_FEATURES; index += 1) {
+        const translationKey = `home.membership.plans.${plan.id}.features.${index}`;
+        const feature = t(translationKey);
+        if (feature === translationKey) {
+          break;
+        }
+        features.push(feature);
+      }
+
+      if (features.length === 0) {
+        features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
+      }
+
+      const note = t(
+        `home.membership.plans.${plan.id}.note`,
+        'Applies automatically across this revenue channel.'
+      );
+
+      return {
+        ...plan,
+        heading,
+        tagline,
+        price,
+        features,
+        note
+      };
+    });
+  }, [t]);
+
+  const planCards = marketingPlanCards.length ? marketingPlanCards : fallbackPlanCards;
+
+  const handlePlanCta = useCallback(() => {
+    const planIds = planCards.map((plan) => plan.id);
+    trackEvent('marketing:plan_cta', {
+      surface: 'home',
+      planIds
+    });
+  }, [planCards]);
+
+  const planCta = useMemo(
+    () => ({
+      to: '/register',
+      label: t('home.membership.cta', 'Launch your workspace'),
+      icon: '✨',
+      onClick: handlePlanCta
+    }),
+    [handlePlanCta, t]
+  );
 
   return (
     <div className="bg-slate-50 text-slate-900">
       <MarketingHero
-        eyebrow={heroData.eyebrow}
-        statusLabel={heroData.status}
+        block={heroBlock}
+        eyebrow={heroEyebrow}
+        statusLabel={heroStatusLabel}
         languageSelector={{
           desktop: <LanguageSelector size="compact" variant="dark" align="end" />,
           mobile: <LanguageSelector size="compact" variant="dark" align="start" fullWidth />
         }}
         chips={heroChips}
-        headline={heroData.headline}
-        subheadline={heroData.subheadline}
-        primaryAction={{ to: '/register', label: heroData.primaryLabel }}
-        secondaryAction={{ to: '/feed', label: heroData.secondaryLabel }}
-        tertiaryAction={{ href: '#instructor', label: heroData.instructorLabel }}
+        headline={heroHeadline}
+        subheadline={heroSubheadline}
+        primaryAction={heroPrimaryAction}
+        secondaryAction={heroSecondaryAction}
+        tertiaryAction={heroTertiaryAction}
         rightPanel={<HeroPreviewPanel t={t} />}
       />
       <CommunitySpotlight />
@@ -303,7 +470,7 @@ export default function Home() {
           'Operate on transparent usage-based pricing designed for modern learning businesses.'
         )}
         plans={planCards}
-        cta={{ to: '/register', label: t('home.membership.cta', 'Launch your workspace'), icon: '✨' }}
+        cta={planCta}
         disclaimer={t(
           'home.membership.disclaimer',
           'Commission defaults include a 25% affiliate share and non-custodial settlement.'

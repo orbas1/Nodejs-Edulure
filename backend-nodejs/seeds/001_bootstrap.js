@@ -105,6 +105,8 @@ export async function seed(knex) {
     await trx('learner_payment_methods').del();
     await trx('learner_billing_contacts').del();
     await trx('learner_system_preferences').del();
+    await trx('learner_onboarding_responses').del();
+    await trx('learner_onboarding_invites').del();
     await trx('learner_course_goals').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flag_tenant_states').del();
@@ -145,6 +147,9 @@ export async function seed(knex) {
     await trx('content_asset_events').del();
     await trx('content_audit_logs').del();
     await trx('content_assets').del();
+    await trx('marketing_plan_features').del();
+    await trx('marketing_plan_offers').del();
+    await trx('marketing_blocks').del();
     await trx('telemetry_lineage_runs').del();
     await trx('telemetry_freshness_monitors').del();
     await trx('telemetry_events').del();
@@ -840,6 +845,206 @@ export async function seed(knex) {
       visibility: 'private',
       cover_image_url: growthLabCover.url,
       metadata: JSON.stringify(growthLabMetadata)
+    });
+
+    await trx('marketing_blocks').insert([
+      {
+        slug: 'flow-five-hero',
+        block_type: 'hero',
+        eyebrow: 'Flow 5 launchpad',
+        title: 'Bring learners from hello to enrolled in one Flow 5 launchpad',
+        subtitle:
+          'Design acquisition experiments, surface personal invites, and hand learners into live cohorts without handing off between tools.',
+        status_label: 'Flow 5 beta open',
+        chips: JSON.stringify(['Acquisition experiments', 'Community invites', 'Live cohorts']),
+        media: JSON.stringify({ theme: 'flow-five', palette: ['#6366f1', '#22d3ee'], badge: 'Flow 5' }),
+        primary_cta: JSON.stringify({ label: 'Start free trial', to: '/register' }),
+        secondary_cta: JSON.stringify({ label: 'View pricing', to: '/pricing' }),
+        tertiary_cta: JSON.stringify({ label: 'See how Flow 5 works', href: 'https://marketing.edulure.test/flow-5-demo' }),
+        metadata: JSON.stringify({ analyticsKey: 'flow5-hero', layout: 'split-right' })
+      },
+      {
+        slug: 'flow-five-proof',
+        block_type: 'proof',
+        eyebrow: 'Customer spotlight',
+        title: 'Ops Guild lifted enrolment 28% after consolidating onboarding',
+        subtitle:
+          'Kai and Amina used Flow 5 checklists, templated CTAs, and invite sync to cut drop-off across marketing and register flows.',
+        status_label: null,
+        chips: JSON.stringify(['28% conversion lift', '5 minute checkout', 'Invite sync ready']),
+        media: JSON.stringify({
+          type: 'stat-stack',
+          stats: [
+            { label: 'Marketing → enrolment', value: '+28%' },
+            { label: 'Flow setup time', value: '2 weeks' },
+            { label: 'NPS after onboarding', value: '64' }
+          ]
+        }),
+        primary_cta: JSON.stringify({ label: 'Read the story', href: 'https://stories.edulure.test/flow5-ops-guild' }),
+        secondary_cta: JSON.stringify({ label: 'Download checklist', href: 'https://docs.edulure.test/flow5/checklist.pdf' }),
+        tertiary_cta: JSON.stringify({}),
+        metadata: JSON.stringify({ analyticsKey: 'flow5-proof', theme: 'slate' })
+      }
+    ]);
+
+    const [communityPlanId] = await trx('marketing_plan_offers').insert({
+      public_id: 'plan-community-tutor',
+      name: 'Community + Tutor Pods',
+      headline: 'Community & tutor pods',
+      tagline: 'Invite-only cohorts, live office hours, and sponsor-ready portals.',
+      price_cents: 14900,
+      currency: 'USD',
+      billing_interval: 'monthly',
+      is_featured: true,
+      badge: JSON.stringify({ label: 'Most popular', tone: 'emerald' }),
+      metadata: JSON.stringify({
+        accent: {
+          gradient: 'from-emerald-500/25 via-teal-500/30 to-cyan-500/30',
+          border: 'border-emerald-300/40',
+          shadow: 'shadow-[0_32px_84px_-42px_rgba(16,185,129,0.6)]'
+        }
+      }),
+      upsell: JSON.stringify({ descriptor: 'Add sponsor marketplace for +$49', optional: true })
+    });
+
+    const [cataloguePlanId] = await trx('marketing_plan_offers').insert({
+      public_id: 'plan-catalogue',
+      name: 'Course Catalogue Pro',
+      headline: 'Course catalogue pro',
+      tagline: 'Ship evergreen catalogues with drip scheduling, bundles, and gated previews.',
+      price_cents: 9900,
+      currency: 'USD',
+      billing_interval: 'monthly',
+      is_featured: false,
+      badge: JSON.stringify({ label: 'Great for academies', tone: 'indigo' }),
+      metadata: JSON.stringify({
+        accent: {
+          gradient: 'from-indigo-500/25 via-sky-500/30 to-violet-500/30',
+          border: 'border-indigo-300/40',
+          shadow: 'shadow-[0_38px_92px_-40px_rgba(99,102,241,0.65)]'
+        }
+      }),
+      upsell: JSON.stringify({ descriptor: 'Bundle ebooks and audio courses for +$19', optional: true })
+    });
+
+    const [livePlanId] = await trx('marketing_plan_offers').insert({
+      public_id: 'plan-live-donations',
+      name: 'Live Sessions & Donations',
+      headline: 'Live sessions & donations',
+      tagline: 'Run hybrid broadcasts, accept donations, and automate replay libraries.',
+      price_cents: 12900,
+      currency: 'USD',
+      billing_interval: 'monthly',
+      is_featured: false,
+      badge: JSON.stringify({ label: 'Launch ready', tone: 'rose' }),
+      metadata: JSON.stringify({
+        accent: {
+          gradient: 'from-rose-500/25 via-orange-500/30 to-amber-500/30',
+          border: 'border-rose-300/40',
+          shadow: 'shadow-[0_44px_98px_-38px_rgba(244,114,182,0.6)]'
+        }
+      }),
+      upsell: JSON.stringify({ descriptor: 'Enable SMS reminders for +$15', optional: true })
+    });
+
+    await trx('marketing_plan_features').insert([
+      {
+        plan_id: communityPlanId,
+        position: 0,
+        label: 'Unlimited private communities',
+        metadata: JSON.stringify({ icon: '🤝' })
+      },
+      {
+        plan_id: communityPlanId,
+        position: 1,
+        label: 'Tutor pods with shared agendas & analytics',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: communityPlanId,
+        position: 2,
+        label: 'Sponsor hub & ready-to-run campaigns',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: cataloguePlanId,
+        position: 0,
+        label: 'Unlimited courses & dynamic bundles',
+        metadata: JSON.stringify({ icon: '📚' })
+      },
+      {
+        plan_id: cataloguePlanId,
+        position: 1,
+        label: 'Drip scheduling with progress automations',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: cataloguePlanId,
+        position: 2,
+        label: 'SEO-optimised catalogue landing pages',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: livePlanId,
+        position: 0,
+        label: 'Live studio with backstage chat & run of show',
+        metadata: JSON.stringify({ icon: '🎤' })
+      },
+      {
+        plan_id: livePlanId,
+        position: 1,
+        label: 'Donations, tipping, and sponsor slots',
+        metadata: JSON.stringify({})
+      },
+      {
+        plan_id: livePlanId,
+        position: 2,
+        label: 'Auto-generate replay library & transcripts',
+        metadata: JSON.stringify({})
+      }
+    ]);
+
+    const inviteExpiry = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
+    await trx('learner_onboarding_invites').insert([
+      {
+        invite_code: 'FLOW5-OPS-GUILD',
+        email: 'flow5-preview@edulure.test',
+        community_id: opsCommunityId,
+        status: 'pending',
+        expires_at: inviteExpiry,
+        metadata: JSON.stringify({ source: 'flow-five', cohort: 'ops-guild' })
+      },
+      {
+        invite_code: 'FLOW5-GROWTH-LAB',
+        email: 'flow5-preview@edulure.test',
+        community_id: growthCommunityId,
+        status: 'pending',
+        expires_at: inviteExpiry,
+        metadata: JSON.stringify({ source: 'flow-five', cohort: 'growth-lab' })
+      }
+    ]);
+
+    await trx('learner_onboarding_responses').insert({
+      email: 'flow5-preview@edulure.test',
+      role: 'instructor',
+      first_name: 'Jordan',
+      last_name: 'Rivera',
+      persona: 'Community architect',
+      goals: JSON.stringify(['Launch Flow 5 beta', 'Automate sponsor onboarding']),
+      invites: JSON.stringify([
+        { code: 'FLOW5-OPS-GUILD', status: 'pending', communitySlug: 'learning-ops-guild' },
+        { code: 'FLOW5-GROWTH-LAB', status: 'pending', communitySlug: 'creator-growth-lab' }
+      ]),
+      preferences: JSON.stringify({
+        marketingOptIn: true,
+        timeCommitment: '4h/week',
+        interests: ['Community launches', 'Sponsor workflow']
+      }),
+      metadata: JSON.stringify({ source: 'flow-five', campaign: 'beta-seed' }),
+      terms_accepted: 1,
+      submitted_at: trx.fn.now(),
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now()
     });
 
     const opsAdminMemberMetadata = {

@@ -4,6 +4,7 @@ import { createApiRouter } from './routerFactory.js';
 
 const router = createApiRouter();
 
+router.get('/marketing/blocks', ContentController.listMarketingBlocks);
 router.post('/assets/upload-session', auth('instructor'), ContentController.createUploadSession);
 router.post('/assets/:assetId/ingest', auth('instructor'), ContentController.confirmUpload);
 router.get('/assets', auth('instructor'), ContentController.list);
