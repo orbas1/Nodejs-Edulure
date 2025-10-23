@@ -11,16 +11,6 @@ export function fetchCoursePlayer(courseId, { token, signal } = {}) {
   });
 }
 
-export function fetchCourseLiveStatus(courseId, { token, signal } = {}) {
-  assertToken(token, 'load course live status');
-  assertId(courseId, 'Course id');
-  return httpClient.get(`/courses/${courseId}/live`, {
-    token,
-    signal,
-    cache: createListCacheConfig(`course:${courseId}:live`, { ttl: 10_000 })
-  });
-}
-
 export function fetchCourseLiveChat(courseId, { token, signal, limit } = {}) {
   assertToken(token, 'load course live chat');
   assertId(courseId, 'Course id');

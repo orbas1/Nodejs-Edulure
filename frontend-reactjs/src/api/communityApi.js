@@ -483,21 +483,6 @@ export async function postCommunityChatMessage({
   return mapResponse(response);
 }
 
-export async function acknowledgeCommunityChat({ communityId, channelId, token, payload, signal } = {}) {
-  const response = await httpClient.post(
-    `/communities/${communityId}/chat/channels/${channelId}/read`,
-    payload ?? {},
-    {
-      token,
-      signal,
-      cache: {
-        invalidateTags: [`community:${communityId}:chat:channels`]
-      }
-    }
-  );
-  return mapResponse(response);
-}
-
 export async function addCommunityChatReaction({
   communityId,
   channelId,
