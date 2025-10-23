@@ -1,80 +1,44 @@
 import { httpClient } from './httpClient.js';
+import { assertToken } from './apiUtils.js';
 
-function ensureUploadPayload(payload) {
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('A payload is required to request a media upload session');
+function buildUploadPayload({ file, kind, visibility }) {
+  if (!file) {
+    throw new Error('A file is required to request an upload');
   }
-  if (!payload.filename) {
-    throw new Error('A filename is required to request a media upload session');
+  const payload = {
+    kind: kind ?? 'image',
+    filename: file.name ?? 'upload',
+    mimeType: file.type || 'application/octet-stream',
+    size: file.size ?? 0
+  };
+  if (visibility) {
+    payload.visibility = visibility;
   }
-  if (!payload.mimeType) {
-    throw new Error('A MIME type is required to request a media upload session');
-  }
-  if (typeof payload.size !== 'number') {
-    throw new Error('A file size must be provided to request a media upload session');
-  }
-
   return payload;
 }
 
-export function requestMediaUpload({ token, payload, signal } = {}) {
-  const body = ensureUploadPayload(payload);
-
-  return httpClient
-    .post('/media/uploads', body, {
-      token,
-      signal
-    })
-    .then((response) => response?.data ?? null);
+export async function requestMediaUpload({ token, file, kind = 'image', visibility }) {
+  assertToken(token, 'request a media upload');
+  const payload = buildUploadPayload({ file, kind, visibility });
+  const response = await httpClient.post('/media/uploads', payload, { token });
+  return response?.data?.data ?? response?.data ?? response;
 }
 
-export function completeMediaUpload({ token, uploadId, payload, signal } = {}) {
-  if (!uploadId) {
-    throw new Error('An upload identifier is required to complete the upload');
+export async function performDirectUpload({ upload, file }) {
+  if (!upload?.url) {
+    throw new Error('Upload URL is required');
   }
-
-  return httpClient.post(`/media/uploads/${encodeURIComponent(uploadId)}/complete`, payload ?? {}, {
-    token,
-    signal,
-    invalidateTags: [`media:upload:${uploadId}`]
+  const method = upload.method ?? 'PUT';
+  const headers = upload.headers ?? { 'Content-Type': file.type || 'application/octet-stream' };
+  const result = await fetch(upload.url, {
+    method,
+    headers,
+    body: file
   });
-}
-
-export function pollMediaUploadStatus({ token, uploadId, signal } = {}) {
-  if (!uploadId) {
-    throw new Error('An upload identifier is required to check the status');
+  if (!result.ok) {
+    const error = new Error('Failed to upload media asset');
+    error.status = result.status;
+    throw error;
   }
-
-  return httpClient.get(`/media/uploads/${encodeURIComponent(uploadId)}/status`, {
-    token,
-    signal,
-    cache: {
-      ttl: 5_000,
-      tags: [`media:upload:${uploadId}:status`],
-      varyByToken: true
-    }
-  });
+  return result;
 }
-
-export function cancelMediaUpload({ token, uploadId, reason, signal } = {}) {
-  if (!uploadId) {
-    throw new Error('An upload identifier is required to cancel the upload');
-  }
-
-  return httpClient.post(
-    `/media/uploads/${encodeURIComponent(uploadId)}/cancel`,
-    reason ? { reason } : {},
-    {
-      token,
-      signal,
-      invalidateTags: [`media:upload:${uploadId}`]
-    }
-  );
-}
-
-export default {
-  requestMediaUpload,
-  completeMediaUpload,
-  pollMediaUploadStatus,
-  cancelMediaUpload
-};

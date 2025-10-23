@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   adsCampaignMetricModelMock: {
     summariseByCampaignIds: vi.fn(),
     summariseWindow: vi.fn(),
+    summariseWindowBulk: vi.fn(),
     listByCampaign: vi.fn()
   },
   domainEventModelMock: {
@@ -97,6 +98,7 @@ describe('AdsService', () => {
         }
       })
     );
+    adsCampaignMetricModelMock.summariseWindowBulk.mockResolvedValue(new Map());
   });
 
   it('applies compliance automation when campaigns overspend beyond tolerance', async () => {
@@ -113,13 +115,20 @@ describe('AdsService', () => {
       lastMetricDate: new Date()
     });
     adsCampaignMetricModelMock.summariseByCampaignIds.mockResolvedValue(lifetime);
-    adsCampaignMetricModelMock.summariseWindow.mockResolvedValue({
-      impressions: 48000,
-      clicks: 2043,
-      conversions: 238,
-      spendCents: 41200,
-      revenueCents: 109500
-    });
+    adsCampaignMetricModelMock.summariseWindowBulk.mockResolvedValue(
+      new Map([
+        [
+          baseCampaign.id,
+          {
+            impressions: 48000,
+            clicks: 2043,
+            conversions: 238,
+            spendCents: 41200,
+            revenueCents: 109500
+          }
+        ]
+      ])
+    );
 
     adsCampaignModelMock.updateById.mockImplementation(async (_id, updates) => ({
       ...baseCampaign,

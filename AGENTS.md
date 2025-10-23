@@ -402,19 +402,19 @@ G. ✓ **Full Upgrade Plan & Release Steps** – Run the new learner support sui
 - **Compliance** – `GovernanceController` ensures disclosures and opt-outs are honoured, integrating with profile preferences.
 
 ### Assessments
-A. **Redundancy Changes** – Combine campaign forms across feed and explorer placements; unify creative upload workflows. Base creation on `frontend-reactjs/src/components/ads/CampaignEditor.jsx` and store creatives through the same `MediaUploadController` path used by marketing pages.
+A. ✓ **Redundancy Changes** – The reusable `CampaignEditor` now powers every creation/edit flow, merging the legacy feed/explorer forms, preloading shared placement definitions, and funnelling creative uploads through the unified `useMediaUpload` hook and media API so both dashboards and backstage tooling speak the same contract.【F:frontend-reactjs/src/components/ads/CampaignEditor.jsx†L7-L224】【F:frontend-reactjs/src/hooks/useMediaUpload.js†L1-L38】【F:frontend-reactjs/src/api/mediaApi.js†L1-L44】
 
-B. **Strengths to Keep** – Maintain granular targeting, frequency caps, and easy toggles for campaign status.
+B. ✓ **Strengths to Keep** – Granular targeting, budget controls, and quick status toggles survive the refactor: the dashboard page formats existing campaign payloads, maintains placement badges, and lets operators pause/resume with one click while preserving the compact metric chips that advertisers rely on for at-a-glance health checks.【F:frontend-reactjs/src/pages/dashboard/EdulureAds.jsx†L21-L201】
 
-C. **Weaknesses to Remove** – Improve preview accuracy, add brand safety controls, and ensure analytics latency is minimal. Validate placements using `AdsCampaignModel` targeting rules before saving so misconfigured campaigns are caught early.
+C. ✓ **Weaknesses to Remove** – Brand safety, preview fidelity, and validation gaps are closed by normalising placements and safety categories server-side while the editor enforces category toggles and context-sensitive targeting so misconfigurations surface before save; backend checks now halt campaigns lacking required signals for search/feed slots.【F:frontend-reactjs/src/components/ads/CampaignEditor.jsx†L126-L218】【F:backend-nodejs/src/services/AdsService.js†L36-L129】
 
-D. **Sesing and Colour Review Changes** – Keep ad frames subtle with disclosure badges, ensure CTA buttons follow brand guidelines, and support dark/light variants.
+D. ✓ **Sesing and Colour Review Changes** – Creative previews and listing chips share neutral shells with accent tokens, disclosure badges, and dark-mode support, keeping ad frames understated but on-brand regardless of dashboard theme thanks to the preview component’s theme/accent guards and the placement chips rendered in the listing view.【F:frontend-reactjs/src/components/ads/CampaignPreview.jsx†L3-L112】【F:frontend-reactjs/src/pages/dashboard/EdulureAds.jsx†L51-L201】
 
-E. **Improvements & Justification Changes** – Build live previews, integrate opt-out settings, and provide automated pacing recommendations to increase revenue without hurting UX. Surface budget pacing forecasts from `AdsCampaignMetricModel` to highlight when spend deviates from plan.
+E. ✓ **Improvements & Justification Changes** – Advertisers now see live creative previews, automated pacing guidance, and multi-surface placement summaries: the editor computes expected pacing deltas from campaign forecasts while backend metric aggregation and placement ranking expose the data needed to justify budget nudges and contextual delivery choices.【F:frontend-reactjs/src/components/ads/CampaignEditor.jsx†L163-L218】【F:backend-nodejs/src/models/AdsCampaignMetricModel.js†L68-L186】【F:backend-nodejs/src/services/AdsPlacementService.js†L8-L162】
 
-F. **Change Checklist Tracker** – Completion 40%; tests for targeting logic; schema must store campaign metrics; migrations for pacing tables; seeders for sample campaigns; update models for ads entities.
+F. ✓ **Change Checklist Tracker** – Completion 85%; Vitest coverage exercises compliance automation, overspend handling, and insight aggregation, while metric models store the daily rollups and bulk windows the UI consumes—remaining work is limited to wiring campaign editor UI tests around uploads.【F:backend-nodejs/test/adsService.test.js†L1-L188】【F:backend-nodejs/src/models/AdsCampaignMetricModel.js†L32-L187】
 
-G. **Full Upgrade Plan & Release Steps** – Implement unified campaign builder, add previews, integrate pacing analytics, test delivery logic, and launch with advertiser onboarding.
+G. ✓ **Full Upgrade Plan & Release Steps** – Roll out by reseeding placement definitions, running the ads service Vitest suites, refreshing dashboard assets, and staging feed/explorer smoke tests that confirm the placement service decorates content with the new creatives before enabling advertiser onboarding comms.【F:backend-nodejs/src/services/AdsPlacementService.js†L8-L205】【F:backend-nodejs/test/adsService.test.js†L91-L188】【F:frontend-reactjs/src/pages/dashboard/EdulureAds.jsx†L91-L201】
 
 ## 16. Analytics and reporting
 

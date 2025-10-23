@@ -5,17 +5,51 @@ import logger from '../config/logger.js';
 
 const log = logger.child({ service: 'AdsPlacementService' });
 
-const CONTEXT_CONFIG = {
-  global_feed: { interval: 5, maxPerPage: 3, slot: 'feed-inline' },
-  community_feed: { interval: 6, maxPerPage: 3, slot: 'feed-community' },
-  search: { interval: null, maxPerPage: 4, slot: 'search-top' },
-  course_live: { interval: 3, maxPerPage: 2, slot: 'course-live' }
-};
+export const PLACEMENT_CONTEXTS = Object.freeze({
+  global_feed: {
+    interval: 5,
+    maxPerPage: 3,
+    slot: 'feed-inline',
+    surface: 'Discovery Feed',
+    label: 'Discovery feed card'
+  },
+  community_feed: {
+    interval: 6,
+    maxPerPage: 3,
+    slot: 'feed-community',
+    surface: 'Community Feed',
+    label: 'Community feed highlight'
+  },
+  search: {
+    interval: null,
+    maxPerPage: 4,
+    slot: 'search-top',
+    surface: 'Explorer Search',
+    label: 'Search result feature'
+  },
+  course_live: {
+    interval: 3,
+    maxPerPage: 2,
+    slot: 'course-live',
+    surface: 'Live Course',
+    label: 'Live session interstitial'
+  }
+});
 
 const ACTIVE_STATUSES = new Set(['active', 'scheduled']);
 
 function resolveContextConfig(context) {
-  return CONTEXT_CONFIG[context] ?? CONTEXT_CONFIG.global_feed;
+  return PLACEMENT_CONTEXTS[context] ?? PLACEMENT_CONTEXTS.global_feed;
+}
+
+function campaignSupportsContext(campaign, context) {
+  const placements = Array.isArray(campaign.metadata?.placements)
+    ? campaign.metadata.placements
+    : [];
+  if (!placements.length) {
+    return true;
+  }
+  return placements.some((placement) => placement?.context === context);
 }
 
 function isCampaignActive(campaign, now = new Date()) {
@@ -94,6 +128,7 @@ export default class AdsPlacementService {
     const now = new Date();
     const filtered = campaigns
       .filter((campaign) => isCampaignActive(campaign, now))
+      .filter((campaign) => campaignSupportsContext(campaign, context))
       .map((campaign) => ({
         campaign,
         score: rankCampaign(campaign, context)
