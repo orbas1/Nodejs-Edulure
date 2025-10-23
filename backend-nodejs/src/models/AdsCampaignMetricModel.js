@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { castAsBigInt } from '../database/utils/casts.js';
 
 const TABLE = 'ads_campaign_metrics_daily';
 
@@ -91,11 +92,11 @@ export default class AdsCampaignMetricModel {
     const query = connection(TABLE)
       .select({
         campaignId: 'campaign_id',
-        impressions: connection.raw('SUM(impressions)::bigint'),
-        clicks: connection.raw('SUM(clicks)::bigint'),
-        conversions: connection.raw('SUM(conversions)::bigint'),
-        spendCents: connection.raw('SUM(spend_cents)::bigint'),
-        revenueCents: connection.raw('SUM(revenue_cents)::bigint'),
+        impressions: castAsBigInt(connection, 'SUM(impressions)'),
+        clicks: castAsBigInt(connection, 'SUM(clicks)'),
+        conversions: castAsBigInt(connection, 'SUM(conversions)'),
+        spendCents: castAsBigInt(connection, 'SUM(spend_cents)'),
+        revenueCents: castAsBigInt(connection, 'SUM(revenue_cents)'),
         lastMetricDate: connection.raw('MAX(metric_date)')
       })
       .whereIn('campaign_id', campaignIds)
@@ -130,11 +131,11 @@ export default class AdsCampaignMetricModel {
 
     const rows = await connection(TABLE)
       .select({
-        impressions: connection.raw('SUM(impressions)::bigint'),
-        clicks: connection.raw('SUM(clicks)::bigint'),
-        conversions: connection.raw('SUM(conversions)::bigint'),
-        spendCents: connection.raw('SUM(spend_cents)::bigint'),
-        revenueCents: connection.raw('SUM(revenue_cents)::bigint')
+        impressions: castAsBigInt(connection, 'SUM(impressions)'),
+        clicks: castAsBigInt(connection, 'SUM(clicks)'),
+        conversions: castAsBigInt(connection, 'SUM(conversions)'),
+        spendCents: castAsBigInt(connection, 'SUM(spend_cents)'),
+        revenueCents: castAsBigInt(connection, 'SUM(revenue_cents)')
       })
       .where({ campaign_id: campaignId })
       .andWhere('metric_date', '>=', since)

@@ -9,6 +9,7 @@ import ExplorerSearchInteractionModel from '../models/ExplorerSearchInteractionM
 import AnalyticsAlertModel from '../models/AnalyticsAlertModel.js';
 import AnalyticsForecastModel from '../models/AnalyticsForecastModel.js';
 import FeatureFlagModel from '../models/FeatureFlagModel.js';
+import { castAsBigInt } from '../database/utils/casts.js';
 import {
   recordExplorerInteraction,
   recordExplorerSearchEvent
@@ -373,11 +374,11 @@ export class ExplorerAnalyticsService {
   async loadAdsSummary({ since, until }) {
     const query = db('ads_campaign_metrics_daily')
       .select({
-        impressions: db.raw('SUM(impressions)::bigint'),
-        clicks: db.raw('SUM(clicks)::bigint'),
-        conversions: db.raw('SUM(conversions)::bigint'),
-        spendCents: db.raw('SUM(spend_cents)::bigint'),
-        revenueCents: db.raw('SUM(revenue_cents)::bigint')
+        impressions: castAsBigInt(db, 'SUM(impressions)'),
+        clicks: castAsBigInt(db, 'SUM(clicks)'),
+        conversions: castAsBigInt(db, 'SUM(conversions)'),
+        spendCents: castAsBigInt(db, 'SUM(spend_cents)'),
+        revenueCents: castAsBigInt(db, 'SUM(revenue_cents)')
       });
     if (since) {
       query.andWhere('metric_date', '>=', since);

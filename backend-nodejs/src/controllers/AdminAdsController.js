@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
 import db from '../config/database.js';
+import { castAsBigInt } from '../database/utils/casts.js';
 import AdsCampaignModel from '../models/AdsCampaignModel.js';
 import { paginated, created, success } from '../utils/httpResponse.js';
 
@@ -176,6 +177,8 @@ export default class AdminAdsController {
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY);
 
+      const fourteenDaysAgo = new Date(now.getTime() - 14 * DAY);
+
       const [campaignTotals, metricsRow, topCampaigns] = await Promise.all([
         db('ads_campaigns')
           .select({
@@ -185,11 +188,11 @@ export default class AdminAdsController {
           .first(),
         db('ads_campaign_metrics_daily')
           .select({
-            impressions: db.raw('SUM(impressions)::bigint'),
-            clicks: db.raw('SUM(clicks)::bigint'),
-            conversions: db.raw('SUM(conversions)::bigint'),
-            spendCents: db.raw('SUM(spend_cents)::bigint'),
-            revenueCents: db.raw('SUM(revenue_cents)::bigint')
+            impressions: castAsBigInt(db, 'SUM(impressions)'),
+            clicks: castAsBigInt(db, 'SUM(clicks)'),
+            conversions: castAsBigInt(db, 'SUM(conversions)'),
+            spendCents: castAsBigInt(db, 'SUM(spend_cents)'),
+            revenueCents: castAsBigInt(db, 'SUM(revenue_cents)')
           })
           .where('metric_date', '>=', thirtyDaysAgo)
           .first(),
@@ -199,28 +202,28 @@ export default class AdminAdsController {
             campaignId: 'm.campaign_id',
             name: 'c.name',
             status: 'c.status',
-            impressions: db.raw('SUM(m.impressions)::bigint'),
-            clicks: db.raw('SUM(m.clicks)::bigint'),
-            conversions: db.raw('SUM(m.conversions)::bigint'),
-            spendCents: db.raw('SUM(m.spend_cents)::bigint'),
-            revenueCents: db.raw('SUM(m.revenue_cents)::bigint')
+            impressions: castAsBigInt(db, 'SUM(m.impressions)'),
+            clicks: castAsBigInt(db, 'SUM(m.clicks)'),
+            conversions: castAsBigInt(db, 'SUM(m.conversions)'),
+            spendCents: castAsBigInt(db, 'SUM(m.spend_cents)'),
+            revenueCents: castAsBigInt(db, 'SUM(m.revenue_cents)')
           })
           .where('m.metric_date', '>=', thirtyDaysAgo)
           .groupBy('m.campaign_id', 'c.name', 'c.status')
-          .orderByRaw('SUM(m.revenue_cents) - SUM(m.spend_cents) DESC NULLS LAST')
+          .orderByRaw('COALESCE(SUM(m.revenue_cents) - SUM(m.spend_cents), 0) DESC')
           .limit(5)
       ]);
 
       const recentWindow = await db('ads_campaign_metrics_daily as m')
         .select({
           metricDate: 'm.metric_date',
-          impressions: db.raw('SUM(m.impressions)::bigint'),
-          clicks: db.raw('SUM(m.clicks)::bigint'),
-          conversions: db.raw('SUM(m.conversions)::bigint'),
-          spendCents: db.raw('SUM(m.spend_cents)::bigint'),
-          revenueCents: db.raw('SUM(m.revenue_cents)::bigint')
+          impressions: castAsBigInt(db, 'SUM(m.impressions)'),
+          clicks: castAsBigInt(db, 'SUM(m.clicks)'),
+          conversions: castAsBigInt(db, 'SUM(m.conversions)'),
+          spendCents: castAsBigInt(db, 'SUM(m.spend_cents)'),
+          revenueCents: castAsBigInt(db, 'SUM(m.revenue_cents)')
         })
-        .where('m.metric_date', '>=', db.raw("current_date - interval '14 days'"))
+        .where('m.metric_date', '>=', fourteenDaysAgo)
         .groupBy('m.metric_date')
         .orderBy('m.metric_date', 'asc');
 

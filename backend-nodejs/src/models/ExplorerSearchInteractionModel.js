@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { castAsBigInt } from '../database/utils/casts.js';
 
 function parseJson(value, fallback = {}) {
   if (value === null || value === undefined) {
@@ -54,7 +55,7 @@ export default class ExplorerSearchInteractionModel {
       .select({
         entityType: 'entity_type',
         interactionType: 'interaction_type',
-        count: connection.raw('COUNT(*)::bigint')
+        count: castAsBigInt(connection, 'COUNT(*)')
       })
       .where({ event_id: eventId })
       .groupBy('entity_type', 'interaction_type');

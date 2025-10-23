@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
 import db from '../config/database.js';
+import { castAsBigInt } from '../database/utils/casts.js';
 import RevenueAdjustmentModel from '../models/RevenueAdjustmentModel.js';
 import { paginated, created, success } from '../utils/httpResponse.js';
 
@@ -100,35 +101,48 @@ export default class AdminRevenueManagementController {
       const DAY = 24 * 60 * 60 * 1000;
       const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY);
 
+      const fourteenDaysAgo = new Date(now.getTime() - 13 * DAY);
+
       const [paymentsRow, adjustmentsSummary, scheduleRow, revenueTrend] = await Promise.all([
         db('payment_intents')
           .select({
-            capturedCents: db.raw(
-              "SUM(CASE WHEN status IN ('succeeded', 'requires_capture') THEN amount_total ELSE 0 END)::bigint"
+            capturedCents: castAsBigInt(
+              db,
+              "SUM(CASE WHEN status IN ('succeeded', 'requires_capture') THEN amount_total ELSE 0 END)"
             ),
-            pendingCents: db.raw(
-              "SUM(CASE WHEN status IN ('processing', 'requires_action') THEN amount_total ELSE 0 END)::bigint"
+            pendingCents: castAsBigInt(
+              db,
+              "SUM(CASE WHEN status IN ('processing', 'requires_action') THEN amount_total ELSE 0 END)"
             ),
-            refundedCents: db.raw('SUM(amount_refunded)::bigint'),
-            totalIntents: db.raw('COUNT(*)')
+            refundedCents: castAsBigInt(db, 'SUM(amount_refunded)'),
+            totalIntents: castAsBigInt(db, 'COUNT(*)')
           })
           .first(),
         RevenueAdjustmentModel.summariseWindow({ since: thirtyDaysAgo, until: now }),
         db('monetization_revenue_schedules')
           .select({
-            scheduledCents: db.raw("SUM(CASE WHEN status = 'pending' THEN amount_cents ELSE 0 END)::bigint"),
-            recognisedCents: db.raw("SUM(CASE WHEN status = 'recognized' THEN recognized_amount_cents ELSE 0 END)::bigint"),
-            inFlight: db.raw("SUM(CASE WHEN status IN ('pending','processing') THEN amount_cents ELSE 0 END)::bigint"),
-            totalSchedules: db.raw('COUNT(*)')
+            scheduledCents: castAsBigInt(
+              db,
+              "SUM(CASE WHEN status = 'pending' THEN amount_cents ELSE 0 END)"
+            ),
+            recognisedCents: castAsBigInt(
+              db,
+              "SUM(CASE WHEN status = 'recognized' THEN recognized_amount_cents ELSE 0 END)"
+            ),
+            inFlight: castAsBigInt(
+              db,
+              "SUM(CASE WHEN status IN ('pending','processing') THEN amount_cents ELSE 0 END)"
+            ),
+            totalSchedules: castAsBigInt(db, 'COUNT(*)')
           })
           .first(),
         db('reporting_payments_revenue_daily')
           .select({
             date: 'reporting_date',
-            grossCents: db.raw('SUM(gross_volume_cents)::bigint'),
-            recognisedCents: db.raw('SUM(recognised_volume_cents)::bigint')
+            grossCents: castAsBigInt(db, 'SUM(gross_volume_cents)'),
+            recognisedCents: castAsBigInt(db, 'SUM(recognised_volume_cents)')
           })
-          .where('reporting_date', '>=', db.raw("current_date - interval '13 days'"))
+          .where('reporting_date', '>=', fourteenDaysAgo)
           .groupBy('reporting_date')
           .orderBy('reporting_date', 'asc')
       ]);

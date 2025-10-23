@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import { castAsBigInt } from '../database/utils/casts.js';
 
 const TABLE = 'revenue_adjustments';
 
@@ -185,15 +186,18 @@ export default class RevenueAdjustmentModel {
   static async summariseWindow({ since, until } = {}, connection = db) {
     const query = connection(TABLE)
       .select({
-        totalAmountCents: connection.raw('SUM(amount_cents)::bigint'),
-        scheduledAmountCents: connection.raw(
-          "SUM(CASE WHEN status = 'scheduled' THEN amount_cents ELSE 0 END)::bigint"
+        totalAmountCents: castAsBigInt(connection, 'SUM(amount_cents)'),
+        scheduledAmountCents: castAsBigInt(
+          connection,
+          "SUM(CASE WHEN status = 'scheduled' THEN amount_cents ELSE 0 END)"
         ),
-        approvedAmountCents: connection.raw(
-          "SUM(CASE WHEN status = 'approved' THEN amount_cents ELSE 0 END)::bigint"
+        approvedAmountCents: castAsBigInt(
+          connection,
+          "SUM(CASE WHEN status = 'approved' THEN amount_cents ELSE 0 END)"
         ),
-        settledAmountCents: connection.raw(
-          "SUM(CASE WHEN status = 'settled' THEN amount_cents ELSE 0 END)::bigint"
+        settledAmountCents: castAsBigInt(
+          connection,
+          "SUM(CASE WHEN status = 'settled' THEN amount_cents ELSE 0 END)"
         )
       });
 

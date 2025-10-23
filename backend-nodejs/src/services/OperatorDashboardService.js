@@ -19,6 +19,7 @@ import PlatformSettingsService, {
   normaliseMonetization as exportedNormaliseMonetization
 } from './PlatformSettingsService.js';
 import { runtimeConfigService } from './FeatureFlagService.js';
+import { castAsBigInt } from '../database/utils/casts.js';
 
 const mergeWithDefaults = (defaults, payload) => {
   const base = structuredClone(defaults);
@@ -1289,22 +1290,32 @@ export default class OperatorDashboardService {
     try {
       paymentsRow = await db('payment_intents')
         .select({
-          succeededIntents: db.raw("SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)::bigint"),
-          processingIntents: db.raw(
-            "SUM(CASE WHEN status IN ('processing','requires_capture') THEN 1 ELSE 0 END)::bigint"
+          succeededIntents: castAsBigInt(
+            db,
+            "SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END)"
           ),
-          requiresActionIntents: db.raw(
-            "SUM(CASE WHEN status IN ('requires_action','requires_payment_method') THEN 1 ELSE 0 END)::bigint"
+          processingIntents: castAsBigInt(
+            db,
+            "SUM(CASE WHEN status IN ('processing','requires_capture') THEN 1 ELSE 0 END)"
           ),
-          failedIntents: db.raw("SUM(CASE WHEN status IN ('canceled','failed') THEN 1 ELSE 0 END)::bigint"),
-          totalIntents: db.raw('COUNT(*)::bigint'),
-          capturedCents: db.raw(
-            "SUM(CASE WHEN status IN ('succeeded','requires_capture') THEN amount_total ELSE 0 END)::bigint"
+          requiresActionIntents: castAsBigInt(
+            db,
+            "SUM(CASE WHEN status IN ('requires_action','requires_payment_method') THEN 1 ELSE 0 END)"
           ),
-          pendingCents: db.raw(
-            "SUM(CASE WHEN status IN ('processing','requires_action') THEN amount_total ELSE 0 END)::bigint"
+          failedIntents: castAsBigInt(
+            db,
+            "SUM(CASE WHEN status IN ('canceled','failed') THEN 1 ELSE 0 END)"
           ),
-          refundedCents: db.raw('SUM(amount_refunded)::bigint')
+          totalIntents: castAsBigInt(db, 'COUNT(*)'),
+          capturedCents: castAsBigInt(
+            db,
+            "SUM(CASE WHEN status IN ('succeeded','requires_capture') THEN amount_total ELSE 0 END)"
+          ),
+          pendingCents: castAsBigInt(
+            db,
+            "SUM(CASE WHEN status IN ('processing','requires_action') THEN amount_total ELSE 0 END)"
+          ),
+          refundedCents: castAsBigInt(db, 'SUM(amount_refunded)')
         })
         .where('created_at', '>=', thirtyDaysAgo)
         .first();
