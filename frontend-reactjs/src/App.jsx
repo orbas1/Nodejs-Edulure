@@ -1,95 +1,105 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout.jsx';
-import Home from './pages/Home.jsx';
-import Login from './pages/Login.jsx';
-import Register from './pages/Register.jsx';
-import InstructorRegister from './pages/InstructorRegister.jsx';
-import Feed from './pages/Feed.jsx';
-import Profile from './pages/Profile.jsx';
-import Explorer from './pages/Explorer.jsx';
-import Analytics from './pages/Analytics.jsx';
-import Admin from './pages/Admin.jsx';
-import ContentLibrary from './pages/ContentLibrary.jsx';
-import LiveClassrooms from './pages/LiveClassrooms.jsx';
-import Ebooks from './pages/Ebooks.jsx';
-import Courses from './pages/Courses.jsx';
-import About from './pages/About.jsx';
-import Privacy from './pages/Privacy.jsx';
-import Terms from './pages/Terms.jsx';
-import Blog from './pages/Blog.jsx';
-import BlogPost from './pages/BlogPost.jsx';
-import Communities from './pages/Communities.jsx';
-import TutorProfile from './pages/TutorProfile.jsx';
-import IntegrationCredentialInvite from './pages/IntegrationCredentialInvite.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
-import Setup from './pages/Setup.jsx';
-import DashboardHome from './pages/dashboard/DashboardHome.jsx';
-import LearnerCommunities from './pages/dashboard/LearnerCommunities.jsx';
-import LearnerCourses from './pages/dashboard/LearnerCourses.jsx';
-import CourseViewer from './pages/dashboard/CourseViewer.jsx';
-import DashboardCalendar from './pages/dashboard/DashboardCalendar.jsx';
-import DashboardBookingsSwitch from './pages/dashboard/DashboardBookingsSwitch.jsx';
-import DashboardEbooksSwitch from './pages/dashboard/DashboardEbooksSwitch.jsx';
-import LearnerFinancial from './pages/dashboard/LearnerFinancial.jsx';
-import LearnerGrowth from './pages/dashboard/LearnerGrowth.jsx';
-import BecomeInstructor from './pages/dashboard/BecomeInstructor.jsx';
-import DashboardAffiliate from './pages/dashboard/DashboardAffiliate.jsx';
-import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
-import InstructorCommunityCreate from './pages/dashboard/InstructorCommunityCreate.jsx';
-import InstructorCommunityManage from './pages/dashboard/InstructorCommunityManage.jsx';
-import InstructorCommunityChats from './pages/dashboard/InstructorCommunityChats.jsx';
-import InstructorCommunityWebinars from './pages/dashboard/InstructorCommunityWebinars.jsx';
-import InstructorCommunityPodcasts from './pages/dashboard/InstructorCommunityPodcasts.jsx';
-import InstructorCommunityOperations from './pages/dashboard/InstructorCommunityOperations.jsx';
-import InstructorCourseCreate from './pages/dashboard/InstructorCourseCreate.jsx';
-import InstructorCourseLibrary from './pages/dashboard/InstructorCourseLibrary.jsx';
-import InstructorCourseManage from './pages/dashboard/InstructorCourseManage.jsx';
-import InstructorCreationStudio from './pages/dashboard/InstructorCreationStudio.jsx';
-import InstructorLessonSchedule from './pages/dashboard/InstructorLessonSchedule.jsx';
-import InstructorTutorSchedule from './pages/dashboard/InstructorTutorSchedule.jsx';
-import InstructorTutorManagement from './pages/dashboard/InstructorTutorManagement.jsx';
-import InstructorServiceSuite from './pages/dashboard/InstructorServiceSuite.jsx';
-import InstructorProjects from './pages/dashboard/InstructorProjects.jsx';
-import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
-import InstructorGrowth from './pages/dashboard/InstructorGrowth.jsx';
-import EdulureAds from './pages/dashboard/EdulureAds.jsx';
-import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
-import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
-import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
-import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
-import FieldServices from './pages/dashboard/FieldServices.jsx';
-import AdminOperator from './pages/dashboard/AdminOperator.jsx';
-import AdminGovernance from './pages/dashboard/AdminGovernance.jsx';
-import AdminIntegrations from './pages/dashboard/AdminIntegrations.jsx';
-import AdminFinanceMonetisation from './pages/dashboard/admin/AdminFinanceMonetisation.jsx';
-import AdminSupportHub from './pages/dashboard/admin/AdminSupportHub.jsx';
-import AdminTrustSafety from './pages/dashboard/admin/AdminTrustSafety.jsx';
-import AdminControl from './pages/dashboard/AdminControl.jsx';
-import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
-import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
-import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
-import CommunitySafety from './pages/dashboard/community/CommunitySafety.jsx';
-import CommunityCommunications from './pages/dashboard/community/CommunityCommunications.jsx';
-import LearnerSocial from './pages/dashboard/LearnerSocial.jsx';
-import LearnerCommunityChats from './pages/dashboard/LearnerCommunityChats.jsx';
-import LearnerSupport from './pages/dashboard/LearnerSupport.jsx';
-import LearnerSettings from './pages/dashboard/LearnerSettings.jsx';
+import RouteLoading from './components/loading/RouteLoading.jsx';
+
+const Home = lazy(() => import('./pages/Home.jsx'));
+const Login = lazy(() => import('./pages/Login.jsx'));
+const Register = lazy(() => import('./pages/Register.jsx'));
+const InstructorRegister = lazy(() => import('./pages/InstructorRegister.jsx'));
+const Feed = lazy(() => import('./pages/Feed.jsx'));
+const Profile = lazy(() => import('./pages/Profile.jsx'));
+const Explorer = lazy(() => import('./pages/Explorer.jsx'));
+const Analytics = lazy(() => import('./pages/Analytics.jsx'));
+const Admin = lazy(() => import('./pages/Admin.jsx'));
+const ContentLibrary = lazy(() => import('./pages/ContentLibrary.jsx'));
+const LiveClassrooms = lazy(() => import('./pages/LiveClassrooms.jsx'));
+const Ebooks = lazy(() => import('./pages/Ebooks.jsx'));
+const Courses = lazy(() => import('./pages/Courses.jsx'));
+const About = lazy(() => import('./pages/About.jsx'));
+const Privacy = lazy(() => import('./pages/Privacy.jsx'));
+const Terms = lazy(() => import('./pages/Terms.jsx'));
+const Blog = lazy(() => import('./pages/Blog.jsx'));
+const BlogPost = lazy(() => import('./pages/BlogPost.jsx'));
+const Communities = lazy(() => import('./pages/Communities.jsx'));
+const TutorProfile = lazy(() => import('./pages/TutorProfile.jsx'));
+const IntegrationCredentialInvite = lazy(() => import('./pages/IntegrationCredentialInvite.jsx'));
+const Setup = lazy(() => import('./pages/Setup.jsx'));
+
+const DashboardHome = lazy(() => import('./pages/dashboard/DashboardHome.jsx'));
+const LearnerCommunities = lazy(() => import('./pages/dashboard/LearnerCommunities.jsx'));
+const LearnerCourses = lazy(() => import('./pages/dashboard/LearnerCourses.jsx'));
+const CourseViewer = lazy(() => import('./pages/dashboard/CourseViewer.jsx'));
+const DashboardCalendar = lazy(() => import('./pages/dashboard/DashboardCalendar.jsx'));
+const DashboardBookingsSwitch = lazy(() => import('./pages/dashboard/DashboardBookingsSwitch.jsx'));
+const DashboardEbooksSwitch = lazy(() => import('./pages/dashboard/DashboardEbooksSwitch.jsx'));
+const LearnerFinancial = lazy(() => import('./pages/dashboard/LearnerFinancial.jsx'));
+const LearnerGrowth = lazy(() => import('./pages/dashboard/LearnerGrowth.jsx'));
+const BecomeInstructor = lazy(() => import('./pages/dashboard/BecomeInstructor.jsx'));
+const DashboardAffiliate = lazy(() => import('./pages/dashboard/DashboardAffiliate.jsx'));
+const DashboardLiveClassesSwitch = lazy(() => import('./pages/dashboard/DashboardLiveClassesSwitch.jsx'));
+const InstructorCommunityCreate = lazy(() => import('./pages/dashboard/InstructorCommunityCreate.jsx'));
+const InstructorCommunityManage = lazy(() => import('./pages/dashboard/InstructorCommunityManage.jsx'));
+const InstructorCommunityChats = lazy(() => import('./pages/dashboard/InstructorCommunityChats.jsx'));
+const InstructorCommunityWebinars = lazy(() => import('./pages/dashboard/InstructorCommunityWebinars.jsx'));
+const InstructorCommunityPodcasts = lazy(() => import('./pages/dashboard/InstructorCommunityPodcasts.jsx'));
+const InstructorCommunityOperations = lazy(() => import('./pages/dashboard/InstructorCommunityOperations.jsx'));
+const InstructorCourseCreate = lazy(() => import('./pages/dashboard/InstructorCourseCreate.jsx'));
+const InstructorCourseLibrary = lazy(() => import('./pages/dashboard/InstructorCourseLibrary.jsx'));
+const InstructorCourseManage = lazy(() => import('./pages/dashboard/InstructorCourseManage.jsx'));
+const InstructorCreationStudio = lazy(() => import('./pages/dashboard/InstructorCreationStudio.jsx'));
+const InstructorLessonSchedule = lazy(() => import('./pages/dashboard/InstructorLessonSchedule.jsx'));
+const InstructorTutorSchedule = lazy(() => import('./pages/dashboard/InstructorTutorSchedule.jsx'));
+const InstructorTutorManagement = lazy(() => import('./pages/dashboard/InstructorTutorManagement.jsx'));
+const InstructorServiceSuite = lazy(() => import('./pages/dashboard/InstructorServiceSuite.jsx'));
+const InstructorProjects = lazy(() => import('./pages/dashboard/InstructorProjects.jsx'));
+const InstructorEbookCreate = lazy(() => import('./pages/dashboard/InstructorEbookCreate.jsx'));
+const InstructorGrowth = lazy(() => import('./pages/dashboard/InstructorGrowth.jsx'));
+const EdulureAds = lazy(() => import('./pages/dashboard/EdulureAds.jsx'));
+const InstructorPricing = lazy(() => import('./pages/dashboard/InstructorPricing.jsx'));
+const DashboardInbox = lazy(() => import('./pages/dashboard/DashboardInbox.jsx'));
+const DashboardAssessments = lazy(() => import('./pages/dashboard/DashboardAssessments.jsx'));
+const DashboardSettings = lazy(() => import('./pages/dashboard/DashboardSettings.jsx'));
+const FieldServices = lazy(() => import('./pages/dashboard/FieldServices.jsx'));
+const AdminOperator = lazy(() => import('./pages/dashboard/AdminOperator.jsx'));
+const AdminGovernance = lazy(() => import('./pages/dashboard/AdminGovernance.jsx'));
+const AdminIntegrations = lazy(() => import('./pages/dashboard/AdminIntegrations.jsx'));
+const AdminFinanceMonetisation = lazy(() => import('./pages/dashboard/admin/AdminFinanceMonetisation.jsx'));
+const AdminSupportHub = lazy(() => import('./pages/dashboard/admin/AdminSupportHub.jsx'));
+const AdminTrustSafety = lazy(() => import('./pages/dashboard/admin/AdminTrustSafety.jsx'));
+const AdminControl = lazy(() => import('./pages/dashboard/AdminControl.jsx'));
+const CommunityOperations = lazy(() => import('./pages/dashboard/community/CommunityOperations.jsx'));
+const CommunityProgramming = lazy(() => import('./pages/dashboard/community/CommunityProgramming.jsx'));
+const CommunityMonetisation = lazy(() => import('./pages/dashboard/community/CommunityMonetisation.jsx'));
+const CommunitySafety = lazy(() => import('./pages/dashboard/community/CommunitySafety.jsx'));
+const CommunityCommunications = lazy(() => import('./pages/dashboard/community/CommunityCommunications.jsx'));
+const LearnerSocial = lazy(() => import('./pages/dashboard/LearnerSocial.jsx'));
+const LearnerCommunityChats = lazy(() => import('./pages/dashboard/LearnerCommunityChats.jsx'));
+const LearnerSupport = lazy(() => import('./pages/dashboard/LearnerSupport.jsx'));
+const LearnerSettings = lazy(() => import('./pages/dashboard/LearnerSettings.jsx'));
+
+const renderWithSuspense = (Component, label) => (
+  <Suspense fallback={<RouteLoading label={label} />}>
+    <Component />
+  </Suspense>
+);
 
 function App() {
   return (
     <Routes>
       <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/instructor" element={<InstructorRegister />} />
+        <Route path="/" element={renderWithSuspense(Home, 'Loading Edulure home')} />
+        <Route path="/login" element={renderWithSuspense(Login, 'Loading login form')} />
+        <Route path="/register" element={renderWithSuspense(Register, 'Loading registration')} />
+        <Route path="/instructor" element={renderWithSuspense(InstructorRegister, 'Preparing instructor onboarding')} />
         <Route
           path="/communities"
           element={(
             <ProtectedRoute allowedRoles={['admin', 'moderator', 'owner', 'member', 'non-member']}>
-              <Communities />
+              {renderWithSuspense(Communities, 'Loading communities experience')}
             </ProtectedRoute>
           )}
         />
@@ -97,7 +107,7 @@ function App() {
           path="/feed"
           element={(
             <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin', 'moderator']}>
-              <Feed />
+              {renderWithSuspense(Feed, 'Loading personalised feed')}
             </ProtectedRoute>
           )}
         />
@@ -105,7 +115,7 @@ function App() {
           path="/profile"
           element={(
             <ProtectedRoute>
-              <Profile />
+              {renderWithSuspense(Profile, 'Loading profile dashboard')}
             </ProtectedRoute>
           )}
         />
@@ -113,7 +123,7 @@ function App() {
           path="/explorer"
           element={(
             <ProtectedRoute allowedRoles={['user', 'instructor', 'admin']}>
-              <Explorer />
+              {renderWithSuspense(Explorer, 'Loading explorer surface')}
             </ProtectedRoute>
           )}
         />
@@ -121,7 +131,7 @@ function App() {
           path="/analytics"
           element={(
             <ProtectedRoute allowedRoles={['instructor', 'admin']}>
-              <Analytics />
+              {renderWithSuspense(Analytics, 'Loading analytics workspace')}
             </ProtectedRoute>
           )}
         />
@@ -129,7 +139,7 @@ function App() {
           path="/admin"
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
-              <Admin />
+              {renderWithSuspense(Admin, 'Loading admin overview')}
             </ProtectedRoute>
           )}
         />
@@ -137,23 +147,26 @@ function App() {
           path="/content"
           element={(
             <ProtectedRoute allowedRoles={['instructor', 'admin']}>
-              <ContentLibrary />
+              {renderWithSuspense(ContentLibrary, 'Loading content library')}
             </ProtectedRoute>
           )}
         />
-        <Route path="/live-classrooms" element={<LiveClassrooms />} />
-        <Route path="/courses" element={<Courses />} />
-        <Route path="/ebooks" element={<Ebooks />} />
-        <Route path="/tutors" element={<TutorProfile />} />
-        <Route path="/blog" element={<Blog />} />
-        <Route path="/blog/:slug" element={<BlogPost />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/integrations/credential-invite/:token" element={<IntegrationCredentialInvite />} />
-        <Route path="/setup" element={<Setup />} />
+        <Route path="/live-classrooms" element={renderWithSuspense(LiveClassrooms, 'Loading live classrooms')} />
+        <Route path="/courses" element={renderWithSuspense(Courses, 'Loading course catalogue')} />
+        <Route path="/ebooks" element={renderWithSuspense(Ebooks, 'Loading ebooks marketplace')} />
+        <Route path="/tutors" element={renderWithSuspense(TutorProfile, 'Loading tutor profiles')} />
+        <Route path="/blog" element={renderWithSuspense(Blog, 'Loading Edulure blog')} />
+        <Route path="/blog/:slug" element={renderWithSuspense(BlogPost, 'Loading blog post')} />
+        <Route path="/about" element={renderWithSuspense(About, 'Loading about Edulure')} />
+        <Route path="/privacy" element={renderWithSuspense(Privacy, 'Loading privacy policy')} />
+        <Route path="/terms" element={renderWithSuspense(Terms, 'Loading terms and conditions')} />
+        <Route
+          path="/integrations/credential-invite/:token"
+          element={renderWithSuspense(IntegrationCredentialInvite, 'Loading credential invite')}
+        />
+        <Route path="/setup" element={renderWithSuspense(Setup, 'Preparing setup wizard')} />
       </Route>
-      <Route path="/dashboard" element={<DashboardEntryRedirect />} />
+      <Route path="/dashboard" element={renderWithSuspense(DashboardEntryRedirect, 'Evaluating dashboard destination')} />
       <Route
         path="/dashboard/:role"
         element={(
@@ -162,29 +175,29 @@ function App() {
           </ProtectedRoute>
         )}
       >
-        <Route index element={<DashboardHome />} />
-        <Route path="communities" element={<LearnerCommunities />} />
-        <Route path="community-chats" element={<LearnerCommunityChats />} />
-        <Route path="courses" element={<LearnerCourses />} />
-        <Route path="courses/:courseId" element={<CourseViewer />} />
-        <Route path="social" element={<LearnerSocial />} />
-        <Route path="assessments" element={<DashboardAssessments />} />
-        <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
-        <Route path="calendar" element={<DashboardCalendar />} />
-        <Route path="bookings" element={<DashboardBookingsSwitch />} />
-        <Route path="support" element={<LearnerSupport />} />
-        <Route path="ebooks" element={<DashboardEbooksSwitch />} />
-        <Route path="financial" element={<LearnerFinancial />} />
-        <Route path="settings" element={<LearnerSettings />} />
-        <Route path="growth" element={<LearnerGrowth />} />
-        <Route path="affiliate" element={<DashboardAffiliate />} />
-        <Route path="become-instructor" element={<BecomeInstructor />} />
-        <Route path="field-services" element={<FieldServices />} />
+        <Route index element={renderWithSuspense(DashboardHome, 'Loading dashboard home')} />
+        <Route path="communities" element={renderWithSuspense(LearnerCommunities, 'Loading learner communities')} />
+        <Route path="community-chats" element={renderWithSuspense(LearnerCommunityChats, 'Loading community chats')} />
+        <Route path="courses" element={renderWithSuspense(LearnerCourses, 'Loading enrolled courses')} />
+        <Route path="courses/:courseId" element={renderWithSuspense(CourseViewer, 'Loading course viewer')} />
+        <Route path="social" element={renderWithSuspense(LearnerSocial, 'Loading social hub')} />
+        <Route path="assessments" element={renderWithSuspense(DashboardAssessments, 'Loading assessments')} />
+        <Route path="live-classes" element={renderWithSuspense(DashboardLiveClassesSwitch, 'Loading live classes')} />
+        <Route path="calendar" element={renderWithSuspense(DashboardCalendar, 'Loading calendar')} />
+        <Route path="bookings" element={renderWithSuspense(DashboardBookingsSwitch, 'Loading bookings')} />
+        <Route path="support" element={renderWithSuspense(LearnerSupport, 'Loading support centre')} />
+        <Route path="ebooks" element={renderWithSuspense(DashboardEbooksSwitch, 'Loading digital library')} />
+        <Route path="financial" element={renderWithSuspense(LearnerFinancial, 'Loading financial dashboard')} />
+        <Route path="settings" element={renderWithSuspense(LearnerSettings, 'Loading learner settings')} />
+        <Route path="growth" element={renderWithSuspense(LearnerGrowth, 'Loading learner growth analytics')} />
+        <Route path="affiliate" element={renderWithSuspense(DashboardAffiliate, 'Loading affiliate tools')} />
+        <Route path="become-instructor" element={renderWithSuspense(BecomeInstructor, 'Loading instructor onboarding')} />
+        <Route path="field-services" element={renderWithSuspense(FieldServices, 'Loading field services hub')} />
         <Route
           path="operations"
           element={(
             <ProtectedRoute allowedRoles={['community']}>
-              <CommunityOperations />
+              {renderWithSuspense(CommunityOperations, 'Loading community operations')}
             </ProtectedRoute>
           )}
         />
@@ -192,7 +205,7 @@ function App() {
           path="programming"
           element={(
             <ProtectedRoute allowedRoles={['community']}>
-              <CommunityProgramming />
+              {renderWithSuspense(CommunityProgramming, 'Loading programming workspace')}
             </ProtectedRoute>
           )}
         />
@@ -200,7 +213,7 @@ function App() {
           path="monetisation"
           element={(
             <ProtectedRoute allowedRoles={['community']}>
-              <CommunityMonetisation />
+              {renderWithSuspense(CommunityMonetisation, 'Loading community monetisation')}
             </ProtectedRoute>
           )}
         />
@@ -208,7 +221,7 @@ function App() {
           path="safety"
           element={(
             <ProtectedRoute allowedRoles={['community']}>
-              <CommunitySafety />
+              {renderWithSuspense(CommunitySafety, 'Loading community safety centre')}
             </ProtectedRoute>
           )}
         />
@@ -216,45 +229,45 @@ function App() {
           path="communications"
           element={(
             <ProtectedRoute allowedRoles={['community']}>
-              <CommunityCommunications />
+              {renderWithSuspense(CommunityCommunications, 'Loading communications tools')}
             </ProtectedRoute>
           )}
         />
-        <Route path="communities/create" element={<InstructorCommunityCreate />} />
-        <Route path="communities/manage" element={<InstructorCommunityManage />} />
+        <Route path="communities/create" element={renderWithSuspense(InstructorCommunityCreate, 'Loading community creator')} />
+        <Route path="communities/manage" element={renderWithSuspense(InstructorCommunityManage, 'Loading community management')} />
         <Route
           path="communities/operations"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorCommunityOperations />
+              {renderWithSuspense(InstructorCommunityOperations, 'Loading instructor community operations')}
             </ProtectedRoute>
           )}
         />
-        <Route path="communities/chats" element={<InstructorCommunityChats />} />
-        <Route path="communities/webinars" element={<InstructorCommunityWebinars />} />
-        <Route path="communities/podcasts" element={<InstructorCommunityPodcasts />} />
+        <Route path="communities/chats" element={renderWithSuspense(InstructorCommunityChats, 'Loading instructor chats')} />
+        <Route path="communities/webinars" element={renderWithSuspense(InstructorCommunityWebinars, 'Loading webinars studio')} />
+        <Route path="communities/podcasts" element={renderWithSuspense(InstructorCommunityPodcasts, 'Loading podcasts studio')} />
         <Route
           path="creation-studio"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorCreationStudio />
+              {renderWithSuspense(InstructorCreationStudio, 'Loading creation studio')}
             </ProtectedRoute>
           )}
         />
-        <Route path="courses/create" element={<InstructorCourseCreate />} />
-        <Route path="courses/library" element={<InstructorCourseLibrary />} />
-        <Route path="courses/manage" element={<InstructorCourseManage />} />
-        <Route path="inbox" element={<DashboardInbox />} />
-        <Route path="growth" element={<InstructorGrowth />} />
-        <Route path="pricing" element={<InstructorPricing />} />
-        <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
-        <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
-        <Route path="tutor-management" element={<InstructorTutorManagement />} />
+        <Route path="courses/create" element={renderWithSuspense(InstructorCourseCreate, 'Loading course creator')} />
+        <Route path="courses/library" element={renderWithSuspense(InstructorCourseLibrary, 'Loading course library')} />
+        <Route path="courses/manage" element={renderWithSuspense(InstructorCourseManage, 'Loading course manager')} />
+        <Route path="inbox" element={renderWithSuspense(DashboardInbox, 'Loading inbox')} />
+        <Route path="growth" element={renderWithSuspense(InstructorGrowth, 'Loading instructor growth analytics')} />
+        <Route path="pricing" element={renderWithSuspense(InstructorPricing, 'Loading pricing workspace')} />
+        <Route path="lesson-schedule" element={renderWithSuspense(InstructorLessonSchedule, 'Loading lesson schedule')} />
+        <Route path="tutor-schedule" element={renderWithSuspense(InstructorTutorSchedule, 'Loading tutor schedule')} />
+        <Route path="tutor-management" element={renderWithSuspense(InstructorTutorManagement, 'Loading tutor management')} />
         <Route
           path="control"
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminControl />
+              {renderWithSuspense(AdminControl, 'Loading admin control centre')}
             </ProtectedRoute>
           )}
         />
@@ -262,7 +275,7 @@ function App() {
           path="operator"
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminOperator />
+              {renderWithSuspense(AdminOperator, 'Loading operator console')}
             </ProtectedRoute>
           )}
         />
@@ -270,7 +283,7 @@ function App() {
           path="integrations"
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminIntegrations />
+              {renderWithSuspense(AdminIntegrations, 'Loading integrations hub')}
             </ProtectedRoute>
           )}
         />
@@ -278,7 +291,7 @@ function App() {
           path="finance"
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminFinanceMonetisation />
+              {renderWithSuspense(AdminFinanceMonetisation, 'Loading finance insights')}
             </ProtectedRoute>
           )}
         />
@@ -286,7 +299,7 @@ function App() {
           path="trust-safety"
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminTrustSafety />
+              {renderWithSuspense(AdminTrustSafety, 'Loading trust & safety tools')}
             </ProtectedRoute>
           )}
         />
@@ -294,7 +307,7 @@ function App() {
           path="support"
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminSupportHub />
+              {renderWithSuspense(AdminSupportHub, 'Loading support hub')}
             </ProtectedRoute>
           )}
         />
@@ -302,7 +315,7 @@ function App() {
           path="governance"
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminGovernance />
+              {renderWithSuspense(AdminGovernance, 'Loading governance workspace')}
             </ProtectedRoute>
           )}
         />
@@ -310,7 +323,7 @@ function App() {
           path="services"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorServiceSuite />
+              {renderWithSuspense(InstructorServiceSuite, 'Loading service suite')}
             </ProtectedRoute>
           )}
         />
@@ -318,7 +331,7 @@ function App() {
           path="projects"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorProjects />
+              {renderWithSuspense(InstructorProjects, 'Loading projects board')}
             </ProtectedRoute>
           )}
         />
@@ -326,16 +339,16 @@ function App() {
           path="ebooks/create"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorEbookCreate />
+              {renderWithSuspense(InstructorEbookCreate, 'Loading ebook creator')}
             </ProtectedRoute>
           )}
         />
-        <Route path="settings" element={<DashboardSettings />} />
+        <Route path="settings" element={renderWithSuspense(DashboardSettings, 'Loading dashboard settings')} />
         <Route
           path="ads"
           element={(
             <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin']}>
-              <EdulureAds />
+              {renderWithSuspense(EdulureAds, 'Loading Edulure ads centre')}
             </ProtectedRoute>
           )}
         />

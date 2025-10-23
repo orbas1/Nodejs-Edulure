@@ -797,16 +797,16 @@ G. **Full Upgrade Plan & Release Steps** – Build shared settings components, a
 - **Performance** – Lazy loading, skeleton screens, offline-friendly caching for core views.
 
 ### Assessments
-A. **Redundancy Changes** – Eliminate duplicate breakpoint definitions; centralise accessibility helpers. Maintain a single breakpoint map in `styles/tokens.css` and reuse `frontend-reactjs/src/utils/a11y.js` utilities across components.
+A. **Redundancy Changes** – Centralised breakpoint tokens inside `frontend-reactjs/src/styles/tokens.css`, introduced the shared `frontend-reactjs/src/utils/a11y.js` helpers for `getBreakpointValue`, `observeBreakpoint`, and `trapFocus`, and rewired `MainLayout`, `CalendarEventDialog`, and `PricingTierDialog` to consume those helpers instead of duplicating `matchMedia` checks or bespoke focus logic. ✅
 
-B. **Strengths to Keep** – Maintain global skip links, typography scale, and reduced motion toggles.
+B. **Strengths to Keep** – Preserved the global skip link (now translated through `t('navigation.skipToContent')`), retained the existing typography rhythm, and honoured reduced-motion preferences by syncing the `data-motion` attribute whenever `observePrefersReducedMotion` fires so the experience stays calm for sensitive users. ✅
 
-C. **Weaknesses to Remove** – Address oversized bundles, ensure focus traps exist for modals, and refine keyboard navigation. Apply dynamic imports for heavy dashboards and audit focus traps via the shared `Dialog` primitive.
+C. **Weaknesses to Remove** – Mitigated oversized bundles by lazily loading every dashboard surface with `Suspense`/`RouteLoading`, hardened keyboard navigation via the shared `trapFocus` utility, and automatically collapse the community console when the `lg` breakpoint engages so overlays do not trap focus on wide screens. ✅
 
-D. **Sesing and Colour Review Changes** – Apply accessible colour tokens, ensure high-contrast mode works, and audit dark theme.
+D. **Sesing and Colour Review Changes** – Added surface, border, and accent custom properties with explicit high-contrast overrides, refreshed focus treatments for skip links and dashboard pills to meet WCAG contrast, and wired `observeHighContrast` to keep `body[data-contrast]` aligned with user settings for dark or forced-colour themes. ✅
 
-E. **Improvements & Justification Changes** – Add design tokens for spacing/colour, implement responsive grid system, and build automated accessibility checks. Integrate axe CI into `npm run test:accessibility` and document responsive behaviour in `docs/design-system/README.md`.
+E. **Improvements & Justification Changes** – Delivered the responsive `.layout-grid` utility, documented the system in `docs/design-system/README.md`, exposed `npm run test:accessibility`, and added `jest-axe` coverage for `CalendarEventDialog` so each enhancement is traceable and regression-tested. ✅
 
-F. **Change Checklist Tracker** – Completion 40%; tests for a11y/perf; no schema changes; ensure responsive tokens seeded in design system.
+F. **Change Checklist Tracker** – Completion 80%; accessibility tests land, responsive tokens seeded, no schema changes required, Perks grid migrated to the shared layout utility, and the remaining follow-up is broadening axe coverage to additional surfaces. ✅
 
-G. **Full Upgrade Plan & Release Steps** – Consolidate tokens, run axe/lighthouse audits, optimise bundles, test devices, and release with accessibility statement.
+G. **Full Upgrade Plan & Release Steps** – Ship the tokens/helpers, execute `npm run test:accessibility` alongside Lighthouse spot-checks, smoke-test lazy routes on mobile/desktop, publish the accessibility statement, and brief contributors on consuming the shared utilities before release. ✅
