@@ -1,30 +1,62 @@
+@import './styles/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  color-scheme: only light;
-}
-
 html {
   scroll-behavior: smooth;
 }
 
 body {
-  @apply bg-white text-slate-950 antialiased;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-root);
+  line-height: var(--line-height-base);
+  @apply antialiased;
 }
 
 a {
-  @apply text-primary transition-colors duration-200;
+  @apply transition-colors duration-200;
+  color: var(--color-primary);
 }
 
 a:hover {
-  @apply text-primary-dark;
+  color: var(--color-primary-dark);
 }
 
 a:focus-visible,
 button:focus-visible {
-  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-white;
+  outline: none;
+  box-shadow: var(--shadow-focus-ring);
+  @apply ring-offset-2;
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  width: auto;
+  height: auto;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  color: #ffffff;
+  clip: auto;
+  clip-path: none;
+  z-index: 1000;
+  box-shadow: var(--shadow-focus-ring);
 }
 
 @layer components {
@@ -75,5 +107,22 @@ button:focus-visible {
 
   .dashboard-primary-pill:focus-visible {
     @apply ring-2 ring-primary/70 ring-offset-2 ring-offset-white;
+  }
+
+  .responsive-grid {
+    display: grid;
+    gap: var(--grid-gap);
+    grid-template-columns: repeat(auto-fit, minmax(var(--grid-min-column), 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

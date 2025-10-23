@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { announcePolite, useFocusTrap } from '../../utils/a11y.js';
 
 const EVENT_TYPES = [
   { value: 'classroom', label: 'Classroom session' },
@@ -30,9 +31,16 @@ const FORM_INPUT_CLASS =
   'mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
 
 export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmit, onClose }) {
-  const dialogRef = useRef(null);
+  const containerRef = useRef(null);
+  const closeButtonRef = useRef(null);
   const [form, setForm] = useState(() => ({ ...DEFAULT_FORM, ...initialData }));
   const [errors, setErrors] = useState({});
+  const dialogTitle = useMemo(
+    () => (mode === 'edit' ? 'Update scheduled item' : 'Create new scheduled item'),
+    [mode]
+  );
+
+  useFocusTrap(containerRef, { enabled: isOpen, initialFocus: closeButtonRef });
 
   useEffect(() => {
     if (isOpen) {
@@ -42,11 +50,13 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
         tags: Array.isArray(initialData?.tags) ? initialData.tags.join(', ') : initialData?.tags ?? ''
       });
       setErrors({});
-      requestAnimationFrame(() => {
-        dialogRef.current?.focus();
-      });
     }
   }, [initialData, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    announcePolite(`${dialogTitle} dialog opened`);
+  }, [dialogTitle, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -65,11 +75,6 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, onClose]);
-
-  const dialogTitle = useMemo(
-    () => (mode === 'edit' ? 'Update scheduled item' : 'Create new scheduled item'),
-    [mode]
-  );
 
   if (!isOpen) {
     return null;
@@ -117,6 +122,7 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4"
       role="dialog"
       aria-modal="true"
@@ -140,7 +146,7 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
             type="button"
             className="dashboard-pill"
             onClick={onClose}
-            ref={dialogRef}
+            ref={closeButtonRef}
           >
             Close
           </button>

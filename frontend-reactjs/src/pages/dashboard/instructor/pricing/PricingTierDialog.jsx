@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { announcePolite, useFocusTrap } from '../../../../utils/a11y.js';
 
 const DEFAULT_FORM = {
   name: '',
@@ -47,9 +48,18 @@ export default function PricingTierDialog({
   onDelete,
   deleting
 }) {
+  const containerRef = useRef(null);
+  const closeButtonRef = useRef(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [errors, setErrors] = useState({});
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const dialogTitle = useMemo(
+    () => (mode === 'edit' ? 'Update subscription tier' : 'Create subscription tier'),
+    [mode]
+  );
+
+  useFocusTrap(containerRef, { enabled: isOpen, initialFocus: closeButtonRef });
 
   useEffect(() => {
     if (!isOpen) {
@@ -74,10 +84,10 @@ export default function PricingTierDialog({
     setErrors({});
   }, [isOpen, tier]);
 
-  const dialogTitle = useMemo(
-    () => (mode === 'edit' ? 'Update subscription tier' : 'Create subscription tier'),
-    [mode]
-  );
+  useEffect(() => {
+    if (!isOpen) return;
+    announcePolite(`${dialogTitle} dialog opened`);
+  }, [dialogTitle, isOpen]);
 
   if (!isOpen) {
     return null;
@@ -138,6 +148,7 @@ export default function PricingTierDialog({
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4"
       role="dialog"
       aria-modal="true"
@@ -156,7 +167,12 @@ export default function PricingTierDialog({
               Define pricing, benefits, and billing cadence for your gated community experiences.
             </p>
           </div>
-          <button type="button" className="dashboard-pill" onClick={onClose}>
+          <button
+            type="button"
+            className="dashboard-pill"
+            onClick={onClose}
+            ref={closeButtonRef}
+          >
             Close
           </button>
         </div>
