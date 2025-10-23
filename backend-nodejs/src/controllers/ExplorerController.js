@@ -9,6 +9,192 @@ const SUPPORTED_ENTITIES = explorerSearchService.getSupportedEntities();
 
 const flexibleObjectSchema = Joi.object().unknown(true);
 
+function normaliseFacetEntries(rawCounts) {
+  if (!rawCounts) {
+    return [];
+  }
+
+  if (Array.isArray(rawCounts)) {
+    return rawCounts
+      .map((entry) => {
+        if (entry === null || entry === undefined) {
+          return null;
+        }
+
+        if (typeof entry === 'object') {
+          const label =
+            entry.label ?? entry.value ?? entry.key ?? entry.name ?? entry.id ?? null;
+          const count = Number(entry.count ?? entry.total ?? entry.value ?? entry.hits ?? 0);
+          if (!label || Number.isNaN(count)) {
+            return null;
+          }
+          return [String(label), count];
+        }
+
+        if (typeof entry === 'string') {
+          return [entry, 1];
+        }
+
+        const stringified = String(entry);
+        return stringified ? [stringified, 1] : null;
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof rawCounts === 'object') {
+    return Object.entries(rawCounts)
+      .map(([label, count]) => {
+        const safeLabel = typeof label === 'string' ? label : String(label);
+        const numeric = Number(count ?? 0);
+        if (!safeLabel || Number.isNaN(numeric)) {
+          return null;
+        }
+        return [safeLabel, numeric];
+      })
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function aggregateFacetMetadata(entitySummaries = []) {
+  const aggregated = new Map();
+
+  for (const summary of entitySummaries) {
+    if (!summary) {
+      continue;
+    }
+
+    const metadata = summary.metadata ?? {};
+    const facets = metadata.facets;
+    if (!facets || typeof facets !== 'object') {
+      continue;
+    }
+
+    for (const [facetKey, rawCounts] of Object.entries(facets)) {
+      if (!facetKey) {
+        continue;
+      }
+
+      if (!aggregated.has(facetKey)) {
+        aggregated.set(facetKey, { counts: new Map(), entities: new Set() });
+      }
+
+      const bucket = aggregated.get(facetKey);
+      const entries = normaliseFacetEntries(rawCounts);
+      for (const [label, count] of entries) {
+        if (!label) {
+          continue;
+        }
+        const trimmedLabel = label.trim();
+        if (!trimmedLabel) {
+          continue;
+        }
+        const safeCount = Number.isFinite(count) ? count : 0;
+        bucket.counts.set(trimmedLabel, (bucket.counts.get(trimmedLabel) ?? 0) + safeCount);
+      }
+
+      bucket.entities.add(summary.entityType);
+    }
+  }
+
+  const result = {};
+  for (const [facetKey, bucket] of aggregated.entries()) {
+    const sortedCounts = [...bucket.counts.entries()].sort((a, b) => b[1] - a[1]);
+    result[facetKey] = {
+      counts: Object.fromEntries(sortedCounts),
+      entities: Array.from(bucket.entities).sort()
+    };
+  }
+  return result;
+}
+
+function serialiseEntitySummaries(entitySummaries = []) {
+  return entitySummaries.map((summary) => {
+    const metadata = summary.metadata ?? {};
+    const page = Number(metadata.page ?? summary.page ?? 1);
+    const perPage = Number(metadata.perPage ?? summary.perPage ?? 0);
+    const facets = metadata.facets && typeof metadata.facets === 'object' ? metadata.facets : {};
+    const markers = Array.isArray(metadata.markers) ? metadata.markers : [];
+
+    return {
+      entityType: summary.entityType,
+      totalHits: Number(summary.totalHits ?? 0),
+      displayedHits: Number(summary.displayedHits ?? 0),
+      processingTimeMs: Number(summary.processingTimeMs ?? 0),
+      zeroResult: Boolean(summary.isZeroResult),
+      page,
+      perPage,
+      facets,
+      markers
+    };
+  });
+}
+
+function buildAnalyticsPayload(context) {
+  const entitySummaries = Array.isArray(context?.entitySummaries) ? context.entitySummaries : [];
+  const facets = aggregateFacetMetadata(entitySummaries);
+  const serialisedEntities = serialiseEntitySummaries(entitySummaries);
+  const totalResults = Number(context?.totalResults ?? context?.resultTotal ?? 0);
+  const totalDisplayed = Number(context?.totalDisplayed ?? 0);
+
+  return {
+    searchEventId: context?.eventUuid ?? null,
+    totalResults,
+    totalDisplayed,
+    zeroResult:
+      typeof context?.isZeroResult === 'boolean'
+        ? context.isZeroResult
+        : serialisedEntities.every((summary) => summary.zeroResult),
+    latencyMs: Number(context?.latencyMs ?? 0),
+    occurredAt: context?.createdAt ?? null,
+    facets,
+    entities: serialisedEntities,
+    filters: context?.filters ?? {},
+    globalFilters: context?.globalFilters ?? {},
+    sort: context?.sortPreferences ?? context?.sort ?? {}
+  };
+}
+
+function buildInlineAnalyticsFromResult(result, { filters = {}, globalFilters = {}, sort = {} } = {}) {
+  if (!result) {
+    return null;
+  }
+
+  const entitySummaries = Object.entries(result.results ?? {}).map(([entityType, summary]) => ({
+    entityType,
+    totalHits: Number(summary?.totalHits ?? summary?.total ?? summary?.estimatedTotalHits ?? 0),
+    displayedHits: Number(summary?.hits?.length ?? 0),
+    processingTimeMs: Number(summary?.processingTimeMs ?? 0),
+    isZeroResult: Number(summary?.totalHits ?? summary?.total ?? summary?.estimatedTotalHits ?? 0) === 0,
+    metadata: {
+      facets: summary?.facets ?? {},
+      markers: summary?.markers ?? [],
+      page: summary?.page ?? result.page ?? 1,
+      perPage: summary?.perPage ?? result.perPage ?? 0
+    }
+  }));
+
+  const facets = aggregateFacetMetadata(entitySummaries);
+  const serialisedEntities = serialiseEntitySummaries(entitySummaries);
+  const totalResults = serialisedEntities.reduce((acc, summary) => acc + summary.totalHits, 0);
+  const totalDisplayed = serialisedEntities.reduce((acc, summary) => acc + summary.displayedHits, 0);
+
+  return {
+    searchEventId: null,
+    totalResults,
+    totalDisplayed,
+    zeroResult: serialisedEntities.every((summary) => summary.zeroResult),
+    latencyMs: 0,
+    occurredAt: null,
+    facets,
+    entities: serialisedEntities,
+    filters,
+    globalFilters,
+    sort
+  };
+}
+
 const searchSchema = Joi.object({
   query: Joi.string().allow('', null).default(''),
   entityTypes: Joi.array()
@@ -102,17 +288,19 @@ export default class ExplorerController {
         req.log?.warn({ err: analyticsError }, 'Failed to record explorer analytics event');
       }
 
+      const analyticsPayload =
+        analyticsContext && analyticsContext.eventUuid
+          ? buildAnalyticsPayload(analyticsContext)
+          : buildInlineAnalyticsFromResult(result, {
+              filters: payload.filters,
+              globalFilters: payload.globalFilters,
+              sort: payload.sort
+            });
+
       return success(res, {
         data: {
           ...result,
-          analytics: analyticsContext
-            ? {
-                searchEventId: analyticsContext.eventUuid,
-                totalResults: analyticsContext.totalResults,
-                totalDisplayed: analyticsContext.totalDisplayed,
-                zeroResult: analyticsContext.entitySummaries.every((summary) => summary.isZeroResult)
-              }
-            : null
+          analytics: analyticsPayload
         },
         message: 'Explorer results fetched'
       });

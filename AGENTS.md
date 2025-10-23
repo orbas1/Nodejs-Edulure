@@ -665,19 +665,19 @@ G. **Full Upgrade Plan & Release Steps** – Create shared tutor card, refine bo
 - **Preview drawer** – Quick view with summary, media, CTA.
 
 ### Assessments
-A. ✅ **Redundancy Changes** – Explorer results now flow through the shared `frontend-reactjs/src/components/search/SearchResultCard.jsx` so communities, courses, tutors, ebooks, profiles, and events render consistently. Active filter summaries moved into the new `frontend-reactjs/src/components/search/FilterChips.jsx`, eliminating bespoke chip logic per section while still sourcing toggles from the existing hook.
+A. ✅ **Redundancy Changes** – Explorer results now flow through the shared `frontend-reactjs/src/components/search/SearchResultCard.jsx`, while filter summaries rely on the reusable `frontend-reactjs/src/components/search/FilterChips.jsx` module. Backend aggregation in `backend-nodejs/src/controllers/ExplorerController.js` standardises analytics enrichment so every entity type shares one response contract instead of bespoke per-surface stitching.
 
-B. ✅ **Strengths to Keep** – The `useExplorerEntitySearch.js` hook still owns query state, saved searches, and preset sort handling; enhancements such as accumulation and load-more honour its prior ergonomics so power users keep familiar filtering and favourite flows intact.
+B. ✅ **Strengths to Keep** – `frontend-reactjs/src/hooks/useExplorerEntitySearch.js` retains ownership of query state, saved searches, pagination, and load-more ergonomics. The hook now consumes richer analytics payloads without losing prior ergonomics, preserving saved-search pinning and reset affordances for power users.
 
-C. ✅ **Weaknesses to Remove** – Search cards pull richer media by falling back to preview/asset collections, multi-select filters collapse to the top five options until expanded, and both initial and incremental fetches show skeleton placeholders for smoother perceived performance.
+C. ✅ **Weaknesses to Remove** – Search cards fall back to preview assets and badges, multi-select filters default to compact rows until expanded, and new analytics aggregation fills the `analytics.facets` payload even when the metrics service is unavailable. Skeleton states cover initial and incremental fetches for smoother perceived performance.
 
-D. ✅ **Sesing and Colour Review Changes** – Filter badges inherit the primary palette with hover transitions, monetisation markers use amber/indigo accents, and facet panels reuse neutral shells so typography and contrast align with the existing Explorer aesthetic.
+D. ✅ **Sesing and Colour Review Changes** – Filter chips inherit the primary palette with gentle hover transitions, monetisation markers lean on amber/indigo accents, and facet/analytics panels reuse neutral shells to keep typography and contrast aligned across explorer layouts.
 
-E. ✅ **Improvements & Justification Changes** – Infinite scroll with IntersectionObserver surfaces continuous hits, manual "Load more" remains as a fallback, analytics facets render trending counts when returned, and sponsored/featured listings gain explicit badges sourced from result metadata.
+E. ✅ **Improvements & Justification Changes** – Infinite scroll via `IntersectionObserver`, manual "Load more" fallback, trending facet counts, and sponsored/featured badges are live. The controller now combines metrics from `ExplorerAnalyticsService` with inline fallbacks, exposing consistent `facets`, latency, and entity breakdowns for downstream dashboards.
 
-F. ✅ **Change Checklist Tracker** – Completion 100%; infinite scroll, facet surfacing, and media fallbacks are in place; no schema or seed changes were required and existing saved-search tests cover the updated hook contract.
+F. ✅ **Change Checklist Tracker** – Completion sits at 100%; Meilisearch-backed indexes, analytics migrations (`backend-nodejs/migrations/20241126160000_explorer_analytics.js`) and bootstrap seeding (`backend-nodejs/seeds/001_bootstrap.js`) remain aligned, so no additional schema or seed work is pending for this tranche.
 
-G. ✅ **Full Upgrade Plan & Release Steps** – Unified cards, centralised chips, enriched results, and the scroll/feed experience are implemented. Next deployments simply verify explorer analytics payloads in staging and ship alongside refreshed catalogue content to showcase the new badges and filters.
+G. ✅ **Full Upgrade Plan & Release Steps** – Unified cards, centralised filter chips, enriched analytics responses, and the scroll/feed experience are production ready. Next deployments only need staging verification of explorer analytics payloads and refreshed catalogue content to highlight badges, filters, and facet trends.
 
 ## 12. Search and media preview experience
 
