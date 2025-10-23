@@ -341,19 +341,19 @@ G. **Full Upgrade Plan & Release Steps** – Unify admin layout, refactor tables
 - **Personalisation** – Interests, learning goals, ad preferences.
 
 ### Assessments
-A. **Redundancy Changes** – Merge duplicate settings forms across learner/instructor dashboards; reuse toggles. Drive both from `frontend-reactjs/src/components/settings/SettingsLayout.jsx`.
+A. **Redundancy Changes** – Drive learner, instructor, and admin preference panes through the shared `frontend-reactjs/src/components/settings/SettingsLayout.jsx`, with backend parity provided by `backend-nodejs/src/services/LearnerDashboardService.js` so every role consumes the same preferences payload.
 
-B. **Strengths to Keep** – Maintain autosave feedback, preview panel, and inline guidance.
+B. **Strengths to Keep** – Preserve autosave feedback, contextual preview banners, and inline guardrails that coach users through digest cadence, reimbursements, and consent choices.
 
-C. **Weaknesses to Remove** – Improve image cropping, reduce tab sprawl, and fix inconsistent notifications. Adopt the cropper from `components/media/AvatarCropper.jsx` and condense sections using accordions.
+C. **Weaknesses to Remove** – Centralise avatar editing in `components/media/AvatarCropper.jsx`, collapse sections with the layout accordion, and route all toggles through the unified change handler so recommendation/ads states never drift.
 
-D. **Sesing and Colour Review Changes** – Keep neutral panel, highlight important toggles, and ensure error states are accessible.
+D. **Sesing and Colour Review Changes** – Maintain neutral glass panels with indigo accents, reuse semantic status palettes in `SettingsLayout`, and surface ads policy callouts with accessible contrast.
 
-E. **Improvements & Justification Changes** – Add avatar cropper, integrate recommended content preview, and expose ad preference toggles. Pull recommendations from `LearnerSystemPreferenceModel` and display ad toggles referencing Edulure Ads data usage statements.
+E. **Improvements & Justification Changes** – Normalise recommendation topics and ads consent via `LearnerSystemPreferenceModel`, hydrate preview cards from `settings.recommendations`, and preserve existing upload + checksum flows.
 
-F. **Change Checklist Tracker** – Completion 45%; tests for preference saving; ensure defaults seeded; schema updates for ad preferences.
+F. **Change Checklist Tracker** – Completion 90%; defaults aligned across `DEFAULT_SYSTEM_FORM`, `DEFAULT_SYSTEM_PREFERENCES`, and bootstrap seeds; migrations cover `learner_system_preferences` and `learner_finance_purchases`; vitest/unit coverage in place for avatar, system, and finance flows.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared settings components, add cropping tool, integrate preview, test flows, and release with onboarding email.
+G. **Full Upgrade Plan & Release Steps** – Roll out shared layout, run backend/frontend tests (`npm run test --workspace backend-nodejs -- --runTestsByPath test/learnerDashboardService.test.js`, `npm run test --workspace frontend-reactjs`), verify seeded data in staging, and refresh onboarding comms with deep links to personalisation.
 
 ## 17. Accessibility and responsiveness
 

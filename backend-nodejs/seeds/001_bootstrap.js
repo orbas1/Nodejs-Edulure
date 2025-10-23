@@ -92,6 +92,8 @@ export async function seed(knex) {
     await trx('course_lessons').del();
     await trx('course_modules').del();
     await trx('courses').del();
+    await trx('learner_finance_purchases').del();
+    await trx('learner_system_preferences').del();
     await trx('community_affiliate_payouts').del();
     await trx('community_subscriptions').del();
     await trx('community_paywall_tiers').del();
@@ -193,6 +195,52 @@ export async function seed(knex) {
       last_login_at: trx.fn.now(),
       password_changed_at: trx.fn.now()
     });
+
+    await trx('learner_system_preferences').insert({
+      user_id: learnerId,
+      language: 'en',
+      region: 'US',
+      timezone: 'America/New_York',
+      notifications_enabled: true,
+      digest_enabled: true,
+      auto_play_media: false,
+      high_contrast: false,
+      reduced_motion: false,
+      preferences: JSON.stringify({
+        interfaceDensity: 'comfortable',
+        analyticsOptIn: true,
+        subtitleLanguage: 'en',
+        audioDescription: false,
+        recommendationsEnabled: true,
+        recommendationTopics: ['growth strategy', 'automation lab', 'community highlights'],
+        adsPersonalisation: false,
+        adsMeasurement: true,
+        adsEmailOptIn: false
+      })
+    });
+
+    await trx('learner_finance_purchases').insert([
+      {
+        user_id: learnerId,
+        reference: 'INV-2024-001',
+        description: 'Launch cohort bundle',
+        amount_cents: 12900,
+        currency: 'USD',
+        status: 'paid',
+        purchased_at: trx.fn.now(),
+        metadata: JSON.stringify({ receiptUrl: 'https://cdn.edulure.test/receipts/inv-2024-001.pdf' })
+      },
+      {
+        user_id: learnerId,
+        reference: 'INV-2024-014',
+        description: 'Community sponsorship add-on',
+        amount_cents: 5900,
+        currency: 'USD',
+        status: 'pending',
+        purchased_at: trx.fn.now(),
+        metadata: JSON.stringify({ receiptUrl: 'https://cdn.edulure.test/receipts/inv-2024-014.pdf' })
+      }
+    ]);
 
     const adminVerificationRef = makeVerificationRef();
     const instructorVerificationRef = makeVerificationRef();

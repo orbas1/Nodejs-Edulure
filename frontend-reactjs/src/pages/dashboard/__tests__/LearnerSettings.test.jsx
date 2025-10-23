@@ -91,13 +91,18 @@ describe('<LearnerSettings />', () => {
           autoPlayMedia: false,
           highContrast: false,
           reducedMotion: false,
-          preferences: {
-            interfaceDensity: 'comfortable',
-            analyticsOptIn: true,
-            subtitleLanguage: 'en',
-            audioDescription: false
-          }
-        },
+        preferences: {
+          interfaceDensity: 'comfortable',
+          analyticsOptIn: true,
+          subtitleLanguage: 'en',
+          audioDescription: false,
+          recommendationsEnabled: true,
+          recommendationTopics: ['growth strategy'],
+          adsPersonalisation: false,
+          adsMeasurement: true,
+          adsEmailOptIn: false
+        }
+      },
         finance: {
           profile: {
             currency: 'USD',
@@ -179,7 +184,12 @@ describe('<LearnerSettings />', () => {
           interfaceDensity: 'comfortable',
           analyticsOptIn: true,
           subtitleLanguage: 'en',
-          audioDescription: false
+          audioDescription: false,
+          recommendationsEnabled: true,
+          recommendationTopics: ['growth strategy'],
+          adsPersonalisation: false,
+          adsMeasurement: true,
+          adsEmailOptIn: false
         }
       }
     });

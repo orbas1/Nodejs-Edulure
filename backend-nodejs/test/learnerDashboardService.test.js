@@ -730,6 +730,9 @@ describe('LearnerDashboardService', () => {
 
     expect(preferences.language).toBe('en');
     expect(preferences.preferences.interfaceDensity).toBe('comfortable');
+    expect(preferences.preferences.recommendationsEnabled).toBe(true);
+    expect(preferences.preferences.recommendationTopics).toEqual([]);
+    expect(preferences.preferences.adsMeasurement).toBe(true);
     expect(preferences.notificationsEnabled).toBe(true);
   });
 
@@ -744,7 +747,17 @@ describe('LearnerDashboardService', () => {
       autoPlayMedia: true,
       highContrast: true,
       reducedMotion: true,
-      preferences: { interfaceDensity: 'compact', analyticsOptIn: false, subtitleLanguage: 'fr', audioDescription: true }
+      preferences: {
+        interfaceDensity: 'compact',
+        analyticsOptIn: false,
+        subtitleLanguage: 'fr',
+        audioDescription: true,
+        recommendationsEnabled: true,
+        recommendationTopics: ['growth', 'automation'],
+        adsPersonalisation: false,
+        adsMeasurement: true,
+        adsEmailOptIn: false
+      }
     });
     systemPreferenceModel.getForUser
       .mockResolvedValueOnce(null)
@@ -758,7 +771,17 @@ describe('LearnerDashboardService', () => {
         autoPlayMedia: true,
         highContrast: true,
         reducedMotion: true,
-        preferences: { interfaceDensity: 'compact', analyticsOptIn: false, subtitleLanguage: 'fr', audioDescription: true }
+        preferences: {
+          interfaceDensity: 'compact',
+          analyticsOptIn: false,
+          subtitleLanguage: 'fr',
+          audioDescription: true,
+          recommendationsEnabled: true,
+          recommendationTopics: ['growth', 'automation'],
+          adsPersonalisation: false,
+          adsMeasurement: true,
+          adsEmailOptIn: false
+        }
       });
 
     const acknowledgement = await LearnerDashboardService.updateSystemPreferences(42, {
@@ -774,7 +797,12 @@ describe('LearnerDashboardService', () => {
         interfaceDensity: 'compact',
         analyticsOptIn: false,
         subtitleLanguage: 'fr',
-        audioDescription: true
+        audioDescription: true,
+        recommendationsEnabled: true,
+        recommendationTopics: ['Growth ', 'automation', 'automation'],
+        adsPersonalisation: false,
+        adsMeasurement: true,
+        adsEmailOptIn: false
       }
     });
 
@@ -784,5 +812,7 @@ describe('LearnerDashboardService', () => {
     );
     expect(acknowledgement.meta.preference.language).toBe('fr');
     expect(acknowledgement.meta.preference.preferences.audioDescription).toBe(true);
+    expect(acknowledgement.meta.preference.preferences.recommendationTopics).toEqual(['Growth', 'automation']);
+    expect(acknowledgement.meta.preference.preferences.adsMeasurement).toBe(true);
   });
 });

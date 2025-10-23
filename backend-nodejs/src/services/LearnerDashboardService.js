@@ -254,9 +254,42 @@ const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
     interfaceDensity: 'comfortable',
     analyticsOptIn: true,
     subtitleLanguage: 'en',
-    audioDescription: false
+    audioDescription: false,
+    recommendationsEnabled: true,
+    recommendationTopics: [],
+    adsPersonalisation: false,
+    adsMeasurement: true,
+    adsEmailOptIn: false
   }
 });
+
+const INTERFACE_DENSITIES = new Set(['comfortable', 'compact', 'expanded']);
+
+function normaliseRecommendationTopics(value, fallback = []) {
+  const source = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : null;
+  if (!source) {
+    return [...fallback];
+  }
+  const seen = new Set();
+  const topics = [];
+  source.forEach((entry) => {
+    const topic = String(entry ?? '').trim();
+    if (!topic) return;
+    const label = topic.slice(0, 64);
+    const key = label.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    topics.push(label);
+  });
+  if (!topics.length) {
+    return [...fallback];
+  }
+  return topics.slice(0, 12);
+}
 
 const DEFAULT_FINANCE_ALERTS = Object.freeze({
   sendEmail: true,
@@ -453,8 +486,19 @@ export default class LearnerDashboardService {
   static async getSystemPreferences(userId) {
     const stored = await LearnerSystemPreferenceModel.getForUser(userId);
     if (!stored) {
-      return { ...DEFAULT_SYSTEM_PREFERENCES };
+      return {
+        ...DEFAULT_SYSTEM_PREFERENCES,
+        preferences: { ...DEFAULT_SYSTEM_PREFERENCES.preferences }
+      };
     }
+    const basePreferences = {
+      ...DEFAULT_SYSTEM_PREFERENCES.preferences,
+      ...(stored.preferences ?? {})
+    };
+    const recommendationTopics = normaliseRecommendationTopics(
+      basePreferences.recommendationTopics,
+      DEFAULT_SYSTEM_PREFERENCES.preferences.recommendationTopics
+    );
     return {
       id: stored.id ?? null,
       language: stored.language ?? DEFAULT_SYSTEM_PREFERENCES.language,
@@ -468,7 +512,39 @@ export default class LearnerDashboardService {
       reducedMotion: stored.reducedMotion ?? DEFAULT_SYSTEM_PREFERENCES.reducedMotion,
       preferences: {
         ...DEFAULT_SYSTEM_PREFERENCES.preferences,
-        ...(stored.preferences ?? {})
+        ...basePreferences,
+        interfaceDensity: INTERFACE_DENSITIES.has(basePreferences.interfaceDensity)
+          ? basePreferences.interfaceDensity
+          : DEFAULT_SYSTEM_PREFERENCES.preferences.interfaceDensity,
+        analyticsOptIn:
+          basePreferences.analyticsOptIn !== undefined
+            ? Boolean(basePreferences.analyticsOptIn)
+            : DEFAULT_SYSTEM_PREFERENCES.preferences.analyticsOptIn,
+        subtitleLanguage:
+          typeof basePreferences.subtitleLanguage === 'string' && basePreferences.subtitleLanguage
+            ? basePreferences.subtitleLanguage.slice(0, 8)
+            : stored.language ?? DEFAULT_SYSTEM_PREFERENCES.preferences.subtitleLanguage,
+        audioDescription:
+          basePreferences.audioDescription !== undefined
+            ? Boolean(basePreferences.audioDescription)
+            : DEFAULT_SYSTEM_PREFERENCES.preferences.audioDescription,
+        recommendationsEnabled:
+          basePreferences.recommendationsEnabled !== undefined
+            ? Boolean(basePreferences.recommendationsEnabled)
+            : DEFAULT_SYSTEM_PREFERENCES.preferences.recommendationsEnabled,
+        recommendationTopics,
+        adsPersonalisation:
+          basePreferences.adsPersonalisation !== undefined
+            ? Boolean(basePreferences.adsPersonalisation)
+            : DEFAULT_SYSTEM_PREFERENCES.preferences.adsPersonalisation,
+        adsMeasurement:
+          basePreferences.adsMeasurement !== undefined
+            ? Boolean(basePreferences.adsMeasurement)
+            : DEFAULT_SYSTEM_PREFERENCES.preferences.adsMeasurement,
+        adsEmailOptIn:
+          basePreferences.adsEmailOptIn !== undefined
+            ? Boolean(basePreferences.adsEmailOptIn)
+            : DEFAULT_SYSTEM_PREFERENCES.preferences.adsEmailOptIn
       },
       createdAt: stored.createdAt ?? null,
       updatedAt: stored.updatedAt ?? null
@@ -494,16 +570,19 @@ export default class LearnerDashboardService {
       payload.preferences && typeof payload.preferences === 'object'
         ? payload.preferences
         : {};
-    const allowedDensity = new Set(['comfortable', 'compact', 'expanded']);
     const basePreferences = {
       ...DEFAULT_SYSTEM_PREFERENCES.preferences,
       ...(existingPreference?.preferences ?? {})
     };
+    const baseTopics = normaliseRecommendationTopics(
+      basePreferences.recommendationTopics,
+      DEFAULT_SYSTEM_PREFERENCES.preferences.recommendationTopics
+    );
     const interfaceDensity = rawPreferences.interfaceDensity;
     const normalisedPreferences = {
       ...basePreferences,
       ...rawPreferences,
-      interfaceDensity: allowedDensity.has(interfaceDensity)
+      interfaceDensity: INTERFACE_DENSITIES.has(interfaceDensity)
         ? interfaceDensity
         : basePreferences.interfaceDensity,
       analyticsOptIn:
@@ -517,7 +596,27 @@ export default class LearnerDashboardService {
       audioDescription:
         rawPreferences.audioDescription !== undefined
           ? Boolean(rawPreferences.audioDescription)
-          : basePreferences.audioDescription
+          : basePreferences.audioDescription,
+      recommendationsEnabled:
+        rawPreferences.recommendationsEnabled !== undefined
+          ? Boolean(rawPreferences.recommendationsEnabled)
+          : basePreferences.recommendationsEnabled,
+      recommendationTopics: normaliseRecommendationTopics(
+        rawPreferences.recommendationTopics,
+        baseTopics
+      ),
+      adsPersonalisation:
+        rawPreferences.adsPersonalisation !== undefined
+          ? Boolean(rawPreferences.adsPersonalisation)
+          : basePreferences.adsPersonalisation,
+      adsMeasurement:
+        rawPreferences.adsMeasurement !== undefined
+          ? Boolean(rawPreferences.adsMeasurement)
+          : basePreferences.adsMeasurement,
+      adsEmailOptIn:
+        rawPreferences.adsEmailOptIn !== undefined
+          ? Boolean(rawPreferences.adsEmailOptIn)
+          : basePreferences.adsEmailOptIn
     };
 
     const preference = await LearnerSystemPreferenceModel.upsertForUser(userId, {

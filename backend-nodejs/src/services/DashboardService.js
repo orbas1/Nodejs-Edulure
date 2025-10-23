@@ -109,9 +109,42 @@ const DEFAULT_SYSTEM_SETTINGS = Object.freeze({
     interfaceDensity: 'comfortable',
     analyticsOptIn: true,
     subtitleLanguage: 'en',
-    audioDescription: false
+    audioDescription: false,
+    recommendationsEnabled: true,
+    recommendationTopics: [],
+    adsPersonalisation: false,
+    adsMeasurement: true,
+    adsEmailOptIn: false
   }
 });
+
+const INTERFACE_DENSITIES = new Set(['comfortable', 'compact', 'expanded']);
+
+function normaliseRecommendationTopics(value, fallback = []) {
+  const source = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : null;
+  if (!source) {
+    return [...fallback];
+  }
+  const seen = new Set();
+  const topics = [];
+  source.forEach((entry) => {
+    const topic = String(entry ?? '').trim();
+    if (!topic) return;
+    const label = topic.slice(0, 64);
+    const key = label.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    topics.push(label);
+  });
+  if (!topics.length) {
+    return [...fallback];
+  }
+  return topics.slice(0, 12);
+}
 
 const DEFAULT_FINANCE_ALERTS = Object.freeze({
   sendEmail: true,
@@ -195,7 +228,7 @@ function normaliseSystemPreferences(preferences) {
       typeof source.reducedMotion === 'boolean' ? source.reducedMotion : DEFAULT_SYSTEM_SETTINGS.reducedMotion,
     preferences: {
       interfaceDensity:
-        typeof nestedPrefs.interfaceDensity === 'string' && nestedPrefs.interfaceDensity
+        typeof nestedPrefs.interfaceDensity === 'string' && INTERFACE_DENSITIES.has(nestedPrefs.interfaceDensity)
           ? nestedPrefs.interfaceDensity
           : DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
       analyticsOptIn:
@@ -211,7 +244,27 @@ function normaliseSystemPreferences(preferences) {
       audioDescription:
         typeof nestedPrefs.audioDescription === 'boolean'
           ? nestedPrefs.audioDescription
-          : DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
+          : DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription,
+      recommendationsEnabled:
+        typeof nestedPrefs.recommendationsEnabled === 'boolean'
+          ? nestedPrefs.recommendationsEnabled
+          : DEFAULT_SYSTEM_SETTINGS.preferences.recommendationsEnabled,
+      recommendationTopics: normaliseRecommendationTopics(
+        nestedPrefs.recommendationTopics,
+        DEFAULT_SYSTEM_SETTINGS.preferences.recommendationTopics
+      ),
+      adsPersonalisation:
+        typeof nestedPrefs.adsPersonalisation === 'boolean'
+          ? nestedPrefs.adsPersonalisation
+          : DEFAULT_SYSTEM_SETTINGS.preferences.adsPersonalisation,
+      adsMeasurement:
+        typeof nestedPrefs.adsMeasurement === 'boolean'
+          ? nestedPrefs.adsMeasurement
+          : DEFAULT_SYSTEM_SETTINGS.preferences.adsMeasurement,
+      adsEmailOptIn:
+        typeof nestedPrefs.adsEmailOptIn === 'boolean'
+          ? nestedPrefs.adsEmailOptIn
+          : DEFAULT_SYSTEM_SETTINGS.preferences.adsEmailOptIn
     },
     updatedAt: updatedAt ? updatedAt.toISOString() : null
   };
