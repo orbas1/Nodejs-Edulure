@@ -149,6 +149,42 @@ export default class AdsCampaignMetricModel {
     };
   }
 
+  static async summariseWindowBulk(campaignIds, { windowDays = 7 } = {}, connection = db) {
+    if (!Array.isArray(campaignIds) || campaignIds.length === 0) {
+      return new Map();
+    }
+
+    const since = new Date();
+    since.setUTCDate(since.getUTCDate() - windowDays + 1);
+    since.setUTCHours(0, 0, 0, 0);
+
+    const rows = await connection(TABLE)
+      .select({
+        campaignId: 'campaign_id',
+        impressions: connection.raw('SUM(impressions)::bigint'),
+        clicks: connection.raw('SUM(clicks)::bigint'),
+        conversions: connection.raw('SUM(conversions)::bigint'),
+        spendCents: connection.raw('SUM(spend_cents)::bigint'),
+        revenueCents: connection.raw('SUM(revenue_cents)::bigint')
+      })
+      .whereIn('campaign_id', campaignIds)
+      .andWhere('metric_date', '>=', since)
+      .groupBy('campaign_id');
+
+    const results = new Map();
+    for (const row of rows) {
+      results.set(Number(row.campaignId), {
+        impressions: Number(row.impressions ?? 0),
+        clicks: Number(row.clicks ?? 0),
+        conversions: Number(row.conversions ?? 0),
+        spendCents: Number(row.spendCents ?? 0),
+        revenueCents: Number(row.revenueCents ?? 0)
+      });
+    }
+
+    return results;
+  }
+
   static deserialize(record) {
     return {
       ...record,

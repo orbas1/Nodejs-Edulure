@@ -5,6 +5,7 @@ import { useOutletContext } from 'react-router-dom';
 
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import CampaignEditor from '../../components/ads/CampaignEditor.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import {
   createAdsCampaign,
@@ -17,13 +18,16 @@ import {
 
 const ALLOWED_ROLES = new Set(['learner', 'instructor', 'admin']);
 
-const CAMPAIGN_STATUSES = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'active', label: 'Active' },
-  { value: 'paused', label: 'Paused' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'archived', label: 'Archived' }
-];
+const createMetricsDraft = () => ({
+  campaignId: '',
+  impressions: '',
+  clicks: '',
+  conversions: '',
+  spendCents: '',
+  revenueCents: ''
+});
+
+const STATUS_CHOICES = ['draft', 'scheduled', 'active', 'paused', 'completed', 'archived'];
 
 const compactNumberFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
@@ -42,40 +46,6 @@ function formatCompactNumber(value) {
     return '0';
   }
   return compactNumberFormatter.format(numeric);
-}
-
-function toDateInput(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
-function toDateTimeLocalInput(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function parseCommaSeparated(value) {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-}
-
-function parseMultiline(value) {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
 }
 
 function formatPlacementLabel(placement) {
@@ -118,416 +88,19 @@ Chip.propTypes = {
   children: PropTypes.node.isRequired
 };
 
-const emptyCampaignForm = {
-  id: null,
-  name: '',
-  status: 'draft',
-  objective: '',
-  dailyBudgetCents: '',
-  totalSpendCents: '',
-  startAt: '',
-  endAt: '',
-  lastSyncedAt: '',
-  metricsImpressions: '',
-  metricsClicks: '',
-  metricsConversions: '',
-  metricsSpendCents: '',
-  metricsRevenueCents: '',
-  metricsCtr: '',
-  metricsCpc: '',
-  metricsCpa: '',
-  metricsRoas: '',
-  targetingKeywords: '',
-  targetingAudiences: '',
-  targetingLocations: '',
-  targetingLanguages: '',
-  targetingSummary: '',
-  creativeHeadline: '',
-  creativeDescription: '',
-  creativeUrl: '',
-  placements: ''
-};
-
-function CampaignForm({ form, onChange, onSubmit, onCancel, submitting }) {
-  return (
-    <form className="space-y-6" onSubmit={onSubmit}>
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Campaign name
-          <input
-            required
-            name="name"
-            value={form.name}
-            onChange={onChange}
-            placeholder="Spring funnel accelerator"
-            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </label>
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Status
-          <select
-            name="status"
-            value={form.status}
-            onChange={onChange}
-            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            {CAMPAIGN_STATUSES.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Objective
-        <input
-          name="objective"
-          value={form.objective}
-          onChange={onChange}
-          placeholder="Drive qualified cohort applications"
-          className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-      </label>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Daily budget (cents)
-          <input
-            name="dailyBudgetCents"
-            type="number"
-            min="0"
-            value={form.dailyBudgetCents}
-            onChange={onChange}
-            placeholder="25000"
-            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </label>
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Lifetime spend (cents)
-          <input
-            name="totalSpendCents"
-            type="number"
-            min="0"
-            value={form.totalSpendCents}
-            onChange={onChange}
-            placeholder="125000"
-            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </label>
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          ROAS
-          <input
-            name="metricsRoas"
-            value={form.metricsRoas}
-            onChange={onChange}
-            placeholder="3.4x"
-            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </label>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Start date
-          <input
-            name="startAt"
-            type="date"
-            value={form.startAt}
-            onChange={onChange}
-            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </label>
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          End date
-          <input
-            name="endAt"
-            type="date"
-            value={form.endAt}
-            onChange={onChange}
-            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </label>
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Last synced
-          <input
-            name="lastSyncedAt"
-            type="datetime-local"
-            value={form.lastSyncedAt}
-            onChange={onChange}
-            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </label>
-      </div>
-
-      <fieldset className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
-        <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Performance metrics</legend>
-        <div className="mt-2 grid gap-4 md:grid-cols-3">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Impressions
-            <input
-              name="metricsImpressions"
-              type="number"
-              min="0"
-              value={form.metricsImpressions}
-              onChange={onChange}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Clicks
-            <input
-              name="metricsClicks"
-              type="number"
-              min="0"
-              value={form.metricsClicks}
-              onChange={onChange}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Conversions
-            <input
-              name="metricsConversions"
-              type="number"
-              min="0"
-              value={form.metricsConversions}
-              onChange={onChange}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Spend (cents)
-            <input
-              name="metricsSpendCents"
-              type="number"
-              min="0"
-              value={form.metricsSpendCents}
-              onChange={onChange}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Revenue (cents)
-            <input
-              name="metricsRevenueCents"
-              type="number"
-              min="0"
-              value={form.metricsRevenueCents}
-              onChange={onChange}
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            CTR (%)
-            <input
-              name="metricsCtr"
-              value={form.metricsCtr}
-              onChange={onChange}
-              placeholder="3.2"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            CPC (currency)
-            <input
-              name="metricsCpc"
-              value={form.metricsCpc}
-              onChange={onChange}
-              placeholder="$2.40"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            CPA (currency)
-            <input
-              name="metricsCpa"
-              value={form.metricsCpa}
-              onChange={onChange}
-              placeholder="$18.00"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-        </div>
-      </fieldset>
-
-      <fieldset className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
-        <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Targeting</legend>
-        <div className="mt-2 grid gap-4 md:grid-cols-2">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Keywords (comma separated)
-            <input
-              name="targetingKeywords"
-              value={form.targetingKeywords}
-              onChange={onChange}
-              placeholder="product strategy, design systems"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Audiences (comma separated)
-            <input
-              name="targetingAudiences"
-              value={form.targetingAudiences}
-              onChange={onChange}
-              placeholder="Product leads, Design managers"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Locations (comma separated)
-            <input
-              name="targetingLocations"
-              value={form.targetingLocations}
-              onChange={onChange}
-              placeholder="United States, Canada"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Languages (comma separated)
-            <input
-              name="targetingLanguages"
-              value={form.targetingLanguages}
-              onChange={onChange}
-              placeholder="English, Spanish"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
-            Summary insight
-            <textarea
-              name="targetingSummary"
-              value={form.targetingSummary}
-              onChange={onChange}
-              rows={2}
-              placeholder="Design leaders in North America with active hiring roadmaps."
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-        </div>
-      </fieldset>
-
-      <fieldset className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
-        <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Creative</legend>
-        <div className="mt-2 space-y-3">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Headline
-            <input
-              name="creativeHeadline"
-              value={form.creativeHeadline}
-              onChange={onChange}
-              placeholder="Launch elite cohorts in 60 days"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Description
-            <textarea
-              name="creativeDescription"
-              value={form.creativeDescription}
-              onChange={onChange}
-              rows={2}
-              placeholder="Partner with Edulure producers to design premium cohort experiences."
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Destination URL
-            <input
-              name="creativeUrl"
-              value={form.creativeUrl}
-              onChange={onChange}
-              placeholder="https://edulure.test/campaigns/spring-growth"
-              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </label>
-        </div>
-      </fieldset>
-
-      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Placements (one per line)
-        <textarea
-          name="placements"
-          value={form.placements}
-          onChange={onChange}
-          rows={3}
-          placeholder="Discovery Feed · Homepage Hero"
-          className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-      </label>
-
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="dashboard-primary-pill px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {submitting ? 'Saving…' : 'Save campaign'}
-        </button>
-        <button type="button" onClick={onCancel} className="dashboard-pill px-5 py-2 text-sm">
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
-}
-
-CampaignForm.defaultProps = {
-  submitting: false
-};
-
-const OBJECTIVE_OPTIONS = [
-  { label: 'Awareness', value: 'awareness' },
-  { label: 'Traffic', value: 'traffic' },
-  { label: 'Leads', value: 'leads' },
-  { label: 'Conversions', value: 'conversions' }
-];
-
-const STATUS_CHOICES = ['draft', 'scheduled', 'active', 'paused', 'completed', 'archived'];
-
-const createCampaignDraft = () => ({
-  name: '',
-  objective: 'traffic',
-  dailyBudgetCents: 5000,
-  creativeHeadline: '',
-  creativeDescription: '',
-  creativeUrl: '',
-  targetingKeywords: '',
-  targetingAudiences: '',
-  targetingLocations: '',
-  targetingLanguages: 'EN',
-  startAt: '',
-  endAt: ''
-});
-
-const createMetricsDraft = () => ({
-  campaignId: '',
-  impressions: '',
-  clicks: '',
-  conversions: '',
-  spendCents: '',
-  revenueCents: ''
-});
-
-const parseCsv = (value) =>
-  String(value ?? '')
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
 export default function EdulureAds() {
   const { role, dashboard, refresh } = useOutletContext();
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
 
   const [campaignsState, setCampaignsState] = useState({ items: [], loading: false, error: null });
-  const [campaignDraft, setCampaignDraft] = useState(createCampaignDraft);
   const [metricsDraft, setMetricsDraft] = useState(createMetricsDraft);
   const [feedback, setFeedback] = useState(null);
-  const [showCreativePreview, setShowCreativePreview] = useState(true);
   const adsRaw = dashboard?.ads ?? null;
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [editorState, setEditorState] = useState({ open: false, campaign: null, mode: 'create' });
+  const [editorSubmitting, setEditorSubmitting] = useState(false);
+  const { campaign: activeCampaign, mode: editorMode } = editorState;
 
   const loadCampaigns = useCallback(async () => {
     if (!token || !isAuthenticated) {
@@ -547,6 +120,46 @@ export default function EdulureAds() {
   useEffect(() => {
     loadCampaigns();
   }, [loadCampaigns]);
+
+  const openEditor = useCallback((campaign) => {
+    setEditorState({ open: true, campaign, mode: campaign ? 'edit' : 'create' });
+  }, []);
+
+  const closeEditor = useCallback(() => {
+    setEditorState({ open: false, campaign: null, mode: 'create' });
+    setEditorSubmitting(false);
+  }, []);
+
+  const handleEditorSubmit = useCallback(
+    async (payload) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage Edulure Ads.' });
+        return;
+      }
+
+      setEditorSubmitting(true);
+      try {
+        if (editorMode === 'edit' && activeCampaign?.id) {
+          await updateAdsCampaign({ token, campaignId: activeCampaign.id, payload });
+          setStatusMessage({ type: 'success', message: 'Campaign updated successfully.' });
+        } else {
+          await createAdsCampaign({ token, payload });
+          setStatusMessage({ type: 'success', message: 'New Edulure Ads campaign launched.' });
+        }
+        await loadCampaigns();
+        await refresh?.();
+        closeEditor();
+      } catch (error) {
+        setStatusMessage({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unable to save campaign right now.'
+        });
+      } finally {
+        setEditorSubmitting(false);
+      }
+    },
+    [activeCampaign?.id, closeEditor, editorMode, loadCampaigns, refresh, token]
+  );
 
   const ads = useMemo(() => {
     if (!adsRaw || typeof adsRaw !== 'object') return null;
@@ -579,129 +192,8 @@ export default function EdulureAds() {
     return { campaigns, summary, experiments, placements, targeting, tags };
   }, [adsRaw]);
 
-  const [statusMessage, setStatusMessage] = useState(null);
-  const [campaignFormVisible, setCampaignFormVisible] = useState(false);
-  const [campaignForm, setCampaignForm] = useState(emptyCampaignForm);
-  const [campaignSubmitting, setCampaignSubmitting] = useState(false);
-
   const campaigns = ads?.campaigns ?? [];
   const summary = ads?.summary ?? {};
-
-  const handleCampaignFieldChange = useCallback((event) => {
-    const { name, value } = event.target;
-    setCampaignForm((current) => ({ ...current, [name]: value }));
-  }, []);
-
-  const closeCampaignForm = useCallback(() => {
-    setCampaignForm(emptyCampaignForm);
-    setCampaignFormVisible(false);
-    setCampaignSubmitting(false);
-  }, []);
-
-  const openCampaignForm = useCallback((campaign) => {
-    if (campaign) {
-      setCampaignForm({
-        id: campaign.id,
-        name: campaign.name ?? '',
-        status: campaign.status ?? 'draft',
-        objective: campaign.objective ?? '',
-        dailyBudgetCents: campaign.dailyBudgetCents != null ? String(campaign.dailyBudgetCents) : '',
-        totalSpendCents: campaign.totalSpendCents != null ? String(campaign.totalSpendCents) : '',
-        startAt: toDateInput(campaign.startAt),
-        endAt: toDateInput(campaign.endAt),
-        lastSyncedAt: toDateTimeLocalInput(campaign.lastSyncedAt ?? campaign.metrics?.lastSyncedAt),
-        metricsImpressions: campaign.metrics?.impressions ?? '',
-        metricsClicks: campaign.metrics?.clicks ?? '',
-        metricsConversions: campaign.metrics?.conversions ?? '',
-        metricsSpendCents: campaign.metrics?.spendCents ?? '',
-        metricsRevenueCents: campaign.metrics?.revenueCents ?? '',
-        metricsCtr: campaign.metrics?.ctr ?? '',
-        metricsCpc: campaign.metrics?.cpc ?? '',
-        metricsCpa: campaign.metrics?.cpa ?? '',
-        metricsRoas: campaign.metrics?.roas ?? '',
-        targetingKeywords: (campaign.targeting?.keywords ?? []).join(', '),
-        targetingAudiences: (campaign.targeting?.audiences ?? []).join(', '),
-        targetingLocations: (campaign.targeting?.locations ?? []).join(', '),
-        targetingLanguages: (campaign.targeting?.languages ?? []).join(', '),
-        targetingSummary: campaign.targeting?.summary ?? '',
-        creativeHeadline: campaign.creative?.headline ?? '',
-        creativeDescription: campaign.creative?.description ?? '',
-        creativeUrl: campaign.creative?.url ?? '',
-        placements: campaign.placements.map((placement) => formatPlacementLabel(placement)).filter(Boolean).join('\n')
-      });
-    } else {
-      setCampaignForm(emptyCampaignForm);
-    }
-    setCampaignFormVisible(true);
-  }, []);
-
-  const handleCampaignSubmit = useCallback(
-    async (event) => {
-      event.preventDefault();
-      if (!token) {
-        setStatusMessage({ type: 'error', message: 'Sign in again to manage Edulure Ads.' });
-        return;
-      }
-
-      setCampaignSubmitting(true);
-
-      const payload = {
-        name: campaignForm.name.trim(),
-        status: campaignForm.status,
-        objective: campaignForm.objective?.trim() || null,
-        dailyBudgetCents: Number(campaignForm.dailyBudgetCents || 0),
-        totalSpendCents: Number(campaignForm.totalSpendCents || 0),
-        startAt: campaignForm.startAt || null,
-        endAt: campaignForm.endAt || null,
-        lastSyncedAt: campaignForm.lastSyncedAt ? new Date(campaignForm.lastSyncedAt).toISOString() : null,
-        metrics: {
-          impressions: Number(campaignForm.metricsImpressions || 0),
-          clicks: Number(campaignForm.metricsClicks || 0),
-          conversions: Number(campaignForm.metricsConversions || 0),
-          spendCents: Number(campaignForm.metricsSpendCents || 0),
-          revenueCents: Number(campaignForm.metricsRevenueCents || 0),
-          ctr: campaignForm.metricsCtr || null,
-          cpc: campaignForm.metricsCpc || null,
-          cpa: campaignForm.metricsCpa || null,
-          roas: campaignForm.metricsRoas || null,
-          lastSyncedAt: campaignForm.lastSyncedAt ? new Date(campaignForm.lastSyncedAt).toISOString() : null
-        },
-        targeting: {
-          summary: campaignForm.targetingSummary?.trim() || '',
-          keywords: parseCommaSeparated(campaignForm.targetingKeywords),
-          audiences: parseCommaSeparated(campaignForm.targetingAudiences),
-          locations: parseCommaSeparated(campaignForm.targetingLocations),
-          languages: parseCommaSeparated(campaignForm.targetingLanguages)
-        },
-        creative: {
-          headline: campaignForm.creativeHeadline?.trim() || null,
-          description: campaignForm.creativeDescription?.trim() || null,
-          url: campaignForm.creativeUrl?.trim() || null
-        },
-        placements: parseMultiline(campaignForm.placements)
-      };
-
-      try {
-        if (campaignForm.id) {
-          await updateAdsCampaign({ token, campaignId: campaignForm.id, payload });
-          setStatusMessage({ type: 'success', message: 'Campaign updated successfully.' });
-        } else {
-          await createAdsCampaign({ token, payload });
-          setStatusMessage({ type: 'success', message: 'New Edulure Ads campaign launched.' });
-        }
-        closeCampaignForm();
-        await refresh?.();
-      } catch (error) {
-        setStatusMessage({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Unable to save campaign right now.'
-        });
-      } finally {
-        setCampaignSubmitting(false);
-      }
-    },
-    [campaignForm, closeCampaignForm, refresh, token]
-  );
 
   if (role && !ALLOWED_ROLES.has(role)) {
     return (
@@ -784,79 +276,6 @@ export default function EdulureAds() {
   const selectedCampaignForMetrics = useMemo(
     () => campaignsState.items.find((campaign) => String(campaign.id) === String(metricsDraft.campaignId)) ?? null,
     [campaignsState.items, metricsDraft.campaignId]
-  );
-
-  const creativePreviewUrl = useMemo(() => {
-    if (!campaignDraft.creativeUrl) {
-      return 'https://player.vimeo.com/video/76979871?h=8272103f6e&title=0&byline=0&portrait=0';
-    }
-    try {
-      const parsed = new URL(campaignDraft.creativeUrl);
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
-        return null;
-      }
-      return parsed.toString();
-    } catch (error) {
-      return null;
-    }
-  }, [campaignDraft.creativeUrl]);
-
-  const isAuthenticatedInstructor = Boolean(token && isAuthenticated);
-
-  const handleCreateCampaign = useCallback(
-    async (event) => {
-      event.preventDefault();
-      if (!token || !isAuthenticatedInstructor) {
-        setFeedback({ tone: 'error', message: 'Sign in with instructor permissions to launch campaigns.' });
-        return;
-      }
-      const keywords = parseCsv(campaignDraft.targetingKeywords);
-      const audiences = parseCsv(campaignDraft.targetingAudiences);
-      const locations = parseCsv(campaignDraft.targetingLocations);
-      const languagesList = parseCsv(campaignDraft.targetingLanguages);
-      const languages = (languagesList.length ? languagesList : ['EN']).map((language) =>
-        language.toUpperCase().slice(0, 2)
-      );
-
-      const payload = {
-        name: campaignDraft.name || 'Untitled campaign',
-        objective: campaignDraft.objective,
-        budget: {
-          currency: 'USD',
-          dailyCents: Math.max(Number(campaignDraft.dailyBudgetCents) || 0, 0)
-        },
-        creative: {
-          headline: campaignDraft.creativeHeadline || 'New creative',
-          description: campaignDraft.creativeDescription || '',
-          url: campaignDraft.creativeUrl || 'https://edulure.com'
-        },
-        targeting: {
-          keywords,
-          audiences,
-          locations,
-          languages
-        },
-        metadata: { createdViaDashboard: true }
-      };
-
-      if (campaignDraft.startAt) {
-        payload.startAt = new Date(campaignDraft.startAt).toISOString();
-      }
-      if (campaignDraft.endAt) {
-        payload.endAt = new Date(campaignDraft.endAt).toISOString();
-      }
-
-      try {
-        await createAdsCampaign({ token, payload });
-        setFeedback({ tone: 'success', message: 'Campaign launched successfully.' });
-        setCampaignDraft(createCampaignDraft());
-        await loadCampaigns();
-        refresh?.();
-      } catch (error) {
-        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to launch campaign.' });
-      }
-    },
-    [campaignDraft, isAuthenticatedInstructor, loadCampaigns, refresh, token]
   );
 
   const handleStatusChange = useCallback(
@@ -957,7 +376,7 @@ export default function EdulureAds() {
           <button type="button" className="dashboard-pill px-5 py-2" onClick={() => refresh?.()}>
             Refresh metrics
           </button>
-          <button type="button" className="dashboard-primary-pill px-5 py-2" onClick={() => openCampaignForm(null)}>
+          <button type="button" className="dashboard-primary-pill px-5 py-2" onClick={() => openEditor(null)}>
             New campaign
           </button>
         </div>
@@ -1046,218 +465,22 @@ export default function EdulureAds() {
           </div>
         </header>
 
-        <form className="grid gap-4 rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm" onSubmit={handleCreateCampaign}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-1 text-sm text-slate-600">
-              Campaign name
-              <input
-                type="text"
-                className="dashboard-input"
-                required
-                value={campaignDraft.name}
-                onChange={(event) => setCampaignDraft((previous) => ({ ...previous, name: event.target.value }))}
-              />
-            </label>
-            <label className="grid gap-1 text-sm text-slate-600">
-              Campaign objective
-              <select
-                className="dashboard-input"
-                value={campaignDraft.objective}
-                onChange={(event) => setCampaignDraft((previous) => ({ ...previous, objective: event.target.value }))}
-              >
-                {OBJECTIVE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+        {editorState.open ? (
+          <CampaignEditor
+            initialCampaign={activeCampaign}
+            availablePlacements={ads?.placements ?? []}
+            onSubmit={handleEditorSubmit}
+            onCancel={closeEditor}
+            submitting={editorSubmitting}
+            token={token}
+            mode={editorMode}
+          />
+        ) : (
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-white/70 p-6 text-sm text-slate-500">
+            Use the <span className="font-semibold text-primary">New campaign</span> button above to open the shared campaign
+            editor. Upload creatives, pick placements, and tune brand safety from one workflow before publishing.
           </div>
-
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.75fr)]">
-            <label className="grid gap-1 text-sm text-slate-600">
-              Daily budget (USD)
-              <input
-                type="number"
-                min="0"
-                step="10"
-                className="dashboard-input"
-                value={campaignDraft.dailyBudgetCents / 100}
-                onChange={(event) =>
-                  setCampaignDraft((previous) => ({
-                    ...previous,
-                    dailyBudgetCents: Math.max(Number(event.target.value || 0) * 100, 0)
-                  }))
-                }
-              />
-            </label>
-            <label className="grid gap-1 text-sm text-slate-600">
-              Start date
-              <input
-                type="date"
-                className="dashboard-input"
-                value={campaignDraft.startAt}
-                onChange={(event) => setCampaignDraft((previous) => ({ ...previous, startAt: event.target.value }))}
-              />
-            </label>
-            <label className="grid gap-1 text-sm text-slate-600">
-              End date
-              <input
-                type="date"
-                className="dashboard-input"
-                value={campaignDraft.endAt}
-                min={campaignDraft.startAt || undefined}
-                onChange={(event) => setCampaignDraft((previous) => ({ ...previous, endAt: event.target.value }))}
-              />
-            </label>
-          </div>
-
-          <details className="rounded-2xl border border-slate-200 bg-slate-50 p-4" open>
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Creative package</summary>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <label className="grid gap-1 text-sm text-slate-600">
-                Headline
-                <input
-                  type="text"
-                  className="dashboard-input"
-                  value={campaignDraft.creativeHeadline}
-                  onChange={(event) =>
-                    setCampaignDraft((previous) => ({ ...previous, creativeHeadline: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="grid gap-1 text-sm text-slate-600">
-                Destination URL
-                <input
-                  type="url"
-                  placeholder="https://"
-                  className="dashboard-input"
-                  value={campaignDraft.creativeUrl}
-                  onChange={(event) =>
-                    setCampaignDraft((previous) => ({ ...previous, creativeUrl: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="grid gap-1 text-sm text-slate-600 md:col-span-2">
-                Description
-                <textarea
-                  rows={2}
-                  className="dashboard-input resize-y"
-                  value={campaignDraft.creativeDescription}
-                  onChange={(event) =>
-                    setCampaignDraft((previous) => ({ ...previous, creativeDescription: event.target.value }))
-                  }
-                />
-              </label>
-            </div>
-            <div className="mt-4 space-y-4">
-              <label className="flex items-center gap-2 text-xs text-slate-500">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300"
-                  checked={showCreativePreview}
-                  onChange={() => setShowCreativePreview((previous) => !previous)}
-                />
-                Show live preview / multimedia embed
-              </label>
-              {showCreativePreview ? (
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                  <div className="rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-inner">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preview</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-900">
-                      {campaignDraft.creativeHeadline || 'Your campaign headline appears here'}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-600">
-                      {campaignDraft.creativeDescription ||
-                        'Craft a compelling description to invite your learners to take action.'}
-                    </p>
-                    <p className="mt-3 text-xs font-semibold text-primary">
-                      {campaignDraft.creativeUrl || 'https://edulure.com'}
-                    </p>
-                  </div>
-                  {creativePreviewUrl ? (
-                    <div className="aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                      <iframe
-                        title="Creative multimedia preview"
-                        src={creativePreviewUrl}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className="h-full w-full"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/50 p-6 text-sm text-slate-400">
-                      Provide a secure HTTPS URL to render the multimedia preview.
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-          </details>
-
-          <details className="rounded-2xl border border-slate-200 bg-slate-50 p-4" open>
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Targeting</summary>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <label className="grid gap-1 text-sm text-slate-600">
-                Keywords (comma separated)
-                <input
-                  type="text"
-                  className="dashboard-input"
-                  value={campaignDraft.targetingKeywords}
-                  placeholder="engagement, retention, lms"
-                  onChange={(event) =>
-                    setCampaignDraft((previous) => ({ ...previous, targetingKeywords: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="grid gap-1 text-sm text-slate-600">
-                Audience cohorts (comma separated)
-                <input
-                  type="text"
-                  className="dashboard-input"
-                  value={campaignDraft.targetingAudiences}
-                  placeholder="Course creators, Bootcamp grads"
-                  onChange={(event) =>
-                    setCampaignDraft((previous) => ({ ...previous, targetingAudiences: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="grid gap-1 text-sm text-slate-600">
-                Locations (comma separated)
-                <input
-                  type="text"
-                  className="dashboard-input"
-                  value={campaignDraft.targetingLocations}
-                  placeholder="United States, Canada"
-                  onChange={(event) =>
-                    setCampaignDraft((previous) => ({ ...previous, targetingLocations: event.target.value }))
-                  }
-                />
-              </label>
-              <label className="grid gap-1 text-sm text-slate-600">
-                Languages (comma separated ISO-2)
-                <input
-                  type="text"
-                  className="dashboard-input"
-                  value={campaignDraft.targetingLanguages}
-                  placeholder="EN, ES"
-                  onChange={(event) =>
-                    setCampaignDraft((previous) => ({ ...previous, targetingLanguages: event.target.value }))
-                  }
-                />
-              </label>
-            </div>
-          </details>
-
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <button type="button" className="dashboard-pill px-4 py-2" onClick={() => setCampaignDraft(createCampaignDraft())}>
-              Reset form
-            </button>
-            <button type="submit" className="dashboard-primary-pill px-6 py-2">
-              Launch campaign via API
-            </button>
-          </div>
-        </form>
+        )}
 
         {campaignsState.error ? (
           <DashboardStateMessage
@@ -1315,6 +538,19 @@ export default function EdulureAds() {
                       </span>
                     ))}
                   </div>
+                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
+                    {(campaign.placements ?? []).map((placement) => (
+                      <span
+                        key={`${campaign.id}-placement-${placement.context}`}
+                        className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600"
+                      >
+                        {placement.label ?? placement.surface ?? placement.context}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Brand safety: {(campaign.brandSafety?.categories ?? ['standard']).join(', ')}
+                  </p>
                 </div>
                 <div className="space-y-1 text-xs text-slate-500">
                   <p className="text-sm font-semibold text-slate-900">{campaign.objective}</p>
@@ -1332,6 +568,13 @@ export default function EdulureAds() {
                   <p>Last metrics {formatDateLabel(campaign.metrics?.lastSyncedAt)}</p>
                 </div>
                 <div className="flex flex-col items-stretch gap-2 text-xs">
+                  <button
+                    type="button"
+                    className="dashboard-pill px-3 py-1"
+                    onClick={() => openEditor(campaign)}
+                  >
+                    Edit campaign
+                  </button>
                   <select
                     className="dashboard-input"
                     value={campaign.status ?? 'draft'}

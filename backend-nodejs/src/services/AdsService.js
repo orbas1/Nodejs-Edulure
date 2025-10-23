@@ -3,6 +3,7 @@ import logger from '../config/logger.js';
 import AdsCampaignModel from '../models/AdsCampaignModel.js';
 import AdsCampaignMetricModel from '../models/AdsCampaignMetricModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import { PLACEMENT_CONTEXTS } from './AdsPlacementService.js';
 
 const log = logger.child({ service: 'AdsService' });
 
@@ -11,6 +12,121 @@ const MIN_HEADLINE_LENGTH = 12;
 const MAX_HEADLINE_LENGTH = 160;
 const ALLOWED_CAMPAIGN_ROLES = new Set(['admin', 'staff', 'instructor', 'service']);
 const ADMIN_LEVEL_ROLES = new Set(['admin', 'staff', 'service']);
+const PLACEMENT_CONTEXT_KEYS = Object.keys(PLACEMENT_CONTEXTS);
+const BRAND_SAFETY_CATEGORIES = new Set(['standard', 'education', 'financial', 'youth', 'sensitive']);
+
+function toStringArray(value) {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : String(entry ?? '').trim()))
+      .filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(/[\n,]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function normalisePlacement(entry) {
+  if (!entry) {
+    return null;
+  }
+  const context = typeof entry === 'string' ? entry : entry.context ?? entry.slot ?? null;
+  if (!context) {
+    return null;
+  }
+  const key = String(context).trim();
+  if (!PLACEMENT_CONTEXT_KEYS.includes(key)) {
+    return null;
+  }
+  const template = PLACEMENT_CONTEXTS[key];
+  return {
+    context: key,
+    slot: entry.slot ?? template.slot,
+    surface: entry.surface ?? template.surface,
+    label: entry.label ?? template.label ?? key
+  };
+}
+
+function validatePlacements(rawPlacements, { allowEmpty = false } = {}) {
+  const seen = new Set();
+  const placements = [];
+  const entries = Array.isArray(rawPlacements) ? rawPlacements : [];
+  for (const entry of entries) {
+    const placement = normalisePlacement(entry);
+    if (!placement) continue;
+    if (seen.has(placement.context)) continue;
+    seen.add(placement.context);
+    placements.push(placement);
+  }
+
+  if (!placements.length && !allowEmpty) {
+    const fallback = normalisePlacement('global_feed');
+    if (fallback) {
+      placements.push(fallback);
+    }
+  }
+
+  return placements;
+}
+
+function validateBrandSafety(raw = {}) {
+  const categories = new Set();
+  const provided = Array.isArray(raw.categories)
+    ? raw.categories
+    : Array.isArray(raw.levels)
+    ? raw.levels
+    : [];
+  for (const value of provided) {
+    const key = String(value ?? '')
+      .toLowerCase()
+      .trim();
+    if (!key) continue;
+    if (BRAND_SAFETY_CATEGORIES.has(key)) {
+      categories.add(key);
+    }
+  }
+  if (!categories.size) {
+    categories.add('standard');
+  }
+
+  const excludedTopics = toStringArray(raw.excludedTopics ?? raw.blockedTopics ?? []);
+  const reviewNotes = typeof raw.reviewNotes === 'string' ? raw.reviewNotes.trim() : null;
+
+  return {
+    categories: Array.from(categories),
+    excludedTopics,
+    reviewNotes: reviewNotes && reviewNotes.length ? reviewNotes : null
+  };
+}
+
+function ensurePlacementCompatibility({ placements, targeting }) {
+  const contexts = Array.isArray(placements) ? placements.map((placement) => placement.context) : [];
+  const keywords = toStringArray(targeting?.keywords ?? []);
+  const audiences = toStringArray(targeting?.audiences ?? []);
+
+  if (contexts.includes('search') && keywords.length === 0) {
+    const error = new Error('Search placements require at least one keyword.');
+    error.status = 422;
+    throw error;
+  }
+
+  if (
+    (contexts.includes('global_feed') || contexts.includes('community_feed')) &&
+    keywords.length === 0 &&
+    audiences.length === 0
+  ) {
+    const error = new Error('Feed placements require keywords or audience segments.');
+    error.status = 422;
+    throw error;
+  }
+}
 
 function normaliseRole(role) {
   return typeof role === 'string' ? role.toLowerCase() : null;
@@ -165,13 +281,27 @@ export default class AdsService {
 
   static async createCampaign(actor, payload) {
     const { id: actorId } = assertActorCanManageCampaigns(actor);
-    const startAt = payload.startAt ? new Date(payload.startAt) : null;
-    const endAt = payload.endAt ? new Date(payload.endAt) : null;
+    const schedule = payload.schedule ?? {};
+    const startInput = payload.startAt ?? schedule.startAt ?? null;
+    const endInput = payload.endAt ?? schedule.endAt ?? null;
+    const startAt = startInput ? new Date(startInput) : null;
+    const endAt = endInput ? new Date(endInput) : null;
     if (startAt && endAt && endAt < startAt) {
       const error = new Error('End date must be after the start date');
       error.status = 422;
       throw error;
     }
+
+    const placements = validatePlacements(payload.placements);
+    const brandSafety = validateBrandSafety(payload.brandSafety);
+    const targeting = {
+      keywords: toStringArray(payload.targeting?.keywords),
+      audiences: toStringArray(payload.targeting?.audiences),
+      locations: toStringArray(payload.targeting?.locations),
+      languages: toStringArray(payload.targeting?.languages ?? ['en'])
+    };
+
+    ensurePlacementCompatibility({ placements, targeting });
 
     const campaign = await db.transaction(async (trx) => {
       const created = await AdsCampaignModel.create(
@@ -183,10 +313,10 @@ export default class AdsService {
           budgetCurrency: payload.budget?.currency ?? payload.budgetCurrency ?? 'USD',
           budgetDailyCents: payload.budget?.dailyCents ?? payload.budgetDailyCents ?? 0,
           spendCurrency: payload.spendCurrency ?? payload.budget?.currency ?? 'USD',
-          targetingKeywords: payload.targeting?.keywords ?? [],
-          targetingAudiences: payload.targeting?.audiences ?? [],
-          targetingLocations: payload.targeting?.locations ?? [],
-          targetingLanguages: payload.targeting?.languages ?? ['en'],
+          targetingKeywords: targeting.keywords,
+          targetingAudiences: targeting.audiences,
+          targetingLocations: targeting.locations,
+          targetingLanguages: targeting.languages.length ? targeting.languages : ['en'],
           creativeHeadline: payload.creative?.headline,
           creativeDescription: payload.creative?.description,
           creativeUrl: payload.creative?.url,
@@ -194,7 +324,13 @@ export default class AdsService {
           endAt: endAt ? endAt.toISOString() : null,
           metadata: {
             reviewChecklist: payload.metadata?.reviewChecklist ?? [],
-            landingPage: payload.creative?.url ?? null
+            landingPage: payload.creative?.url ?? null,
+            placements,
+            brandSafety,
+            creativeAsset: payload.creative?.asset ?? null,
+            preview: payload.preview ?? { theme: 'light', accent: 'primary' },
+            lastFormSurface: payload.metadata?.lastFormSurface ?? 'dashboard_ads',
+            lastCompatibilityCheckAt: new Date().toISOString()
           }
         },
         trx
@@ -208,7 +344,9 @@ export default class AdsService {
           payload: {
             createdBy: actorId,
             objective: payload.objective,
-            status: created.status
+            status: created.status,
+            placements: placements.map((placement) => placement.context),
+            brandSafety: brandSafety.categories
           },
           performedBy: actorId
         },
@@ -247,10 +385,18 @@ export default class AdsService {
       updates.budgetDailyCents = payload.budget?.dailyCents ?? payload.budgetDailyCents;
     }
     if (payload.targeting) {
-      updates.targetingKeywords = payload.targeting.keywords ?? campaign.targetingKeywords;
-      updates.targetingAudiences = payload.targeting.audiences ?? campaign.targetingAudiences;
-      updates.targetingLocations = payload.targeting.locations ?? campaign.targetingLocations;
-      updates.targetingLanguages = payload.targeting.languages ?? campaign.targetingLanguages;
+      const targetingUpdates = {
+        keywords: toStringArray(payload.targeting.keywords ?? campaign.targetingKeywords),
+        audiences: toStringArray(payload.targeting.audiences ?? campaign.targetingAudiences),
+        locations: toStringArray(payload.targeting.locations ?? campaign.targetingLocations),
+        languages: toStringArray(payload.targeting.languages ?? campaign.targetingLanguages)
+      };
+      updates.targetingKeywords = targetingUpdates.keywords;
+      updates.targetingAudiences = targetingUpdates.audiences;
+      updates.targetingLocations = targetingUpdates.locations;
+      updates.targetingLanguages = targetingUpdates.languages.length
+        ? targetingUpdates.languages
+        : campaign.targetingLanguages;
     }
     if (payload.creative) {
       updates.creativeHeadline = payload.creative.headline ?? campaign.creativeHeadline;
@@ -265,9 +411,34 @@ export default class AdsService {
         updates.endAt = new Date(payload.schedule.endAt).toISOString();
       }
     }
+    const metadata = { ...campaign.metadata };
     if (payload.metadata) {
-      updates.metadata = { ...campaign.metadata, ...payload.metadata };
+      Object.assign(metadata, payload.metadata);
     }
+    if (payload.placements) {
+      metadata.placements = validatePlacements(payload.placements);
+    }
+    if (payload.brandSafety) {
+      metadata.brandSafety = validateBrandSafety(payload.brandSafety);
+    }
+    if (payload.creative && Object.prototype.hasOwnProperty.call(payload.creative, 'asset')) {
+      metadata.creativeAsset = payload.creative.asset ?? null;
+    }
+    if (payload.preview) {
+      metadata.preview = { ...metadata.preview, ...payload.preview };
+    }
+    metadata.lastCompatibilityCheckAt = new Date().toISOString();
+
+    const nextTargeting = {
+      keywords: updates.targetingKeywords ?? campaign.targetingKeywords,
+      audiences: updates.targetingAudiences ?? campaign.targetingAudiences,
+      locations: updates.targetingLocations ?? campaign.targetingLocations,
+      languages: updates.targetingLanguages ?? campaign.targetingLanguages
+    };
+    const nextPlacements = metadata.placements ?? campaign.metadata?.placements ?? [];
+    ensurePlacementCompatibility({ placements: nextPlacements, targeting: nextTargeting });
+
+    updates.metadata = metadata;
 
     const updated = await AdsCampaignModel.updateById(campaign.id, updates);
 
@@ -473,15 +644,7 @@ export default class AdsService {
 
     const ids = campaigns.map((campaign) => campaign.id);
     const lifetimeMap = await AdsCampaignMetricModel.summariseByCampaignIds(ids);
-
-    const trailingPairs = await Promise.all(
-      campaigns.map(async (campaign) => {
-        const summary = await AdsCampaignMetricModel.summariseWindow(campaign.id, { windowDays: 7 });
-        return [campaign.id, summary ?? defaultSummary()];
-      })
-    );
-
-    const trailingMap = new Map(trailingPairs);
+    const trailingMap = await AdsCampaignMetricModel.summariseWindowBulk(ids, { windowDays: 7 });
 
     await Promise.all(campaigns.map((campaign) => this.applyLifecycleTransitions(campaign)));
 
@@ -753,13 +916,17 @@ export default class AdsService {
       creative: {
         headline: campaign.creativeHeadline,
         description: campaign.creativeDescription,
-        url: campaign.creativeUrl
+        url: campaign.creativeUrl,
+        asset: campaign.metadata?.creativeAsset ?? null
       },
       schedule: {
         startAt: toISO(campaign.startAt),
         endAt: toISO(campaign.endAt)
       },
       compliance,
+      placements: Array.isArray(campaign.metadata?.placements) ? campaign.metadata.placements : [],
+      brandSafety: campaign.metadata?.brandSafety ?? { categories: ['standard'], excludedTopics: [] },
+      preview: campaign.metadata?.preview ?? { theme: 'light', accent: 'primary' },
       metadata: campaign.metadata,
       createdBy: campaign.createdBy,
       createdAt: toISO(campaign.createdAt),

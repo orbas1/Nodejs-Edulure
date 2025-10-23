@@ -396,25 +396,25 @@ G. ✓ **Full Upgrade Plan & Release Steps** – Run the new learner support sui
 ## 15. Ads and sponsorship management
 
 ### Flow outline
-- **Campaign creation** – `dashboard/EdulureAds.jsx` lets admins craft campaigns backed by `AdsController.createCampaign`, storing creatives, targeting, and budget.【F:backend-nodejs/src/controllers/AdsController.js†L1-L200】
-- **Placement & delivery** – `FeedController` and `ExplorerController` request eligible ads via `AdsService.selectPlacements`, returning cards styled to match feed aesthetics.
-- **Measurement** – `AnalyticsController` records impressions/clicks; results surface in dashboards for owners and advertisers.
-- **Compliance** – `GovernanceController` ensures disclosures and opt-outs are honoured, integrating with profile preferences.
+- **Campaign creation** – `EdulureAds.jsx` surfaces the unified `CampaignEditor`, posts to the shared ads API client, and funnels validated payloads through `AdsController.create` so operators manage placements, brand safety, and previews without duplicating flows across surfaces.【F:frontend-reactjs/src/pages/dashboard/EdulureAds.jsx†L1-L162】【F:frontend-reactjs/src/components/ads/CampaignEditor.jsx†L7-L219】【F:frontend-reactjs/src/api/adsApi.js†L14-L47】【F:backend-nodejs/src/controllers/AdsController.js†L70-L199】
+- **Placement & delivery** – `AdsService` now persists placement metadata and brand-safety settings on every campaign, while `AdsPlacementService` ranks eligible creatives per surface so explorer, feed, and live classrooms share the same slot contract.【F:backend-nodejs/src/services/AdsService.js†L282-L361】【F:backend-nodejs/src/services/AdsPlacementService.js†L8-L160】
+- **Measurement** – Daily metrics land in `ads_campaign_metrics_daily`, are summarised by `AdsCampaignMetricModel`, and hydrate dashboard insights with lifetime, trailing, and forecast views surfaced inside the ads workspace.【F:backend-nodejs/src/models/AdsCampaignMetricModel.js†L1-L188】【F:backend-nodejs/src/services/AdsService.js†L600-L712】【F:frontend-reactjs/src/pages/dashboard/EdulureAds.jsx†L224-L260】
+- **Compliance** – Automated reviews couple `AdsService` checks with editor guardrails so prohibited copy, missing landing pages, or mismatched targeting halt delivery before violating governance controls.【F:frontend-reactjs/src/components/ads/CampaignEditor.jsx†L185-L218】【F:backend-nodejs/src/services/AdsService.js†L715-L760】
 
 ### Assessments
-A. **Redundancy Changes** – Combine campaign forms across feed and explorer placements; unify creative upload workflows. Base creation on `frontend-reactjs/src/components/ads/CampaignEditor.jsx` and store creatives through the same `MediaUploadController` path used by marketing pages.
+A. ✓ **Redundancy Changes** – `CampaignEditor` drives all create/edit flows, merges default placement scaffolding, and reuses the media upload hook so dashboards, backstage tooling, and governance reviewers work from the same contract without bespoke forms.【F:frontend-reactjs/src/components/ads/CampaignEditor.jsx†L7-L219】【F:frontend-reactjs/src/hooks/useMediaUpload.js†L1-L38】
 
-B. **Strengths to Keep** – Maintain granular targeting, frequency caps, and easy toggles for campaign status.
+B. ✓ **Strengths to Keep** – The dashboard still exposes quick status toggles, budget and targeting chips, and role-gated controls while leaning on the shared ads API, so operators retain the compact summary panels and pause/resume flows they relied on before consolidation.【F:frontend-reactjs/src/pages/dashboard/EdulureAds.jsx†L96-L260】【F:frontend-reactjs/src/api/adsApi.js†L14-L90】
 
-C. **Weaknesses to Remove** – Improve preview accuracy, add brand safety controls, and ensure analytics latency is minimal. Validate placements using `AdsCampaignModel` targeting rules before saving so misconfigured campaigns are caught early.
+C. ✓ **Weaknesses to Remove** – Input validation now spans placements, brand safety, and schedules end-to-end: the controller accepts structured placement arrays, the service harmonises metadata and keyword checks, and placement selection refuses contexts that lack the required signals, preventing broken search/feed deliveries.【F:backend-nodejs/src/controllers/AdsController.js†L9-L199】【F:backend-nodejs/src/services/AdsService.js†L282-L361】【F:backend-nodejs/src/services/AdsPlacementService.js†L41-L160】
 
-D. **Sesing and Colour Review Changes** – Keep ad frames subtle with disclosure badges, ensure CTA buttons follow brand guidelines, and support dark/light variants.
+D. ✓ **Sesing and Colour Review Changes** – The preview component ships neutral shells, accent badges, and disclosure styling that mirror production cards, while the editor keeps typography and focus treatments aligned with dashboard tokens so ads render consistently across light and dark modes.【F:frontend-reactjs/src/components/ads/CampaignPreview.jsx†L1-L112】【F:frontend-reactjs/src/components/ads/CampaignEditor.jsx†L226-L260】
 
-E. **Improvements & Justification Changes** – Build live previews, integrate opt-out settings, and provide automated pacing recommendations to increase revenue without hurting UX. Surface budget pacing forecasts from `AdsCampaignMetricModel` to highlight when spend deviates from plan.
+E. ✓ **Improvements & Justification Changes** – Hydrated insights blend lifetime, trailing, and forecast metrics with compliance status and pacing hints, justifying spend adjustments and placement mix decisions from a single dataset shared across UI and services.【F:backend-nodejs/src/models/AdsCampaignMetricModel.js†L1-L188】【F:backend-nodejs/src/services/AdsService.js†L600-L712】【F:frontend-reactjs/src/components/ads/CampaignEditor.jsx†L163-L178】
 
-F. **Change Checklist Tracker** – Completion 40%; tests for targeting logic; schema must store campaign metrics; migrations for pacing tables; seeders for sample campaigns; update models for ads entities.
+F. ✓ **Change Checklist Tracker** – Completion 100%; migrations define campaigns/metrics tables, seeds populate brand-safe placements, tests assert metadata + compliance wiring, and models/services hydrate placements, preview, and metrics so schema, code, and fixtures stay in lockstep.【F:backend-nodejs/migrations/20241119150000_ads_intelligence.js†L3-L74】【F:backend-nodejs/seeds/001_bootstrap.js†L3382-L3470】【F:backend-nodejs/src/models/AdsCampaignModel.js†L5-L155】【F:backend-nodejs/test/adsService.test.js†L1-L298】
 
-G. **Full Upgrade Plan & Release Steps** – Implement unified campaign builder, add previews, integrate pacing analytics, test delivery logic, and launch with advertiser onboarding.
+G. ✓ **Full Upgrade Plan & Release Steps** – Apply the ads migration, reseed to pull updated placement metadata, run the Vitest ads suite, and smoke test feed/search delivery so the shared placements and compliance automation remain healthy before opening the rollout comms.【F:backend-nodejs/migrations/20241119150000_ads_intelligence.js†L3-L79】【F:backend-nodejs/seeds/001_bootstrap.js†L3382-L3470】【F:backend-nodejs/test/adsService.test.js†L1-L298】
 
 ## 16. Analytics and reporting
 

@@ -6,6 +6,8 @@ import { paginated, success } from '../utils/httpResponse.js';
 const objectiveEnum = ['awareness', 'traffic', 'leads', 'conversions'];
 const statusEnum = ['draft', 'scheduled', 'active', 'paused', 'completed', 'archived'];
 
+const placementContextEnum = ['global_feed', 'community_feed', 'search', 'course_live'];
+
 const listSchema = Joi.object({
   status: Joi.alternatives().try(Joi.string(), Joi.array().items(Joi.string())),
   search: Joi.string().max(120).allow('', null),
@@ -31,6 +33,40 @@ const budgetSchema = Joi.object({
   dailyCents: Joi.number().integer().min(1000).max(20_000_000).required()
 });
 
+const placementSchema = Joi.array()
+  .items(
+    Joi.alternatives().try(
+      Joi.string().valid(...placementContextEnum),
+      Joi.object({
+        context: Joi.string()
+          .valid(...placementContextEnum)
+          .required(),
+        slot: Joi.string().trim().max(120).allow('', null),
+        surface: Joi.string().trim().max(120).allow('', null),
+        label: Joi.string().trim().max(160).allow('', null)
+      })
+    )
+  )
+  .default([]);
+
+const brandSafetySchema = Joi.object({
+  categories: Joi.array()
+    .items(Joi.string().valid('standard', 'education', 'financial', 'youth', 'sensitive'))
+    .default(['standard']),
+  excludedTopics: Joi.array().items(Joi.string().trim().max(80)).default([]),
+  reviewNotes: Joi.string().trim().max(500).allow('', null)
+}).default({ categories: ['standard'], excludedTopics: [], reviewNotes: null });
+
+const previewSchema = Joi.object({
+  theme: Joi.string().valid('light', 'dark').default('light'),
+  accent: Joi.string().valid('primary', 'indigo', 'emerald', 'amber').default('primary')
+}).default({ theme: 'light', accent: 'primary' });
+
+const scheduleSchema = Joi.object({
+  startAt: Joi.date().iso().optional(),
+  endAt: Joi.date().iso().optional()
+}).optional();
+
 const createSchema = Joi.object({
   name: Joi.string().trim().max(200).required(),
   objective: Joi.string()
@@ -42,11 +78,17 @@ const createSchema = Joi.object({
   budget: budgetSchema.required(),
   targeting: targetingSchema.default({}),
   creative: creativeSchema.required(),
+  schedule: scheduleSchema,
+  placements: placementSchema,
+  brandSafety: brandSafetySchema,
+  preview: previewSchema,
   metadata: Joi.object().optional(),
   startAt: Joi.date().iso().optional(),
   endAt: Joi.date().iso().optional()
 }).custom((value, helpers) => {
-  if (value.startAt && value.endAt && new Date(value.endAt) < new Date(value.startAt)) {
+  const startAt = value.startAt ?? value.schedule?.startAt ?? null;
+  const endAt = value.endAt ?? value.schedule?.endAt ?? null;
+  if (startAt && endAt && new Date(endAt) < new Date(startAt)) {
     return helpers.error('any.invalid', { message: 'End date must be after the start date' });
   }
   return value;
@@ -67,6 +109,9 @@ const updateSchema = Joi.object({
     startAt: Joi.date().iso().optional(),
     endAt: Joi.date().iso().optional()
   }).optional(),
+  placements: placementSchema.optional(),
+  brandSafety: brandSafetySchema.optional(),
+  preview: previewSchema.optional(),
   metadata: Joi.object().optional()
 });
 

@@ -5,11 +5,13 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn(),
     count: vi.fn(),
     updateById: vi.fn(),
-    findByPublicId: vi.fn()
+    findByPublicId: vi.fn(),
+    create: vi.fn()
   },
   adsCampaignMetricModelMock: {
     summariseByCampaignIds: vi.fn(),
     summariseWindow: vi.fn(),
+    summariseWindowBulk: vi.fn(),
     listByCampaign: vi.fn()
   },
   domainEventModelMock: {
@@ -97,6 +99,7 @@ describe('AdsService', () => {
         }
       })
     );
+    adsCampaignMetricModelMock.summariseWindowBulk.mockResolvedValue(new Map());
   });
 
   it('applies compliance automation when campaigns overspend beyond tolerance', async () => {
@@ -113,13 +116,20 @@ describe('AdsService', () => {
       lastMetricDate: new Date()
     });
     adsCampaignMetricModelMock.summariseByCampaignIds.mockResolvedValue(lifetime);
-    adsCampaignMetricModelMock.summariseWindow.mockResolvedValue({
-      impressions: 48000,
-      clicks: 2043,
-      conversions: 238,
-      spendCents: 41200,
-      revenueCents: 109500
-    });
+    adsCampaignMetricModelMock.summariseWindowBulk.mockResolvedValue(
+      new Map([
+        [
+          baseCampaign.id,
+          {
+            impressions: 48000,
+            clicks: 2043,
+            conversions: 238,
+            spendCents: 41200,
+            revenueCents: 109500
+          }
+        ]
+      ])
+    );
 
     adsCampaignModelMock.updateById.mockImplementation(async (_id, updates) => ({
       ...baseCampaign,
@@ -193,5 +203,97 @@ describe('AdsService', () => {
         actor: { role: 'instructor' }
       })
     ).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('creates campaigns with placements, brand safety, and preview metadata', async () => {
+    const now = new Date();
+    const later = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const createdCampaign = {
+      ...baseCampaign,
+      id: 987,
+      publicId: '2e7f0e26-7d79-4cfd-99b7-14cb2251ab38',
+      status: 'draft',
+      budgetDailyCents: 5000,
+      startAt: now.toISOString(),
+      endAt: later.toISOString(),
+      metadata: {}
+    };
+
+    adsCampaignMetricModelMock.summariseByCampaignIds.mockResolvedValue(
+      new Map([
+        [
+          createdCampaign.id,
+          {
+            impressions: 0,
+            clicks: 0,
+            conversions: 0,
+            spendCents: 0,
+            revenueCents: 0,
+            lastMetricDate: null
+          }
+        ]
+      ])
+    );
+    adsCampaignMetricModelMock.summariseWindowBulk.mockResolvedValue(
+      new Map([[createdCampaign.id, { impressions: 0, clicks: 0, conversions: 0, spendCents: 0, revenueCents: 0 }]])
+    );
+
+    adsCampaignModelMock.create.mockImplementation(async (payload) => {
+      expect(Array.isArray(payload.metadata.placements)).toBe(true);
+      expect(payload.metadata.placements).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ context: 'global_feed', slot: 'feed-inline' }),
+          expect.objectContaining({ context: 'search', slot: 'search-top' })
+        ])
+      );
+      expect(payload.metadata.brandSafety.categories).toEqual(expect.arrayContaining(['education']));
+      expect(payload.metadata.preview).toMatchObject({ theme: 'dark', accent: 'indigo' });
+      return {
+        ...createdCampaign,
+        metadata: payload.metadata
+      };
+    });
+
+    adsCampaignModelMock.updateById.mockImplementation(async (_id, updates) => ({
+      ...createdCampaign,
+      ...updates,
+      metadata: { ...createdCampaign.metadata, ...updates.metadata }
+    }));
+
+    const result = await AdsService.createCampaign(
+      { id: 42, role: 'admin' },
+      {
+        name: 'Creator Growth Sprint',
+        objective: 'traffic',
+        status: 'draft',
+        budget: { currency: 'USD', dailyCents: 5000 },
+        targeting: {
+          keywords: ['growth marketing'],
+          audiences: ['Creators'],
+          locations: ['US'],
+          languages: ['EN']
+        },
+        creative: {
+          headline: 'Unlock telemetry-backed growth campaigns',
+          description: 'Automation playbooks and campaign reviews for creators.',
+          url: 'https://edulure.test/ads/creator-growth-sprint',
+          asset: {
+            url: 'https://cdn.edulure.test/assets/ads/creator-growth-sprint.png',
+            type: 'image/png'
+          }
+        },
+        schedule: { startAt: now.toISOString(), endAt: later.toISOString() },
+        placements: ['global_feed', { context: 'search' }],
+        brandSafety: { categories: ['education', 'financial'], excludedTopics: ['crypto'], reviewNotes: 'Approved' },
+        preview: { theme: 'dark', accent: 'indigo' }
+      }
+    );
+
+    expect(result.id).toBe(createdCampaign.publicId);
+    expect(result.placements).toHaveLength(2);
+    expect(result.brandSafety.categories).toContain('education');
+    expect(result.preview).toMatchObject({ theme: 'dark', accent: 'indigo' });
+    expect(domainEventModelMock.record).toHaveBeenCalled();
+    expect(adsCampaignModelMock.create).toHaveBeenCalled();
   });
 });
