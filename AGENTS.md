@@ -776,19 +776,26 @@ G. **Full Upgrade Plan & Release Steps** – Run the reporting view migration, r
 - **Personalisation** – Interests, learning goals, ad preferences.
 
 ### Assessments
-A. ✅ **Redundancy Changes** – Consolidated learner and admin settings shells around the shared `SettingsLayout`, `SettingsToggleField`, and `SettingsAccordion` primitives so both dashboards inherit identical spacing, status messaging, and toggle semantics. Refactored `LearnerSettings.jsx` and `DashboardSettings.jsx` to consume the shared layout, eliminating bespoke headers, cards, and checkbox wiring while keeping action handlers unchanged.
+A. ✓
+   Shared primitives keep dashboards consistent: `SettingsLayout.jsx`, `SettingsToggleField.jsx`, and `SettingsAccordion.jsx` drive every settings surface, while `LearnerSettings.jsx` and `DashboardSettings.jsx` import the same layout scaffolding so bespoke headers, checkboxes, and wrappers are eliminated without disturbing each page’s fetch/update hooks.
 
-B. ✅ **Strengths to Keep** – Preserved autosave and acknowledgement flows by centralising status banners in `SettingsLayout` and retaining optimistic updates plus refresh hooks in `LearnerSettings.jsx`. The preview grid and contextual helper copy continue to render alongside forms, with updated copy emphasising learner guidance rather than removing existing reassurance patterns.
+B. ✓
+   Autosave and acknowledgement behaviour persists. `LearnerSettings.jsx` maps API feedback into a `statusBanner` prop for `SettingsLayout` and continues to surface contextual `DashboardStateMessage` components beside each accordion, and `DashboardSettings.jsx` keeps the unsaved-change summary plus refresh affordances so experienced operators recognise their existing workflows.
 
-C. ✅ **Weaknesses to Remove** – Introduced the reusable `AvatarCropper.jsx` with zoom/offset controls and circular masking, embedded inside `ProfileIdentityEditor.jsx` to replace the previous static upload field. Collapsed sprawling settings tabs into responsive accordions driven by `SettingsAccordion.jsx`, which now avoids nested buttons, exposes proper focus outlines, and positions section actions predictably.
+C. ✓
+   Experience debt is removed through richer media tooling and simpler navigation. `AvatarCropper.jsx` now supplies zoom, pan, and reset controls embedded in `ProfileIdentityEditor.jsx`, and settings content is broken into accessible accordions via `SettingsAccordion.jsx`, trimming redundant tab chrome while keeping keyboard focus and action buttons predictable in `LearnerSettings.jsx`.
 
-D. ✅ **Sesing and Colour Review Changes** – Harmonised surfaces with neutral white/stone backgrounds, subtle borders, and focus-visible rings that meet contrast targets. Toggle states leverage primary accent shades, and alert banners follow status-specific palettes (sky/emerald/amber/rose) to keep error messaging accessible across dashboards.
+D. ✓
+   Visual language is unified across settings. The shared layout and toggle components render neutral stone panels, slate typography, and primary accent toggles, while `LearnerSettings.jsx` applies consistent badge palettes for finance tables and modals so status, warning, and success states meet contrast requirements without deviating between learner and admin shells.
 
-E. ✅ **Improvements & Justification Changes** – Added personalisation controls that surface ad and sponsored toggles, recommended-topic text inputs, and a live recommendation preview built from backend helpers. `LearnerDashboardService.js` now normalises ad metadata, extends finance workspace payloads through `LearnerFinancialProfileModel` and `LearnerFinancePurchaseModel`, and rebuilds previews so UI payloads align with learner preferences, while the frontend renders the preview cards and Edulure Ads data usage copy inline.
+E. ✓
+   Personalisation wiring spans frontend and backend. `LearnerDashboardService.js` normalises recommended topics, ad personalisation, finance alerts, and recommendation previews before handing them to `LearnerSettings.jsx`, which presents ad usage copy, preview cards, and finance workspaces powered by `LearnerFinancialProfileModel` and `LearnerFinancePurchaseModel` records.
 
-F. ✅ **Change Checklist Tracker** – All preference flows covered by updated vitest suites (`LearnerSettings` and `ProfileIdentityEditor`) and backend unit tests for `LearnerDashboardService`. `backend-nodejs/seeds/001_bootstrap.js` seeds learner system preferences, financial profiles, payment methods, billing contacts, and finance purchases so migrations and models stay in lockstep with the unified settings experience, and the avatar cropper plus finance dialogs remain exercised via component tests.
+F. ✓
+   Regression coverage and data seeding back the experience. Vitest suites for `LearnerSettings` and `ProfileIdentityEditor` exercise autosave, modal, and cropper flows, backend unit tests target `LearnerDashboardService`, and `backend-nodejs/seeds/001_bootstrap.js` provisions learner preferences, finance profiles, purchases, and subscriptions so environments mirror production-ready payloads.
 
-G. ✅ **Full Upgrade Plan & Release Steps** – Delivered the shared settings components, avatar cropper, ad preference wiring, and recommendation preview end-to-end. Updated dialogs with `role="dialog"`, executed backend/frontend vitest runs, and documented the new architecture here so onboarding and release comms can highlight the unified settings experience.
+G. ✓
+   Release steps focus on resilience: keep dialogs wired with explicit `role="dialog"`, run workspace-wide tests via `npm run test --workspaces`, reseed after applying learner preference migrations, and share this architecture summary during rollout so teams validate both learner and admin settings in staging before shipping.
 
 ## 17. Accessibility and responsiveness
 
