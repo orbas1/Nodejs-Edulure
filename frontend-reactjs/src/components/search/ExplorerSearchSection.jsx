@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   AdjustmentsHorizontalIcon,
@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 import SearchResultCard from './SearchResultCard.jsx';
+import FilterChips, { buildFilterChips } from './FilterChips.jsx';
 import { useExplorerEntitySearch } from '../../hooks/useExplorerEntitySearch.js';
 
 function classNames(...classes) {
@@ -18,12 +19,16 @@ function classNames(...classes) {
 }
 
 function FilterControl({ definition, value, onChange, onToggle }) {
+  const [expanded, setExpanded] = useState(false);
+  const options = definition.options ?? [];
+
   if (definition.type === 'multi') {
+    const visibleOptions = expanded ? options : options.slice(0, 5);
     return (
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{definition.label}</p>
         <div className="flex flex-wrap gap-2">
-          {definition.options.map((option) => {
+          {visibleOptions.map((option) => {
             const selected = value?.includes(option.value);
             return (
               <button
@@ -43,6 +48,15 @@ function FilterControl({ definition, value, onChange, onToggle }) {
             );
           })}
         </div>
+        {options.length > 5 ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="text-xs font-semibold text-primary transition hover:text-primary-dark"
+          >
+            {expanded ? 'Show fewer' : 'Show all'}
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -172,13 +186,14 @@ export default function ExplorerSearchSection({
     clearFilters,
     sort,
     setSort,
-    page,
     total,
-    totalPages,
-    goToPage,
+    hasMore,
+    loadMore,
     results,
     loading,
+    appending,
     error,
+    analytics,
     savedSearches,
     savedSearchError,
     savedSearchLoading,
@@ -194,6 +209,31 @@ export default function ExplorerSearchSection({
   }, [query]);
 
   const filtersByKey = filters ?? {};
+  const filterChips = useMemo(() => buildFilterChips(filtersByKey, filterDefinitions), [filtersByKey, filterDefinitions]);
+  const activeFilters = filterChips.length;
+  const sentinelRef = useRef(null);
+  const totalDisplay = total || results.length;
+
+  const facetEntries = useMemo(() => {
+    if (!analytics?.facets) return [];
+    return Object.entries(analytics.facets)
+      .map(([facetKey, facetValue]) => {
+        const counts = facetValue?.counts ?? facetValue;
+        if (!counts || typeof counts !== 'object') {
+          return null;
+        }
+        const sorted = Object.entries(counts)
+          .map(([label, count]) => ({ label, count: Number(count ?? 0) }))
+          .filter((item) => item.label !== '' && !Number.isNaN(item.count))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+        if (!sorted.length) {
+          return null;
+        }
+        return { key: facetKey, values: sorted };
+      })
+      .filter(Boolean);
+  }, [analytics]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -246,7 +286,46 @@ export default function ExplorerSearchSection({
     }
   };
 
-  const activeFilters = useMemo(() => Object.keys(filtersByKey).length, [filtersByKey]);
+  const handleRemoveFilter = useCallback(
+    (chip) => {
+      const definition = filterDefinitions.find((item) => item.key === chip.key);
+      if (!definition) return;
+      if (definition.type === 'multi') {
+        toggleMultiFilter(chip.key, chip.rawValue);
+        return;
+      }
+      if (definition.type === 'range') {
+        setFilterValue(chip.key, null);
+        return;
+      }
+      setFilterValue(chip.key, null);
+    },
+    [filterDefinitions, setFilterValue, toggleMultiFilter]
+  );
+
+  useEffect(() => {
+    if (!hasMore) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            loadMore();
+          }
+        });
+      },
+      { rootMargin: '200px 0px', threshold: 0 }
+    );
+    const element = sentinelRef.current;
+    if (element) {
+      observer.observe(element);
+    }
+    return () => {
+      if (element) {
+        observer.unobserve(element);
+      }
+      observer.disconnect();
+    };
+  }, [hasMore, loadMore]);
 
   return (
     <section className="rounded-4xl bg-white/80 p-8 shadow-xl ring-1 ring-slate-100">
@@ -301,38 +380,46 @@ export default function ExplorerSearchSection({
       </header>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[3fr,1fr] lg:gap-10">
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-100 bg-slate-50/60 p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                <FunnelIcon className="mr-2 inline-block h-4 w-4" /> Filters
-              </h3>
-              <span className="text-xs font-semibold text-primary">{activeFilters} applied</span>
-            </div>
-            <div className="mt-5 grid gap-6 md:grid-cols-2">
-              {filterDefinitions.map((definition) => (
-                <FilterControl
-                  key={definition.key}
-                  definition={definition}
-                  value={filtersByKey[definition.key]}
-                  onChange={(value) => setFilterValue(definition.key, value)}
-                  onToggle={(value) => toggleMultiFilter(definition.key, value)}
-                />
-              ))}
-            </div>
+      <div className="space-y-6">
+        <div className="rounded-3xl border border-slate-100 bg-slate-50/60 p-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              <FunnelIcon className="mr-2 inline-block h-4 w-4" /> Filters
+            </h3>
+            <span className="text-xs font-semibold text-primary">
+              {activeFilters ? `${activeFilters} applied` : 'No filters applied'}
+            </span>
           </div>
+          <div className="mt-5 grid gap-6 md:grid-cols-2">
+            {filterDefinitions.map((definition) => (
+              <FilterControl
+                key={definition.key}
+                definition={definition}
+                value={filtersByKey[definition.key]}
+                onChange={(value) => setFilterValue(definition.key, value)}
+                onToggle={(value) => toggleMultiFilter(definition.key, value)}
+              />
+            ))}
+          </div>
+          <FilterChips
+            filters={filtersByKey}
+            definitions={filterDefinitions}
+            chips={filterChips}
+            onRemove={handleRemoveFilter}
+          />
+        </div>
 
-          {error ? (
-            <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-600" role="alert">
-              {error}
+        {error ? (
+          <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-600" role="alert">
+            {error}
             </div>
           ) : null}
 
-          {loading && !results.length ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, index) => (
-                <div key={index} className="animate-pulse rounded-3xl border border-slate-100 bg-white/80 p-6">
-                  <div className="h-4 w-32 rounded bg-slate-200" />
+        {loading && !results.length ? (
+          <div className="space-y-4">
+            {[...Array(3)].map((_, index) => (
+              <div key={index} className="animate-pulse rounded-3xl border border-slate-100 bg-white/80 p-6">
+                <div className="h-4 w-32 rounded bg-slate-200" />
                   <div className="mt-3 h-5 w-64 rounded bg-slate-200" />
                   <div className="mt-3 h-3 w-full rounded bg-slate-100" />
                   <div className="mt-2 h-3 w-3/4 rounded bg-slate-100" />
@@ -348,40 +435,69 @@ export default function ExplorerSearchSection({
                 Broaden your query, adjust the filters or try a different sort order. Saved searches make it easy to revisit high-performing setups.
               </p>
             </div>
-          ) : null}
+        ) : null}
 
-          <div className="space-y-4">
-            {results.map((hit) => (
-              <SearchResultCard key={`${entityType}-${hit.id ?? hit.documentId ?? hit.slug}`} entityType={entityType} hit={hit} />
+        {results.length ? (
+          <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white/80 px-5 py-3 text-xs font-semibold text-slate-500">
+            <span>
+              Showing {results.length} of {totalDisplay} results
+            </span>
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={loadMore}
+                className="inline-flex items-center gap-2 rounded-full border border-primary/30 px-4 py-2 text-xs font-semibold text-primary transition hover:border-primary hover:text-primary-dark"
+                disabled={loading}
+              >
+                Load more
+              </button>
+            ) : (
+              <span className="text-xs font-semibold text-emerald-600">End of catalogue</span>
+            )}
+          </div>
+        ) : null}
+
+        <div className="space-y-4">
+          {results.map((hit) => (
+            <SearchResultCard key={`${entityType}-${hit.id ?? hit.documentId ?? hit.slug}`} entityType={entityType} hit={hit} />
+          ))}
+        </div>
+
+        {appending ? (
+          <div className="space-y-4" aria-hidden>
+            {[...Array(2)].map((_, index) => (
+              <div key={index} className="animate-pulse rounded-3xl border border-slate-100 bg-white/80 p-6">
+                <div className="h-4 w-24 rounded bg-slate-200" />
+                <div className="mt-3 h-5 w-52 rounded bg-slate-200" />
+                <div className="mt-3 h-3 w-full rounded bg-slate-100" />
+              </div>
             ))}
           </div>
+        ) : null}
 
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600">
-              <span>
-                Showing page {page} of {totalPages} · {total} results
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => goToPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  className="rounded-full border border-slate-200 px-4 py-2 transition disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary hover:text-primary"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() => goToPage(Math.min(totalPages, page + 1))}
-                  disabled={page === totalPages}
-                  className="rounded-full border border-slate-200 px-4 py-2 transition disabled:cursor-not-allowed disabled:opacity-50 hover:border-primary hover:text-primary"
-                >
-                  Next
-                </button>
-              </div>
+        <div ref={sentinelRef} aria-hidden className="h-1 w-full" />
+
+        {facetEntries.length ? (
+          <div className="rounded-3xl border border-slate-100 bg-white/70 p-6 shadow-sm">
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Trending facets</h4>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {facetEntries.map((facet) => (
+                <div key={facet.key} className="rounded-2xl bg-slate-50/80 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{facet.key}</p>
+                  <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                    {facet.values.map((item) => (
+                      <li key={`${facet.key}-${item.label}`} className="flex items-center justify-between gap-3">
+                        <span className="truncate">{item.label}</span>
+                        <span className="text-xs font-semibold text-slate-400">{item.count}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
+      </div>
 
         <aside className="space-y-6">
           <div className="rounded-3xl border border-slate-100 bg-white/60 p-6 shadow-sm">

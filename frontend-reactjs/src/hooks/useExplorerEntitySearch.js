@@ -52,6 +52,7 @@ export function useExplorerEntitySearch({
   const [results, setResults] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [appending, setAppending] = useState(false);
   const [error, setError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
 
@@ -67,7 +68,7 @@ export function useExplorerEntitySearch({
   }, [filters, transformFilters]);
 
   const executeSearch = useCallback(
-    async (overrides = {}) => {
+    async ({ page: targetPage = 1, append = false } = {}) => {
       if (!entityType) return;
       if (abortRef.current) {
         abortRef.current.abort();
@@ -75,6 +76,7 @@ export function useExplorerEntitySearch({
       const controller = new AbortController();
       abortRef.current = controller;
       setLoading(true);
+      setAppending(Boolean(append));
       setError(null);
       try {
         const payload = {
@@ -83,7 +85,7 @@ export function useExplorerEntitySearch({
           filters: cleanedFilters && Object.keys(cleanedFilters).length ? { [entityType]: cleanedFilters } : {},
           globalFilters: {},
           sort: sort ? { [entityType]: sort } : {},
-          page: overrides.page ?? page,
+          page: targetPage,
           perPage: pageSize
         };
         const response = await searchExplorer(payload, { token, signal: controller.signal });
@@ -91,9 +93,12 @@ export function useExplorerEntitySearch({
           throw new Error(response?.message ?? 'Search failed');
         }
         const entityResult = response.data?.results?.[entityType];
-        setResults(entityResult?.hits ?? []);
-        setTotal(response.data?.totals?.[entityType] ?? 0);
+        const hits = entityResult?.hits ?? [];
+        setResults((prev) => (append ? [...prev, ...hits] : hits));
+        const totalResults = response.data?.totals?.[entityType] ?? 0;
+        setTotal(totalResults);
         setAnalytics(response.data?.analytics ?? null);
+        setPage(targetPage);
       } catch (err) {
         if (err.name === 'CanceledError' || err.name === 'AbortError') {
           return;
@@ -102,13 +107,15 @@ export function useExplorerEntitySearch({
         setAnalytics(null);
       } finally {
         setLoading(false);
+        setAppending(false);
       }
     },
-    [cleanedFilters, entityType, page, pageSize, query, sort, token]
+    [cleanedFilters, entityType, pageSize, query, sort, token]
   );
 
   useEffect(() => {
     setPage(1);
+    setResults([]);
     executeSearch({ page: 1 });
     return () => {
       if (abortRef.current) {
@@ -252,15 +259,17 @@ export function useExplorerEntitySearch({
     setFilters({});
   }, []);
 
-  const goToPage = useCallback(
-    (nextPage) => {
-      setPage(nextPage);
-      executeSearch({ page: nextPage });
-    },
-    [executeSearch]
-  );
+  const loadMore = useCallback(() => {
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const nextPage = page + 1;
+    if (loading || nextPage > totalPages) {
+      return;
+    }
+    executeSearch({ page: nextPage, append: true });
+  }, [executeSearch, loading, page, pageSize, total]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const hasMore = page < totalPages;
 
   return {
     query,
@@ -274,12 +283,14 @@ export function useExplorerEntitySearch({
     page,
     total,
     totalPages,
-    goToPage,
+    hasMore,
+    loadMore,
     results,
     loading,
+    appending,
     error,
     analytics,
-    refresh: () => executeSearch({ page }),
+    refresh: () => executeSearch({ page: 1 }),
     savedSearches,
     savedSearchError,
     savedSearchLoading,
