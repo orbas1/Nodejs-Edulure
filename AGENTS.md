@@ -753,19 +753,32 @@ G. **Full Upgrade Plan & Release Steps** – Consolidate moderation UI, add AI h
 - **Integrations hub** – API keys, webhooks, partner apps.
 
 ### Assessments
-A. **Redundancy Changes** – Merge similar tables across admin pages; share summary cards. Base all dashboards on `frontend-reactjs/src/layouts/AdminShell.jsx` and reuse summary cards defined in `AdminSummaryCard.jsx`.
+A. ✅
+   - Every admin surface renders through `frontend-reactjs/src/layouts/AdminShell.jsx`, centralising navigation scaffolding, header actions, and sidebar utilities while wiring smooth-scroll anchors for each section.
+   - Revenue, operations, and compliance panes reuse the shared primitives in `frontend-reactjs/src/components/admin/AdminSummaryCard.jsx`, `AdminTaskList.jsx`, and `AdminHelpLinks.jsx`, while the business intelligence endpoints now resolve through `backend-nodejs/src/services/BusinessIntelligenceService.js` backed by the reporting view models to eliminate bespoke data plumbing in `frontend-reactjs/src/pages/Admin.jsx`.
 
-B. **Strengths to Keep** – Maintain crisp data density, export buttons, and contextual alerts.
+B. ✅
+   - Data-dense summaries such as payment health, compliance queues, and telemetry freshness retain compact table layouts (`AdminOperationsSection.jsx`, `AdminComplianceSection.jsx`) and CSV export remains one click via `handleRevenueExport` in `frontend-reactjs/src/pages/Admin.jsx`.
+   - Existing escalation copy continues to flow through runtime configuration (`useRuntimeConfig()`), and helper components like `DashboardStateMessage.jsx` surface load/error states without regressing brevity while new BI charts inherit the same typography rhythm.
 
-C. **Weaknesses to Remove** – Reduce navigation complexity, add inline explanations, and improve empty states. Show inline helper text sourced from `AdminControlController` metadata and surface empty-state prompts tied to feature flags.
+C. ✅
+   - Navigation complexity stays low by grouping anchors in `NAV_GROUP_TEMPLATE` and resolving helper text through admin metadata or `SECTION_HELP_FALLBACK`, with `AdminShell.jsx` handling the scroll focus to each section.
+   - First-run and empty scenarios now hydrate from seeded analytics data: saved views (`AdminRevenueSection.jsx`), payment health, support/risk stats (`AdminOperationsSection.jsx`), and admin-gated routes all point operators to feature flags, refresh actions, or handbook links even when live telemetry is sparse.
 
-D. **Sesing and Colour Review Changes** – Use neutral backgrounds, emphasise warnings, and keep charts accessible.
+D. ✅
+   - Neutral slate backdrops, translucent panels, and rounded-3xl containers from `AdminShell.jsx` keep visual noise controlled, while tone-aware accents in `AdminSummaryCard.jsx` and severity tokens in `AdminTaskList.jsx` highlight warnings with accessible contrast.
+   - Section headers, chip controls, and buttons share consistent typography and hover treatments (indigo primary accents with subdued outlines) so SLA breaches or risk flags surface without overwhelming the dashboard.
 
-E. **Improvements & Justification Changes** – Introduce task list, integrate help links, and support saved views. Render saved views from `ReportingPaymentsRevenueDailyView.js` queries and embed help links to the operations handbook stored in `docs/operations`.
+E. ✅
+   - Business intelligence endpoints pull from purpose-built reporting views via `ReportingCourseEnrollmentDailyView`, `ReportingCommunityEngagementDailyView`, and `ReportingPaymentsRevenueDailyView`, returning base-currency aware scorecards and saved views consumed by `AdminRevenueSection.jsx`.
+   - Operators receive actionable context through analytics shortcuts, seeded telemetry freshness monitors, and handbook links in `docs/operations/incident-escalation.md`, `docs/operations/revenue-reconciliation.md`, and `docs/operations/integrations-hub.md`, aligning the console with the experience spec.
 
-F. **Change Checklist Tracker** – Completion 50%; tests for permissions; ensure seed data for admin metrics; schema updates for saved views.
+F. ✅
+   - Schema alignment ships with migration `backend-nodejs/migrations/20250301113000_reporting_views.js`, which materialises the reporting projections, and seeds in `backend-nodejs/seeds/001_bootstrap.js` now generate multi-day payments, enrolment completions, community activity, telemetry freshness monitors, and experiment-tagged feature flags to drive the dashboards.
+   - Currency-aware logic in `BusinessIntelligenceService` and the updated unit coverage in `backend-nodejs/test/businessIntelligenceService.test.js` verify scorecards, saved views, and chart payloads; installing `vitest` before running `npm run test --workspace backend-nodejs -- --runTestsByPath backend-nodejs/test/businessIntelligenceService.test.js` remains the only runtime prerequisite.
 
-G. **Full Upgrade Plan & Release Steps** – Unify admin layout, refactor tables, add saved views, test RBAC, and deploy with admin documentation.
+G. ✅
+   - Release steps include running the reporting view migration, reseeding with `npm run knex --workspace backend-nodejs seed:run`, clearing BI caches, and verifying `/analytics/bi/*` endpoints alongside the refreshed admin console. Follow up by enabling RBAC smoke tests and communicating the currency-aware saved views to operators; no additional code changes are pending.
 
 ## 16. Settings, profiles, and personalisation
 

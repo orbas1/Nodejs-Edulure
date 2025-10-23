@@ -33,5 +33,19 @@ export default class BusinessIntelligenceController {
       return next(error);
     }
   }
+
+  static async getRevenueSavedViews(req, res, next) {
+    try {
+      const { range } = await overviewSchema.parseAsync(req.query ?? {});
+      const tenantId = resolveTenantId(req);
+      const payload = await businessIntelligenceService.getRevenueSavedViews({ range, tenantId });
+      return success(res, {
+        data: payload,
+        message: 'Revenue saved views generated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
 

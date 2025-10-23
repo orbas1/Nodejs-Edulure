@@ -1,3 +1,4 @@
+import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 import ReportingCourseEnrollmentDailyView from '../models/ReportingCourseEnrollmentDailyView.js';
 import ReportingCommunityEngagementDailyView from '../models/ReportingCommunityEngagementDailyView.js';
@@ -48,7 +49,7 @@ function buildDelta(current, previous) {
 function resolveCurrencyBreakdown(rows) {
   const byCurrency = new Map();
   rows.forEach((row) => {
-    const currency = row.currency ?? 'USD';
+    const currency = (row.currency ?? 'USD').toUpperCase();
     if (!byCurrency.has(currency)) {
       byCurrency.set(currency, {
         currency,
@@ -70,7 +71,57 @@ function resolveCurrencyBreakdown(rows) {
     entry.totalIntents += Number(row.totalIntents ?? 0);
     entry.succeededIntents += Number(row.succeededIntents ?? 0);
   });
-  return Array.from(byCurrency.values());
+  return Array.from(byCurrency.values()).sort((a, b) => {
+    if (b.grossVolumeCents !== a.grossVolumeCents) {
+      return b.grossVolumeCents - a.grossVolumeCents;
+    }
+    return a.currency.localeCompare(b.currency);
+  });
+}
+
+function aggregateRevenueRows(rows = [], { currency } = {}) {
+  const normalizedCurrency = currency ? currency.toUpperCase() : null;
+  return rows.reduce(
+    (acc, row) => {
+      const rowCurrency = (row.currency ?? row.currency_code ?? '').toUpperCase();
+      if (normalizedCurrency && rowCurrency && rowCurrency !== normalizedCurrency) {
+        return acc;
+      }
+      const gross = Number(row.grossVolumeCents ?? row.gross_volume_cents ?? 0);
+      const recognised = Number(row.recognisedVolumeCents ?? row.recognised_volume_cents ?? 0);
+      const discount = Number(row.discountCents ?? row.discount_cents ?? 0);
+      const tax = Number(row.taxCents ?? row.tax_cents ?? 0);
+      const refunded = Number(row.refundedCents ?? row.refunded_cents ?? 0);
+      const totalIntents = Number(row.totalIntents ?? row.total_intents ?? 0);
+      const succeededIntents = Number(row.succeededIntents ?? row.succeeded_intents ?? 0);
+
+      acc.grossVolumeCents += gross;
+      acc.recognisedVolumeCents += recognised;
+      acc.discountCents += discount;
+      acc.taxCents += tax;
+      acc.refundedCents += refunded;
+      acc.totalIntents += totalIntents;
+      acc.succeededIntents += succeededIntents;
+
+      return acc;
+    },
+    {
+      grossVolumeCents: 0,
+      recognisedVolumeCents: 0,
+      discountCents: 0,
+      taxCents: 0,
+      refundedCents: 0,
+      totalIntents: 0,
+      succeededIntents: 0
+    }
+  );
+}
+
+function computeRate(numerator, denominator) {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
+    return 0;
+  }
+  return numerator / denominator;
 }
 
 function determineOverallFreshnessStatus(pipelines = []) {
@@ -93,7 +144,8 @@ export class BusinessIntelligenceService {
     communityReportingModel = ReportingCommunityEngagementDailyView,
     paymentsReportingModel = ReportingPaymentsRevenueDailyView,
     featureFlagModel = FeatureFlagModel,
-    freshnessModel = TelemetryFreshnessMonitorModel
+    freshnessModel = TelemetryFreshnessMonitorModel,
+    baseCurrency = env.payments.defaultCurrency
   } = {}) {
     this.logger = loggerInstance;
     this.courseReportingModel = courseReportingModel;
@@ -101,6 +153,7 @@ export class BusinessIntelligenceService {
     this.paymentsReportingModel = paymentsReportingModel;
     this.featureFlagModel = featureFlagModel;
     this.freshnessModel = freshnessModel;
+    this.baseCurrency = (baseCurrency ?? 'USD').toUpperCase();
   }
 
   resolveRange(rangeKey) {
@@ -184,6 +237,7 @@ export class BusinessIntelligenceService {
 
   async getExecutiveOverview({ range = '30d', tenantId = 'global' } = {}) {
     const { start, end, previousStart, previousEnd, days } = this.resolveRange(range);
+    const baseCurrency = this.baseCurrency;
 
     const [
       enrollmentDaily,
@@ -241,7 +295,7 @@ export class BusinessIntelligenceService {
         'Failed to load revenue daily summaries for BI overview'
       ),
       this.safeCall(
-        () => this.paymentsReportingModel.fetchTotals({ start, end }),
+        () => this.paymentsReportingModel.fetchTotals({ start, end, currency: baseCurrency }),
         {
           grossVolumeCents: 0,
           recognisedVolumeCents: 0,
@@ -254,7 +308,12 @@ export class BusinessIntelligenceService {
         'Failed to load revenue totals for BI overview'
       ),
       this.safeCall(
-        () => this.paymentsReportingModel.fetchTotals({ start: previousStart, end: previousEnd }),
+        () =>
+          this.paymentsReportingModel.fetchTotals({
+            start: previousStart,
+            end: previousEnd,
+            currency: baseCurrency
+          }),
         {
           grossVolumeCents: 0,
           recognisedVolumeCents: 0,
@@ -333,6 +392,7 @@ export class BusinessIntelligenceService {
         },
         recognisedRevenue: {
           cents: revenueTotals.recognisedVolumeCents,
+          currency: baseCurrency,
           change: buildDelta(
             revenueTotals.recognisedVolumeCents,
             previousRevenueTotals.recognisedVolumeCents
@@ -340,6 +400,7 @@ export class BusinessIntelligenceService {
         },
         netRevenue: {
           cents: recognisedNetRevenueCents,
+          currency: baseCurrency,
           change: buildDelta(recognisedNetRevenueCents, normalisedPreviousNetRevenueCents)
         },
         averageProgressPercent: {
@@ -369,6 +430,216 @@ export class BusinessIntelligenceService {
       categoryBreakdown: sortedCategoryBreakdown,
       experiments,
       dataQuality
+    };
+  }
+
+  async getRevenueSavedViews({ range = '30d', tenantId = 'global' } = {}) {
+    const { start, end, previousStart, previousEnd, days } = this.resolveRange(range);
+    const baseCurrency = this.baseCurrency;
+
+    const [currentDaily, previousDaily] = await Promise.all([
+      this.safeCall(
+        () => this.paymentsReportingModel.fetchDailySummaries({ start, end, tenantId }),
+        [],
+        'Failed to load revenue daily summaries for saved views'
+      ),
+      this.safeCall(
+        () =>
+          this.paymentsReportingModel.fetchDailySummaries({ start: previousStart, end: previousEnd, tenantId }),
+        [],
+        'Failed to load previous revenue summaries for saved views'
+      )
+    ]);
+
+    const normalizedCurrency = baseCurrency;
+    const hasBaseCurrencyCurrent = normalizedCurrency
+      ? currentDaily.some((row) => (row.currency ?? '').toUpperCase() === normalizedCurrency)
+      : false;
+    const hasBaseCurrencyPrevious = normalizedCurrency
+      ? previousDaily.some((row) => (row.currency ?? '').toUpperCase() === normalizedCurrency)
+      : false;
+
+    const filteredCurrentDaily = hasBaseCurrencyCurrent
+      ? currentDaily.filter((row) => (row.currency ?? '').toUpperCase() === normalizedCurrency)
+      : currentDaily;
+    const filteredPreviousDaily = hasBaseCurrencyPrevious
+      ? previousDaily.filter((row) => (row.currency ?? '').toUpperCase() === normalizedCurrency)
+      : previousDaily;
+
+    const currentTotals = aggregateRevenueRows(
+      currentDaily,
+      hasBaseCurrencyCurrent ? { currency: normalizedCurrency } : {}
+    );
+    const previousTotals = aggregateRevenueRows(
+      previousDaily,
+      hasBaseCurrencyPrevious ? { currency: normalizedCurrency } : {}
+    );
+
+    const netRevenueCents = Math.max(currentTotals.recognisedVolumeCents - currentTotals.refundedCents, 0);
+    const previousNetRevenueCents = Math.max(
+      previousTotals.recognisedVolumeCents - previousTotals.refundedCents,
+      0
+    );
+
+    const successRate = computeRate(currentTotals.succeededIntents, currentTotals.totalIntents);
+    const previousSuccessRate = computeRate(previousTotals.succeededIntents, previousTotals.totalIntents);
+
+    const refundRate = computeRate(currentTotals.refundedCents, currentTotals.recognisedVolumeCents);
+    const previousRefundRate = computeRate(
+      previousTotals.refundedCents,
+      previousTotals.recognisedVolumeCents
+    );
+
+    const discountRate = computeRate(currentTotals.discountCents, currentTotals.grossVolumeCents);
+    const previousDiscountRate = computeRate(previousTotals.discountCents, previousTotals.grossVolumeCents);
+
+    const currentAverageTicket = computeRate(
+      currentTotals.recognisedVolumeCents,
+      currentTotals.succeededIntents
+    );
+    const previousAverageTicket = computeRate(
+      previousTotals.recognisedVolumeCents,
+      previousTotals.succeededIntents
+    );
+
+    const prepareChartPoint = (row) => ({
+      date: row.date,
+      grossVolumeCents: Number(row.grossVolumeCents ?? row.gross_volume_cents ?? 0),
+      recognisedVolumeCents: Number(row.recognisedVolumeCents ?? row.recognised_volume_cents ?? 0),
+      discountCents: Number(row.discountCents ?? row.discount_cents ?? 0),
+      taxCents: Number(row.taxCents ?? row.tax_cents ?? 0),
+      refundedCents: Number(row.refundedCents ?? row.refunded_cents ?? 0),
+      totalIntents: Number(row.totalIntents ?? row.total_intents ?? 0),
+      succeededIntents: Number(row.succeededIntents ?? row.succeeded_intents ?? 0),
+      currency: (row.currency ?? normalizedCurrency ?? 'USD').toUpperCase(),
+      netRevenueCents: Math.max(
+        Number(row.recognisedVolumeCents ?? row.recognised_volume_cents ?? 0) -
+          Number(row.refundedCents ?? row.refunded_cents ?? 0),
+        0
+      )
+    });
+
+    const views = [
+      {
+        id: 'net-revenue',
+        name: 'Net revenue focus',
+        description: 'Recognised revenue minus refunds across the selected range.',
+        metrics: [
+          {
+            key: 'netRevenue',
+            label: 'Net revenue',
+            unit: 'cents',
+            currency: baseCurrency,
+            current: netRevenueCents,
+            previous: previousNetRevenueCents,
+            change: buildDelta(netRevenueCents, previousNetRevenueCents)
+          },
+          {
+            key: 'recognisedRevenue',
+            label: 'Recognised revenue',
+            unit: 'cents',
+            currency: baseCurrency,
+            current: currentTotals.recognisedVolumeCents,
+            previous: previousTotals.recognisedVolumeCents,
+            change: buildDelta(
+              currentTotals.recognisedVolumeCents,
+              previousTotals.recognisedVolumeCents
+            )
+          },
+          {
+            key: 'refundRate',
+            label: 'Refund rate',
+            unit: 'ratio',
+            current: refundRate,
+            previous: previousRefundRate,
+            change: buildDelta(refundRate, previousRefundRate)
+          }
+        ],
+        chart: filteredCurrentDaily.map(prepareChartPoint),
+        filters: { paymentStatus: 'succeeded', currency: baseCurrency }
+      },
+      {
+        id: 'payment-health',
+        name: 'Payment health',
+        description: 'Monitor intent success, retry workload, and gross payment throughput.',
+        metrics: [
+          {
+            key: 'successRate',
+            label: 'Success rate',
+            unit: 'ratio',
+            current: successRate,
+            previous: previousSuccessRate,
+            change: buildDelta(successRate, previousSuccessRate)
+          },
+          {
+            key: 'totalIntents',
+            label: 'Payment intents',
+            unit: 'count',
+            current: currentTotals.totalIntents,
+            previous: previousTotals.totalIntents,
+            change: buildDelta(currentTotals.totalIntents, previousTotals.totalIntents)
+          },
+          {
+            key: 'grossVolume',
+            label: 'Gross volume',
+            unit: 'cents',
+            currency: baseCurrency,
+            current: currentTotals.grossVolumeCents,
+            previous: previousTotals.grossVolumeCents,
+            change: buildDelta(currentTotals.grossVolumeCents, previousTotals.grossVolumeCents)
+          }
+        ],
+        chart: filteredCurrentDaily.map(prepareChartPoint),
+        filters: { intentStatus: ['succeeded', 'requires_action', 'failed'], currency: baseCurrency }
+      },
+      {
+        id: 'revenue-leakage',
+        name: 'Leakage & discounts',
+        description: 'Track where revenue is discounted or lost to refunds and taxes.',
+        metrics: [
+          {
+            key: 'discountRate',
+            label: 'Discount rate',
+            unit: 'ratio',
+            current: discountRate,
+            previous: previousDiscountRate,
+            change: buildDelta(discountRate, previousDiscountRate)
+          },
+          {
+            key: 'taxVolume',
+            label: 'Tax collected',
+            unit: 'cents',
+            currency: baseCurrency,
+            current: currentTotals.taxCents,
+            previous: previousTotals.taxCents,
+            change: buildDelta(currentTotals.taxCents, previousTotals.taxCents)
+          },
+          {
+            key: 'averageTicket',
+            label: 'Average ticket',
+            unit: 'cents',
+            currency: baseCurrency,
+            current: currentAverageTicket,
+            previous: previousAverageTicket,
+            change: buildDelta(currentAverageTicket, previousAverageTicket)
+          }
+        ],
+        chart: filteredCurrentDaily.map(prepareChartPoint),
+        filters: { focus: ['discounts', 'refunds', 'taxes'], currency: baseCurrency }
+      }
+    ];
+
+    return {
+      tenantId,
+      range,
+      timeframe: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        previousStart: previousStart.toISOString(),
+        previousEnd: previousEnd.toISOString(),
+        days
+      },
+      views
     };
   }
 }

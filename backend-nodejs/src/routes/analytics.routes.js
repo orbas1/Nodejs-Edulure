@@ -9,5 +9,6 @@ router.get('/explorer/summary', auth('instructor'), AnalyticsController.getExplo
 router.get('/explorer/alerts', auth('instructor'), AnalyticsController.getExplorerAlerts);
 router.post('/explorer/interactions', auth('user'), AnalyticsController.recordExplorerInteraction);
 router.get('/bi/executive-overview', auth('admin'), BusinessIntelligenceController.getExecutiveOverview);
+router.get('/bi/revenue/saved-views', auth('admin'), BusinessIntelligenceController.getRevenueSavedViews);
 
 export default router;

@@ -63,6 +63,13 @@ const buildEncryptedKycDocument = (
   };
 };
 
+const daysAgo = (days, { hour = 12 } = {}) => {
+  const base = new Date();
+  base.setUTCHours(hour, 0, 0, 0);
+  base.setUTCDate(base.getUTCDate() - days);
+  return base;
+};
+
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
     await trx('analytics_forecasts').del();
@@ -811,7 +818,7 @@ export async function seed(knex) {
         tags: JSON.stringify(['Roadmap', 'Automation']),
         visibility: 'members',
         status: 'published',
-        published_at: trx.fn.now(),
+        published_at: daysAgo(2, { hour: 17 }),
         comment_count: 6,
         reaction_summary: JSON.stringify({ applause: 18, thumbsUp: 9, total: 27 }),
         metadata: JSON.stringify({ relatedResource: 'ops-blueprint-v1', analyticsKey: 'ops-hq-roadmap-drop' })
@@ -829,7 +836,7 @@ export async function seed(knex) {
         tags: JSON.stringify(['Campaigns', 'Live Session']),
         visibility: 'members',
         status: 'published',
-        published_at: trx.fn.now(),
+        published_at: daysAgo(1, { hour: 19 }),
         comment_count: 12,
         reaction_summary: JSON.stringify({ insights: 32, total: 32 }),
         metadata: JSON.stringify({
@@ -837,6 +844,23 @@ export async function seed(knex) {
           registrationUrl: 'https://events.edulure.test/ama-multi-channel-funnels'
         })
       });
+
+    await trx('community_posts').insert({
+      community_id: growthCommunityId,
+      channel_id: growthAnnouncementsChannelId,
+      author_id: instructorId,
+      post_type: 'update',
+      title: 'Revenue Ops Win: +18% Net Retention',
+      body:
+        'Revenue ops just closed the loop on the October retention push. Share the delta telemetry in #ops-hq and review the playbook adjustments before Friday’s sync.',
+      tags: JSON.stringify(['Revenue', 'Retention']),
+      visibility: 'public',
+      status: 'published',
+      published_at: daysAgo(4, { hour: 13 }),
+      comment_count: 9,
+      reaction_summary: JSON.stringify({ applause: 14, insights: 8, total: 22 }),
+      metadata: JSON.stringify({ surfacedIn: 'admin-console', analyticsKey: 'rev-ops-retention' })
+    });
 
     const [opsBlueprintResourceId] = await trx('community_resources').insert({
         community_id: opsCommunityId,
@@ -1278,8 +1302,25 @@ export async function seed(knex) {
       user_id: learnerId,
       status: 'active',
       progress_percent: 46.5,
-      started_at: trx.fn.now(),
+      started_at: daysAgo(5, { hour: 9 }),
+      last_accessed_at: daysAgo(1, { hour: 16 }),
       metadata: JSON.stringify({ cohort: '2024-Q4', enrollmentSource: 'seed' })
+    });
+
+    const [opsCompletedEnrollmentId] = await trx('course_enrollments').insert({
+      public_id: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      user_id: adminId,
+      status: 'completed',
+      progress_percent: 100,
+      started_at: daysAgo(10, { hour: 8 }),
+      completed_at: daysAgo(2, { hour: 14 }),
+      last_accessed_at: daysAgo(2, { hour: 18 }),
+      metadata: JSON.stringify({
+        cohort: '2024-Q4',
+        enrollmentSource: 'seed',
+        completionBadgeIssued: true
+      })
     });
 
     await trx('course_progress').insert([
@@ -1297,6 +1338,22 @@ export async function seed(knex) {
         completed: false,
         progress_percent: 25,
         metadata: JSON.stringify({ lastLocation: 'section-2', note: 'Review telemetry thresholds' })
+      },
+      {
+        enrollment_id: opsCompletedEnrollmentId,
+        lesson_id: commandCenterLessonId,
+        completed: true,
+        completed_at: daysAgo(3, { hour: 11 }),
+        progress_percent: 100,
+        metadata: JSON.stringify({ completionSource: 'web', revisitCount: 2 })
+      },
+      {
+        enrollment_id: opsCompletedEnrollmentId,
+        lesson_id: telemetryLessonId,
+        completed: true,
+        completed_at: daysAgo(2, { hour: 17 }),
+        progress_percent: 100,
+        metadata: JSON.stringify({ completionSource: 'mobile', note: 'Refresher before audit' })
       }
     ]);
 
@@ -1387,6 +1444,9 @@ export async function seed(knex) {
     const subscriptionPublicId = crypto.randomUUID();
     const providerIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
     const providerChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
+    const subscriptionTimestamp = daysAgo(1, { hour: 10 });
+    const nextYear = new Date(subscriptionTimestamp.getTime());
+    nextYear.setUTCFullYear(nextYear.getUTCFullYear() + 1);
 
     const subscriptionPayment = await PaymentIntentModel.create(
       {
@@ -1428,17 +1488,22 @@ export async function seed(knex) {
         entityType: 'community_subscription',
         entityId: subscriptionPublicId,
         receiptEmail: 'noemi.carvalho@edulure.test',
-        capturedAt: trx.fn.now()
+        capturedAt: subscriptionTimestamp
       },
       trx
     );
     const subscriptionPaymentId = subscriptionPayment.id;
+
+    await trx('payment_intents')
+      .where({ id: subscriptionPaymentId })
+      .update({ created_at: subscriptionTimestamp, updated_at: subscriptionTimestamp });
 
     await trx('payment_ledger_entries').insert({
       payment_intent_id: subscriptionPaymentId,
       entry_type: 'charge',
       amount: 205092,
       currency: 'USD',
+      recorded_at: subscriptionTimestamp,
       details: JSON.stringify({
         provider: 'stripe',
         chargeId: providerChargeId,
@@ -1464,12 +1529,8 @@ export async function seed(knex) {
       deferred_revenue_account: '2050-deferred-revenue',
       metadata: JSON.stringify({ seed: true, owner: 'finance-ops' }),
       status: 'active',
-      effective_from: trx.fn.now()
+      effective_from: subscriptionTimestamp
     });
-
-    const subscriptionTimestamp = new Date();
-    const nextYear = new Date(subscriptionTimestamp.getTime());
-    nextYear.setFullYear(nextYear.getFullYear() + 1);
 
     const [usageRecordId] = await trx('monetization_usage_records').insert({
       public_id: crypto.randomUUID(),
@@ -1562,6 +1623,149 @@ export async function seed(knex) {
       trx
     );
 
+    const partialRefundTimestamp = daysAgo(3, { hour: 15 });
+    const partialRefundPayment = await PaymentIntentModel.create(
+      {
+        publicId: crypto.randomUUID(),
+        userId: learnerId,
+        provider: 'stripe',
+        providerIntentId: `pi_${crypto.randomBytes(8).toString('hex')}`,
+        providerLatestChargeId: `ch_${crypto.randomBytes(6).toString('hex')}`,
+        status: 'succeeded',
+        currency: 'USD',
+        amountSubtotal: 99000,
+        amountDiscount: 9000,
+        amountTax: 7200,
+        amountTotal: 97200,
+        amountRefunded: 12000,
+        taxBreakdown: { jurisdiction: 'US-NY', rate: 0.075 },
+        metadata: {
+          public_id: crypto.randomUUID(),
+          entity_type: 'course_enrollment',
+          entity_id: String(opsCompletedEnrollmentId),
+          items: [
+            {
+              id: 'automation-masterclass',
+              name: 'Automation Launch Masterclass',
+              unitAmount: 99000,
+              quantity: 1,
+              discount: 9000,
+              tax: 7200,
+              total: 97200
+            }
+          ],
+          couponCode: 'OPSRELIEF15',
+          retry: false,
+          refundReason: 'customer_satisfaction',
+          taxableSubtotal: 99000,
+          taxableAfterDiscount: 90000
+        },
+        entityType: 'course_enrollment',
+        entityId: String(opsCompletedEnrollmentId),
+        receiptEmail: 'amina.diallo@edulure.test',
+        capturedAt: partialRefundTimestamp
+      },
+      trx
+    );
+
+    await trx('payment_intents')
+      .where({ id: partialRefundPayment.id })
+      .update({
+        created_at: partialRefundTimestamp,
+        updated_at: partialRefundTimestamp,
+        captured_at: partialRefundTimestamp
+      });
+
+    const eurTimestamp = daysAgo(5, { hour: 11 });
+    const eurPayment = await PaymentIntentModel.create(
+      {
+        publicId: crypto.randomUUID(),
+        userId: instructorId,
+        provider: 'stripe',
+        providerIntentId: `pi_${crypto.randomBytes(8).toString('hex')}`,
+        providerLatestChargeId: `ch_${crypto.randomBytes(6).toString('hex')}`,
+        status: 'succeeded',
+        currency: 'EUR',
+        amountSubtotal: 54000,
+        amountDiscount: 0,
+        amountTax: 0,
+        amountTotal: 54000,
+        amountRefunded: 0,
+        taxBreakdown: { jurisdiction: 'EU-DE', rate: 0 },
+        metadata: {
+          public_id: crypto.randomUUID(),
+          entity_type: 'course_enrollment',
+          entity_id: String(opsEnrollmentId),
+          items: [
+            {
+              id: 'automation-masterclass-eu',
+              name: 'Automation Masterclass EU Cohort',
+              unitAmount: 54000,
+              quantity: 1,
+              discount: 0,
+              tax: 0,
+              total: 54000
+            }
+          ],
+          settlementCurrency: 'EUR',
+          region: 'eu-central'
+        },
+        entityType: 'course_enrollment',
+        entityId: String(opsEnrollmentId),
+        receiptEmail: 'kai.watanabe@edulure.test',
+        capturedAt: eurTimestamp
+      },
+      trx
+    );
+
+    await trx('payment_intents')
+      .where({ id: eurPayment.id })
+      .update({ created_at: eurTimestamp, updated_at: eurTimestamp, captured_at: eurTimestamp });
+
+    const retryTimestamp = daysAgo(2, { hour: 16 });
+    const retryPayment = await PaymentIntentModel.create(
+      {
+        publicId: crypto.randomUUID(),
+        userId: learnerId,
+        provider: 'stripe',
+        providerIntentId: `pi_${crypto.randomBytes(8).toString('hex')}`,
+        status: 'requires_action',
+        currency: 'USD',
+        amountSubtotal: 65000,
+        amountDiscount: 3500,
+        amountTax: 5200,
+        amountTotal: 66700,
+        amountRefunded: 0,
+        taxBreakdown: { jurisdiction: 'US-IL', rate: 0.08 },
+        metadata: {
+          public_id: crypto.randomUUID(),
+          entity_type: 'community_subscription',
+          entity_id: subscriptionPublicId,
+          items: [
+            {
+              id: 'ops-premium-monthly',
+              name: 'Premium Ops Lab',
+              unitAmount: 65000,
+              quantity: 1,
+              discount: 3500,
+              tax: 5200,
+              total: 66700
+            }
+          ],
+          retryReason: 'authentication_required',
+          retryWindowMinutes: 90
+        },
+        entityType: 'community_subscription',
+        entityId: subscriptionPublicId,
+        receiptEmail: 'noemi.carvalho@edulure.test'
+      },
+      trx
+    );
+
+    await trx('payment_intents')
+      .where({ id: retryPayment.id })
+      .update({ created_at: retryTimestamp, updated_at: retryTimestamp });
+
     await trx('community_members')
       .where({ community_id: growthCommunityId, user_id: learnerId })
       .update({
@@ -1621,6 +1825,33 @@ export async function seed(knex) {
           subscriptionId: growthSubscriptionId
         }),
         performed_by: adminId
+      }
+    ]);
+
+    await trx('telemetry_freshness_monitors').insert([
+      {
+        pipeline_key: 'warehouse.reporting.payments',
+        status: 'healthy',
+        threshold_minutes: 20,
+        last_event_at: daysAgo(0, { hour: 6 }),
+        lag_seconds: 120,
+        metadata: JSON.stringify({ view: 'reporting_payments_revenue_daily', lastBatchId: 'rev-ops-007' })
+      },
+      {
+        pipeline_key: 'warehouse.reporting.community',
+        status: 'warning',
+        threshold_minutes: 45,
+        last_event_at: daysAgo(1, { hour: 22 }),
+        lag_seconds: 5400,
+        metadata: JSON.stringify({ view: 'reporting_community_engagement_daily', pendingReplays: 1 })
+      },
+      {
+        pipeline_key: 'warehouse.reporting.enrollments',
+        status: 'critical',
+        threshold_minutes: 30,
+        last_event_at: daysAgo(2, { hour: 4 }),
+        lag_seconds: 86400,
+        metadata: JSON.stringify({ view: 'reporting_course_enrollment_daily', missingSource: 'course_progress_ingest' })
       }
     ]);
 
@@ -1986,7 +2217,13 @@ export async function seed(knex) {
       rollout_strategy: 'percentage',
       rollout_percentage: 35,
       environments: JSON.stringify(['staging', 'production']),
-      metadata: JSON.stringify({ owner: 'Commerce', jiraKey: 'PAY-872' })
+      metadata: JSON.stringify({
+        owner: 'Commerce',
+        jiraKey: 'PAY-872',
+        experimentId: 'exp-checkout-boost',
+        tags: ['experiment', 'checkout', 'revenue'],
+        hypothesis: 'Reducing friction in card authentication lifts net revenue 8%'
+      })
     });
 
     const [liveClassroomsFlagId] = await trx('feature_flags').insert({
