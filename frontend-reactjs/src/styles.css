@@ -1,33 +1,196 @@
+@import './styles/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: only light;
-}
+@layer base {
+  :root {
+    color-scheme: only light;
+  }
 
-html {
-  scroll-behavior: smooth;
-}
+  html {
+    scroll-behavior: smooth;
+  }
 
-body {
-  @apply bg-white text-slate-950 antialiased;
-}
+  body {
+    @apply bg-[color:var(--surface-base)] text-slate-950 antialiased;
+  }
 
-a {
-  @apply text-primary transition-colors duration-200;
-}
+  a {
+    @apply text-primary transition-colors duration-200;
+  }
 
-a:hover {
-  @apply text-primary-dark;
-}
+  a:hover {
+    @apply text-primary-dark;
+  }
 
-a:focus-visible,
-button:focus-visible {
-  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-white;
+  a:focus-visible,
+  button:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
 }
 
 @layer components {
+  .px-responsive-edge {
+    padding-left: var(--space-edge);
+    padding-right: var(--space-edge);
+  }
+
+  .py-section-default {
+    padding-block: var(--space-section);
+  }
+
+  .py-section-cozy {
+    padding-block: var(--space-section-cozy);
+  }
+
+  .py-section-tight {
+    padding-block: var(--space-section-tight);
+  }
+
+  .py-section-loose {
+    padding-block: var(--space-section-loose);
+  }
+
+  .py-section-balanced {
+    padding-block: var(--space-section);
+  }
+
+  @media (min-width: 64rem) {
+    .py-section-balanced {
+      padding-block: var(--space-section-loose);
+    }
+  }
+
+  .marketing-media-frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-3xl);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-subtle);
+    box-shadow: var(--shadow-soft);
+    aspect-ratio: var(--media-aspect-landscape);
+    transition: transform var(--motion-duration) var(--motion-ease-out),
+      box-shadow var(--motion-duration) var(--motion-ease-out);
+  }
+
+  .marketing-media-frame--interactive:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lifted);
+  }
+
+  .marketing-media-frame > img,
+  .marketing-media-frame > video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .marketing-media-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--gradient-highlight);
+    pointer-events: none;
+    mix-blend-mode: screen;
+    opacity: 0.85;
+  }
+
+  .marketing-media-skeleton {
+    position: absolute;
+    inset: 0;
+    background-image: var(--gradient-skeleton);
+    background-size: 400% 100%;
+    animation: skeletonPulse 1.6s linear infinite;
+  }
+
+  .form-shell {
+    background: var(--surface-subtle);
+    padding-block: var(--space-section);
+  }
+
+  .form-shell-inner {
+    display: grid;
+    gap: var(--space-lg);
+    border-radius: var(--radius-3xl);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-glass);
+    box-shadow: var(--shadow-lifted);
+    backdrop-filter: blur(18px);
+    padding: var(--space-xl);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-shell-inner[data-layout='two-column'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (min-width: 56rem) {
+    .form-shell-inner[data-layout='two-column'] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .form-label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .form-input {
+    width: 100%;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-base);
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.95rem;
+    color: #1f2937;
+    line-height: 1.5;
+    box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.04);
+    transition: border-color var(--motion-duration) var(--motion-ease-out),
+      box-shadow var(--motion-duration) var(--motion-ease-out);
+  }
+
+  .form-input:focus-visible {
+    outline: none;
+    border-color: #2d62ff;
+    box-shadow: var(--focus-ring);
+  }
+
+  textarea.form-input {
+    min-height: 8.5rem;
+    resize: vertical;
+  }
+
+  select.form-input {
+    background-image: linear-gradient(45deg, transparent 50%, rgba(15, 23, 42, 0.45) 50%),
+      linear-gradient(135deg, rgba(15, 23, 42, 0.45) 50%, transparent 50%);
+    background-position: calc(100% - 20px) calc(50% - 3px), calc(100% - 14px) calc(50% - 3px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 2.75rem;
+    appearance: none;
+  }
+
+  .form-input[disabled] {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .form-helper {
+    margin-top: var(--space-2xs);
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
+  .form-footnote {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+
   .dashboard-shell {
     @apply min-h-screen bg-slate-50 text-slate-900;
   }

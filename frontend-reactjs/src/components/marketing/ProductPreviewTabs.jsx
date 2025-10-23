@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
@@ -18,11 +18,46 @@ export default function ProductPreviewTabs({
 }) {
   const [activeKey, setActiveKey] = useState(tabs[DEFAULT_TAB_KEY]?.key ?? null);
   const tabRefs = useRef({});
+  const [imageLoadState, setImageLoadState] = useState(() =>
+    tabs.reduce((acc, tab) => {
+      acc[tab.key] = false;
+      return acc;
+    }, {})
+  );
 
   const tabOrder = useMemo(() => tabs.map((tab) => tab.key), [tabs]);
 
   const getTabId = (key) => `product-preview-tab-${key}`;
   const getPanelId = (key) => `product-preview-tabpanel-${key}`;
+
+  useEffect(() => {
+    setImageLoadState((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      tabs.forEach((tab) => {
+        if (typeof next[tab.key] !== 'boolean') {
+          next[tab.key] = false;
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach((key) => {
+        if (!tabs.find((tab) => tab.key === key)) {
+          delete next[key];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [tabs]);
+
+  const registerImageLoaded = (key) => {
+    setImageLoadState((prev) => {
+      if (prev[key]) {
+        return prev;
+      }
+      return { ...prev, [key]: true };
+    });
+  };
 
   const activateTab = (key) => {
     setActiveKey(key);
@@ -149,16 +184,22 @@ export default function ProductPreviewTabs({
               >
                 <div className="absolute -left-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
                 <div className="absolute -right-6 top-12 h-56 w-56 rounded-full bg-fuchsia-300/20 blur-[140px]" aria-hidden="true" />
-                <div className="relative overflow-hidden rounded-[2.75rem] border border-slate-200 bg-white shadow-[0_40px_120px_-45px_rgba(15,23,42,0.45)]">
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10" aria-hidden="true" />
+                <div className="marketing-media-frame marketing-media-frame--interactive">
+                  <div className="marketing-media-overlay" aria-hidden="true" />
+                  {!imageLoadState[tab.key] ? <div className="marketing-media-skeleton" aria-hidden="true" /> : null}
                   {tab.image ? (
                     <img
                       src={tab.image.src}
                       alt={tab.image.alt}
-                      className="relative block h-full w-full object-cover"
+                      className="relative"
                       loading="lazy"
+                      onLoad={() => registerImageLoaded(tab.key)}
                     />
-                  ) : null}
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-white/40 text-sm font-semibold text-slate-500">
+                      Preview coming soon
+                    </div>
+                  )}
                   <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/20 bg-slate-900/70 p-4 text-white shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] backdrop-blur">
                     <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/70">{tab.label}</p>
                     {tab.caption ? <p className="mt-2 text-lg font-semibold text-white">{tab.caption}</p> : null}

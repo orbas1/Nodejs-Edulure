@@ -23,48 +23,50 @@ export default function AuthCard({
       : 'Need a hand? Our support team is available 24/7.');
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-180px)] max-w-6xl items-center justify-center px-6 py-16">
-      <div className="grid w-full gap-12 rounded-4xl border border-slate-200 bg-white/85 p-10 shadow-2xl backdrop-blur md:grid-cols-2 md:p-12">
-        <div className="space-y-6">
-          <div>
-            {badge && (
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-                {badge}
-              </span>
-            )}
-            <h1 className="text-3xl font-semibold text-slate-900">{title}</h1>
-            <p className="mt-3 text-sm text-slate-600">{subtitle}</p>
-          </div>
-          <ul className="space-y-3 text-sm text-slate-600">
-            {highlightItems.map((item) => (
-              <li key={item} className="flex items-start gap-2">
-                <span className="mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                  •
+    <section className="form-shell">
+      <div className="mx-auto max-w-6xl px-responsive-edge">
+        <div className="form-shell-inner" data-layout="two-column">
+          <div className="space-y-6 text-slate-900">
+            <div className="space-y-4">
+              {badge ? (
+                <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.32em] text-primary">
+                  {badge}
                 </span>
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="space-y-8">
-          {children}
-          <div className="space-y-3 text-xs text-slate-500">
-            <p>
-              By continuing you agree to Edulure&apos;s{' '}
-              <a href="/terms" className="font-semibold text-primary">
-                Terms
-              </a>{' '}
-              and{' '}
-              <a href="/privacy" className="font-semibold text-primary">
-                Privacy Policy
-              </a>
-              .
-            </p>
-            <p>{safeFootnote}</p>
+              ) : null}
+              <h1 className="text-3xl font-semibold leading-tight">{title}</h1>
+              <p className="text-sm text-slate-600">{subtitle}</p>
+            </div>
+            <ul className="space-y-3 text-sm text-slate-600">
+              {highlightItems.map((item) => (
+                <li key={item} className="flex items-start gap-3 rounded-2xl border border-white/40 bg-white/30 px-4 py-3 shadow-[0_12px_32px_-24px_rgba(45,98,255,0.4)]">
+                  <span className="mt-0.5 inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                    •
+                  </span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="space-y-8">
+            {children}
+            <div className="space-y-3 form-footnote">
+              <p>
+                By continuing you agree to Edulure&apos;s{' '}
+                <a href="/terms" className="font-semibold text-primary">
+                  Terms
+                </a>{' '}
+                and{' '}
+                <a href="/privacy" className="font-semibold text-primary">
+                  Privacy Policy
+                </a>
+                .
+              </p>
+              <p>{safeFootnote}</p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 

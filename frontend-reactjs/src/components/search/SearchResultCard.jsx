@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   AcademicCapIcon,
@@ -102,19 +103,30 @@ export default function SearchResultCard({ entityType, hit }) {
       });
   }
 
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [imageUrl]);
+
   return (
     <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
       <div className="grid gap-6 lg:grid-cols-[320px,1fr] lg:items-start">
-        <div className="relative overflow-hidden rounded-3xl border border-slate-100 bg-slate-100/80 shadow-inner">
+        <div className="marketing-media-frame marketing-media-frame--interactive">
+          <div className="marketing-media-overlay" aria-hidden="true" />
           {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={hit.title ?? hit.name ?? 'Search result'}
-              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-              loading="lazy"
-            />
+            <>
+              {!imageLoaded ? <div className="marketing-media-skeleton" aria-hidden="true" /> : null}
+              <img
+                src={imageUrl}
+                alt={hit.title ?? hit.name ?? 'Search result'}
+                className="relative transition duration-300 group-hover:scale-[1.02]"
+                loading="lazy"
+                onLoad={() => setImageLoaded(true)}
+              />
+            </>
           ) : (
-            <div className="flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/10 via-primary/5 to-primary/20 p-6 text-center text-sm font-semibold text-primary">
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-white/40 p-6 text-center text-sm font-semibold text-primary">
               <Icon className="h-10 w-10" />
               <span>Visual preview coming soon</span>
             </div>

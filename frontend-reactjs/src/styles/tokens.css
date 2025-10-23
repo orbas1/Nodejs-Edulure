@@ -1,0 +1,88 @@
+:root {
+  --surface-base: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-inverse: #0f172a;
+  --surface-glass: rgba(255, 255, 255, 0.88);
+  --surface-glass-strong: rgba(15, 23, 42, 0.78);
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.14);
+  --shadow-soft: 0 24px 60px -32px rgba(15, 23, 42, 0.35);
+  --shadow-lifted: 0 28px 84px -34px rgba(45, 98, 255, 0.35);
+  --shadow-inverse: 0 40px 120px -48px rgba(15, 23, 42, 0.65);
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
+  --radius-2xl: 2.25rem;
+  --radius-3xl: 3rem;
+  --radius-pill: 999px;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+  --space-3xl: 6rem;
+  --space-edge: clamp(1.125rem, 1.6vw + 0.75rem, 2.25rem);
+  --space-edge-lg: clamp(2rem, 2.5vw + 1.5rem, 3.5rem);
+  --space-section: clamp(4rem, 6vw, 6.5rem);
+  --space-section-cozy: clamp(3.5rem, 5vw, 5.5rem);
+  --space-section-tight: clamp(3rem, 4vw, 4.5rem);
+  --space-section-loose: clamp(4.5rem, 7vw, 7.5rem);
+  --bp-sm: 40rem;
+  --bp-md: 56rem;
+  --bp-lg: 72rem;
+  --motion-duration: 220ms;
+  --motion-duration-long: 360ms;
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --focus-ring: 0 0 0 3px rgba(45, 98, 255, 0.35);
+  --focus-ring-strong: 0 0 0 3px rgba(16, 185, 129, 0.35);
+  --gradient-night: linear-gradient(135deg, #0f172a 0%, #1e1b4b 48%, #1e293b 100%);
+  --gradient-highlight: linear-gradient(135deg, rgba(45, 98, 255, 0.25), rgba(79, 70, 229, 0.15));
+  --gradient-form: linear-gradient(135deg, rgba(45, 98, 255, 0.08), rgba(129, 140, 248, 0.12));
+  --gradient-skeleton: linear-gradient(90deg, rgba(148, 163, 184, 0.14) 0%, rgba(148, 163, 184, 0.24) 50%, rgba(148, 163, 184, 0.14) 100%);
+  --media-aspect-landscape: 4 / 3;
+  --media-aspect-portrait: 3 / 4;
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --space-edge: var(--space-edge-lg);
+    --space-section: clamp(5rem, 6vw, 7rem);
+    --space-section-cozy: clamp(4rem, 5vw, 6rem);
+    --space-section-tight: clamp(3.5rem, 4vw, 5rem);
+    --space-section-loose: clamp(5rem, 7vw, 8rem);
+  }
+}
+
+[data-theme='dark'] {
+  --surface-base: #020617;
+  --surface-subtle: #0f172a;
+  --surface-glass: rgba(15, 23, 42, 0.92);
+  --surface-glass-strong: rgba(15, 23, 42, 0.92);
+  --border-subtle: rgba(148, 163, 184, 0.18);
+  --border-strong: rgba(148, 163, 184, 0.32);
+  --shadow-soft: 0 28px 78px -36px rgba(15, 23, 42, 0.95);
+  --shadow-lifted: 0 32px 94px -38px rgba(99, 102, 241, 0.55);
+  --shadow-inverse: 0 40px 120px -60px rgba(15, 23, 42, 0.85);
+}
+
+@keyframes skeletonPulse {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

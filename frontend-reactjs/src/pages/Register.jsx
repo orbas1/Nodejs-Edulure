@@ -219,7 +219,7 @@ export default function Register() {
               name="role"
               value={formState.role}
               onChange={handleChange}
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="form-input mt-2"
             >
               {ROLE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -227,7 +227,7 @@ export default function Register() {
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-xs text-slate-500">{ADMIN_REQUEST_NOTE}</p>
+            <p className="form-helper">{ADMIN_REQUEST_NOTE}</p>
           </FormField>
           <FormField
             label="Age"
