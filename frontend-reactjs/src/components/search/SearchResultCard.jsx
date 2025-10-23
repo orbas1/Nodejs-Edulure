@@ -1,106 +1,20 @@
 import PropTypes from 'prop-types';
+import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import {
-  AcademicCapIcon,
-  ArrowTopRightOnSquareIcon,
-  BookOpenIcon,
-  CalendarDaysIcon,
-  CurrencyDollarIcon,
-  GlobeAltIcon,
-  SparklesIcon,
-  StarIcon,
-  UserCircleIcon,
-  UsersIcon
-} from '@heroicons/react/24/outline';
+  ICONS,
+  buildBadgeLabels,
+  extractImageUrl,
+  extractMetrics,
+  getEntityIcon
+} from './resultFormatting.js';
 
-function formatNumber(value) {
-  if (value === null || value === undefined) return null;
-  const number = Number(value);
-  if (Number.isNaN(number)) return null;
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(number);
-}
+const { CurrencyDollarIcon, StarIcon, SparklesIcon, GlobeAltIcon } = ICONS;
 
-function formatCurrency(value) {
-  if (!value) return null;
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-  }
-  if (typeof value === 'object') {
-    const amount = Number(value.amount ?? value.value);
-    if (!Number.isFinite(amount)) {
-      return null;
-    }
-    const currency = value.currency ?? 'USD';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount / (amount >= 100 ? 100 : 1));
-  }
-  return null;
-}
-
-function formatDuration(minutes) {
-  if (!minutes || Number.isNaN(Number(minutes))) return null;
-  const mins = Number(minutes);
-  if (mins < 60) return `${Math.round(mins)} min`;
-  const hours = mins / 60;
-  return `${hours.toFixed(hours < 10 ? 1 : 0)} hr`;
-}
-
-const ENTITY_ICON = {
-  communities: UsersIcon,
-  courses: AcademicCapIcon,
-  ebooks: BookOpenIcon,
-  tutors: UsersIcon,
-  profiles: UserCircleIcon,
-  events: CalendarDaysIcon
-};
-
-export default function SearchResultCard({ entityType, hit }) {
-  const Icon = ENTITY_ICON[entityType] ?? ArrowTopRightOnSquareIcon;
-  const price = formatCurrency(hit.price ?? hit.metrics?.price ?? hit.raw?.price);
-  const rating =
-    hit.metrics?.rating?.average ?? hit.raw?.rating?.average
-      ? `${formatNumber(hit.metrics?.rating?.average ?? hit.raw?.rating?.average)}★`
-      : null;
-  const enrolments = formatNumber(hit.metrics?.enrolments ?? hit.raw?.enrolmentCount);
-  const readingTime = formatDuration(hit.metrics?.readingTimeMinutes ?? hit.raw?.readingTimeMinutes);
-  const location = hit.geo?.country ?? hit.raw?.country ?? hit.metrics?.location;
-  const availability = hit.metrics?.startAt ?? hit.raw?.startAt ?? hit.metrics?.upcomingSession;
-  const imageUrl =
-    hit.imageUrl ??
-    hit.coverImageUrl ??
-    hit.thumbnailUrl ??
-    hit.avatarUrl ??
-    hit.previewImage ??
-    hit.preview?.image ??
-    hit.media?.[0]?.url ??
-    hit.assets?.[0]?.url ??
-    hit.raw?.coverImageUrl ??
-    hit.raw?.thumbnailUrl ??
-    hit.raw?.avatarUrl ??
-    hit.raw?.previewImage ??
-    hit.raw?.media?.[0]?.url ??
-    null;
-
-  const badgeLabels = [];
-  const monetisationTag =
-    hit.monetisationTag ??
-    hit.monetisation?.tag ??
-    hit.badges?.find((badge) => badge.type === 'sponsored')?.label ??
-    (hit.isSponsored ? 'Sponsored' : null);
-  if (monetisationTag) {
-    badgeLabels.push({ label: monetisationTag, tone: 'amber' });
-  }
-
-  if (hit.featured || hit.badges?.some((badge) => badge.type === 'featured')) {
-    badgeLabels.push({ label: 'Featured', tone: 'indigo' });
-  }
-
-  if (hit.badges?.length) {
-    hit.badges
-      .filter((badge) => badge.type !== 'featured' && badge.type !== 'sponsored')
-      .slice(0, 3)
-      .forEach((badge) => {
-        badgeLabels.push({ label: badge.label ?? badge.type, tone: 'slate' });
-      });
-  }
+export default function SearchResultCard({ entityType, hit, onPreview }) {
+  const Icon = getEntityIcon(entityType);
+  const imageUrl = extractImageUrl(hit);
+  const { price, rating, enrolments, readingTime, location, availability } = extractMetrics(hit);
+  const badgeLabels = buildBadgeLabels(hit);
 
   return (
     <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
@@ -142,10 +56,22 @@ export default function SearchResultCard({ entityType, hit }) {
           ) : null}
         </div>
         <div className="flex flex-col gap-4">
-          <div>
-            <h3 className="text-2xl font-semibold text-slate-900">{hit.title ?? hit.name}</h3>
-            {hit.subtitle ? <p className="mt-1 text-sm font-medium text-slate-500">{hit.subtitle}</p> : null}
-            {hit.description ? <p className="mt-3 text-sm leading-relaxed text-slate-600">{hit.description}</p> : null}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h3 className="text-2xl font-semibold text-slate-900">{hit.title ?? hit.name}</h3>
+              {hit.subtitle ? <p className="mt-1 text-sm font-medium text-slate-500">{hit.subtitle}</p> : null}
+              {hit.description ? <p className="mt-3 text-sm leading-relaxed text-slate-600">{hit.description}</p> : null}
+            </div>
+            {onPreview ? (
+              <button
+                type="button"
+                onClick={() => onPreview(hit)}
+                className="inline-flex items-center gap-2 self-start rounded-full border border-primary/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary transition hover:border-primary hover:bg-primary/5"
+              >
+                Quick preview
+              </button>
+            ) : null}
+          </div>
             {hit.highlights?.length ? (
               <ul className="mt-3 flex flex-wrap gap-2 text-xs text-primary">
                 {hit.highlights.slice(0, 4).map((highlight) => (
@@ -261,5 +187,10 @@ SearchResultCard.propTypes = {
         href: PropTypes.string
       })
     )
-  }).isRequired
+  }).isRequired,
+  onPreview: PropTypes.func
+};
+
+SearchResultCard.defaultProps = {
+  onPreview: null
 };
