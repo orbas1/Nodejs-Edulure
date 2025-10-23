@@ -10,6 +10,7 @@ import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboar
 import useLearnerProgress from '../../hooks/useLearnerProgress.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useMountedRef from '../../hooks/useMountedRef.js';
+import { buildLearnerProgressCardPayload } from '../../utils/dashboard/learnerProgressCards.js';
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -247,6 +248,18 @@ export default function LearnerCourses() {
       }),
     [activeCourses, goalsByCourseId, progressByCourseId, revenueByCourseId]
   );
+
+  const progressCardByCourseId = useMemo(() => {
+    const entries = enrichedCourses.map((course, index) => {
+      const card = buildLearnerProgressCardPayload(course, {
+        baseHref: '/dashboard/courses',
+        fallbackId: `enriched-course-${index}`
+      });
+      const key = course.id ?? card.id;
+      return [key, card];
+    });
+    return new Map(entries);
+  }, [enrichedCourses]);
 
   const showProgressSkeletons = progressLoading && enrichedCourses.length === 0;
 
@@ -494,53 +507,24 @@ export default function LearnerCourses() {
               ))
             : enrichedCourses.map((course) => {
                 const expanded = expandedCourseId === course.id;
-                const goal = course.goal ?? null;
-                const revenue = course.revenueOpportunity
-                  ? {
-                      headline:
-                        course.revenueOpportunity.headline ??
-                        course.revenueOpportunity.title ??
-                        'Unlock learner rewards',
-                      caption:
-                        course.revenueOpportunity.caption ??
-                        course.revenueOpportunity.body ??
-                        null,
-                      action:
-                        course.revenueOpportunity.actionLabel && course.revenueOpportunity.actionHref
-                          ? {
-                              label: course.revenueOpportunity.actionLabel,
-                              href: course.revenueOpportunity.actionHref
-                            }
-                          : course.revenueOpportunity.action?.label && course.revenueOpportunity.action?.href
-                            ? {
-                                label: course.revenueOpportunity.action.label,
-                                href: course.revenueOpportunity.action.href
-                              }
-                            : null
-                    }
-                  : null;
-
-                const goalPayload = goal
-                  ? {
-                      statusLabel: goal.status ?? goal.statusLabel ?? null,
-                      dueLabel: goal.dueLabel ?? goal.dueDate ?? null,
-                      focusMinutesPerWeek: Number.isFinite(Number(goal.focusMinutesPerWeek))
-                        ? Number(goal.focusMinutesPerWeek)
-                        : null,
-                      nextStep: goal.nextStep ?? goal.upNext ?? null
-                    }
-                  : null;
+                const cardData =
+                  progressCardByCourseId.get(course.id) ??
+                  buildLearnerProgressCardPayload(course, { baseHref: '/dashboard/courses' });
+                const cardMeta = progressLastUpdatedAt
+                  ? { lastUpdatedLabel: formatRelativeTimestamp(progressLastUpdatedAt) }
+                  : cardData.meta;
 
                 return (
                   <LearnerProgressCard
                     key={course.id}
-                    title={course.title}
-                    status={course.status}
-                    instructor={course.instructor}
-                    progressPercent={course.progressPercent}
-                    nextLabel={course.nextLessonLabel}
-                    goal={goalPayload}
-                    revenue={revenue}
+                    title={cardData.title}
+                    status={cardData.status}
+                    instructor={cardData.instructor}
+                    progressPercent={cardData.progressPercent}
+                    nextLabel={cardData.nextLabel}
+                    goal={cardData.goal}
+                    revenue={cardData.revenue}
+                    highlight={cardData.highlight}
                     primaryAction={{
                       label: 'Open course',
                       onClick: () => handleOpenCourse(course.id),
@@ -551,11 +535,7 @@ export default function LearnerCourses() {
                       onClick: () => toggleExpandedCourse(course.id),
                       disabled: disableActions
                     }}
-                    meta={
-                      progressLastUpdatedAt
-                        ? { lastUpdatedLabel: formatRelativeTimestamp(progressLastUpdatedAt) }
-                        : null
-                    }
+                    meta={cardMeta}
                   >
                     {course.completedLessons != null && course.totalLessons != null ? (
                       <p className="text-xs text-slate-500">
