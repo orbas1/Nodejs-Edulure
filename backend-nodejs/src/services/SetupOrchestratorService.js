@@ -5,6 +5,8 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 
 import logger from '../config/logger.js';
+import SetupRunModel from '../models/SetupRunModel.js';
+import SetupRunTaskModel from '../models/SetupRunTaskModel.js';
 import { startWorkerService } from '../servers/workerService.js';
 import { startRealtimeServer } from '../servers/realtimeServer.js';
 
@@ -228,6 +230,11 @@ class SetupOrchestratorService extends EventEmitter {
   constructor() {
     super();
     this.reset();
+    setImmediate(() => {
+      this.restoreFromHistory().catch((error) => {
+        logger.error({ err: error }, 'Failed to restore setup orchestrator history');
+      });
+    });
   }
 
   reset() {
@@ -244,11 +251,17 @@ class SetupOrchestratorService extends EventEmitter {
       heartbeatAt: null
     };
     this.pendingEnvConfig = null;
+    this.currentRunRecord = null;
+    this.runHistory = [];
     this.emitChange();
   }
 
   getStatus() {
     return clone(this.state);
+  }
+
+  getRecentRuns(limit = 10) {
+    return this.runHistory.slice(0, limit).map((run) => clone(run));
   }
 
   buildTaskDescriptor(id) {
@@ -307,6 +320,114 @@ class SetupOrchestratorService extends EventEmitter {
     };
   }
 
+  async restoreFromHistory() {
+    try {
+      this.runHistory = await SetupRunModel.listRecent(10);
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to load setup run history');
+      this.runHistory = [];
+    }
+
+    const latestRun = this.runHistory[0] ?? null;
+    if (!latestRun) {
+      this.emitChange();
+      return;
+    }
+
+    let tasks = [];
+    try {
+      tasks = await SetupRunTaskModel.listByRunId(latestRun.id);
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to load setup run tasks');
+    }
+
+    const mappedTasks = tasks.map((task) => ({
+      id: task.taskId,
+      label: task.label,
+      status: task.status,
+      logs: task.logs,
+      startedAt: task.startedAt,
+      completedAt: task.completedAt,
+      error: Object.keys(task.error ?? {}).length ? task.error : null
+    }));
+
+    if (latestRun.status === 'running') {
+      const now = new Date().toISOString();
+      const interruptionError = {
+        message: 'Setup run interrupted due to service restart',
+        command: null,
+        exitCode: null,
+        taskId: null
+      };
+
+      try {
+        await SetupRunModel.updateByPublicId(latestRun.publicId, {
+          status: 'failed',
+          completedAt: now,
+          heartbeatAt: now,
+          lastError: interruptionError
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Failed to mark interrupted setup run as failed');
+      }
+
+      await Promise.all(
+        mappedTasks
+          .filter((task) => task.status === 'pending' || task.status === 'running')
+          .map(async (task) => {
+            const updatedError = {
+              message:
+                task.status === 'pending'
+                  ? 'Task was not executed before restart'
+                  : 'Task interrupted due to service restart',
+              command: task.error?.command ?? null,
+              exitCode: task.error?.exitCode ?? null
+            };
+            try {
+              await SetupRunTaskModel.updateByRunAndTask(latestRun.id, task.id, {
+                status: 'failed',
+                completedAt: now,
+                error: { ...(task.error ?? {}), ...updatedError }
+              });
+            } catch (error) {
+              logger.error({ err: error }, 'Failed to mark setup run task as interrupted');
+            }
+            task.status = 'failed';
+            task.completedAt = now;
+            task.error = { ...(task.error ?? {}), ...updatedError };
+          })
+      );
+
+      this.state = {
+        ...this.state,
+        id: latestRun.publicId,
+        status: 'failed',
+        startedAt: latestRun.startedAt,
+        completedAt: now,
+        tasks: mappedTasks,
+        activePreset: null,
+        lastPreset: latestRun.presetId ?? null,
+        lastError: interruptionError,
+        heartbeatAt: now
+      };
+    } else {
+      this.state = {
+        ...this.state,
+        id: latestRun.publicId,
+        status: 'idle',
+        startedAt: null,
+        completedAt: latestRun.completedAt ?? null,
+        tasks: mappedTasks,
+        activePreset: null,
+        lastPreset: latestRun.presetId ?? null,
+        lastError: latestRun.lastError ?? null,
+        heartbeatAt: latestRun.heartbeatAt ?? latestRun.completedAt ?? null
+      };
+    }
+
+    this.emitChange();
+  }
+
   describeTaskState(descriptor) {
     return {
       id: descriptor.id,
@@ -358,8 +479,9 @@ class SetupOrchestratorService extends EventEmitter {
 
     const previousLastPreset = this.state.lastPreset ?? null;
 
+    const runId = randomUUID();
     this.state = {
-      id: randomUUID(),
+      id: runId,
       status: 'running',
       startedAt: new Date().toISOString(),
       completedAt: null,
@@ -375,6 +497,34 @@ class SetupOrchestratorService extends EventEmitter {
     this.beginHeartbeat();
     this.emitChange();
 
+    try {
+      const createdRun = await SetupRunModel.create({
+        publicId: runId,
+        presetId: this.state.activePreset ?? null,
+        status: 'running',
+        startedAt: this.state.startedAt,
+        heartbeatAt: this.state.heartbeatAt,
+        metadata: {
+          taskOrder: descriptors.map((descriptor) => descriptor.id)
+        }
+      });
+      this.currentRunRecord = { id: createdRun.id, publicId: createdRun.publicId };
+      await SetupRunTaskModel.createMany(
+        createdRun.id,
+        descriptors.map((descriptor, index) => ({
+          taskId: descriptor.id,
+          label: descriptor.label,
+          orderIndex: index,
+          status: 'pending',
+          logs: [],
+          error: {}
+        }))
+      );
+      await this.refreshHistory();
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to persist setup run metadata');
+    }
+
     setImmediate(() => {
       this.execute(descriptors).catch((error) => {
         logger.error({ err: error }, 'Setup run failed');
@@ -384,16 +534,32 @@ class SetupOrchestratorService extends EventEmitter {
     return this.getStatus();
   }
 
-  appendLog(index, message) {
+  async appendLog(index, message) {
     if (!this.state.tasks[index]) {
       return;
     }
     this.state.tasks[index].logs.push(message);
     this.emitChange();
+    if (!this.currentRunRecord) {
+      return;
+    }
+
+    try {
+      await SetupRunTaskModel.appendLog(this.currentRunRecord.id, this.state.tasks[index].id, message);
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to append setup task log');
+    }
   }
 
   updateHeartbeat() {
     this.state.heartbeatAt = new Date().toISOString();
+    if (this.currentRunRecord) {
+      SetupRunModel.updateByPublicId(this.currentRunRecord.publicId, {
+        heartbeatAt: this.state.heartbeatAt
+      }).catch((error) => {
+        logger.error({ err: error }, 'Failed to record setup run heartbeat');
+      });
+    }
   }
 
   beginHeartbeat() {
@@ -423,15 +589,36 @@ class SetupOrchestratorService extends EventEmitter {
       taskState.status = 'running';
       taskState.startedAt = new Date().toISOString();
       this.emitChange();
+      if (this.currentRunRecord) {
+        try {
+          await SetupRunTaskModel.updateByRunAndTask(this.currentRunRecord.id, descriptor.id, {
+            status: 'running',
+            startedAt: taskState.startedAt
+          });
+        } catch (error) {
+          logger.error({ err: error }, 'Failed to mark setup task as running');
+        }
+      }
       try {
         const result = await descriptor.run();
         if (result?.output) {
-          this.appendLog(index, result.output);
+          await this.appendLog(index, result.output);
         }
         taskState.status = 'succeeded';
         taskState.completedAt = new Date().toISOString();
         taskState.error = null;
         this.emitChange();
+        if (this.currentRunRecord) {
+          try {
+            await SetupRunTaskModel.updateByRunAndTask(this.currentRunRecord.id, descriptor.id, {
+              status: 'succeeded',
+              completedAt: taskState.completedAt,
+              error: {}
+            });
+          } catch (error) {
+            logger.error({ err: error }, 'Failed to mark setup task as succeeded');
+          }
+        }
       } catch (errorOrResult) {
         const error = errorOrResult?.error ?? errorOrResult;
         taskState.status = 'failed';
@@ -464,6 +651,30 @@ class SetupOrchestratorService extends EventEmitter {
         this.clearHeartbeat();
         this.updateHeartbeat();
         this.emitChange();
+        if (this.currentRunRecord) {
+          try {
+            await SetupRunTaskModel.updateByRunAndTask(this.currentRunRecord.id, descriptor.id, {
+              status: 'failed',
+              completedAt: taskState.completedAt,
+              error: taskState.error,
+              logs: taskState.logs
+            });
+          } catch (taskError) {
+            logger.error({ err: taskError }, 'Failed to persist failed setup task state');
+          }
+          try {
+            await SetupRunModel.updateByPublicId(this.currentRunRecord.publicId, {
+              status: 'failed',
+              completedAt: this.state.completedAt,
+              heartbeatAt: this.state.heartbeatAt,
+              lastError: this.state.lastError
+            });
+          } catch (runError) {
+            logger.error({ err: runError }, 'Failed to persist failed setup run state');
+          }
+        }
+        await this.refreshHistory();
+        this.currentRunRecord = null;
         return;
       }
     }
@@ -477,6 +688,28 @@ class SetupOrchestratorService extends EventEmitter {
     this.clearHeartbeat();
     this.updateHeartbeat();
     this.emitChange();
+    if (this.currentRunRecord) {
+      try {
+        await SetupRunModel.updateByPublicId(this.currentRunRecord.publicId, {
+          status: 'succeeded',
+          completedAt: this.state.completedAt,
+          heartbeatAt: this.state.heartbeatAt,
+          lastError: null
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Failed to persist successful setup run state');
+      }
+      await this.refreshHistory();
+    }
+    this.currentRunRecord = null;
+  }
+
+  async refreshHistory() {
+    try {
+      this.runHistory = await SetupRunModel.listRecent(10);
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to refresh setup run history');
+    }
   }
 }
 

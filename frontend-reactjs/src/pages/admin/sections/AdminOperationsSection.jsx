@@ -72,10 +72,14 @@ function resolveConnectionBadge(state) {
   }
 }
 
-function SetupStatusCard({ state, connectionState, error }) {
+function SetupStatusCard({ state, connectionState, error, history }) {
   const badge = resolveConnectionBadge(connectionState);
   const status = state?.status ?? 'idle';
   const activePreset = state?.activePreset ?? state?.lastPreset ?? '—';
+  const lastCompletedRun = useMemo(
+    () => (Array.isArray(history) ? history.find((run) => run.status === 'succeeded') : null),
+    [history]
+  );
 
   return (
     <div className="dashboard-section">
@@ -109,6 +113,13 @@ function SetupStatusCard({ state, connectionState, error }) {
           Last error {state.lastError.taskId ?? '—'}: {state.lastError.message ?? '—'}
         </p>
       ) : null}
+      {lastCompletedRun ? (
+        <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
+          <p className="font-semibold text-slate-700">Last successful run</p>
+          <p className="mt-1">Preset: {lastCompletedRun.presetId ?? '—'}</p>
+          <p className="mt-1">Completed at: {formatTimestamp(lastCompletedRun.completedAt)}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -116,20 +127,23 @@ function SetupStatusCard({ state, connectionState, error }) {
 SetupStatusCard.propTypes = {
   state: PropTypes.object,
   connectionState: PropTypes.string,
-  error: PropTypes.string
+  error: PropTypes.string,
+  history: PropTypes.arrayOf(PropTypes.object)
 };
 
 SetupStatusCard.defaultProps = {
   state: null,
   connectionState: 'idle',
-  error: null
+  error: null,
+  history: undefined
 };
 
 export default function AdminOperationsSection({ sectionId, supportStats, riskStats, platformStats }) {
   const {
     state: setupState,
     connectionState: setupConnectionState,
-    error: setupError
+    error: setupError,
+    history: setupHistory
   } = useSetupProgress();
 
   return (
@@ -137,7 +151,12 @@ export default function AdminOperationsSection({ sectionId, supportStats, riskSt
       <StatList title="Support load" emptyLabel="No pending support indicators." entries={supportStats} />
       <StatList title="Risk &amp; trust" emptyLabel="No risk signals detected." entries={riskStats} />
       <StatList title="Platform snapshot" emptyLabel="No aggregate platform metrics available." entries={platformStats} />
-      <SetupStatusCard state={setupState} connectionState={setupConnectionState} error={setupError} />
+      <SetupStatusCard
+        state={setupState}
+        connectionState={setupConnectionState}
+        error={setupError}
+        history={setupHistory}
+      />
     </section>
   );
 }

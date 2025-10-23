@@ -20,7 +20,7 @@ const hasWindow = typeof window !== 'undefined';
 const hasEventSource = hasWindow && typeof window.EventSource !== 'undefined';
 
 export default function useSetupProgress({ autoStart = true, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS } = {}) {
-  const [snapshot, setSnapshot] = useState({ state: null, tasks: [], presets: [], defaults: {} });
+  const [snapshot, setSnapshot] = useState({ state: null, tasks: [], presets: [], defaults: {}, history: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [connectionState, setConnectionState] = useState('idle');
@@ -39,7 +39,8 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
       state: data?.state ?? null,
       tasks: data?.tasks ?? [],
       presets: data?.presets ?? [],
-      defaults: data?.defaults ?? {}
+      defaults: data?.defaults ?? {},
+      history: data?.history ?? []
     });
     setLoading(false);
     setError(null);
@@ -166,7 +167,8 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
       state: snapshot.state,
       tasks: snapshot.tasks,
       presets: snapshot.presets,
-      defaults: snapshot.defaults
+      defaults: snapshot.defaults,
+      history: snapshot.history
     }),
     [snapshot]
   );

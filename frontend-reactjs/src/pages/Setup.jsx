@@ -104,6 +104,16 @@ const TASK_STATUS_CLASS = {
   failed: 'border-rose-500 text-rose-600 bg-rose-50/80'
 };
 
+const RUN_STATUS_CLASS = {
+  succeeded: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  failed: 'border-rose-200 bg-rose-50 text-rose-700',
+  running: 'border-indigo-200 bg-indigo-50 text-indigo-700'
+};
+
+function resolveRunStatusClass(status) {
+  return RUN_STATUS_CLASS[status] ?? 'border-slate-200 bg-slate-50 text-slate-600';
+}
+
 function formatDate(value) {
   if (!value) return '—';
   const date = new Date(value);
@@ -111,6 +121,39 @@ function formatDate(value) {
     return '—';
   }
   return date.toLocaleTimeString();
+}
+
+function formatFullDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+  return date.toLocaleString();
+}
+
+function formatDuration(start, end) {
+  if (!start || !end) {
+    return '—';
+  }
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return '—';
+  }
+  const diffMs = Math.max(0, endDate.getTime() - startDate.getTime());
+  const totalSeconds = Math.round(diffMs / 1000);
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m ${remainingSeconds}s`;
+  }
+  const totalHours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  return `${totalHours}h ${remainingMinutes}m`;
 }
 
 export default function Setup() {
@@ -133,7 +176,8 @@ export default function Setup() {
     defaults,
     loading,
     error: streamError,
-    connectionState
+    connectionState,
+    history
   } = useSetupProgress();
 
   const orderedTaskIds = useMemo(() => taskCatalog.map((task) => task.id), [taskCatalog]);
@@ -145,6 +189,8 @@ export default function Setup() {
     });
     return map;
   }, [presets]);
+
+  const recentRuns = useMemo(() => (Array.isArray(history) ? history.slice(0, 5) : []), [history]);
 
   const presetInitialisedRef = useRef(false);
 
@@ -639,6 +685,70 @@ export default function Setup() {
                   ) : null}
                 </>
               ) : null}
+            </section>
+
+            <section className="rounded-3xl bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Recent runs</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    History for the five latest installer executions.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  {recentRuns.length ? `${recentRuns.length} shown` : 'No runs'}
+                </span>
+              </div>
+              <ul className="mt-4 space-y-3">
+                {recentRuns.length === 0 ? (
+                  <li className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500">
+                    Runs will appear here once the installer has executed.
+                  </li>
+                ) : (
+                  recentRuns.map((run) => {
+                    const presetLabel = presetsById.get(run.presetId)?.label ?? run.presetId ?? 'Custom selection';
+                    const statusClass = resolveRunStatusClass(run.status);
+                    const taskCount = Array.isArray(run.metadata?.taskOrder) ? run.metadata.taskOrder.length : '—';
+                    const statusLabel = run.status ? run.status.charAt(0).toUpperCase() + run.status.slice(1) : 'Unknown';
+                    return (
+                      <li key={run.publicId} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{presetLabel}</p>
+                            <p className="mt-1 font-mono text-[11px] text-slate-500">{run.publicId}</p>
+                          </div>
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${statusClass}`}>
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <dl className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-500">
+                          <div className="space-y-1">
+                            <dt className="text-[11px] uppercase tracking-wide text-slate-400">Started</dt>
+                            <dd className="text-slate-700">{formatFullDate(run.startedAt)}</dd>
+                          </div>
+                          <div className="space-y-1">
+                            <dt className="text-[11px] uppercase tracking-wide text-slate-400">Completed</dt>
+                            <dd className="text-slate-700">{formatFullDate(run.completedAt)}</dd>
+                          </div>
+                          <div className="space-y-1">
+                            <dt className="text-[11px] uppercase tracking-wide text-slate-400">Duration</dt>
+                            <dd className="text-slate-700">{formatDuration(run.startedAt, run.completedAt)}</dd>
+                          </div>
+                          <div className="space-y-1">
+                            <dt className="text-[11px] uppercase tracking-wide text-slate-400">Tasks</dt>
+                            <dd className="text-slate-700">{taskCount}</dd>
+                          </div>
+                        </dl>
+                        {run.lastError?.message ? (
+                          <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+                            {run.lastError.message}
+                          </p>
+                        ) : null}
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
             </section>
 
             <section className="rounded-3xl bg-white p-6 shadow-sm">

@@ -25,7 +25,8 @@ export default class SetupController {
       state: setupOrchestratorService.getStatus(),
       tasks: setupOrchestratorService.describeTasks(),
       presets: setupOrchestratorService.describePresets(),
-      defaults: setupOrchestratorService.describeDefaults()
+      defaults: setupOrchestratorService.describeDefaults(),
+      history: setupOrchestratorService.getRecentRuns()
     };
   }
 
