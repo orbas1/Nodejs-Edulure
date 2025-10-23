@@ -1032,6 +1032,12 @@ export async function seed(knex) {
       badge: 'Advanced cohort',
       colors: ['#0ea5e9', '#2563eb']
     });
+    const automationCertificateArtwork = await ensureSeedImage('certificate-automation-masterclass', {
+      title: 'Ops Launch Faculty',
+      subtitle: 'Certificate of Completion',
+      badge: 'Automation Masterclass',
+      colors: ['#4338ca', '#6366f1']
+    });
 
     const [opsAutomationCourseId] = await trx('courses').insert({
       public_id: crypto.randomUUID(),
@@ -1048,6 +1054,7 @@ export async function seed(knex) {
       languages: JSON.stringify(['en']),
       delivery_format: 'cohort',
       thumbnail_url: automationCourseArtwork.url,
+      hero_image_url: automationCourseArtwork.url,
       price_currency: 'USD',
       price_amount: 129900,
       rating_average: 4.8,
@@ -1057,6 +1064,15 @@ export async function seed(knex) {
       release_at: trx.fn.now(),
       status: 'published',
       metadata: JSON.stringify({
+        brandColor: '#4338ca',
+        certificateBackgroundUrl: automationCertificateArtwork.url,
+        certificateIssuer: 'Ops Launch Faculty',
+        certificateTemplate: {
+          accentColor: '#4338ca',
+          backgroundUrl: automationCertificateArtwork.url,
+          issuedBy: 'Ops Launch Faculty',
+          signature: 'Dean of Automation Programs'
+        },
         syllabusVersion: '2024-Q4',
         analyticsKey: 'ops-masterclass',
         dripCampaign: {
@@ -1198,9 +1214,12 @@ export async function seed(knex) {
       release_offset_days: 0,
       metadata: JSON.stringify({
         recommendedDurationMinutes: 120,
+        releaseAt: new Date().toISOString(),
+        releaseOffsetDays: 0,
         drip: {
           gating: 'Immediate access',
           prerequisites: [],
+          releaseLabel: 'Available day 1',
           notifications: ['Email 24h before release'],
           workspace: 'Ops Launch HQ'
         },
@@ -1221,9 +1240,12 @@ export async function seed(knex) {
       release_offset_days: 7,
       metadata: JSON.stringify({
         hasSimulation: true,
+        releaseAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        releaseOffsetDays: 7,
         drip: {
           gating: 'Requires Module 1 completion',
           prerequisites: ['Launch Command Center'],
+          releaseLabel: 'Unlocks day 8',
           notifications: ['Email 24h before release', 'SMS 2h before release'],
           workspace: 'Ops Launch HQ'
         },

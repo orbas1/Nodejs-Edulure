@@ -29,16 +29,58 @@ function formatDateLabel(value) {
   }
 }
 
+function deriveModuleReleaseLabel(module) {
+  if (!module) return null;
+  const metadata = module.metadata ?? {};
+  const releaseSources = [
+    metadata.releaseAt,
+    metadata.releaseDate,
+    metadata.release_at,
+    metadata.drip?.releaseAt,
+    metadata.drip?.releaseDate,
+    metadata.drip?.releaseWindowDate
+  ];
+  for (const value of releaseSources) {
+    const label = formatDateLabel(value);
+    if (label) {
+      return label;
+    }
+  }
+  const gatingLabelCandidates = [metadata.releaseLabel, metadata.drip?.releaseLabel, metadata.gating, metadata.drip?.gating];
+  for (const candidate of gatingLabelCandidates) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+  const offset = Number(module.releaseOffsetDays ?? metadata.releaseOffsetDays);
+  if (Number.isFinite(offset)) {
+    if (offset <= 0) {
+      return 'Available day 1';
+    }
+    return `Unlocks day ${offset + 1}`;
+  }
+  return null;
+}
+
 function normaliseModules(modules = []) {
   const map = new Map();
   modules.forEach((module) => {
     if (!module?.id) return;
+    const releaseOffset = Number.isFinite(Number(module.releaseOffsetDays))
+      ? Number(module.releaseOffsetDays)
+      : Number.isFinite(Number(module.metadata?.releaseOffsetDays))
+        ? Number(module.metadata.releaseOffsetDays)
+        : null;
     map.set(module.id, {
       id: module.id,
       courseId: module.courseId,
       title: module.title,
       position: module.position ?? 0,
-      releaseLabel: formatDateLabel(module.metadata?.releaseAt ?? module.metadata?.releaseDate),
+      releaseOffsetDays: releaseOffset,
+      releaseLabel: deriveModuleReleaseLabel(module),
       metadata: module.metadata ?? {},
       createdAt: toIsoString(module.createdAt),
       updatedAt: toIsoString(module.updatedAt)
@@ -153,6 +195,7 @@ function computeModuleSummary(module, lessons, progressLookup) {
     courseId: module.courseId,
     title: module.title,
     position: module.position,
+    releaseOffsetDays: module.releaseOffsetDays ?? null,
     releaseLabel: module.releaseLabel,
     totalLessons,
     completedLessons,

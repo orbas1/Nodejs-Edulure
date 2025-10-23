@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { addTimestamps, ensureUpdatedAtTrigger } from './_helpers/schema.js';
 
 export async function up(knex) {
   const hasCourses = await knex.schema.hasTable('courses');
@@ -42,14 +43,12 @@ export async function up(knex) {
         .notNullable()
         .defaultTo('draft');
       table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      addTimestamps(table, knex);
       table.index(['status', 'category']);
       table.index(['instructor_id', 'status']);
       table.index(['release_at']);
     });
+    await ensureUpdatedAtTrigger(knex, 'courses');
   }
 
   const hasModules = await knex.schema.hasTable('course_modules');
@@ -68,13 +67,11 @@ export async function up(knex) {
       table.integer('position').unsigned().notNullable().defaultTo(0);
       table.integer('release_offset_days').notNullable().defaultTo(0);
       table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      addTimestamps(table, knex);
       table.unique(['course_id', 'slug']);
       table.index(['course_id', 'position']);
     });
+    await ensureUpdatedAtTrigger(knex, 'course_modules');
   }
 
   const hasLessons = await knex.schema.hasTable('course_lessons');
@@ -107,13 +104,11 @@ export async function up(knex) {
       table.integer('duration_minutes').unsigned().notNullable().defaultTo(0);
       table.timestamp('release_at');
       table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      addTimestamps(table, knex);
       table.unique(['module_id', 'slug']);
       table.index(['course_id', 'position']);
     });
+    await ensureUpdatedAtTrigger(knex, 'course_lessons');
   }
 
   const hasAssignments = await knex.schema.hasTable('course_assignments');
@@ -139,13 +134,11 @@ export async function up(knex) {
       table.integer('due_offset_days').notNullable().defaultTo(0);
       table.json('rubric').notNullable().defaultTo(jsonDefault(knex, {}));
       table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      addTimestamps(table, knex);
       table.index(['course_id']);
       table.index(['module_id']);
     });
+    await ensureUpdatedAtTrigger(knex, 'course_assignments');
   }
 
   const hasEnrollments = await knex.schema.hasTable('course_enrollments');
@@ -176,10 +169,12 @@ export async function up(knex) {
       table.timestamp('completed_at');
       table.timestamp('last_accessed_at');
       table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
+      addTimestamps(table, knex);
       table.unique(['course_id', 'user_id']);
       table.index(['status']);
       table.index(['user_id', 'status']);
     });
+    await ensureUpdatedAtTrigger(knex, 'course_enrollments');
   }
 
   const hasProgress = await knex.schema.hasTable('course_progress');
@@ -204,9 +199,11 @@ export async function up(knex) {
       table.timestamp('completed_at');
       table.decimal('progress_percent', 5, 2).notNullable().defaultTo(0);
       table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
+      addTimestamps(table, knex);
       table.unique(['enrollment_id', 'lesson_id']);
       table.index(['lesson_id']);
     });
+    await ensureUpdatedAtTrigger(knex, 'course_progress');
   }
 }
 
