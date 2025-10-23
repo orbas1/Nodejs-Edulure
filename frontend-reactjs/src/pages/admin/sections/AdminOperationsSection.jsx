@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 import { ensureArray, ensureString } from '../utils.js';
+import useSetupProgress from '../../../hooks/useSetupProgress.js';
 
 function normaliseEntries(entries) {
   return ensureArray(entries).map((entry, index) => ({
@@ -45,12 +46,98 @@ StatList.propTypes = {
   ).isRequired
 };
 
+function formatTimestamp(value) {
+  if (!value) {
+    return '—';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+
+  return date.toLocaleString();
+}
+
+function resolveConnectionBadge(state) {
+  switch (state) {
+    case 'streaming':
+      return { label: 'Live', className: 'border-emerald-300 bg-emerald-50 text-emerald-700' };
+    case 'polling':
+      return { label: 'Polling', className: 'border-amber-300 bg-amber-50 text-amber-700' };
+    case 'error':
+      return { label: 'Disconnected', className: 'border-rose-300 bg-rose-50 text-rose-700' };
+    default:
+      return { label: 'Idle', className: 'border-slate-200 bg-slate-50 text-slate-600' };
+  }
+}
+
+function SetupStatusCard({ state, connectionState, error }) {
+  const badge = resolveConnectionBadge(connectionState);
+  const status = state?.status ?? 'idle';
+  const activePreset = state?.activePreset ?? state?.lastPreset ?? '—';
+
+  return (
+    <div className="dashboard-section">
+      <div className="flex items-start justify-between">
+        <h3 className="text-lg font-semibold text-slate-900">Installer</h3>
+        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${badge.className}`}>
+          {badge.label}
+        </span>
+      </div>
+      <dl className="mt-3 space-y-2 text-sm text-slate-600">
+        <div className="flex justify-between">
+          <dt>Status</dt>
+          <dd className="capitalize">{status}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt>Run ID</dt>
+          <dd className="font-mono text-xs">{state?.id ?? '—'}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt>Heartbeat</dt>
+          <dd>{formatTimestamp(state?.heartbeatAt)}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt>Preset</dt>
+          <dd>{activePreset}</dd>
+        </div>
+      </dl>
+      {error ? <p className="mt-3 text-xs text-amber-700">{error}</p> : null}
+      {state?.lastError ? (
+        <p className="mt-3 text-xs text-rose-600">
+          Last error {state.lastError.taskId ?? '—'}: {state.lastError.message ?? '—'}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+SetupStatusCard.propTypes = {
+  state: PropTypes.object,
+  connectionState: PropTypes.string,
+  error: PropTypes.string
+};
+
+SetupStatusCard.defaultProps = {
+  state: null,
+  connectionState: 'idle',
+  error: null
+};
+
 export default function AdminOperationsSection({ sectionId, supportStats, riskStats, platformStats }) {
+  const {
+    state: setupState,
+    connectionState: setupConnectionState,
+    error: setupError
+  } = useSetupProgress();
+
   return (
     <section id={sectionId} className="grid gap-6 lg:grid-cols-3">
       <StatList title="Support load" emptyLabel="No pending support indicators." entries={supportStats} />
       <StatList title="Risk &amp; trust" emptyLabel="No risk signals detected." entries={riskStats} />
       <StatList title="Platform snapshot" emptyLabel="No aggregate platform metrics available." entries={platformStats} />
+      <SetupStatusCard state={setupState} connectionState={setupConnectionState} error={setupError} />
     </section>
   );
 }

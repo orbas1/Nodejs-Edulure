@@ -6,6 +6,7 @@ import { createApiRouter } from './routerFactory.js';
 const router = createApiRouter({ allowDevelopmentOrigins: true });
 
 router.get('/status', SetupController.getStatus);
+router.get('/events', SetupController.streamEvents);
 router.post('/runs', express.json({ limit: '1mb' }), SetupController.startRun);
 
 export default router;

@@ -2,12 +2,22 @@ import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { EventEmitter } from 'node:events';
 
 import logger from '../config/logger.js';
 import { startWorkerService } from '../servers/workerService.js';
 import { startRealtimeServer } from '../servers/realtimeServer.js';
 
 const projectRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..');
+const DEFAULT_PRESET_ID = 'lite';
+const HEARTBEAT_INTERVAL_MS = 5_000;
+
+const clone = (value) => {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value));
+};
 const TASK_DEFINITIONS = new Map([
   [
     'environment',
@@ -84,6 +94,36 @@ export const DEFAULT_SETUP_TASK_SEQUENCE = [
   'frontend'
 ];
 
+const PRESET_DEFINITIONS = new Map([
+  [
+    'lite',
+    {
+      id: 'lite',
+      label: 'Lite preset',
+      description: 'Web, background jobs, and Edulure Search for local installs.',
+      tasks: ['environment', 'database', 'search', 'backend', 'frontend']
+    }
+  ],
+  [
+    'full',
+    {
+      id: 'full',
+      label: 'Full preset',
+      description: 'Complete stack with realtime and schedulers for staging parity.',
+      tasks: [...DEFAULT_SETUP_TASK_SEQUENCE]
+    }
+  ],
+  [
+    'ads-analytics',
+    {
+      id: 'ads-analytics',
+      label: 'Ads & analytics preset',
+      description: 'Full stack tuned for monetisation experiments and telemetry.',
+      tasks: [...DEFAULT_SETUP_TASK_SEQUENCE]
+    }
+  ]
+]);
+
 function runCommand(command, { cwd = projectRoot } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, {
@@ -109,10 +149,10 @@ function runCommand(command, { cwd = projectRoot } = {}) {
 
     child.on('close', (code) => {
       if (code === 0) {
-        resolve({ code, output: output.join('') });
+        resolve({ code, output: output.join(''), command });
       } else {
         const error = new Error(`Command failed with exit code ${code}`);
-        reject({ error, output: output.join(''), code });
+        reject({ error, output: output.join(''), code, command });
       }
     });
   });
@@ -184,24 +224,31 @@ async function writeEnvironmentFiles(envConfig = {}) {
   return { backendWritten: Boolean(backendEntries), frontendWritten: Boolean(frontendEntries) };
 }
 
-class SetupOrchestratorService {
+class SetupOrchestratorService extends EventEmitter {
   constructor() {
+    super();
     this.reset();
   }
 
   reset() {
+    this.clearHeartbeat();
     this.state = {
       id: null,
       status: 'idle',
       startedAt: null,
       completedAt: null,
-      tasks: []
+      tasks: [],
+      activePreset: null,
+      lastPreset: null,
+      lastError: null,
+      heartbeatAt: null
     };
     this.pendingEnvConfig = null;
+    this.emitChange();
   }
 
   getStatus() {
-    return this.state;
+    return clone(this.state);
   }
 
   buildTaskDescriptor(id) {
@@ -231,6 +278,35 @@ class SetupOrchestratorService {
     });
   }
 
+  listPresetIds() {
+    return Array.from(PRESET_DEFINITIONS.keys());
+  }
+
+  describePresets() {
+    return this.listPresetIds().map((id) => this.describePreset(id));
+  }
+
+  describePreset(id) {
+    const preset = PRESET_DEFINITIONS.get(id);
+    if (!preset) {
+      throw new Error(`Unknown setup preset "${id}"`);
+    }
+
+    return {
+      id: preset.id,
+      label: preset.label,
+      description: preset.description,
+      tasks: [...preset.tasks]
+    };
+  }
+
+  describeDefaults() {
+    return {
+      sequence: [...DEFAULT_SETUP_TASK_SEQUENCE],
+      preset: DEFAULT_PRESET_ID
+    };
+  }
+
   describeTaskState(descriptor) {
     return {
       id: descriptor.id,
@@ -238,16 +314,31 @@ class SetupOrchestratorService {
       status: 'pending',
       logs: [],
       startedAt: null,
-      completedAt: null
+      completedAt: null,
+      error: null
     };
   }
 
-  async startRun({ tasks, envConfig } = {}) {
+  resolvePresetTasks(presetId) {
+    if (!presetId) {
+      return null;
+    }
+
+    const preset = PRESET_DEFINITIONS.get(presetId);
+    if (!preset) {
+      throw new Error(`Unknown setup preset "${presetId}"`);
+    }
+
+    return [...preset.tasks];
+  }
+
+  async startRun({ tasks, envConfig, preset } = {}) {
     if (this.state.status === 'running') {
       throw new Error('A setup run is already in progress');
     }
 
-    const taskIds = Array.isArray(tasks) && tasks.length ? tasks : DEFAULT_SETUP_TASK_SEQUENCE;
+    const presetTasks = this.resolvePresetTasks(preset);
+    const taskIds = Array.isArray(tasks) && tasks.length ? tasks : presetTasks ?? DEFAULT_SETUP_TASK_SEQUENCE;
     const descriptors = taskIds.map((id) => {
       if (!TASK_DEFINITIONS.has(id)) {
         throw new Error(`Unknown setup task "${id}"`);
@@ -265,14 +356,24 @@ class SetupOrchestratorService {
       throw new Error('Environment configuration is required when running the environment task');
     }
 
+    const previousLastPreset = this.state.lastPreset ?? null;
+
     this.state = {
       id: randomUUID(),
       status: 'running',
       startedAt: new Date().toISOString(),
       completedAt: null,
-      tasks: descriptors.map((descriptor) => this.describeTaskState(descriptor))
+      tasks: descriptors.map((descriptor) => this.describeTaskState(descriptor)),
+      activePreset: preset ?? null,
+      lastPreset: previousLastPreset,
+      lastError: null,
+      heartbeatAt: null
     };
     this.pendingEnvConfig = envConfig ?? null;
+
+    this.updateHeartbeat();
+    this.beginHeartbeat();
+    this.emitChange();
 
     setImmediate(() => {
       this.execute(descriptors).catch((error) => {
@@ -280,7 +381,7 @@ class SetupOrchestratorService {
       });
     });
 
-    return this.state;
+    return this.getStatus();
   }
 
   appendLog(index, message) {
@@ -288,6 +389,31 @@ class SetupOrchestratorService {
       return;
     }
     this.state.tasks[index].logs.push(message);
+    this.emitChange();
+  }
+
+  updateHeartbeat() {
+    this.state.heartbeatAt = new Date().toISOString();
+  }
+
+  beginHeartbeat() {
+    this.clearHeartbeat();
+    this.updateHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      this.updateHeartbeat();
+      this.emitChange();
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  clearHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  emitChange() {
+    this.emit('state', this.getStatus());
   }
 
   async execute(descriptors) {
@@ -296,6 +422,7 @@ class SetupOrchestratorService {
       const taskState = this.state.tasks[index];
       taskState.status = 'running';
       taskState.startedAt = new Date().toISOString();
+      this.emitChange();
       try {
         const result = await descriptor.run();
         if (result?.output) {
@@ -303,21 +430,53 @@ class SetupOrchestratorService {
         }
         taskState.status = 'succeeded';
         taskState.completedAt = new Date().toISOString();
+        taskState.error = null;
+        this.emitChange();
       } catch (errorOrResult) {
         const error = errorOrResult?.error ?? errorOrResult;
         taskState.status = 'failed';
         taskState.completedAt = new Date().toISOString();
-        taskState.logs.push(errorOrResult?.output ?? error?.message ?? String(error));
+        const command = errorOrResult?.command ?? null;
+        const exitCode = Number.isFinite(errorOrResult?.code) ? errorOrResult.code : null;
+        const message = error?.message ?? String(error);
+        const output = errorOrResult?.output ?? null;
+        if (output) {
+          taskState.logs.push(output);
+        } else {
+          taskState.logs.push(message);
+        }
+        taskState.error = {
+          message,
+          command,
+          exitCode
+        };
         this.state.status = 'failed';
         this.state.completedAt = new Date().toISOString();
+        this.state.lastPreset = this.state.activePreset ?? this.state.lastPreset ?? null;
+        this.state.lastError = {
+          taskId: descriptor.id,
+          command,
+          exitCode,
+          message
+        };
+        this.state.activePreset = null;
         this.pendingEnvConfig = null;
+        this.clearHeartbeat();
+        this.updateHeartbeat();
+        this.emitChange();
         return;
       }
     }
 
     this.state.status = 'succeeded';
     this.state.completedAt = new Date().toISOString();
+    this.state.lastPreset = this.state.activePreset ?? this.state.lastPreset ?? null;
+    this.state.activePreset = null;
+    this.state.lastError = null;
     this.pendingEnvConfig = null;
+    this.clearHeartbeat();
+    this.updateHeartbeat();
+    this.emitChange();
   }
 }
 

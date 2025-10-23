@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowPathIcon,
   CheckCircleIcon,
@@ -7,8 +7,9 @@ import {
   WrenchScrewdriverIcon
 } from '@heroicons/react/24/outline';
 
-import { fetchSetupStatus, startSetupRun } from '../api/setupApi.js';
+import { startSetupRun } from '../api/setupApi.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import useSetupProgress from '../hooks/useSetupProgress.js';
 
 const BACKEND_FIELD_GROUPS = [
   {
@@ -97,10 +98,10 @@ const R2_STORAGE_FIELDS = [
 ];
 
 const TASK_STATUS_CLASS = {
-  pending: 'border-slate-200 text-slate-600',
-  running: 'border-blue-400 text-blue-600 bg-blue-50/60',
-  succeeded: 'border-emerald-400 text-emerald-600 bg-emerald-50/60',
-  failed: 'border-rose-400 text-rose-600 bg-rose-50/60'
+  pending: 'border-slate-200 text-slate-600 bg-slate-50/70',
+  running: 'border-indigo-400 text-indigo-600 bg-indigo-50/70',
+  succeeded: 'border-emerald-400 text-emerald-600 bg-emerald-50/70',
+  failed: 'border-rose-500 text-rose-600 bg-rose-50/80'
 };
 
 function formatDate(value) {
@@ -119,47 +120,68 @@ export default function Setup() {
   const [frontendEnv, setFrontendEnv] = useState(DEFAULT_FRONTEND_VALUES);
   const [storageDriver, setStorageDriver] = useState('local');
   const [advancedStorageValues, setAdvancedStorageValues] = useState({});
-  const [taskCatalog, setTaskCatalog] = useState([]);
   const [selectedTasks, setSelectedTasks] = useState(new Set());
-  const [setupState, setSetupState] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [selectedPreset, setSelectedPreset] = useState(null);
+  const [isCustomTaskSelection, setIsCustomTaskSelection] = useState(false);
+  const [formError, setFormError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const {
+    state: setupState,
+    tasks: taskCatalog,
+    presets,
+    defaults,
+    loading,
+    error: streamError,
+    connectionState
+  } = useSetupProgress();
 
   const orderedTaskIds = useMemo(() => taskCatalog.map((task) => task.id), [taskCatalog]);
 
-  const pollForStatus = useCallback(async () => {
-    try {
-      const data = await fetchSetupStatus();
-      setTaskCatalog(data.tasks ?? []);
-      setSetupState(data.state ?? null);
-      if (!selectedTasks.size && Array.isArray(data.defaults?.sequence)) {
-        setSelectedTasks(new Set(data.defaults.sequence));
+  const presetsById = useMemo(() => {
+    const map = new Map();
+    presets.forEach((preset) => {
+      map.set(preset.id, preset);
+    });
+    return map;
+  }, [presets]);
+
+  const presetInitialisedRef = useRef(false);
+
+  const applyPreset = useCallback(
+    (presetId) => {
+      const preset = presetsById.get(presetId);
+      if (!preset) {
+        return;
       }
-      setError(null);
-    } catch (err) {
-      console.error('Failed to load setup status', err);
-      setError(err.message ?? 'Failed to load setup status');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedTasks.size]);
+      setSelectedPreset(presetId);
+      setSelectedTasks(new Set(preset.tasks));
+      setIsCustomTaskSelection(false);
+    },
+    [presetsById]
+  );
 
   useEffect(() => {
-    pollForStatus();
-  }, [pollForStatus]);
+    if (presetInitialisedRef.current) {
+      return;
+    }
+    if (!presets.length) {
+      return;
+    }
+    const defaultPresetId = defaults?.preset ?? presets[0]?.id;
+    if (!defaultPresetId) {
+      return;
+    }
+    applyPreset(defaultPresetId);
+    presetInitialisedRef.current = true;
+  }, [applyPreset, defaults, presets]);
 
   useEffect(() => {
-    if (!setupState || setupState.status !== 'running') {
-      return undefined;
+    if (!setupState?.activePreset) {
+      return;
     }
-
-    const interval = setInterval(() => {
-      pollForStatus();
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [setupState, pollForStatus]);
+    applyPreset(setupState.activePreset);
+  }, [applyPreset, setupState?.activePreset]);
 
   const handleBackendChange = useCallback((key, value) => {
     setBackendEnv((prev) => ({ ...prev, [key]: value }));
@@ -173,6 +195,13 @@ export default function Setup() {
     setAdvancedStorageValues((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const handlePresetSelect = useCallback(
+    (presetId) => {
+      applyPreset(presetId);
+    },
+    [applyPreset]
+  );
+
   const toggleTask = useCallback((taskId) => {
     setSelectedTasks((prev) => {
       const next = new Set(prev);
@@ -183,6 +212,7 @@ export default function Setup() {
       }
       return next;
     });
+    setIsCustomTaskSelection(true);
   }, []);
 
   const isEnvironmentTaskSelected = useMemo(() => selectedTasks.has('environment'), [selectedTasks]);
@@ -213,21 +243,61 @@ export default function Setup() {
     setupState
   ]);
 
+  const activePresetLabel = useMemo(() => {
+    if (!setupState?.activePreset) {
+      return null;
+    }
+    const preset = presetsById.get(setupState.activePreset);
+    return preset?.label ?? setupState.activePreset;
+  }, [presetsById, setupState?.activePreset]);
+
+  const lastPresetLabel = useMemo(() => {
+    if (!setupState?.lastPreset) {
+      return null;
+    }
+    const preset = presetsById.get(setupState.lastPreset);
+    return preset?.label ?? setupState.lastPreset;
+  }, [presetsById, setupState?.lastPreset]);
+
+  const selectedPresetDescription = useMemo(() => {
+    if (!selectedPreset) {
+      return null;
+    }
+    return presetsById.get(selectedPreset)?.description ?? null;
+  }, [presetsById, selectedPreset]);
+
+  const lastError = setupState?.lastError ?? null;
+  const lastHeartbeat = formatDate(setupState?.heartbeatAt);
+  const connectionLabel = connectionState === 'streaming' ? 'Live updates' : connectionState === 'polling' ? 'Polling fallback' : connectionState === 'error' ? 'Connection lost' : 'Idle';
+  const isRunning = setupState?.status === 'running';
+  const connectionBadgeClass = useMemo(() => {
+    if (connectionState === 'streaming') {
+      return 'border-emerald-300 bg-emerald-50 text-emerald-700';
+    }
+    if (connectionState === 'polling') {
+      return 'border-amber-300 bg-amber-50 text-amber-700';
+    }
+    if (connectionState === 'error') {
+      return 'border-rose-300 bg-rose-50 text-rose-700';
+    }
+    return 'border-slate-200 bg-slate-50 text-slate-600';
+  }, [connectionState]);
+
   const handleSubmit = useCallback(
     async (event) => {
       event.preventDefault();
       if (!selectedTasks.size) {
-        setError('Select at least one setup task to run.');
+        setFormError('Select at least one setup task to run.');
         return;
       }
       if (selectedTasks.has('environment') && !backendEnv.APP_URL) {
-        setError('APP_URL is required when writing environment files.');
+        setFormError('APP_URL is required when writing environment files.');
         return;
       }
 
       try {
         setIsSubmitting(true);
-        setError(null);
+        setFormError(null);
         const taskOrder = orderedTaskIds.length ? orderedTaskIds : Array.from(selectedTasks);
         const tasks = Array.from(selectedTasks).sort((a, b) => {
           const positionA = taskOrder.indexOf(a);
@@ -238,17 +308,16 @@ export default function Setup() {
           return positionA - positionB;
         });
 
-        const payload = { tasks, envConfig: buildPayload() };
-        const data = await startSetupRun(payload);
-        setSetupState(data.state ?? null);
+        const payload = { tasks, envConfig: buildPayload(), preset: selectedPreset };
+        await startSetupRun(payload);
       } catch (err) {
         console.error('Failed to start setup run', err);
-        setError(err.message ?? 'Failed to start setup run');
+        setFormError(err.message ?? 'Failed to start setup run');
       } finally {
         setIsSubmitting(false);
       }
     },
-    [buildPayload, backendEnv.APP_URL, orderedTaskIds, selectedTasks]
+    [buildPayload, backendEnv.APP_URL, orderedTaskIds, selectedPreset, selectedTasks]
   );
 
   const storageFields = storageDriver === 'r2' ? R2_STORAGE_FIELDS : LOCAL_STORAGE_FIELDS;
@@ -267,6 +336,15 @@ export default function Setup() {
             leaving your browser. The installer writes local <code>.env.local</code> files and verifies each component.
           </p>
         </header>
+
+        {streamError ? (
+          <div className="mb-6 rounded-3xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            <p className="font-semibold">Realtime updates paused</p>
+            <p className="mt-1 text-xs">
+              {streamError}. The installer is running in polling mode until the connection is restored.
+            </p>
+          </div>
+        ) : null}
 
         <div className="grid gap-8 lg:grid-cols-[2fr,1fr]">
           <form onSubmit={handleSubmit} className="flex flex-col gap-8">
@@ -403,6 +481,33 @@ export default function Setup() {
               <p className="mt-1 text-sm text-slate-500">
                 Choose the tasks to execute. The installer will run them sequentially and stream logs below.
               </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {presets.map((preset) => {
+                  const isSelected = selectedPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handlePresetSelect(preset.id)}
+                      className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                        isSelected
+                          ? 'border-primary bg-primary text-white shadow-sm'
+                          : 'border-slate-200 bg-slate-100 text-slate-600 hover:border-primary/60 hover:text-primary'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+                {isCustomTaskSelection ? (
+                  <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                    Custom selection
+                  </span>
+                ) : null}
+              </div>
+              {selectedPresetDescription ? (
+                <p className="mt-2 text-xs text-slate-500">{selectedPresetDescription}</p>
+              ) : null}
               <div className="mt-4 grid gap-3">
                 {taskCatalog.map((task) => {
                   const isSelected = selectedTasks.has(task.id);
@@ -433,51 +538,106 @@ export default function Setup() {
             </section>
 
             <div className="flex items-center justify-between gap-4">
-              {error ? <p className="text-sm font-semibold text-rose-600">{error}</p> : <span />}
+              {formError ? <p className="text-sm font-semibold text-rose-600">{formError}</p> : <span />}
               <button
                 type="submit"
-                disabled={isSubmitting || (setupState?.status === 'running' && runningTaskCount > 0)}
+                disabled={isSubmitting || (isRunning && runningTaskCount > 0)}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {isSubmitting || setupState?.status === 'running' ? (
+                {isSubmitting || isRunning ? (
                   <ArrowPathIcon className="h-5 w-5 animate-spin" />
                 ) : (
                   <PlayIcon className="h-5 w-5" />
                 )}
-                {setupState?.status === 'running' ? 'Running installer…' : 'Run installer'}
+                {isRunning ? 'Running installer…' : 'Run installer'}
               </button>
             </div>
           </form>
 
           <aside className="flex flex-col gap-6">
             <section className="rounded-3xl bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900">Run status</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {isLoading
-                  ? 'Loading current status…'
-                  : setupState
-                    ? `Current run: ${setupState.status ?? 'unknown'}`
-                    : 'No runs executed yet.'}
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Run status</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {loading
+                      ? 'Loading current status…'
+                      : setupState
+                        ? `Current run: ${setupState.status ?? 'unknown'}`
+                        : 'No runs executed yet.'}
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${connectionBadgeClass}`}
+                >
+                  {connectionLabel}
+                </span>
+              </div>
               {setupState ? (
-                <dl className="mt-4 space-y-2 text-sm text-slate-600">
-                  <div className="flex justify-between">
-                    <dt>Run ID</dt>
-                    <dd className="font-mono text-xs">{setupState.id ?? '—'}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt>Started</dt>
-                    <dd>{formatDate(setupState.startedAt)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt>Completed</dt>
-                    <dd>{formatDate(setupState.completedAt)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt>Status</dt>
-                    <dd className="capitalize">{setupState.status}</dd>
-                  </div>
-                </dl>
+                <>
+                  <dl className="mt-4 space-y-2 text-sm text-slate-600">
+                    <div className="flex justify-between">
+                      <dt>Run ID</dt>
+                      <dd className="font-mono text-xs">{setupState.id ?? '—'}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Started</dt>
+                      <dd>{formatDate(setupState.startedAt)}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Completed</dt>
+                      <dd>{formatDate(setupState.completedAt)}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Status</dt>
+                      <dd className="capitalize">{setupState.status ?? 'unknown'}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Heartbeat</dt>
+                      <dd>{lastHeartbeat}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Preset</dt>
+                      <dd>{activePresetLabel ?? '—'}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt>Last preset</dt>
+                      <dd>{lastPresetLabel ?? '—'}</dd>
+                    </div>
+                  </dl>
+                  {setupState.lastPreset ? (
+                    <button
+                      type="button"
+                      onClick={() => handlePresetSelect(setupState.lastPreset)}
+                      className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+                    >
+                      <ArrowPathIcon className="h-4 w-4" />
+                      Load {lastPresetLabel ?? setupState.lastPreset} preset
+                    </button>
+                  ) : null}
+                  {lastError ? (
+                    <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700">
+                      <p className="font-semibold">Last failure</p>
+                      <dl className="mt-2 space-y-1">
+                        <div className="flex justify-between gap-3">
+                          <dt>Task</dt>
+                          <dd className="font-mono text-[11px] text-rose-800">{lastError.taskId ?? '—'}</dd>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <dt>Command</dt>
+                          <dd className="truncate text-rose-800" title={lastError.command ?? ''}>
+                            {lastError.command ?? '—'}
+                          </dd>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <dt>Exit code</dt>
+                          <dd>{lastError.exitCode ?? '—'}</dd>
+                        </div>
+                      </dl>
+                      <p className="mt-2 text-[11px]">{lastError.message ?? '—'}</p>
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </section>
 
@@ -490,17 +650,44 @@ export default function Setup() {
                   return (
                     <div key={task.id} className={`rounded-2xl border px-4 py-3 ${statusClass}`}>
                       <div className="flex items-center justify-between text-sm font-semibold">
-                        <span>{task.label}</span>
+                        <span>{task.label ?? task.id}</span>
                         <span className="capitalize">{status}</span>
                       </div>
-                      {task.logs?.length ? (
-                        <details className="mt-3 rounded-xl bg-white/70 p-3 text-xs text-slate-600">
-                          <summary className="cursor-pointer font-medium text-slate-700">View logs</summary>
-                          <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-slate-600">
-                            {task.logs.join('\n')}
-                          </pre>
-                        </details>
+                      {task.error ? (
+                        <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+                          <p className="font-semibold">Error</p>
+                          <p className="mt-1">{task.error.message ?? 'Task failed'}</p>
+                          <dl className="mt-2 space-y-1">
+                            <div className="flex justify-between gap-3">
+                              <dt>Command</dt>
+                              <dd className="truncate text-rose-800" title={task.error.command ?? ''}>
+                                {task.error.command ?? '—'}
+                              </dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt>Exit code</dt>
+                              <dd>{task.error.exitCode ?? '—'}</dd>
+                            </div>
+                          </dl>
+                        </div>
                       ) : null}
+                      <details className="mt-3 rounded-xl bg-white/70 p-3 text-xs text-slate-600">
+                        <summary className="cursor-pointer font-medium text-slate-700">View logs</summary>
+                        <div className="mt-2 space-y-2">
+                          {task.logs?.length ? (
+                            task.logs.map((entry, index) => (
+                              <pre
+                                key={`${task.id}-log-${index}`}
+                                className="overflow-x-auto rounded-lg bg-slate-900/80 p-3 font-mono text-[11px] text-slate-100"
+                              >
+                                {entry}
+                              </pre>
+                            ))
+                          ) : (
+                            <p className="rounded-lg bg-slate-100 px-3 py-2 text-slate-500">No log output yet.</p>
+                          )}
+                        </div>
+                      </details>
                     </div>
                   );
                 })}
