@@ -362,14 +362,33 @@ function normaliseBlog(blog) {
   };
 }
 
-function normaliseProgressCards(courses, goals) {
+function normaliseProgressCards(courses, goals, promotions) {
+  const toKey = (...values) => {
+    for (const value of values) {
+      if (value !== undefined && value !== null) {
+        return String(value);
+      }
+    }
+    return null;
+  };
+
   const goalMap = new Map();
   if (Array.isArray(goals)) {
     goals.forEach((goal) => {
       if (!goal) return;
-      const key = goal.courseId ?? goal.id ?? goal.slug ?? null;
+      const key = toKey(goal.courseId, goal.id, goal.slug, goal.courseSlug);
       if (!key) return;
       goalMap.set(key, goal);
+    });
+  }
+
+  const promotionMap = new Map();
+  if (Array.isArray(promotions)) {
+    promotions.forEach((promotion) => {
+      if (!promotion) return;
+      const key = toKey(promotion.courseId, promotion.id, promotion.slug, promotion.courseSlug);
+      if (!key) return;
+      promotionMap.set(key, promotion);
     });
   }
 
@@ -378,22 +397,56 @@ function normaliseProgressCards(courses, goals) {
   }
 
   return courses.slice(0, 3).map((course, index) => {
-    const goal = goalMap.get(course.courseId ?? course.id) ?? null;
-    const progressPercent = Number.isFinite(Number(goal?.progressPercent ?? course.progress))
-      ? Number(goal?.progressPercent ?? course.progress)
+    const courseKey = toKey(course.courseId, course.id, index);
+    const goal = goalMap.get(courseKey) ?? goalMap.get(toKey(course.id, course.courseId)) ?? course.goal ?? null;
+
+    const rawProgress = goal?.progressPercent ?? course.progressPercent ?? course.progress;
+    const progressPercent = Number.isFinite(Number(rawProgress))
+      ? Math.max(0, Math.min(100, Number(rawProgress)))
       : 0;
     const dueLabel = goal?.dueLabel
       ? goal.dueLabel
       : goal?.dueDate
         ? new Date(goal.dueDate).toLocaleDateString()
-        : null;
+        : goal?.metadata?.dueLabel ?? null;
     const nextStep = goal?.nextStep ?? goal?.upNext ?? course?.nextLesson ?? null;
+    const goalPriority = Number.isFinite(Number(goal?.priority)) ? Number(goal.priority) : null;
+
+    const promotion =
+      promotionMap.get(courseKey) ??
+      promotionMap.get(toKey(course.id, course.courseId)) ??
+      course.revenueOpportunity ??
+      null;
+
+    const actionLabel =
+      promotion?.actionLabel ?? promotion?.action?.label ?? promotion?.cta?.label ?? promotion?.ctaLabel ?? null;
+    const actionHref =
+      sanitiseActionLink(
+        promotion?.actionHref ?? promotion?.action?.href ?? promotion?.cta?.href ?? promotion?.ctaHref ?? null
+      ) ?? null;
+
+    const revenue = promotion
+      ? {
+          headline:
+            promotion.headline ?? promotion.title ?? promotion.kicker ?? 'Unlock new learning rewards',
+          caption: promotion.body ?? promotion.description ?? promotion.caption ?? null,
+          action: actionLabel && actionHref ? { label: actionLabel, href: actionHref } : null
+        }
+      : null;
+
+    const meta = course.lastTouchedLabel
+      ? { lastUpdatedLabel: course.lastTouchedLabel }
+      : course.lastTouchedAt
+        ? { lastUpdatedLabel: new Date(course.lastTouchedAt).toLocaleDateString() }
+        : goal?.metadata?.updatedLabel
+          ? { lastUpdatedLabel: goal.metadata.updatedLabel }
+          : null;
 
     return {
-      id: course.id ?? course.courseId ?? `course-${index}`,
+      id: courseKey ?? `course-${index}`,
       title: course.title ?? 'Course',
-      status: course.status ?? 'Active',
-      instructor: course.instructor ?? null,
+      status: goal?.statusLabel ?? goal?.status ?? course.goalStatus ?? course.status ?? 'Active program',
+      instructor: course.instructor ?? course.instructorName ?? null,
       progressPercent,
       nextLessonLabel: nextStep,
       goal: goal
@@ -408,19 +461,23 @@ function normaliseProgressCards(courses, goals) {
         : null,
       primaryAction: {
         label: 'Resume course',
-        href: `/dashboard/courses?courseId=${encodeURIComponent(course.courseId ?? course.id ?? '')}`
+        href: `/dashboard/courses?courseId=${encodeURIComponent(course.courseId ?? course.id ?? courseKey ?? '')}`
       },
       secondaryAction: nextStep
         ? {
             label: 'View modules',
-            href: `/dashboard/courses?courseId=${encodeURIComponent(course.courseId ?? course.id ?? '')}#modules`
+            href: `/dashboard/courses?courseId=${encodeURIComponent(
+              course.courseId ?? course.id ?? courseKey ?? ''
+            )}#modules`
           }
         : null,
       highlight:
-        goal?.priority === 1 ||
-        (typeof goal?.status === 'string' && goal.status.toLowerCase().includes('focus')),
-      revenue: course.revenueOpportunity ?? null,
-      meta: course.lastTouchedLabel ? { lastUpdatedLabel: course.lastTouchedLabel } : null
+        goalPriority === 1 ||
+        (Array.isArray(goal?.tags) && goal.tags.includes('primary')) ||
+        promotion?.highlight === true ||
+        progressPercent >= 80,
+      revenue,
+      meta
     };
   });
 }
@@ -541,8 +598,13 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   const accessControl = useMemo(() => createSectionAccessControl(dashboard), [dashboard]);
 
   const progressCards = useMemo(
-    () => normaliseProgressCards(dashboard?.courses?.active, dashboard?.courses?.goals),
-    [dashboard?.courses?.active, dashboard?.courses?.goals]
+    () =>
+      normaliseProgressCards(
+        dashboard?.courses?.active,
+        dashboard?.courses?.goals,
+        dashboard?.courses?.promotions
+      ),
+    [dashboard?.courses?.active, dashboard?.courses?.goals, dashboard?.courses?.promotions]
   );
   const metrics = useMemo(() => normaliseMetrics(metricsSource), [metricsSource]);
   const learningPace = useMemo(

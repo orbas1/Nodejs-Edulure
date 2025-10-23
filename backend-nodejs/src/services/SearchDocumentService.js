@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import logger from '../config/logger.js';
+import ExplorerSearchDailyMetricModel from '../models/ExplorerSearchDailyMetricModel.js';
 
 const ENTITY_PRIORITY = {
   courses: 'high',
@@ -475,6 +476,23 @@ export class SearchDocumentService {
           runAt
         }
       );
+
+      try {
+        await ExplorerSearchDailyMetricModel.recordRefreshSummary(
+          {
+            metricDate: runAt,
+            entityType: type,
+            refreshedAt: runAt,
+            documentCount: normalisedDocuments.length
+          },
+          connection
+        );
+      } catch (error) {
+        this.logger?.warn?.(
+          { err: error, entityType: type },
+          'Failed to record explorer search refresh summary metadata'
+        );
+      }
 
       processed += normalisedDocuments.length;
     }

@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  createSavedSearch,
-  deleteSavedSearch,
-  listSavedSearches,
-  searchExplorer,
-  updateSavedSearch
-} from '../api/explorerApi.js';
+import { createSavedSearch, deleteSavedSearch, listSavedSearches, updateSavedSearch } from '../api/explorerApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useSearchProvider } from './useSearchProvider.js';
 
 function sanitiseFilters(filters = {}) {
   return Object.entries(filters).reduce((acc, [key, value]) => {
@@ -44,6 +39,7 @@ export function useExplorerEntitySearch({
 }) {
   const { isAuthenticated, session } = useAuth();
   const token = session?.tokens?.accessToken;
+  const { performSearch } = useSearchProvider({ entityTypes: entityType ? [entityType] : [], defaultPerPage: pageSize });
 
   const [query, setQuery] = useState(initialQuery);
   const [filters, setFilters] = useState(initialFilters);
@@ -55,6 +51,7 @@ export function useExplorerEntitySearch({
   const [appending, setAppending] = useState(false);
   const [error, setError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [refreshSummary, setRefreshSummary] = useState({});
 
   const [savedSearches, setSavedSearches] = useState([]);
   const [savedSearchError, setSavedSearchError] = useState(null);
@@ -88,16 +85,14 @@ export function useExplorerEntitySearch({
           page: targetPage,
           perPage: pageSize
         };
-        const response = await searchExplorer(payload, { token, signal: controller.signal });
-        if (!response?.success) {
-          throw new Error(response?.message ?? 'Search failed');
-        }
-        const entityResult = response.data?.results?.[entityType];
+        const data = await performSearch(payload, { signal: controller.signal });
+        const entityResult = data?.results?.[entityType];
         const hits = entityResult?.hits ?? [];
         setResults((prev) => (append ? [...prev, ...hits] : hits));
-        const totalResults = response.data?.totals?.[entityType] ?? 0;
+        const totalResults = data?.totals?.[entityType] ?? 0;
         setTotal(totalResults);
-        setAnalytics(response.data?.analytics ?? null);
+        setAnalytics(data?.analytics ?? null);
+        setRefreshSummary(data?.refreshSummary ?? {});
         setPage(targetPage);
       } catch (err) {
         if (err.name === 'CanceledError' || err.name === 'AbortError') {
@@ -105,17 +100,19 @@ export function useExplorerEntitySearch({
         }
         setError(err.message ?? 'Unable to fetch explorer results');
         setAnalytics(null);
+        setRefreshSummary({});
       } finally {
         setLoading(false);
         setAppending(false);
       }
     },
-    [cleanedFilters, entityType, pageSize, query, sort, token]
+    [cleanedFilters, entityType, pageSize, performSearch, query, sort, token]
   );
 
   useEffect(() => {
     setPage(1);
     setResults([]);
+    setRefreshSummary({});
     executeSearch({ page: 1 });
     return () => {
       if (abortRef.current) {
@@ -290,6 +287,7 @@ export function useExplorerEntitySearch({
     appending,
     error,
     analytics,
+    refreshSummary,
     refresh: () => executeSearch({ page: 1 }),
     savedSearches,
     savedSearchError,

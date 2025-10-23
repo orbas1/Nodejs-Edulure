@@ -21,6 +21,26 @@ function parseMetadata(value) {
   return typeof value === 'object' && value !== null ? value : {};
 }
 
+function toTimestamp(value, { label = 'timestamp' } = {}) {
+  if (!value) {
+    const fallback = new Date();
+    return Number.isNaN(fallback.valueOf()) ? new Date() : fallback;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.valueOf())) {
+    throw new TypeError(`Invalid ${label} provided to ExplorerSearchDailyMetricModel`);
+  }
+  return date;
+}
+
+function describeDeltaSeconds(refreshedAt) {
+  const reference = toTimestamp(refreshedAt, { label: 'refresh timestamp' });
+  const deltaMs = Date.now() - reference.getTime();
+  const deltaSeconds = Math.max(0, Math.round(deltaMs / 1000));
+  return { reference, deltaSeconds };
+}
+
 function normaliseBadge(badge) {
   if (!badge) {
     return null;
@@ -372,6 +392,76 @@ export default class ExplorerSearchDailyMetricModel {
       });
     }
     return results;
+  }
+
+  static async recordRefreshSummary(
+    { metricDate, entityType, refreshedAt = new Date(), documentCount = 0 },
+    connection = db
+  ) {
+    const date = normaliseDate(metricDate ?? refreshedAt);
+    const normalisedEntityType = normaliseEntityType(entityType);
+    const { reference, deltaSeconds } = describeDeltaSeconds(refreshedAt);
+    const refreshedIso = reference.toISOString();
+    const safeDocumentCount = toNonNegativeInteger(documentCount);
+
+    return withTransaction(connection, async (trx) => {
+      const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
+      const existing = await applyForUpdate(existingQuery).first();
+      const nowIso = new Date().toISOString();
+
+      if (!existing) {
+        const metadata = {
+          refreshSummary: {
+            refreshedAt: refreshedIso,
+            deltaSeconds,
+            documentCount: safeDocumentCount,
+            deltaCount: safeDocumentCount,
+            updatedAt: nowIso
+          }
+        };
+
+        const payload = {
+          metric_date: date,
+          entity_type: normalisedEntityType,
+          searches: 0,
+          zero_results: 0,
+          displayed_results: 0,
+          total_results: 0,
+          clicks: 0,
+          conversions: 0,
+          average_latency_ms: 0,
+          metadata: JSON.stringify(metadata)
+        };
+
+        const [id] = await trx(TABLE).insert(payload);
+        const row = await trx(TABLE).where({ id }).first();
+        return toDomain(row);
+      }
+
+      const metadata = parseMetadata(existing.metadata);
+      const previousSummary = metadata.refreshSummary ?? {};
+      const previousCount = Number(previousSummary.documentCount ?? 0);
+      const deltaCount = safeDocumentCount - (Number.isFinite(previousCount) ? previousCount : 0);
+
+      metadata.refreshSummary = {
+        ...previousSummary,
+        refreshedAt: refreshedIso,
+        deltaSeconds,
+        documentCount: safeDocumentCount,
+        deltaCount,
+        updatedAt: nowIso
+      };
+
+      await trx(TABLE)
+        .where({ id: existing.id })
+        .update({
+          metadata: JSON.stringify(metadata),
+          updated_at: trx.fn.now()
+        });
+
+      const row = await trx(TABLE).where({ id: existing.id }).first();
+      return toDomain(row);
+    });
   }
 
   static async appendPreviewDigests(
