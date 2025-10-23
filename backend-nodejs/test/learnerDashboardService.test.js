@@ -79,6 +79,18 @@ const mocks = vi.hoisted(() => ({
   fieldServiceProviderModel: {
     listByIds: vi.fn()
   },
+  supportRepository: {
+    listCases: vi.fn(),
+    findCase: vi.fn(),
+    createCase: vi.fn(),
+    updateCase: vi.fn(),
+    addMessage: vi.fn(),
+    closeCase: vi.fn()
+  },
+  supportKnowledgeBaseService: {
+    buildSuggestionsForTicket: vi.fn(),
+    searchArticles: vi.fn()
+  },
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -159,6 +171,14 @@ vi.mock('../src/config/logger.js', () => ({
   default: { child: () => mocks.logger }
 }));
 
+vi.mock('../src/repositories/LearnerSupportRepository.js', () => ({
+  default: mocks.supportRepository
+}));
+
+vi.mock('../src/services/SupportKnowledgeBaseService.js', () => ({
+  default: mocks.supportKnowledgeBaseService
+}));
+
 vi.mock('../src/config/database.js', () => ({
   default: {
     transaction: (handler) => mocks.db.transaction(handler)
@@ -188,6 +208,8 @@ const {
   fieldServiceOrderModel,
   fieldServiceEventModel,
   fieldServiceProviderModel,
+  supportRepository,
+  supportKnowledgeBaseService,
   db,
   fieldServiceWorkspaceBuilder
 } = mocks;
@@ -453,6 +475,14 @@ describe('LearnerDashboardService', () => {
     fieldServiceEventModel.create.mockResolvedValue({ id: 'evt-1' });
     fieldServiceEventModel.listByOrderIds.mockResolvedValue([]);
     fieldServiceProviderModel.listByIds.mockResolvedValue([]);
+    supportRepository.listCases.mockResolvedValue([]);
+    supportRepository.findCase.mockResolvedValue(null);
+    supportRepository.createCase.mockResolvedValue(null);
+    supportRepository.updateCase.mockResolvedValue(null);
+    supportRepository.addMessage.mockResolvedValue(null);
+    supportRepository.closeCase.mockResolvedValue(null);
+    supportKnowledgeBaseService.buildSuggestionsForTicket.mockResolvedValue([]);
+    supportKnowledgeBaseService.searchArticles.mockResolvedValue([]);
     fieldServiceWorkspaceBuilder.mockReturnValue({
       customer: { assignments: [{ id: 'order-1', serviceType: 'lab setup', status: 'dispatched' }] }
     });
@@ -792,5 +822,180 @@ describe('LearnerDashboardService', () => {
       expect.arrayContaining(['community-building'])
     );
     expect(acknowledgement.meta.preference.preferences.adPersonalisation).toBe(true);
+  });
+
+  it('lists support tickets and hydrates missing knowledge suggestions', async () => {
+    const existingTicket = {
+      id: 'case-1',
+      subject: 'Live classroom frozen',
+      category: 'Live classroom',
+      priority: 'high',
+      status: 'waiting',
+      knowledgeSuggestions: [
+        { id: 'kb-1', title: 'Reset classrooms', url: '#', minutes: 5 }
+      ],
+      messages: [
+        { id: 'msg-1', author: 'learner', body: 'Learners cannot join.' }
+      ]
+    };
+    const ticketNeedingSuggestions = {
+      id: 'case-2',
+      subject: 'Billing decline',
+      category: 'Billing',
+      priority: 'normal',
+      status: 'open',
+      knowledgeSuggestions: [],
+      messages: [
+        { id: 'msg-2', author: 'support', body: 'Following up' },
+        { id: 'msg-3', author: 'learner', body: 'Card keeps failing' }
+      ]
+    };
+    supportRepository.listCases.mockResolvedValue([existingTicket, ticketNeedingSuggestions]);
+    supportKnowledgeBaseService.buildSuggestionsForTicket.mockResolvedValueOnce([
+      {
+        id: 'billing-retry',
+        title: 'Retry billing payments',
+        excerpt: 'Steps to resolve',
+        url: 'https://support.edulure.test/billing-retry',
+        minutes: 4
+      }
+    ]);
+
+    const tickets = await LearnerDashboardService.listSupportTickets(42);
+
+    expect(supportRepository.listCases).toHaveBeenCalledWith(42);
+    expect(supportKnowledgeBaseService.buildSuggestionsForTicket).toHaveBeenCalledTimes(1);
+    expect(supportKnowledgeBaseService.buildSuggestionsForTicket).toHaveBeenLastCalledWith({
+      subject: 'Billing decline',
+      description: 'Card keeps failing',
+      category: 'Billing'
+    });
+    expect(supportRepository.updateCase).toHaveBeenCalledWith(42, 'case-2', {
+      knowledgeSuggestions: [
+        {
+          id: 'billing-retry',
+          title: 'Retry billing payments',
+          excerpt: 'Steps to resolve',
+          url: 'https://support.edulure.test/billing-retry',
+          minutes: 4
+        }
+      ]
+    });
+    expect(tickets[1].knowledgeSuggestions).toEqual([
+      expect.objectContaining({ id: 'billing-retry', title: 'Retry billing payments' })
+    ]);
+  });
+
+  it('creates support tickets with knowledge suggestions and AI summary', async () => {
+    supportKnowledgeBaseService.buildSuggestionsForTicket.mockResolvedValue([
+      { id: 'kb-setup', title: 'Reset your classroom', url: 'https://support/kb-setup', minutes: 5 }
+    ]);
+    supportRepository.createCase.mockResolvedValue({ id: 'case-9', subject: 'Live classroom frozen' });
+
+    const ticket = await LearnerDashboardService.createSupportTicket(42, {
+      subject: 'Live classroom frozen',
+      category: 'Live classroom',
+      priority: 'urgent',
+      description: 'Learners freeze at 95%.',
+      attachments: [{ id: 'att-1', name: 'logs.txt', size: 200 }]
+    });
+
+    expect(supportKnowledgeBaseService.buildSuggestionsForTicket).toHaveBeenCalledWith({
+      subject: 'Live classroom frozen',
+      description: 'Learners freeze at 95%.',
+      category: 'Live classroom'
+    });
+    expect(supportRepository.createCase).toHaveBeenCalledWith(42, {
+      subject: 'Live classroom frozen',
+      category: 'Live classroom',
+      priority: 'urgent',
+      status: 'open',
+      channel: 'Portal',
+      knowledgeSuggestions: [
+        { id: 'kb-setup', title: 'Reset your classroom', url: 'https://support/kb-setup', minutes: 5 }
+      ],
+      aiSummary: expect.stringContaining('Learner reported “Live classroom frozen”.'),
+      messages: [
+        expect.objectContaining({
+          author: 'learner',
+          body: 'Learners freeze at 95%.',
+          attachments: [{ id: 'att-1', name: 'logs.txt', size: 200 }]
+        })
+      ],
+      metadata: expect.objectContaining({ intake: expect.objectContaining({ channel: 'portal', attachments: 1 }) })
+    });
+    expect(ticket).toEqual({ id: 'case-9', subject: 'Live classroom frozen' });
+  });
+
+  it('adds learner support ticket messages and refreshes suggestions', async () => {
+    supportRepository.addMessage.mockResolvedValue({ id: 'msg-4', body: 'Adding more details', author: 'learner' });
+    supportRepository.findCase.mockResolvedValue({
+      id: 'case-5',
+      subject: 'Billing issue',
+      category: 'Billing',
+      messages: [
+        { id: 'm-1', author: 'learner', body: 'Initial description' },
+        { id: 'm-2', author: 'learner', body: 'Adding more details' }
+      ]
+    });
+    supportKnowledgeBaseService.buildSuggestionsForTicket.mockResolvedValue([
+      { id: 'kb-billing', title: 'Resolve billing', url: '#', minutes: 3 }
+    ]);
+
+    const message = await LearnerDashboardService.addSupportTicketMessage(42, 'case-5', {
+      author: 'learner',
+      body: 'Adding more details'
+    });
+
+    expect(supportRepository.addMessage).toHaveBeenCalledWith(42, 'case-5', {
+      author: 'learner',
+      body: 'Adding more details',
+      attachments: [],
+      createdAt: expect.any(String)
+    });
+    expect(supportRepository.findCase).toHaveBeenCalledWith(42, 'case-5');
+    expect(supportKnowledgeBaseService.buildSuggestionsForTicket).toHaveBeenCalledWith({
+      subject: 'Billing issue',
+      description: 'Initial description Adding more details',
+      category: 'Billing'
+    });
+    expect(supportRepository.updateCase).toHaveBeenCalledWith(42, 'case-5', {
+      knowledgeSuggestions: [{ id: 'kb-billing', title: 'Resolve billing', url: '#', minutes: 3 }]
+    });
+    expect(message).toEqual({ id: 'msg-4', body: 'Adding more details', author: 'learner' });
+  });
+
+  it('closes support tickets and proxies to repository', async () => {
+    supportRepository.closeCase.mockResolvedValue({ id: 'case-7', status: 'closed' });
+
+    const ticket = await LearnerDashboardService.closeSupportTicket(42, 'case-7', {
+      resolutionNote: 'Issue resolved',
+      satisfaction: 5
+    });
+
+    expect(supportRepository.closeCase).toHaveBeenCalledWith(42, 'case-7', {
+      resolutionNote: 'Issue resolved',
+      satisfaction: 5
+    });
+    expect(ticket).toEqual({ id: 'case-7', status: 'closed' });
+  });
+
+  it('searches the support knowledge base through the dedicated service', async () => {
+    supportKnowledgeBaseService.searchArticles.mockResolvedValue([
+      { id: 'kb-1', title: 'Reset classrooms' }
+    ]);
+
+    const articles = await LearnerDashboardService.searchSupportKnowledgeBase(42, {
+      query: 'Live classroom',
+      category: 'Live classroom',
+      limit: 3
+    });
+
+    expect(supportKnowledgeBaseService.searchArticles).toHaveBeenCalledWith({
+      query: 'Live classroom',
+      category: 'Live classroom',
+      limit: 3
+    });
+    expect(articles).toEqual([{ id: 'kb-1', title: 'Reset classrooms' }]);
   });
 });

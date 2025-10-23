@@ -120,6 +120,9 @@ export async function seed(knex) {
     await trx('community_post_moderation_cases').del();
     await trx('scam_reports').del();
     await trx('moderation_analytics_events').del();
+    await trx('learner_support_messages').del();
+    await trx('learner_support_cases').del();
+    await trx('support_articles').del();
     await trx('community_message_reactions').del();
     await trx('community_channel_members').del();
     await trx('community_messages').del();
@@ -4077,6 +4080,173 @@ export async function seed(knex) {
     ];
 
     await trx('security_incidents').insert(securityIncidents);
+
+    await trx('support_articles').insert([
+      {
+        slug: 'live-classroom-reset',
+        title: 'Stabilise a live classroom session',
+        summary: 'Step-by-step recovery to restore frozen live classroom rooms and re-sync media.',
+        category: 'Live classroom',
+        keywords: JSON.stringify(['live classroom', 'troubleshooting', 'reset']),
+        url: 'https://support.edulure.test/articles/live-classroom-reset',
+        minutes: 5,
+        helpfulness_score: 9.6
+      },
+      {
+        slug: 'billing-reconcile-declines',
+        title: 'Resolve recurring billing declines',
+        summary: 'Checklist for reconciling recurring payment failures and communicating with learners.',
+        category: 'Billing & payments',
+        keywords: JSON.stringify(['billing', 'payments', 'declines']),
+        url: 'https://support.edulure.test/articles/billing-reconcile-declines',
+        minutes: 4,
+        helpfulness_score: 8.8
+      },
+      {
+        slug: 'course-content-refresh',
+        title: 'Refresh stale course content for learners',
+        summary: 'Guidance to regenerate course caches and notify enrolled learners when modules change.',
+        category: 'Course access',
+        keywords: JSON.stringify(['course', 'cache', 'refresh']),
+        url: 'https://support.edulure.test/articles/course-content-refresh',
+        minutes: 6,
+        helpfulness_score: 8.1
+      }
+    ]);
+
+    const supportCaseAlphaCreatedAt = new Date('2025-02-01T08:30:00Z');
+    const supportCaseAlphaUpdatedAt = new Date('2025-02-01T09:10:00Z');
+    const [supportCaseAlphaInsert] = await trx('learner_support_cases').insert(
+      {
+        user_id: learnerId,
+        reference: 'SUP-1001',
+        subject: 'Live classroom session frozen at 95%',
+        category: 'Live classroom',
+        priority: 'high',
+        status: 'waiting',
+        channel: 'Portal',
+        owner: 'Mira Patel',
+        last_agent: 'Mira Patel',
+        escalation_breadcrumbs: JSON.stringify([
+          {
+            id: 'crumb-created',
+            actor: 'learner',
+            label: 'Ticket created',
+            at: supportCaseAlphaCreatedAt.toISOString()
+          },
+          {
+            id: 'crumb-escalated',
+            actor: 'support',
+            label: 'Escalated to live ops',
+            note: 'Shift handed to live operations to recover frozen breakout rooms.',
+            at: '2025-02-01T08:42:00Z'
+          }
+        ]),
+        knowledge_suggestions: JSON.stringify([
+          {
+            id: 'live-classroom-reset',
+            title: 'Stabilise a live classroom session',
+            excerpt: 'Reset real-time channels and reissue instructor invites to unstick sessions at 95%.',
+            url: 'https://support.edulure.test/articles/live-classroom-reset',
+            category: 'Live classroom',
+            minutes: 5
+          }
+        ]),
+        ai_summary: 'Learner reported “Live classroom session frozen at 95%”. Priority: High.',
+        follow_up_due_at: new Date('2025-02-01T12:30:00Z'),
+        ai_summary_generated_at: new Date('2025-02-01T08:35:00Z'),
+        metadata: JSON.stringify({
+          intake: { channel: 'portal', attachments: 1 },
+          firstResponseMinutes: 28
+        }),
+        created_at: supportCaseAlphaCreatedAt,
+        updated_at: supportCaseAlphaUpdatedAt
+      },
+      ['id']
+    );
+    const supportCaseAlphaId =
+      typeof supportCaseAlphaInsert === 'object' ? supportCaseAlphaInsert.id : supportCaseAlphaInsert;
+
+    await trx('learner_support_messages').insert([
+      {
+        case_id: supportCaseAlphaId,
+        author: 'learner',
+        body: 'Learners report the live classroom stalls at 95% while joining. Restarted twice with same result.',
+        attachments: JSON.stringify([
+          { id: 'att-live-1', name: 'classroom-log.csv', size: 2048, url: null, type: 'text/csv' }
+        ]),
+        created_at: supportCaseAlphaCreatedAt
+      },
+      {
+        case_id: supportCaseAlphaId,
+        author: 'support',
+        body: 'Reset realtime layer, escalated to operations for proactive monitoring.',
+        attachments: JSON.stringify([]),
+        created_at: new Date('2025-02-01T08:45:00Z')
+      }
+    ]);
+
+    const supportCaseBetaCreatedAt = new Date('2025-02-04T14:10:00Z');
+    const [supportCaseBetaInsert] = await trx('learner_support_cases').insert(
+      {
+        user_id: learnerId,
+        reference: 'SUP-1002',
+        subject: 'Recurring billing decline on premium plan',
+        category: 'Billing & payments',
+        priority: 'normal',
+        status: 'open',
+        channel: 'Portal',
+        owner: 'Mira Patel',
+        last_agent: 'Jordan Lee',
+        escalation_breadcrumbs: JSON.stringify([
+          {
+            id: 'crumb-1002-created',
+            actor: 'learner',
+            label: 'Ticket created',
+            at: supportCaseBetaCreatedAt.toISOString()
+          }
+        ]),
+        knowledge_suggestions: JSON.stringify([
+          {
+            id: 'billing-reconcile-declines',
+            title: 'Resolve recurring billing declines',
+            excerpt: 'Run the retry playbook and notify learners when payment profiles need an update.',
+            url: 'https://support.edulure.test/articles/billing-reconcile-declines',
+            category: 'Billing & payments',
+            minutes: 4
+          },
+          {
+            id: 'course-content-refresh',
+            title: 'Refresh stale course content for learners',
+            excerpt: 'Rebuild cached modules after billing reinstatement to avoid access mismatch.',
+            url: 'https://support.edulure.test/articles/course-content-refresh',
+            category: 'Course access',
+            minutes: 6
+          }
+        ]),
+        ai_summary: 'Learner reported “Recurring billing decline on premium plan”. Priority: Normal.',
+        follow_up_due_at: new Date('2025-02-05T14:10:00Z'),
+        ai_summary_generated_at: new Date('2025-02-04T14:15:00Z'),
+        metadata: JSON.stringify({
+          intake: { channel: 'portal', attachments: 0 },
+          renewalAmountCents: 12900
+        }),
+        created_at: supportCaseBetaCreatedAt,
+        updated_at: supportCaseBetaCreatedAt
+      },
+      ['id']
+    );
+    const supportCaseBetaId = typeof supportCaseBetaInsert === 'object' ? supportCaseBetaInsert.id : supportCaseBetaInsert;
+
+    await trx('learner_support_messages').insert([
+      {
+        case_id: supportCaseBetaId,
+        author: 'learner',
+        body: 'Card declined twice on renewal. Bank confirmed funds are available.',
+        attachments: JSON.stringify([]),
+        created_at: supportCaseBetaCreatedAt
+      }
+    ]);
 
     const [
       phishingIncident,

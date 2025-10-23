@@ -1,148 +1,13 @@
-import crypto from 'crypto';
-
 import db from '../config/database.js';
+import SupportTicketModel, { __testables as modelTestables } from '../models/SupportTicketModel.js';
 
-function toIso(value) {
-  if (!value) {
-    return null;
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function safeParseJsonColumn(value, fallback) {
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-
-  if (typeof value === 'object') {
-    if (Array.isArray(fallback) && Array.isArray(value)) {
-      return value;
-    }
-    if (!Array.isArray(fallback) && !Array.isArray(value)) {
-      return value;
-    }
-  }
-
-  if (typeof value !== 'string') {
-    return fallback;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return fallback;
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(fallback) && !Array.isArray(parsed)) {
-      return fallback;
-    }
-    if (!Array.isArray(fallback) && typeof parsed !== 'object') {
-      return fallback;
-    }
-    return parsed ?? fallback;
-  } catch (_error) {
-    return fallback;
-  }
-}
-
-function normaliseAttachmentInput(payload) {
-  if (!payload) {
-    return [];
-  }
-  if (Array.isArray(payload)) {
-    return payload.map((item) => ({
-      id: item.id ?? crypto.randomUUID(),
-      name: item.name ?? item.filename ?? 'Attachment',
-      size: (() => {
-        const raw = item.size ?? item.bytes;
-        if (raw === null || raw === undefined || raw === '') {
-          return null;
-        }
-        const numeric = Number(raw);
-        return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
-      })(),
-      url: item.url ?? item.href ?? null,
-      type: item.type ?? item.mimeType ?? null
-    }));
-  }
-  return [];
-}
-
-function serialiseAttachments(payload) {
-  const attachments = normaliseAttachmentInput(payload);
-  if (!attachments.length) {
-    return JSON.stringify([]);
-  }
-  return JSON.stringify(attachments);
-}
-
-function serialiseMetadata(value) {
-  if (value === undefined || value === null) {
-    return null;
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-    try {
-      JSON.parse(trimmed);
-      return trimmed;
-    } catch (_error) {
-      return JSON.stringify({});
-    }
-  }
-
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value);
-    } catch (_error) {
-      return JSON.stringify({});
-    }
-  }
-
-  return null;
-}
-
-function mapMessage(row) {
-  if (!row) {
-    return null;
-  }
-  return {
-    id: row.id,
-    author: row.author,
-    body: row.body,
-    attachments: normaliseAttachmentInput(safeParseJsonColumn(row.attachments, [])),
-    createdAt: toIso(row.created_at)
-  };
-}
-
-function mapCase(row, messages = []) {
-  if (!row) {
-    return null;
-  }
-  return {
-    id: row.id,
-    reference: row.reference,
-    subject: row.subject,
-    category: row.category,
-    priority: row.priority,
-    status: row.status,
-    channel: row.channel,
-    satisfaction: row.satisfaction,
-    owner: row.owner,
-    lastAgent: row.last_agent,
-    metadata: safeParseJsonColumn(row.metadata, {}),
-    createdAt: toIso(row.created_at),
-    updatedAt: toIso(row.updated_at),
-    messages: messages.map((message) => mapMessage(message)).filter(Boolean)
-  };
+function groupMessagesByCase(messages) {
+  return messages.reduce((acc, message) => {
+    const list = acc.get(message.case_id) ?? [];
+    list.push(message);
+    acc.set(message.case_id, list);
+    return acc;
+  }, new Map());
 }
 
 export default class LearnerSupportRepository {
@@ -151,167 +16,127 @@ export default class LearnerSupportRepository {
     if (!cases.length) {
       return [];
     }
+
     const caseIds = cases.map((item) => item.id);
-    const messages = await db('learner_support_messages')
-      .whereIn('case_id', caseIds)
-      .orderBy('created_at', 'asc');
-    const messagesByCase = messages.reduce((acc, message) => {
-      const list = acc.get(message.case_id) ?? [];
-      list.push(message);
-      acc.set(message.case_id, list);
-      return acc;
-    }, new Map());
-    return cases.map((supportCase) => mapCase(supportCase, messagesByCase.get(supportCase.id) ?? []));
+    const messages = await db('learner_support_messages').whereIn('case_id', caseIds).orderBy('created_at', 'asc');
+    const messagesByCase = groupMessagesByCase(messages);
+
+    return cases.map((row) => SupportTicketModel.mapCase(row, messagesByCase.get(row.id) ?? []));
   }
 
   static async findCase(userId, caseId) {
-    const record = await db('learner_support_cases')
-      .where({ user_id: userId, id: caseId })
-      .first();
+    const record = await db('learner_support_cases').where({ user_id: userId, id: caseId }).first();
     if (!record) {
       return null;
     }
-    const messages = await db('learner_support_messages')
-      .where({ case_id: caseId })
-      .orderBy('created_at', 'asc');
-    return mapCase(record, messages);
+    const messages = await db('learner_support_messages').where({ case_id: caseId }).orderBy('created_at', 'asc');
+    return SupportTicketModel.mapCase(record, messages);
   }
 
   static async createCase(userId, payload = {}) {
-    const reference = payload.reference ?? `SUP-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-    const [caseId] = await db('learner_support_cases').insert(
-      {
-        user_id: userId,
-        reference,
-        subject: payload.subject,
-        category: payload.category ?? 'General',
-        priority: payload.priority ?? 'normal',
-        status: payload.status ?? 'open',
-        channel: payload.channel ?? 'Portal',
-        owner: payload.owner ?? null,
-        last_agent: payload.lastAgent ?? payload.owner ?? null,
-        satisfaction: payload.satisfaction ?? null,
-        metadata: serialiseMetadata(payload.metadata)
-      },
-      ['id']
-    );
-    const resolvedCaseId = typeof caseId === 'object' ? caseId.id : caseId;
+    const { caseRecord, messageRecords } = SupportTicketModel.buildCreatePayload(userId, payload);
+    const [inserted] = await db('learner_support_cases').insert(caseRecord, ['id']);
+    const caseId = typeof inserted === 'object' ? inserted.id : inserted;
 
-    const messagesPayload = Array.isArray(payload.messages)
-      ? payload.messages
-      : Array.isArray(payload.initialMessages)
-        ? payload.initialMessages
-        : [];
-
-    if (messagesPayload.length) {
+    if (messageRecords.length) {
       await db('learner_support_messages').insert(
-        messagesPayload.map((message) => ({
-          case_id: resolvedCaseId,
-          author: message.author ?? 'learner',
-          body: message.body ?? '',
-          attachments: serialiseAttachments(message.attachments ?? message.files),
-          created_at: toIso(message.createdAt ?? message.sentAt ?? new Date())
-        }))
+        messageRecords.map((message) => SupportTicketModel.prepareMessageInsert(caseId, message))
       );
     }
 
-    return this.findCase(userId, resolvedCaseId);
+    return this.findCase(userId, caseId);
   }
 
   static async updateCase(userId, caseId, updates = {}) {
-    const payload = {};
-    if (updates.subject) {
-      payload.subject = updates.subject;
-    }
-    if (updates.category) {
-      payload.category = updates.category;
-    }
-    if (updates.priority) {
-      payload.priority = updates.priority;
-    }
-    if (updates.status) {
-      payload.status = updates.status;
-    }
-    if (updates.owner !== undefined) {
-      payload.owner = updates.owner;
-    }
-    if (updates.lastAgent !== undefined) {
-      payload.last_agent = updates.lastAgent;
-    }
-    if (updates.satisfaction !== undefined) {
-      payload.satisfaction = updates.satisfaction;
-    }
-    if (updates.metadata !== undefined) {
-      payload.metadata = serialiseMetadata(updates.metadata);
-    }
+    const payload = SupportTicketModel.buildUpdatePayload(updates);
     if (Object.keys(payload).length === 0) {
       return this.findCase(userId, caseId);
     }
-    await db('learner_support_cases').where({ user_id: userId, id: caseId }).update({ ...payload, updated_at: db.fn.now() });
+    await db('learner_support_cases').where({ user_id: userId, id: caseId }).update(payload);
     return this.findCase(userId, caseId);
   }
 
   static async addMessage(userId, caseId, message = {}) {
-    const target = await db('learner_support_cases')
-      .where({ user_id: userId, id: caseId })
-      .first();
+    const target = await db('learner_support_cases').where({ user_id: userId, id: caseId }).first();
     if (!target) {
       return null;
     }
+
     const [inserted] = await db('learner_support_messages').insert(
-      {
-        case_id: caseId,
-        author: message.author ?? 'learner',
-        body: message.body ?? '',
-        attachments: serialiseAttachments(message.attachments ?? message.files),
-        created_at: toIso(message.createdAt ?? new Date())
-      },
+      SupportTicketModel.prepareMessageInsert(caseId, message),
       ['id']
     );
     const messageId = typeof inserted === 'object' ? inserted.id : inserted;
-    await db('learner_support_cases').where({ id: caseId }).update({ updated_at: db.fn.now(), last_agent: message.author });
+
+    const newBreadcrumbs = SupportTicketModel.appendBreadcrumb(target.escalation_breadcrumbs, {
+      actor: message.author ?? 'learner',
+      label: message.author === 'learner' ? 'Learner replied' : 'Support replied',
+      note: message.body ?? null,
+      at: message.createdAt ?? new Date()
+    });
+
+    await db('learner_support_cases')
+      .where({ id: caseId })
+      .update({
+        last_agent: message.author === 'support' ? message.author : target.last_agent,
+        escalation_breadcrumbs: SupportTicketModel.serialiseJson(newBreadcrumbs),
+        follow_up_due_at:
+          message.author === 'support'
+            ? SupportTicketModel.calculateFollowUpDueAt(target.priority)
+            : target.follow_up_due_at,
+        updated_at: db.fn.now()
+      });
+
     const created = await db('learner_support_messages').where({ id: messageId }).first();
-    return mapMessage(created);
+    return SupportTicketModel.mapMessage(created);
   }
 
   static async closeCase(userId, caseId, { resolutionNote, satisfaction } = {}) {
-    const existing = await db('learner_support_cases')
-      .where({ user_id: userId, id: caseId })
-      .first();
+    const existing = await db('learner_support_cases').where({ user_id: userId, id: caseId }).first();
     if (!existing) {
       return null;
     }
-    const existingMetadata = safeParseJsonColumn(existing.metadata, {});
+
+    const breadcrumbs = SupportTicketModel.appendBreadcrumb(existing.escalation_breadcrumbs, {
+      actor: 'learner',
+      label: 'Learner closed ticket',
+      note: resolutionNote ?? null,
+      at: new Date()
+    });
+
+    const existingMetadata = SupportTicketModel.parseJson(existing.metadata, {});
     const updatedMetadata = {
       ...existingMetadata,
       resolutionNote: resolutionNote ?? existingMetadata.resolutionNote ?? null
     };
+
     await db('learner_support_cases')
       .where({ id: caseId })
       .update({
         status: 'closed',
         satisfaction: satisfaction ?? existing.satisfaction,
-        metadata: serialiseMetadata(updatedMetadata),
+        metadata: SupportTicketModel.serialiseMetadata(updatedMetadata),
+        escalation_breadcrumbs: SupportTicketModel.serialiseJson(breadcrumbs),
+        follow_up_due_at: null,
         updated_at: db.fn.now()
       });
+
     if (resolutionNote) {
-      await db('learner_support_messages').insert({
-        case_id: caseId,
-        author: 'support',
-        body: resolutionNote,
-        attachments: JSON.stringify([]),
-        created_at: db.fn.now()
-      });
+      await db('learner_support_messages').insert(
+        SupportTicketModel.prepareMessageInsert(caseId, {
+          author: 'learner',
+          body: resolutionNote,
+          attachments: [],
+          createdAt: new Date()
+        })
+      );
     }
+
     return this.findCase(userId, caseId);
   }
 }
 
 export const __testables = {
-  safeParseJsonColumn,
-  normaliseAttachmentInput,
-  serialiseAttachments,
-  serialiseMetadata,
-  mapMessage,
-  mapCase
+  ...modelTestables,
+  groupMessagesByCase
 };

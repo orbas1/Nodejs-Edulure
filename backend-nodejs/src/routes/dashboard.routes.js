@@ -125,6 +125,7 @@ router.post(
   auth(),
   LearnerDashboardController.closeFieldServiceAssignment
 );
+router.get('/learner/support/knowledge-base', auth(), LearnerDashboardController.searchSupportKnowledgeBase);
 router.get('/learner/support/tickets', auth(), LearnerDashboardController.listSupportTickets);
 router.post('/learner/support/tickets', auth(), LearnerDashboardController.createSupportTicket);
 router.put('/learner/support/tickets/:ticketId', auth(), LearnerDashboardController.updateSupportTicket);

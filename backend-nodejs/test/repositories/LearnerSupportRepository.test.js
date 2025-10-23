@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { __testables } from '../../src/repositories/LearnerSupportRepository.js';
 
 const {
-  safeParseJsonColumn,
+  parseJson,
   normaliseAttachmentInput,
   serialiseAttachments,
   serialiseMetadata,
@@ -127,9 +127,9 @@ describe('LearnerSupportRepository helpers', () => {
   });
 
   it('safeParseJsonColumn falls back when invalid', () => {
-    expect(safeParseJsonColumn('[{"id":1}]', [])).toEqual([{ id: 1 }]);
-    expect(safeParseJsonColumn('{"ok":true}', {})).toEqual({ ok: true });
-    expect(safeParseJsonColumn('invalid', {})).toEqual({});
-    expect(safeParseJsonColumn('', [])).toEqual([]);
+    expect(parseJson('[{"id":1}]', [])).toEqual([{ id: 1 }]);
+    expect(parseJson('{"ok":true}', {})).toEqual({ ok: true });
+    expect(parseJson('invalid', {})).toEqual({});
+    expect(parseJson('', [])).toEqual([]);
   });
 });

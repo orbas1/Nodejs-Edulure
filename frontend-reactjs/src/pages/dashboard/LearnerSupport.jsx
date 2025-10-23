@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx';
 import useLearnerSupportCases from '../../hooks/useLearnerSupportCases.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
+import TicketForm from '../../components/support/TicketForm.jsx';
 
 const PRIORITY_BADGES = {
   urgent: 'bg-rose-100 text-rose-700',
@@ -303,15 +304,7 @@ export default function LearnerSupport() {
   } = useLearnerSupportCases(initialCases, { session });
 
   const [selectedCaseId, setSelectedCaseId] = useState(null);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardStep, setWizardStep] = useState(0);
-  const [wizardForm, setWizardForm] = useState({
-    subject: '',
-    category: CATEGORY_OPTIONS[0],
-    priority: 'normal',
-    description: '',
-    attachments: []
-  });
+  const [ticketFormOpen, setTicketFormOpen] = useState(false);
   const [messageBody, setMessageBody] = useState('');
   const [messageAttachments, setMessageAttachments] = useState([]);
   const [statusMessage, setStatusMessage] = useState(null);
@@ -337,102 +330,84 @@ export default function LearnerSupport() {
 
   const selectedCase = cases.find((supportCase) => supportCase.id === selectedCaseId) ?? null;
 
-  const handleWizardFieldChange = useCallback((event) => {
-    const { name, value } = event.target;
-    setWizardForm((current) => ({ ...current, [name]: value }));
-  }, []);
-
-  const handleWizardAttachment = useCallback((event) => {
-    const files = Array.from(event.target.files ?? []);
-    if (!files.length) return;
-    setWizardForm((current) => ({
-      ...current,
-      attachments: [...current.attachments, ...files.map((file) => createAttachmentMeta(file))]
-    }));
-    event.target.value = '';
-  }, []);
-
-  const handleWizardAttachmentRemove = useCallback((id) => {
-    setWizardForm((current) => ({
-      ...current,
-      attachments: current.attachments.filter((attachment) => attachment.id !== id)
-    }));
-  }, []);
-
-  const resetWizard = useCallback(() => {
-    setWizardStep(0);
-    setWizardForm({ subject: '', category: CATEGORY_OPTIONS[0], priority: 'normal', description: '', attachments: [] });
-  }, []);
-
-  const handleCreateCase = useCallback(async () => {
-    if (!wizardForm.subject.trim() || !wizardForm.description.trim()) {
-      setStatusMessage({ type: 'error', message: 'Add a subject and description to submit your request.' });
-      return;
-    }
-    setPendingAction('create');
-    const timestamp = new Date().toISOString();
-    const attachments = wizardForm.attachments.map((attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-      size: attachment.size,
-      type: attachment.type
-    }));
-    let response;
-    try {
-      if (!token) {
-        throw new Error('Sign in again to sync with the support team. Your request will be stored locally.');
+  const handleTicketSubmit = useCallback(
+    async ({ subject, category, priority, description, attachments = [], knowledgeSuggestions = [] }) => {
+      const trimmedSubject = subject?.trim();
+      const trimmedDescription = description?.trim();
+      if (!trimmedSubject || !trimmedDescription) {
+        setStatusMessage({ type: 'error', message: 'Add a subject and description to submit your request.' });
+        return;
       }
-      response = await createSupportTicketApi({
-        token,
-        payload: {
-          subject: wizardForm.subject,
-          category: wizardForm.category,
-          priority: wizardForm.priority,
-          description: wizardForm.description,
-          attachments
-        }
-      });
-      setStatusMessage({
-        type: 'success',
-        message: response?.message ?? 'Support request submitted. We will notify you via email and in-app.'
-      });
-    } catch (apiError) {
-      setStatusMessage({
-        type: 'warning',
-        message:
-          apiError instanceof Error
-            ? `${apiError.message} We saved the ticket locally and will retry when you refresh.`
-            : 'We saved the ticket locally but could not reach the support API.'
-      });
-    } finally {
-      setPendingAction(null);
-    }
 
-    const remoteTicket = response?.data?.ticket ?? response?.data ?? {};
-    const created = createCase({
-      id: remoteTicket.id ?? remoteTicket.ticketId ?? `support-${Date.now()}`,
-      reference: remoteTicket.reference ?? remoteTicket.ref ?? null,
-      subject: remoteTicket.subject ?? wizardForm.subject,
-      category: remoteTicket.category ?? wizardForm.category,
-      priority: remoteTicket.priority ?? wizardForm.priority,
-      status: remoteTicket.status ?? 'open',
-      createdAt: remoteTicket.createdAt ?? timestamp,
-      updatedAt: remoteTicket.updatedAt ?? timestamp,
-      messages: [
-        {
-          id: `msg-${timestamp}`,
-          author: 'learner',
-          body: wizardForm.description,
-          createdAt: timestamp,
-          attachments
+      setPendingAction('create');
+      const timestamp = new Date().toISOString();
+      let response;
+      try {
+        if (!token) {
+          throw new Error('Sign in again to sync with the support team. Your request will be stored locally.');
         }
-      ]
-    });
+        response = await createSupportTicketApi({
+          token,
+          payload: {
+            subject: trimmedSubject,
+            category,
+            priority,
+            description: trimmedDescription,
+            attachments,
+            knowledgeSuggestions
+          }
+        });
+        setStatusMessage({
+          type: 'success',
+          message: response?.message ?? 'Support request submitted. We will notify you via email and in-app.'
+        });
+      } catch (apiError) {
+        setStatusMessage({
+          type: 'warning',
+          message:
+            apiError instanceof Error
+              ? `${apiError.message} We saved the ticket locally and will retry when you refresh.`
+              : 'We saved the ticket locally but could not reach the support API.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
 
-    setSelectedCaseId(created?.id ?? remoteTicket.id ?? null);
-    setWizardOpen(false);
-    resetWizard();
-  }, [createCase, resetWizard, token, wizardForm]);
+      const remoteTicket = response?.data?.ticket ?? response?.data ?? {};
+      const created = createCase({
+        id: remoteTicket.id ?? remoteTicket.ticketId ?? `support-${Date.now()}`,
+        reference: remoteTicket.reference ?? remoteTicket.ref ?? null,
+        subject: remoteTicket.subject ?? trimmedSubject,
+        category: remoteTicket.category ?? category,
+        priority: remoteTicket.priority ?? priority,
+        status: remoteTicket.status ?? 'open',
+        knowledgeSuggestions:
+          remoteTicket.knowledgeSuggestions ?? remoteTicket.knowledge_suggestions ?? knowledgeSuggestions,
+        followUpDueAt: remoteTicket.followUpDueAt ?? remoteTicket.follow_up_due_at ?? null,
+        aiSummary: remoteTicket.aiSummary ?? remoteTicket.ai_summary ?? null,
+        escalationBreadcrumbs:
+          remoteTicket.escalationBreadcrumbs ?? remoteTicket.escalation_breadcrumbs ?? [],
+        createdAt: remoteTicket.createdAt ?? timestamp,
+        updatedAt: remoteTicket.updatedAt ?? timestamp,
+        messages:
+          remoteTicket.messages?.length > 0
+            ? remoteTicket.messages
+            : [
+                {
+                  id: `msg-${timestamp}`,
+                  author: 'learner',
+                  body: trimmedDescription,
+                  createdAt: timestamp,
+                  attachments
+                }
+              ]
+      });
+
+      setSelectedCaseId(created?.id ?? remoteTicket.id ?? null);
+      setTicketFormOpen(false);
+    },
+    [createCase, token]
+  );
 
   const handleMessageAttachment = useCallback((event) => {
     const files = Array.from(event.target.files ?? []);
@@ -601,147 +576,17 @@ export default function LearnerSupport() {
 
   return (
     <div className="space-y-10">
-      {wizardOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-8">
-          <div className="w-full max-w-3xl rounded-3xl bg-white p-8 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="dashboard-kicker">New request</p>
-                <h2 className="text-xl font-semibold text-slate-900">Tell us what you need</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  Capture the context for your learner success request. You can attach logs, screenshots, or module IDs.
-                </p>
-              </div>
-              <button type="button" className="dashboard-pill" onClick={() => setWizardOpen(false)}>
-                Cancel
-              </button>
-            </div>
-
-            <div className="mt-6">
-              <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <span className={`h-2 w-2 rounded-full ${wizardStep === 0 ? 'bg-primary' : 'bg-slate-300'}`} />
-                Step {wizardStep + 1} of 2
-              </div>
-
-              {wizardStep === 0 ? (
-                <div className="mt-6 grid gap-5 md:grid-cols-2">
-                  <label className="flex flex-col text-sm font-medium text-slate-700">
-                    Subject
-                    <input
-                      name="subject"
-                      value={wizardForm.subject}
-                      onChange={handleWizardFieldChange}
-                      placeholder="Summarise your request"
-                      className="dashboard-input mt-2"
-                      required
-                    />
-                  </label>
-                  <label className="flex flex-col text-sm font-medium text-slate-700">
-                    Category
-                    <select
-                      name="category"
-                      value={wizardForm.category}
-                      onChange={handleWizardFieldChange}
-                      className="dashboard-input mt-2"
-                    >
-                      {CATEGORY_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col text-sm font-medium text-slate-700">
-                    Priority
-                    <select
-                      name="priority"
-                      value={wizardForm.priority}
-                      onChange={handleWizardFieldChange}
-                      className="dashboard-input mt-2"
-                    >
-                      {PRIORITY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                    <p className="font-semibold text-slate-600">Response commitments</p>
-                    <p className="mt-2">
-                      {serviceWindow}. First response under {firstResponseMinutes} minutes on average.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-6 space-y-4">
-                  <label className="flex flex-col text-sm font-medium text-slate-700">
-                    Describe the issue
-                    <textarea
-                      name="description"
-                      rows={6}
-                      value={wizardForm.description}
-                      onChange={handleWizardFieldChange}
-                      className="dashboard-input mt-2"
-                      placeholder="Share context, learners impacted, timelines, and any troubleshooting so far."
-                    />
-                  </label>
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Attachments</p>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-primary/40 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10">
-                        <ArrowUpTrayIcon className="h-4 w-4" aria-hidden="true" /> Upload files
-                        <input type="file" multiple className="hidden" onChange={handleWizardAttachment} />
-                      </label>
-                      <span className="text-xs text-slate-400">Screenshots, CSVs, up to 10 MB each.</span>
-                    </div>
-                    <AttachmentList attachments={wizardForm.attachments} />
-                    {wizardForm.attachments.length ? (
-                      <div className="flex flex-wrap gap-2">
-                        {wizardForm.attachments.map((attachment) => (
-                          <button
-                            type="button"
-                            key={attachment.id}
-                            className="dashboard-pill text-xs"
-                            onClick={() => handleWizardAttachmentRemove(attachment.id)}
-                          >
-                            Remove {attachment.name}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-8 flex items-center justify-between">
-              <button
-                type="button"
-                className="dashboard-pill"
-                onClick={() => setWizardStep((step) => Math.max(0, step - 1))}
-                disabled={wizardStep === 0}
-              >
-                Back
-              </button>
-              {wizardStep === 0 ? (
-                <button type="button" className="dashboard-primary-pill" onClick={() => setWizardStep(1)}>
-                  Continue
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="dashboard-primary-pill"
-                  onClick={handleCreateCase}
-                  disabled={pendingAction === 'create'}
-                >
-                  {pendingAction === 'create' ? 'Submitting…' : 'Submit ticket'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <TicketForm
+        open={ticketFormOpen}
+        onClose={() => setTicketFormOpen(false)}
+        onSubmit={handleTicketSubmit}
+        serviceWindow={serviceWindow}
+        firstResponseMinutes={firstResponseMinutes}
+        categoryOptions={CATEGORY_OPTIONS}
+        priorityOptions={PRIORITY_OPTIONS}
+        defaultCategory={CATEGORY_OPTIONS[0]}
+        defaultPriority="normal"
+      />
 
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-2">
@@ -754,7 +599,7 @@ export default function LearnerSupport() {
           <button type="button" className="dashboard-pill" onClick={() => refresh?.()}>
             <ArrowPathIcon className="mr-2 h-4 w-4" aria-hidden="true" /> Sync data
           </button>
-          <button type="button" className="dashboard-primary-pill" onClick={() => setWizardOpen(true)}>
+          <button type="button" className="dashboard-primary-pill" onClick={() => setTicketFormOpen(true)}>
             <PlusIcon className="mr-2 h-4 w-4" aria-hidden="true" /> New request
           </button>
         </div>
