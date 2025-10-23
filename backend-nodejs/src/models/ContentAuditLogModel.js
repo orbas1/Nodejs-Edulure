@@ -29,4 +29,25 @@ export default class ContentAuditLogModel {
       payload: typeof row.payload === 'string' ? JSON.parse(row.payload || '{}') : row.payload
     }));
   }
+
+  static async listRecent({ limit = 25, since } = {}, connection = db) {
+    const resolvedLimit = Math.max(1, Math.min(100, Number.parseInt(limit ?? 25, 10) || 25));
+    const query = connection(TABLE)
+      .select(BASE_COLUMNS)
+      .orderBy('created_at', 'desc')
+      .limit(resolvedLimit);
+
+    if (since) {
+      const sinceDate = new Date(since);
+      if (!Number.isNaN(sinceDate.getTime())) {
+        query.where('created_at', '>=', sinceDate);
+      }
+    }
+
+    const rows = await query;
+    return rows.map((row) => ({
+      ...row,
+      payload: typeof row.payload === 'string' ? JSON.parse(row.payload || '{}') : row.payload
+    }));
+  }
 }

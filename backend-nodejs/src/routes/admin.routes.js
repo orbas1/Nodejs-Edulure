@@ -2,6 +2,7 @@ import AdminAdsController from '../controllers/AdminAdsController.js';
 import AdminBlogController from '../controllers/AdminBlogController.js';
 import AdminBookingController from '../controllers/AdminBookingController.js';
 import AdminControlController from '../controllers/AdminControlController.js';
+import AdminAuditLogController from '../controllers/AdminAuditLogController.js';
 import AdminFeatureFlagController from '../controllers/AdminFeatureFlagController.js';
 import AdminIntegrationsController from '../controllers/AdminIntegrationsController.js';
 import AdminSettingsController from '../controllers/AdminSettingsController.js';
@@ -154,6 +155,8 @@ router.get('/control/podcasts/:showId/episodes', auth('admin'), AdminControlCont
 router.post('/control/podcasts/:showId/episodes', auth('admin'), AdminControlController.createPodcastEpisode);
 router.put('/control/podcasts/:showId/episodes/:episodeId', auth('admin'), AdminControlController.updatePodcastEpisode);
 router.delete('/control/podcasts/:showId/episodes/:episodeId', auth('admin'), AdminControlController.deletePodcastEpisode);
+router.get('/control/overview', auth('admin'), AdminControlController.getOverview);
+router.get('/control/audit-log', auth('admin'), AdminAuditLogController.listRecent);
 
 router.get('/control/bookings', auth('admin'), AdminBookingController.list);
 router.post('/control/bookings', auth('admin'), AdminBookingController.create);

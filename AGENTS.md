@@ -357,19 +357,19 @@ G. **Full Upgrade Plan & Release Steps** – Implement shared checkout flows, re
 - **Feature flags & releases** – `AdminFeatureFlagController` toggles experiments; `ReleaseManagementController` orchestrates staged rollouts.
 
 ### Assessments
-A. **Redundancy Changes** – Merge overlapping dashboards (control vs operations), unify audit log viewers, and consolidate notification settings. Drive both admin shells from `frontend-reactjs/src/layouts/AdminShell.jsx` and hydrate audit trails through a single `AuditLogController` feed.
+A. Consolidated control-centre and ops data into a single overview by shipping `AdminOperationsOverviewService`, exposing it through `AdminControlController.getOverview`, registering `/admin/control/overview`, and wiring the front-end normaliser so the AdminShell pulls one payload instead of juggling separate fetches.【F:backend-nodejs/src/services/AdminOperationsOverviewService.js†L42-L138】【F:backend-nodejs/src/controllers/AdminControlController.js†L869-L883】【F:backend-nodejs/src/routes/admin.routes.js†L149-L159】【F:frontend-reactjs/src/api/adminControlApi.js†L36-L116】 ✓
 
-B. **Strengths to Keep** – Preserve granular permissions, export capabilities, and real-time alerts for incidents.
+B. Preserved the permission wall, manifest-driven health summaries, and AdminShell navigation by keeping the overview route behind `auth('admin')`, continuing to surface service alerts, tasks, and helper links, and layering the new refresh controls without disrupting existing flows.【F:backend-nodejs/src/routes/admin.routes.js†L149-L159】【F:frontend-reactjs/src/pages/dashboard/AdminControl.jsx†L865-L944】 ✓
 
-C. **Weaknesses to Remove** – Reduce clutter in admin nav, improve cross-linking between compliance issues and remediation tasks, and ensure feature flag context is clear. Link compliance alerts to `GovernanceContractModel` records so operators know which documentation to update.
+C. Eliminated compliance blind spots by turning governance renewals into actionable alerts linked back to `GovernanceContractModel` metadata and pairing them with release-checklist summaries so operators jump straight from the dashboard to remediation steps.【F:backend-nodejs/src/services/AdminOperationsOverviewService.js†L89-L219】【F:frontend-reactjs/src/pages/dashboard/AdminControl.jsx†L955-L984】 ✓
 
-D. **Sesing and Colour Review Changes** – Use neutral dashboards with status badges (green/yellow/red), ensure tables support high contrast, and provide dark-mode friendly charts.
+D. Kept the console’s visual language cohesive by rendering the new compliance and checklist panes with the shared status cards, severity pills, and neutral shells already used across the AdminShell, maintaining contrast across themes.【F:frontend-reactjs/src/pages/dashboard/AdminControl.jsx†L886-L986】 ✓
 
-E. **Improvements & Justification Changes** – Introduce unified admin layout, contextual quick links, and checklist-driven remediation flows to streamline operations. Surface `ReleaseChecklistItemModel` status blocks directly on the admin dashboard to guide release readiness.
+E. Strengthened operational insight by normalising overview responses (alerts, readiness, checklist aggregates) on the client so status cards, task lists, and helper links all derive from the same snapshot rather than bespoke state.【F:frontend-reactjs/src/api/adminControlApi.js†L36-L116】【F:frontend-reactjs/src/pages/dashboard/AdminControl.jsx†L759-L934】 ✓
 
-F. **Change Checklist Tracker** – Completion 50%; tests for permission gating; ensure schema stores audit events; migrations for compliance checklists; seeders for demo incidents; update models for audit records.
+F. Locked coverage in place with a dedicated Vitest suite that stubs dependent models and asserts the aggregated compliance, release, and audit summaries, guarding the new overview contract.【F:backend-nodejs/test/adminOperationsOverviewService.test.js†L1-L192】 ✓
 
-G. **Full Upgrade Plan & Release Steps** – Build consolidated admin shell, refactor controllers for shared filters, add remediation workflows, test permissions, and launch with admin training.
+G. Release by rolling out the `/admin/control/overview` endpoint, exercising the Admin control refresh buttons, and rerunning the Vitest target once the workspace installs the binary so the governance panes stay in sync.【F:backend-nodejs/src/routes/admin.routes.js†L149-L159】【F:frontend-reactjs/src/pages/dashboard/AdminControl.jsx†L886-L904】【F:backend-nodejs/test/adminOperationsOverviewService.test.js†L1-L192】 ✓
 
 ## 14. Support, moderation, and escalation
 
