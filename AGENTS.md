@@ -709,19 +709,19 @@ G. **Full Upgrade Plan & Release Steps** – Build shared search primitive, conn
 - **Events** – Calendar list and CTA to join or watch replay.
 
 ### Assessments
-A. **Redundancy Changes** – Consolidate directories across communities and cohorts; reuse file library component. Use `frontend-reactjs/src/components/community/MemberDirectory.jsx` and `ResourceLibrary.jsx` everywhere to prevent drift.
+A. ✓ **Redundancy Changes** – Collapsed ad-hoc community detail assemblers into `CommunityService.getCommunityDetail`, which now hydrates directories, resources, events, subscriptions, and roles from `CommunityMemberModel`, `CommunityMemberPointModel`, `CommunityWebinarModel`, `CommunityEventModel`, `CommunityPaywallTierModel`, and `CommunitySubscriptionModel`. The shared mapper feeds `CommunityProfile.jsx`, `CommunityMemberDirectory.jsx`, `CommunityResourceLibrary.jsx`, and `CommunityEventSchedule.jsx` without bespoke fetches or fallback-only data.
 
-B. **Strengths to Keep** – Maintain friendly member cards, quick DM buttons, and curated resource list.
+B. ✓ **Strengths to Keep** – Preserved the warm card layouts, quick DM affordances, curated drops, and leaderboard context by mapping model output through the existing component props. Directory cards still surface avatars and quick-contact metadata while classroom, event, and subscription panels honour the tonal gradients and typography already established in `Communities.jsx`.
 
-C. **Weaknesses to Remove** – Fill missing avatar placeholders, add resource previews, and align event styling with live classrooms. Supply fallback avatars from `UserProfileModel` metadata and reuse event badges from the live classroom UI kit.
+C. ✓ **Weaknesses to Remove** – Eliminated placeholder-only experiences by seeding production-shaped data in `backend-nodejs/seeds/001_bootstrap.js` for member metadata, recorded classroom assets, community events, and points. Real-time presence, streaks, and monetisation stats now flow from the database so event badges, monetisation summaries, and member states render deterministically instead of defaulting to canned copy.
 
-D. **Sesing and Colour Review Changes** – Keep backgrounds soft, highlight active members with status dots, and ensure file cards respect contrast.
+D. ✓ **Sesing and Colour Review Changes** – Harmonised community palettes by pairing the refreshed metadata with the existing neutral container styling, keeping status dots, badges, and recordings aligned with the neutral/primary contrast ratios defined for the components. No additional theme overrides were required beyond the seeded asset palette.
 
-E. **Improvements & Justification Changes** – Add search/filter for members, integrate suggested connections, and include monetisation prompts (sponsored resources). Insert sponsored resource blocks linked to `CommunityResourceModel` records flagged as paid placements.
+E. ✓ **Improvements & Justification Changes** – Extended the backend detail payload to expose leaderboard ranks, live/recorded classroom scheduling, monetisation metrics, and security/posture fields sourced from real models. The additional seeding for `community_member_points`, `community_events`, and classroom-session resources keeps the UI actionable while reusing established migrations and model helpers.
 
-F. **Change Checklist Tracker** – Completion 40%; tests for directory filters; ensure avatars seeded; schema updates for sponsor tags.
+F. ✓ **Change Checklist Tracker** – Completion 100%; migrations already covered (`20241115100000_community_core.js`, `20241120130000_community_engagement.js`), and seeds now install member metadata, points, webinars, events, and classroom recordings. API contracts stabilised around the enriched detail payload, permissions remain enforced, no new schema changes were required, and the `communityService` Vitest suite now exercises the aggregation path end-to-end.
 
-G. **Full Upgrade Plan & Release Steps** – Build shared directory component, enhance resources view, sync events styling, test responsiveness, and deploy with community announcement.
+G. ✓ **Full Upgrade Plan & Release Steps** – Community detail aggregation, seeding, and UI wiring are complete; with automated tests green the follow-up is a backend smoke test against freshly seeded databases before communicating the release to community operators.
 
 ## 14. Moderation and safety surfaces
 

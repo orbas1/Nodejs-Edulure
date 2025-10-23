@@ -396,12 +396,146 @@ export async function seed(knex) {
       }
     ]);
 
+    const nowIso = new Date().toISOString();
     const learningOpsCover = await ensureSeedImage('community-learning-ops', {
       title: 'Learning Ops Guild',
       subtitle: 'Incident-proof live classrooms',
       badge: 'Community access',
       colors: ['#6366f1', '#4338ca']
     });
+
+    const learningOpsMetadata = {
+      focus: ['operations', 'automation'],
+      timezone: 'UTC',
+      defaultChannel: 'weekly-war-room',
+      category: 'operations',
+      tagline: 'Incident-proof live classrooms and automation squads',
+      country: 'US',
+      languages: ['en'],
+      analyticsKey: 'OPS-HQ',
+      ratings: {
+        average: 4.94,
+        totalReviews: 212,
+        highlight: 'Trusted launch control hub for revenue classrooms',
+        breakdown: { '5': 0.86, '4': 0.12, '3': 0.02 }
+      },
+      reviews: [
+        {
+          id: 'ops-review-1',
+          reviewer: 'Linh Tran',
+          role: 'VP Learning Ops, Aurora',
+          rating: 5,
+          comment: 'Runbooks, escalation drills, and monetisation guardrails in one place.',
+          publishedAt: nowIso
+        },
+        {
+          id: 'ops-review-2',
+          reviewer: 'Mason Patel',
+          role: 'Director of Enablement, Alloy',
+          rating: 5,
+          comment: 'The automation labs and weekly war room keep launches resilient.',
+          publishedAt: nowIso
+        }
+      ],
+      membershipMap: {
+        totalCountries: 18,
+        lastUpdatedAt: nowIso,
+        clusters: [
+          { region: 'North America', percentage: 0.38, change: '+3.8%' },
+          { region: 'EMEA', percentage: 0.31, change: '+2.1%' },
+          { region: 'APAC', percentage: 0.22, change: '+1.4%' },
+          { region: 'LATAM', percentage: 0.09, change: '+0.7%' }
+        ],
+        avatars: [
+          'https://images.generated.photos/ops1.png',
+          'https://images.generated.photos/ops2.png',
+          'https://images.generated.photos/ops3.png',
+          'https://images.generated.photos/ops4.png',
+          'https://images.generated.photos/ops5.png'
+        ]
+      },
+      classrooms: {
+        liveClassroom: {
+          host: 'Learning Ops Guild',
+          status: 'Standby',
+          capacity: 180,
+          streamUrl: 'https://events.edulure.test/live/ops-stage'
+        },
+        live: [
+          {
+            id: 'ops-live-blueprint',
+            title: 'Launch Readiness Blueprint AMA',
+            facilitator: 'Amina Diallo',
+            startsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+            durationMinutes: 75,
+            seatsRemaining: 24,
+            status: 'announced',
+            registrationUrl: 'https://events.edulure.test/ops-blueprint-ama'
+          }
+        ],
+        recorded: [
+          {
+            id: 'ops-recorded-staging',
+            title: 'Staging Failover Simulation',
+            facilitator: 'Kai Watanabe',
+            startsAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+            durationMinutes: 58,
+            watchUrl: 'https://cdn.edulure.test/replays/staging-failover.mp4'
+          }
+        ],
+        chatChannels: ['operations-hq', 'weekly-war-room', 'exec-briefings']
+      },
+      subscription: {
+        currency: 'USD',
+        billingInterval: 'monthly',
+        addons: [
+          {
+            id: 'ops-addon-sim',
+            name: 'Simulation Pack',
+            priceCents: 2900,
+            description: 'Additional quarterly live automation simulations.'
+          },
+          {
+            id: 'ops-addon-office-hours',
+            name: 'Priority office hours',
+            priceCents: 1900,
+            description: 'Direct incident coaching slots with the ops strategist team.'
+          }
+        ],
+        collection: { provider: 'stripe', mode: 'subscription' },
+        metrics: { churnRate: 0.018 }
+      },
+      events: [
+        {
+          id: 'ops-event-summit',
+          title: 'Automation Summit Workshop',
+          type: 'Workshop',
+          startsAt: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString(),
+          location: 'Virtual',
+          registrationUrl: 'https://events.edulure.test/ops-summit-workshop'
+        }
+      ],
+      roles: {},
+      security: {
+        zeroTrust: true,
+        singleSignOn: true,
+        auditLog: true,
+        lastPenTest: '2024-Q1',
+        dataResidency: 'US-East / EU-West mirrored'
+      },
+      launchChecklist: {
+        overallStatus: 'green',
+        items: [
+          { id: 'ops-check-1', label: 'QA playbooks reviewed', status: 'complete', owner: 'Amina Diallo' },
+          { id: 'ops-check-2', label: 'Incident escalation tree refreshed', status: 'complete', owner: 'Kai Watanabe' },
+          { id: 'ops-check-3', label: 'Telemetry alerts tuned', status: 'in-progress', owner: 'Noemi Carvalho' }
+        ]
+      },
+      links: {
+        hub: 'https://app.edulure.test/communities/learning-ops-guild',
+        knowledgeBase: 'https://docs.edulure.test/ops/playbooks'
+      }
+    };
 
     const [opsCommunityId] = await trx('communities').insert({
       owner_id: instructorId,
@@ -411,15 +545,7 @@ export async function seed(knex) {
         'Operations leaders share classroom launch playbooks, QA scorecards, and tooling automation recipes.',
       visibility: 'public',
       cover_image_url: learningOpsCover.url,
-      metadata: JSON.stringify({
-        focus: ['operations', 'automation'],
-        timezone: 'UTC',
-        defaultChannel: 'weekly-war-room',
-        category: 'operations',
-        tagline: 'Incident-proof live classrooms and automation squads',
-        country: 'US',
-        languages: ['en']
-      })
+      metadata: JSON.stringify(learningOpsMetadata)
     });
 
     const growthLabCover = await ensureSeedImage('community-growth-lab', {
@@ -429,6 +555,102 @@ export async function seed(knex) {
       colors: ['#f97316', '#fb7185']
     });
 
+    const growthLabMetadata = {
+      focus: ['growth', 'ads'],
+      ndaRequired: true,
+      defaultChannel: 'campaign-sprint',
+      category: 'growth',
+      tagline: 'Experiment-led growth and paid acquisition guild',
+      country: 'GB',
+      languages: ['en'],
+      analyticsKey: 'GROWTH-LAB',
+      ratings: {
+        average: 4.88,
+        totalReviews: 168,
+        highlight: 'High-trust lab for multi-channel launch strategy',
+        breakdown: { '5': 0.8, '4': 0.17, '3': 0.03 }
+      },
+      reviews: [
+        {
+          id: 'growth-review-1',
+          reviewer: 'Sasha Idris',
+          role: 'Growth Lead, Nova',
+          rating: 5,
+          comment: 'Campaign retros and benchmark dashboards make optimisation effortless.',
+          publishedAt: nowIso
+        }
+      ],
+      membershipMap: {
+        totalCountries: 22,
+        lastUpdatedAt: nowIso,
+        clusters: [
+          { region: 'North America', percentage: 0.34, change: '+4.1%' },
+          { region: 'EMEA', percentage: 0.27, change: '+1.9%' },
+          { region: 'APAC', percentage: 0.25, change: '+2.5%' },
+          { region: 'LATAM', percentage: 0.14, change: '+1.2%' }
+        ],
+        avatars: [
+          'https://images.generated.photos/growth1.png',
+          'https://images.generated.photos/growth2.png',
+          'https://images.generated.photos/growth3.png',
+          'https://images.generated.photos/growth4.png'
+        ]
+      },
+      classrooms: {
+        liveClassroom: {
+          host: 'Creator Growth Lab',
+          status: 'Standby',
+          capacity: 220,
+          streamUrl: 'https://events.edulure.test/live/growth-stage'
+        },
+        live: [],
+        recorded: [],
+        chatChannels: ['growth-broadcasts', 'campaign-sprint', 'partner-ops']
+      },
+      subscription: {
+        currency: 'USD',
+        billingInterval: 'annual',
+        addons: [
+          {
+            id: 'growth-addon-affiliate',
+            name: 'Affiliate accelerator',
+            priceCents: 4900,
+            description: 'Additional slots for affiliate cohort and concierge campaign tuning.'
+          }
+        ],
+        collection: { provider: 'stripe', mode: 'subscription' },
+        metrics: { churnRate: 0.024 }
+      },
+      events: [
+        {
+          id: 'growth-event-campaign-lab',
+          title: 'Campaign Lab AMA',
+          type: 'AMA',
+          startsAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+          registrationUrl: 'https://events.edulure.test/campaign-lab-ama'
+        }
+      ],
+      roles: {},
+      security: {
+        zeroTrust: true,
+        singleSignOn: true,
+        auditLog: true,
+        lastPenTest: '2024-Q1',
+        dataResidency: 'EU-West with US DR'
+      },
+      launchChecklist: {
+        overallStatus: 'amber',
+        items: [
+          { id: 'growth-check-1', label: 'Affiliate offer refresh', status: 'in-progress', owner: 'Kai Watanabe' },
+          { id: 'growth-check-2', label: 'Attribution dashboard QA', status: 'complete', owner: 'Amina Diallo' }
+        ]
+      },
+      links: {
+        hub: 'https://app.edulure.test/communities/creator-growth-lab',
+        monetisationGuide: 'https://docs.edulure.test/growth/monetisation-playbook'
+      }
+    };
+
     const [growthCommunityId] = await trx('communities').insert({
       owner_id: adminId,
       name: 'Creator Growth Lab',
@@ -436,41 +658,78 @@ export async function seed(knex) {
       description: 'Creators refine monetisation funnels, ad experiments, and marketplace launches together.',
       visibility: 'private',
       cover_image_url: growthLabCover.url,
-      metadata: JSON.stringify({
-        focus: ['growth', 'ads'],
-        ndaRequired: true,
-        defaultChannel: 'campaign-sprint',
-        category: 'growth',
-        tagline: 'Experiment-led growth and paid acquisition guild',
-        country: 'GB',
-        languages: ['en']
-      })
+      metadata: JSON.stringify(growthLabMetadata)
     });
+
+    const opsAdminMemberMetadata = {
+      title: 'Automation Guild Owner',
+      roleLabel: 'Guild Owner',
+      location: 'Austin, US',
+      contactEmail: 'amina.diallo@edulure.test',
+      tags: ['Automation', 'Playbooks', 'Escalations'],
+      recommended: true,
+      lastActiveAt: nowIso,
+      avatarUrl: adminAvatar.url
+    };
+    const opsLearnerMemberMetadata = {
+      title: 'Incident Analyst',
+      roleLabel: 'Operator',
+      location: 'Lisbon, PT',
+      contactEmail: 'noemi.carvalho@edulure.test',
+      tags: ['QA', 'Telemetry'],
+      recommended: true,
+      lastActiveAt: nowIso,
+      avatarUrl: learnerAvatar.url
+    };
+    const growthModeratorMetadata = {
+      title: 'Campaign Architect',
+      roleLabel: 'Moderator',
+      location: 'Tokyo, JP',
+      contactEmail: 'kai.watanabe@edulure.test',
+      tags: ['Attribution', 'Paid media'],
+      recommended: true,
+      lastActiveAt: nowIso,
+      avatarUrl: instructorAvatar.url
+    };
+    const growthMemberMetadata = {
+      title: 'Acquisition Strategist',
+      roleLabel: 'Analyst',
+      location: 'London, UK',
+      contactEmail: 'noemi.carvalho@edulure.test',
+      tags: ['Benchmarks', 'Affiliates'],
+      recommended: false,
+      lastActiveAt: nowIso,
+      avatarUrl: learnerAvatar.url
+    };
 
     await trx('community_members').insert([
       {
         community_id: opsCommunityId,
         user_id: adminId,
         role: 'admin',
-        status: 'active'
+        status: 'active',
+        metadata: JSON.stringify(opsAdminMemberMetadata)
       },
       {
         community_id: opsCommunityId,
         user_id: learnerId,
         role: 'member',
-        status: 'active'
+        status: 'active',
+        metadata: JSON.stringify(opsLearnerMemberMetadata)
       },
       {
         community_id: growthCommunityId,
         user_id: instructorId,
         role: 'moderator',
-        status: 'active'
+        status: 'active',
+        metadata: JSON.stringify(growthModeratorMetadata)
       },
       {
         community_id: growthCommunityId,
         user_id: learnerId,
         role: 'member',
-        status: 'pending'
+        status: 'pending',
+        metadata: JSON.stringify(growthMemberMetadata)
       }
     ]);
 
@@ -866,6 +1125,26 @@ export async function seed(knex) {
         metadata: JSON.stringify({ requiresSso: true })
     });
 
+    await trx('community_resources').insert({
+      community_id: opsCommunityId,
+      created_by: instructorId,
+      title: 'Incident rehearsal replay',
+      description: 'Recording with annotated runbooks and escalation checkpoints from the latest simulation.',
+      resource_type: 'classroom_session',
+      link_url: 'https://cdn.edulure.test/replays/incident-rehearsal',
+      tags: JSON.stringify(['Recording', 'Incident response']),
+      visibility: 'members',
+      status: 'published',
+      published_at: trx.fn.now(),
+      metadata: JSON.stringify({
+        facilitator: 'Learning Ops Guild',
+        durationMinutes: 62,
+        recordedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        watchUrl: 'https://cdn.edulure.test/replays/incident-rehearsal',
+        sponsored: false
+      })
+    });
+
     const upcomingOpsWebinarStartAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
     const followUpOpsWebinarStartAt = new Date(Date.now() + 12 * 24 * 60 * 60 * 1000);
 
@@ -881,7 +1160,14 @@ export async function seed(knex) {
         watch_url: 'https://events.edulure.test/ops-incident-command',
         description:
           'Live tabletop drill walking through classroom failover, paging flows, and escalation runbooks ahead of launch week.',
-        metadata: JSON.stringify({ track: 'operations', tags: ['automation', 'qa'] })
+        metadata: JSON.stringify({
+          track: 'operations',
+          tags: ['automation', 'qa'],
+          durationMinutes: 75,
+          seatsRemaining: 32,
+          registrationUrl: 'https://events.edulure.test/ops-incident-command/register',
+          location: 'Virtual'
+        })
       },
       {
         community_id: opsCommunityId,
@@ -889,12 +1175,112 @@ export async function seed(knex) {
         topic: 'Automation war room retrospective',
         host: 'Amina Diallo',
         start_at: followUpOpsWebinarStartAt,
-        status: 'draft',
+        status: 'scheduled',
         registrant_count: 64,
         watch_url: 'https://events.edulure.test/ops-automation-retro',
         description:
           'Post-launch retrospective covering automation wins, failure points, and roadmap items queued for the next sprint.',
-        metadata: JSON.stringify({ track: 'operations', requiresPrep: true })
+        metadata: JSON.stringify({
+          track: 'operations',
+          requiresPrep: true,
+          durationMinutes: 60,
+          seatsRemaining: 40,
+          registrationUrl: 'https://events.edulure.test/ops-automation-retro/register',
+          location: 'Virtual'
+        })
+      }
+    ]);
+
+    await trx('community_member_points').insert([
+      {
+        community_id: opsCommunityId,
+        user_id: adminId,
+        points: 1280,
+        lifetime_points: 5120,
+        tier: 'platinum',
+        last_awarded_at: trx.fn.now(),
+        last_activity_at: trx.fn.now(),
+        metadata: JSON.stringify({ grade: 'A', role: 'ops-strategist', currentStreakDays: 14 })
+      },
+      {
+        community_id: opsCommunityId,
+        user_id: learnerId,
+        points: 860,
+        lifetime_points: 1640,
+        tier: 'gold',
+        last_awarded_at: trx.fn.now(),
+        last_activity_at: trx.fn.now(),
+        metadata: JSON.stringify({ grade: 'B', role: 'operator', currentStreakDays: 9 })
+      },
+      {
+        community_id: growthCommunityId,
+        user_id: instructorId,
+        points: 1420,
+        lifetime_points: 4180,
+        tier: 'platinum',
+        last_awarded_at: trx.fn.now(),
+        last_activity_at: trx.fn.now(),
+        metadata: JSON.stringify({ grade: 'A', role: 'moderator', currentStreakDays: 11 })
+      },
+      {
+        community_id: growthCommunityId,
+        user_id: learnerId,
+        points: 930,
+        lifetime_points: 2150,
+        tier: 'gold',
+        last_awarded_at: trx.fn.now(),
+        last_activity_at: trx.fn.now(),
+        metadata: JSON.stringify({ grade: 'B', role: 'analyst', currentStreakDays: 6 })
+      }
+    ]);
+
+    const opsCommunitySummitStart = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
+    const opsCommunitySummitEnd = new Date(opsCommunitySummitStart.getTime() + 90 * 60 * 1000);
+    const growthSummitStart = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
+    const growthSummitEnd = new Date(growthSummitStart.getTime() + 60 * 60 * 1000);
+
+    await trx('community_events').insert([
+      {
+        community_id: opsCommunityId,
+        created_by: instructorId,
+        title: 'Automation Summit Workshop',
+        slug: 'automation-summit-workshop',
+        summary: 'Hands-on launch rehearsal across escalation pods.',
+        description:
+          'Operators collaborate on automation guardrails, classroom failover drills, and telemetry dashboards in a guided workshop.',
+        start_at: opsCommunitySummitStart,
+        end_at: opsCommunitySummitEnd,
+        timezone: 'UTC',
+        visibility: 'members',
+        status: 'scheduled',
+        attendance_limit: 180,
+        attendance_count: 64,
+        waitlist_count: 8,
+        requires_rsvp: true,
+        is_online: true,
+        meeting_url: 'https://events.edulure.test/ops-summit',
+        metadata: JSON.stringify({ registrationUrl: 'https://events.edulure.test/ops-summit/register', track: 'automation' })
+      },
+      {
+        community_id: growthCommunityId,
+        created_by: adminId,
+        title: 'Creator Monetisation Roundtable',
+        slug: 'creator-monetisation-roundtable',
+        summary: 'Invite-only strategy session for growth operators.',
+        description:
+          'Deep dive into cross-channel monetisation funnels, pricing experiments, and affiliate optimisation with the Growth Lab moderators.',
+        start_at: growthSummitStart,
+        end_at: growthSummitEnd,
+        timezone: 'UTC',
+        visibility: 'members',
+        status: 'scheduled',
+        attendance_limit: 120,
+        attendance_count: 54,
+        waitlist_count: 5,
+        requires_rsvp: true,
+        is_online: true,
+        meeting_url: 'https://events.edulure.test/growth-roundtable',
+        metadata: JSON.stringify({ registrationUrl: 'https://events.edulure.test/growth-roundtable/register', track: 'growth' })
       }
     ]);
 
@@ -1568,8 +1954,10 @@ export async function seed(knex) {
         status: 'active',
         role: 'growth-analyst',
         metadata: JSON.stringify({
-        subscriptionPublicId,
-        referralCode: affiliateReferralCode,
+          ...growthMemberMetadata,
+          statusNote: 'Activated via subscription',
+          subscriptionPublicId,
+          referralCode: affiliateReferralCode,
           affiliateId: growthAffiliateId,
           roleDefinitionId: growthAnalystRoleId
         }),
@@ -1580,7 +1968,11 @@ export async function seed(knex) {
       .where({ community_id: opsCommunityId, user_id: adminId })
       .update({
         role: 'ops-strategist',
-        metadata: JSON.stringify({ playbookOwner: true, roleDefinitionId: opsStrategistRoleId }),
+        metadata: JSON.stringify({
+          ...opsAdminMemberMetadata,
+          playbookOwner: true,
+          roleDefinitionId: opsStrategistRoleId
+        }),
         updated_at: trx.fn.now()
       });
 
