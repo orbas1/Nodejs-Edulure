@@ -17,6 +17,7 @@ import { checkInToLiveSession, joinLiveSession } from '../../api/learnerDashboar
 import { useAuth } from '../../context/AuthContext.jsx';
 import ScheduleGrid from '../../components/scheduling/ScheduleGrid.jsx';
 import { enqueueLiveSessionAction, flushLiveSessionQueue } from '../../utils/liveSessionQueue.js';
+import LiveClassroomChat from '../../components/live/LiveClassroomChat.jsx';
 
 function ReadinessBadge({ status }) {
   const base = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide';
@@ -29,7 +30,7 @@ function ReadinessBadge({ status }) {
   return <span className={`${base} bg-rose-100 text-rose-700`}>Action</span>;
 }
 
-function SessionCard({ session, onAction, pending, onDonate }) {
+function SessionCard({ session, onAction, pending, onDonate, onSendChat, onReactChat, chatPending }) {
   const occupancy = session.occupancy ?? {};
   const occupancyLabel = occupancy.capacity
     ? `${occupancy.reserved ?? 0}/${occupancy.capacity} seats`
@@ -41,6 +42,8 @@ function SessionCard({ session, onAction, pending, onDonate }) {
   const facilitators = Array.isArray(session.facilitators) ? session.facilitators : [];
   const attendance = session.attendance ?? {};
   const attendanceSummary = Number.isFinite(Number(attendance.total)) ? Number(attendance.total) : null;
+
+  const chat = session.chat ?? {};
 
   return (
     <article className="dashboard-card space-y-5 p-5">
@@ -169,6 +172,22 @@ function SessionCard({ session, onAction, pending, onDonate }) {
           </div>
         </div>
       )}
+
+      <LiveClassroomChat
+        sessionTitle={session.title}
+        messages={chat.messages ?? []}
+        participants={chat.participants ?? []}
+        isMuted={chat.muted ?? false}
+        isBusy={chatPending}
+        onSend={
+          typeof onSendChat === 'function' ? (body) => onSendChat(session, body) : undefined
+        }
+        onReact={
+          typeof onReactChat === 'function'
+            ? (messageId, reaction) => onReactChat(session, messageId, reaction)
+            : undefined
+        }
+      />
     </article>
   );
 }
@@ -351,6 +370,7 @@ export default function LearnerLiveClasses() {
   const token = session?.tokens?.accessToken ?? null;
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingSessionId, setPendingSessionId] = useState(null);
+  const [pendingChatSessionId, setPendingChatSessionId] = useState(null);
   const [donationSession, setDonationSession] = useState(null);
   const [donationSubmitting, setDonationSubmitting] = useState(false);
   const [donationStatus, setDonationStatus] = useState(null);
@@ -484,6 +504,42 @@ export default function LearnerLiveClasses() {
     setDonationSession(null);
     setDonationStatus(null);
     setDonationSubmitting(false);
+  }, []);
+
+  const handleSendChatMessage = useCallback(
+    (sessionItem, messageBody) => {
+      if (!sessionItem?.id || !messageBody) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => {
+        setPendingChatSessionId(sessionItem.id);
+        enqueueLiveSessionAction({
+          sessionId: sessionItem.id,
+          action: 'chat-message',
+          payload: { body: messageBody }
+        });
+        setStatusMessage({
+          type: 'pending',
+          message: `Message queued for ${sessionItem.title}.`
+        });
+        setTimeout(() => {
+          setPendingChatSessionId((current) => (current === sessionItem.id ? null : current));
+          resolve();
+        }, 200);
+      });
+    },
+    [setStatusMessage]
+  );
+
+  const handleReactToChatMessage = useCallback((sessionItem, messageId, reaction) => {
+    if (!sessionItem?.id || !messageId || !reaction) {
+      return;
+    }
+    enqueueLiveSessionAction({
+      sessionId: sessionItem.id,
+      action: 'chat-reaction',
+      payload: { messageId, reaction }
+    });
   }, []);
 
   useEffect(() => {
@@ -641,15 +697,18 @@ export default function LearnerLiveClasses() {
           </span>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          {active.map((sessionItem) => (
-            <SessionCard
-              key={sessionItem.id}
-              session={sessionItem}
-              onAction={handleSessionAction}
-              pending={pendingSessionId === sessionItem.id}
-              onDonate={handleDonationOpen}
-            />
-          ))}
+            {active.map((sessionItem) => (
+              <SessionCard
+                key={sessionItem.id}
+                session={sessionItem}
+                onAction={handleSessionAction}
+                pending={pendingSessionId === sessionItem.id}
+                onDonate={handleDonationOpen}
+                onSendChat={handleSendChatMessage}
+                onReactChat={handleReactToChatMessage}
+                chatPending={pendingChatSessionId === sessionItem.id}
+              />
+            ))}
           {active.length === 0 && (
             <DashboardStateMessage
               title="No active sessions"
@@ -668,15 +727,18 @@ export default function LearnerLiveClasses() {
           </span>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          {upcoming.map((sessionItem) => (
-            <SessionCard
-              key={sessionItem.id}
-              session={sessionItem}
-              onAction={handleSessionAction}
-              pending={pendingSessionId === sessionItem.id}
-              onDonate={handleDonationOpen}
-            />
-          ))}
+            {upcoming.map((sessionItem) => (
+              <SessionCard
+                key={sessionItem.id}
+                session={sessionItem}
+                onAction={handleSessionAction}
+                pending={pendingSessionId === sessionItem.id}
+                onDonate={handleDonationOpen}
+                onSendChat={handleSendChatMessage}
+                onReactChat={handleReactToChatMessage}
+                chatPending={pendingChatSessionId === sessionItem.id}
+              />
+            ))}
           {upcoming.length === 0 && (
             <DashboardStateMessage
               title="No upcoming sessions"
@@ -695,15 +757,18 @@ export default function LearnerLiveClasses() {
           </span>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          {completed.map((sessionItem) => (
-            <SessionCard
-              key={sessionItem.id}
-              session={sessionItem}
-              onAction={handleSessionAction}
-              pending={false}
-              onDonate={handleDonationOpen}
-            />
-          ))}
+            {completed.map((sessionItem) => (
+              <SessionCard
+                key={sessionItem.id}
+                session={sessionItem}
+                onAction={handleSessionAction}
+                pending={false}
+                onDonate={handleDonationOpen}
+                onSendChat={handleSendChatMessage}
+                onReactChat={handleReactToChatMessage}
+                chatPending={false}
+              />
+            ))}
           {completed.length === 0 && (
             <DashboardStateMessage
               title="No completed sessions"

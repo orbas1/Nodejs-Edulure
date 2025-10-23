@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import InstructorTaskBoard from '../../components/dashboard/InstructorTaskBoard.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { fetchCommunities } from '../../api/communityApi.js';
 import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
@@ -298,6 +299,16 @@ function InstructorGrowth() {
 
   const isAuthenticatedInstructor = Boolean(token && isAuthenticated);
 
+  const handleTaskSelect = useCallback(
+    (experimentId) => {
+      const target = experimentsState.items.find((experiment) => experiment.id === experimentId);
+      if (target) {
+        handleEdit(target);
+      }
+    },
+    [experimentsState.items, handleEdit]
+  );
+
   if (!isAuthenticatedInstructor) {
     return (
       <DashboardStateMessage
@@ -347,6 +358,8 @@ function InstructorGrowth() {
           <p className="mt-1 text-xs text-slate-500">Experiments with published learnings ready for rollout.</p>
         </div>
       </section>
+
+      <InstructorTaskBoard experiments={experimentsState.items} onSelectTask={handleTaskSelect} isBusy={saving} />
 
       <section className="dashboard-section space-y-6">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

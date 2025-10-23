@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 
+import MediaPreviewSlot from '../media/MediaPreviewSlot.jsx';
+
 const numberFormatter = new Intl.NumberFormat('en-US');
 
 function formatRelativeTime(timestamp) {
@@ -84,8 +86,35 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
   const moderationReason = post.moderation?.context ?? post.moderation?.reason;
   const moderationReviewContext = post.moderation?.reviewContext ?? null;
   const preview = post.media?.preview;
-  const previewUrl = preview?.thumbnailUrl;
+  const previewUrl = preview?.thumbnailUrl ?? preview?.imageUrl ?? null;
   const previewAspectRatio = preview?.aspectRatio ?? '16:9';
+  const previewHoverVideo = preview?.hoverVideoUrl ?? preview?.videoUrl ?? null;
+  const previewCaption = preview?.caption ?? post.title ?? 'Feed preview';
+  const previewBadges = useMemo(() => {
+    const badges = [];
+    if (preview?.context) {
+      badges.push(preview.context);
+    }
+    if (post.community?.name) {
+      badges.push(post.community.name);
+    }
+    if (preview?.badge) {
+      badges.push(preview.badge);
+    }
+    if (badges.length === 0 && post.tags?.length) {
+      badges.push(`#${post.tags[0]}`);
+    }
+    return badges.slice(0, 3);
+  }, [post.community?.name, post.tags, preview?.badge, preview?.context]);
+  const previewMetadata = useMemo(() => {
+    if (!preview) {
+      return post.media?.metadata ?? null;
+    }
+    return {
+      source: preview.source ?? preview.provider ?? post.media?.metadata?.source,
+      freshnessLabel: preview.generatedAt ?? preview.updatedAt ?? post.media?.metadata?.freshnessLabel
+    };
+  }, [post.media?.metadata, preview]);
   const viewerReactions = Array.isArray(post.viewer?.reactions) ? post.viewer.reactions : [];
   const defaultReactionKey = 'appreciate';
   const hasReacted = viewerReactions.includes(defaultReactionKey);
@@ -176,11 +205,17 @@ export default function FeedItemCard({ post, onModerate, onRemove, actionState, 
           {title && <h4 className="mt-4 break-words text-sm font-semibold text-slate-900">{title}</h4>}
           <p className="mt-3 break-words text-sm leading-6 text-slate-700">{bodyCopy}</p>
 
-          {previewUrl ? (
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-              <div className="relative w-full" style={{ aspectRatio: resolvedAspectRatio }}>
-                <img src={previewUrl} alt={post.title ?? 'Post preview'} className="h-full w-full object-cover" loading="lazy" />
-              </div>
+          {previewUrl || previewHoverVideo ? (
+            <div className="mt-4">
+              <MediaPreviewSlot
+                thumbnailUrl={previewUrl}
+                hoverVideoUrl={previewHoverVideo}
+                aspectRatio={resolvedAspectRatio}
+                caption={previewCaption}
+                badges={previewBadges}
+                metadata={previewMetadata}
+                fallbackIllustration="feed"
+              />
             </div>
           ) : null}
 

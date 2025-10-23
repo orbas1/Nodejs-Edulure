@@ -8,6 +8,7 @@ import {
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
+import TutorProfileCard from '../../components/tutor/TutorProfileCard.jsx';
 import useMountedRef from '../../hooks/useMountedRef.js';
 
 const severityStyles = {
@@ -27,13 +28,6 @@ const severityStyles = {
     wrapper: 'border-slate-200 bg-slate-50 text-slate-600',
     icon: InformationCircleIcon
   }
-};
-
-const statusToneStyles = {
-  success: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
-  warning: 'bg-amber-500/10 text-amber-600 border-amber-200',
-  info: 'bg-sky-500/10 text-sky-600 border-sky-200',
-  neutral: 'bg-slate-500/10 text-slate-600 border-slate-200'
 };
 
 export default function InstructorTutorManagement() {
@@ -105,39 +99,77 @@ export default function InstructorTutorManagement() {
     }
   }, [instructorOrchestration, mounted, refresh, roster]);
 
-  const handleRouting = useCallback(async () => {
-    if (!instructorOrchestration?.routeTutorRequest) {
-      return;
-    }
-    setPendingAction('routing');
-    setFeedback(null);
-    try {
-      const payload = {
-        pendingCount: notifications.filter((item) => item.severity === 'warning').length,
-        rulesetId: dashboard?.tutors?.activeRuleset
-      };
-      const result = await instructorOrchestration.routeTutorRequest(payload);
-      if (mounted.current) {
+  const handleRouting = useCallback(
+    async (targetTutor = null) => {
+      if (!instructorOrchestration?.routeTutorRequest) {
+        return;
+      }
+      setPendingAction(`routing:${targetTutor?.id ?? 'all'}`);
+      setFeedback(null);
+      try {
+        const payload = {
+          pendingCount: notifications.filter((item) => item.severity === 'warning').length,
+          rulesetId: dashboard?.tutors?.activeRuleset,
+          tutorId: targetTutor?.id ?? undefined
+        };
+        const result = await instructorOrchestration.routeTutorRequest(payload);
+        if (mounted.current) {
+          setFeedback({
+            tone: 'success',
+            message: targetTutor
+              ? `${targetTutor.name ?? 'Tutor'} routing recalibrated.`
+              : 'Tutor routing recalibrated.',
+            detail: result?.summary ?? 'Routing updates will propagate to mentor pods.'
+          });
+        }
+        await refresh?.();
+      } catch (error) {
+        if (mounted.current) {
+          setFeedback({
+            tone: 'error',
+            message: error.message ?? 'Unable to open routing rules.'
+          });
+        }
+      } finally {
+        if (mounted.current) {
+          setPendingAction(null);
+        }
+      }
+    },
+    [dashboard, instructorOrchestration, mounted, notifications, refresh]
+  );
+
+  const handleBookMentor = useCallback(
+    async (tutor) => {
+      if (!tutor) return;
+      if (!instructorOrchestration?.bookMentorSession) {
+        setFeedback({
+          tone: 'info',
+          message: 'Use the scheduling workspace to coordinate this mentor session.'
+        });
+        return;
+      }
+      setPendingAction(`book:${tutor.id}`);
+      try {
+        const response = await instructorOrchestration.bookMentorSession({ tutorId: tutor.id });
         setFeedback({
           tone: 'success',
-          message: 'Tutor routing recalibrated.',
-          detail: result?.summary ?? 'Routing updates will propagate to mentor pods.'
+          message: response?.message ?? 'Mentor session booked successfully.'
         });
-      }
-      await refresh?.();
-    } catch (error) {
-      if (mounted.current) {
+        await refresh?.();
+      } catch (error) {
         setFeedback({
           tone: 'error',
-          message: error.message ?? 'Unable to open routing rules.'
+          message: error.message ?? 'Unable to book this mentor session right now.'
         });
+      } finally {
+        if (mounted.current) {
+          setPendingAction(null);
+        }
       }
-    } finally {
-      if (mounted.current) {
-        setPendingAction(null);
-      }
-    }
-  }, [dashboard, instructorOrchestration, mounted, notifications, refresh]);
+    },
+    [instructorOrchestration, mounted, refresh]
+  );
 
   if (roster.length === 0 && availability.length === 0) {
     return (
@@ -235,76 +267,23 @@ export default function InstructorTutorManagement() {
             <button
               type="button"
               className="dashboard-pill disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={handleRouting}
-              disabled={pendingAction === 'routing'}
-              aria-busy={pendingAction === 'routing'}
+              onClick={() => handleRouting()}
+              disabled={pendingAction?.startsWith('routing')}
+              aria-busy={pendingAction?.startsWith('routing')}
             >
               Open routing rules
             </button>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {roster.map((tutor) => {
-              const badgeStyle = statusToneStyles[tutor.statusTone] ?? statusToneStyles.neutral;
-              return (
-                <article key={tutor.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">{tutor.name}</h3>
-                      <p className="mt-1 text-sm text-slate-600">{tutor.headline}</p>
-                    </div>
-                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeStyle}`}>
-                      {tutor.status}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
-                    {tutor.focusAreas?.map((item) => (
-                      <span key={item} className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                  <dl className="mt-4 space-y-2 text-sm text-slate-700">
-                    <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Rate</dt>
-                      <dd className="font-medium text-slate-900">{tutor.rate}</dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Rating</dt>
-                      <dd className="font-medium text-slate-900">{tutor.rating}</dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Response SLA</dt>
-                      <dd className="font-medium text-slate-900">{tutor.responseTime}</dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Availability</dt>
-                      <dd className="font-medium text-slate-900">{tutor.availability}</dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Timezone</dt>
-                      <dd className="font-medium text-slate-900">{tutor.timezone}</dd>
-                    </div>
-                    {tutor.weeklyHours && (
-                      <div className="flex items-center justify-between">
-                        <dt className="text-slate-500">Preference</dt>
-                        <dd className="font-medium text-slate-900">{tutor.weeklyHours}</dd>
-                      </div>
-                    )}
-                    {tutor.sessions && (
-                      <div className="flex items-center justify-between">
-                        <dt className="text-slate-500">Sessions</dt>
-                        <dd className="font-medium text-slate-900">{tutor.sessions}</dd>
-                      </div>
-                    )}
-                  </dl>
-                  {tutor.workload && (
-                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-primary">
-                      {tutor.workload}
-                    </p>
-                  )}
-                </article>
-              );
-            })}
+            {roster.map((tutor) => (
+              <TutorProfileCard
+                key={tutor.id}
+                tutor={tutor}
+                onBook={handleBookMentor}
+                onRoute={(value) => handleRouting(value)}
+                actionsDisabled={pendingAction === `book:${tutor.id}` || pendingAction === `routing:${tutor.id}`}
+              />
+            ))}
           </div>
         </section>
       )}

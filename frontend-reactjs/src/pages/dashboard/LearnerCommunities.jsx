@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import DashboardSectionHeader from '../../components/dashboard/DashboardSectionHeader.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import CommunityDirectory from '../../components/community/CommunityDirectory.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { triggerCommunityAction } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -149,64 +150,11 @@ export default function LearnerCommunities() {
         }
       />
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        {managed.length === 0 ? (
-          <div className="dashboard-section">
-            <p className="text-sm font-semibold text-slate-900">No communities assigned yet</p>
-            <p className="mt-2 text-sm text-slate-600">
-              Invite your team or switch roles to start curating learning communities for this Learnspace.
-            </p>
-          </div>
-        ) : null}
-        {managed.map((community) => (
-          <div key={community.id} className="dashboard-section space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-              <span>{community.members} members</span>
-              <span>Moderators {community.moderators}</span>
-              <span className="rounded-full bg-primary/10 px-3 py-1 font-semibold text-primary">
-                Health · {community.health}
-              </span>
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">{community.name}</h2>
-              <p className="mt-2 text-sm text-slate-600">Operational initiatives keeping this community energised.</p>
-            </div>
-            <ul className="grid gap-2 md:grid-cols-2">
-              {community.initiatives.map((initiative) => (
-                <li key={initiative} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  {initiative}
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-              <button
-                type="button"
-                className="dashboard-pill px-3 py-1"
-                onClick={() => handleCommunityAction(community.id, 'view-analytics')}
-                disabled={disableActions}
-              >
-                View analytics
-              </button>
-              <button
-                type="button"
-                className="dashboard-pill px-3 py-1"
-                onClick={() => handleCommunityAction(community.id, 'automations')}
-                disabled={disableActions}
-              >
-                Automations
-              </button>
-              <button
-                type="button"
-                className="dashboard-pill px-3 py-1"
-                onClick={() => handleCommunityAction(community.id, 'export-health-report')}
-                disabled={disableActions}
-              >
-                Export health report
-              </button>
-            </div>
-          </div>
-        ))}
-      </section>
+      <CommunityDirectory
+        communities={managed}
+        onAction={(community, actionId) => handleCommunityAction(community.id, actionId)}
+        disabled={disableActions}
+      />
 
       <section className="dashboard-section space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

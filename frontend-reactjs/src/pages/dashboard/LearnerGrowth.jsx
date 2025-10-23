@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import LearnerGoalsWidget from '../../components/dashboard/LearnerGoalsWidget.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import {
   createGrowthInitiative,
@@ -691,19 +692,7 @@ export default function LearnerGrowth() {
         </div>
       ) : null}
 
-      {metrics.length ? (
-        <section className="grid gap-4 md:grid-cols-3">
-          {metrics.map((metric) => (
-            <div
-              key={metric.label}
-              className="rounded-3xl border border-slate-200 bg-white/60 p-6 shadow-sm"
-            >
-              <p className="dashboard-kicker">{metric.label}</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{metric.value ?? '—'}</p>
-            </div>
-          ))}
-        </section>
-      ) : null}
+      <LearnerGoalsWidget initiatives={initiatives} metrics={metrics} />
 
       {initiativeFormVisible ? (
         <section className="dashboard-section">

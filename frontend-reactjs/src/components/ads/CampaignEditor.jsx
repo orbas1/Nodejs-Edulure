@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useMediaUpload } from '../../hooks/useMediaUpload.js';
 import CampaignPreview from './CampaignPreview.jsx';
+import CampaignOptimizationChecklist from './CampaignOptimizationChecklist.jsx';
 
 const DEFAULT_PLACEMENTS = [
   { context: 'global_feed', label: 'Discovery feed card', surface: 'Discovery Feed', slot: 'feed-inline' },
@@ -543,6 +544,7 @@ export default function CampaignEditor({
               {pacingInsight ?? 'We will forecast pacing once this campaign records at least three days of spend.'}
             </p>
           </div>
+          <CampaignOptimizationChecklist state={state} metrics={initialCampaign?.metrics} />
           <div className="mt-auto flex flex-wrap gap-3">
             <button
               type="submit"
