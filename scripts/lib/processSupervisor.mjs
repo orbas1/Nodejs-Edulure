@@ -4,6 +4,67 @@ import process from 'node:process';
 const DEFAULT_EXIT_TIMEOUT_MS = 5000;
 const WINDOWS = process.platform === 'win32';
 
+const ANSI = {
+  reset: '\u001B[0m',
+  blue: '\u001B[34m',
+  green: '\u001B[32m',
+  yellow: '\u001B[33m',
+  red: '\u001B[31m',
+  cyan: '\u001B[36m',
+  magenta: '\u001B[35m'
+};
+
+function supportsColor(stream = process.stdout) {
+  if (!stream) {
+    return false;
+  }
+  if (typeof stream.isTTY === 'boolean') {
+    return stream.isTTY;
+  }
+  return Boolean(process.stdout?.isTTY);
+}
+
+function determineColour(type) {
+  if (!type) {
+    return null;
+  }
+
+  const [category, detail] = String(type).split(':');
+  switch (category) {
+    case 'task': {
+      if (detail === 'complete') return 'green';
+      if (detail === 'error' || detail === 'fatal') return 'red';
+      if (detail === 'skip') return 'yellow';
+      return 'blue';
+    }
+    case 'process': {
+      if (detail === 'crash' || detail === 'error') return 'red';
+      if (detail === 'restart-complete' || detail === 'exit') return 'green';
+      if (detail === 'stopped') return 'yellow';
+      return 'cyan';
+    }
+    case 'command': {
+      if (detail === 'error' || detail === 'unknown') return 'red';
+      if (detail === 'list' || detail === 'help') return 'blue';
+      return 'blue';
+    }
+    default:
+      break;
+  }
+
+  if (type === 'ready') {
+    return 'green';
+  }
+  if (type === 'shutdown') {
+    return 'yellow';
+  }
+  if (type === 'hint' || type === 'preset') {
+    return 'cyan';
+  }
+
+  return null;
+}
+
 function toArray(value) {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
@@ -15,6 +76,14 @@ function normaliseLabel(label) {
 
 function createLogger({ scope, format = 'pretty', stream = process.stdout } = {}) {
   const label = scope ?? 'process-supervisor';
+  const colourEnabled = format === 'pretty' && supportsColor(stream);
+
+  const applyColour = (colour, value) => {
+    if (!colourEnabled || !colour || !ANSI[colour]) {
+      return value;
+    }
+    return `${ANSI[colour]}${value}${ANSI.reset}`;
+  };
 
   return function log(event) {
     const payload = {
@@ -28,16 +97,36 @@ function createLogger({ scope, format = 'pretty', stream = process.stdout } = {}
       return;
     }
 
-    const parts = [`[${label}]`];
+    const segments = [`[${label}]`];
     if (payload.label) {
-      parts.push(payload.label);
+      segments.push(payload.label);
     }
+
+    const messageSegments = [];
     if (payload.message) {
-      parts.push(payload.message);
+      messageSegments.push(payload.message);
     } else if (payload.type) {
-      parts.push(payload.type);
+      messageSegments.push(payload.type);
     }
-    stream.write(`${parts.join(' ')}\n`);
+
+    if (payload.details) {
+      if (typeof payload.details === 'string') {
+        messageSegments.push(payload.details);
+      } else {
+        try {
+          messageSegments.push(JSON.stringify(payload.details));
+        } catch (_error) {
+          messageSegments.push(String(payload.details));
+        }
+      }
+    }
+
+    const colour = determineColour(payload.type);
+    const renderedMessage = messageSegments.length
+      ? applyColour(colour, messageSegments.join(' – '))
+      : applyColour(colour, payload.type ?? 'event');
+
+    stream.write(`${segments.join(' ')} ${renderedMessage}\n`);
   };
 }
 

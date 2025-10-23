@@ -5,7 +5,7 @@ import readline from 'node:readline';
 import { parseArgs } from 'node:util';
 
 import createProcessSupervisor from './lib/processSupervisor.mjs';
-import { applyServicePreset } from '../backend-nodejs/src/utils/servicePreset.js';
+import { applyServicePreset, PRESET_DEFINITIONS } from '../backend-nodejs/src/utils/servicePreset.js';
 
 const VALID_LOG_FORMATS = new Set(['pretty', 'ndjson']);
 
@@ -37,10 +37,20 @@ async function main() {
   }
 
   const { preset, target, jobGroups } = applyServicePreset(backendEnv);
+  const presetDetails = PRESET_DEFINITIONS[preset] ?? null;
+  const description = presetDetails?.description ? ` – ${presetDetails.description}` : '';
+  const presetMessageParts = [`preset=${preset}`];
+  if (target) {
+    presetMessageParts.push(`targets=${target}`);
+  }
+  if (jobGroups) {
+    presetMessageParts.push(`jobGroups=${jobGroups}`);
+  }
 
   supervisor.log({
     type: 'preset',
-    message: `backend preset=${preset} targets=${target}${jobGroups ? ` jobGroups=${jobGroups}` : ''}`
+    label: presetDetails?.label ?? preset,
+    message: `${presetMessageParts.join(' ')}${description}`
   });
 
   if (!values['skip-db-install']) {

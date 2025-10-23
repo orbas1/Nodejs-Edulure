@@ -194,30 +194,35 @@ npm run audit
 Use the unified launcher to prepare the database and run backend + frontend services with a single command. Presets control which subsystems start automatically.
 
 ```bash
-# Start lite preset (HTTP APIs with in-process jobs + websocket gateway)
+# Start lite preset (HTTP APIs with essential background jobs)
 npm run dev:stack -- --preset=lite
 
-# Start full preset (includes heavy schedulers and realtime fan-out)
+# Start ads + analytics preset (enables monetisation/export jobs without engagement schedulers)
+npm run dev:stack -- --preset=ads-analytics
+
+# Start full preset (includes heavy schedulers, realtime fan-out, and engagement automation)
 npm run dev:stack -- --preset=full
 
 # Skip frontend if you only need the backend
 npm run dev:stack -- --preset=lite -- --skip-frontend
 ```
 
-- `--preset=lite` (default) launches the API with internalised job runners, realtime gateway, messaging, and search so only the frontend and backend processes are required locally.
-- `--preset=full` mirrors production by enabling heavier scheduler groups and realtime broadcasting, still inside the primary backend process.
-- `--preset=analytics` extends `full` by starting analytics/billing exporters; use when testing heavy data workflows.
+- `--preset=lite` (default) launches the API with internalised job runners, realtime gateway, messaging, and search while limiting worker schedulers to the `core` job group.
+- `--preset=ads-analytics` enables analytics and monetisation schedulers alongside the worker, keeping community/governance jobs paused so you can validate data exports and billing flows without extra load.
+- `--preset=full` mirrors production by enabling every scheduler group plus realtime broadcasting, still inside the primary backend process.
 - `--service-target=<list>` overrides preset defaults if you need explicit control (for example, `web,worker`).
 
 When the launcher runs it:
 
-1. Ensures Postgres migrations and seeds execute once, caching completion in `.edulure/setup-state.json` to avoid redundant installs.
+1. Ensures database migrations and seeds execute once (MySQL by default), caching completion in `.edulure/setup-state.json` to avoid redundant installs.
 2. Boots the backend with the cooperative job coordinator so worker, realtime, messaging, video, and notification subsystems live inside the same Node.js process.
-3. Enables the Edulure Search provider (Postgres-backed) and exposes health/readiness probes before starting the frontend.
-4. Streams prefixed logs (`[web]`, `[jobs]`, `[search]`, `[realtime]`) so you can differentiate subsystems quickly and see remediation hints if environment variables are missing.
+3. Applies the selected preset so the worker only starts scheduler job groups listed in `SERVICE_JOB_GROUPS` (set automatically by the preset). Telemetry and monetisation exporters stay dormant until you opt in via the preset or environment variables.
+4. Enables the Edulure Search provider (Postgres-backed) and exposes health/readiness probes before starting the frontend.
+5. Streams prefixed, colour-coded logs (`[web]`, `[jobs]`, `[search]`, `[realtime]`) so you can differentiate subsystems quickly and see remediation hints if environment variables are missing.
 
 - Pass `--log-format=ndjson` to emit newline-delimited JSON logs that can be piped into `jq` or forwarded to observability tooling. Pretty printing remains the default for interactive terminals.
 - While the launcher is running you can type commands into the terminal: `:list` prints active child processes, `:restart <label>` gracefully restarts either the backend or frontend watcher, `:help` shows the available commands, and `:quit` exits after shutting down child processes cleanly.
+- Override `SERVICE_JOB_GROUPS` (comma-separated) if you need to customise which background schedulers run outside of the preset defaults (for example, `SERVICE_JOB_GROUPS=core,analytics`).
 
 ### Guided installation UI
 

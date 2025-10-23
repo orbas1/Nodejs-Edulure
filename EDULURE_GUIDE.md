@@ -54,9 +54,9 @@ This guide documents the day-to-day workflows, operational expectations, and arc
    - Duplicate `.env.example` files for each workspace (`backend-nodejs/.env.example`, `frontend-reactjs/.env.example` if provided) and customise values for your environment.
 
 6. **Unified dev stack**
-   - Run `npm run dev:stack -- --preset=<lite|full|analytics>` to install the database (unless `--skip-db-install` is provided) and launch backend/frontend watchers through the shared process supervisor.
-   - The launcher and the backend `src/bin/stack.js` both call `applyServicePreset` so presets and manual `SERVICE_TARGET` overrides resolve consistently across scripts and runtime environments.
-   - Use interactive commands from the terminal (`:list`, `:restart <label>`, `:quit`) or `--log-format=ndjson` when you need machine-readable logs for piping into other tooling.
+   - Run `npm run dev:stack -- --preset=<lite|ads-analytics|full>` to install the database (unless `--skip-db-install` is provided) and launch backend/frontend watchers through the shared process supervisor. Presets map to job group combinations (`lite` = core, `ads-analytics` = core+analytics+monetization, `full` = all groups).
+   - The launcher and the backend `src/bin/stack.js` both call `applyServicePreset` so presets, `SERVICE_TARGET`, and `SERVICE_JOB_GROUPS` overrides resolve consistently across scripts and runtime environments.
+   - Use interactive commands from the terminal (`:list`, `:restart <label>`, `:quit`) or `--log-format=ndjson` when you need machine-readable logs. Pretty mode now colour-codes info/warn/error streams so it is easier to spot crashes.
 
 ## Backend service
 

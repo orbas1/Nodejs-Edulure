@@ -105,6 +105,7 @@ export async function seed(knex) {
     await trx('learner_payment_methods').del();
     await trx('learner_billing_contacts').del();
     await trx('learner_system_preferences').del();
+    await trx('service_presets').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flag_tenant_states').del();
     await trx('feature_flags').del();
@@ -3036,6 +3037,33 @@ export async function seed(knex) {
         exposure_level: 'internal',
         sensitive: false,
         metadata: JSON.stringify({ owner: 'Commerce' })
+      }
+    ]);
+
+    await trx('service_presets').insert([
+      {
+        key: 'lite',
+        label: 'Lite stack',
+        description: 'Single web process with background orchestration limited to essentials for local development.',
+        default_targets: JSON.stringify(['web']),
+        default_job_groups: JSON.stringify(['core']),
+        metadata: JSON.stringify({ recommendedFor: ['local-dev', 'qa'], order: 1 })
+      },
+      {
+        key: 'ads-analytics',
+        label: 'Ads & analytics stack',
+        description: 'Web and worker services with analytics and monetisation schedulers enabled for experimentation.',
+        default_targets: JSON.stringify(['web', 'worker']),
+        default_job_groups: JSON.stringify(['core', 'analytics', 'monetization']),
+        metadata: JSON.stringify({ recommendedFor: ['ads-validation', 'analytics'], order: 2 })
+      },
+      {
+        key: 'full',
+        label: 'Full stack',
+        description: 'Production-parity footprint with web, worker, and realtime services plus every scheduler enabled.',
+        default_targets: JSON.stringify(['web', 'worker', 'realtime']),
+        default_job_groups: JSON.stringify(['core', 'engagement', 'governance', 'analytics', 'monetization']),
+        metadata: JSON.stringify({ recommendedFor: ['staging', 'production'], order: 3 })
       }
     ]);
 

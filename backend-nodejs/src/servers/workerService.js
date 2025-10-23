@@ -19,7 +19,37 @@ import { createProcessSignalRegistry } from './processSignalRegistry.js';
 
 const serviceLogger = logger.child({ service: 'worker-service' });
 
+function parseJobGroups(value) {
+  if (!value) {
+    return new Set(['all']);
+  }
+
+  const tokens = String(value)
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!tokens.length) {
+    return new Set(['all']);
+  }
+
+  return new Set(tokens);
+}
+
+function isGroupEnabled(activeGroups, group) {
+  if (!group) {
+    return true;
+  }
+  if (!activeGroups || !activeGroups.size || activeGroups.has('all')) {
+    return true;
+  }
+  return activeGroups.has(group);
+}
+
 export async function startWorkerService({ withSignalHandlers = true } = {}) {
+  const activeJobGroups = parseJobGroups(process.env.SERVICE_JOB_GROUPS);
+  serviceLogger.info({ jobGroups: Array.from(activeJobGroups) }, 'Configured worker job groups');
+
   const readiness = createReadinessTracker('worker-service', [
     'database',
     'feature-flags',
@@ -92,116 +122,151 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   let probeServerPending = false;
 
   try {
-    readiness.markPending('asset-ingestion', 'Starting asset ingestion poller');
-    try {
-      assetIngestionService.start();
-      registerCleanup('asset-ingestion', () => assetIngestionService.stop());
-      if (!env.integrations.cloudConvertApiKey) {
+    if (isGroupEnabled(activeJobGroups, 'core')) {
+      readiness.markPending('asset-ingestion', 'Starting asset ingestion poller');
+      try {
+        assetIngestionService.start();
+        registerCleanup('asset-ingestion', () => assetIngestionService.stop());
+        if (!env.integrations.cloudConvertApiKey) {
+          readiness.markDegraded(
+            'asset-ingestion',
+            'Running without CloudConvert – PowerPoint conversions will queue until configured'
+          );
+          serviceLogger.warn('Asset ingestion running without CloudConvert API key; conversions will be retried later.');
+        } else {
+          readiness.markReady('asset-ingestion', 'Asset ingestion poller active');
+        }
+      } catch (error) {
+        readiness.markFailed('asset-ingestion', error);
+        serviceLogger.error({ err: error }, 'Failed to start asset ingestion service');
+        throw error;
+      }
+    } else {
+      readiness.markDegraded('asset-ingestion', 'Skipped – job group "core" disabled by preset');
+      serviceLogger.info('Skipping asset ingestion service because core job group disabled.');
+    }
+
+    if (isGroupEnabled(activeJobGroups, 'governance')) {
+      readiness.markPending('data-retention', 'Starting data retention scheduler');
+      try {
+        dataRetentionJob.start();
+        registerCleanup('data-retention', () => dataRetentionJob.stop());
+        if (!env.retention.enabled) {
+          readiness.markDegraded('data-retention', 'Data retention scheduler disabled by configuration');
+        } else {
+          readiness.markReady('data-retention', 'Data retention scheduler active');
+        }
+      } catch (error) {
+        readiness.markFailed('data-retention', error);
+        serviceLogger.error({ err: error }, 'Failed to start data retention job');
+        throw error;
+      }
+
+      readiness.markPending('data-partitioning', 'Starting data partition scheduler');
+      try {
+        dataPartitionJob.start();
+        registerCleanup('data-partitioning', () => dataPartitionJob.stop());
+        if (!env.partitioning.enabled) {
+          readiness.markDegraded('data-partitioning', 'Data partition scheduler disabled by configuration');
+        } else {
+          readiness.markReady('data-partitioning', 'Data partition scheduler active');
+        }
+      } catch (error) {
+        readiness.markFailed('data-partitioning', error);
+        serviceLogger.error({ err: error }, 'Failed to start data partition job');
+        throw error;
+      }
+    } else {
+      readiness.markDegraded('data-retention', 'Skipped – job group "governance" disabled by preset');
+      readiness.markDegraded('data-partitioning', 'Skipped – job group "governance" disabled by preset');
+      serviceLogger.info('Skipping governance job group (data retention/partitioning) because preset disabled it.');
+    }
+
+    if (isGroupEnabled(activeJobGroups, 'engagement')) {
+      readiness.markPending('community-reminder', 'Starting community reminder scheduler');
+      try {
+        communityReminderJob.start();
+        registerCleanup('community-reminder', () => communityReminderJob.stop());
+        if (!env.engagement.reminders.enabled) {
+          readiness.markDegraded('community-reminder', 'Community reminders disabled by configuration');
+        } else {
+          readiness.markReady('community-reminder', 'Community reminders scheduler active');
+        }
+      } catch (error) {
+        readiness.markFailed('community-reminder', error);
+        serviceLogger.error({ err: error }, 'Failed to start community reminder job');
+        throw error;
+      }
+
+      readiness.markPending('moderation-follow-up', 'Starting moderation follow-up scheduler');
+      try {
+        moderationFollowUpJob.start();
+        registerCleanup('moderation-follow-up', () => moderationFollowUpJob.stop());
+        if (!env.moderation.followUps.enabled) {
+          readiness.markDegraded(
+            'moderation-follow-up',
+            'Moderation follow-up reminders disabled by configuration'
+          );
+        } else {
+          readiness.markReady('moderation-follow-up', 'Moderation follow-up scheduler active');
+        }
+      } catch (error) {
+        readiness.markFailed('moderation-follow-up', error);
+        serviceLogger.error({ err: error }, 'Failed to start moderation follow-up job');
+        throw error;
+      }
+    } else {
+      readiness.markDegraded('community-reminder', 'Skipped – job group "engagement" disabled by preset');
+      readiness.markDegraded('moderation-follow-up', 'Skipped – job group "engagement" disabled by preset');
+      serviceLogger.info('Skipping engagement job group because preset disabled it.');
+    }
+
+    if (isGroupEnabled(activeJobGroups, 'analytics')) {
+      if (env.telemetry.export.enabled) {
+        readiness.markPending('telemetry-warehouse', 'Starting telemetry warehouse scheduler');
+        try {
+          telemetryWarehouseJob.start();
+          registerCleanup('telemetry-warehouse', () => telemetryWarehouseJob.stop());
+          readiness.markReady('telemetry-warehouse', 'Telemetry export scheduler active');
+        } catch (error) {
+          readiness.markFailed('telemetry-warehouse', error);
+          serviceLogger.error({ err: error }, 'Failed to start telemetry warehouse job');
+          throw error;
+        }
+      } else {
         readiness.markDegraded(
-          'asset-ingestion',
-          'Running without CloudConvert – PowerPoint conversions will queue until configured'
+          'telemetry-warehouse',
+          'Skipped – telemetry export disabled by configuration'
         );
-        serviceLogger.warn('Asset ingestion running without CloudConvert API key; conversions will be retried later.');
-      } else {
-        readiness.markReady('asset-ingestion', 'Asset ingestion poller active');
+        serviceLogger.info('Telemetry warehouse job disabled via configuration.');
       }
-    } catch (error) {
-      readiness.markFailed('asset-ingestion', error);
-      serviceLogger.error({ err: error }, 'Failed to start asset ingestion service');
-      throw error;
+    } else {
+      readiness.markDegraded('telemetry-warehouse', 'Skipped – job group "analytics" disabled by preset');
+      serviceLogger.info('Skipping analytics job group because preset disabled it.');
     }
 
-    readiness.markPending('data-retention', 'Starting data retention scheduler');
-    try {
-      dataRetentionJob.start();
-      registerCleanup('data-retention', () => dataRetentionJob.stop());
-      if (!env.retention.enabled) {
-        readiness.markDegraded('data-retention', 'Data retention scheduler disabled by configuration');
+    if (isGroupEnabled(activeJobGroups, 'monetization')) {
+      if (env.monetization.reconciliation.enabled) {
+        readiness.markPending('monetization-reconciliation', 'Starting monetization reconciliation scheduler');
+        try {
+          monetizationReconciliationJob.start();
+          registerCleanup('monetization-reconciliation', () => monetizationReconciliationJob.stop());
+          readiness.markReady('monetization-reconciliation', 'Monetization reconciliation scheduler active');
+        } catch (error) {
+          readiness.markFailed('monetization-reconciliation', error);
+          serviceLogger.error({ err: error }, 'Failed to start monetization reconciliation job');
+          throw error;
+        }
       } else {
-        readiness.markReady('data-retention', 'Data retention scheduler active');
-      }
-    } catch (error) {
-      readiness.markFailed('data-retention', error);
-      serviceLogger.error({ err: error }, 'Failed to start data retention job');
-      throw error;
-    }
-
-    readiness.markPending('data-partitioning', 'Starting data partition scheduler');
-    try {
-      dataPartitionJob.start();
-      registerCleanup('data-partitioning', () => dataPartitionJob.stop());
-      if (!env.partitioning.enabled) {
-        readiness.markDegraded('data-partitioning', 'Data partition scheduler disabled by configuration');
-      } else {
-        readiness.markReady('data-partitioning', 'Data partition scheduler active');
-      }
-    } catch (error) {
-      readiness.markFailed('data-partitioning', error);
-      serviceLogger.error({ err: error }, 'Failed to start data partition job');
-      throw error;
-    }
-
-    readiness.markPending('community-reminder', 'Starting community reminder scheduler');
-    try {
-      communityReminderJob.start();
-      registerCleanup('community-reminder', () => communityReminderJob.stop());
-      if (!env.engagement.reminders.enabled) {
-        readiness.markDegraded('community-reminder', 'Community reminders disabled by configuration');
-      } else {
-        readiness.markReady('community-reminder', 'Community reminders scheduler active');
-      }
-    } catch (error) {
-      readiness.markFailed('community-reminder', error);
-      serviceLogger.error({ err: error }, 'Failed to start community reminder job');
-      throw error;
-    }
-
-    readiness.markPending('moderation-follow-up', 'Starting moderation follow-up scheduler');
-    try {
-      moderationFollowUpJob.start();
-      registerCleanup('moderation-follow-up', () => moderationFollowUpJob.stop());
-      if (!env.moderation.followUps.enabled) {
         readiness.markDegraded(
-          'moderation-follow-up',
-          'Moderation follow-up reminders disabled by configuration'
+          'monetization-reconciliation',
+          'Skipped – monetization reconciliation disabled by configuration'
         );
-      } else {
-        readiness.markReady('moderation-follow-up', 'Moderation follow-up scheduler active');
+        serviceLogger.info('Monetization reconciliation job disabled via configuration.');
       }
-    } catch (error) {
-      readiness.markFailed('moderation-follow-up', error);
-      serviceLogger.error({ err: error }, 'Failed to start moderation follow-up job');
-      throw error;
-    }
-
-    readiness.markPending('telemetry-warehouse', 'Starting telemetry warehouse scheduler');
-    try {
-      telemetryWarehouseJob.start();
-      registerCleanup('telemetry-warehouse', () => telemetryWarehouseJob.stop());
-      if (!env.telemetry.export.enabled) {
-        readiness.markDegraded('telemetry-warehouse', 'Telemetry export scheduler disabled by configuration');
-      } else {
-        readiness.markReady('telemetry-warehouse', 'Telemetry export scheduler active');
-      }
-    } catch (error) {
-      readiness.markFailed('telemetry-warehouse', error);
-      serviceLogger.error({ err: error }, 'Failed to start telemetry warehouse job');
-      throw error;
-    }
-
-    readiness.markPending('monetization-reconciliation', 'Starting monetization reconciliation scheduler');
-    try {
-      monetizationReconciliationJob.start();
-      registerCleanup('monetization-reconciliation', () => monetizationReconciliationJob.stop());
-      if (!env.monetization.reconciliation.enabled) {
-        readiness.markDegraded('monetization-reconciliation', 'Monetization reconciliation disabled by configuration');
-      } else {
-        readiness.markReady('monetization-reconciliation', 'Monetization reconciliation scheduler active');
-      }
-    } catch (error) {
-      readiness.markFailed('monetization-reconciliation', error);
-      serviceLogger.error({ err: error }, 'Failed to start monetization reconciliation job');
-      throw error;
+    } else {
+      readiness.markDegraded('monetization-reconciliation', 'Skipped – job group "monetization" disabled by preset');
+      serviceLogger.info('Skipping monetization job group because preset disabled it.');
     }
 
     readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');

@@ -4,6 +4,7 @@ import {
   setupOrchestratorService,
   DEFAULT_SETUP_TASK_SEQUENCE
 } from '../services/SetupOrchestratorService.js';
+import ServicePresetModel from '../models/ServicePresetModel.js';
 import { success } from '../utils/httpResponse.js';
 
 const startSchema = Joi.object({
@@ -22,6 +23,7 @@ const startSchema = Joi.object({
 export default class SetupController {
   static async getStatus(_req, res) {
     const state = setupOrchestratorService.getStatus();
+    const presets = await ServicePresetModel.listAll();
     return success(res, {
       status: 200,
       message: 'Setup status retrieved',
@@ -30,7 +32,8 @@ export default class SetupController {
         tasks: setupOrchestratorService.describeTasks(),
         defaults: {
           sequence: DEFAULT_SETUP_TASK_SEQUENCE
-        }
+        },
+        presets
       }
     });
   }
