@@ -1455,9 +1455,11 @@ export default class LearnerDashboardController {
   static async joinLiveSession(req, res, next) {
     try {
       const sessionId = requireIdentifier(req.params, 'sessionId', { label: 'Live session id' });
+      const body = sanitiseBody(req.body ?? {});
       const acknowledgement = await LearnerDashboardService.joinLiveSession(
         req.user.id,
-        sessionId
+        sessionId,
+        body
       );
       return success(res, {
         data: acknowledgement,
@@ -1471,9 +1473,11 @@ export default class LearnerDashboardController {
   static async checkInToLiveSession(req, res, next) {
     try {
       const sessionId = requireIdentifier(req.params, 'sessionId', { label: 'Live session id' });
+      const body = sanitiseBody(req.body ?? {});
       const acknowledgement = await LearnerDashboardService.checkInToLiveSession(
         req.user.id,
-        sessionId
+        sessionId,
+        body
       );
       return success(res, {
         data: acknowledgement,

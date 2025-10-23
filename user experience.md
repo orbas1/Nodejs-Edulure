@@ -149,7 +149,7 @@ G. **Full Upgrade Plan & Release Steps** – Implement shared feed primitives, e
 - **Event replays** – Card grid with thumbnails and tags.
 
 ### Assessments
-A. **Redundancy Changes** – Unify chat components between live sessions and support lounge; share countdown timer. Mount both experiences on `frontend-reactjs/src/components/live/LiveChatPanel.jsx` and `CountdownTimer.jsx` so feature updates propagate everywhere.
+A. **Redundancy Changes** – Unify chat components between live sessions and support lounge; share countdown timer. Mount both experiences on `frontend-reactjs/src/components/live/LiveChatPanel.jsx` and `CountdownTimer.jsx` so feature updates propagate everywhere, and drive scheduling views through the shared `frontend-reactjs/src/components/scheduling/ScheduleCard.jsx` primitive now reused by tutor rosters and admin consoles.
 
 B. **Strengths to Keep** – Maintain calm lobby, clear host controls, and follow-up checklist.
 
@@ -157,7 +157,7 @@ C. **Weaknesses to Remove** – Provide offline fallback for video, reduce clutt
 
 D. **Sesing and Colour Review Changes** – Darken stage background, highlight controls with secondary accent, and ensure chat bubbles maintain contrast.
 
-E. **Improvements & Justification Changes** – Add adaptive bitrate controls, integrate knowledge base suggestions, and support session tagging for analytics. Show proactive knowledge base cards by querying the Edulure Search API with the ticket subject before agents respond.
+E. **Improvements & Justification Changes** – Add adaptive bitrate controls, integrate knowledge base suggestions, and support session tagging for analytics. Show proactive knowledge base cards by querying the Edulure Search API with the ticket subject before agents respond, while the streaming mode selector now forwards learner preferences to `LearnerDashboardService.joinLiveSession` so attendance telemetry in catalogue cards reflects real connection quality.
 
 F. **Change Checklist Tracker** – Completion 35%; tests for realtime fallback; ensure knowledge base seeded; schema updates for replay metadata.
 

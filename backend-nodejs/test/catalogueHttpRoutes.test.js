@@ -62,13 +62,16 @@ describe('Catalogue HTTP routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data).toHaveLength(1);
-    expect(listLiveClassroomsSpy).toHaveBeenCalledWith({
-      search: undefined,
-      statuses: ['scheduled', 'live'],
-      limit: 12,
-      offset: 0,
-      upcomingOnly: true
-    });
+    expect(listLiveClassroomsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search: undefined,
+        statuses: ['scheduled', 'live'],
+        limit: 12,
+        offset: 0,
+        upcomingOnly: true,
+        registrationForUserId: null
+      })
+    );
     expect(countLiveClassroomsSpy).toHaveBeenCalledWith({
       search: undefined,
       statuses: ['scheduled', 'live'],
@@ -85,13 +88,16 @@ describe('Catalogue HTTP routes', () => {
       .query({ search: 'analytics', statuses: 'completed', includePast: 'true', limit: 5, offset: 10 });
 
     expect(response.status).toBe(200);
-    expect(listLiveClassroomsSpy).toHaveBeenCalledWith({
-      search: 'analytics',
-      statuses: ['completed'],
-      limit: 5,
-      offset: 10,
-      upcomingOnly: false
-    });
+    expect(listLiveClassroomsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search: 'analytics',
+        statuses: ['completed'],
+        limit: 5,
+        offset: 10,
+        upcomingOnly: false,
+        registrationForUserId: null
+      })
+    );
     expect(countLiveClassroomsSpy).toHaveBeenCalledWith({
       search: 'analytics',
       statuses: ['completed'],

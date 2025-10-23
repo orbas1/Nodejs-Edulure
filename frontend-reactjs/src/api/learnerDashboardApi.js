@@ -270,14 +270,27 @@ export async function deleteFinancePurchase({ token, purchaseId, signal } = {}) 
   });
 }
 
-export async function joinLiveSession({ token, sessionId, signal } = {}) {
+export async function joinLiveSession({
+  token,
+  sessionId,
+  quality,
+  bandwidthCapKbps,
+  device,
+  signal
+} = {}) {
   ensureToken(token);
   if (!sessionId) {
     throw new Error('A live session identifier is required to join');
   }
+  const payload = {};
+  if (quality) payload.quality = quality;
+  if (bandwidthCapKbps !== undefined && bandwidthCapKbps !== null) {
+    payload.bandwidthCapKbps = Number(bandwidthCapKbps);
+  }
+  if (device) payload.device = device;
   return httpClient.post(
     `/dashboard/learner/live-sessions/${sessionId}/join`,
-    {},
+    payload,
     {
       token,
       signal
@@ -285,14 +298,33 @@ export async function joinLiveSession({ token, sessionId, signal } = {}) {
   );
 }
 
-export async function checkInToLiveSession({ token, sessionId, signal } = {}) {
+export async function checkInToLiveSession({
+  token,
+  sessionId,
+  quality,
+  latencyMs,
+  downlinkKbps,
+  bandwidthCapKbps,
+  device,
+  signal
+} = {}) {
   ensureToken(token);
   if (!sessionId) {
     throw new Error('A live session identifier is required to check in');
   }
+  const payload = {};
+  if (quality) payload.quality = quality;
+  if (latencyMs !== undefined && latencyMs !== null) payload.latencyMs = Number(latencyMs);
+  if (downlinkKbps !== undefined && downlinkKbps !== null) {
+    payload.downlinkKbps = Number(downlinkKbps);
+  }
+  if (bandwidthCapKbps !== undefined && bandwidthCapKbps !== null) {
+    payload.bandwidthCapKbps = Number(bandwidthCapKbps);
+  }
+  if (device) payload.device = device;
   return httpClient.post(
     `/dashboard/learner/live-sessions/${sessionId}/check-in`,
-    {},
+    payload,
     {
       token,
       signal

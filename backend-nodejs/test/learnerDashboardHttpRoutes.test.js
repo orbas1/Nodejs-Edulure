@@ -231,4 +231,36 @@ describe('Learner dashboard HTTP routes', () => {
       body: 'Hello'
     });
   });
+
+  it('passes streaming preferences through to the live session join service', async () => {
+    serviceMock.joinLiveSession.mockResolvedValue({ reference: 'lc-1' });
+
+    const response = await request(app)
+      .post('/api/v1/dashboard/learner/live-sessions/lc-1/join')
+      .send({ quality: ' LOW ', bandwidthCapKbps: '800', device: ' Mobile ' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.joinLiveSession).toHaveBeenCalledWith(42, 'lc-1', {
+      quality: 'LOW',
+      bandwidthCapKbps: '800',
+      device: 'Mobile'
+    });
+  });
+
+  it('passes network diagnostics when checking in to live sessions', async () => {
+    serviceMock.checkInToLiveSession.mockResolvedValue({ reference: 'checkin_1' });
+
+    const response = await request(app)
+      .post('/api/v1/dashboard/learner/live-sessions/lc-99/check-in')
+      .send({ latencyMs: 420, downlinkKbps: '1200', device: ' Desktop ' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.checkInToLiveSession).toHaveBeenCalledWith(42, 'lc-99', {
+      latencyMs: 420,
+      downlinkKbps: '1200',
+      device: 'Desktop'
+    });
+  });
 });

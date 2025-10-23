@@ -17,6 +17,8 @@ import LearnerAffiliatePayoutModel from '../models/LearnerAffiliatePayoutModel.j
 import LearnerAdCampaignModel from '../models/LearnerAdCampaignModel.js';
 import InstructorApplicationModel from '../models/InstructorApplicationModel.js';
 import LearnerLibraryEntryModel from '../models/LearnerLibraryEntryModel.js';
+import LiveClassroomModel from '../models/LiveClassroomModel.js';
+import LiveClassroomRegistrationModel from '../models/LiveClassroomRegistrationModel.js';
 import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
 import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
@@ -59,6 +61,31 @@ function parseDate(value, fallback) {
 function normaliseDurationMinutes(value, fallback = 60) {
   const numeric = Number(value);
   if (Number.isFinite(numeric) && numeric >= 15 && numeric <= 600) {
+    return Math.round(numeric);
+  }
+  return fallback;
+}
+
+const STREAM_QUALITIES = new Set(['standard', 'low', 'audio']);
+
+function normaliseStreamQuality(value) {
+  if (!value) {
+    return 'standard';
+  }
+  const normalised = String(value).trim().toLowerCase();
+  return STREAM_QUALITIES.has(normalised) ? normalised : 'standard';
+}
+
+function normaliseDeviceProfile(value) {
+  if (!value) {
+    return 'web';
+  }
+  return String(value).trim().toLowerCase().slice(0, 120) || 'web';
+}
+
+function normalisePositiveInteger(value, fallback = null) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric >= 0) {
     return Math.round(numeric);
   }
   return fallback;
@@ -1772,23 +1799,166 @@ export default class LearnerDashboardService {
     });
   }
 
-  static async joinLiveSession(userId, sessionId) {
-    log.info({ userId, sessionId }, 'Learner joined live session');
-    return buildAcknowledgement({
-      reference: sessionId,
-      message: 'Live session joined'
+  static async joinLiveSession(userId, sessionIdentifier, options = {}) {
+    if (!userId) {
+      const error = new Error('Authentication is required to join a live session');
+      error.status = 401;
+      throw error;
+    }
+
+    const quality = normaliseStreamQuality(options.quality);
+    const bandwidthCapKbps = normalisePositiveInteger(options.bandwidthCapKbps);
+    const device = normaliseDeviceProfile(options.device);
+
+    return db.transaction(async (trx) => {
+      const classroom = await LiveClassroomModel.findByIdentifier(sessionIdentifier, trx, {
+        registrationForUserId: userId
+      });
+      if (!classroom) {
+        const error = new Error('Live classroom not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const metadata = {
+        streaming: {
+          quality,
+          bandwidthCapKbps,
+          device
+        },
+        joinedAt: new Date().toISOString()
+      };
+
+      await LiveClassroomRegistrationModel.registerOrUpdate(
+        {
+          classroomId: classroom.id,
+          userId,
+          status: 'registered',
+          metadata,
+          checkpoint: {
+            type: 'join',
+            userId,
+            quality,
+            bandwidthCapKbps,
+            device
+          }
+        },
+        trx
+      );
+
+      await LiveClassroomModel.appendAttendanceCheckpoint(
+        classroom.id,
+        {
+          type: 'join',
+          userId,
+          quality,
+          bandwidthCapKbps,
+          device
+        },
+        trx
+      );
+
+      log.info({ userId, sessionId: classroom.publicId ?? classroom.id, quality, device }, 'Learner joined live session');
+
+      return buildAcknowledgement({
+        reference: classroom.publicId ?? String(classroom.id),
+        message: 'Live session joined',
+        meta: {
+          quality,
+          bandwidthCapKbps,
+          device
+        }
+      });
     });
   }
 
-  static async checkInToLiveSession(userId, sessionId) {
-    const checkInId = generateReference('checkin');
-    log.info({ userId, sessionId, checkInId }, 'Learner checked in to live session');
-    return buildAcknowledgement({
-      reference: checkInId,
-      message: 'Live session check-in recorded',
-      meta: {
-        sessionId
+  static async checkInToLiveSession(userId, sessionIdentifier, options = {}) {
+    if (!userId) {
+      const error = new Error('Authentication is required to check in to a live session');
+      error.status = 401;
+      throw error;
+    }
+
+    const quality = normaliseStreamQuality(options.quality);
+    const latencyMs = normalisePositiveInteger(options.latencyMs);
+    const downlinkKbps = normalisePositiveInteger(options.downlinkKbps);
+    const bandwidthCapKbps = normalisePositiveInteger(options.bandwidthCapKbps);
+    const device = normaliseDeviceProfile(options.device);
+
+    return db.transaction(async (trx) => {
+      const classroom = await LiveClassroomModel.findByIdentifier(sessionIdentifier, trx, {
+        registrationForUserId: userId
+      });
+      if (!classroom) {
+        const error = new Error('Live classroom not found');
+        error.status = 404;
+        throw error;
       }
+
+      const checkInId = generateReference('checkin');
+      const metadata = {
+        streaming: {
+          quality,
+          bandwidthCapKbps,
+          device,
+          latencyMs,
+          downlinkKbps
+        },
+        lastCheckInId: checkInId,
+        lastCheckInAt: new Date().toISOString()
+      };
+
+      await LiveClassroomRegistrationModel.registerOrUpdate(
+        {
+          classroomId: classroom.id,
+          userId,
+          status: 'attended',
+          metadata,
+          checkpoint: {
+            type: 'check-in',
+            userId,
+            quality,
+            latencyMs,
+            bandwidthCapKbps,
+            downlinkKbps,
+            device,
+            reference: checkInId
+          }
+        },
+        trx
+      );
+
+      await LiveClassroomModel.appendAttendanceCheckpoint(
+        classroom.id,
+        {
+          type: 'check-in',
+          userId,
+          quality,
+          latencyMs,
+          bandwidthCapKbps,
+          downlinkKbps,
+          device,
+          reference: checkInId
+        },
+        trx
+      );
+
+      log.info(
+        { userId, sessionId: classroom.publicId ?? classroom.id, checkInId, latencyMs, downlinkKbps, quality },
+        'Learner checked in to live session'
+      );
+
+      return buildAcknowledgement({
+        reference: checkInId,
+        message: 'Live session check-in recorded',
+        meta: {
+          sessionId: classroom.publicId ?? String(classroom.id),
+          quality,
+          latencyMs,
+          downlinkKbps,
+          device
+        }
+      });
     });
   }
 

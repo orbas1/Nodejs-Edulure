@@ -138,7 +138,9 @@ describe('Live classrooms public catalogue behaviour', () => {
 
     await user.click(await screen.findByRole('button', { name: /Check in/i }));
 
-    expect(checkInToLiveSessionMock).toHaveBeenCalledWith({ token: 'token', sessionId: 'lc-2' });
+    expect(checkInToLiveSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'token', sessionId: 'lc-2', quality: 'standard', device: expect.any(String) })
+    );
     expect(await screen.findByText('Check-in recorded. Enjoy the classroom!')).toBeInTheDocument();
   });
 
@@ -171,7 +173,9 @@ describe('Live classrooms public catalogue behaviour', () => {
 
     await user.click(await screen.findByRole('button', { name: /Join session/i }));
 
-    expect(joinLiveSessionMock).toHaveBeenCalledWith({ token: 'token', sessionId: 'pub-3' });
+    expect(joinLiveSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'token', sessionId: 'pub-3', quality: 'standard', device: expect.any(String) })
+    );
     expect(await screen.findByText('Session joined. Check your email for the meeting link.')).toBeInTheDocument();
   });
 });

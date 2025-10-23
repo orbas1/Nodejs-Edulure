@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowPathIcon,
   CalendarDaysIcon,
+  ChartBarIcon,
+  PencilSquareIcon,
   PlayCircleIcon,
+  SignalIcon,
+  TrashIcon,
   VideoCameraIcon
 } from '@heroicons/react/24/outline';
 
@@ -15,6 +19,7 @@ import {
 } from '../api/learnerDashboardApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { listPublicLiveClassrooms } from '../api/catalogueApi.js';
+import ScheduleCard from '../components/scheduling/ScheduleCard.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
@@ -79,6 +84,93 @@ const FORM_STEPS = [
     description: 'Topics, slug and JSON metadata'
   }
 ];
+
+function classNames(...classes) {
+  return classes.filter(Boolean).join(' ');
+}
+
+const STREAMING_MODES = {
+  standard: {
+    label: 'Balanced streaming',
+    description: '720p video, realtime chat and adaptive captions.',
+    bandwidthCapKbps: null
+  },
+  low: {
+    label: 'Low bandwidth',
+    description: '480p video with throttled reactions for congested networks.',
+    bandwidthCapKbps: 800
+  },
+  audio: {
+    label: 'Audio only',
+    description: 'Disable video and focus on captions plus emoji reactions.',
+    bandwidthCapKbps: 128
+  }
+};
+
+function formatDateTime(value, options = {}) {
+  if (!value) return 'TBC';
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'TBC';
+    }
+    return date.toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      ...options
+    });
+  } catch (_error) {
+    return 'TBC';
+  }
+}
+
+function formatStatus(status) {
+  if (!status) return 'Draft';
+  return status
+    .toString()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function resolveScheduleTone(status) {
+  switch (status) {
+    case 'live':
+      return 'success';
+    case 'cancelled':
+      return 'danger';
+    case 'draft':
+      return 'neutral';
+    default:
+      return 'primary';
+  }
+}
+
+function getDeviceProfile() {
+  if (typeof navigator === 'undefined') {
+    return 'web';
+  }
+  if (navigator.userAgentData?.platform) {
+    return navigator.userAgentData.platform.toLowerCase();
+  }
+  if (navigator.platform) {
+    return navigator.platform.toLowerCase();
+  }
+  return (navigator.userAgent || 'web').slice(0, 120).toLowerCase();
+}
+
+function getNetworkMetrics() {
+  if (typeof navigator === 'undefined') {
+    return { latencyMs: null, downlinkKbps: null };
+  }
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!connection) {
+    return { latencyMs: null, downlinkKbps: null };
+  }
+  const latencyMs = typeof connection.rtt === 'number' ? Math.round(connection.rtt) : null;
+  const downlinkKbps =
+    typeof connection.downlink === 'number' ? Math.round(connection.downlink * 1000) : null;
+  return { latencyMs, downlinkKbps };
+}
 
 function createEmptyForm() {
   return {
@@ -145,6 +237,12 @@ function LiveClassroomCard({ classroom, onJoin, onCheckIn }) {
     completed: 'bg-primary/10 text-primary',
     cancelled: 'bg-rose-100 text-rose-600'
   }[classroom.status ?? 'draft'];
+  const analytics = classroom.analytics ?? {};
+  const attendanceHistory = Array.isArray(classroom.metadata?.attendanceCheckpoints)
+    ? classroom.metadata.attendanceCheckpoints
+    : [];
+  const lastEvent = analytics.lastEventAt || attendanceHistory.at(-1)?.occurredAt || null;
+  const lastEventType = analytics.lastEventType || attendanceHistory.at(-1)?.type || null;
   return (
     <article className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -156,10 +254,10 @@ function LiveClassroomCard({ classroom, onJoin, onCheckIn }) {
           {classroom.summary ? <p className="text-sm text-slate-600">{classroom.summary}</p> : null}
           <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 ${statusColour}`}>
-              {classroom.status}
+              {formatStatus(classroom.status)}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-              Capacity {classroom.capacity ?? 0}
+              Reserved {classroom.reservedSeats ?? 0}/{classroom.capacity ?? 0}
             </span>
             {classroom.isTicketed ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-amber-600">
@@ -173,27 +271,22 @@ function LiveClassroomCard({ classroom, onJoin, onCheckIn }) {
           </div>
         </div>
         <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <CalendarDaysIcon className="h-4 w-4" /> Schedule
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <CalendarDaysIcon className="h-4 w-4" /> Schedule
+        </p>
+        <p className="mt-2 font-semibold text-slate-800">
+          {formatDateTime(classroom.startAt)}
+        </p>
+        {classroom.endAt ? (
+          <p className="text-xs text-slate-500">
+            Ends {formatDateTime(classroom.endAt, { dateStyle: undefined, timeStyle: 'short' })}
           </p>
-          <p className="mt-2 font-semibold text-slate-800">
-            {classroom.startAt
-              ? new Date(classroom.startAt).toLocaleString(undefined, {
-                  dateStyle: 'medium',
-                  timeStyle: 'short'
-                })
-              : 'TBC'}
-          </p>
-          {classroom.endAt ? (
-            <p className="text-xs text-slate-500">
-              Ends {new Date(classroom.endAt).toLocaleString(undefined, { timeStyle: 'short' })}
-            </p>
-          ) : null}
-          {classroom.timezone ? (
-            <p className="mt-1 text-xs text-slate-500">Timezone {classroom.timezone}</p>
-          ) : null}
-        </div>
+        ) : null}
+        {classroom.timezone ? (
+          <p className="mt-1 text-xs text-slate-500">Timezone {classroom.timezone}</p>
+        ) : null}
       </div>
+    </div>
       {classroom.description ? (
         <p className="text-sm leading-relaxed text-slate-600">{classroom.description}</p>
       ) : null}
@@ -206,6 +299,22 @@ function LiveClassroomCard({ classroom, onJoin, onCheckIn }) {
           ))}
         </div>
       ) : null}
+      <div className="grid gap-2 rounded-3xl bg-slate-900/90 p-4 text-slate-100">
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
+          <ChartBarIcon className="h-4 w-4" /> Attendance telemetry
+        </p>
+        <div className="flex flex-wrap gap-4 text-sm font-semibold">
+          <span>{analytics.totalJoins ?? 0} joins</span>
+          <span>{analytics.totalCheckIns ?? 0} check-ins</span>
+          {analytics.averageLatencyMs ? <span>{analytics.averageLatencyMs} ms latency</span> : null}
+          {analytics.peakBandwidthKbps ? <span>{analytics.peakBandwidthKbps} kbps peak</span> : null}
+        </div>
+        <p className="text-xs text-slate-300">
+          {lastEvent
+            ? `Last event ${formatDateTime(lastEvent)} · ${lastEventType ? formatStatus(lastEventType) : 'Recorded'}`
+            : 'No attendance checkpoints recorded yet.'}
+        </p>
+      </div>
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -523,6 +632,7 @@ export default function LiveClassrooms() {
   const [editingId, setEditingId] = useState(null);
   const [currentStep, setCurrentStep] = useState('basics');
   const [submitting, setSubmitting] = useState(false);
+  const [bandwidthMode, setBandwidthMode] = useState('standard');
 
   const featuredLiveClass = useMemo(() => liveClassrooms[0] ?? null, [liveClassrooms]);
   const liveKeywords = useMemo(() => {
@@ -712,7 +822,14 @@ export default function LiveClassrooms() {
     }
     try {
       const sessionId = classroom.publicId ?? classroom.id;
-      await joinLiveSession({ token, sessionId });
+      const selectedMode = STREAMING_MODES[bandwidthMode] ?? STREAMING_MODES.standard;
+      await joinLiveSession({
+        token,
+        sessionId,
+        quality: bandwidthMode,
+        bandwidthCapKbps: selectedMode.bandwidthCapKbps,
+        device: getDeviceProfile()
+      });
       setSuccessMessage('Session joined. Check your email for the meeting link.');
     } catch (err) {
       setError(err.message ?? 'Unable to join session');
@@ -726,7 +843,17 @@ export default function LiveClassrooms() {
     }
     try {
       const sessionId = classroom.publicId ?? classroom.id;
-      await checkInToLiveSession({ token, sessionId });
+      const selectedMode = STREAMING_MODES[bandwidthMode] ?? STREAMING_MODES.standard;
+      const { latencyMs, downlinkKbps } = getNetworkMetrics();
+      await checkInToLiveSession({
+        token,
+        sessionId,
+        quality: bandwidthMode,
+        latencyMs,
+        downlinkKbps,
+        bandwidthCapKbps: selectedMode.bandwidthCapKbps,
+        device: getDeviceProfile()
+      });
       setSuccessMessage('Check-in recorded. Enjoy the classroom!');
     } catch (err) {
       setError(err.message ?? 'Unable to check in');
@@ -785,46 +912,51 @@ export default function LiveClassrooms() {
             <p className="text-sm text-slate-500">No live classrooms scheduled yet.</p>
           ) : null}
           <div className="grid gap-4">
-            {liveClassrooms.map((classroom) => (
-              <div
-                key={classroom.id}
-                className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-slate-600"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{classroom.title}</p>
-                    <p className="text-xs text-slate-500">
-                      Starts{' '}
-                      {classroom.startAt
-                        ? new Date(classroom.startAt).toLocaleString(undefined, {
-                            dateStyle: 'medium',
-                            timeStyle: 'short'
-                          })
-                        : 'TBC'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(classroom)}
-                      className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(classroom.id)}
-                      className="inline-flex items-center justify-center rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Capacity {classroom.capacity ?? 0} · Reserved {classroom.reservedSeats ?? 0} · Status {classroom.status}
-                </p>
-              </div>
-            ))}
+            {liveClassrooms.map((classroom) => {
+              const analytics = classroom.analytics ?? {};
+              return (
+                <ScheduleCard
+                  key={classroom.id}
+                  title={classroom.title}
+                  subtitle={classroom.communityName ? `Community · ${classroom.communityName}` : undefined}
+                  statusLabel={formatStatus(classroom.status)}
+                  statusTone={resolveScheduleTone(classroom.status)}
+                  metrics={[
+                    { label: 'Starts', value: formatDateTime(classroom.startAt) },
+                    {
+                      label: 'Capacity',
+                      value: `${classroom.reservedSeats ?? 0}/${classroom.capacity ?? 0}`
+                    },
+                    { label: 'Timezone', value: classroom.timezone ?? 'Etc/UTC' },
+                    { label: 'Check-ins', value: analytics.totalCheckIns ?? 0 }
+                  ]}
+                  tagGroups={[
+                    { tone: 'primary', items: Array.isArray(classroom.topics) ? classroom.topics : [] }
+                  ]}
+                  actions={[
+                    {
+                      label: 'Edit',
+                      onClick: () => handleEdit(classroom),
+                      tone: 'neutral',
+                      icon: PencilSquareIcon
+                    },
+                    {
+                      label: 'Delete',
+                      onClick: () => handleDelete(classroom.id),
+                      tone: 'danger',
+                      icon: TrashIcon
+                    }
+                  ]}
+                  footer={
+                    analytics.lastEventAt
+                      ? `Last event ${formatDateTime(analytics.lastEventAt)} · ${
+                          analytics.lastEventType ? formatStatus(analytics.lastEventType) : 'Recorded'
+                        }`
+                      : 'No attendance telemetry captured yet.'
+                  }
+                />
+              );
+            })}
           </div>
         </div>
       </div>
@@ -860,6 +992,55 @@ export default function LiveClassrooms() {
           {!isAdmin && error ? (
             <p className="text-sm font-semibold text-rose-500">{error}</p>
           ) : null}
+          <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Streaming mode</p>
+                <h3 className="text-lg font-semibold text-slate-900">Optimise the live stream for your connection</h3>
+                <p className="text-sm text-slate-600">
+                  Choose how Edulure balances video quality, reactions and captions. The selected mode applies to join and
+                  check-in actions.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right text-xs text-slate-500">
+                <p className="flex items-center justify-end gap-2 text-slate-400">
+                  <SignalIcon className="h-4 w-4" /> Current mode
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">
+                  {STREAMING_MODES[bandwidthMode]?.label ?? STREAMING_MODES.standard.label}
+                </p>
+                <p className="text-[11px]">
+                  {STREAMING_MODES[bandwidthMode]?.bandwidthCapKbps
+                    ? `Capped at ${STREAMING_MODES[bandwidthMode].bandwidthCapKbps} kbps`
+                    : 'Adaptive bitrate enabled'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {Object.entries(STREAMING_MODES).map(([modeKey, modeConfig]) => {
+                const active = bandwidthMode === modeKey;
+                return (
+                  <button
+                    key={modeKey}
+                    type="button"
+                    onClick={() => setBandwidthMode(modeKey)}
+                    className={classNames(
+                      'rounded-2xl border px-4 py-4 text-left transition focus:outline-none focus:ring-2 focus:ring-primary',
+                      active
+                        ? 'border-primary bg-primary/10 text-primary shadow-inner'
+                        : 'border-slate-200 bg-white/80 text-slate-600 hover:border-primary/40 hover:text-primary'
+                    )}
+                  >
+                    <p className="text-sm font-semibold">{modeConfig.label}</p>
+                    <p className="mt-1 text-xs text-slate-500">{modeConfig.description}</p>
+                    <p className="mt-3 text-[11px] font-semibold text-slate-400">
+                      {modeConfig.bandwidthCapKbps ? `Cap ${modeConfig.bandwidthCapKbps} kbps` : 'Adaptive bitrate'}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="grid gap-6 lg:grid-cols-2">
             {liveClassrooms.map((classroom) => (
               <LiveClassroomCard

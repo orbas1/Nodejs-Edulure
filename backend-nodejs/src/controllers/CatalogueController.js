@@ -144,13 +144,15 @@ export default class CatalogueController {
       });
 
       const statuses = normaliseStatuses(query.statuses);
+      const registrationForUserId = req.user?.id ?? null;
       const [items, total] = await Promise.all([
         LiveClassroomModel.listPublic({
           search: query.search || undefined,
           statuses,
           limit: query.limit,
           offset: query.offset,
-          upcomingOnly: !query.includePast
+          upcomingOnly: !query.includePast,
+          registrationForUserId
         }),
         LiveClassroomModel.countPublic({
           search: query.search || undefined,
