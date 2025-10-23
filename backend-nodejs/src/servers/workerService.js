@@ -1,10 +1,13 @@
 import http from 'node:http';
 
+import { env } from '../config/env.js';
 import { createProbeApp } from '../observability/probes.js';
 import { createServiceRuntime } from './runtimeEnvironment.js';
+import resolveRuntimeToggles from './runtimeToggles.js';
 import { BACKGROUND_JOB_TARGETS, startBackgroundJobs } from './workerRoutines.js';
 
 export async function startWorkerService({ withSignalHandlers = true } = {}) {
+  const toggles = resolveRuntimeToggles();
   const runtime = await createServiceRuntime({
     serviceName: 'worker-service',
     readinessTargets: [
@@ -20,6 +23,12 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
 
   const { readiness, registry, logger: serviceLogger } = runtime;
 
+  if (!toggles.enableJobs) {
+    BACKGROUND_JOB_TARGETS.forEach((target) => {
+      readiness.markDegraded(target, 'Background jobs disabled by preset');
+    });
+  }
+
   const probeApp = createProbeApp({
     service: 'worker-service',
     readinessCheck: () => readiness.snapshot(),
@@ -31,7 +40,9 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   let jobRunner;
 
   try {
-    jobRunner = await startBackgroundJobs({ readiness, logger: serviceLogger });
+    if (toggles.enableJobs) {
+      jobRunner = await startBackgroundJobs({ readiness, logger: serviceLogger });
+    }
 
     readiness.markPending('probe-server', 'Starting probe server');
     probeServerPending = true;
