@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useCallback, useId } from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 
@@ -15,6 +15,39 @@ export default function SettingsToggleField({
   const controlId = id ?? `${name ?? 'settings-toggle'}-${autoId}`;
   const labelId = `${controlId}-label`;
   const descriptionId = description ? `${controlId}-description` : undefined;
+
+  const handleToggle = useCallback(() => {
+    if (disabled) return;
+    onChange(!checked);
+  }, [checked, disabled, onChange]);
+
+  const handleKeyDown = useCallback(
+    (event) => {
+      if (disabled) return;
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        if (checked) {
+          onChange(false);
+        }
+        return;
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        if (!checked) {
+          onChange(true);
+        }
+        return;
+      }
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onChange(!checked);
+      }
+    },
+    [checked, disabled, onChange]
+  );
 
   return (
     <div
@@ -41,6 +74,8 @@ export default function SettingsToggleField({
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
           disabled={disabled}
+          tabIndex={-1}
+          aria-hidden="true"
           className="sr-only"
         />
         <button
@@ -50,12 +85,15 @@ export default function SettingsToggleField({
             checked ? 'border-primary bg-primary' : 'border-slate-200 bg-slate-200',
             disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
           )}
-          onClick={() => onChange(!checked)}
+          onClick={handleToggle}
+          onKeyDown={handleKeyDown}
           role="switch"
           aria-checked={checked}
           aria-labelledby={labelId}
           aria-describedby={descriptionId}
           aria-controls={controlId}
+          aria-disabled={disabled || undefined}
+          data-state={checked ? 'on' : 'off'}
           disabled={disabled}
         >
           <span

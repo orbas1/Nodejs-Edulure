@@ -18,8 +18,12 @@ export default function SettingsAccordion({
   const [open, setOpen] = useState(Boolean(defaultOpen));
 
   return (
-    <section id={sectionId} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section
+      id={sectionId}
+      className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+      data-state={open ? 'open' : 'closed'}
+    >
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <button
           type="button"
           onClick={() => setOpen((previous) => !previous)}
@@ -27,6 +31,7 @@ export default function SettingsAccordion({
           aria-expanded={open}
           aria-controls={panelId}
           id={headerId}
+          data-state={open ? 'open' : 'closed'}
         >
           <div className="space-y-1">
             <p className="text-base font-semibold text-slate-900">{title}</p>
@@ -40,7 +45,13 @@ export default function SettingsAccordion({
           />
         </button>
         {actions ? (
-          <div className="hidden items-center gap-2 px-6 pb-4 text-sm font-medium text-primary sm:flex sm:pb-0 sm:pr-8 sm:pt-0">
+          <div
+            className={clsx(
+              'flex flex-wrap items-center gap-2 px-6 pb-4 text-sm font-medium text-primary sm:self-stretch sm:border-l sm:pb-0 sm:pl-6 sm:pr-8',
+              open ? 'sm:border-primary/20' : 'sm:border-slate-200'
+            )}
+            aria-label={`${title} actions`}
+          >
             {actions}
           </div>
         ) : null}
