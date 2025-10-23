@@ -2,16 +2,25 @@ import Joi from 'joi';
 
 import AuthService from '../services/AuthService.js';
 import { success } from '../utils/httpResponse.js';
+import { env } from '../config/env.js';
+import {
+  DEFAULT_PASSWORD_POLICY,
+  buildPasswordPattern,
+  describePasswordPolicy,
+  resolvePasswordPolicy
+} from '../config/passwordPolicy.js';
 
-const passwordPattern = new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{12,}$');
+const runtimePasswordPolicy = env?.security?.passwordPolicy ?? DEFAULT_PASSWORD_POLICY;
+const resolvedPasswordPolicy = resolvePasswordPolicy(runtimePasswordPolicy);
+const passwordPattern = buildPasswordPattern(resolvedPasswordPolicy);
+const passwordPolicySummary = describePasswordPolicy(resolvedPasswordPolicy);
 
 const registerSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(120).required(),
   lastName: Joi.string().trim().max(120).allow('', null),
   email: Joi.string().email().required(),
   password: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base':
-      'Password must be at least 12 characters and include upper, lower, numeric, and special characters.'
+    'string.pattern.base': resolvedPasswordPolicy.description
   }),
   role: Joi.string().valid('user', 'instructor', 'admin').default('user'),
   age: Joi.number().integer().min(16).max(120).optional(),
@@ -87,6 +96,20 @@ function buildContext(req) {
 }
 
 export default class AuthController {
+  static passwordPolicy = passwordPolicySummary.policy;
+
+  static passwordRequirements = passwordPolicySummary.requirements;
+
+  static async describePasswordPolicy(_req, res) {
+    return success(res, {
+      data: {
+        policy: AuthController.passwordPolicy,
+        requirements: AuthController.passwordRequirements
+      },
+      message: 'Password policy retrieved'
+    });
+  }
+
   static async register(req, res, next) {
     try {
       const payload = await registerSchema.validateAsync(req.body, {

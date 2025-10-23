@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import AuthCard from '../components/AuthCard.jsx';
-import FormField from '../components/FormField.jsx';
+
+import AuthForm from '../components/auth/AuthForm.jsx';
 import SocialSignOn from '../components/SocialSignOn.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { API_BASE_URL } from '../api/httpClient.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import { createLoginState, validateLoginState } from '../utils/validation/auth.js';
 
 const SOCIAL_ROUTES = {
   google: '/auth/oauth/google',
@@ -19,16 +20,16 @@ const EMAIL_CODE_TTL_MINUTES = 5;
 export default function Login() {
   const navigate = useNavigate();
   const { login, isLoading } = useAuth();
-  const [formState, setFormState] = useState({ email: '', password: '' });
-  const [rememberMe, setRememberMe] = useState(true);
-  const [error, setError] = useState(null);
+  const [formState, setFormState] = useState(() => createLoginState());
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [formError, setFormError] = useState(null);
   const [isTwoFactorRequired, setIsTwoFactorRequired] = useState(false);
   const [showTwoFactorInput, setShowTwoFactorInput] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   usePageMetadata({
     title: 'Secure login · Edulure',
-    description: 'Sign in to Edulure with email, password, or enterprise social providers. Multi-factor authentication enforced for sensitive roles.',
+    description:
+      'Sign in to Edulure with email, password, or enterprise social providers. Multi-factor authentication enforced for sensitive roles.',
     canonicalPath: '/login',
     robots: 'noindex, nofollow',
     analytics: {
@@ -53,31 +54,46 @@ export default function Login() {
     [oauthBase]
   );
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
+  const updateField = useCallback((name, value) => {
     setFormState((prev) => ({ ...prev, [name]: value }));
-  };
+    setFieldErrors((prev) => {
+      if (!prev || !prev[name]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError(null);
+    setFormError(null);
+
+    const validation = validateLoginState(formState, { requireTwoFactor: isTwoFactorRequired });
+    setFieldErrors(validation.errors);
+    if (!validation.isValid) {
+      setFormError('Please review the highlighted fields and try again.');
+      return;
+    }
+
     try {
       const payload = {
-        email: formState.email,
-        password: formState.password,
-        ...(showTwoFactorInput && twoFactorCode.trim()
-          ? { twoFactorCode: twoFactorCode.trim() }
-          : {})
+        email: validation.cleaned.email,
+        password: validation.cleaned.password,
+        ...(validation.cleaned.twoFactorCode ? { twoFactorCode: validation.cleaned.twoFactorCode } : {})
       };
+
       await login(payload);
       navigate('/feed', { replace: true });
-      setTwoFactorCode('');
+      setFormState(() => createLoginState({ rememberMe: validation.cleaned.rememberMe }));
       setIsTwoFactorRequired(false);
       setShowTwoFactorInput(false);
     } catch (err) {
       const message =
         err?.original?.response?.data?.message ?? err?.message ?? 'Unable to sign in. Please try again.';
       const code = err?.original?.response?.data?.code ?? err?.code;
+
       if (code === 'TWO_FACTOR_REQUIRED') {
         const details = err?.original?.response?.data?.details ?? {};
         const deliveredMessage =
@@ -86,119 +102,121 @@ export default function Login() {
             : 'We just emailed you a six-digit security code. Enter it below to continue.';
         setShowTwoFactorInput(true);
         setIsTwoFactorRequired(true);
-        setError(deliveredMessage);
+        setFormError(deliveredMessage);
         return;
       }
       if (code === 'TWO_FACTOR_INVALID') {
         setShowTwoFactorInput(true);
         setIsTwoFactorRequired(true);
-        setError('That email security code was invalid or expired. Request a new code and try again.');
+        setFormError('That email security code was invalid or expired. Request a new code and try again.');
         return;
       }
       if (code === 'TWO_FACTOR_SETUP_REQUIRED') {
         setShowTwoFactorInput(true);
         setIsTwoFactorRequired(true);
-        setError('Multi-factor email codes must be configured before access. Check your security settings.');
+        setFormError('Multi-factor email codes must be configured before access. Check your security settings.');
         return;
       }
-      setError(message);
+
+      setFormError(message);
     }
   };
 
   return (
-    <AuthCard title="Welcome back" subtitle="Please sign in with your email address or choose a social account.">
-      <div className="space-y-8">
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          {error ? <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
-          <FormField
-            label="Email address"
-            type="email"
-            name="email"
-            value={formState.email}
-            onChange={handleChange}
-            placeholder="you@company.com"
-            required
-          />
-          <FormField
-            label="Password"
-            type="password"
-            name="password"
-            value={formState.password}
-            onChange={handleChange}
-            placeholder="••••••••"
-            required
-            helper="Use the password you created when registering your Learnspace."
-          />
-          <div className="space-y-3">
-            {showTwoFactorInput ? (
-              <div className="rounded-3xl border border-primary/20 bg-primary/5 px-4 py-4 text-sm text-slate-600 shadow-inner">
-                <p className="font-semibold text-primary">Multi-factor verification</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Enter the six-digit code we emailed to you. Codes expire after {EMAIL_CODE_TTL_MINUTES} minutes and should be entered without spaces.
-                </p>
-              </div>
-            ) : null}
-            {showTwoFactorInput ? (
-              <FormField
-                label="Email security code"
-                name="twoFactorCode"
-                placeholder="123456"
-                value={twoFactorCode}
-                onChange={(event) => setTwoFactorCode(event.target.value.replace(/[^0-9]/g, ''))}
-                inputMode="numeric"
-                pattern="\d{6}"
-                required={isTwoFactorRequired}
-                helper="6-digit code sent to your Edulure email"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowTwoFactorInput(true)}
-                className="text-xs font-semibold text-primary transition hover:text-primary-dark"
-              >
-                Have an email code?
-              </button>
-            )}
-          </div>
-          <div className="flex items-center justify-between text-sm text-slate-500">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                checked={rememberMe}
-                onChange={(event) => setRememberMe(event.target.checked)}
-              />
-              <span className="font-semibold">Remember this device</span>
-            </label>
-            <Link to="/reset" className="font-semibold text-primary">
-              Forgot password?
-            </Link>
-          </div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-primary/50"
-          >
-            {isLoading ? 'Authenticating…' : 'Log in securely'}
-          </button>
-        </form>
-        <div className="space-y-4">
-          <div className="relative flex items-center gap-3">
-            <span className="h-px flex-1 bg-slate-200" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-              or try an alternative login
-            </span>
-            <span className="h-px flex-1 bg-slate-200" />
-          </div>
-          <SocialSignOn onSelect={handleSocialSignOn} />
-        </div>
-        <div className="text-sm text-slate-500">
+    <AuthForm
+      title="Welcome back"
+      subtitle="Please sign in with your email address or choose a social account."
+      onSubmit={handleSubmit}
+      submitLabel={isLoading ? 'Authenticating…' : 'Log in securely'}
+      busy={isLoading}
+      error={formError}
+      actions={
+        <span>
           New to Edulure?{' '}
           <Link to="/register" className="font-semibold text-primary">
             Create your account
           </Link>
-        </div>
+        </span>
+      }
+    >
+      <AuthForm.Field
+        label="Email address"
+        type="email"
+        name="email"
+        value={formState.email}
+        onChange={(event) => updateField(event.target.name, event.target.value)}
+        placeholder="you@company.com"
+        required
+        error={fieldErrors.email}
+      />
+      <AuthForm.Field
+        label="Password"
+        type="password"
+        name="password"
+        value={formState.password}
+        onChange={(event) => updateField(event.target.name, event.target.value)}
+        placeholder="••••••••"
+        required
+        helper="Use the password you created when registering your Learnspace."
+        error={fieldErrors.password}
+      />
+      <div className="space-y-3">
+        {showTwoFactorInput ? (
+          <div className="rounded-3xl border border-primary/20 bg-primary/5 px-4 py-4 text-sm text-slate-600 shadow-inner">
+            <p className="font-semibold text-primary">Multi-factor verification</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Enter the six-digit code we emailed to you. Codes expire after {EMAIL_CODE_TTL_MINUTES} minutes and should be
+              entered without spaces.
+            </p>
+          </div>
+        ) : null}
+        {showTwoFactorInput ? (
+          <AuthForm.Field
+            label="Email security code"
+            name="twoFactorCode"
+            placeholder="123456"
+            value={formState.twoFactorCode}
+            onChange={(event) => updateField(event.target.name, event.target.value.replace(/[^0-9]/g, ''))}
+            inputMode="numeric"
+            pattern="\d{6}"
+            required={isTwoFactorRequired}
+            helper="6-digit code sent to your Edulure email"
+            error={fieldErrors.twoFactorCode}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowTwoFactorInput(true)}
+            className="text-xs font-semibold text-primary transition hover:text-primary-dark"
+          >
+            Have an email code?
+          </button>
+        )}
       </div>
-    </AuthCard>
+      <div className="flex items-center justify-between text-sm text-slate-500">
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            checked={formState.rememberMe}
+            onChange={(event) => updateField('rememberMe', event.target.checked)}
+          />
+          <span className="font-semibold">Remember this device</span>
+        </label>
+        <Link to="/reset" className="font-semibold text-primary">
+          Forgot password?
+        </Link>
+      </div>
+      <div className="space-y-4">
+        <div className="relative flex items-center gap-3">
+          <span className="h-px flex-1 bg-slate-200" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+            or try an alternative login
+          </span>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+        <SocialSignOn onSelect={handleSocialSignOn} />
+      </div>
+    </AuthForm>
   );
 }

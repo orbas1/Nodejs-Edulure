@@ -1,19 +1,11 @@
-const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/;
-
-function normaliseText(value, maxLength = 120) {
-  if (value === undefined || value === null) {
-    return '';
-  }
-  const trimmed = String(value).trim();
-  if (!trimmed) {
-    return '';
-  }
-  return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
-}
-
-function normaliseEmail(value) {
-  return normaliseText(value, 180).toLowerCase();
-}
+import {
+  DEFAULT_PASSWORD_POLICY,
+  EMAIL_PATTERN,
+  evaluatePasswordStrength,
+  normaliseEmail,
+  normalisePasswordPolicy,
+  normaliseText
+} from './auth.js';
 
 function normaliseListInput(value, { maxItems = 10, maxLength = 160 } = {}) {
   if (!value) {
@@ -74,6 +66,113 @@ function normaliseInvites(value) {
   return inviteList.map((code) => ({ code }));
 }
 
+function buildPreferences({ marketingOptIn, timeCommitment, onboardingPath, interests }) {
+  return {
+    marketingOptIn: Boolean(marketingOptIn),
+    timeCommitment: timeCommitment || undefined,
+    onboardingPath: onboardingPath || undefined,
+    interests: interests.length ? interests : undefined
+  };
+}
+
+function buildMetadata({ marketingSource, marketingCampaign }) {
+  return {
+    ...(marketingSource ? { source: marketingSource } : {}),
+    ...(marketingCampaign ? { campaign: marketingCampaign } : {})
+  };
+}
+
+function buildNormalisedOnboardingState(mode, state, passwordPolicy = DEFAULT_PASSWORD_POLICY) {
+  const firstName = normaliseText(state.firstName, 120);
+  const lastName = normaliseText(state.lastName, 120);
+  const email = normaliseEmail(state.email);
+  const persona = normaliseText(state.persona, 160);
+  const goals = normaliseListInput(state.goalsInput, { maxItems: 10, maxLength: 160 });
+  const invites = normaliseInvites(state.inviteCodes ?? state.invites);
+  const marketingOptIn = Boolean(state.marketingOptIn);
+  const interests = normaliseListInput(state.interestsInput, { maxItems: 12, maxLength: 120 });
+  const marketingSource = normaliseText(state.marketingSource, 120);
+  const marketingCampaign = normaliseText(state.marketingCampaign, 120);
+  const timeCommitment = normaliseText(state.timeCommitment, 60);
+  const onboardingPath = normaliseText(state.onboardingPath, 120);
+  const termsAccepted = Boolean(state.termsAccepted);
+  const address = sanitiseAddress(state.address);
+  const ageResult = parseAge(state.age);
+
+  const password = typeof state.password === 'string' ? state.password : '';
+  const confirmPassword = typeof state.confirmPassword === 'string' ? state.confirmPassword : '';
+  const defaultRole = mode === 'learner' ? 'instructor' : 'instructor';
+  const role = normaliseText(state.role, 32) || defaultRole;
+  const passwordEvaluation = evaluatePasswordStrength(password, passwordPolicy);
+
+  const preferences = buildPreferences({
+    marketingOptIn,
+    timeCommitment,
+    onboardingPath,
+    interests
+  });
+  const metadata = buildMetadata({ marketingSource, marketingCampaign });
+
+  const cleaned = {
+    firstName,
+    lastName,
+    email,
+    persona,
+    goals,
+    invites,
+    marketingOptIn,
+    interests,
+    marketingSource,
+    marketingCampaign,
+    timeCommitment,
+    onboardingPath,
+    termsAccepted,
+    age: ageResult?.value,
+    address,
+    password,
+    confirmPassword,
+    role,
+    headline: normaliseText(state.headline, 160),
+    portfolio: normaliseText(state.portfolio, 200),
+    expertise: normaliseText(state.expertise, 240),
+    audience: normaliseText(state.audience, 240),
+    preferences,
+    metadata,
+    passwordEvaluation,
+    ageError: ageResult?.error
+  };
+
+  const bootstrapPayload = {
+    email,
+    role,
+    firstName,
+    lastName,
+    persona: persona || undefined,
+    goals,
+    invites,
+    preferences,
+    metadata,
+    termsAccepted
+  };
+
+  const registerPayload =
+    mode === 'learner'
+      ? {
+          firstName,
+          lastName,
+          email,
+          password,
+          confirmPassword,
+          role,
+          age: ageResult?.value,
+          address,
+          marketingOptIn
+        }
+      : null;
+
+  return { cleaned, bootstrapPayload, registerPayload };
+}
+
 export function createOnboardingState(mode = 'learner') {
   const base = {
     firstName: '',
@@ -117,128 +216,73 @@ export function createOnboardingState(mode = 'learner') {
   };
 }
 
-export function validateOnboardingState(mode, state) {
+export function validateOnboardingState(mode, state, options = {}) {
+  const passwordPolicy = normalisePasswordPolicy(options.passwordPolicy ?? DEFAULT_PASSWORD_POLICY);
+  const { cleaned, bootstrapPayload, registerPayload } = buildNormalisedOnboardingState(mode, state, passwordPolicy);
   const errors = {};
-  const firstName = normaliseText(state.firstName, 120);
-  const lastName = normaliseText(state.lastName, 120);
-  const email = normaliseEmail(state.email);
-  const persona = normaliseText(state.persona, 160);
-  const goals = normaliseListInput(state.goalsInput, { maxItems: 10, maxLength: 160 });
-  const invites = normaliseInvites(state.inviteCodes ?? state.invites);
-  const marketingOptIn = Boolean(state.marketingOptIn);
-  const interests = normaliseListInput(state.interestsInput, { maxItems: 12, maxLength: 120 });
-  const marketingSource = normaliseText(state.marketingSource, 120);
-  const marketingCampaign = normaliseText(state.marketingCampaign, 120);
-  const timeCommitment = normaliseText(state.timeCommitment, 60);
-  const onboardingPath = normaliseText(state.onboardingPath, 120);
-  const termsAccepted = Boolean(state.termsAccepted);
 
-  if (!firstName) {
+  if (!cleaned.firstName) {
     errors.firstName = 'First name is required';
   }
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!cleaned.email || !EMAIL_PATTERN.test(cleaned.email)) {
     errors.email = 'Enter a valid email address';
   }
 
-  let password;
-  let confirmPassword;
   if (mode === 'learner') {
-    password = state.password ?? '';
-    confirmPassword = state.confirmPassword ?? '';
-    const role = normaliseText(state.role, 32) || 'instructor';
-    if (!PASSWORD_PATTERN.test(password)) {
-      errors.password =
-        'Use at least 12 characters with upper, lower, number, and symbol.';
+    if (!cleaned.passwordEvaluation.isCompliant) {
+      errors.password = cleaned.passwordEvaluation.description;
     }
-    if (password !== confirmPassword) {
+    if (cleaned.password !== cleaned.confirmPassword) {
       errors.confirmPassword = 'Passwords must match';
     }
-    if (!['user', 'instructor', 'admin'].includes(role)) {
+    if (!['user', 'instructor', 'admin'].includes(cleaned.role)) {
       errors.role = 'Select a valid role';
     }
   }
 
-  const ageResult = parseAge(state.age);
-  if (ageResult?.error) {
-    errors.age = ageResult.error;
+  if (cleaned.ageError) {
+    errors.age = cleaned.ageError;
   }
 
-  if (!termsAccepted) {
+  if (!cleaned.termsAccepted) {
     errors.termsAccepted = 'You must accept the terms to continue';
   }
-
-  const address = sanitiseAddress(state.address);
-
-  const preferences = {
-    marketingOptIn,
-    timeCommitment: timeCommitment || undefined,
-    onboardingPath: onboardingPath || undefined,
-    interests: interests.length ? interests : undefined
-  };
-
-  const metadata = {
-    ...(marketingSource ? { source: marketingSource } : {}),
-    ...(marketingCampaign ? { campaign: marketingCampaign } : {})
-  };
-
-  const cleaned = {
-    firstName,
-    lastName,
-    email,
-    persona,
-    goals,
-    invites,
-    marketingOptIn,
-    interests,
-    marketingSource,
-    marketingCampaign,
-    timeCommitment,
-    onboardingPath,
-    termsAccepted,
-    age: ageResult?.value,
-    address,
-    password,
-    confirmPassword,
-    role: normaliseText(state.role, 32) || 'instructor',
-    headline: normaliseText(state.headline, 160),
-    portfolio: normaliseText(state.portfolio, 200),
-    expertise: normaliseText(state.expertise, 240),
-    audience: normaliseText(state.audience, 240)
-  };
-
-  const bootstrapPayload = {
-    email,
-    role: cleaned.role,
-    firstName,
-    lastName,
-    persona: persona || undefined,
-    goals,
-    invites,
-    preferences,
-    metadata,
-    termsAccepted
-  };
-
-  const registerPayload =
-    mode === 'learner'
-      ? {
-          firstName,
-          lastName,
-          email,
-          password,
-          confirmPassword,
-          role: cleaned.role,
-          age: cleaned.age,
-          address,
-          marketingOptIn
-        }
-      : null;
 
   return {
     errors,
     isValid: Object.keys(errors).length === 0,
     cleaned,
     bootstrapPayload,
-    registerPayload
+    registerPayload,
+    passwordPolicy,
+    passwordEvaluation: cleaned.passwordEvaluation
+  };
+}
+
+export function buildOnboardingDraftPayload(mode, state, options = {}) {
+  const passwordPolicy = normalisePasswordPolicy(options.passwordPolicy ?? DEFAULT_PASSWORD_POLICY);
+  const { bootstrapPayload } = buildNormalisedOnboardingState(mode, state, passwordPolicy);
+  return bootstrapPayload;
+}
+
+export function calculateOnboardingCompletion(mode, state, options = {}) {
+  const passwordPolicy = normalisePasswordPolicy(options.passwordPolicy ?? DEFAULT_PASSWORD_POLICY);
+  const { cleaned } = buildNormalisedOnboardingState(mode, state, passwordPolicy);
+  const checkpoints = [
+    Boolean(cleaned.firstName),
+    Boolean(cleaned.email),
+    Boolean(cleaned.persona),
+    cleaned.goals.length > 0,
+    cleaned.interests.length > 0,
+    cleaned.termsAccepted,
+    mode === 'learner' ? cleaned.passwordEvaluation.isCompliant : true,
+    mode === 'learner' ? Boolean(cleaned.password && cleaned.password === cleaned.confirmPassword) : true
+  ];
+  const completed = checkpoints.filter(Boolean).length;
+  const total = checkpoints.length;
+  return {
+    completed,
+    total,
+    progress: total ? completed / total : 0
   };
 }
