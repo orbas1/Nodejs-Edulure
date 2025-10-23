@@ -3,7 +3,19 @@ import Joi from 'joi';
 import AuthService from '../services/AuthService.js';
 import { success } from '../utils/httpResponse.js';
 
-const passwordPattern = new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{12,}$');
+const PASSWORD_POLICY = Object.freeze({
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSymbol: true,
+  description:
+    'Passwords must contain at least 12 characters with upper and lower case letters, a number, and a special character.'
+});
+
+const passwordPattern = new RegExp(
+  `^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{${PASSWORD_POLICY.minLength},}$`
+);
 
 const registerSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(120).required(),
@@ -239,4 +251,30 @@ export default class AuthController {
       return next(error);
     }
   }
+
+  static async passwordPolicy(_req, res, next) {
+    try {
+      const requirements = [
+        `At least ${PASSWORD_POLICY.minLength} characters`,
+        PASSWORD_POLICY.requireUppercase ? 'One uppercase letter (A-Z)' : null,
+        PASSWORD_POLICY.requireLowercase ? 'One lowercase letter (a-z)' : null,
+        PASSWORD_POLICY.requireNumber ? 'One digit (0-9)' : null,
+        PASSWORD_POLICY.requireSymbol ? 'One special character (!@#$…)' : null
+      ].filter(Boolean);
+
+      return success(res, {
+        data: {
+          policy: PASSWORD_POLICY,
+          requirements,
+          example: 'Skool#Launch42',
+          updatedAt: new Date().toISOString()
+        },
+        message: 'Password policy retrieved'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
+
+export { PASSWORD_POLICY };

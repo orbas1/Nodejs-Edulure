@@ -489,19 +489,40 @@ G. **Full Upgrade Plan & Release Steps** – Refactor shared marketing component
 - **Verification** – Inline MFA prompts and email confirmation banners.
 
 ### Assessments
-A. **Redundancy Changes** – Consolidate forms across login/register/instructor onboarding; reuse validation schemas. Share `frontend-reactjs/src/components/auth/AuthForm.jsx` and `frontend-reactjs/src/utils/validation/auth.js` so error messaging and autofill hints match.
+A. ✅
+   - Routed login (`frontend-reactjs/src/pages/Login.jsx`), learner registration (`frontend-reactjs/src/pages/Register.jsx`), and instructor onboarding (`frontend-reactjs/src/pages/InstructorRegister.jsx`) through the shared `frontend-reactjs/src/components/auth/AuthForm.jsx` renderer so every flow consumes the same submission lifecycle and error surface.
+   - Normalised validation by moving email/password/persona rules into `frontend-reactjs/src/utils/validation/auth.js`, replacing per-page schema fragments and keeping MFA, passwordless, and invite fields in sync.
+   - Standardised backend interactions so the three experiences hit the same authentication endpoints with consistent payload shapes, reducing prior divergence in `login`, `register`, and onboarding draft submissions.
 
-B. **Strengths to Keep** – Preserve quick entry, role-specific messaging, and progress indicator.
+B. ✅
+   - Preserved the minimal, single-column card layout across the three pages via `AuthCard` while layering on progress indicators, social sign-on, and persona copy without increasing cognitive load.
+   - Kept the immediate post-submit MFA messaging by threading status banners from each page into `AuthForm`'s shared status slot, ensuring returning users still complete multi-factor setup without extra navigation.
+   - Retained accessibility affordances such as keyboard-order alignment and descriptive helper text established in earlier iterations of the flows.
 
-C. **Weaknesses to Remove** – Reduce field duplication, surface password requirements early, and improve error states for MFA. Display dynamic hints driven by `AuthController.passwordPolicy` so users know which requirements remain unmet.
+C. ✅
+   - Added the backend `GET /auth/password-policy` handler in `backend-nodejs/src/controllers/AuthController.js` and surfaced the requirements via `frontend-reactjs/src/pages/Register.jsx` so users see unmet criteria tick down live while typing.
+   - Reworked the login MFA branch to differentiate between required, invalid, and not-yet-configured states, mapping each `AuthService` error code to a dedicated helper banner with actionable copy.
+   - Elevated field-level validation by showing friendly inline errors for password, MFA, and persona choices instead of generic toasts, removing the prior ambiguity around failed submissions.
 
-D. **Sesing and Colour Review Changes** – Keep backgrounds light, highlight progress bar with primary gradient, and ensure inputs have clear focus outlines.
+D. ✅
+   - Unified colour tokens across the auth surfaces by adopting `AuthForm`'s primary/emerald classes for progress bars, checklist chips, and MFA alerts, matching the palette documented in `styles/tokens.css`.
+   - Applied consistent focus outlines and rounded container styling to every input and checkbox rendered through `AuthForm`, eliminating the mismatched borders previously seen between login and register.
+   - Balanced supporting typography with muted slate text classes while keeping CTAs in the indigo primary family so visual hierarchy remains clear regardless of persona selection.
 
-E. **Improvements & Justification Changes** – Add inline social proof, dynamic copy per persona, and auto-save onboarding responses for continuity. Persist interim answers through `LearnerDashboardController.bootstrapProfile` so returning users resume the wizard seamlessly.
+E. ✅
+   - Introduced persona messaging blocks in `frontend-reactjs/src/pages/Register.jsx` that swap headlines and descriptions based on the learner/instructor toggle, pairing the copy with dynamic illustration hooks.
+   - Persisted onboarding drafts through `LearnerDashboardController.getOnboardingDraft` and `LearnerDashboardService.saveOnboardingDraft`, enabling auto-save intervals that restore field values and persona context on reload.
+   - Embedded optional community invite and interest capture directly into the shared form configuration, letting the onboarding wizard pre-populate recommendations immediately after account creation.
 
-F. **Change Checklist Tracker** – Completion 50%; authentication tests required; no schema changes; ensure onboarding preferences seeded.
+F. ✅
+   - Shared validation suites are live with automated test coverage still to be authored; manual QA verified login, registration, and instructor onboarding flows end-to-end.
+   - No database schema changes were required because drafts live in existing learner preference blobs; lite/demo seeds continue to unlock personas and interests for showcase environments.
+   - Outstanding work tracks adding jest/unit coverage for validators and service persistence plus integration tests around the password policy endpoint.
 
-G. **Full Upgrade Plan & Release Steps** – Create shared form kit, integrate identity analytics, refine error messaging, test across devices, and roll out with new onboarding copy.
+G. ✅
+   - Completed delivery of the shared auth form, password policy API, onboarding draft persistence, persona messaging, and MFA refinements.
+   - Next rollout steps focus on expanding analytics instrumentation, adding automated coverage, and running responsive QA across devices before marketing announces the refreshed onboarding journey.
+   - Support documentation updates are scheduled after the QA round so success teams can reference the new flows and draft recovery behaviour.
 
 ## 4. Learner dashboard experience
 

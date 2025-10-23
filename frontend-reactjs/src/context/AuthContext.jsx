@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { httpClient } from '../api/httpClient.js';
+import { clearAuthTokenResolver, httpClient, setAuthTokenResolver } from '../api/httpClient.js';
 
 const TOKEN_STORAGE_KEY = 'edulure.session';
 
@@ -44,6 +44,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     persistSession(session);
   }, [session]);
+
+  useEffect(() => {
+    setAuthTokenResolver(() => session?.tokens?.accessToken ?? null);
+    return () => {
+      clearAuthTokenResolver();
+    };
+  }, [session?.tokens?.accessToken]);
 
   const login = useCallback(async (credentials) => {
     setIsLoading(true);
