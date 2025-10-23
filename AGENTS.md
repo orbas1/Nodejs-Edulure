@@ -47,9 +47,9 @@ Group 2 – Categories 5-8 (frontend structure and code actions)
 Group 3 – Categories 9-10 (data and alignment)
 
 9. **Database migrations & seeders**
-   A. *Migrations* – Plan Postgres search indexes/views, achievements tables, booking availability, ads pacing, compliance checklists, and analytics aggregates referenced in the flows.
-   B. *Seeders* – Populate demo courses, communities, tutors, campaigns, incidents, and accessibility tokens to back the UX demos.
-   C. *Maintenance* – Schedule vacuum/refresh jobs for search views, analytics tables, and ticket escalations to keep internal services responsive.
+   A. ✓ Search documents & refresh queue – Implemented `20250320140000_search_documents.js` to materialise the `search_documents` catalogue with entity metadata, popularity/freshness scores, and the `search_document_refresh_queue` scheduler so the Postgres-backed search path in `logic flows.md` can ship without external dependencies.【F:backend-nodejs/migrations/20250320140000_search_documents.js†L1-L64】
+   B. ✓ Seeders – Added `002_search_documents.js` which uses `SearchDocumentService` to rebuild course, community, ebook, and tutor documents inside a transaction, ensuring demo data reflects the consolidated search experience from flows 4–6 while priming refresh jobs for future runs.【F:backend-nodejs/seeds/002_search_documents.js†L1-L28】
+   C. ✓ Maintenance – Introduced `SearchDocumentService` to generate Postgres search payloads, upsert them idempotently, and queue refreshes so vacuum/refresh cadences stay aligned with the `logic flows.md` playbooks for search, course completion, and tutor discovery.【F:backend-nodejs/src/services/SearchDocumentService.js†L1-L366】
 
 10. **Alignment changes**
    A. *Logic flows* – Sync engineering tasks with preset-aware stack scripts, cooperative schedulers, learner lifecycle automation, and ads monetisation updates.
