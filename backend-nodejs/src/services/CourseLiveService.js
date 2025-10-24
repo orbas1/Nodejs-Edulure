@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import logger from '../config/logger.js';
+import { recordLiveCourseMessagePosted, updateLiveCoursePresenceMetrics } from '../observability/metrics.js';
 
 const log = logger.child({ service: 'CourseLiveService' });
 
@@ -25,9 +26,11 @@ function pruneMessages(messages, limit) {
 }
 
 class CourseLiveService {
-  constructor() {
+  constructor({ maxChatHistory = 200, idleTimeoutMs = 120000, sessionRetentionMs = 900000 } = {}) {
     this.sessions = new Map();
-    this.maxChatHistory = 200;
+    this.maxChatHistory = Math.max(Number(maxChatHistory) || 200, 1);
+    this.idleTimeoutMs = Math.max(Number(idleTimeoutMs) || 120000, 1000);
+    this.sessionRetentionMs = Math.max(Number(sessionRetentionMs) || 900000, 60000);
   }
 
   ensureSession(courseId) {
@@ -37,8 +40,57 @@ class CourseLiveService {
         messages: [],
         createdAt: new Date()
       });
+      this.updatePresenceMetrics();
     }
     return this.sessions.get(courseId);
+  }
+
+  purgeStaleViewers(courseId, session, now = new Date()) {
+    let removed = 0;
+    for (const [viewerId, entry] of session.viewers.entries()) {
+      const lastSeen = entry.lastSeenAt instanceof Date
+        ? entry.lastSeenAt
+        : entry.lastSeenAt
+          ? new Date(entry.lastSeenAt)
+          : null;
+      if (!lastSeen || Number.isNaN(lastSeen.getTime()) || now.getTime() - lastSeen.getTime() > this.idleTimeoutMs) {
+        session.viewers.delete(viewerId);
+        removed += 1;
+      }
+    }
+
+    if (removed > 0) {
+      log.debug({ courseId, removed }, 'course live presence purged stale viewers');
+    }
+
+    return removed;
+  }
+
+  maybeCleanupSession(courseId, session, now = new Date()) {
+    if (session.viewers.size > 0) {
+      return false;
+    }
+
+    const createdAt = session.createdAt instanceof Date ? session.createdAt : new Date(session.createdAt ?? now);
+    const sessionAgeMs = now.getTime() - createdAt.getTime();
+    const shouldRemove = session.messages.length === 0 || sessionAgeMs >= this.sessionRetentionMs;
+
+    if (shouldRemove) {
+      this.sessions.delete(courseId);
+      log.debug({ courseId }, 'course live session removed after inactivity');
+      return true;
+    }
+
+    session.createdAt = createdAt;
+    return false;
+  }
+
+  updatePresenceMetrics() {
+    let viewerCount = 0;
+    for (const session of this.sessions.values()) {
+      viewerCount += session.viewers.size;
+    }
+    updateLiveCoursePresenceMetrics({ sessionCount: this.sessions.size, viewerCount });
   }
 
   joinCourse(courseId, user) {
@@ -93,6 +145,7 @@ class CourseLiveService {
     session.messages.push(message);
     session.messages = pruneMessages(session.messages, this.maxChatHistory);
     log.debug({ courseId, userId: user.id }, 'course live chat message appended');
+    recordLiveCourseMessagePosted();
     return message;
   }
 
@@ -105,12 +158,23 @@ class CourseLiveService {
   getPresence(courseId) {
     const session = this.sessions.get(courseId);
     if (!session) {
+      this.updatePresenceMetrics();
       return {
         totalViewers: 0,
         viewers: []
       };
     }
-    return {
+    const now = new Date();
+    this.purgeStaleViewers(courseId, session, now);
+    if (this.maybeCleanupSession(courseId, session, now)) {
+      this.updatePresenceMetrics();
+      return {
+        totalViewers: 0,
+        viewers: []
+      };
+    }
+
+    const presence = {
       totalViewers: session.viewers.size,
       viewers: Array.from(session.viewers.values()).map((entry) => ({
         ...entry.user,
@@ -118,10 +182,14 @@ class CourseLiveService {
         lastSeenAt: entry.lastSeenAt.toISOString()
       }))
     };
+
+    this.updatePresenceMetrics();
+    return presence;
   }
 
   reset() {
     this.sessions.clear();
+    this.updatePresenceMetrics();
   }
 }
 

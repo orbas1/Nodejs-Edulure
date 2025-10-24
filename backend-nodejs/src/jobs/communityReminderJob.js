@@ -6,6 +6,7 @@ import CommunityEventModel from '../models/CommunityEventModel.js';
 import CommunityEventReminderModel from '../models/CommunityEventReminderModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import IntegrationProviderService from '../services/IntegrationProviderService.js';
+import { recordBackgroundJobRun, recordIntegrationRequestAttempt } from '../observability/metrics.js';
 
 function createLogger() {
   return logger.child({ module: 'community-reminder-job' });
@@ -76,11 +77,19 @@ async function dispatchReminder(reminder, log) {
       }
     }
 
+    const twilioStartedAt = Date.now();
     try {
       const message = await twilioClient.sendMessage({
         to: destination,
         body: messageBody,
         statusCallback: reminder.metadata?.statusCallbackUrl ?? null
+      });
+      recordIntegrationRequestAttempt({
+        provider: 'twilio',
+        operation: 'send_message',
+        outcome: 'success',
+        statusCode: message?.status ?? 'accepted',
+        durationMs: Date.now() - twilioStartedAt
       });
       deliveryMetadata = {
         provider: 'twilio',
@@ -89,6 +98,13 @@ async function dispatchReminder(reminder, log) {
         messageSid: message.sid
       };
     } catch (error) {
+      recordIntegrationRequestAttempt({
+        provider: 'twilio',
+        operation: 'send_message',
+        outcome: 'failure',
+        statusCode: error?.status ?? error?.code ?? 'error',
+        durationMs: Date.now() - twilioStartedAt
+      });
       log.error({ err: error, reminderId: reminder.id }, 'Failed to deliver SMS reminder');
       await CommunityEventReminderModel.markOutcome(reminder.id, {
         status: 'failed',
@@ -188,50 +204,94 @@ export class CommunityReminderJob {
   }
 
   async runCycle(trigger = 'manual') {
+    const jobKey = 'community_reminder';
+    const startedAt = process.hrtime.bigint();
+
     if (!this.enabled) {
       this.logger.debug({ trigger }, 'Community reminder job invoked while disabled');
+      recordBackgroundJobRun({ job: jobKey, trigger, outcome: 'skipped', durationMs: 0, processed: 0, succeeded: 0, failed: 0 });
       return { processed: 0, dispatched: [] };
     }
 
-    const now = this.nowProvider();
-    const reminders = await CommunityEventReminderModel.listDue({
-      now,
-      lookaheadMinutes: this.lookaheadMinutes,
-      limit: this.batchSize
-    });
+    try {
+      const now = this.nowProvider();
+      const reminders = await CommunityEventReminderModel.listDue({
+        now,
+        lookaheadMinutes: this.lookaheadMinutes,
+        limit: this.batchSize
+      });
 
-    if (!reminders.length) {
-      this.logger.debug({ trigger }, 'No community reminders due');
-      return { processed: 0, dispatched: [] };
-    }
-
-    const ids = reminders.map((reminder) => reminder.id);
-    await CommunityEventReminderModel.markProcessing(ids);
-
-    const dispatched = [];
-    for (const reminder of reminders) {
-      try {
-        const result = await dispatchReminder(reminder, this.logger);
-        dispatched.push(result);
-      } catch (error) {
-        this.logger.error(
-          { err: error, reminderId: reminder.id },
-          'Failed to dispatch community reminder'
-        );
-        await CommunityEventReminderModel.markOutcome(reminder.id, {
-          status: 'failed',
-          failureReason: error.message ?? 'dispatch_failed'
-        });
-        dispatched.push({ reminderId: reminder.id, status: 'failed' });
+      if (!reminders.length) {
+        this.logger.debug({ trigger }, 'No community reminders due');
+        const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+        recordBackgroundJobRun({ job: jobKey, trigger, outcome: 'idle', durationMs, processed: 0, succeeded: 0, failed: 0 });
+        return { processed: 0, dispatched: [] };
       }
+
+      const ids = reminders.map((reminder) => reminder.id);
+      await CommunityEventReminderModel.markProcessing(ids);
+
+      const dispatched = [];
+      for (const reminder of reminders) {
+        try {
+          const result = await dispatchReminder(reminder, this.logger);
+          dispatched.push(result);
+        } catch (error) {
+          this.logger.error(
+            { err: error, reminderId: reminder.id },
+            'Failed to dispatch community reminder'
+          );
+          await CommunityEventReminderModel.markOutcome(reminder.id, {
+            status: 'failed',
+            failureReason: error.message ?? 'dispatch_failed'
+          });
+          dispatched.push({ reminderId: reminder.id, status: 'failed' });
+        }
+      }
+
+      this.logger.info(
+        { trigger, processed: reminders.length, dispatched: dispatched.length },
+        'Community reminders dispatched'
+      );
+
+      const summary = dispatched.reduce(
+        (acc, item) => {
+          if (item.status === 'sent') {
+            acc.succeeded += 1;
+          } else if (item.status === 'failed') {
+            acc.failed += 1;
+          }
+          return acc;
+        },
+        { succeeded: 0, failed: 0 }
+      );
+
+      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+      const outcome = summary.failed > 0 ? 'partial' : 'success';
+      recordBackgroundJobRun({
+        job: jobKey,
+        trigger,
+        outcome,
+        durationMs,
+        processed: reminders.length,
+        succeeded: summary.succeeded,
+        failed: summary.failed
+      });
+
+      return { processed: reminders.length, dispatched };
+    } catch (error) {
+      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+      recordBackgroundJobRun({
+        job: jobKey,
+        trigger,
+        outcome: 'failure',
+        durationMs,
+        processed: 0,
+        succeeded: 0,
+        failed: 0
+      });
+      throw error;
     }
-
-    this.logger.info(
-      { trigger, processed: reminders.length, dispatched: dispatched.length },
-      'Community reminders dispatched'
-    );
-
-    return { processed: reminders.length, dispatched };
   }
 
   stop() {
