@@ -8,6 +8,8 @@ import {
   UsersIcon
 } from '@heroicons/react/24/outline';
 
+import { deriveMemberClusters } from './communityEngagementMetrics.js';
+
 const STATUS_COLORS = {
   Active: 'bg-emerald-500',
   Pending: 'bg-amber-400',
@@ -240,6 +242,8 @@ export default function CommunityMemberDirectory({ members, onMessageMember, isL
 
   const normalisedMembers = useMemo(() => normaliseMembers(members), [members]);
 
+  const clusterBreakdown = useMemo(() => deriveMemberClusters(normalisedMembers), [normalisedMembers]);
+
   const roleOptions = useMemo(() => {
     const uniqueRoles = new Set(['All roles']);
     normalisedMembers.forEach((member) => uniqueRoles.add(member.role ?? 'Member'));
@@ -286,6 +290,23 @@ export default function CommunityMemberDirectory({ members, onMessageMember, isL
           <span>Suggested connections: {recommendedCount}</span>
         </div>
       </header>
+
+      {clusterBreakdown.length ? (
+        <div className="grid gap-3 rounded-3xl border border-slate-200 bg-white/90 p-4 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
+          {clusterBreakdown.map((cluster) => (
+            <div key={cluster.key} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+              <p className="text-sm font-semibold text-slate-800">{cluster.label}</p>
+              <p className="mt-1">Members: {cluster.members}</p>
+              <p className="mt-1">Online: {cluster.online}</p>
+              {cluster.sampleMembers.length ? (
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Examples: {cluster.sampleMembers.join(', ')}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
         <label className="relative flex items-center rounded-3xl border border-slate-200 bg-white/90 px-4 py-2 text-sm text-slate-500 focus-within:border-primary focus-within:text-primary">

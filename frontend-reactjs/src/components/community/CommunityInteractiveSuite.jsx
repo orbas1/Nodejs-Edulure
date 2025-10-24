@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 import usePersistentCollection from '../../hooks/usePersistentCollection.js';
+import { computeCommunityEngagementMetrics } from './communityEngagementMetrics.js';
 
 const DEFAULT_FEED_POSTS = [
   {
@@ -242,6 +243,74 @@ function useCommunityCollections(communityId) {
   const events = usePersistentCollection(`${storageNamespace}-events`, DEFAULT_EVENTS);
 
   return { feed, liveClassrooms, recordedClassrooms, calendar, livestreams, podcasts, leaderboard, events };
+}
+
+function EngagementSummary({ insights, communityName }) {
+  if (!insights) return null;
+  const { totals, liveMinutes, recordedMinutes, upcomingEventsCount, trendingTags, topContributors } = insights;
+  return (
+    <section className="rounded-4xl border border-slate-200 bg-white/90 p-6 shadow-xl">
+      <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Community pulse</p>
+          <h2 className="text-lg font-semibold text-slate-900">Engagement snapshot for {communityName}</h2>
+        </div>
+        <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-primary">
+            <RocketLaunchIcon className="h-4 w-4" /> {totals.liveSessions} live
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+            <PlayCircleIcon className="h-4 w-4" /> {totals.recordedSessions} on-demand
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+            <FireIcon className="h-4 w-4" /> {totals.feedPosts} feed posts
+          </span>
+        </div>
+      </header>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <div className="rounded-3xl border border-slate-100 bg-slate-50/80 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Live minutes</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{liveMinutes}</p>
+          <p className="mt-1 text-xs text-slate-500">Minutes of live programming scheduled this week.</p>
+        </div>
+        <div className="rounded-3xl border border-slate-100 bg-slate-50/80 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">On-demand minutes</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{recordedMinutes}</p>
+          <p className="mt-1 text-xs text-slate-500">Total runtime of recorded classrooms.</p>
+        </div>
+        <div className="rounded-3xl border border-slate-100 bg-slate-50/80 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Upcoming events</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{upcomingEventsCount}</p>
+          <p className="mt-1 text-xs text-slate-500">Scheduled within the next 7 days.</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-slate-100 bg-white/90 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trending tags</p>
+          <ul className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+            {trendingTags.length ? trendingTags.map((tag) => (
+              <li key={tag.tag} className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+                {tag.tag} · {tag.count}
+              </li>
+            )) : <li className="text-slate-500">No tag activity yet.</li>}
+          </ul>
+        </div>
+        <div className="rounded-3xl border border-slate-100 bg-white/90 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Top contributors</p>
+          <ul className="mt-2 space-y-2 text-sm text-slate-700">
+            {topContributors.length ? topContributors.map((contributor) => (
+              <li key={`${contributor.name}-${contributor.points}`} className="flex items-center justify-between">
+                <span>{contributor.name}</span>
+                <span className="text-xs text-slate-400">{contributor.points} pts</span>
+              </li>
+            )) : <li className="text-xs text-slate-500">No leaderboard data available.</li>}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
 }
 function FeedManager({ collection, communityName }) {
   const emptyDraft = useMemo(
@@ -2153,8 +2222,22 @@ export default function CommunityInteractiveSuite({
     replaceEvents(normaliseEvents(initialEvents));
   }, [communityId, initialEvents, replaceEvents]);
 
+  const engagementInsights = useMemo(
+    () =>
+      computeCommunityEngagementMetrics({
+        feed: feed.items,
+        liveClassrooms: liveClassrooms.items,
+        recordedClassrooms: recordedClassrooms.items,
+        calendar: calendar.items,
+        events: events.items,
+        leaderboard: leaderboard.items
+      }),
+    [feed.items, liveClassrooms.items, recordedClassrooms.items, calendar.items, events.items, leaderboard.items]
+  );
+
   return (
     <div className="space-y-8">
+      <EngagementSummary insights={engagementInsights} communityName={communityName} />
       <FeedManager collection={feed} communityName={communityName} />
       <ClassroomManager liveCollection={liveClassrooms} recordedCollection={recordedClassrooms} />
       <CalendarManager calendarCollection={calendar} />

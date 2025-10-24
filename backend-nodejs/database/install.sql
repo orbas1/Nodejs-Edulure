@@ -408,6 +408,344 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
      WHERE table_schema = DATABASE()
+       AND table_name = 'community_messages'
+  ) THEN
+    CREATE TABLE community_messages (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      community_id INT UNSIGNED NOT NULL,
+      channel_id INT UNSIGNED NOT NULL,
+      author_id INT UNSIGNED NOT NULL,
+      message_type ENUM('text', 'system', 'event', 'file', 'live') NOT NULL DEFAULT 'text',
+      body TEXT NOT NULL,
+      attachments JSON NOT NULL DEFAULT (JSON_ARRAY()),
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      status ENUM('visible', 'hidden', 'deleted') NOT NULL DEFAULT 'visible',
+      pinned TINYINT(1) NOT NULL DEFAULT 0,
+      thread_root_id INT UNSIGNED NULL,
+      reply_to_message_id INT UNSIGNED NULL,
+      delivered_at DATETIME NULL,
+      deleted_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX community_messages_channel_created_idx (community_id, channel_id, created_at),
+      INDEX community_messages_thread_root_idx (thread_root_id),
+      INDEX community_messages_status_idx (status),
+      CONSTRAINT fk_community_messages_community FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+      CONSTRAINT fk_community_messages_channel FOREIGN KEY (channel_id) REFERENCES community_channels(id) ON DELETE CASCADE,
+      CONSTRAINT fk_community_messages_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_community_messages_thread_root FOREIGN KEY (thread_root_id) REFERENCES community_messages(id) ON DELETE SET NULL,
+      CONSTRAINT fk_community_messages_reply FOREIGN KEY (reply_to_message_id) REFERENCES community_messages(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'community_channel_members'
+  ) THEN
+    CREATE TABLE community_channel_members (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      channel_id INT UNSIGNED NOT NULL,
+      user_id INT UNSIGNED NOT NULL,
+      role ENUM('member', 'moderator') NOT NULL DEFAULT 'member',
+      notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
+      mute_until DATETIME NULL,
+      last_read_at DATETIME NULL,
+      last_read_message_id INT UNSIGNED NULL,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY community_channel_members_unique (channel_id, user_id),
+      KEY community_channel_members_user_idx (user_id),
+      CONSTRAINT fk_channel_members_channel FOREIGN KEY (channel_id) REFERENCES community_channels(id) ON DELETE CASCADE,
+      CONSTRAINT fk_channel_members_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_channel_members_last_read FOREIGN KEY (last_read_message_id) REFERENCES community_messages(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'community_message_reactions'
+  ) THEN
+    CREATE TABLE community_message_reactions (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      message_id INT UNSIGNED NOT NULL,
+      user_id INT UNSIGNED NOT NULL,
+      emoji VARCHAR(40) NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY community_message_reactions_unique (message_id, user_id, emoji),
+      KEY community_message_reactions_emoji_idx (emoji),
+      CONSTRAINT fk_message_reactions_message FOREIGN KEY (message_id) REFERENCES community_messages(id) ON DELETE CASCADE,
+      CONSTRAINT fk_message_reactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'community_message_moderation_actions'
+  ) THEN
+    CREATE TABLE community_message_moderation_actions (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      message_id INT UNSIGNED NOT NULL,
+      actor_id INT UNSIGNED NOT NULL,
+      action_type ENUM('hide', 'restore', 'delete', 'flag') NOT NULL,
+      reason VARCHAR(500) NULL,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      KEY community_message_moderation_actions_message_idx (message_id),
+      KEY community_message_moderation_actions_action_idx (action_type),
+      CONSTRAINT fk_message_actions_message FOREIGN KEY (message_id) REFERENCES community_messages(id) ON DELETE CASCADE,
+      CONSTRAINT fk_message_actions_actor FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'direct_message_threads'
+  ) THEN
+    CREATE TABLE direct_message_threads (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      subject VARCHAR(240) NULL,
+      is_group TINYINT(1) NOT NULL DEFAULT 0,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      last_message_at DATETIME NULL,
+      last_message_preview VARCHAR(280) NULL,
+      archived_at DATETIME NULL,
+      archived_by INT UNSIGNED NULL,
+      archive_metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX direct_message_threads_last_message_idx (last_message_at),
+      INDEX direct_message_threads_archived_idx (archived_at),
+      CONSTRAINT fk_direct_message_threads_archived_by FOREIGN KEY (archived_by) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'direct_message_threads'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_message_threads'
+         AND column_name = 'archive_metadata'
+    ) THEN
+      ALTER TABLE direct_message_threads
+        ADD COLUMN archive_metadata JSON NOT NULL DEFAULT (JSON_OBJECT());
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_message_threads'
+         AND column_name = 'archived_at'
+    ) THEN
+      ALTER TABLE direct_message_threads ADD COLUMN archived_at DATETIME NULL;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_message_threads'
+         AND column_name = 'archived_by'
+    ) THEN
+      ALTER TABLE direct_message_threads
+        ADD COLUMN archived_by INT UNSIGNED NULL,
+        ADD CONSTRAINT fk_direct_message_threads_archived_by FOREIGN KEY (archived_by) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_message_threads'
+         AND index_name = 'direct_message_threads_last_message_idx'
+    ) THEN
+      ALTER TABLE direct_message_threads
+        ADD INDEX direct_message_threads_last_message_idx (last_message_at);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_message_threads'
+         AND index_name = 'direct_message_threads_archived_idx'
+    ) THEN
+      ALTER TABLE direct_message_threads
+        ADD INDEX direct_message_threads_archived_idx (archived_at);
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'direct_messages'
+  ) THEN
+    CREATE TABLE direct_messages (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      thread_id INT UNSIGNED NOT NULL,
+      sender_id INT UNSIGNED NOT NULL,
+      message_type ENUM('text', 'system', 'file') NOT NULL DEFAULT 'text',
+      body TEXT NOT NULL,
+      attachments JSON NOT NULL DEFAULT (JSON_ARRAY()),
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      status ENUM('sent', 'delivered', 'read', 'deleted') NOT NULL DEFAULT 'sent',
+      delivered_at DATETIME NULL,
+      read_at DATETIME NULL,
+      deleted_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      KEY direct_messages_thread_created_idx (thread_id, created_at),
+      CONSTRAINT fk_direct_messages_thread FOREIGN KEY (thread_id) REFERENCES direct_message_threads(id) ON DELETE CASCADE,
+      CONSTRAINT fk_direct_messages_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'direct_messages'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_messages'
+         AND index_name = 'direct_messages_thread_created_idx'
+    ) THEN
+      ALTER TABLE direct_messages
+        ADD INDEX direct_messages_thread_created_idx (thread_id, created_at);
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'direct_message_participants'
+  ) THEN
+    CREATE TABLE direct_message_participants (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      thread_id INT UNSIGNED NOT NULL,
+      user_id INT UNSIGNED NOT NULL,
+      role ENUM('member', 'admin') NOT NULL DEFAULT 'member',
+      notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
+      is_muted TINYINT(1) NOT NULL DEFAULT 0,
+      mute_until DATETIME NULL,
+      last_read_at DATETIME NULL,
+      last_read_message_id INT UNSIGNED NULL,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      archived_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY direct_message_participants_unique (thread_id, user_id),
+      KEY direct_message_participants_user_idx (user_id),
+      KEY direct_message_participants_archive_idx (user_id, archived_at),
+      CONSTRAINT fk_direct_message_participants_thread FOREIGN KEY (thread_id) REFERENCES direct_message_threads(id) ON DELETE CASCADE,
+      CONSTRAINT fk_direct_message_participants_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_direct_message_participants_last_read FOREIGN KEY (last_read_message_id) REFERENCES direct_messages(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'direct_message_participants'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_message_participants'
+         AND column_name = 'archived_at'
+    ) THEN
+      ALTER TABLE direct_message_participants ADD COLUMN archived_at DATETIME NULL;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_message_participants'
+         AND index_name = 'direct_message_participants_user_idx'
+    ) THEN
+      ALTER TABLE direct_message_participants
+        ADD INDEX direct_message_participants_user_idx (user_id);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'direct_message_participants'
+         AND index_name = 'direct_message_participants_archive_idx'
+    ) THEN
+      ALTER TABLE direct_message_participants
+        ADD INDEX direct_message_participants_archive_idx (user_id, archived_at);
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'user_presence_sessions'
+  ) THEN
+    CREATE TABLE user_presence_sessions (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNSIGNED NOT NULL,
+      session_id VARCHAR(64) NOT NULL,
+      client ENUM('web', 'mobile', 'provider', 'admin') NOT NULL DEFAULT 'web',
+      status ENUM('online', 'away', 'offline') NOT NULL DEFAULT 'online',
+      connected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME NULL,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      UNIQUE KEY user_presence_sessions_session_unique (session_id),
+      KEY user_presence_sessions_user_idx (user_id),
+      KEY user_presence_sessions_status_idx (status),
+      KEY user_presence_sessions_expires_idx (expires_at),
+      CONSTRAINT fk_user_presence_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'user_privacy_settings'
+  ) THEN
+    CREATE TABLE user_privacy_settings (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNSIGNED NOT NULL,
+      profile_visibility ENUM('public', 'followers', 'private') NOT NULL DEFAULT 'public',
+      follow_approval_required TINYINT(1) NOT NULL DEFAULT 0,
+      message_permission ENUM('anyone', 'followers', 'none') NOT NULL DEFAULT 'followers',
+      share_activity TINYINT(1) NOT NULL DEFAULT 1,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY user_privacy_settings_user_unique (user_id),
+      CONSTRAINT fk_user_privacy_settings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'user_privacy_settings'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'user_privacy_settings'
+         AND index_name = 'user_privacy_settings_user_unique'
+    ) THEN
+      ALTER TABLE user_privacy_settings
+        ADD UNIQUE KEY user_privacy_settings_user_unique (user_id);
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
        AND table_name = 'learner_system_preferences'
   ) THEN
     CREATE TABLE learner_system_preferences (

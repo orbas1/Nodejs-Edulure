@@ -110,7 +110,8 @@ export default function RoleManagementPanel({
   assignmentForm,
   onAssignmentChange,
   onAssignmentSubmit,
-  interactive
+  interactive,
+  roleInsights
 }) {
   const safeRoles = Array.isArray(roles) ? roles.filter(Boolean).map(normaliseRole) : [];
   const safeAssignments = Array.isArray(assignments)
@@ -199,6 +200,10 @@ export default function RoleManagementPanel({
     roleKey: assignmentState.roleKey ?? ''
   };
 
+  const highlightedRoles = Array.isArray(roleInsights)
+    ? roleInsights.filter((insight) => insight?.roleKey).slice(0, 3)
+    : [];
+
   const createRoleKeyExists = managedRoleKeys.has(safeCreateForm.roleKey.trim());
   const isCreateDisabled =
     !interactive ||
@@ -268,6 +273,20 @@ export default function RoleManagementPanel({
           Refresh
         </button>
       </header>
+
+      {highlightedRoles.length ? (
+        <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+          {highlightedRoles.map((insight) => (
+            <div key={insight.roleKey} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+              <p className="font-semibold text-slate-700">{insight.roleKey}</p>
+              <p className="mt-1">Members: {insight.members ?? 0}</p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Live: {insight.online ?? 0} · Away: {insight.away ?? 0}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <p className="mt-2 text-xs text-slate-500">
         Configure moderators, voice hosts, and broadcast leads. Align permissions with programme policies in minutes. RBAC
@@ -519,9 +538,18 @@ RoleManagementPanel.propTypes = {
   }).isRequired,
   onAssignmentChange: PropTypes.func.isRequired,
   onAssignmentSubmit: PropTypes.func.isRequired,
-  interactive: PropTypes.bool.isRequired
+  interactive: PropTypes.bool.isRequired,
+  roleInsights: PropTypes.arrayOf(
+    PropTypes.shape({
+      roleKey: PropTypes.string.isRequired,
+      members: PropTypes.number,
+      online: PropTypes.number,
+      away: PropTypes.number
+    })
+  )
 };
 
 RoleManagementPanel.defaultProps = {
-  error: null
+  error: null,
+  roleInsights: []
 };

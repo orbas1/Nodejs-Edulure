@@ -1,5 +1,10 @@
 import PropTypes from 'prop-types';
-import { ArrowPathIcon, CircleStackIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowPathIcon,
+  ArrowTopRightOnSquareIcon,
+  CircleStackIcon,
+  PaperAirplaneIcon
+} from '@heroicons/react/24/outline';
 
 import { getChannelTypeMeta } from './channelMetadata.js';
 
@@ -49,7 +54,12 @@ export default function ChannelSidebar({
   onRefresh,
   activeChannelId,
   onSelectChannel,
-  interactive
+  interactive,
+  socialGraph,
+  directMessages,
+  directMessagesLoading,
+  onSelectDirectRecipient,
+  onOpenDirectThread
 }) {
   const errorMessage = error
     ? error instanceof Error
@@ -58,6 +68,17 @@ export default function ChannelSidebar({
       ? error
       : null
     : null;
+
+  const presenceSummary = socialGraph?.stats?.presence;
+  const topConnectors = Array.isArray(socialGraph?.topConnectors)
+    ? socialGraph.topConnectors.slice(0, 3)
+    : [];
+  const directThreads = Array.isArray(directMessages?.threads)
+    ? directMessages.threads.slice(0, 3)
+    : [];
+  const directSuggestions = Array.isArray(directMessages?.suggestions)
+    ? directMessages.suggestions.slice(0, 3)
+    : [];
 
   return (
     <aside className="flex h-full w-full flex-col gap-6">
@@ -93,6 +114,44 @@ export default function ChannelSidebar({
               <span>Working in offline preview mode. Changes queue until an authenticated session is available.</span>
             )}
           </div>
+
+          {presenceSummary ? (
+            <div className="grid gap-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-[11px] text-slate-500">
+              <p className="font-semibold uppercase tracking-wide text-slate-500">Live presence</p>
+              <div className="flex flex-wrap gap-2">
+                <span className="dashboard-pill px-3 py-1">
+                  Online {presenceSummary.byStatus?.online ?? 0}
+                </span>
+                <span className="dashboard-pill px-3 py-1">
+                  Away {presenceSummary.byStatus?.away ?? 0}
+                </span>
+                <span className="dashboard-pill px-3 py-1">
+                  Offline {presenceSummary.byStatus?.offline ?? 0}
+                </span>
+              </div>
+              {presenceSummary.recent?.length ? (
+                <p className="text-[11px] text-slate-400">
+                  Recent activity: {presenceSummary.recent.map((member) => member.displayName).join(', ')}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {topConnectors.length ? (
+            <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Top connectors</p>
+              <ul className="space-y-2 text-xs text-slate-600">
+                {topConnectors.map((connector) => (
+                  <li key={connector.id} className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-slate-700">{connector.displayName}</span>
+                    <span className="text-[11px] text-slate-400">
+                      {connector.peerCount} peers · {connector.channelCount} channels
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -170,6 +229,96 @@ export default function ChannelSidebar({
           )}
         </div>
       </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
+        <header className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <CircleStackIcon className="h-5 w-5 text-primary" aria-hidden="true" />
+            Direct connections
+          </div>
+          <span className="text-xs text-slate-400">
+            {directThreads.length} threads · {directSuggestions.length} suggestions
+          </span>
+        </header>
+        <div className="mt-3 space-y-4 text-xs text-slate-500">
+          {directMessagesLoading ? (
+            <p>Loading direct connections…</p>
+          ) : directThreads.length ? (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Active threads</p>
+              <ul className="mt-2 space-y-2">
+                {directThreads.map((thread) => (
+                  <li
+                    key={thread.id}
+                    className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3"
+                  >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-700">{thread.name}</p>
+                          <p className="mt-1 text-[11px] text-slate-400">
+                          {thread.members.length} members ·{' '}
+                          {thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleString() : 'No activity yet'}
+                          {thread.unreadCount ? (
+                            <span className="ml-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-[1px] text-[10px] font-semibold text-primary">
+                              {thread.unreadCount} unread
+                            </span>
+                          ) : null}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onOpenDirectThread?.(thread)}
+                          className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-500 transition hover:border-primary/40 hover:text-primary"
+                          aria-label={`Open direct thread ${thread.name}`}
+                          data-thread-id={thread.id}
+                        >
+                        <ArrowTopRightOnSquareIcon className="h-4 w-4" aria-hidden="true" />
+                        Open
+                      </button>
+                    </div>
+                    {thread.lastMessageSnippet ? (
+                      <p className="mt-2 text-slate-500">{thread.lastMessageSnippet}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p>No direct threads detected yet.</p>
+          )}
+
+          {directSuggestions.length ? (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Suggested intros</p>
+              <ul className="mt-2 space-y-2">
+                {directSuggestions.map((suggestion) => (
+                  <li
+                    key={suggestion.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-2"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-700">{suggestion.displayName}</p>
+                      <p className="text-[11px] text-slate-400">
+                        {suggestion.peerCount} peers · {suggestion.channelCount} channels
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onSelectDirectRecipient?.(suggestion)}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-500 transition hover:border-primary/40 hover:text-primary"
+                      aria-label={`Compose direct message to ${suggestion.displayName}`}
+                      data-member-id={suggestion.id}
+                    >
+                      <PaperAirplaneIcon className="h-4 w-4" aria-hidden="true" />
+                      Compose
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </aside>
   );
 }
@@ -189,11 +338,28 @@ ChannelSidebar.propTypes = {
   onRefresh: PropTypes.func.isRequired,
   activeChannelId: PropTypes.string,
   onSelectChannel: PropTypes.func.isRequired,
-  interactive: PropTypes.bool.isRequired
+  interactive: PropTypes.bool.isRequired,
+  socialGraph: PropTypes.shape({
+    stats: PropTypes.object,
+    topConnectors: PropTypes.array,
+    directMessages: PropTypes.object
+  }),
+  directMessages: PropTypes.shape({
+    threads: PropTypes.array,
+    suggestions: PropTypes.array
+  }),
+  directMessagesLoading: PropTypes.bool,
+  onSelectDirectRecipient: PropTypes.func,
+  onOpenDirectThread: PropTypes.func
 };
 
 ChannelSidebar.defaultProps = {
   selectedCommunityId: null,
   error: null,
-  activeChannelId: null
+  activeChannelId: null,
+  socialGraph: null,
+  directMessages: null,
+  directMessagesLoading: false,
+  onSelectDirectRecipient: null,
+  onOpenDirectThread: null
 };

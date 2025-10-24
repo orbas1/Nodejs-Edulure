@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2024-11-26T00:00:00.000Z",
+  "generatedAt": "2025-04-26T00:00:00.000Z",
   "database": "edulure",
   "tables": {
     "users": {
@@ -2471,6 +2471,850 @@
             "status"
           ],
           "unique": false
+        }
+      ]
+    },
+    "community_messages": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "community_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "channel_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "author_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "message_type": {
+          "dataType": "enum",
+          "columnType": "enum('text','system','event','file','live')",
+          "isNullable": false,
+          "columnDefault": "text"
+        },
+        "body": {
+          "dataType": "text",
+          "columnType": "text",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "attachments": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "[]"
+        },
+        "metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        },
+        "status": {
+          "dataType": "enum",
+          "columnType": "enum('visible','hidden','deleted')",
+          "isNullable": false,
+          "columnDefault": "visible"
+        },
+        "pinned": {
+          "dataType": "tinyint",
+          "columnType": "tinyint(1)",
+          "isNullable": false,
+          "columnDefault": "0"
+        },
+        "thread_root_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "reply_to_message_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "delivered_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "deleted_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "created_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP",
+          "extra": "on update CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "community_messages_channel_created_idx",
+          "columns": [
+            "community_id",
+            "channel_id",
+            "created_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "community_messages_thread_root_idx",
+          "columns": [
+            "thread_root_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "community_messages_status_idx",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "community_channel_members": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "channel_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "user_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "role": {
+          "dataType": "enum",
+          "columnType": "enum('member','moderator')",
+          "isNullable": false,
+          "columnDefault": "member"
+        },
+        "notifications_enabled": {
+          "dataType": "tinyint",
+          "columnType": "tinyint(1)",
+          "isNullable": false,
+          "columnDefault": "1"
+        },
+        "mute_until": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "last_read_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "last_read_message_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        },
+        "created_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP",
+          "extra": "on update CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "community_channel_members_unique",
+          "columns": [
+            "channel_id",
+            "user_id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "community_channel_members_user_idx",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "community_message_reactions": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "message_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "user_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "emoji": {
+          "dataType": "varchar",
+          "columnType": "varchar(40)",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "created_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "community_message_reactions_unique",
+          "columns": [
+            "message_id",
+            "user_id",
+            "emoji"
+          ],
+          "unique": true
+        },
+        {
+          "name": "community_message_reactions_emoji_idx",
+          "columns": [
+            "emoji"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "community_message_moderation_actions": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "message_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "actor_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "action_type": {
+          "dataType": "enum",
+          "columnType": "enum('hide','restore','delete','flag')",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "reason": {
+          "dataType": "varchar",
+          "columnType": "varchar(500)",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        },
+        "created_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "community_message_moderation_actions_message_idx",
+          "columns": [
+            "message_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "community_message_moderation_actions_action_idx",
+          "columns": [
+            "action_type"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "direct_message_threads": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "subject": {
+          "dataType": "varchar",
+          "columnType": "varchar(240)",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "is_group": {
+          "dataType": "tinyint",
+          "columnType": "tinyint(1)",
+          "isNullable": false,
+          "columnDefault": "0"
+        },
+        "metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        },
+        "last_message_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "last_message_preview": {
+          "dataType": "varchar",
+          "columnType": "varchar(280)",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "archived_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "archived_by": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "archive_metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        },
+        "created_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP",
+          "extra": "on update CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "direct_message_threads_last_message_idx",
+          "columns": [
+            "last_message_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "direct_message_threads_archived_idx",
+          "columns": [
+            "archived_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "direct_messages": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "thread_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "sender_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "message_type": {
+          "dataType": "enum",
+          "columnType": "enum('text','system','file')",
+          "isNullable": false,
+          "columnDefault": "text"
+        },
+        "body": {
+          "dataType": "text",
+          "columnType": "text",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "attachments": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "[]"
+        },
+        "metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        },
+        "status": {
+          "dataType": "enum",
+          "columnType": "enum('sent','delivered','read','deleted')",
+          "isNullable": false,
+          "columnDefault": "sent"
+        },
+        "delivered_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "read_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "deleted_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "created_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP",
+          "extra": "on update CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "direct_messages_thread_created_idx",
+          "columns": [
+            "thread_id",
+            "created_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "direct_message_participants": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "thread_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "user_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "role": {
+          "dataType": "enum",
+          "columnType": "enum('member','admin')",
+          "isNullable": false,
+          "columnDefault": "member"
+        },
+        "notifications_enabled": {
+          "dataType": "tinyint",
+          "columnType": "tinyint(1)",
+          "isNullable": false,
+          "columnDefault": "1"
+        },
+        "is_muted": {
+          "dataType": "tinyint",
+          "columnType": "tinyint(1)",
+          "isNullable": false,
+          "columnDefault": "0"
+        },
+        "mute_until": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "last_read_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "last_read_message_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        },
+        "archived_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "created_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP",
+          "extra": "on update CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "direct_message_participants_unique",
+          "columns": [
+            "thread_id",
+            "user_id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "direct_message_participants_user_idx",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "direct_message_participants_archive_idx",
+          "columns": [
+            "user_id",
+            "archived_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "user_presence_sessions": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "user_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "session_id": {
+          "dataType": "varchar",
+          "columnType": "varchar(64)",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "client": {
+          "dataType": "enum",
+          "columnType": "enum('web','mobile','provider','admin')",
+          "isNullable": false,
+          "columnDefault": "web"
+        },
+        "status": {
+          "dataType": "enum",
+          "columnType": "enum('online','away','offline')",
+          "isNullable": false,
+          "columnDefault": "online"
+        },
+        "connected_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        },
+        "last_seen_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        },
+        "expires_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": true,
+          "columnDefault": null
+        },
+        "metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "user_presence_sessions_session_unique",
+          "columns": [
+            "session_id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "user_presence_sessions_user_idx",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "user_presence_sessions_status_idx",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        },
+        {
+          "name": "user_presence_sessions_expires_idx",
+          "columns": [
+            "expires_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "user_privacy_settings": {
+      "columns": {
+        "id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null,
+          "extra": "auto_increment"
+        },
+        "user_id": {
+          "dataType": "int",
+          "columnType": "int unsigned",
+          "isNullable": false,
+          "columnDefault": null
+        },
+        "profile_visibility": {
+          "dataType": "enum",
+          "columnType": "enum('public','followers','private')",
+          "isNullable": false,
+          "columnDefault": "public"
+        },
+        "follow_approval_required": {
+          "dataType": "tinyint",
+          "columnType": "tinyint(1)",
+          "isNullable": false,
+          "columnDefault": "0"
+        },
+        "message_permission": {
+          "dataType": "enum",
+          "columnType": "enum('anyone','followers','none')",
+          "isNullable": false,
+          "columnDefault": "followers"
+        },
+        "share_activity": {
+          "dataType": "tinyint",
+          "columnType": "tinyint(1)",
+          "isNullable": false,
+          "columnDefault": "1"
+        },
+        "metadata": {
+          "dataType": "json",
+          "columnType": "json",
+          "isNullable": false,
+          "columnDefault": "{}"
+        },
+        "created_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "dataType": "datetime",
+          "columnType": "datetime",
+          "isNullable": false,
+          "columnDefault": "CURRENT_TIMESTAMP",
+          "extra": "on update CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "columns": [
+            "id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "user_privacy_settings_user_unique",
+          "columns": [
+            "user_id"
+          ],
+          "unique": true
         }
       ]
     }

@@ -63,6 +63,14 @@ export const channelTypeMetadata = {
     accent: 'bg-sky-100 text-sky-700',
     recommendedRoles: ['instructor', 'moderator'],
     compliance: 'Only certified trainers may publish content.'
+  },
+  direct: {
+    label: 'Direct thread',
+    description: 'Private conversation between selected members.',
+    icon: ChatBubbleBottomCenterTextIcon,
+    accent: 'bg-primary/10 text-primary',
+    recommendedRoles: ['member', 'moderator'],
+    compliance: 'Messages follow community code of conduct and respect privacy settings.'
   }
 };
 

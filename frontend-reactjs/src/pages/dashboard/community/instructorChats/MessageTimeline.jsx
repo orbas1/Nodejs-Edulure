@@ -95,6 +95,16 @@ ModerationBadge.defaultProps = {
   status: null
 };
 
+function resolveAuthorKey(author) {
+  if (!author) return null;
+  if (author.id) return String(author.id);
+  if (author.userId) return String(author.userId);
+  if (author.email) return `email:${author.email.toLowerCase()}`;
+  if (author.displayName) return `name:${author.displayName.toLowerCase()}`;
+  if (author.name) return `name:${author.name.toLowerCase()}`;
+  return null;
+}
+
 export default function MessageTimeline({
   channel,
   messages,
@@ -104,7 +114,8 @@ export default function MessageTimeline({
   onLoadMore,
   onReact,
   onRemoveReaction,
-  onModerate
+  onModerate,
+  graph
 }) {
   const channelMeta = channel ? getChannelTypeMeta(channel.channelType) : null;
   const errorMessage = error
@@ -114,6 +125,12 @@ export default function MessageTimeline({
       ? error
       : null
     : null;
+
+  const nodeLookup = graph?.nodeLookup ?? {};
+  const responseInsight = graph?.stats?.response;
+  const topChannels = Array.isArray(graph?.stats?.topChannels)
+    ? graph.stats.topChannels.slice(0, 3)
+    : [];
 
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white/95 shadow-sm">
@@ -127,6 +144,11 @@ export default function MessageTimeline({
           <div className="flex flex-col items-end text-right text-xs text-slate-400">
             <span>{channel.members ?? channel.memberCount ?? '—'} members</span>
             {channel.updatedAt ? <span>Updated {new Date(channel.updatedAt).toLocaleString()}</span> : null}
+            {responseInsight?.medianMinutes ? (
+              <span>
+                Median response {responseInsight.medianMinutes.toFixed(1)} min
+              </span>
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -181,6 +203,22 @@ export default function MessageTimeline({
                   ) : null}
                   <MessageAttachments attachments={message.attachments} />
                 </div>
+                {(() => {
+                  const memberKey = resolveAuthorKey(message.author);
+                  const insight = memberKey ? nodeLookup[memberKey] : null;
+                  if (!insight) return null;
+                  return (
+                    <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                      <span className="rounded-full bg-slate-100 px-2 py-[2px]">Peers {insight.peerCount}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-[2px]">Channels {insight.channelCount}</span>
+                      {insight.presenceStatus ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-[2px] capitalize">
+                          Status {insight.presenceStatus}
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                })()}
                 <footer className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                   <button
                     type="button"
@@ -243,6 +281,18 @@ export default function MessageTimeline({
           </button>
         </div>
       )}
+      {topChannels.length ? (
+        <div className="border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
+          <p className="font-semibold uppercase tracking-wide text-slate-400">Trending channels</p>
+          <ul className="mt-2 flex flex-wrap gap-3">
+            {topChannels.map((entry) => (
+              <li key={entry.id} className="rounded-full bg-slate-50 px-3 py-1 text-slate-600">
+                {entry.name} · {entry.activityCount} msgs
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -256,7 +306,11 @@ MessageTimeline.propTypes = {
   onLoadMore: PropTypes.func,
   onReact: PropTypes.func,
   onRemoveReaction: PropTypes.func,
-  onModerate: PropTypes.func
+  onModerate: PropTypes.func,
+  graph: PropTypes.shape({
+    nodeLookup: PropTypes.object,
+    stats: PropTypes.object
+  })
 };
 
 MessageTimeline.defaultProps = {
@@ -265,5 +319,6 @@ MessageTimeline.defaultProps = {
   onLoadMore: null,
   onReact: null,
   onRemoveReaction: null,
-  onModerate: null
+  onModerate: null,
+  graph: null
 };
