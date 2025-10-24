@@ -117,6 +117,21 @@ const designDependencies = [
     updatedAt: now
   },
   {
+    id: 24,
+    navItemId: 'feed',
+    navItemLabel: 'Feed',
+    navItemCategory: 'primary',
+    navItemRoute: '/feed',
+    roleScope: ['user'],
+    dependencyKey: 'feed-reference-doc',
+    dependencyType: 'reference',
+    value: '/docs/design-system/navigation-annex#feed-topbar',
+    notes: null,
+    displayOrder: 3,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
     id: 23,
     navItemId: 'feed',
     navItemLabel: 'Feed',
@@ -248,6 +263,30 @@ describe('NavigationAnnexRepository', () => {
             unit: 'clicks'
           }
         ]
+      }
+    ]);
+
+    expect(annex.documentationIndex).toEqual([
+      {
+        href: '/docs/design-system/navigation-annex#feed-topbar',
+        usageCount: 1,
+        categories: ['design'],
+        navItems: ['feed'],
+        navItemLabels: ['Feed']
+      },
+      {
+        href: '/docs/operations/navigation-readiness#registry-validation',
+        usageCount: 1,
+        categories: ['operations'],
+        navItems: ['feed'],
+        navItemLabels: ['Feed']
+      },
+      {
+        href: '/handbook/navigation-annex#feed-registry',
+        usageCount: 1,
+        categories: ['product'],
+        navItems: ['feed'],
+        navItemLabels: ['Feed']
       }
     ]);
 

@@ -140,6 +140,45 @@ function sortByPriority(a, b) {
   return String(a.label ?? a.id ?? '').localeCompare(String(b.label ?? b.id ?? ''));
 }
 
+function normaliseDocumentationHref(href) {
+  if (!href) {
+    return null;
+  }
+  const trimmed = String(href).trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed;
+}
+
+function registerDocumentationReference(map, href, { navItemId, navItemLabel, category }) {
+  const normalised = normaliseDocumentationHref(href);
+  if (!normalised) {
+    return;
+  }
+
+  const entry = map.get(normalised) ?? {
+    href: normalised,
+    usageCount: 0,
+    categories: new Set(),
+    navItemIds: new Set(),
+    navItemLabels: new Set()
+  };
+
+  entry.usageCount += 1;
+  if (category) {
+    entry.categories.add(category);
+  }
+  if (navItemId) {
+    entry.navItemIds.add(navItemId);
+  }
+  if (navItemLabel) {
+    entry.navItemLabels.add(navItemLabel);
+  }
+
+  map.set(normalised, entry);
+}
+
 export default class NavigationAnnexRepository {
   static async describe({ role } = {}, connection = db) {
     const nodes = new Map();
@@ -152,6 +191,7 @@ export default class NavigationAnnexRepository {
     const checklistTasks = [];
     const strategyByPillar = new Map();
     const narrativeIndex = new Map();
+    const documentationIndex = new Map();
     const resolvedRole = normaliseRole(role);
 
     const backlogRows = await NavigationAnnexBacklogItemModel.listAll(connection);
@@ -176,6 +216,13 @@ export default class NavigationAnnexRepository {
         priority: row.priority ?? 99,
         displayOrder: row.displayOrder ?? 0
       });
+      if (row.backlogRef) {
+        registerDocumentationReference(documentationIndex, row.backlogRef, {
+          navItemId: row.navItemId,
+          navItemLabel: row.navItemLabel,
+          category: 'product'
+        });
+      }
     }
 
     const operationsRows = await NavigationAnnexOperationTaskModel.listAll(connection);
@@ -207,6 +254,13 @@ export default class NavigationAnnexRepository {
       node.operations.tasks.push(task);
       if (row.includeInChecklist) {
         checklistTasks.push(task);
+      }
+      if (row.href) {
+        registerDocumentationReference(documentationIndex, row.href, {
+          navItemId: row.navItemId,
+          navItemLabel: row.navItemLabel,
+          category: 'operations'
+        });
       }
     }
 
@@ -246,6 +300,13 @@ export default class NavigationAnnexRepository {
           if (row.value) {
             node.design.references.add(row.value);
             aggregatedDesign.references.add(row.value);
+            if (row.value.includes('/docs/')) {
+              registerDocumentationReference(documentationIndex, row.value, {
+                navItemId: row.navItemId,
+                navItemLabel: row.navItemLabel,
+                category: 'design'
+              });
+            }
           }
           break;
         }
@@ -404,12 +465,23 @@ export default class NavigationAnnexRepository {
           .map(({ id, label, baseline, target, unit }) => ({ id, label, baseline, target, unit }))
       }));
 
+    const documentationReferences = Array.from(documentationIndex.values())
+      .sort((a, b) => String(a.href).localeCompare(String(b.href)))
+      .map((entry) => ({
+        href: entry.href,
+        usageCount: entry.usageCount,
+        categories: Array.from(entry.categories),
+        navItems: Array.from(entry.navItemIds),
+        navItemLabels: Array.from(entry.navItemLabels)
+      }));
+
     return {
       initiatives,
       operationsChecklist,
       designDependencies,
       strategyNarratives,
       productBacklog,
+      documentationIndex: documentationReferences,
       refreshedAt: new Date().toISOString()
     };
   }

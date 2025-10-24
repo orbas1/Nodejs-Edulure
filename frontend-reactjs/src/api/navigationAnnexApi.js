@@ -105,6 +105,22 @@ function normaliseOperationsChecklist(raw = []) {
   }));
 }
 
+function normaliseDocumentationIndex(raw = []) {
+  return ensureArray(raw).map((entry) => {
+    const href = typeof entry.href === 'string' ? entry.href : '';
+    return {
+      href,
+      usageCount:
+        typeof entry.usageCount === 'number'
+          ? entry.usageCount
+          : ensureArray(entry.navItems).length || 0,
+      categories: ensureArray(entry.categories).map((value) => String(value)),
+      navItems: ensureArray(entry.navItems).map((value) => String(value)),
+      navItemLabels: ensureArray(entry.navItemLabels).map((value) => String(value))
+    };
+  });
+}
+
 function normaliseAnnexResponse(payload = {}) {
   const data = payload?.data ?? payload;
   const initiatives = data?.initiatives ?? {};
@@ -119,6 +135,7 @@ function normaliseAnnexResponse(payload = {}) {
     designDependencies: normaliseDesignDependencies(data?.designDependencies),
     strategyNarratives: normaliseStrategyNarratives(data?.strategyNarratives),
     productBacklog: normaliseProductBacklog(data?.productBacklog),
+    documentationIndex: normaliseDocumentationIndex(data?.documentationIndex),
     refreshedAt: data?.refreshedAt ?? null
   };
 }
