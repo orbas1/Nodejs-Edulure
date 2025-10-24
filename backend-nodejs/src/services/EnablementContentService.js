@@ -5,6 +5,8 @@ import crypto from 'node:crypto';
 import * as markedModule from 'marked';
 
 import logger from '../config/logger.js';
+import EnablementGuideModel from '../models/EnablementGuideModel.js';
+import { getEnvironmentDescriptor } from '../utils/environmentContext.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultContentDirectory = path.resolve(__dirname, '../enablement/content');
@@ -253,10 +255,38 @@ class EnablementContentService {
     this.cacheTtlMs = cacheTtlMs;
     this.cache = null;
     this.cacheExpiresAt = 0;
+    this.environmentDescriptor = getEnvironmentDescriptor();
   }
 
   async refreshCache() {
     this.cache = await this.buildCache();
+    await EnablementGuideModel.replaceAll(
+      this.cache.articles.map((article) => ({
+        slug: article.slug,
+        title: article.metadata.title,
+        summary: article.metadata.summary,
+        excerpt: article.excerpt,
+        owner: article.metadata.owner,
+        audience: article.metadata.audience,
+        products: article.metadata.products,
+        tags: article.metadata.tags,
+        capabilities: article.metadata.capabilities,
+        deliverables: article.metadata.deliverables,
+        readingTimeMinutes: article.readingTimeMinutes,
+        timeToCompleteMinutes: article.metadata.timeToCompleteMinutes,
+        wordCount: article.wordCount,
+        contentHash: article.contentHash,
+        sourcePath: article.filePath,
+        metadata: {
+          ...article.metadata,
+          estimatedReadingMinutes: article.readingTimeMinutes
+        },
+        publishedAt: article.metadata.publishedAt ?? null,
+        lastIndexedAt: new Date(article.updatedAt ?? Date.now()),
+        searchText: article.searchText
+      })),
+      { environment: this.environmentDescriptor }
+    );
     this.cacheExpiresAt = Date.now() + this.cacheTtlMs;
     return {
       articles: this.cache.articles.length,

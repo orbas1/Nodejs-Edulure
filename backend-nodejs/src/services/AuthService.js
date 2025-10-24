@@ -9,6 +9,7 @@ import UserModel from '../models/UserModel.js';
 import UserSessionModel from '../models/UserSessionModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import LearnerOnboardingResponseModel from '../models/LearnerOnboardingResponseModel.js';
+import UserRoleAssignmentModel from '../models/UserRoleAssignmentModel.js';
 import { emailVerificationService } from './EmailVerificationService.js';
 import { sessionRegistry } from './SessionRegistry.js';
 import TwoFactorService from './TwoFactorService.js';
@@ -54,6 +55,45 @@ function buildInvalidRefreshTokenError() {
   error.status = 401;
   error.code = 'INVALID_REFRESH_TOKEN';
   return error;
+}
+
+function normaliseRoleIdentifier(role) {
+  if (typeof role !== 'string') {
+    return null;
+  }
+  const trimmed = role.trim();
+  return trimmed.length ? trimmed : null;
+}
+
+function buildRoleList(primaryRole, assignments = [], additionalRoles = []) {
+  const roles = new Set();
+  const addRole = (value) => {
+    const roleValue = normaliseRoleIdentifier(value);
+    if (roleValue) {
+      roles.add(roleValue);
+    }
+  };
+
+  addRole(primaryRole);
+  assignments.forEach((assignment) => addRole(assignment?.roleKey));
+  additionalRoles.forEach((role) => addRole(role));
+
+  return Array.from(roles);
+}
+
+async function serializeUserWithAuthorizations(userRecord, connection = db) {
+  if (!userRecord) {
+    return { serialized: null, roles: [], assignments: [] };
+  }
+
+  const assignments = await UserRoleAssignmentModel.listActiveByUser(userRecord.id, connection);
+  const roles = buildRoleList(userRecord.role, assignments);
+  const serialized = serializeUser(
+    { ...userRecord, roles, roleAssignments: assignments },
+    { roles, roleAssignments: assignments }
+  );
+
+  return { serialized, roles, assignments };
 }
 
 export default class AuthService {
@@ -120,11 +160,26 @@ export default class AuthService {
 
       await LearnerOnboardingResponseModel.linkUser(payload.email, payload.role, user.id, trx);
 
+      await UserRoleAssignmentModel.assign(
+        {
+          userId: user.id,
+          roleKey: user.role,
+          scopeType: 'global',
+          assignedBy: context.actorId ?? user.id,
+          metadata: {
+            source: 'registration',
+            method: context.inviteCode ? 'invite' : 'self_service'
+          }
+        },
+        trx
+      );
+
+      const { serialized: serializedUser } = await serializeUserWithAuthorizations(user, trx);
       const verification = await emailVerificationService.issueVerification(user, context, trx);
 
       return {
         data: {
-          user: serializeUser(user),
+          user: serializedUser,
           verification: {
             status: 'pending',
             expiresAt: verification.expiresAt.toISOString()
@@ -293,8 +348,10 @@ export default class AuthService {
       await UserModel.clearLoginFailures(user.id, trx);
       const refreshedUser = await UserModel.findById(user.id, trx);
 
+      const { serialized: serializedUser, roles } = await serializeUserWithAuthorizations(refreshedUser, trx);
+
       const session = await this.createSession(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, role: refreshedUser.role, roles },
         context,
         trx
       );
@@ -314,7 +371,7 @@ export default class AuthService {
         trx
       );
 
-      return this.buildAuthResponse(serializeUser(refreshedUser), session);
+      return this.buildAuthResponse(serializedUser, session);
     });
   }
 
@@ -378,8 +435,9 @@ export default class AuthService {
       await UserSessionModel.markRotated(session.id, trx);
       sessionRegistry.markRevoked(session.id, 'rotated');
 
+      const { serialized: serializedUser, roles } = await serializeUserWithAuthorizations(user, trx);
       const newSession = await this.createSession(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, role: user.role, roles },
         context,
         trx
       );
@@ -400,7 +458,7 @@ export default class AuthService {
         trx
       );
 
-      return this.buildAuthResponse(serializeUser(user), newSession);
+      return this.buildAuthResponse(serializedUser, newSession);
     });
   }
 
@@ -540,17 +598,31 @@ export default class AuthService {
     sessionRegistry.remember(sessionRecord);
 
     const { secret, algorithm, kid } = getActiveJwtKey();
-    const accessToken = jwt.sign(
-      { sub: user.id, email: user.email, role: user.role, sid: sessionRecord.id },
-      secret,
-      {
-        expiresIn: `${env.security.accessTokenTtlMinutes}m`,
-        audience: env.security.jwtAudience,
-        issuer: env.security.jwtIssuer,
-        keyid: kid,
-        algorithm
-      }
-    );
+    const tokenRoles = Array.isArray(user.roles)
+      ? Array.from(
+          new Set(
+            user.roles
+              .map((role) => (typeof role === 'string' ? role.trim() : ''))
+              .filter((role) => role.length > 0)
+          )
+        )
+      : [];
+    const tokenPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      sid: sessionRecord.id
+    };
+    if (tokenRoles.length > 0) {
+      tokenPayload.roles = tokenRoles;
+    }
+    const accessToken = jwt.sign(tokenPayload, secret, {
+      expiresIn: `${env.security.accessTokenTtlMinutes}m`,
+      audience: env.security.jwtAudience,
+      issuer: env.security.jwtIssuer,
+      keyid: kid,
+      algorithm
+    });
 
     return {
       accessToken,

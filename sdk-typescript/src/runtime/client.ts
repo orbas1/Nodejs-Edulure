@@ -16,6 +16,7 @@ import { TelemetryService } from '../generated/services/TelemetryService';
 
 import type { ConfigureSdkOptions } from './configure';
 import { configureSdk } from './configure';
+import type { SessionManager } from './auth';
 import type { SdkManifest } from './manifest';
 import { sdkManifest } from './manifest';
 
@@ -39,6 +40,7 @@ export type ServiceRegistry = {
 export type SdkClient = ServiceRegistry & {
   readonly openApi: OpenAPIConfig;
   readonly manifest: SdkManifest;
+  readonly session?: SessionManager;
 };
 
 const registry: ServiceRegistry = Object.freeze({
@@ -59,8 +61,23 @@ const registry: ServiceRegistry = Object.freeze({
 });
 
 export function createSdkClient(options: ConfigureSdkOptions): SdkClient {
-  const openApi = configureSdk(options);
-  return Object.freeze({ ...registry, openApi, manifest: sdkManifest });
+  const originalAuth = options.auth;
+  let session: SessionManager | undefined;
+
+  const openApi = configureSdk({
+    ...options,
+    auth: originalAuth
+      ? {
+          ...originalAuth,
+          onSession: (value) => {
+            session = value;
+            originalAuth.onSession?.(value);
+          },
+        }
+      : undefined,
+  });
+
+  return Object.freeze({ ...registry, openApi, manifest: sdkManifest, session });
 }
 
 export function getService<K extends keyof ServiceRegistry>(key: K): ServiceRegistry[K] {

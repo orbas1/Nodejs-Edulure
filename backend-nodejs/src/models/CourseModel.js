@@ -1,6 +1,7 @@
 import slugify from 'slugify';
 
 import db from '../config/database.js';
+import CourseVersionSnapshotModel from './CourseVersionSnapshotModel.js';
 import { normaliseClusterKey } from '../utils/learningClusters.js';
 
 const TABLE = 'courses';
@@ -348,47 +349,78 @@ export default class CourseModel {
     };
 
     const [id] = await connection(TABLE).insert(payload);
-    return this.findById(id, connection);
+    const created = await this.findById(id, connection);
+    if (created) {
+      await CourseVersionSnapshotModel.recordInitial(created, connection, {
+        actorId: course.createdBy ?? course.instructorId ?? null
+      });
+    }
+    return created;
   }
 
-  static async updateById(id, updates, connection = db) {
+  static async updateById(id, updates = {}, connection = db) {
+    const existing = await this.findById(id, connection);
+    if (!existing) {
+      return null;
+    }
+
+    const { changeSummary, updatedBy, ...courseUpdates } = updates ?? {};
     const payload = {};
-    if (updates.title !== undefined) payload.title = updates.title;
-    if (updates.slug !== undefined) payload.slug = this.normaliseSlug(updates.slug, updates.title);
-    if (updates.summary !== undefined) payload.summary = updates.summary ?? null;
-    if (updates.description !== undefined) payload.description = updates.description ?? null;
-    if (updates.level !== undefined) payload.level = updates.level ?? 'beginner';
-    if (updates.category !== undefined) payload.category = updates.category ?? 'general';
-    if (updates.skills !== undefined) payload.skills = serialiseArray(updates.skills ?? []);
-    if (updates.tags !== undefined) payload.tags = serialiseArray(updates.tags ?? []);
-    if (updates.languages !== undefined) payload.languages = serialiseArray(updates.languages ?? ['en']);
-    if (updates.deliveryFormat !== undefined) payload.delivery_format = updates.deliveryFormat ?? 'self_paced';
-    if (updates.thumbnailUrl !== undefined) payload.thumbnail_url = updates.thumbnailUrl ?? null;
-    if (updates.heroImageUrl !== undefined) payload.hero_image_url = updates.heroImageUrl ?? null;
-    if (updates.trailerUrl !== undefined) payload.trailer_url = updates.trailerUrl ?? null;
-    if (updates.promoVideoUrl !== undefined) payload.promo_video_url = updates.promoVideoUrl ?? null;
-    if (updates.syllabusUrl !== undefined) payload.syllabus_url = updates.syllabusUrl ?? null;
-    if (updates.priceCurrency !== undefined) payload.price_currency = updates.priceCurrency ?? 'USD';
-    if (updates.priceAmount !== undefined) payload.price_amount = updates.priceAmount ?? 0;
-    if (updates.ratingAverage !== undefined) payload.rating_average = updates.ratingAverage ?? 0;
-    if (updates.ratingCount !== undefined) payload.rating_count = updates.ratingCount ?? 0;
-    if (updates.enrolmentCount !== undefined) payload.enrolment_count = updates.enrolmentCount ?? 0;
-    if (updates.isPublished !== undefined) payload.is_published = updates.isPublished;
-    if (updates.releaseAt !== undefined) payload.release_at = updates.releaseAt ?? null;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.metadata !== undefined) payload.metadata = serialiseJson(updates.metadata ?? {}, {});
-    if (updates.clusterKey !== undefined) payload.cluster_key = normaliseClusterKey(updates.clusterKey);
-    if (updates.instructorId !== undefined) payload.instructor_id = updates.instructorId;
+    if (courseUpdates.title !== undefined) payload.title = courseUpdates.title;
+    if (courseUpdates.slug !== undefined)
+      payload.slug = this.normaliseSlug(courseUpdates.slug, courseUpdates.title ?? existing.title);
+    if (courseUpdates.summary !== undefined) payload.summary = courseUpdates.summary ?? null;
+    if (courseUpdates.description !== undefined) payload.description = courseUpdates.description ?? null;
+    if (courseUpdates.level !== undefined) payload.level = courseUpdates.level ?? 'beginner';
+    if (courseUpdates.category !== undefined) payload.category = courseUpdates.category ?? 'general';
+    if (courseUpdates.skills !== undefined) payload.skills = serialiseArray(courseUpdates.skills ?? []);
+    if (courseUpdates.tags !== undefined) payload.tags = serialiseArray(courseUpdates.tags ?? []);
+    if (courseUpdates.languages !== undefined)
+      payload.languages = serialiseArray(courseUpdates.languages ?? ['en']);
+    if (courseUpdates.deliveryFormat !== undefined)
+      payload.delivery_format = courseUpdates.deliveryFormat ?? 'self_paced';
+    if (courseUpdates.thumbnailUrl !== undefined) payload.thumbnail_url = courseUpdates.thumbnailUrl ?? null;
+    if (courseUpdates.heroImageUrl !== undefined) payload.hero_image_url = courseUpdates.heroImageUrl ?? null;
+    if (courseUpdates.trailerUrl !== undefined) payload.trailer_url = courseUpdates.trailerUrl ?? null;
+    if (courseUpdates.promoVideoUrl !== undefined) payload.promo_video_url = courseUpdates.promoVideoUrl ?? null;
+    if (courseUpdates.syllabusUrl !== undefined) payload.syllabus_url = courseUpdates.syllabusUrl ?? null;
+    if (courseUpdates.priceCurrency !== undefined)
+      payload.price_currency = courseUpdates.priceCurrency ?? 'USD';
+    if (courseUpdates.priceAmount !== undefined) payload.price_amount = courseUpdates.priceAmount ?? 0;
+    if (courseUpdates.ratingAverage !== undefined) payload.rating_average = courseUpdates.ratingAverage ?? 0;
+    if (courseUpdates.ratingCount !== undefined) payload.rating_count = courseUpdates.ratingCount ?? 0;
+    if (courseUpdates.enrolmentCount !== undefined)
+      payload.enrolment_count = courseUpdates.enrolmentCount ?? 0;
+    if (courseUpdates.isPublished !== undefined) payload.is_published = courseUpdates.isPublished;
+    if (courseUpdates.releaseAt !== undefined) payload.release_at = courseUpdates.releaseAt ?? null;
+    if (courseUpdates.status !== undefined) payload.status = courseUpdates.status;
+    if (courseUpdates.metadata !== undefined)
+      payload.metadata = serialiseJson(courseUpdates.metadata ?? {}, {});
+    if (courseUpdates.clusterKey !== undefined)
+      payload.cluster_key = normaliseClusterKey(courseUpdates.clusterKey);
+    if (courseUpdates.instructorId !== undefined) payload.instructor_id = courseUpdates.instructorId;
 
     if (Object.keys(payload).length === 0) {
-      return this.findById(id, connection);
+      return existing;
     }
 
     await connection(TABLE)
       .where({ id })
       .update({ ...payload, updated_at: connection.fn.now() });
-
-    return this.findById(id, connection);
+    const updated = await this.findById(id, connection);
+    if (updated) {
+      await CourseVersionSnapshotModel.recordChange(
+        {
+          courseId: id,
+          previous: existing,
+          next: updated,
+          actorId: updatedBy ?? null,
+          changeSummary: changeSummary ?? null
+        },
+        connection
+      );
+    }
+    return updated;
   }
 
   static async deleteById(id, connection = db) {
