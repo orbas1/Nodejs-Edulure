@@ -20,6 +20,7 @@ import UserFollowModel from '../src/models/UserFollowModel.js';
 import UserModel from '../src/models/UserModel.js';
 import UserMuteModel from '../src/models/UserMuteModel.js';
 import UserPresenceSessionModel from '../src/models/UserPresenceSessionModel.js';
+import { buildEnvironmentColumns, getEnvironmentDescriptor } from '../src/utils/environmentContext.js';
 
 const { databaseMock } = vi.hoisted(() => {
   const queue = [];
@@ -60,6 +61,16 @@ vi.mock('../src/config/database.js', () => ({
 afterEach(() => {
   databaseMock.__setExpectations();
 });
+
+const environmentDescriptor = getEnvironmentDescriptor();
+const environmentColumns = buildEnvironmentColumns(environmentDescriptor);
+const environmentExpectation = {
+  key: environmentDescriptor.key,
+  name: environmentDescriptor.name,
+  tier: environmentDescriptor.tier,
+  region: environmentDescriptor.region,
+  workspace: environmentDescriptor.workspace
+};
 
 function handleNested(expectation, type, handler) {
   const nested = createNestedBuilder();
@@ -259,10 +270,12 @@ function createConnectionStub(expectations = []) {
   });
   connection.raw = vi.fn((sql, bindings) => ({ sql, bindings }));
   connection.fn = { now: vi.fn(() => new Date('2024-01-01T00:00:00.000Z')) };
+  connection.client = { config: { client: 'mysql' } };
   connection.transaction = vi.fn(async (handler) => {
     const trx = createConnectionStub(queue.shift()?.transaction ?? []);
     trx.raw = connection.raw;
     trx.fn = connection.fn;
+    trx.client = connection.client;
     return handler(trx);
   });
   return connection;
@@ -710,6 +723,7 @@ describe('SavedSearchModel', () => {
       entityTypes: ['course'],
       filters: { level: 'advanced' },
       globalFilters: { locale: 'en' },
+      deliveryChannels: [],
       sortPreferences: { sort: 'recent' },
       isPinned: true,
       lastUsedAt: '2024-04-01T00:00:00.000Z',
@@ -989,6 +1003,11 @@ describe('TelemetryConsentLedgerModel', () => {
           id: 99,
           user_id: 45,
           tenant_id: 'global',
+          environment_key: environmentColumns.environment_key,
+          environment_name: environmentColumns.environment_name,
+          environment_tier: environmentColumns.environment_tier,
+          environment_region: environmentColumns.environment_region,
+          environment_workspace: environmentColumns.environment_workspace,
           consent_scope: 'telemetry',
           consent_version: 'v2',
           status: 'granted',
@@ -1028,12 +1047,14 @@ describe('TelemetryConsentLedgerModel', () => {
       user_id: 45,
       consent_scope: 'telemetry',
       consent_version: 'v2',
-      evidence: JSON.stringify({ ip: '1.1.1.1' })
+      evidence: JSON.stringify({ ip: '1.1.1.1' }),
+      ...environmentColumns
     });
     expect(result).toMatchObject({
       userId: 45,
       consentScope: 'telemetry',
-      metadata: { region: 'eu' }
+      metadata: { region: 'eu' },
+      environment: environmentExpectation
     });
   });
 
@@ -1045,6 +1066,11 @@ describe('TelemetryConsentLedgerModel', () => {
           id: 12,
           user_id: 45,
           tenant_id: 'global',
+          environment_key: environmentColumns.environment_key,
+          environment_name: environmentColumns.environment_name,
+          environment_tier: environmentColumns.environment_tier,
+          environment_region: environmentColumns.environment_region,
+          environment_workspace: environmentColumns.environment_workspace,
           consent_scope: 'telemetry',
           consent_version: 'v2',
           status: 'granted',
@@ -1066,6 +1092,7 @@ describe('TelemetryConsentLedgerModel', () => {
     );
 
     expect(consent).toMatchObject({ userId: 45, consentVersion: 'v2' });
+    expect(consent.environment).toMatchObject(environmentExpectation);
   });
 });
 
@@ -1094,6 +1121,11 @@ describe('TelemetryEventBatchModel', () => {
           checksum: null,
           error_message: null,
           metadata: JSON.stringify({ priority: 'standard' }),
+          environment_key: environmentColumns.environment_key,
+          environment_name: environmentColumns.environment_name,
+          environment_tier: environmentColumns.environment_tier,
+          environment_region: environmentColumns.environment_region,
+          environment_workspace: environmentColumns.environment_workspace,
           created_at: '2024-05-01T00:00:00.000Z',
           updated_at: '2024-05-01T00:00:00.000Z'
         }
@@ -1108,9 +1140,11 @@ describe('TelemetryEventBatchModel', () => {
     expect(inserts[0]).toMatchObject({
       destination: 's3',
       status: 'exporting',
-      metadata: JSON.stringify({ priority: 'standard' })
+      metadata: JSON.stringify({ priority: 'standard' }),
+      ...environmentColumns
     });
     expect(batch.metadata).toEqual({ priority: 'standard' });
+    expect(batch.environment).toMatchObject(environmentExpectation);
   });
 
   it('marks failures and enriches metadata safely', async () => {
@@ -1159,6 +1193,11 @@ describe('TelemetryEventModel', () => {
       id: 50,
       event_uuid: 'uuid-1',
       tenant_id: 'global',
+      environment_key: environmentColumns.environment_key,
+      environment_name: environmentColumns.environment_name,
+      environment_tier: environmentColumns.environment_tier,
+      environment_region: environmentColumns.environment_region,
+      environment_workspace: environmentColumns.environment_workspace,
       schema_version: 'v1',
       event_name: 'course.created',
       event_version: '1',
@@ -1223,9 +1262,11 @@ describe('TelemetryEventModel', () => {
     expect(inserts[0]).toMatchObject({
       event_name: 'course.created',
       payload: JSON.stringify({ foo: 'bar' }),
-      tags: JSON.stringify(['alpha'])
+      tags: JSON.stringify(['alpha']),
+      ...environmentColumns
     });
     expect(event.metadata).toEqual({ region: 'eu' });
+    expect(event.environment).toMatchObject(environmentExpectation);
   });
 
   it('returns duplicate marker when dedupe hash already exists', async () => {
@@ -1233,6 +1274,11 @@ describe('TelemetryEventModel', () => {
       id: 50,
       event_uuid: 'uuid-1',
       tenant_id: 'global',
+      environment_key: environmentColumns.environment_key,
+      environment_name: environmentColumns.environment_name,
+      environment_tier: environmentColumns.environment_tier,
+      environment_region: environmentColumns.environment_region,
+      environment_workspace: environmentColumns.environment_workspace,
       schema_version: 'v1',
       event_name: 'course.created',
       event_version: '1',
@@ -1343,8 +1389,8 @@ describe('TelemetryEventModel', () => {
       export_batch_id: 17
     });
     const [rawSql, rawBindings] = extractLatestCall(connection.raw);
-    expect(rawSql).toEqual('JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), ?)');
-    expect(rawBindings).toEqual(JSON.stringify({ exportedBy: 'job-1' }));
+    expect(rawSql).toEqual('JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), CAST(? AS JSON))');
+    expect(rawBindings).toEqual([JSON.stringify({ exportedBy: 'job-1' })]);
   });
 });
 
@@ -1506,8 +1552,8 @@ describe('TelemetryLineageRunModel', () => {
 
     expect(updates[0]).toMatchObject({ status: 'success' });
     const [sql, bindings] = extractLatestCall(connection.raw);
-    expect(sql).toEqual('JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), ?)');
-    expect(bindings).toEqual(JSON.stringify({ durationMs: 300000 }));
+    expect(sql).toEqual('JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), CAST(? AS JSON))');
+    expect(bindings).toEqual([JSON.stringify({ durationMs: 300000 })]);
     expect(completed.output).toEqual({ result: 'ok' });
   });
 });

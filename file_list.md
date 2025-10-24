@@ -144,6 +144,10 @@ This document lists all files in the repository, grouped by their top-level dire
 - `backend-nodejs/scripts/verify-schema-drift.js`
 - `backend-nodejs/scripts/wait-for-db.js`
 - `backend-nodejs/seeds/001_bootstrap.js`
+- `backend-nodejs/seeds/002_search_documents.js`
+- `backend-nodejs/seeds/003_platform_settings_provider_transitions.js`
+- `backend-nodejs/seeds/004_navigation_annex.js`
+- `backend-nodejs/seeds/005_environment_blueprints.js`
 - `backend-nodejs/src/app.js`
 - `backend-nodejs/src/bin/realtime.js`
 - `backend-nodejs/src/bin/web.js`
@@ -1125,6 +1129,12 @@ This document lists all files in the repository, grouped by their top-level dire
 - `infrastructure/docker/Dockerfile.frontend`
 - `infrastructure/docker/nginx.conf`
 - `infrastructure/environment-manifest.json`
+- `infrastructure/observability/README.md`
+- `infrastructure/observability/grafana/dashboards/consent-ledger.json`
+- `infrastructure/observability/grafana/dashboards/environment-runtime.json`
+- `infrastructure/observability/grafana/provisioning/dashboards/observability.yaml`
+- `infrastructure/observability/grafana/provisioning/datasources/prometheus.yaml`
+- `infrastructure/observability/prometheus/prometheus.yml`
 - `infrastructure/terraform/envs/dev/main.tf`
 - `infrastructure/terraform/envs/dev/variables.tf`
 - `infrastructure/terraform/envs/prod/main.tf`
@@ -1147,10 +1157,17 @@ This document lists all files in the repository, grouped by their top-level dire
 ## scripts/
 
 - `scripts/bootstrap-environment.sh`
+- `scripts/dev-stack.mjs`
+- `scripts/onboard.mjs`
+- `scripts/observability-stack.mjs`
 - `scripts/release/run-readiness.mjs`
 - `scripts/security/generate-license-report.mjs`
 - `scripts/security/run-npm-audit.mjs`
 - `scripts/verify-node-version.mjs`
+
+## scripts/lib/
+
+- `scripts/lib/processSupervisor.mjs`
 
 
 

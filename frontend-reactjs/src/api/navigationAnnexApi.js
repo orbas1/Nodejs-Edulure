@@ -57,9 +57,29 @@ function normaliseInitiativeBucket(items = []) {
       product: item.initiative?.product ?? null,
       operations: item.initiative?.operations ?? { tasks: [] },
       design: item.initiative?.design ?? { tokens: [], qa: [], references: [] },
-      strategy: item.initiative?.strategy ?? { pillar: null, narrative: null, metrics: [] }
+      strategy: normaliseInitiativeStrategy(item.initiative?.strategy)
     }
   }));
+}
+
+function normaliseInitiativeStrategy(raw = {}) {
+  const pillar = raw?.pillar ?? null;
+  const narrative = raw?.narrative ?? null;
+  const narratives = ensureArray(raw?.narratives).map((value) => String(value));
+  const metrics = ensureArray(raw?.metrics).map((metric) => ({
+    id: metric.id ?? metric.key ?? metric.label ?? 'metric',
+    label: metric.label ?? metric.name ?? '',
+    baseline: metric.baseline ?? null,
+    target: metric.target ?? null,
+    unit: metric.unit ?? ''
+  }));
+
+  return {
+    pillar,
+    narrative: narrative ?? narratives[0] ?? null,
+    narratives,
+    metrics
+  };
 }
 
 function normaliseStrategyNarratives(raw = []) {
@@ -105,6 +125,22 @@ function normaliseOperationsChecklist(raw = []) {
   }));
 }
 
+function normaliseDocumentationIndex(raw = []) {
+  return ensureArray(raw).map((entry) => {
+    const href = typeof entry.href === 'string' ? entry.href : '';
+    return {
+      href,
+      usageCount:
+        typeof entry.usageCount === 'number'
+          ? entry.usageCount
+          : ensureArray(entry.navItems).length || 0,
+      categories: ensureArray(entry.categories).map((value) => String(value)),
+      navItems: ensureArray(entry.navItems).map((value) => String(value)),
+      navItemLabels: ensureArray(entry.navItemLabels).map((value) => String(value))
+    };
+  });
+}
+
 function normaliseAnnexResponse(payload = {}) {
   const data = payload?.data ?? payload;
   const initiatives = data?.initiatives ?? {};
@@ -119,6 +155,7 @@ function normaliseAnnexResponse(payload = {}) {
     designDependencies: normaliseDesignDependencies(data?.designDependencies),
     strategyNarratives: normaliseStrategyNarratives(data?.strategyNarratives),
     productBacklog: normaliseProductBacklog(data?.productBacklog),
+    documentationIndex: normaliseDocumentationIndex(data?.documentationIndex),
     refreshedAt: data?.refreshedAt ?? null
   };
 }

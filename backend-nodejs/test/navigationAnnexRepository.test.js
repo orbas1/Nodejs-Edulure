@@ -65,6 +65,25 @@ const operationTasks = [
     updatedAt: now
   },
   {
+    id: 12,
+    navItemId: 'feed',
+    navItemLabel: 'Feed',
+    navItemCategory: 'primary',
+    navItemRoute: '/feed',
+    roleScope: ['user'],
+    taskKey: 'ops-feed-shared-reference',
+    label: 'Cross-check shared annex overview.',
+    cadence: 'weekly',
+    runbookSection: 'navigation-registry-validation',
+    href: '/docs/operations/shared-annex#overview',
+    owner: 'Operations',
+    priority: 3,
+    displayOrder: 3,
+    includeInChecklist: 1,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
     id: 11,
     navItemId: 'admin-only',
     navItemLabel: 'Admin only',
@@ -117,6 +136,36 @@ const designDependencies = [
     updatedAt: now
   },
   {
+    id: 24,
+    navItemId: 'feed',
+    navItemLabel: 'Feed',
+    navItemCategory: 'primary',
+    navItemRoute: '/feed',
+    roleScope: ['user'],
+    dependencyKey: 'feed-reference-doc',
+    dependencyType: 'reference',
+    value: '/docs/design-system/navigation-annex#feed-topbar',
+    notes: null,
+    displayOrder: 3,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    id: 25,
+    navItemId: 'feed',
+    navItemLabel: 'Feed',
+    navItemCategory: 'primary',
+    navItemRoute: '/feed',
+    roleScope: ['user'],
+    dependencyKey: 'feed-shared-reference',
+    dependencyType: 'reference',
+    value: '/docs/operations/shared-annex#overview',
+    notes: null,
+    displayOrder: 4,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
     id: 23,
     navItemId: 'feed',
     navItemLabel: 'Feed',
@@ -149,6 +198,20 @@ const strategyNarratives = [
     updatedAt: now
   },
   {
+    id: 33,
+    navItemId: 'feed',
+    navItemLabel: 'Feed',
+    navItemCategory: 'primary',
+    navItemRoute: '/feed',
+    roleScope: ['user'],
+    narrativeKey: 'retention-feed-latency',
+    pillar: 'retention',
+    narrative: 'Improve feed load time for returning learners.',
+    displayOrder: 2,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
     id: 32,
     navItemId: 'admin-only',
     navItemLabel: 'Admin only',
@@ -174,6 +237,18 @@ const strategyMetrics = [
     target: '2.1',
     unit: 'clicks',
     displayOrder: 1,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    id: 43,
+    narrativeId: 33,
+    metricKey: 'feed-render-latency',
+    label: 'Feed render time on warm cache',
+    baseline: '1.8s',
+    target: '1.2s',
+    unit: 'duration',
+    displayOrder: 2,
     createdAt: now,
     updatedAt: now
   },
@@ -216,7 +291,14 @@ describe('NavigationAnnexRepository', () => {
     expect(feed.initiative.operations.tasks).toHaveLength(1);
     expect(feed.initiative.design.tokens).toEqual(['--space-4']);
     expect(feed.initiative.design.qa).toEqual([{ id: 'feed-qa', label: 'Ensure focus ring is visible.' }]);
-    expect(feed.initiative.strategy).toMatchObject({ pillar: 'Retention', narrative: expect.any(String) });
+    expect(feed.initiative.strategy).toMatchObject({
+      pillar: 'Retention',
+      narrative: 'Reduce clicks to reach the feed after sign-in.'
+    });
+    expect(feed.initiative.strategy.narratives).toEqual([
+      'Reduce clicks to reach the feed after sign-in.',
+      'Improve feed load time for returning learners.'
+    ]);
 
     expect(annex.productBacklog).toEqual([
       {
@@ -238,7 +320,10 @@ describe('NavigationAnnexRepository', () => {
     expect(annex.strategyNarratives).toEqual([
       {
         pillar: 'Retention',
-        narratives: ['Reduce clicks to reach the feed after sign-in.'],
+        narratives: [
+          'Reduce clicks to reach the feed after sign-in.',
+          'Improve feed load time for returning learners.'
+        ],
         metrics: [
           {
             id: 'nav-click-depth',
@@ -246,8 +331,46 @@ describe('NavigationAnnexRepository', () => {
             baseline: '3.2',
             target: '2.1',
             unit: 'clicks'
+          },
+          {
+            id: 'feed-render-latency',
+            label: 'Feed render time on warm cache',
+            baseline: '1.8s',
+            target: '1.2s',
+            unit: 'duration'
           }
         ]
+      }
+    ]);
+
+    expect(annex.documentationIndex).toEqual([
+      {
+        href: '/docs/design-system/navigation-annex#feed-topbar',
+        usageCount: 1,
+        categories: ['design'],
+        navItems: ['feed'],
+        navItemLabels: ['Feed']
+      },
+      {
+        href: '/docs/operations/navigation-readiness#registry-validation',
+        usageCount: 1,
+        categories: ['operations'],
+        navItems: ['feed'],
+        navItemLabels: ['Feed']
+      },
+      {
+        href: '/docs/operations/shared-annex#overview',
+        usageCount: 2,
+        categories: ['design', 'operations'],
+        navItems: ['feed'],
+        navItemLabels: ['Feed']
+      },
+      {
+        href: '/handbook/navigation-annex#feed-registry',
+        usageCount: 1,
+        categories: ['product'],
+        navItems: ['feed'],
+        navItemLabels: ['Feed']
       }
     ]);
 

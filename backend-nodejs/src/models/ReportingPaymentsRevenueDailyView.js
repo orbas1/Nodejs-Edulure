@@ -20,6 +20,14 @@ function toDateRange({ start, end }) {
   return [normaliseDate(start), normaliseDate(end)];
 }
 
+function normaliseCurrency(value) {
+  if (!value && value !== 0) {
+    return null;
+  }
+  const normalised = String(value).trim().toUpperCase().slice(0, 8);
+  return normalised || null;
+}
+
 function parseCurrencies(input) {
   if (!input) {
     return [];
@@ -33,8 +41,7 @@ function parseCurrencies(input) {
 
   const unique = new Set();
   for (const value of values) {
-    if (!value) continue;
-    const normalised = value.toUpperCase().slice(0, 8);
+    const normalised = normaliseCurrency(value);
     if (!normalised) continue;
     unique.add(normalised);
   }
@@ -78,8 +85,15 @@ function fillMissingDays(rows, startDate, endDate, currencies = []) {
     return rows;
   }
 
-  const currencySet = new Set(currencies.length ? currencies : rows.map((row) => row.currency));
-  const lookup = new Map(rows.map((row) => [`${row.currency}:${row.date}`, row]));
+  const currencySet = new Set(
+    currencies.length ? currencies : rows.map((row) => normaliseCurrency(row.currency) ?? row.currency)
+  );
+  const lookup = new Map(
+    rows.map((row) => {
+      const currency = normaliseCurrency(row.currency) ?? row.currency;
+      return [`${currency}:${row.date}`, { ...row, currency }];
+    })
+  );
   const filled = [];
 
   for (const currency of currencySet) {
@@ -145,17 +159,21 @@ export default class ReportingPaymentsRevenueDailyView {
 
     const rows = await query;
 
-    const normalised = rows.map((row) => ({
-      date: normaliseDate(row.date),
-      currency: row.currency,
-      totalIntents: normaliseNumber(row.total_intents),
-      succeededIntents: normaliseNumber(row.succeeded_intents),
-      grossVolumeCents: normaliseNumber(row.gross_volume_cents),
-      discountCents: normaliseNumber(row.discount_cents),
-      taxCents: normaliseNumber(row.tax_cents),
-      refundedCents: normaliseNumber(row.refunded_cents),
-      recognisedVolumeCents: normaliseNumber(row.recognised_volume_cents)
-    }));
+    const normalised = rows.map((row) => {
+      const date = normaliseDate(row.date);
+      const currency = normaliseCurrency(row.currency) ?? row.currency ?? null;
+      return {
+        date,
+        currency,
+        totalIntents: normaliseNumber(row.total_intents),
+        succeededIntents: normaliseNumber(row.succeeded_intents),
+        grossVolumeCents: normaliseNumber(row.gross_volume_cents),
+        discountCents: normaliseNumber(row.discount_cents),
+        taxCents: normaliseNumber(row.tax_cents),
+        refundedCents: normaliseNumber(row.refunded_cents),
+        recognisedVolumeCents: normaliseNumber(row.recognised_volume_cents)
+      };
+    });
 
     if (!options.fillGaps) {
       return normalised;

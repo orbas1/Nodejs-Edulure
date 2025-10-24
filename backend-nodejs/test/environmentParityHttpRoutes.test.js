@@ -55,6 +55,84 @@ const blueprintRegistryMock = [
   }
 ];
 
+const descriptorRegistryMock = [
+  {
+    environmentName: 'dev',
+    domain: 'dev.edulure.com',
+    awsAccountAlias: 'edulure-dev',
+    awsRegion: 'us-east-1',
+    awsVpcId: 'vpc-dev-edulure',
+    awsPrivateSubnetTags: ['tier:nonprod', 'app:edulure-api'],
+    awsPublicSubnetTags: ['tier:edge', 'app:edulure-alb'],
+    blueprintParameter: '/edulure/dev/api/environment-blueprint',
+    blueprintRuntimeEndpoint: 'https://dev.edulure.com/ops/runtime-blueprint.json',
+    blueprintServiceName: 'backend-service',
+    terraformWorkspace: 'infrastructure/terraform/envs/dev',
+    dockerComposeFile: 'docker-compose.yml',
+    dockerComposeCommand: 'docker compose --profile dev up --build',
+    dockerComposeProfiles: ['dev'],
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityCloudwatchDashboard: 'edulure-dev-api-observability',
+    contactsPrimary: 'platform@edulure.com',
+    contactsOnCall: 'platform-oncall@edulure.com',
+    contactsAdditional: [],
+    changeWindows: ['Weekdays 14:00-22:00 UTC'],
+    notes: [],
+    metadata: {}
+  },
+  {
+    environmentName: 'staging',
+    domain: 'staging.edulure.com',
+    awsAccountAlias: 'edulure-staging',
+    awsRegion: 'us-east-1',
+    awsVpcId: 'vpc-staging-edulure',
+    awsPrivateSubnetTags: ['tier:preprod', 'app:edulure-api'],
+    awsPublicSubnetTags: ['tier:edge', 'app:edulure-alb'],
+    blueprintParameter: '/edulure/staging/api/environment-blueprint',
+    blueprintRuntimeEndpoint: 'https://staging.edulure.com/ops/runtime-blueprint.json',
+    blueprintServiceName: 'backend-service',
+    terraformWorkspace: 'infrastructure/terraform/envs/staging',
+    dockerComposeFile: 'docker-compose.yml',
+    dockerComposeCommand: 'docker compose --profile staging up --build',
+    dockerComposeProfiles: ['staging'],
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityCloudwatchDashboard: 'edulure-staging-api-observability',
+    contactsPrimary: 'release@edulure.com',
+    contactsOnCall: 'release-oncall@edulure.com',
+    contactsAdditional: [],
+    changeWindows: ['Tuesday & Thursday 16:00-20:00 UTC'],
+    notes: [],
+    metadata: {}
+  },
+  {
+    environmentName: 'prod',
+    domain: 'edulure.com',
+    awsAccountAlias: 'edulure-prod',
+    awsRegion: 'us-east-1',
+    awsVpcId: 'vpc-prod-edulure',
+    awsPrivateSubnetTags: ['tier:production', 'app:edulure-api'],
+    awsPublicSubnetTags: ['tier:edge', 'app:edulure-alb'],
+    blueprintParameter: '/edulure/prod/api/environment-blueprint',
+    blueprintRuntimeEndpoint: 'https://edulure.com/ops/runtime-blueprint.json',
+    blueprintServiceName: 'backend-service',
+    terraformWorkspace: 'infrastructure/terraform/envs/prod',
+    dockerComposeFile: 'docker-compose.yml',
+    dockerComposeCommand: 'docker compose --profile prod up --build',
+    dockerComposeProfiles: ['prod'],
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityCloudwatchDashboard: 'edulure-prod-api-observability',
+    contactsPrimary: 'operations@edulure.com',
+    contactsOnCall: 'sre-oncall@edulure.com',
+    contactsAdditional: [],
+    changeWindows: [
+      'Saturday 01:00-04:00 UTC (primary)',
+      'Wednesday 23:00-01:00 UTC (contingency)'
+    ],
+    notes: [],
+    metadata: {}
+  }
+];
+
 vi.mock('../src/config/env.js', () => ({
   env: {
     nodeEnv: 'test',
@@ -198,6 +276,12 @@ vi.mock('../src/config/redisClient.js', () => ({
 vi.mock('../src/models/EnvironmentBlueprintModel.js', () => ({
   default: {
     listAll: vi.fn().mockResolvedValue(blueprintRegistryMock)
+  }
+}));
+
+vi.mock('../src/models/EnvironmentDescriptorModel.js', () => ({
+  default: {
+    listAll: vi.fn().mockResolvedValue(descriptorRegistryMock)
   }
 }));
 

@@ -156,6 +156,62 @@ export default class SupportOperationsService {
     this.logger = loggerInstance;
   }
 
+  #normaliseTenantId(rawTenantId) {
+    if (!rawTenantId || rawTenantId === 'default') {
+      return null;
+    }
+    return rawTenantId;
+  }
+
+  async #findTenantScopedCase(tenantId, ticketId) {
+    if (!ticketId) {
+      return null;
+    }
+    const resolvedTenantId = await this.#resolveTenantId(tenantId);
+    const record = await this.db('learner_support_cases')
+      .where({ id: ticketId, tenant_id: resolvedTenantId })
+      .first();
+    if (!record) {
+      return null;
+    }
+    return { tenantId: resolvedTenantId, record };
+  }
+
+  async #loadCaseWithMessages(caseId) {
+    if (!caseId) {
+      return null;
+    }
+    const row = await this.db('learner_support_cases').where({ id: caseId }).first();
+    if (!row) {
+      return null;
+    }
+    const messages = await this.db('learner_support_messages')
+      .where({ case_id: caseId })
+      .orderBy('created_at', 'asc');
+    return SupportTicketModel.mapCase(row, messages);
+  }
+
+  #buildActorDescriptor(actor) {
+    if (!actor || typeof actor !== 'object') {
+      return { id: null, name: null, email: null };
+    }
+    const fullName = [actor.firstName, actor.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const name = actor.name ?? (fullName.length ? fullName : null);
+    return {
+      id: actor.id ?? null,
+      name,
+      email: actor.email ?? null
+    };
+  }
+
+  #actorLabel(actor) {
+    const descriptor = this.#buildActorDescriptor(actor);
+    return descriptor.name ?? descriptor.email ?? (descriptor.id !== null ? String(descriptor.id) : 'operator');
+  }
+
   async listTenants() {
     const rows = await this.db('support_operations_tenants').orderBy('display_order', 'asc').orderBy('name', 'asc');
     const items = rows.map((row) => ({
@@ -173,8 +229,9 @@ export default class SupportOperationsService {
   }
 
   async #resolveTenantId(tenantId) {
-    if (tenantId) {
-      return tenantId;
+    const candidate = this.#normaliseTenantId(tenantId);
+    if (candidate) {
+      return candidate;
     }
     const tenants = await this.listTenants();
     return tenants.defaultTenantId ?? 'global';
@@ -260,7 +317,8 @@ export default class SupportOperationsService {
       audienceSize: row.audience_size ?? null,
       scheduledAt: toIso(row.scheduled_at),
       createdAt: toIso(row.created_at),
-      author: row.author ?? null
+      author: row.author ?? null,
+      message: row.message ?? null
     });
 
     const knowledgeBase = {
@@ -358,6 +416,291 @@ export default class SupportOperationsService {
       automation,
       settings,
       onboarding
+    };
+  }
+
+  async assignTicket(params = {}) {
+    const { tenantId, ticketId, assigneeId, actor } = params;
+    const context = await this.#findTenantScopedCase(tenantId, ticketId);
+    if (!context) {
+      const error = new Error('Support ticket not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const { tenantId: resolvedTenantId, record } = context;
+    const now = this.nowProvider();
+    const actorDescriptor = this.#buildActorDescriptor(actor);
+    const metadata = SupportTicketModel.parseJson(record.metadata, {});
+    const assignmentHistory = Array.isArray(metadata.assignmentHistory) ? metadata.assignmentHistory : [];
+
+    let nextOwner = record.owner;
+    let shouldTrackHistory = false;
+    if (Object.prototype.hasOwnProperty.call(params, 'assigneeId')) {
+      nextOwner = assigneeId ?? null;
+      shouldTrackHistory = true;
+    }
+
+    if (shouldTrackHistory) {
+      assignmentHistory.push({
+        assignedAt: now.toISOString(),
+        assignedBy: actorDescriptor,
+        assignedTo: nextOwner
+      });
+      metadata.assignmentHistory = assignmentHistory;
+    }
+
+    const breadcrumb = SupportTicketModel.appendBreadcrumb(record.escalation_breadcrumbs, {
+      actor: this.#actorLabel(actorDescriptor),
+      label: nextOwner ? 'Ticket assigned' : 'Assignment updated',
+      note: nextOwner ? `Assigned to ${nextOwner}` : 'Assignment cleared',
+      at: now
+    });
+
+    const updatePayload = {
+      metadata: SupportTicketModel.serialiseMetadata(metadata),
+      escalation_breadcrumbs: SupportTicketModel.serialiseJson(breadcrumb),
+      follow_up_due_at: SupportTicketModel.calculateFollowUpDueAt(record.priority),
+      updated_at: this.db.fn.now()
+    };
+
+    if (shouldTrackHistory) {
+      updatePayload.owner = nextOwner;
+      updatePayload.last_agent = nextOwner ?? record.last_agent;
+    }
+
+    if (record.status && OPEN_STATUSES.has(record.status.toLowerCase())) {
+      updatePayload.status = 'in_progress';
+    }
+
+    await this.db('learner_support_cases').where({ id: record.id }).update(updatePayload);
+
+    this.logger.info(
+      { tenantId: resolvedTenantId, ticketId: record.id, assigneeId: nextOwner },
+      'Support ticket assignment updated'
+    );
+
+    return this.#loadCaseWithMessages(record.id);
+  }
+
+  async escalateTicket({ tenantId, ticketId, reason, target, actor } = {}) {
+    const context = await this.#findTenantScopedCase(tenantId, ticketId);
+    if (!context) {
+      const error = new Error('Support ticket not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const { tenantId: resolvedTenantId, record } = context;
+    const now = this.nowProvider();
+    const actorDescriptor = this.#buildActorDescriptor(actor);
+    const metadata = SupportTicketModel.parseJson(record.metadata, {});
+    const history = Array.isArray(metadata.escalationHistory) ? metadata.escalationHistory : [];
+    history.push({
+      target: target ?? null,
+      reason: reason ?? null,
+      escalatedAt: now.toISOString(),
+      escalatedBy: actorDescriptor
+    });
+    metadata.escalationHistory = history;
+
+    const breadcrumb = SupportTicketModel.appendBreadcrumb(record.escalation_breadcrumbs, {
+      actor: this.#actorLabel(actorDescriptor),
+      label: 'Ticket escalated',
+      note: target ? `Escalated to ${target}${reason ? ` — ${reason}` : ''}` : reason ?? 'Escalated',
+      at: now
+    });
+
+    await this.db('learner_support_cases')
+      .where({ id: record.id })
+      .update({
+        status: 'escalated',
+        metadata: SupportTicketModel.serialiseMetadata(metadata),
+        escalation_breadcrumbs: SupportTicketModel.serialiseJson(breadcrumb),
+        updated_at: this.db.fn.now()
+      });
+
+    this.logger.info(
+      { tenantId: resolvedTenantId, ticketId: record.id, target: target ?? null },
+      'Support ticket escalated'
+    );
+
+    return this.#loadCaseWithMessages(record.id);
+  }
+
+  async resolveTicket({ tenantId, ticketId, resolution = {}, actor } = {}) {
+    const context = await this.#findTenantScopedCase(tenantId, ticketId);
+    if (!context) {
+      const error = new Error('Support ticket not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const { tenantId: resolvedTenantId, record } = context;
+    const now = this.nowProvider();
+    const actorDescriptor = this.#buildActorDescriptor(actor);
+    const metadata = SupportTicketModel.parseJson(record.metadata, {});
+    const history = Array.isArray(metadata.resolutionHistory) ? metadata.resolutionHistory : [];
+    const resolvedBy = resolution.resolvedBy ?? this.#actorLabel(actorDescriptor);
+    const summary = resolution.summary ?? null;
+    history.push({
+      resolvedAt: now.toISOString(),
+      resolvedBy,
+      summary
+    });
+    metadata.resolutionHistory = history;
+
+    const breadcrumb = SupportTicketModel.appendBreadcrumb(record.escalation_breadcrumbs, {
+      actor: resolvedBy,
+      label: 'Ticket resolved',
+      note: summary ?? 'Marked resolved from support hub',
+      at: now
+    });
+
+    await this.db('learner_support_cases')
+      .where({ id: record.id })
+      .update({
+        status: 'resolved',
+        metadata: SupportTicketModel.serialiseMetadata(metadata),
+        escalation_breadcrumbs: SupportTicketModel.serialiseJson(breadcrumb),
+        follow_up_due_at: null,
+        updated_at: this.db.fn.now()
+      });
+
+    this.logger.info(
+      { tenantId: resolvedTenantId, ticketId: record.id },
+      'Support ticket resolved from operator hub'
+    );
+
+    return this.#loadCaseWithMessages(record.id);
+  }
+
+  async scheduleBroadcast({ tenantId, payload = {}, actor } = {}) {
+    if (!payload.title) {
+      const error = new Error('A broadcast title is required');
+      error.status = 422;
+      throw error;
+    }
+
+    const resolvedTenantId = await this.#resolveTenantId(tenantId);
+    const now = this.nowProvider();
+    const scheduledAt = payload.scheduledAt ? new Date(payload.scheduledAt) : now;
+    const rawChannel = (payload.channel ?? 'in-app').toString().toLowerCase();
+    const channel = rawChannel === 'in_app' || rawChannel === 'inapp' ? 'in-app' : rawChannel;
+    const audienceSize = Number.isFinite(Number(payload.audienceSize)) ? Number(payload.audienceSize) : null;
+    const actorDescriptor = this.#buildActorDescriptor(actor);
+    const messageInput = typeof payload.message === 'string' ? payload.message.trim() : '';
+    const message = messageInput.length ? messageInput : null;
+
+    const [inserted] = await this.db('support_operations_communications').insert(
+      {
+        tenant_id: resolvedTenantId,
+        title: payload.title,
+        channel,
+        status: payload.status ?? 'scheduled',
+        audience_size: audienceSize,
+        scheduled_at: scheduledAt,
+        author: actorDescriptor.name ?? actorDescriptor.email ?? payload.author ?? null,
+        message
+      },
+      ['id']
+    );
+
+    const recordId = typeof inserted === 'object' ? inserted.id : inserted;
+    const stored = await this.db('support_operations_communications').where({ id: recordId }).first();
+
+    const broadcast = {
+      id: stored.id,
+      tenantId: stored.tenant_id,
+      title: stored.title,
+      channel: stored.channel,
+      status: stored.status,
+      audienceSize: stored.audience_size ?? null,
+      scheduledAt: SupportTicketModel.toIso(stored.scheduled_at),
+      createdAt: SupportTicketModel.toIso(stored.created_at),
+      author: stored.author ?? null,
+      message: stored.message ?? message
+    };
+
+    this.logger.info(
+      { tenantId: resolvedTenantId, broadcastId: broadcast.id, channel: broadcast.channel },
+      'Support broadcast scheduled'
+    );
+
+    return broadcast;
+  }
+
+  async updateNotificationPolicy({ tenantId, policyId, updates = {}, actor } = {}) {
+    if (!policyId) {
+      const error = new Error('Notification policy identifier is required');
+      error.status = 422;
+      throw error;
+    }
+
+    const resolvedTenantId = await this.#resolveTenantId(tenantId);
+    const payload = {};
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+      payload.name = updates.name;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'description')) {
+      payload.description = updates.description ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'slaMinutes')) {
+      payload.sla_minutes = updates.slaMinutes ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'channels')) {
+      payload.channels = SupportTicketModel.serialiseJson(updates.channels ?? {});
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'escalationTargets')) {
+      payload.escalation_targets = SupportTicketModel.serialiseJson(updates.escalationTargets ?? []);
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return this.#loadNotificationPolicy(policyId);
+    }
+
+    payload.updated_at = this.db.fn.now();
+
+    const updated = await this.db('support_notification_policies')
+      .where({ id: policyId, tenant_id: resolvedTenantId })
+      .update(payload);
+
+    if (!updated) {
+      const error = new Error('Notification policy not found');
+      error.status = 404;
+      throw error;
+    }
+
+    this.logger.info(
+      {
+        tenantId: resolvedTenantId,
+        policyId,
+        updatedBy: this.#actorLabel(actor)
+      },
+      'Support notification policy updated'
+    );
+
+    return this.#loadNotificationPolicy(policyId);
+  }
+
+  async #loadNotificationPolicy(policyId) {
+    if (!policyId) {
+      return null;
+    }
+    const row = await this.db('support_notification_policies').where({ id: policyId }).first();
+    if (!row) {
+      return null;
+    }
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      name: row.name,
+      description: row.description ?? null,
+      slaMinutes: row.sla_minutes ?? null,
+      channels: SupportTicketModel.parseJson(row.channels, {}),
+      escalationTargets: SupportTicketModel.parseJson(row.escalation_targets, []),
+      updatedAt: SupportTicketModel.toIso(row.updated_at)
     };
   }
 }

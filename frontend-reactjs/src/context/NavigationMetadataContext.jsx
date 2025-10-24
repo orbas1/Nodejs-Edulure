@@ -9,6 +9,7 @@ const defaultData = {
   designDependencies: { tokens: [], qa: [], references: [] },
   strategyNarratives: [],
   productBacklog: [],
+  documentationIndex: [],
   refreshedAt: null
 };
 

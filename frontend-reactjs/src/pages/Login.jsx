@@ -7,7 +7,12 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { API_BASE_URL } from '../api/httpClient.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { createLoginState, validateLoginState } from '../utils/validation/auth.js';
-import { trackAuthAttempt, trackAuthInteraction, trackAuthView } from '../lib/analytics.js';
+import {
+  trackAuthAttempt,
+  trackAuthInteraction,
+  trackAuthView,
+  trackNavigationSelect
+} from '../lib/analytics.js';
 
 const SOCIAL_ROUTES = {
   google: '/auth/oauth/google',
@@ -60,6 +65,10 @@ export default function Login() {
     },
     [oauthBase]
   );
+
+  const handleNavigateToRegister = useCallback(() => {
+    trackNavigationSelect('auth:register', { from: 'login' });
+  }, []);
 
   useEffect(() => {
     trackAuthView('login', {
@@ -184,6 +193,19 @@ export default function Login() {
     });
   }, [showTwoFactorInput, formState.twoFactorCode, isTwoFactorRequired]);
 
+  const handleRememberMeToggle = useCallback(
+    (event) => {
+      const { checked } = event.target;
+      updateField('rememberMe', checked);
+      trackAuthInteraction('login', 'remember_me_toggle', { enabled: checked });
+    },
+    [updateField]
+  );
+
+  const handleForgotPassword = useCallback(() => {
+    trackNavigationSelect('auth:reset', { from: 'login' });
+  }, []);
+
   return (
     <AuthForm
       title="Welcome back"
@@ -195,7 +217,11 @@ export default function Login() {
       actions={
         <span>
           New to Edulure?{' '}
-          <Link to="/register" className="font-semibold text-primary">
+          <Link
+            to="/register"
+            className="font-semibold text-primary"
+            onClick={handleNavigateToRegister}
+          >
             Create your account
           </Link>
         </span>
@@ -265,11 +291,11 @@ export default function Login() {
             type="checkbox"
             className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
             checked={formState.rememberMe}
-            onChange={(event) => updateField('rememberMe', event.target.checked)}
+            onChange={handleRememberMeToggle}
           />
           <span className="font-semibold">Remember this device</span>
         </label>
-        <Link to="/reset" className="font-semibold text-primary">
+        <Link to="/reset" className="font-semibold text-primary" onClick={handleForgotPassword}>
           Forgot password?
         </Link>
       </div>

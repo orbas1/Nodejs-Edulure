@@ -1,22 +1,8 @@
 import db from '../config/database.js';
 import { TABLES } from '../database/domains/telemetry.js';
 import jsonMergePatch from '../database/utils/jsonMergePatch.js';
-
-function parseJson(value, fallback = {}) {
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-
-  if (typeof value === 'object') {
-    return value;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch (_error) {
-    return fallback;
-  }
-}
+import { buildEnvironmentColumns } from '../utils/environmentContext.js';
+import { readJsonColumn, writeJsonColumn } from '../utils/modelUtils.js';
 
 function toDomain(row) {
   if (!row) {
@@ -34,7 +20,14 @@ function toDomain(row) {
     fileKey: row.file_key,
     checksum: row.checksum,
     errorMessage: row.error_message,
-    metadata: parseJson(row.metadata, {}),
+    metadata: readJsonColumn(row.metadata, {}),
+    environment: {
+      key: row.environment_key ?? null,
+      name: row.environment_name ?? null,
+      tier: row.environment_tier ?? null,
+      region: row.environment_region ?? null,
+      workspace: row.environment_workspace ?? null
+    },
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -44,14 +37,21 @@ export default class TelemetryExportModel {
   static toDomain = toDomain;
 
   static async create(
-    { destination = 's3', status = 'exporting', metadata = {}, startedAt = new Date() } = {},
+    {
+      destination = 's3',
+      status = 'exporting',
+      metadata = {},
+      startedAt = new Date(),
+      environment
+    } = {},
     connection = db
   ) {
     const insertPayload = {
       destination,
       status,
-      metadata: JSON.stringify(metadata ?? {}),
-      started_at: startedAt
+      metadata: writeJsonColumn(metadata ?? {}),
+      started_at: startedAt,
+      ...buildEnvironmentColumns(environment ?? {})
     };
 
     const [id] = await connection(TABLES.EVENT_BATCHES).insert(insertPayload);
@@ -72,8 +72,10 @@ export default class TelemetryExportModel {
     return toDomain(row);
   }
 
-  static async listRecent({ limit = 20, destination } = {}, connection = db) {
+  static async listRecent({ limit = 20, destination, environment } = {}, connection = db) {
+    const envColumns = buildEnvironmentColumns(environment ?? {});
     const query = connection(TABLES.EVENT_BATCHES)
+      .where({ environment_key: envColumns.environment_key })
       .orderBy('created_at', 'desc')
       .limit(Math.max(1, limit));
 

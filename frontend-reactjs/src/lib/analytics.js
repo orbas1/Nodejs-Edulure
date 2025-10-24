@@ -69,6 +69,11 @@ function trackIntegrationInvite(event, metadata = {}) {
   trackEvent(`integration_invite:${event}`, metadata);
 }
 
+export function trackIntegrationInviteInteraction(interaction, metadata = {}) {
+  if (!interaction) return;
+  trackIntegrationInvite('interaction', { interaction, ...metadata });
+}
+
 export function trackIntegrationInviteEvent(event, metadata = {}) {
   if (!event) return;
   trackIntegrationInvite(event, metadata);

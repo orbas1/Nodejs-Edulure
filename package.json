@@ -17,6 +17,8 @@
     "preinstall": "node ./scripts/verify-node-version.mjs",
     "bootstrap": "npm install --workspaces",
     "dev:stack": "node ./scripts/dev-stack.mjs",
+    "dev:observability": "node ./scripts/observability-stack.mjs",
+    "onboard": "node ./scripts/onboard.mjs",
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
@@ -24,6 +26,7 @@
     "audit": "node ./scripts/security/run-npm-audit.mjs",
     "audit:ci": "node ./scripts/security/run-npm-audit.mjs --workspace backend-nodejs && node ./scripts/security/run-npm-audit.mjs --workspace frontend-reactjs && npm --workspace sdk-typescript run audit:dependencies",
     "license:report": "node ./scripts/security/generate-license-report.mjs",
+    "describe:environment": "node ./scripts/infrastructure/describe-environment.mjs",
     "zap:baseline": "node ./scripts/security/verify-security-headers.mjs"
   },
   "config": {

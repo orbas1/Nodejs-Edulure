@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: edulure-backend
+    metrics_path: /metrics
+    scheme: http
+    basic_auth:
+      username: metrics
+      password: metrics-pass-123
+    static_configs:
+      - targets:
+          - backend:8080
+          - host.docker.internal:4000
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: "backend:8080"
+        replacement: web-service-compose
+      - source_labels: [__address__]
+        target_label: instance
+        regex: "host\\.docker\\.internal:4000"
+        replacement: web-service-devstack
+    metric_relabel_configs:
+      - source_labels: [route]
+        regex: ".*"
+        target_label: route
+        action: replace
