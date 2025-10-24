@@ -385,40 +385,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Stage admin updates, run operator testing, refresh documentation, coordinate enablement, and release with monitoring for latency and error spikes.
 
 ### 2.G Commerce, Billing & Profile Management (`src/pages/Profile.jsx`, `src/pages/TutorProfile.jsx`, `src/components/billing/`, `src/hooks/useBillingPortal.js`)
-1. **Appraisal:** Account surfaces for learners and instructors to manage subscriptions, invoices, payment methods, and upsell prompts.
-2. **Functionality:** Components fetch billing data, render invoice tables, expose plan upgrade/downgrade modals, and integrate with monetisation endpoints.
-3. **Logic Usefulness:** Billing context providers coordinate state across profile and upsell components, ensuring consistent plan data and CTA behaviour.
-4. **Redundancies:** Subscription status badges duplicated with dashboard components; unify with shared badge component.
-5. **Placeholders Or non-working functions or stubs:** Billing portal deep link awaiting backend configuration; ensure UI messaging handles absence gracefully.
-6. **Duplicate Functions:** Currency formatting repeated; centralise in `utils/currency.js` shared with marketing.
-7. **Improvements need to make:** Add usage-based billing visualisations, self-serve downgrades, and invoice search.
-8. **Styling improvements:** Improve table density, typography hierarchy, and responsive card layouts for billing summaries.
-9. **Efficiency analysis and improvement:** Cache billing data and refresh on explicit user action to reduce network chatter.
-10. **Strengths to Keep:** Clear upgrade CTAs, accessible invoice downloads, and integration with backend ledger.
-11. **Weaknesses to remove:** Redundant plan descriptions clutter layout; condense copy.
-12. **Styling and Colour review changes:** Align alert banners and plan highlights with brand palette.
-13. **CSS, orientation, placement and arrangement changes:** Optimise layout for small screens to avoid horizontal scrolling.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify plan benefits, reduce redundant pricing descriptions, and ensure consistent tone.
-15. **Change Checklist Tracker:** Update billing regression tests and finance review steps before deployment.
-16. **Full Upgrade Plan & Release Steps:** Launch UI tweaks via feature flag, coordinate backend plan updates, run billing smoke tests, and release after sign-off.
+1. **Appraisal:** End-to-end account billing workspace spanning React, Vitest-covered backend routes, and a dedicated `billing_portal_sessions` ledger that now captures every portal launch for audit and security reviews.
+2. **Functionality:** `AccountBillingController` exposes `/account/billing/{overview|payment-methods|invoices|portal-sessions}` routes, all brokered through `AccountBillingService` which stitches subscriptions, intents, purchases, and learner finance preferences, while the profile page renders the summary, payment, and invoice cards powered by `useBillingPortal`.
+3. **Logic Usefulness:** The service trims and normalises raw finance models, hashes portal tokens, and enforces return-origin policy before persisting via `BillingPortalSessionModel`; front-end hooks memoise combined data, throttle refreshes, and trigger portal launches backed by the API payload.
+4. **Redundancies:** Status badges and billing metadata labels still diverge between tutor analytics and the new profile cards—converge on a shared badge/label system to avoid drift.
+5. **Placeholders Or non-working functions or stubs:** Stubbed portal links have been replaced with fully audited sessions, but empty states for invoices/payment methods should incorporate help-centre links instead of placeholder copy.
+6. **Duplicate Functions:** Currency and amount formatting now point to `src/utils/currency.js`; finish migrating legacy components (e.g., tutor pricing tables) still rolling bespoke formatters.
+7. **Improvements need to make:** Layer in usage-based and seat-consumption charts, enable plan changes without leaving the workspace, and surface invoice filtering/search for finance teams.
+8. **Styling improvements:** Harmonise card elevations and table density across summary, payment, and invoice components so they align with design tokens and preserve readability on high-density finance data.
+9. **Efficiency analysis and improvement:** Persist session expiry clean-up server side, reuse frontend cache tags (`billing:*`), and ship background refreshes only when mutations occur to cap API chatter under concurrency.
+10. **Strengths to Keep:** Secure token handling (SHA-256 hashes), deterministic overview aggregation, consistent currency formatting, and the guided upgrade CTAs embedded beside real plan data.
+11. **Weaknesses to remove:** Portal launch failures surface as generic toasts; expose specific remediation (missing billing configuration, disallowed return origin) so operators can self-serve.
+12. **Styling and Colour review changes:** Align banner accents, warning states, and invoice status pills with the finance palette to maintain AA contrast while matching marketing collateral.
+13. **CSS, orientation, placement and arrangement changes:** Refine responsive breakpoints so invoice tables collapse to summary lists, payment method cards stack cleanly, and the summary hero keeps critical plan data above the fold on mobile.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Audit plan-benefit copy and support notes to reduce repetition, keep calls to action below 140 characters, and ensure terminology matches finance help articles.
+15. **Change Checklist Tracker:** Include Vitest suites (`accountBillingService`, `billingPortalSessionModel`, route smoke tests), knex migration (`20250326133000_billing_portal_sessions`), seed refresh, and OpenAPI verification before shipping.
+16. **Full Upgrade Plan & Release Steps:** Apply migration + seed in staging, validate `/account/billing/*` endpoints end-to-end, confirm hashed sessions in the new table, run UI regression on profile billing cards, update release comms, and roll out behind the `platform.api.v1.accountBilling` flag prior to general availability.
 
 ### 2.H Integrations, Enablement & Invitations (`src/pages/IntegrationCredentialInvite.jsx`, `src/components/integrations/`, `src/hooks/useIntegrationInvite.js`)
-1. **Appraisal:** Admin-facing flows for inviting partners, issuing API keys, and guiding enablement tasks.
-2. **Functionality:** Page parses invitation tokens, displays provider capabilities, triggers acceptance flows, and surfaces follow-up steps for integration teams.
-3. **Logic Usefulness:** Hooks coordinate with backend invites API, manage state transitions, and trigger analytics events to track onboarding progress.
-4. **Redundancies:** Capability card layouts duplicated in enablement surfaces; centralise to maintain style parity.
-5. **Placeholders Or non-working functions or stubs:** Some enablement steps reference TODO documentation links; update to avoid dead ends.
-6. **Duplicate Functions:** Token parsing utilities repeated in multiple hooks; consolidate to shared helper.
-7. **Improvements need to make:** Add progress tracking, auto-expiry notifications, and support chat escalation.
-8. **Styling improvements:** Align provider badges, callouts, and progress bars with design tokens.
-9. **Efficiency analysis and improvement:** Prefetch provider metadata after verifying token to minimise perceived latency.
-10. **Strengths to Keep:** Clear invitation guidance, audit-friendly analytics, and integration with backend governance.
-11. **Weaknesses to remove:** Limited error messaging for expired invites; add dedicated states and actionable remediation.
-12. **Styling and Colour review changes:** Ensure status colours align with accessible contrast and brand.
-13. **CSS, orientation, placement and arrangement changes:** Provide responsive layout guidance for multi-step invites on mobile devices.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refine enablement copy to remain concise and avoid repeated warnings.
-15. **Change Checklist Tracker:** Include invite acceptance QA, analytics verification, and documentation link audit in release checklist.
-16. **Full Upgrade Plan & Release Steps:** Stage invites in lower environments, validate token handling, refresh enablement docs, coordinate with partner teams, and release with monitoring of acceptance rates.
+1. **Appraisal:** Consolidated operator invite flow that now pairs reusable React components with resilient `useIntegrationInvite` logic to shepherd external partners through credential handoff and enablement steps.
+2. **Functionality:** `IntegrationCredentialInvite.jsx` wires `InviteSummaryCard`, `InviteStatusBanner`, `InviteExpiryCountdown`, and `InviteSecurityChecklist` to token lookups, acceptance mutations, documentation checks, and countdown timers so admins see status, tasks, and expiry in one workspace.
+3. **Logic Usefulness:** The hook debounces token validation, retries fetches with exponential back-off, and emits structured analytics while shared countdown + checklist components keep UI states consistent across enablement and partner dashboards.
+4. **Redundancies:** Enablement CTA card shells still overlap with general integrations dashboard components—extract shared wrappers to `components/integrations/common/` so badge, icon, and layout logic lives once.
+5. **Placeholders Or non-working functions or stubs:** Remaining TODO doc links are now flagged with explicit “coming soon” messaging and tracked via metadata on invites; continue backfilling URLs as partner docs ship.
+6. **Duplicate Functions:** Invite token parsing lives solely in `useIntegrationInvite` and is reused by countdown/status components; remove any older `parseInviteToken` helpers lingering in admin dashboards to avoid divergence.
+7. **Improvements need to make:** Add automated escalation when countdown breaches SLA, allow re-send with audit trail, and stream invite status over websockets for realtime operator consoles.
+8. **Styling improvements:** Ensure the summary, status banner, and checklist adopt the same elevation, spacing, and typography scale as other enablement surfaces for visual parity.
+9. **Efficiency analysis and improvement:** Batch-load provider metadata alongside invite payload, memoise derived checklist tasks, and avoid re-render churn by localising countdown updates to a single component interval.
+10. **Strengths to Keep:** Clear expiry cues, actionable next steps, analytics hooks for partner ops, and modular components that can be re-used inside admin/onboarding suites.
+11. **Weaknesses to remove:** Error toasts still collapse detailed API reasons; bubble structured guidance (missing pre-checks, expired tokens) into inline banners so operators can self-remediate.
+12. **Styling and Colour review changes:** Align provider badge colours and status states with integrations palette, ensuring contrast across countdown + banner states.
+13. **CSS, orientation, placement and arrangement changes:** Optimise the two-column layout to collapse gracefully for tablets, keeping summary first, then actionable checklist, and shifting documentation links to accordions on mobile.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Streamline invite copy to focus on “what to do next”, avoid repeated warnings about expiry, and keep support escalation language consistent with partner docs.
+15. **Change Checklist Tracker:** Cover Vitest invite flow suites, manual token expiry drills, documentation link validation, and analytics event verification for each release train.
+16. **Full Upgrade Plan & Release Steps:** Stage invites with mocked providers, rehearse expiry + acceptance flows end-to-end, update enablement docs, train partner-success teams, and roll out behind `integration-invite` flag while monitoring acceptance + escalation metrics.
 
 ### 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
 1. **Appraisal:** Embedded support launcher, help centre entries, contextual guides, and feedback capture integrated into the web shell.
