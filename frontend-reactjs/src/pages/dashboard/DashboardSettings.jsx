@@ -16,6 +16,7 @@ import SettingsToggleField from '../../components/settings/SettingsToggleField.j
 import SettingsAccordion from '../../components/settings/SettingsAccordion.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useOutletContext } from 'react-router-dom';
+import { useTheme } from '../../providers/ThemeProvider.jsx';
 import {
   fetchAppearanceSettings,
   fetchIntegrationSettings,
@@ -468,6 +469,7 @@ function useSettingsSection({ token, fetcher, updater, fallback, sectionName }) 
 }
 
 function AppearanceSection({ state, onChange, onSubmit, saving = false, disabled = false }) {
+  const { setMode: setGlobalMode, setDensity: setGlobalDensity } = useTheme();
   const updateBranding = (field, value) =>
     onChange((prev) => ({
       ...prev,
@@ -478,13 +480,22 @@ function AppearanceSection({ state, onChange, onSubmit, saving = false, disabled
     }));
 
   const updateTheme = (field, value) =>
-    onChange((prev) => ({
-      ...prev,
-      theme: {
-        ...prev.theme,
-        [field]: value
+    onChange((prev) => {
+      const next = {
+        ...prev,
+        theme: {
+          ...prev.theme,
+          [field]: value
+        }
+      };
+      if (field === 'density') {
+        setGlobalDensity(value);
       }
-    }));
+      if (field === 'mode') {
+        setGlobalMode(value === 'system' ? 'auto' : value);
+      }
+      return next;
+    });
 
   const updateHero = (field, value) =>
     onChange((prev) => ({

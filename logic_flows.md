@@ -425,13 +425,13 @@ This compendium maps the execution paths, responsibilities, and release consider
 2. **Functionality:** Components open inline help drawers, search knowledge base, submit tickets, and capture quick feedback for analytics.
 3. **Logic Usefulness:** Support hooks track page context, user role, and prior interactions to surface relevant guides automatically.
 4. **Redundancies:** Help article previews duplicated between launcher and standalone support pages; centralise components.
-5. **Placeholders Or non-working functions or stubs:** Offline escalation path flagged TODO; communicate fallback instructions clearly.
+5. **Placeholders Or non-working functions or stubs:** Offline escalation path previously flagged TODO now surfaces clear fallback instructions and live-contact details inside the support launcher.
 6. **Duplicate Functions:** Feedback capture logic repeated in dashboards; unify to maintain analytics consistency.
 7. **Improvements need to make:** Add AI-powered suggestions, integrate with status page, and expose case history to users.
 8. **Styling improvements:** Align support widget styling with overlay design tokens and ensure accessible focus states.
-9. **Efficiency analysis and improvement:** Lazy-load third-party scripts and cache article metadata to reduce page weight.
+9. **Efficiency analysis and improvement:** Lazy-load third-party scripts and cache article metadata with a short-lived in-memory knowledge base cache plus offline-aware debouncing to reduce page weight.
 10. **Strengths to Keep:** Context-aware assistance, analytics instrumentation, and accessible components.
-11. **Weaknesses to remove:** Modal stacking conflicts; rationalise trigger priority.
+11. **Weaknesses to remove:** Modal stacking conflicts; rationalise trigger priority and ensure cached suggestions hydrate predictably when reopening the launcher.
 12. **Styling and Colour review changes:** Ensure badges and alerts use accessible colours.
 13. **CSS, orientation, placement and arrangement changes:** Optimise placement for mobile to avoid covering primary CTAs.
 14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refine support copy to be empathetic yet concise and remove repeated disclaimers.
@@ -444,10 +444,10 @@ This compendium maps the execution paths, responsibilities, and release consider
 3. **Logic Usefulness:** Centralised theming ensures shared tokens propagate to marketing, dashboard, and admin surfaces, while layout primitives enforce consistent spacing.
 4. **Redundancies:** Breakpoint definitions appear in CSS modules and JS utilities; consolidate into single source to avoid mismatch.
 5. **Placeholders Or non-working functions or stubs:** I18n scaffolding exists but lacks translation files; flag as TODO and guard UI toggles.
-6. **Duplicate Functions:** Theme toggling logic repeated in multiple components; centralise within theme provider to avoid state divergence.
+6. **Duplicate Functions:** Theme toggling logic is now centralised within a shared ThemeProvider to avoid state divergence across layouts and settings forms.
 7. **Improvements need to make:** Add dark mode parity, integrate design tokens via CSS variables, and expose layout telemetry for UX monitoring.
 8. **Styling improvements:** Ensure typographic scale matches design-system documentation and unify spacing tokens across components.
-9. **Efficiency analysis and improvement:** Tree-shake unused icons, split vendor bundles, and memoise layout contexts.
+9. **Efficiency analysis and improvement:** Tree-shake unused icons, split vendor bundles, memoise layout contexts, and stream layout telemetry events so UX monitoring can react to shell usage in real time.
 10. **Strengths to Keep:** Well-structured providers, accessible navigation scaffolding, and consistent design token usage.
 11. **Weaknesses to remove:** Global CSS overrides that leak into modular components; tighten scoping.
 12. **Styling and Colour review changes:** Align theme palettes with updated design tokens and ensure accessible defaults.

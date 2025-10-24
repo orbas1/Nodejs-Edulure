@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpTrayIcon, SparklesIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowUpTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
-import { searchSupportKnowledgeBase } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import useSupportLauncher from '../../hooks/useSupportLauncher.js';
+import SupportKnowledgeResults from './SupportKnowledgeResults.jsx';
 
 function createAttachmentMeta(file, index) {
   const id =
@@ -42,28 +43,6 @@ function normaliseCategoryOptions(categoryOptions) {
   return categoryOptions;
 }
 
-function mapKnowledgeSuggestions(articles = []) {
-  if (!Array.isArray(articles)) {
-    return [];
-  }
-  return articles
-    .map((article, index) => {
-      if (!article) {
-        return null;
-      }
-      const id = article.id ?? article.slug ?? `kb-${index}`;
-      return {
-        id,
-        title: article.title ?? 'Support guide',
-        excerpt: article.excerpt ?? article.summary ?? article.description ?? '',
-        url: article.url ?? '#',
-        category: article.category ?? 'General',
-        minutes: Number.isFinite(Number(article.minutes)) ? Number(article.minutes) : 3
-      };
-    })
-    .filter(Boolean);
-}
-
 function AttachmentBadge({ attachment, onRemove }) {
   return (
     <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
@@ -93,6 +72,7 @@ export default function TicketForm({
 }) {
   const auth = useAuth();
   const token = auth?.session?.tokens?.accessToken ?? null;
+  const user = auth?.session?.user ?? null;
   const categories = useMemo(() => normaliseCategoryOptions(categoryOptions), [categoryOptions]);
   const priorities = useMemo(() => normalisePriorityOptions(priorityOptions), [priorityOptions]);
   const defaultCategoryValue = defaultCategory ?? categories[0] ?? 'General';
@@ -101,8 +81,6 @@ export default function TicketForm({
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [suggestions, setSuggestions] = useState([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [form, setForm] = useState({
     subject: '',
     category: defaultCategoryValue,
@@ -111,13 +89,30 @@ export default function TicketForm({
     attachments: []
   });
 
+  const {
+    suggestions,
+    loading: loadingSuggestions,
+    error: suggestionsError,
+    offline,
+    isStale,
+    lastFetchedAt,
+    refresh,
+    contextMetadata
+  } = useSupportLauncher({
+    token,
+    user,
+    subject: form.subject,
+    description: form.description,
+    category: form.category,
+    isOpen: open
+  });
+
   useEffect(() => {
     if (!open) {
       return;
     }
     setStep(0);
     setError(null);
-    setSuggestions([]);
     setForm({
       subject: '',
       category: defaultCategoryValue,
@@ -126,44 +121,6 @@ export default function TicketForm({
       attachments: []
     });
   }, [open, defaultCategoryValue, defaultPriorityValue]);
-
-  useEffect(() => {
-    if (!open || !token) {
-      return undefined;
-    }
-    const query = `${form.subject} ${form.description}`.trim();
-    if (!query) {
-      setSuggestions([]);
-      return undefined;
-    }
-    const controller = new AbortController();
-    setLoadingSuggestions(true);
-    searchSupportKnowledgeBase({
-      token,
-      query,
-      category: form.category,
-      limit: 5,
-      signal: controller.signal
-    })
-      .then((response) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        const articles = response?.data?.articles ?? response?.articles ?? [];
-        setSuggestions(mapKnowledgeSuggestions(articles));
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setSuggestions([]);
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoadingSuggestions(false);
-        }
-      });
-    return () => controller.abort();
-  }, [open, token, form.subject, form.description, form.category]);
 
   const handleFieldChange = (event) => {
     const { name, value } = event.target;
@@ -229,7 +186,12 @@ export default function TicketForm({
         priority: form.priority,
         description: form.description.trim(),
         attachments: attachmentsPayload,
-        knowledgeSuggestions: suggestions
+        knowledgeSuggestions: suggestions,
+        metadata: {
+          ...contextMetadata,
+          knowledgeSuggestions: suggestions.map((item) => item.id),
+          knowledgeLastFetchedAt: lastFetchedAt
+        }
       });
       onClose?.();
     } catch (submitError) {
@@ -336,36 +298,15 @@ export default function TicketForm({
               />
             </label>
 
-            <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4">
-              <div className="flex items-center gap-3 text-sm font-semibold text-primary">
-                <SparklesIcon className="h-5 w-5" />
-                Suggested fixes
-              </div>
-              <p className="mt-2 text-xs text-primary/80">
-                We surface knowledge base guidance while you draft so you and the support desk share the same playbooks.
-              </p>
-              <div className="mt-4 space-y-3">
-                {loadingSuggestions ? (
-                  <p className="text-xs text-slate-500">Searching the knowledge base…</p>
-                ) : suggestions.length ? (
-                  suggestions.map((suggestion) => (
-                    <div key={suggestion.id} className="rounded-xl bg-white p-4 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-slate-800">{suggestion.title}</p>
-                        <span className="text-xs font-medium text-slate-400">{suggestion.minutes} min</span>
-                      </div>
-                      {suggestion.excerpt ? (
-                        <p className="mt-1 text-xs text-slate-500">{suggestion.excerpt}</p>
-                      ) : null}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-slate-400">
-                    No instant matches yet. Add more detail and we will fetch tailored runbooks.
-                  </p>
-                )}
-              </div>
-            </div>
+            <SupportKnowledgeResults
+              suggestions={suggestions}
+              loading={loadingSuggestions}
+              error={suggestionsError}
+              offline={offline}
+              lastFetchedAt={lastFetchedAt}
+              isStale={isStale}
+              onRefresh={refresh}
+            />
 
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Attachments</p>

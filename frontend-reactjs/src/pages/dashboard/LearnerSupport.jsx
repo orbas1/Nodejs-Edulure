@@ -27,6 +27,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import useLearnerSupportCases from '../../hooks/useLearnerSupportCases.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import TicketForm from '../../components/support/TicketForm.jsx';
+import { normaliseKnowledgeArticles } from '../../features/support/knowledgeBase.js';
 
 const PRIORITY_BADGES = {
   urgent: 'bg-rose-100 text-rose-700',
@@ -94,22 +95,6 @@ function formatRelative(value) {
   }
   const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
   return RELATIVE_FORMATTER.format(diffDays, 'day');
-}
-
-function normaliseKnowledgeBase(articles) {
-  if (!Array.isArray(articles)) {
-    return [];
-  }
-  return articles
-    .filter((article) => article?.title)
-    .map((article) => ({
-      id: article.id ?? article.slug ?? article.title,
-      title: article.title,
-      excerpt: article.excerpt ?? article.summary ?? 'Explore the playbook to resolve common learner requests.',
-      url: article.url ?? '#',
-      category: article.category ?? article.topic ?? 'Guide',
-      minutes: Number(article.minutes ?? article.readTime ?? 3)
-    }));
 }
 
 function normaliseContacts(contacts) {
@@ -287,7 +272,10 @@ export default function LearnerSupport() {
   const token = session?.tokens?.accessToken ?? null;
 
   const initialCases = useMemo(() => (Array.isArray(data?.cases) ? data.cases : []), [data?.cases]);
-  const knowledgeBase = useMemo(() => normaliseKnowledgeBase(data?.knowledgeBase ?? data?.articles), [data]);
+  const knowledgeBase = useMemo(
+    () => normaliseKnowledgeArticles(data?.knowledgeBase ?? data?.articles),
+    [data]
+  );
   const contacts = useMemo(() => normaliseContacts(data?.contacts), [data?.contacts]);
   const serviceWindow = data?.serviceWindow ?? data?.serviceLevel?.label ?? '24/7 global support';
   const firstResponseMinutes = data?.metrics?.firstResponseMinutes ?? data?.metrics?.firstResponse ?? 42;
@@ -331,7 +319,15 @@ export default function LearnerSupport() {
   const selectedCase = cases.find((supportCase) => supportCase.id === selectedCaseId) ?? null;
 
   const handleTicketSubmit = useCallback(
-    async ({ subject, category, priority, description, attachments = [], knowledgeSuggestions = [] }) => {
+    async ({
+      subject,
+      category,
+      priority,
+      description,
+      attachments = [],
+      knowledgeSuggestions = [],
+      metadata = {}
+    }) => {
       const trimmedSubject = subject?.trim();
       const trimmedDescription = description?.trim();
       if (!trimmedSubject || !trimmedDescription) {
@@ -354,7 +350,8 @@ export default function LearnerSupport() {
             priority,
             description: trimmedDescription,
             attachments,
-            knowledgeSuggestions
+            knowledgeSuggestions,
+            metadata
           }
         });
         setStatusMessage({
@@ -383,6 +380,7 @@ export default function LearnerSupport() {
         status: remoteTicket.status ?? 'open',
         knowledgeSuggestions:
           remoteTicket.knowledgeSuggestions ?? remoteTicket.knowledge_suggestions ?? knowledgeSuggestions,
+        metadata: remoteTicket.metadata ?? remoteTicket.meta ?? metadata,
         followUpDueAt: remoteTicket.followUpDueAt ?? remoteTicket.follow_up_due_at ?? null,
         aiSummary: remoteTicket.aiSummary ?? remoteTicket.ai_summary ?? null,
         escalationBreadcrumbs:
