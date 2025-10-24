@@ -259,6 +259,18 @@ const designDependencies = [
     display_order: 3
   },
   {
+    nav_item_id: 'feed',
+    nav_item_label: 'Feed',
+    nav_item_category: 'primary',
+    nav_item_route: '/feed',
+    role_scope: ['user', 'instructor'],
+    dependency_key: 'feed-doc-navigation-annex',
+    dependency_type: 'reference',
+    value: '/docs/product/navigation-backlog.md#feed-registry',
+    notes: 'Product handbook anchor describing feed remediation.',
+    display_order: 4
+  },
+  {
     nav_item_id: 'create-post',
     nav_item_label: 'Publish community update',
     nav_item_category: 'quick_action',
@@ -283,6 +295,18 @@ const designDependencies = [
     display_order: 2
   },
   {
+    nav_item_id: 'create-post',
+    nav_item_label: 'Publish community update',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/learner/communities',
+    role_scope: ['user', 'instructor'],
+    dependency_key: 'quick-compose-doc-navigation-annex',
+    dependency_type: 'reference',
+    value: '/docs/operations/navigation-readiness.md#quick-compose',
+    notes: 'Operational readiness checklist anchor for quick compose.',
+    display_order: 3
+  },
+  {
     nav_item_id: 'launch-session',
     nav_item_label: 'Schedule live session',
     nav_item_category: 'quick_action',
@@ -305,6 +329,18 @@ const designDependencies = [
     value: 'frontend-reactjs/src/components/navigation/AppTopBar.jsx',
     notes: null,
     display_order: 2
+  },
+  {
+    nav_item_id: 'launch-session',
+    nav_item_label: 'Schedule live session',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/instructor/live-classes',
+    role_scope: ['instructor', 'admin'],
+    dependency_key: 'quick-live-session-doc-navigation-annex',
+    dependency_type: 'reference',
+    value: '/docs/operations/navigation-readiness.md#quick-live-session',
+    notes: 'Runbook anchor covering live session quick actions.',
+    display_order: 3
   },
   {
     nav_item_id: 'courses',
@@ -343,6 +379,18 @@ const designDependencies = [
     display_order: 3
   },
   {
+    nav_item_id: 'courses',
+    nav_item_label: 'Courses',
+    nav_item_category: 'primary',
+    nav_item_route: '/courses',
+    role_scope: ['user', 'instructor'],
+    dependency_key: 'courses-doc-navigation-annex',
+    dependency_type: 'reference',
+    value: '/docs/product/navigation-backlog.md#courses-discovery',
+    notes: 'Product backlog anchor for course discovery upgrades.',
+    display_order: 4
+  },
+  {
     nav_item_id: 'instructor-course-create',
     nav_item_label: 'Build course',
     nav_item_category: 'dashboard',
@@ -377,6 +425,18 @@ const designDependencies = [
     value: 'frontend-reactjs/src/pages/dashboard/InstructorCourseCreate.jsx',
     notes: null,
     display_order: 3
+  },
+  {
+    nav_item_id: 'instructor-course-create',
+    nav_item_label: 'Build course',
+    nav_item_category: 'dashboard',
+    nav_item_route: '/dashboard/instructor/courses/create',
+    role_scope: ['instructor'],
+    dependency_key: 'builder-doc-navigation-annex',
+    dependency_type: 'reference',
+    value: '/docs/operations/navigation-readiness.md#course-upload-readiness',
+    notes: 'Operational handbook anchor for course upload readiness.',
+    display_order: 4
   }
 ];
 

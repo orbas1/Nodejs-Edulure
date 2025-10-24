@@ -957,40 +957,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 ## 9. Documentation, Knowledge & Strategy (`EDULURE_GUIDE.md`, `docs/`, `user experience.md`, `valuation/`)
 
 ### 9.A Product & Technical Guides (`EDULURE_GUIDE.md`, `README.md`, `user experience.md`, `docs/design-system/`)
-1. **Appraisal:** Comprehensive guides explaining architecture, product strategy, user journeys, and design system foundations.
-2. **Functionality:** Provide onboarding context, architecture diagrams, UX principles, and component documentation for designers and engineers.
-3. **Logic Usefulness:** Aligns teams on vision, constraints, and execution details while enabling consistent UX.
-4. **Redundancies:** Some sections duplicate README content; consolidate to reduce maintenance.
-5. **Placeholders Or non-working functions or stubs:** Certain design system tokens flagged TBD; plan updates.
-6. **Duplicate Functions:** Component documentation overlaps across guides; centralise in design system directory.
-7. **Improvements need to make:** Add interactive component examples, localisation guidelines, and accessibility checklists.
-8. **Styling improvements:** Harmonise typography, spacing, and illustration styles across guides.
-9. **Efficiency analysis and improvement:** Introduce navigation aids, search, and cross-links for faster discovery.
-10. **Strengths to Keep:** Depth of content, cross-functional perspective, and actionable guidance.
-11. **Weaknesses to remove:** Outdated terminology; update to reflect current brand language.
-12. **Styling and Colour review changes:** Ensure docs follow brand palette while maintaining accessibility.
-13. **CSS, orientation, placement and arrangement changes:** Provide responsive layouts for long-form documentation.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Edit for clarity, reduce redundancy, and maintain consistent tone.
-15. **Change Checklist Tracker:** Document updates alongside releases, noting impacted sections and reviewers.
-16. **Full Upgrade Plan & Release Steps:** Audit guides quarterly, gather feedback, incorporate updates, and publish release notes.
+1. **Appraisal:** Navigation annex documentation is now backed by database seeds and repository aggregation so every surface (handbook, notification panel, API) exposes the same canon for product and technical guides.
+2. **Functionality:** `NavigationAnnexRepository.describe` emits a `documentationIndex`, seeded anchors in `004_navigation_annex.js`, and UI summaries in `NavigationAnnex.jsx`/`AppNotificationPanel.jsx` render backlog items, doc references, and impacted files in one place.
+3. **Logic Usefulness:** Designers, engineers, and enablement teams can fetch precise execution plans and impacted code paths without reconciling Markdown lists; the shared helper in `utils/navigationAnnex.js` keeps copy consistent.
+4. **Redundancies:** Legacy prose-only annex sections were replaced by seeded anchors and dynamic chips, eliminating drift between README guidance and runtime payloads.
+5. **Placeholders Or non-working functions or stubs:** Seeds currently cover feed, courses, quick actions, and upload readiness; future navigation surfaces need corresponding anchors before launch.
+6. **Duplicate Functions:** Documentation label formatting is centralised in the repository and API normaliser, removing the duplicate string manipulation that previously lived in each UI surface.
+7. **Improvements need to make:** Add automated linting to validate seeded anchors resolve and expose changelog URLs so release notes link directly to annex updates.
+8. **Styling improvements:** Cross-surface summary cards share annex palette tokens (`bg-primary/10`, slate neutrals) and responsive spacing, reinforcing brand alignment across docs.
+9. **Efficiency analysis and improvement:** Backend sets dedupe anchors/nav items before serialising JSON, sorts narratives and reference chips for deterministic payloads, and the UI limits cards to the top five entries while memoising context fetches to avoid re-render storms.
+10. **Strengths to Keep:** Cached HTTP responses, abortable fetches, and snapshot tests keep annex documentation fast and deterministic across staging and production.
+11. **Weaknesses to remove:** Documentation entries remain English-only and lack ownership metadata—future iterations should integrate translation keys and maintainer tags.
+12. **Styling and Colour review changes:** Documentation chips reuse established primary/surface colours that already satisfy AA contrast and match the annex notification treatment.
+13. **CSS, orientation, placement and arrangement changes:** The handbook summary introduces a three-column grid that collapses cleanly to one column on small screens while preserving card padding and readability.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Updated copy emphasises actionable verbs (“View reference”, “Operational readiness”) and mirrors the seeded anchor titles for clarity.
+15. **Change Checklist Tracker:** When guides change, update the seed file, rerun `npm --workspace backend-nodejs run seed`, execute repository and UI tests, and capture refreshed screenshots for `docs/product/navigation-backlog.md`.
+16. **Full Upgrade Plan & Release Steps:** Extend seeds with new anchors, reseed staging, validate `/api/v1/navigation/annex`, capture handbook/notification screenshots, and brief enablement teams before announcing documentation updates.
 
 ### 9.B Operational Playbooks & Incident Response (`docs/operations/`, `qa/operations/`, `scripts/incident-*`)
-1. **Appraisal:** Detailed playbooks covering incident response, escalation, compliance, and operational readiness.
-2. **Functionality:** Offer step-by-step procedures, communication templates, and escalation matrices for operational teams.
-3. **Logic Usefulness:** Ensures consistent incident handling, compliance adherence, and clear accountability.
-4. **Redundancies:** Overlapping steps across runbooks; consolidate to reduce confusion.
-5. **Placeholders Or non-working functions or stubs:** Some incident templates reference TBD owners; fill gaps promptly.
-6. **Duplicate Functions:** Escalation checklists duplicated across documents; centralise in master playbook.
-7. **Improvements need to make:** Add post-incident review templates, automation hooks, and integrate with incident tooling.
-8. **Styling improvements:** Align playbook typography and colours with design system for readability during stressful events.
-9. **Efficiency analysis and improvement:** Provide quick-reference summaries, automate distribution, and integrate with chatops.
-10. **Strengths to Keep:** Thorough coverage and clear escalation paths.
-11. **Weaknesses to remove:** Manual document distribution; automate via portal or chat bots.
-12. **Styling and Colour review changes:** Ensure severity indicators meet accessibility guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout templates optimised for print and mobile reference.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Simplify language, remove redundancy, and maintain consistent voice.
-15. **Change Checklist Tracker:** Track playbook revisions, owner confirmations, and drill schedules.
-16. **Full Upgrade Plan & Release Steps:** Review with operations, run tabletop exercises, incorporate feedback, and republish.
+1. **Appraisal:** Annex A54 operational tasks now originate from `navigation_annex_operation_tasks` and flow through `operationsChecklist`, giving the notification panel and handbook shared, real-time readiness data.
+2. **Functionality:** Repository role filters, panel loading/error states, and handbook summary cards expose cadence, navigation surface, and runbook anchors directly inside the app.
+3. **Logic Usefulness:** Operations staff can confirm pre-release tasks and drill requirements without cross-referencing Markdown, reducing the chance of skipping a checklist step.
+4. **Redundancies:** Static quick links in the panel were removed; seeded anchors ensure runbooks stay synchronised with the operational documentation.
+5. **Placeholders Or non-working functions or stubs:** Seeds cover the primary navigation flows; add additional roles/tasks as new annex initiatives land.
+6. **Duplicate Functions:** Shared formatting helpers output identical chip labels in the handbook and panel, keeping operational copy aligned across surfaces.
+7. **Improvements need to make:** Implement completion/owner metadata and webhook hooks so ops can assign and clear tasks without leaving the annex view.
+8. **Styling improvements:** Operational cards reuse annex chip palettes and uppercase cadence tags, improving scannability during incident triage.
+9. **Efficiency analysis and improvement:** UI slices checklist arrays to the top five items and reuses cached annex responses, keeping render cost low even as tasks expand.
+10. **Strengths to Keep:** Abortable fetches, memoised context state, and Vitest coverage keep annex operations reliable in both production and drill environments.
+11. **Weaknesses to remove:** Current UI is read-only; once backend exposes safe mutations, add completion toggles and audit logging for task sign-off.
+12. **Styling and Colour review changes:** Readiness and error states leverage existing slate/rose palettes that already pass contrast reviews for Annex operational tooling.
+13. **CSS, orientation, placement and arrangement changes:** Notification panel maintains responsive columnar layout, while the handbook groups readiness, backlog, and documentation in a responsive grid for quick scanning.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Copy highlights cadence, nav item, and runbook call-to-action in under two lines, matching the concise tone required during incidents.
+15. **Change Checklist Tracker:** After updating operational tasks reseed the database, run repository/UI tests, and update `docs/operations/navigation-readiness.md` with fresh screenshots.
+16. **Full Upgrade Plan & Release Steps:** Seed new tasks, reseed staging, validate annex API responses by role, rehearse the playbook via the notification panel and handbook, then publish drill notes with annex evidence.
 
 ### 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
 1. **Appraisal:** Design system tokens, component guidelines, UX research summaries, and cross-platform theming references.
@@ -1463,18 +1463,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Schedule refresh cadence, align with QA, and audit privacy compliance.
 
 ### A53. Product & Technical Guides (9.A)
-- **Operational Depth:** `navigation_annex_backlog_items` seeds the Annex A53 backlog so `GET /api/v1/navigation/annex` and the handbook render the same epic summaries for each navigation surface.
-- **Gaps & Risks:** Some diagrams outdated. Documentation lacks changelog linking guides to releases; ensure seed updates include references to revised artefacts.
-- **Resilience & Efficiency:** Automate doc linting, enforce broken-link checks, and structure navigation.
-- **UX & Communications:** Maintain consistent tone, accessibility, and cross-linking.
-- **Change Management:** Version docs, align with releases, and solicit stakeholder reviews.
+- **Operational Depth:** `navigation_annex_backlog_items` and the enhanced `documentationIndex` aggregate ensure `/api/v1/navigation/annex`, the handbook summary, and the notification panel all expose the same epic, impacted files, and documentation anchors seeded in `004_navigation_annex.js`.
+- **Gaps & Risks:** Anchors rely on manual maintenance—missing lint or changelog automation could let broken links slip into releases until the annex surfaces errors.
+- **Resilience & Efficiency:** Repository-level dedupe keeps payloads lean, UI slices limit cards to high-priority entries, and shared helpers prevent repeated parsing across surfaces.
+- **UX & Communications:** Cross-surface summary cards present execution plans, impacted files, and reference links with consistent copy and accessible chips, reducing the need to hunt across Markdown guides.
+- **Change Management:** Updating guides now requires reseeding, running backend/frontend annex tests, and capturing refreshed screenshots for `docs/product/navigation-backlog.md` so enablement packs reflect the live payload.
 
 ### A54. Operational Playbooks & Incident Response (9.B)
-- **Operational Depth:** `navigation_annex_operation_tasks` provides the Annex A54 checklist powering the notification panel and runbooks, keeping operational readiness steps in sync with releases.
-- **Gaps & Risks:** Some scripts reference deprecated tooling. Playbook ownership unclear; document who maintains the annex seeds.
-- **Resilience & Efficiency:** Run regular drills, update contacts, and automate alert routing.
-- **UX & Communications:** Keep instructions concise, include diagrams, and highlight escalation paths.
-- **Change Management:** Review quarterly, capture lessons learned, and archive superseded docs.
+- **Operational Depth:** Annex readiness tasks are seeded in `navigation_annex_operation_tasks`, aggregated by `NavigationAnnexRepository`, and rendered through shared checklist UIs so both the notification panel and handbook show live cadence, nav item, and runbook anchors.
+- **Gaps & Risks:** Tasks remain read-only—without completion metadata or ownership fields, operations still rely on external tooling to track execution status.
+- **Resilience & Efficiency:** Abortable fetches, cached responses, and slice limits keep the annex responsive during drills while seeds guarantee consistent payloads across environments.
+- **UX & Communications:** Updated cards highlight cadence, navigation surface, and “View runbook” links in accessible chips, reinforcing escalation paths during incidents.
+- **Change Management:** Reseed and rerun annex tests whenever playbooks change, then update `docs/operations/navigation-readiness.md` with fresh evidence to document drill readiness.
 
 ### A55. Design System Assets & UX Research (9.C)
 - **Operational Depth:** `navigation_annex_design_dependencies` now enumerates token adoption, QA checks, and references so design reviews consume the same annex payload as the application.

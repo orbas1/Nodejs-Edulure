@@ -106,6 +106,7 @@ function ensureNode(nodes, row) {
       strategy: {
         pillar: null,
         narrative: null,
+        narratives: new Map(),
         metrics: new Map(),
         sortOrder: row.displayOrder ?? 0
       }
@@ -121,7 +122,7 @@ function ensureStrategyPillar(pillars, pillarName, displayOrder = 0) {
   if (!pillars.has(pillarName)) {
     pillars.set(pillarName, {
       pillar: pillarName,
-      narratives: new Set(),
+      narratives: new Map(),
       metrics: new Map(),
       order: displayOrder
     });
@@ -132,12 +133,78 @@ function ensureStrategyPillar(pillars, pillarName, displayOrder = 0) {
   return pillars.get(pillarName);
 }
 
+function registerNarrative(map, text, order = 0) {
+  if (!text) {
+    return;
+  }
+  const resolvedOrder = order ?? 0;
+  const existing = map.get(text);
+  if (!existing) {
+    map.set(text, { text, order: resolvedOrder });
+    return;
+  }
+  const nextOrder = existing.order ?? resolvedOrder;
+  existing.order = Math.min(nextOrder, resolvedOrder);
+  map.set(text, existing);
+}
+
+function normaliseNarrativeList(map) {
+  return Array.from(map.values())
+    .sort((a, b) => {
+      const orderDiff = (a.order ?? 0) - (b.order ?? 0);
+      if (orderDiff !== 0) {
+        return orderDiff;
+      }
+      return a.text.localeCompare(b.text);
+    })
+    .map((entry) => entry.text);
+}
+
 function sortByPriority(a, b) {
   const priorityDiff = (a.priority ?? 99) - (b.priority ?? 99);
   if (priorityDiff !== 0) return priorityDiff;
   const displayDiff = (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
   if (displayDiff !== 0) return displayDiff;
   return String(a.label ?? a.id ?? '').localeCompare(String(b.label ?? b.id ?? ''));
+}
+
+function normaliseDocumentationHref(href) {
+  if (!href) {
+    return null;
+  }
+  const trimmed = String(href).trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed;
+}
+
+function registerDocumentationReference(map, href, { navItemId, navItemLabel, category }) {
+  const normalised = normaliseDocumentationHref(href);
+  if (!normalised) {
+    return;
+  }
+
+  const entry = map.get(normalised) ?? {
+    href: normalised,
+    usageCount: 0,
+    categories: new Set(),
+    navItemIds: new Set(),
+    navItemLabels: new Set()
+  };
+
+  entry.usageCount += 1;
+  if (category) {
+    entry.categories.add(category);
+  }
+  if (navItemId) {
+    entry.navItemIds.add(navItemId);
+  }
+  if (navItemLabel) {
+    entry.navItemLabels.add(navItemLabel);
+  }
+
+  map.set(normalised, entry);
 }
 
 export default class NavigationAnnexRepository {
@@ -152,6 +219,7 @@ export default class NavigationAnnexRepository {
     const checklistTasks = [];
     const strategyByPillar = new Map();
     const narrativeIndex = new Map();
+    const documentationIndex = new Map();
     const resolvedRole = normaliseRole(role);
 
     const backlogRows = await NavigationAnnexBacklogItemModel.listAll(connection);
@@ -176,6 +244,13 @@ export default class NavigationAnnexRepository {
         priority: row.priority ?? 99,
         displayOrder: row.displayOrder ?? 0
       });
+      if (row.backlogRef) {
+        registerDocumentationReference(documentationIndex, row.backlogRef, {
+          navItemId: row.navItemId,
+          navItemLabel: row.navItemLabel,
+          category: 'product'
+        });
+      }
     }
 
     const operationsRows = await NavigationAnnexOperationTaskModel.listAll(connection);
@@ -207,6 +282,13 @@ export default class NavigationAnnexRepository {
       node.operations.tasks.push(task);
       if (row.includeInChecklist) {
         checklistTasks.push(task);
+      }
+      if (row.href) {
+        registerDocumentationReference(documentationIndex, row.href, {
+          navItemId: row.navItemId,
+          navItemLabel: row.navItemLabel,
+          category: 'operations'
+        });
       }
     }
 
@@ -246,6 +328,13 @@ export default class NavigationAnnexRepository {
           if (row.value) {
             node.design.references.add(row.value);
             aggregatedDesign.references.add(row.value);
+            if (row.value.includes('/docs/')) {
+              registerDocumentationReference(documentationIndex, row.value, {
+                navItemId: row.navItemId,
+                navItemLabel: row.navItemLabel,
+                category: 'design'
+              });
+            }
           }
           break;
         }
@@ -266,6 +355,7 @@ export default class NavigationAnnexRepository {
       node.strategy.pillar = formattedPillar;
       node.strategy.narrative = row.narrative;
       node.strategy.sortOrder = Math.min(node.strategy.sortOrder ?? row.displayOrder ?? 0, row.displayOrder ?? 0);
+      registerNarrative(node.strategy.narratives, row.narrative, row.displayOrder ?? 0);
       narrativeIndex.set(row.id, {
         pillar: formattedPillar,
         navItemId: row.navItemId,
@@ -273,7 +363,7 @@ export default class NavigationAnnexRepository {
         displayOrder: row.displayOrder ?? 0
       });
       const pillarEntry = ensureStrategyPillar(strategyByPillar, formattedPillar, row.displayOrder ?? 0);
-      pillarEntry.narratives.add(row.narrative);
+      registerNarrative(pillarEntry.narratives, row.narrative, row.displayOrder ?? 0);
     }
 
     const metricsRows = await NavigationAnnexStrategyMetricModel.listAll(connection);
@@ -324,6 +414,9 @@ export default class NavigationAnnexRepository {
         .sort(sortByPriority)
         .map(({ id, label, baseline, target, unit }) => ({ id, label, baseline, target, unit }));
 
+      const nodeNarratives = normaliseNarrativeList(node.strategy.narratives);
+      const primaryNarrative = nodeNarratives.length ? nodeNarratives[0] : node.strategy.narrative;
+
       const initiative = {
         id: node.id,
         label: node.label,
@@ -339,7 +432,8 @@ export default class NavigationAnnexRepository {
           design,
           strategy: {
             pillar: node.strategy.pillar,
-            narrative: node.strategy.narrative,
+            narrative: primaryNarrative,
+            narratives: nodeNarratives,
             metrics: strategyMetrics
           }
         }
@@ -398,10 +492,20 @@ export default class NavigationAnnexRepository {
       })
       .map((entry) => ({
         pillar: entry.pillar,
-        narratives: Array.from(entry.narratives),
+        narratives: normaliseNarrativeList(entry.narratives),
         metrics: Array.from(entry.metrics.values())
           .sort(sortByPriority)
           .map(({ id, label, baseline, target, unit }) => ({ id, label, baseline, target, unit }))
+      }));
+
+    const documentationReferences = Array.from(documentationIndex.values())
+      .sort((a, b) => String(a.href).localeCompare(String(b.href)))
+      .map((entry) => ({
+        href: entry.href,
+        usageCount: entry.usageCount,
+        categories: Array.from(entry.categories).sort((a, b) => a.localeCompare(b)),
+        navItems: Array.from(entry.navItemIds).sort((a, b) => a.localeCompare(b)),
+        navItemLabels: Array.from(entry.navItemLabels).sort((a, b) => a.localeCompare(b))
       }));
 
     return {
@@ -410,6 +514,7 @@ export default class NavigationAnnexRepository {
       designDependencies,
       strategyNarratives,
       productBacklog,
+      documentationIndex: documentationReferences,
       refreshedAt: new Date().toISOString()
     };
   }

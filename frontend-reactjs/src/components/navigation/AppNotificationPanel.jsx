@@ -5,6 +5,11 @@ import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/ou
 
 import { NOTIFICATION_GROUPS } from '../../navigation/routes.js';
 import { useNavigationMetadata } from '../../context/NavigationMetadataContext.jsx';
+import {
+  formatCategoryLabel,
+  formatDocumentationLabel,
+  isInternalDocumentationLink
+} from '../../utils/navigationAnnex.js';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -31,11 +36,23 @@ export default function AppNotificationPanel({
     designDependencies,
     strategyNarratives,
     productBacklog,
+    documentationIndex,
     status,
     error
   } = useNavigationMetadata();
   const isLoading = status === 'loading';
   const hasError = status === 'error';
+
+  const openDocumentation = (event, href) => {
+    if (!href) {
+      event.preventDefault();
+      return;
+    }
+    if (onNavigate && isInternalDocumentationLink(href)) {
+      event.preventDefault();
+      onNavigate(href);
+    }
+  };
 
   return (
     <Transition.Root show={open} as={Fragment}>
@@ -390,6 +407,75 @@ export default function AppNotificationPanel({
                                 View execution plan
                               </a>
                             </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                  <section aria-labelledby="documentation-index">
+                    <div className="flex items-center justify-between">
+                      <h2
+                        id="documentation-index"
+                        className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                      >
+                        Documentation coverage
+                      </h2>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        Annex A53 & A54
+                      </span>
+                    </div>
+                    <ul className="mt-3 space-y-3">
+                      {isLoading && documentationIndex.length === 0 ? (
+                        <li className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
+                          Loading documentation references…
+                        </li>
+                      ) : null}
+                      {hasError && documentationIndex.length === 0 ? (
+                        <li className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-xs text-rose-600">
+                          Unable to load documentation coverage right now.
+                        </li>
+                      ) : null}
+                      {documentationIndex.map((entry) => (
+                        <li
+                          key={entry.href || entry.navItems.join('-')}
+                          className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {formatDocumentationLabel(entry.href)}
+                            </p>
+                            {entry.href ? (
+                              <p className="mt-1 text-xs text-slate-500">{entry.href}</p>
+                            ) : null}
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {entry.categories.map((category) => (
+                                <span
+                                  key={`${entry.href}-${category}`}
+                                  className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary"
+                                >
+                                  {formatCategoryLabel(category)}
+                                </span>
+                              ))}
+                              {entry.navItemLabels.map((label) => (
+                                <span
+                                  key={`${entry.href}-${label}`}
+                                  className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {entry.href ? (
+                            <a
+                              className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary/20"
+                              href={entry.href}
+                              onClick={(event) => openDocumentation(event, entry.href)}
+                              target={isInternalDocumentationLink(entry.href) ? undefined : '_blank'}
+                              rel={isInternalDocumentationLink(entry.href) ? undefined : 'noreferrer'}
+                            >
+                              View reference
+                            </a>
                           ) : null}
                         </li>
                       ))}

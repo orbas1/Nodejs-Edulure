@@ -3,13 +3,25 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useNavigationMetadata } from '../../context/NavigationMetadataContext.jsx';
+import {
+  formatCategoryLabel,
+  formatDocumentationLabel,
+  isInternalDocumentationLink
+} from '../../utils/navigationAnnex.js';
 
 function SectionCard({ section }) {
   const { id, label, initiative, originIds, quickAccess } = section;
   const operations = initiative.operations ?? { tasks: [] };
   const design = initiative.design ?? { tokens: [], qa: [], references: [] };
-  const strategy = initiative.strategy ?? { narratives: [], metrics: [] };
+  const strategy =
+    initiative.strategy ?? { pillar: null, narrative: null, narratives: [], metrics: [] };
   const product = initiative.product ?? { epicId: label, summary: '', impactedFiles: [] };
+  const strategyNarratives =
+    strategy.narratives && strategy.narratives.length
+      ? strategy.narratives
+      : strategy.narrative
+        ? [strategy.narrative]
+        : [];
 
   return (
     <section
@@ -112,22 +124,46 @@ function SectionCard({ section }) {
             ) : null}
             {design.qa?.length ? (
               <ul className="mt-3 space-y-2 text-xs text-slate-500">
-                {design.qa.map((qa, index) => (
-                  <li key={`${id}-qa-${index}`} className="leading-snug">
-                    {qa}
+                {design.qa.map((qa) => (
+                  <li key={`${id}-qa-${qa.id}`} className="leading-snug">
+                    {qa.label}
                   </li>
                 ))}
               </ul>
             ) : null}
             {design.references?.length ? (
-              <p className="mt-3 text-[11px] uppercase tracking-wide text-slate-400">
-                References: {design.references.join(', ')}
-              </p>
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">References</p>
+                <ul className="space-y-1 text-xs text-slate-500">
+                  {design.references.map((reference, index) => (
+                    <li key={`${id}-reference-${index}`} className="flex flex-wrap items-center gap-2">
+                      {isInternalDocumentationLink(reference) ? (
+                        <Link
+                          to={reference}
+                          className="text-xs font-semibold text-primary transition hover:text-primary/80"
+                        >
+                          {formatDocumentationLabel(reference)}
+                        </Link>
+                      ) : (
+                        <code className="rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-600">{reference}</code>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Strategy narrative</h3>
-            <p className="text-sm text-slate-600">{strategy.narrative}</p>
+            {strategyNarratives.length ? (
+              <ul className="mt-2 space-y-2 text-sm text-slate-600">
+                {strategyNarratives.map((narrative) => (
+                  <li key={`${id}-strategy-${narrative}`}>{narrative}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">No strategy narrative recorded.</p>
+            )}
             {strategy.metrics?.length ? (
               <ul className="mt-3 space-y-2 text-xs text-slate-500">
                 {strategy.metrics.map((metric) => (
@@ -154,8 +190,30 @@ SectionCard.propTypes = {
     initiative: PropTypes.shape({
       product: PropTypes.object,
       operations: PropTypes.object,
-      design: PropTypes.object,
-      strategy: PropTypes.object
+      design: PropTypes.shape({
+        tokens: PropTypes.arrayOf(PropTypes.string),
+        qa: PropTypes.arrayOf(
+          PropTypes.shape({
+            id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+            label: PropTypes.string.isRequired
+          })
+        ),
+        references: PropTypes.arrayOf(PropTypes.string)
+      }),
+      strategy: PropTypes.shape({
+        pillar: PropTypes.string,
+        narrative: PropTypes.string,
+        narratives: PropTypes.arrayOf(PropTypes.string),
+        metrics: PropTypes.arrayOf(
+          PropTypes.shape({
+            id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+            label: PropTypes.string.isRequired,
+            baseline: PropTypes.string,
+            target: PropTypes.string,
+            unit: PropTypes.string
+          })
+        )
+      })
     }).isRequired,
     originIds: PropTypes.instanceOf(Set).isRequired,
     quickAccess: PropTypes.string
@@ -163,7 +221,15 @@ SectionCard.propTypes = {
 };
 
 export default function NavigationAnnex() {
-  const { initiatives, status, refresh } = useNavigationMetadata();
+  const {
+    initiatives,
+    status,
+    refresh,
+    productBacklog,
+    operationsChecklist,
+    documentationIndex,
+    refreshedAt
+  } = useNavigationMetadata();
   const isLoading = status === 'loading';
   const hasError = status === 'error';
 
@@ -194,6 +260,34 @@ export default function NavigationAnnex() {
 
     return Array.from(sectionMap.values());
   }, [initiatives]);
+
+  const lastRefreshed = useMemo(
+    () => (refreshedAt ? new Date(refreshedAt).toLocaleString() : null),
+    [refreshedAt]
+  );
+
+  const renderDocumentationAnchor = (href) => {
+    if (!href) {
+      return null;
+    }
+    if (isInternalDocumentationLink(href)) {
+      return (
+        <Link to={href} className="text-xs font-semibold text-primary transition hover:text-primary/80">
+          {formatDocumentationLabel(href)}
+        </Link>
+      );
+    }
+    return (
+      <a
+        href={href}
+        className="text-xs font-semibold text-primary transition hover:text-primary/80"
+        target="_blank"
+        rel="noreferrer"
+      >
+        {formatDocumentationLabel(href)}
+      </a>
+    );
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-4 pb-16 pt-10 sm:px-6 lg:px-8">
@@ -239,6 +333,153 @@ export default function NavigationAnnex() {
           <SectionCard key={section.id} section={section} />
         ))}
       </div>
+      <section
+        aria-labelledby="annex-summary"
+        className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm backdrop-blur"
+      >
+        <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Annex overview</p>
+            <h2 id="annex-summary" className="text-xl font-semibold text-slate-900">
+              Cross-surface summary
+            </h2>
+            <p className="text-sm text-slate-600">
+              Consolidated Annex A53 and A54 references that feed the notification panel, runbooks, and handbook checklists.
+            </p>
+          </div>
+          {lastRefreshed ? (
+            <span className="inline-flex h-10 items-center justify-center rounded-full bg-primary/10 px-4 text-[11px] font-semibold uppercase tracking-wide text-primary">
+              Refreshed {lastRefreshed}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <header className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Product backlog (Annex A53)</h3>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                {productBacklog.length} epics
+              </span>
+            </header>
+            <ul className="mt-3 space-y-3 text-sm text-slate-600">
+              {isLoading && productBacklog.length === 0 ? (
+                <li className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-3 text-xs text-slate-500">
+                  Loading Annex A53 backlog…
+                </li>
+              ) : null}
+              {hasError && productBacklog.length === 0 ? (
+                <li className="rounded-2xl border border-rose-200 bg-rose-50/70 p-3 text-xs text-rose-600">
+                  Unable to load backlog summaries.
+                </li>
+              ) : null}
+              {productBacklog.slice(0, 5).map((epic) => (
+                <li key={epic.id} className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+                  <p className="font-semibold text-slate-900">{epic.id}</p>
+                  <p className="mt-1 text-xs text-slate-500">{epic.summary}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {epic.impactedFiles.map((file) => (
+                      <span key={`${epic.id}-${file}`} className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
+                        {file}
+                      </span>
+                    ))}
+                  </div>
+                  {renderDocumentationAnchor(epic.backlogRef)}
+                </li>
+              ))}
+              {productBacklog.length > 5 ? (
+                <li className="text-xs text-slate-400">{productBacklog.length - 5} additional epics seeded.</li>
+              ) : null}
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <header className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Operational readiness (Annex A54)</h3>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                {operationsChecklist.length} tasks
+              </span>
+            </header>
+            <ul className="mt-3 space-y-3 text-sm text-slate-600">
+              {isLoading && operationsChecklist.length === 0 ? (
+                <li className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-3 text-xs text-slate-500">
+                  Loading operational tasks…
+                </li>
+              ) : null}
+              {hasError && operationsChecklist.length === 0 ? (
+                <li className="rounded-2xl border border-rose-200 bg-rose-50/70 p-3 text-xs text-rose-600">
+                  Unable to load Annex A54 checklist.
+                </li>
+              ) : null}
+              {operationsChecklist.slice(0, 5).map((task) => (
+                <li key={task.id} className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+                  <p className="font-semibold text-slate-900">{task.label}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+                    <span>Cadence: {task.cadence}</span>
+                    {task.navItemLabel ? (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
+                        {task.navItemLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                  {renderDocumentationAnchor(task.href)}
+                </li>
+              ))}
+              {operationsChecklist.length > 5 ? (
+                <li className="text-xs text-slate-400">{operationsChecklist.length - 5} additional checklist items.</li>
+              ) : null}
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <header className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Documentation links</h3>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                {documentationIndex.length} references
+              </span>
+            </header>
+            <ul className="mt-3 space-y-3 text-sm text-slate-600">
+              {isLoading && documentationIndex.length === 0 ? (
+                <li className="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-3 text-xs text-slate-500">
+                  Loading documentation references…
+                </li>
+              ) : null}
+              {hasError && documentationIndex.length === 0 ? (
+                <li className="rounded-2xl border border-rose-200 bg-rose-50/70 p-3 text-xs text-rose-600">
+                  Unable to load documentation coverage.
+                </li>
+              ) : null}
+              {documentationIndex.slice(0, 5).map((entry) => (
+                <li key={entry.href || entry.navItems.join('-')} className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+                  <p className="font-semibold text-slate-900">
+                    {formatDocumentationLabel(entry.href)}
+                  </p>
+                  {entry.href ? <p className="mt-1 text-xs text-slate-500">{entry.href}</p> : null}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {entry.categories.map((category) => (
+                      <span
+                        key={`${entry.href}-${category}`}
+                        className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary"
+                      >
+                        {formatCategoryLabel(category)}
+                      </span>
+                    ))}
+                    {entry.navItemLabels.map((navLabel) => (
+                      <span
+                        key={`${entry.href}-${navLabel}`}
+                        className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500"
+                      >
+                        {navLabel}
+                      </span>
+                    ))}
+                  </div>
+                  {renderDocumentationAnchor(entry.href)}
+                </li>
+              ))}
+              {documentationIndex.length > 5 ? (
+                <li className="text-xs text-slate-400">{documentationIndex.length - 5} additional references tracked.</li>
+              ) : null}
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
