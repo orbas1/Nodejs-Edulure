@@ -32,6 +32,7 @@ import releaseRoutes from './release.routes.js';
 import catalogueRoutes from './catalogue.routes.js';
 import instructorRoutes from './instructor.routes.js';
 import mediaRoutes from './media.routes.js';
+import mobileRoutes from './mobile.routes.js';
 import setupRoutes from './setup.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 import { buildRouteRegistry } from './registryValidator.js';
@@ -57,6 +58,7 @@ const routerMap = {
   analytics: analyticsRoutes,
   dashboard: dashboardRoutes,
   courses: courseRoutes,
+  mobile: mobileRoutes,
   admin: adminRoutes,
   verification: verificationRoutes,
   ebooks: ebookRoutes,

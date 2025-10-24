@@ -1131,6 +1131,30 @@ const ROUTE_DEFINITIONS = [
     statusPageComponent: 'api-ebooks'
   },
   {
+    name: 'mobile',
+    capability: 'mobile-experience',
+    description: 'Mobile billing, messaging, and learner support endpoints.',
+    basePath: '/mobile',
+    flagKey: 'platform.api.v1.mobile',
+    defaultState: 'enabled',
+    fallbackStatus: 503,
+    disabledMessage: 'Mobile companion services are temporarily unavailable. Please try again soon.',
+    audience: 'user',
+    owners: ['mobile-experience', 'learner-success'],
+    serviceTier: 'core',
+    tags: ['api', 'v1', 'mobile', 'billing', 'messaging'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'user',
+      allowedRoles: ['user', 'staff', 'admin']
+    },
+    cors: {
+      allowedOrigins: ['@env:app.corsOrigins'],
+      allowedMethods: ['GET', 'POST']
+    },
+    statusPageComponent: 'api-mobile'
+  },
+  {
     name: 'catalogue',
     capability: 'public-catalogue',
     description: 'Public catalogue endpoints for live classrooms, courses, and tutors.',
