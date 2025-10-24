@@ -40,7 +40,10 @@ describe('TelemetryWarehouseService', () => {
     };
 
     storage = {
-      uploadBuffer: vi.fn()
+      uploadBuffer: vi.fn(),
+      downloadToBuffer: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('missing'), { code: 'NoSuchKey' }))
     };
 
     vi.spyOn(metrics, 'recordTelemetryExport').mockImplementation(() => {});
@@ -67,7 +70,8 @@ describe('TelemetryWarehouseService', () => {
           prefix: 'warehouse/telemetry',
           batchSize: 10,
           compress: true,
-          runOnStartup: false
+          runOnStartup: false,
+          checkpoint: { encrypt: false }
         },
         freshness: {
           warehouseThresholdMinutes: 30
@@ -115,7 +119,9 @@ describe('TelemetryWarehouseService', () => {
     eventModel.listPendingForExport.mockResolvedValue([event]);
     batchModel.create.mockResolvedValue({ id: 55, batchUuid: 'batch-123', status: 'exporting' });
     lineageModel.startRun.mockResolvedValue({ id: 777 });
-    storage.uploadBuffer.mockResolvedValue({ bucket: 'private', key: 'warehouse/telemetry/batch-123.jsonl.gz', checksum: 'abc123' });
+    storage.uploadBuffer
+      .mockResolvedValueOnce({ bucket: 'private', key: 'warehouse/telemetry/batch-123.jsonl.gz', checksum: 'abc123' })
+      .mockResolvedValueOnce({ bucket: 'private', key: 'warehouse/telemetry/checkpoint.json', checksum: 'ckp123' });
 
     service = new TelemetryWarehouseService({
       eventModel,
@@ -132,7 +138,8 @@ describe('TelemetryWarehouseService', () => {
           prefix: 'warehouse/telemetry',
           batchSize: 10,
           compress: true,
-          runOnStartup: false
+          runOnStartup: false,
+          checkpoint: { encrypt: false }
         },
         freshness: {
           warehouseThresholdMinutes: 30
@@ -152,8 +159,23 @@ describe('TelemetryWarehouseService', () => {
       destination: 's3',
       metadata: { trigger: 'test', requestedSize: 10 }
     });
-    expect(storage.uploadBuffer).toHaveBeenCalledTimes(1);
-    expect(eventModel.markExported).toHaveBeenCalledWith([1], expect.objectContaining({ batchId: 55 }));
+    expect(storage.uploadBuffer).toHaveBeenCalledTimes(2);
+    expect(storage.uploadBuffer.mock.calls[1][0]).toMatchObject({
+      key: 'warehouse/telemetry/checkpoint.json',
+      metadata: expect.objectContaining({ 'edulure-checkpoint': 'telemetry-export', 'edulure-encrypted': 'false' })
+    });
+    expect(eventModel.markExported).toHaveBeenCalledWith(
+      [1],
+      expect.objectContaining({
+        batchId: 55,
+        metadata: expect.objectContaining({
+          destination: 'warehouse/telemetry/batch-123.jsonl.gz',
+          checkpointId: 55,
+          schemaSignatures: ['app.launch:v1']
+        })
+      })
+    );
+    expect(summary.checkpoint).toMatchObject({ encrypted: false, batchId: 55, schemaSignatures: ['app.launch:v1'] });
     expect(metrics.recordTelemetryExport).toHaveBeenCalledWith(
       expect.objectContaining({ destination: 's3', result: 'success', eventCount: 1, durationSeconds: expect.any(Number) })
     );
@@ -202,7 +224,14 @@ describe('TelemetryWarehouseService', () => {
       storage,
       loggerInstance: loggerStub,
       config: {
-        export: { enabled: true, destination: 's3', bucket: 'private', prefix: 'warehouse/telemetry', batchSize: 10 },
+        export: {
+          enabled: true,
+          destination: 's3',
+          bucket: 'private',
+          prefix: 'warehouse/telemetry',
+          batchSize: 10,
+          checkpoint: { encrypt: false }
+        },
         freshness: { warehouseThresholdMinutes: 30 },
         lineage: { tool: 'dbt', autoRecord: true }
       }

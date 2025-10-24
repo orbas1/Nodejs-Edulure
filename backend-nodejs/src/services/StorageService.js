@@ -381,15 +381,14 @@ class LocalStorageService extends BaseStorageService {
     };
   }
 
-  async uploadBuffer({ bucket, key, body, contentType, visibility = 'workspace' }) {
+  async uploadBuffer({ bucket, key, body, contentType, visibility = 'workspace', metadata = {} }) {
     await this.ensureInitialised();
     const targetBucket = this.resolveBucket(visibility, bucket);
     const filePath = path.join(this.root, targetBucket, normaliseKey(key));
     await ensureDirectory(path.dirname(filePath));
     await fs.writeFile(filePath, body);
-    if (contentType) {
-      await fs.writeFile(`${filePath}.meta`, JSON.stringify({ contentType }), { flag: 'w' }).catch(() => {});
-    }
+    const metaPayload = { contentType, metadata };
+    await fs.writeFile(`${filePath}.meta`, JSON.stringify(metaPayload), { flag: 'w' }).catch(() => {});
     return {
       bucket: targetBucket,
       key,
@@ -398,7 +397,7 @@ class LocalStorageService extends BaseStorageService {
     };
   }
 
-  async uploadStream({ bucket, key, stream, contentType, visibility = 'workspace' }) {
+  async uploadStream({ bucket, key, stream, contentType, visibility = 'workspace', metadata = {} }) {
     await this.ensureInitialised();
     const targetBucket = this.resolveBucket(visibility, bucket);
     const filePath = path.join(this.root, targetBucket, normaliseKey(key));
@@ -408,9 +407,8 @@ class LocalStorageService extends BaseStorageService {
     passThrough.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
     await pipeline(stream, passThrough, createWriteStream(filePath));
     const buffer = Buffer.concat(chunks);
-    if (contentType) {
-      await fs.writeFile(`${filePath}.meta`, JSON.stringify({ contentType }), { flag: 'w' }).catch(() => {});
-    }
+    const metaPayload = { contentType, metadata };
+    await fs.writeFile(`${filePath}.meta`, JSON.stringify(metaPayload), { flag: 'w' }).catch(() => {});
     return {
       bucket: targetBucket,
       key,
@@ -455,11 +453,15 @@ class LocalStorageService extends BaseStorageService {
     const filePath = path.join(this.root, bucket ?? storageBuckets.private, normaliseKey(key));
     const buffer = await fs.readFile(filePath);
     let contentType = mime.lookup(key) || 'application/octet-stream';
+    let metadata = {};
     try {
       const rawMeta = await fs.readFile(`${filePath}.meta`, 'utf8');
-      const metadata = JSON.parse(rawMeta);
-      if (metadata.contentType) {
-        contentType = metadata.contentType;
+      const stored = JSON.parse(rawMeta);
+      if (stored.contentType) {
+        contentType = stored.contentType;
+      }
+      if (stored.metadata) {
+        metadata = stored.metadata;
       }
     } catch (error) {
       if (error.code !== 'ENOENT') {
@@ -471,7 +473,8 @@ class LocalStorageService extends BaseStorageService {
       key,
       buffer,
       size: buffer.length,
-      contentType
+      contentType,
+      metadata
     };
   }
 
@@ -481,11 +484,15 @@ class LocalStorageService extends BaseStorageService {
     const filePath = path.join(this.root, targetBucket, normaliseKey(key));
     const stream = createReadStream(filePath);
     let contentType = mime.lookup(key) || 'application/octet-stream';
+    let metadata = {};
     try {
       const rawMeta = await fs.readFile(`${filePath}.meta`, 'utf8');
-      const metadata = JSON.parse(rawMeta);
-      if (metadata.contentType) {
-        contentType = metadata.contentType;
+      const stored = JSON.parse(rawMeta);
+      if (stored.contentType) {
+        contentType = stored.contentType;
+      }
+      if (stored.metadata) {
+        metadata = stored.metadata;
       }
     } catch (error) {
       if (error.code !== 'ENOENT') {
@@ -498,7 +505,7 @@ class LocalStorageService extends BaseStorageService {
       stream,
       contentLength: (await fs.stat(filePath)).size,
       contentType,
-      metadata: {}
+      metadata
     };
   }
 

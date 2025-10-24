@@ -11,6 +11,7 @@ import {
   recordTelemetryExport,
   recordTelemetryFreshness
 } from '../observability/metrics.js';
+import dataEncryptionService from './DataEncryptionService.js';
 
 function normalisePrefix(prefix, fallback) {
   const source = (prefix ?? fallback ?? '').trim();
@@ -60,6 +61,7 @@ export class TelemetryWarehouseService {
     this.lineageModel = lineageModel;
     this.storage = storage;
     this.logger = loggerInstance;
+    this.encryptionService = dataEncryptionService;
 
     const exportConfig = config?.export ?? {};
     const freshnessConfig = config?.freshness ?? {};
@@ -67,6 +69,8 @@ export class TelemetryWarehouseService {
 
     const defaultBucket = env.storage?.privateBucket;
     const prefix = normalisePrefix(exportConfig.prefix, 'warehouse/telemetry');
+    const checkpointConfig = exportConfig.checkpoint ?? {};
+    const checkpointKey = normalisePrefix(checkpointConfig.key, `${prefix}/checkpoint.json`);
 
     this.config = {
       export: {
@@ -76,7 +80,14 @@ export class TelemetryWarehouseService {
         prefix,
         batchSize: exportConfig.batchSize ?? 5000,
         compress: exportConfig.compress !== false,
-        runOnStartup: exportConfig.runOnStartup !== false
+        runOnStartup: exportConfig.runOnStartup !== false,
+        checkpoint: {
+          enabled: Boolean(checkpointKey && (exportConfig.bucket ?? defaultBucket)),
+          key: checkpointKey,
+          encrypt: checkpointConfig.encrypt !== false,
+          classification: checkpointConfig.classification ?? 'telemetry.checkpoint',
+          encryptionKeyId: checkpointConfig.encryptionKeyId ?? null
+        }
       },
       freshness: {
         ingestionThresholdMinutes: freshnessConfig.ingestionThresholdMinutes ?? 15,
@@ -98,6 +109,17 @@ export class TelemetryWarehouseService {
 
     const batchSize = Math.max(1, limit ?? this.config.export.batchSize);
     const events = await this.eventModel.listPendingForExport({ limit: batchSize });
+    const schemaSignatures = new Set();
+    for (const event of events) {
+      const signature = `${event?.eventName ?? 'unknown'}:${event?.schemaVersion ?? 'unknown'}`;
+      schemaSignatures.add(signature);
+    }
+
+    let previousCheckpoint = null;
+    if (this.config.export.checkpoint.enabled) {
+      previousCheckpoint = await this.loadExportCheckpoint();
+    }
+    let checkpoint = null;
 
     if (!events.length) {
       this.logger.debug({ trigger }, 'No telemetry events pending export');
@@ -112,7 +134,7 @@ export class TelemetryWarehouseService {
         lastEventAt: new Date(),
         thresholdMinutes: this.config.freshness.warehouseThresholdMinutes
       });
-      return { status: 'noop', exported: 0 };
+      return { status: 'noop', exported: 0, checkpoint: previousCheckpoint };
     }
 
     const startTime = Date.now();
@@ -161,14 +183,40 @@ export class TelemetryWarehouseService {
         eventsCount: events.length,
         fileKey: upload.key,
         checksum: upload.checksum,
-        metadata: { bucket: upload.bucket, byteLength: buffer.length }
+        metadata: {
+          bucket: upload.bucket,
+          byteLength: buffer.length,
+          schemaSignatures: Array.from(schemaSignatures)
+        }
       });
+      const exportMetadata = {
+        destination: key,
+        exportedAt: new Date().toISOString(),
+        trigger,
+        schemaSignatures: Array.from(schemaSignatures)
+      };
+
+      checkpoint = await this.#writeCheckpoint({
+        trigger,
+        batchId: batch.id,
+        destinationKey: key,
+        lastEvent: events.at(-1) ?? null,
+        eventCount: events.length,
+        schemaSignatures
+      });
+
+      if (checkpoint?.batchId) {
+        exportMetadata.checkpointId = checkpoint.batchId;
+      }
+      if (checkpoint?.lastEventOccurredAt) {
+        exportMetadata.lastEventOccurredAt = checkpoint.lastEventOccurredAt;
+      }
 
       await this.eventModel.markExported(
         events.map((event) => event.id),
         {
           batchId: batch.id,
-          metadata: { destination: key, exportedAt: new Date().toISOString(), trigger }
+          metadata: exportMetadata
         }
       );
 
@@ -205,7 +253,8 @@ export class TelemetryWarehouseService {
           output: {
             batchId: batch.id,
             eventsCount: events.length,
-            destinationKey: key
+            destinationKey: key,
+            schemaSignatures: Array.from(schemaSignatures)
           },
           metadata: { trigger }
         });
@@ -215,7 +264,10 @@ export class TelemetryWarehouseService {
         status: 'exported',
         exported: events.length,
         batchId: batch.id,
-        fileKey: key
+        fileKey: key,
+        checkpoint,
+        previousCheckpoint,
+        schemaSignatures: Array.from(schemaSignatures)
       };
     } catch (error) {
       this.logger.error({ err: error, batchId: batch.id }, 'Telemetry export failed');
@@ -237,6 +289,148 @@ export class TelemetryWarehouseService {
       }
 
       throw error;
+    }
+  }
+
+  async loadExportCheckpoint() {
+    if (!this.config.export.checkpoint.enabled) {
+      return null;
+    }
+
+    try {
+      const response = await this.storage.downloadToBuffer({
+        bucket: this.config.export.bucket,
+        key: this.config.export.checkpoint.key
+      });
+      const raw = response?.buffer?.toString('utf8');
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(parsed, 'encrypted')) {
+        const encryptedValue = parsed.encrypted;
+        if (!encryptedValue) {
+          return null;
+        }
+        const ciphertext = Buffer.from(encryptedValue, 'base64');
+        const decrypted = this.encryptionService.decryptStructured(
+          ciphertext,
+          parsed.keyId ?? this.config.export.checkpoint.encryptionKeyId ?? undefined
+        );
+        if (!decrypted || typeof decrypted !== 'object') {
+          return null;
+        }
+        return {
+          ...decrypted,
+          encrypted: true,
+          keyId: parsed.keyId ?? null,
+          classification: parsed.classification ?? this.config.export.checkpoint.classification,
+          hash: parsed.hash ?? null,
+          fingerprint: parsed.fingerprint ?? null
+        };
+      }
+
+      if (parsed.checkpoint && typeof parsed.checkpoint === 'object') {
+        return { ...parsed.checkpoint, encrypted: false };
+      }
+
+      if (parsed.lastEventUuid || parsed.batchId || parsed.exportedAt) {
+        return { ...parsed, encrypted: false };
+      }
+
+      return null;
+    } catch (error) {
+      if (
+        error?.code === 'NoSuchKey' ||
+        error?.code === 'ENOENT' ||
+        error?.$metadata?.httpStatusCode === 404 ||
+        error?.statusCode === 404
+      ) {
+        this.logger.debug('Telemetry export checkpoint not found');
+        return null;
+      }
+      this.logger.error({ err: error }, 'Failed to load telemetry export checkpoint');
+      return null;
+    }
+  }
+
+  async #writeCheckpoint({ trigger, batchId, destinationKey, lastEvent, eventCount, schemaSignatures }) {
+    if (!this.config.export.checkpoint.enabled) {
+      return null;
+    }
+
+    try {
+      const occurredAt = lastEvent?.occurredAt
+        ? new Date(lastEvent.occurredAt).toISOString()
+        : new Date().toISOString();
+      const payload = {
+        version: 1,
+        batchId,
+        destinationKey,
+        trigger,
+        eventCount,
+        lastEventUuid: lastEvent?.eventUuid ?? null,
+        lastEventOccurredAt: occurredAt,
+        exportedAt: new Date().toISOString(),
+        schemaSignatures: Array.from(schemaSignatures ?? [])
+      };
+
+      if (this.config.export.checkpoint.encrypt) {
+        const encrypted = this.encryptionService.encryptStructured(payload, {
+          classificationTag: this.config.export.checkpoint.classification,
+          keyId: this.config.export.checkpoint.encryptionKeyId ?? undefined,
+          fingerprintValues: [payload.lastEventUuid, batchId].filter(Boolean)
+        });
+
+        const body = Buffer.from(
+          JSON.stringify({
+            version: 1,
+            encrypted: encrypted.ciphertext ? encrypted.ciphertext.toString('base64') : null,
+            keyId: encrypted.keyId,
+            hash: encrypted.hash,
+            classification: encrypted.classificationTag,
+            fingerprint: encrypted.fingerprint ?? null
+          }),
+          'utf8'
+        );
+
+        await this.storage.uploadBuffer({
+          bucket: this.config.export.bucket,
+          key: this.config.export.checkpoint.key,
+          body,
+          contentType: 'application/json',
+          visibility: 'workspace',
+          metadata: {
+            'edulure-checkpoint': 'telemetry-export',
+            'edulure-encrypted': 'true'
+          }
+        });
+
+        return { ...payload, encrypted: true };
+      }
+
+      const body = Buffer.from(JSON.stringify({ version: 1, checkpoint: payload }), 'utf8');
+      await this.storage.uploadBuffer({
+        bucket: this.config.export.bucket,
+        key: this.config.export.checkpoint.key,
+        body,
+        contentType: 'application/json',
+        visibility: 'workspace',
+        metadata: {
+          'edulure-checkpoint': 'telemetry-export',
+          'edulure-encrypted': 'false'
+        }
+      });
+
+      return { ...payload, encrypted: false };
+    } catch (error) {
+      this.logger.error({ err: error }, 'Failed to persist telemetry export checkpoint');
+      return null;
     }
   }
 }

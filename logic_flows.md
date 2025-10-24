@@ -1280,18 +1280,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Track playbook updates, run tabletop exercises, and monitor alert fatigue.
 
 ### A36. Monetization Reconciliation Job (4.E)
-- **Operational Depth:** Compares platform ledger with processor exports, logging variances for finance review.
-- **Gaps & Risks:** Missing support for multi-currency reconciliation; plan extension. Error handling currently logs without alerting.
-- **Resilience & Efficiency:** Stream reconciliation, parallelise by account, and store historical diffs.
-- **UX & Communications:** Generate dashboards with actionable remediation steps.
-- **Change Management:** Schedule finance reviews, archive reports, and update compliance documentation.
+- **Operational Depth:** `MonetizationFinanceService.runReconciliation` now walks every tenant returned by the job cache, aggregates invoiced, usage, recognised, and deferred cents per currency, and normalises each value to the base currency defined by `env.monetization.reconciliation.baseCurrency`. The FX matrix from `env.monetization.reconciliation.fxRates` feeds `convertToBaseCurrency`, producing a `currencyBreakdown` array and aggregate base-currency totals that are persisted via `MonetizationReconciliationRunModel` together with variance ratios and prior-run deltas exposed in the metadata payload.
+- **Gaps & Risks:** Variance alerts are created through `AnalyticsAlertModel` with thresholds driven by `MONETIZATION_RECONCILIATION_ALERT_VARIANCE_RATIO` and `MONETIZATION_RECONCILIATION_ALERT_VARIANCE_CENTS`. These values, alongside the FX table sourced from `MONETIZATION_FX_RATES`, remain environment managed; without disciplined refresh they can drift from processor rates or finance tolerance bands.
+- **Resilience & Efficiency:** `MonetizationReconciliationJob.resolveTenants` keeps a TTL cache (default 10 minutes) to avoid redundant catalog lookups, and `runCycle` auto-pauses the scheduler after repeated failures using the configured back-off window. Per-currency maths stays in-memory, and metadata records the last successful run so operators can replay the window without re-querying historic FX data.
+- **UX & Communications:** Alerts include the configured `dashboardSlug`, breach payloads from `#detectBreaches`, and the base currency variance so finance teams can hop from the alert into dashboards with the same identifiers. Stored run metadata mirrors the `currencyBreakdown`, letting BI and reconciliation workbooks ingest per-currency columns without bespoke joins.
+- **Change Management:** Finance and operations should catalogue the new inputs—`MONETIZATION_BASE_CURRENCY`, `MONETIZATION_FX_RATES`, and alert recipient lists—within their runbooks, review escalation recipients before promotion, and schedule post-deploy validations comparing aggregate and per-currency variances against source ledgers.
 
 ### A37. Telemetry Warehouse Job (4.F)
-- **Operational Depth:** Batches events into warehouse schemas, maintaining idempotency with cursor checkpoints.
-- **Gaps & Risks:** Checkpoint files lack encryption; secure them. Schema changes require manual intervention.
-- **Resilience & Efficiency:** Implement backpressure controls, compress payloads, and monitor lag.
-- **UX & Communications:** Publish lag metrics, provide troubleshooting guides.
-- **Change Management:** Coordinate schema migrations, document rollbacks, and alert data teams.
+- **Operational Depth:** `TelemetryWarehouseService.exportPendingEvents` gathers pending events, captures schema signatures (`eventName:schemaVersion`), streams them into JSONL (optionally gzipped), and persists both the batch metadata and a checkpoint JSON via `StorageService.uploadBuffer`. The checkpoint writer records `batchId`, last-event identifiers, occurrence timestamps, and schema signatures, while `loadExportCheckpoint` hydrates prior state so downstream jobs receive both `previousCheckpoint` and `checkpoint` contexts.
+- **Gaps & Risks:** Checkpoint payloads default to encryption (`TELEMETRY_EXPORT_CHECKPOINT_ENCRYPT`) by delegating to `DataEncryptionService`; operators must rotate `TELEMETRY_EXPORT_CHECKPOINT_KEY_ID` keys in line with governance. Repeated write failures currently only log errors and return `null`, so sustained storage outages could reduce recovery breadcrumbs without additional alerting.
+- **Resilience & Efficiency:** The job handles empty exports early, tolerates missing checkpoints by catching `NoSuchKey`/`ENOENT`, and rate-limits retries via the scheduler’s pause logic. Object metadata tags (`edulure-pipeline`, `edulure-checkpoint`) give lifecycle tooling the ability to target telemetry artefacts without globbing buckets, and freshness metrics capture warehouse lag for observability dashboards.
+- **UX & Communications:** Export summaries surface the batch `fileKey`, schema signature set, and both checkpoint snapshots, enabling analytics engineers to diagnose ingestion drift from a single job payload. The checkpoint metadata also carries encryption fingerprints so platform security can audit which keys protected each export.
+- **Change Management:** Update telemetry runbooks with the new environment toggles (`TELEMETRY_EXPORT_PREFIX`, `TELEMETRY_EXPORT_CHECKPOINT_CLASSIFICATION`, encryption flags), brief analytics teams on schema signature usage, and document how to disable checkpoint encryption in lower environments for deterministic fixture-driven tests.
 
 ### A38. Identity & Access Schema (5.A)
 - **Operational Depth:** Models enforce tenant scoping, MFA relationships, and role assignments.

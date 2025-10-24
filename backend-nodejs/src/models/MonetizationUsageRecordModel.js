@@ -196,6 +196,31 @@ export default class MonetizationUsageRecordModel {
     return toNumber(row?.total ?? 0);
   }
 
+  static async sumForWindowByCurrency({ tenantId, start, end }, connection = db) {
+    const query = connection(TABLE)
+      .select('currency')
+      .sum({ total: 'amount_cents' })
+      .where({ tenant_id: normaliseTenantId(tenantId ?? 'global') })
+      .groupBy('currency');
+
+    if (start) {
+      query.andWhere('usage_date', '>=', start);
+    }
+    if (end) {
+      query.andWhere('usage_date', '<=', end);
+    }
+
+    const rows = await query;
+    return rows.reduce((accumulator, row) => {
+      if (!row) {
+        return accumulator;
+      }
+      const currency = (row.currency ?? '').toString().trim().toUpperCase() || 'GBP';
+      accumulator[currency] = toNumber(row.total ?? row.amount_cents ?? 0);
+      return accumulator;
+    }, {});
+  }
+
   static async distinctTenants(connection = db) {
     const rows = await connection(TABLE).distinct({ tenantId: 'tenant_id' });
     return rows

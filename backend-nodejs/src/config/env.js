@@ -178,6 +178,78 @@ function normalizePrefix(value, fallback = '') {
   return source.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
+function parseNumber(value, { fallback = 0, min, max } = {}) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+
+  let result = numeric;
+  if (Number.isFinite(min) && result < min) {
+    result = min;
+  }
+  if (Number.isFinite(max) && result > max) {
+    result = max;
+  }
+  return result;
+}
+
+function parseFxRateTable(value, defaultBaseCurrency = 'GBP') {
+  const fallbackBase = (defaultBaseCurrency ?? 'GBP').trim().toUpperCase() || 'GBP';
+
+  if (!value) {
+    return { baseCurrency: fallbackBase, rates: {} };
+  }
+
+  const parsedSource = typeof value === 'string' ? tryParseJson(value) : value;
+  let baseCurrency = fallbackBase;
+  let ratesSource = {};
+
+  if (parsedSource && typeof parsedSource === 'object' && !Array.isArray(parsedSource)) {
+    const candidateBase = parsedSource.baseCurrency ?? parsedSource.base_currency;
+    if (candidateBase && typeof candidateBase === 'string' && candidateBase.trim()) {
+      baseCurrency = candidateBase.trim().toUpperCase();
+    }
+    if (parsedSource.rates && typeof parsedSource.rates === 'object') {
+      ratesSource = parsedSource.rates;
+    } else {
+      ratesSource = parsedSource;
+    }
+  } else if (typeof value === 'string') {
+    value
+      .split(/[;,]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .forEach((entry) => {
+        const [code, rate] = entry.split(':');
+        if (code && rate) {
+          ratesSource[code.trim()] = Number(rate.trim());
+        }
+      });
+  }
+
+  const rates = Object.entries(ratesSource).reduce((accumulator, [code, rate]) => {
+    const normalisedCode = String(code ?? '')
+      .trim()
+      .toUpperCase();
+    if (!normalisedCode || normalisedCode.length !== 3) {
+      return accumulator;
+    }
+
+    const numericRate = Number(rate);
+    if (Number.isFinite(numericRate) && numericRate > 0) {
+      accumulator[normalisedCode] = Number(numericRate.toFixed(8));
+    }
+    return accumulator;
+  }, {});
+
+  if (!baseCurrency || baseCurrency.length !== 3) {
+    baseCurrency = fallbackBase;
+  }
+
+  return { baseCurrency, rates };
+}
+
 function clampRate(rate) {
   if (typeof rate !== 'number' || Number.isNaN(rate)) {
     return 0;
@@ -1273,6 +1345,14 @@ const storageBuckets = {
 
 const telemetryExportBucket = raw.TELEMETRY_EXPORT_BUCKET ?? storageBuckets.private;
 const telemetryExportPrefix = normalizePrefix(raw.TELEMETRY_EXPORT_PREFIX, 'warehouse/telemetry');
+const telemetryCheckpointKey = normalizePrefix(
+  raw.TELEMETRY_EXPORT_CHECKPOINT_KEY,
+  `${telemetryExportPrefix}/checkpoint.json`
+);
+const telemetryCheckpointEncrypt = raw.TELEMETRY_EXPORT_CHECKPOINT_ENCRYPT !== 'false';
+const telemetryCheckpointClassification =
+  (raw.TELEMETRY_EXPORT_CHECKPOINT_CLASSIFICATION ?? 'telemetry.checkpoint').trim() || 'telemetry.checkpoint';
+const telemetryCheckpointKeyId = (raw.TELEMETRY_EXPORT_CHECKPOINT_KEY_ID ?? '').trim() || null;
 const twoFactorChallengeTtlSeconds = raw.TWO_FACTOR_CHALLENGE_TTL_SECONDS;
 const twoFactorResendCooldownSeconds = raw.TWO_FACTOR_RESEND_COOLDOWN_SECONDS;
 const twoFactorMaxAttempts = raw.TWO_FACTOR_MAX_ATTEMPTS;
@@ -1300,6 +1380,24 @@ const monetizationTenantAllowlist = Array.from(
       .filter(Boolean)
   )
 );
+const monetizationFxConfig = parseFxRateTable(
+  raw.MONETIZATION_FX_RATES,
+  raw.MONETIZATION_BASE_CURRENCY ?? defaultCurrency
+);
+const monetizationVarianceRatioThreshold = Math.abs(
+  parseNumber(raw.MONETIZATION_RECONCILIATION_ALERT_VARIANCE_RATIO, { fallback: 0.05 })
+);
+const monetizationVarianceCentsThreshold = Math.max(
+  0,
+  Math.round(parseNumber(raw.MONETIZATION_RECONCILIATION_ALERT_VARIANCE_CENTS, { fallback: 0, min: 0 }))
+);
+const monetizationAlertSeverity = (raw.MONETIZATION_RECONCILIATION_ALERT_SEVERITY ?? 'warning')
+  .toString()
+  .trim()
+  .toLowerCase();
+const monetizationAlertRecipients = parseCsv(raw.MONETIZATION_RECONCILIATION_ALERT_RECIPIENTS ?? '');
+const monetizationAlertDashboard = (raw.MONETIZATION_RECONCILIATION_ALERT_DASHBOARD ?? '').trim() || null;
+const monetizationAlertAnalyticsEnabled = raw.MONETIZATION_RECONCILIATION_ALERT_ANALYTICS !== 'false';
 
 const environmentRequiredTags = parseCsv(raw.ENVIRONMENT_REQUIRED_TAGS ?? 'environment,project');
 const environmentDependencies = parseCsv(raw.ENVIRONMENT_DEPENDENCIES ?? 'database,redis');
@@ -1584,7 +1682,19 @@ export const env = {
       runOnStartup: raw.MONETIZATION_RECONCILIATION_RUN_ON_STARTUP,
       recognitionWindowDays: raw.MONETIZATION_RECOGNITION_WINDOW_DAYS,
       tenants: monetizationTenantAllowlist,
-      tenantCacheMinutes: raw.MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES
+      tenantCacheMinutes: raw.MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES,
+      baseCurrency: monetizationFxConfig.baseCurrency,
+      fxRates: monetizationFxConfig.rates,
+      alerts: {
+        analytics: monetizationAlertAnalyticsEnabled,
+        severity: ['info', 'warning', 'critical'].includes(monetizationAlertSeverity)
+          ? monetizationAlertSeverity
+          : 'warning',
+        varianceRatioThreshold: monetizationVarianceRatioThreshold,
+        varianceCentsThreshold: monetizationVarianceCentsThreshold,
+        recipients: monetizationAlertRecipients,
+        dashboardSlug: monetizationAlertDashboard
+      }
     }
   },
   domainEvents: {
@@ -1901,7 +2011,14 @@ export const env = {
       compress: raw.TELEMETRY_EXPORT_COMPRESS,
       cronExpression: raw.TELEMETRY_EXPORT_CRON,
       timezone: raw.TELEMETRY_EXPORT_TIMEZONE,
-      runOnStartup: raw.TELEMETRY_EXPORT_RUN_ON_STARTUP
+      runOnStartup: raw.TELEMETRY_EXPORT_RUN_ON_STARTUP,
+      checkpoint: {
+        enabled: true,
+        key: telemetryCheckpointKey,
+        encrypt: telemetryCheckpointEncrypt,
+        classification: telemetryCheckpointClassification,
+        encryptionKeyId: telemetryCheckpointKeyId
+      }
     },
     freshness: {
       ingestionThresholdMinutes: raw.TELEMETRY_FRESHNESS_INGESTION_THRESHOLD_MINUTES,

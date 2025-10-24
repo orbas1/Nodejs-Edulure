@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
 import PaymentLedgerEntryModel from '../models/PaymentLedgerEntryModel.js';
@@ -120,6 +121,34 @@ function addDays(isoDate, days) {
   const clone = new Date(base.getTime());
   clone.setUTCDate(clone.getUTCDate() + days);
   return clone.toISOString();
+}
+
+function normaliseCurrencyCode(currency, fallback = 'GBP') {
+  const code = (currency ?? '').toString().trim().toUpperCase();
+  if (/^[A-Z]{3}$/.test(code)) {
+    return code;
+  }
+  return fallback;
+}
+
+function convertToBaseCurrency(amountCents, currency, baseCurrency, fxRates = {}) {
+  const value = Number(amountCents);
+  if (!Number.isFinite(value) || value === 0) {
+    return 0;
+  }
+
+  const targetBase = normaliseCurrencyCode(baseCurrency);
+  const code = normaliseCurrencyCode(currency, targetBase);
+  if (code === targetBase) {
+    return Math.round(value);
+  }
+
+  const rate = Number(fxRates?.[code]);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    return Math.round(value);
+  }
+
+  return Math.round(value * rate);
 }
 
 function normalisePaymentItems(items, fallback) {
@@ -1000,33 +1029,129 @@ class MonetizationFinanceService {
       };
     }
 
+    const baseCurrency =
+      env.monetization?.reconciliation?.baseCurrency ?? env.payments?.defaultCurrency ?? 'GBP';
+    const fxRates = env.monetization?.reconciliation?.fxRates ?? {};
+
     const paymentsQuery = queryConnection('payment_intents')
+      .select('currency')
       .where({ status: 'succeeded' })
       .andWhereNotNull('captured_at')
       .andWhere('captured_at', '>=', windowStart)
       .andWhere('captured_at', '<=', windowEnd)
+      .groupBy('currency')
       .sum({ total: 'amount_total' });
 
     applyTenantMetadataScope(paymentsQuery, normalizedTenant, queryConnection);
 
-    const [paymentsRow] = await paymentsQuery;
-    const invoicedCents = coercePositiveInteger(paymentsRow?.total ?? 0);
+    const paymentRows = await paymentsQuery;
+    const invoicedByCurrency = paymentRows.reduce((accumulator, row) => {
+      if (!row) {
+        return accumulator;
+      }
+      const currency = normaliseCurrencyCode(row.currency, baseCurrency);
+      const amount = coercePositiveInteger(row.total ?? row.amount_total ?? 0);
+      accumulator[currency] = (accumulator[currency] ?? 0) + amount;
+      return accumulator;
+    }, {});
 
-    const usageCents = await MonetizationUsageRecordModel.sumForWindow(
+    const usageByCurrency = await MonetizationUsageRecordModel.sumForWindowByCurrency(
       { tenantId: normalizedTenant, start: windowStart, end: windowEnd },
       queryConnection
     );
-    const recognizedCents = await MonetizationRevenueScheduleModel.sumRecognizedForWindow(
+    const recognizedByCurrency = await MonetizationRevenueScheduleModel.sumRecognizedForWindowByCurrency(
       { tenantId: normalizedTenant, start: windowStart, end: windowEnd },
       queryConnection
     );
-    const deferredCents = await MonetizationRevenueScheduleModel.sumDeferredBalance(
+    const deferredByCurrency = await MonetizationRevenueScheduleModel.sumDeferredBalanceByCurrency(
       { tenantId: normalizedTenant },
       queryConnection
     );
 
-    const varianceCents = recognizedCents - invoicedCents;
-    const varianceRatio = invoicedCents > 0 ? Number((varianceCents / invoicedCents).toFixed(4)) : 0;
+    const currencySet = new Set([
+      ...Object.keys(invoicedByCurrency),
+      ...Object.keys(usageByCurrency ?? {}),
+      ...Object.keys(recognizedByCurrency ?? {}),
+      ...Object.keys(deferredByCurrency ?? {})
+    ]);
+
+    if (currencySet.size === 0) {
+      currencySet.add(normaliseCurrencyCode(baseCurrency));
+    }
+
+    const currencyBreakdown = [];
+    const aggregatedTotals = {
+      invoicedCents: 0,
+      usageCents: 0,
+      recognizedCents: 0,
+      deferredCents: 0
+    };
+
+    for (const code of currencySet) {
+      const currency = normaliseCurrencyCode(code, baseCurrency);
+      const invoiced = coercePositiveInteger(invoicedByCurrency?.[currency] ?? 0);
+      const usage = coercePositiveInteger(usageByCurrency?.[currency] ?? 0);
+      const recognized = coercePositiveInteger(recognizedByCurrency?.[currency] ?? 0);
+      const deferred = coercePositiveInteger(deferredByCurrency?.[currency] ?? 0);
+      const variance = recognized - invoiced;
+      const varianceRatio = invoiced > 0 ? Number((variance / invoiced).toFixed(4)) : 0;
+
+      currencyBreakdown.push({
+        currency,
+        invoicedCents: invoiced,
+        usageCents: usage,
+        recognizedCents: recognized,
+        deferredCents: deferred,
+        varianceCents: variance,
+        varianceRatio
+      });
+
+      aggregatedTotals.invoicedCents += convertToBaseCurrency(invoiced, currency, baseCurrency, fxRates);
+      aggregatedTotals.usageCents += convertToBaseCurrency(usage, currency, baseCurrency, fxRates);
+      aggregatedTotals.recognizedCents += convertToBaseCurrency(recognized, currency, baseCurrency, fxRates);
+      aggregatedTotals.deferredCents += convertToBaseCurrency(deferred, currency, baseCurrency, fxRates);
+    }
+
+    currencyBreakdown.sort((a, b) => a.currency.localeCompare(b.currency));
+
+    const varianceCents = aggregatedTotals.recognizedCents - aggregatedTotals.invoicedCents;
+    const varianceRatio =
+      aggregatedTotals.invoicedCents > 0
+        ? Number((varianceCents / aggregatedTotals.invoicedCents).toFixed(4))
+        : 0;
+
+    const previousRun = await MonetizationReconciliationRunModel.latest(
+      { tenantId: normalizedTenant },
+      queryConnection
+    );
+
+    const metadata = {
+      reconciliationMethod: 'automated',
+      generatedAt: new Date().toISOString(),
+      baseCurrency: normaliseCurrencyCode(baseCurrency),
+      fxRates,
+      currencyBreakdown
+    };
+
+    if (previousRun) {
+      metadata.previousRun = {
+        id: previousRun.id,
+        createdAt: previousRun.createdAt,
+        varianceCents: previousRun.varianceCents,
+        varianceRatio: previousRun.varianceRatio,
+        invoicedCents: previousRun.invoicedCents,
+        usageCents: previousRun.usageCents,
+        recognizedCents: previousRun.recognizedCents,
+        deferredCents: previousRun.deferredCents,
+        deltas: {
+          invoicedCents: aggregatedTotals.invoicedCents - previousRun.invoicedCents,
+          usageCents: aggregatedTotals.usageCents - previousRun.usageCents,
+          recognizedCents: aggregatedTotals.recognizedCents - previousRun.recognizedCents,
+          deferredCents: aggregatedTotals.deferredCents - previousRun.deferredCents,
+          varianceCents: varianceCents - previousRun.varianceCents
+        }
+      };
+    }
 
     const run = await MonetizationReconciliationRunModel.create(
       {
@@ -1034,21 +1159,21 @@ class MonetizationFinanceService {
         windowStart,
         windowEnd,
         status: 'completed',
-        invoicedCents,
-        usageCents,
-        recognizedCents,
-        deferredCents,
+        invoicedCents: aggregatedTotals.invoicedCents,
+        usageCents: aggregatedTotals.usageCents,
+        recognizedCents: aggregatedTotals.recognizedCents,
+        deferredCents: aggregatedTotals.deferredCents,
         varianceCents,
         varianceRatio,
-        metadata: {
-          reconciliationMethod: 'automated',
-          generatedAt: new Date().toISOString()
-        }
+        metadata
       },
       connection
     );
 
-    updateDeferredRevenueBalance({ tenantId: normalizedTenant, balanceCents: deferredCents });
+    updateDeferredRevenueBalance({
+      tenantId: normalizedTenant,
+      balanceCents: aggregatedTotals.deferredCents
+    });
 
     return run;
   }

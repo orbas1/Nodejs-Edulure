@@ -253,6 +253,29 @@ export default class MonetizationRevenueScheduleModel {
     return deferred < 0 ? 0 : deferred;
   }
 
+  static async sumDeferredBalanceByCurrency({ tenantId }, connection = db) {
+    const rows = await connection(TABLE)
+      .select('currency')
+      .where({ tenant_id: normaliseTenantId(tenantId ?? 'global') })
+      .andWhere('status', '!=', 'recognized')
+      .sum({ total: 'amount_cents' })
+      .sum({ recognized: 'recognized_amount_cents' })
+      .groupBy('currency');
+
+    return rows.reduce((accumulator, row) => {
+      if (!row) {
+        return accumulator;
+      }
+
+      const currency = (row.currency ?? '').toString().trim().toUpperCase() || 'GBP';
+      const total = toNumber(row.total ?? row.amount_cents ?? 0);
+      const recognized = toNumber(row.recognized ?? row.recognized_amount_cents ?? 0);
+      const deferred = Math.max(0, total - recognized);
+      accumulator[currency] = deferred;
+      return accumulator;
+    }, {});
+  }
+
   static async sumRecognizedForWindow({ tenantId, start, end }, connection = db) {
     const query = connection(TABLE)
       .where({ tenant_id: normaliseTenantId(tenantId ?? 'global'), status: 'recognized' })
@@ -267,6 +290,31 @@ export default class MonetizationRevenueScheduleModel {
 
     const [row] = await query;
     return toNumber(row?.total ?? 0);
+  }
+
+  static async sumRecognizedForWindowByCurrency({ tenantId, start, end }, connection = db) {
+    const query = connection(TABLE)
+      .select('currency')
+      .where({ tenant_id: normaliseTenantId(tenantId ?? 'global'), status: 'recognized' })
+      .sum({ total: 'recognized_amount_cents' })
+      .groupBy('currency');
+
+    if (start) {
+      query.andWhere('recognized_at', '>=', start);
+    }
+    if (end) {
+      query.andWhere('recognized_at', '<=', end);
+    }
+
+    const rows = await query;
+    return rows.reduce((accumulator, row) => {
+      if (!row) {
+        return accumulator;
+      }
+      const currency = (row.currency ?? '').toString().trim().toUpperCase() || 'GBP';
+      accumulator[currency] = toNumber(row.total ?? row.recognized_amount_cents ?? 0);
+      return accumulator;
+    }, {});
   }
 
   static toDomain(row) {

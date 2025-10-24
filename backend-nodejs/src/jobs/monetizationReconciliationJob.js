@@ -2,6 +2,7 @@ import cron from 'node-cron';
 
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
+import AnalyticsAlertModel from '../models/AnalyticsAlertModel.js';
 import MonetizationFinanceService from '../services/MonetizationFinanceService.js';
 
 function ensurePositiveInteger(value, fallback) {
@@ -26,7 +27,8 @@ export class MonetizationReconciliationJob {
     config = env.monetization.reconciliation,
     loggerInstance = logger.child({ module: 'monetization-reconciliation-job' }),
     maxConsecutiveFailures = 3,
-    failureBackoffMinutes = 10
+    failureBackoffMinutes = 10,
+    alertModel = AnalyticsAlertModel
   } = {}) {
     this.service = service;
     this.scheduler = scheduler;
@@ -50,6 +52,27 @@ export class MonetizationReconciliationJob {
     this.task = null;
     this.consecutiveFailures = 0;
     this.pausedUntil = null;
+    this.alertModel = alertModel;
+
+    const alertsConfig = config?.alerts ?? {};
+    const ratioThreshold = Number(alertsConfig?.varianceRatioThreshold);
+    const centsThreshold = ensurePositiveInteger(alertsConfig?.varianceCentsThreshold, 0);
+    const severity = typeof alertsConfig?.severity === 'string' ? alertsConfig.severity.toLowerCase() : 'warning';
+
+    this.alerting = {
+      enabled: alertsConfig?.analytics !== false,
+      severity: ['info', 'warning', 'critical'].includes(severity) ? severity : 'warning',
+      varianceRatioThreshold: Number.isFinite(ratioThreshold) ? Math.abs(ratioThreshold) : 0.05,
+      varianceCentsThreshold: centsThreshold,
+      recipients: Array.isArray(alertsConfig?.recipients) ? alertsConfig.recipients : [],
+      dashboardSlug: alertsConfig?.dashboardSlug ?? null
+    };
+    this.alertingEnabled =
+      this.alerting.enabled &&
+      this.alertModel &&
+      typeof this.alertModel.create === 'function' &&
+      typeof this.alertModel.findOpenByCode === 'function' &&
+      typeof this.alertModel.resolve === 'function';
   }
 
   start() {
@@ -120,10 +143,12 @@ export class MonetizationReconciliationJob {
             end: windowEndIso
           });
 
-          tenantSummaries.push({ tenantId, recognition, reconciliation });
+          const alert = await this.#handleTenantOutcome({ tenantId, trigger, run: reconciliation });
+          tenantSummaries.push({ tenantId, recognition, reconciliation, alert });
         } catch (error) {
           failures.push({ tenantId, error });
           this.logger.error({ err: error, tenantId, trigger }, 'Monetization reconciliation failed for tenant');
+          await this.#handleTenantOutcome({ tenantId, trigger, error });
         }
       }
 
@@ -204,6 +229,152 @@ export class MonetizationReconciliationJob {
 
     this.logger.debug({ tenants: resolved }, 'Resolved monetization tenants for reconciliation');
     return resolved;
+  }
+
+  #alertCode(tenantId) {
+    const scope = normaliseTenantScope(tenantId ?? 'global');
+    return `monetization.reconciliation.${scope}`;
+  }
+
+  #detectBreaches(run) {
+    if (!run) {
+      return [];
+    }
+
+    const breaches = [];
+    const ratioThreshold = Number.isFinite(this.alerting?.varianceRatioThreshold)
+      ? Math.abs(this.alerting.varianceRatioThreshold)
+      : 0.05;
+    const centsThreshold = Number.isFinite(this.alerting?.varianceCentsThreshold)
+      ? Math.abs(this.alerting.varianceCentsThreshold)
+      : 0;
+
+    const aggregateRatio = Number(run.varianceRatio ?? 0);
+    const aggregateCents = Number(run.varianceCents ?? 0);
+
+    if (
+      (ratioThreshold > 0 && Math.abs(aggregateRatio) >= ratioThreshold) ||
+      (centsThreshold > 0 && Math.abs(aggregateCents) >= centsThreshold)
+    ) {
+      breaches.push({
+        scope: 'aggregate',
+        currency: run?.metadata?.baseCurrency ?? 'BASE',
+        varianceRatio: aggregateRatio,
+        varianceCents: aggregateCents
+      });
+    }
+
+    const breakdown = Array.isArray(run?.metadata?.currencyBreakdown) ? run.metadata.currencyBreakdown : [];
+    for (const entry of breakdown) {
+      const entryRatio = Number(entry?.varianceRatio ?? 0);
+      const entryCents = Number(entry?.varianceCents ?? 0);
+      if (
+        (ratioThreshold > 0 && Math.abs(entryRatio) >= ratioThreshold) ||
+        (centsThreshold > 0 && Math.abs(entryCents) >= centsThreshold)
+      ) {
+        breaches.push({
+          scope: 'currency',
+          currency: entry?.currency ?? 'UNK',
+          varianceRatio: entryRatio,
+          varianceCents: entryCents
+        });
+      }
+    }
+
+    return breaches;
+  }
+
+  async #resolveAlert(tenantId) {
+    if (!this.alertingEnabled) {
+      return { status: 'skipped' };
+    }
+
+    try {
+      const existing = await this.alertModel.findOpenByCode(this.#alertCode(tenantId));
+      if (existing) {
+        await this.alertModel.resolve(existing.id);
+        return { status: 'resolved', alertId: existing.id };
+      }
+      return { status: 'noop' };
+    } catch (error) {
+      this.logger.error({ err: error, tenantId }, 'Failed to resolve monetization reconciliation alert');
+      return { status: 'error', error: error.message };
+    }
+  }
+
+  async #raiseAlert({ tenantId, trigger, run, error, breaches = [] }) {
+    if (!this.alertingEnabled) {
+      return { status: 'skipped' };
+    }
+
+    try {
+      const alertCode = this.#alertCode(tenantId);
+      const existing = await this.alertModel.findOpenByCode(alertCode);
+      if (existing) {
+        await this.alertModel.resolve(existing.id);
+      }
+
+      const message = error
+        ? `Monetization reconciliation failed for tenant ${tenantId}: ${error.message}`
+        : `Monetization reconciliation variance detected for tenant ${tenantId}.`;
+
+      const metadata = {
+        tenantId,
+        trigger,
+        breaches,
+        run:
+          run && typeof run === 'object'
+            ? {
+                id: run.id ?? null,
+                windowStart: run.windowStart ?? null,
+                windowEnd: run.windowEnd ?? null,
+                varianceCents: run.varianceCents ?? null,
+                varianceRatio: run.varianceRatio ?? null,
+                baseCurrency: run?.metadata?.baseCurrency ?? null
+              }
+            : null,
+        thresholds: {
+          varianceRatio: this.alerting.varianceRatioThreshold,
+          varianceCents: this.alerting.varianceCentsThreshold
+        },
+        dashboardSlug: this.alerting.dashboardSlug,
+        error: error
+          ? {
+              message: error.message,
+              name: error.name ?? 'Error'
+            }
+          : null
+      };
+
+      const alert = await this.alertModel.create({
+        alertCode,
+        severity: this.alerting.severity,
+        message,
+        metadata
+      });
+
+      return { status: 'raised', alertId: alert.id, breaches };
+    } catch (alertError) {
+      this.logger.error({ err: alertError, tenantId }, 'Failed to raise monetization reconciliation alert');
+      return { status: 'error', error: alertError.message };
+    }
+  }
+
+  async #handleTenantOutcome({ tenantId, trigger, run, error }) {
+    if (!this.alertingEnabled) {
+      return { status: 'skipped' };
+    }
+
+    if (error) {
+      return this.#raiseAlert({ tenantId, trigger, run: run ?? null, error });
+    }
+
+    const breaches = this.#detectBreaches(run);
+    if (breaches.length > 0) {
+      return this.#raiseAlert({ tenantId, trigger, run, breaches });
+    }
+
+    return this.#resolveAlert(tenantId);
   }
 }
 
