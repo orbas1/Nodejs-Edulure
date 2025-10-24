@@ -255,6 +255,72 @@ class ConversationThread {
   }
 }
 
+@immutable
+class QueuedInboxMessage {
+  const QueuedInboxMessage({
+    required this.queueId,
+    required this.threadId,
+    required this.message,
+    required this.enqueuedAt,
+    this.retryCount = 0,
+    this.lastAttemptAt,
+    this.lastError,
+  });
+
+  final String queueId;
+  final String threadId;
+  final InboxMessage message;
+  final DateTime enqueuedAt;
+  final int retryCount;
+  final DateTime? lastAttemptAt;
+  final String? lastError;
+
+  QueuedInboxMessage copyWith({
+    InboxMessage? message,
+    int? retryCount,
+    DateTime? lastAttemptAt,
+    String? lastError,
+  }) {
+    return QueuedInboxMessage(
+      queueId: queueId,
+      threadId: threadId,
+      message: message ?? this.message,
+      enqueuedAt: enqueuedAt,
+      retryCount: retryCount ?? this.retryCount,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      lastError: lastError ?? this.lastError,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'queueId': queueId,
+        'threadId': threadId,
+        'message': message.toJson(),
+        'enqueuedAt': enqueuedAt.toIso8601String(),
+        'retryCount': retryCount,
+        'lastAttemptAt': lastAttemptAt?.toIso8601String(),
+        'lastError': lastError,
+      };
+
+  factory QueuedInboxMessage.fromJson(Map<String, dynamic> json) {
+    return QueuedInboxMessage(
+      queueId: json['queueId']?.toString() ?? 'queue-${DateTime.now().microsecondsSinceEpoch}',
+      threadId: json['threadId']?.toString() ?? 'thread',
+      message: InboxMessage.fromJson(
+        Map<String, dynamic>.from(json['message'] as Map),
+      ),
+      enqueuedAt: DateTime.tryParse(json['enqueuedAt']?.toString() ?? '') ?? DateTime.now(),
+      retryCount: json['retryCount'] is int
+          ? json['retryCount'] as int
+          : int.tryParse('${json['retryCount']}') ?? 0,
+      lastAttemptAt: json['lastAttemptAt'] is String
+          ? DateTime.tryParse(json['lastAttemptAt'] as String)
+          : null,
+      lastError: json['lastError']?.toString(),
+    );
+  }
+}
+
 enum SupportPriority { low, normal, high, urgent }
 
 enum SupportStatus { open, inProgress, awaitingCustomer, resolved, closed }

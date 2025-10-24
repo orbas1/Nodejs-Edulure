@@ -21,6 +21,12 @@ abstract class CommercePersistence {
   Future<CommunitySubscriptionSnapshot?> loadCommunitySubscriptions();
   Future<void> saveCommunitySubscriptions(CommunitySubscriptionSnapshot snapshot);
 
+  Future<BillingCatalogSnapshot?> loadBillingCatalog();
+  Future<void> saveBillingCatalog(BillingCatalogSnapshot snapshot);
+
+  Future<List<PendingReceipt>> loadPendingReceipts();
+  Future<void> savePendingReceipts(List<PendingReceipt> receipts);
+
   Future<void> reset();
 }
 
@@ -38,6 +44,8 @@ class CommercePersistenceService implements CommercePersistence {
   static const _courseKey = 'courses.checkout';
   static const _tutorKey = 'tutors.booking';
   static const _communityKey = 'community.subscriptions';
+  static const _catalogKey = 'billing.catalog';
+  static const _receiptsKey = 'billing.receipts';
 
   final String _boxName;
   final HiveInterface _hive;
@@ -92,6 +100,30 @@ class CommercePersistenceService implements CommercePersistence {
   @override
   Future<void> saveCommunitySubscriptions(CommunitySubscriptionSnapshot snapshot) {
     return _write(_communityKey, _encoder.encodeCommunitySnapshot(snapshot));
+  }
+
+  @override
+  Future<BillingCatalogSnapshot?> loadBillingCatalog() {
+    return _read(_catalogKey, _encoder.decodeBillingCatalog);
+  }
+
+  @override
+  Future<void> saveBillingCatalog(BillingCatalogSnapshot snapshot) {
+    return _write(_catalogKey, _encoder.encodeBillingCatalog(snapshot));
+  }
+
+  @override
+  Future<List<PendingReceipt>> loadPendingReceipts() async {
+    final receipts = await _read<List<PendingReceipt>>(
+      _receiptsKey,
+      _encoder.decodePendingReceipts,
+    );
+    return receipts ?? const <PendingReceipt>[];
+  }
+
+  @override
+  Future<void> savePendingReceipts(List<PendingReceipt> receipts) {
+    return _write(_receiptsKey, _encoder.encodePendingReceipts(receipts));
   }
 
   @override

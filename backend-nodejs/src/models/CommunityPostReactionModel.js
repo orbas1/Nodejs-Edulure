@@ -60,11 +60,14 @@ export default class CommunityPostReactionModel {
 
     return rows.reduce((summary, row) => {
       const key = normaliseReaction(row.reaction);
-      if (!key) return summary;
+      if (!key) {
+        return summary;
+      }
       const count = Number(row.count ?? 0);
-      // eslint-disable-next-line no-param-reassign
-      summary[key] = count;
-      return summary;
+      if (summary[key] === count) {
+        return summary;
+      }
+      return { ...summary, [key]: count };
     }, {});
   }
 

@@ -17,6 +17,7 @@ import ebookRoutes from './ebook.routes.js';
 import explorerRoutes from './explorer.routes.js';
 import feedRoutes from './feed.routes.js';
 import paymentRoutes from './payment.routes.js';
+import billingRoutes from './billing.routes.js';
 import integrationInviteRoutes from './integrationInvite.routes.js';
 import runtimeConfigRoutes from './runtimeConfig.routes.js';
 import socialRoutes from './social.routes.js';
@@ -32,6 +33,9 @@ import catalogueRoutes from './catalogue.routes.js';
 import instructorRoutes from './instructor.routes.js';
 import mediaRoutes from './media.routes.js';
 import setupRoutes from './setup.routes.js';
+import notificationsRoutes from './notifications.routes.js';
+import inboxRoutes from './inbox.routes.js';
+import integrationsRoutes from './integrations.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 import { buildRouteRegistry } from './registryValidator.js';
 
@@ -44,6 +48,7 @@ const routerMap = {
   creation: creationRoutes,
   'runtime-config': runtimeConfigRoutes,
   payments: paymentRoutes,
+  billing: billingRoutes,
   'integration-invites': integrationInviteRoutes,
   compliance: complianceRoutes,
   security: securityRoutes,
@@ -54,6 +59,8 @@ const routerMap = {
   ads: adsRoutes,
   analytics: analyticsRoutes,
   dashboard: dashboardRoutes,
+  notifications: notificationsRoutes,
+  inbox: inboxRoutes,
   courses: courseRoutes,
   admin: adminRoutes,
   verification: verificationRoutes,
@@ -69,7 +76,8 @@ const routerMap = {
   release: releaseRoutes,
   catalogue: catalogueRoutes,
   media: mediaRoutes,
-  setup: setupRoutes
+  setup: setupRoutes,
+  integrations: integrationsRoutes
 };
 
 export const apiRouteRegistry = buildRouteRegistry({

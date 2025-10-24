@@ -173,6 +173,9 @@ export async function seed(knex) {
     await trx('kyc_audit_logs').del();
     await trx('kyc_documents').del();
     await trx('kyc_verifications').del();
+    await trx('notification_device_registrations').del();
+    await trx('notification_preferences').del();
+    await trx('billing_receipt_submissions').del();
     await trx('user_sessions').del();
     await trx('user_email_verification_tokens').del();
     await trx('user_profiles').del();
@@ -265,6 +268,91 @@ export async function seed(knex) {
       created_at: trx.fn.now(),
       updated_at: trx.fn.now()
     });
+
+    await trx('notification_preferences').insert({
+      user_id: learnerId,
+      channels: JSON.stringify({
+        email: { enabled: true },
+        push: { enabled: true },
+        sms: { enabled: false },
+        slack: { enabled: false }
+      }),
+      categories: JSON.stringify({
+        support: { push: true, email: true },
+        billing: { push: true, email: true }
+      }),
+      slack_channel: null,
+      slack_workspace: null,
+      last_synced_at: trx.fn.now(),
+      metadata: JSON.stringify({ seed: true, cohort: 'mobile-defaults' }),
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now()
+    });
+
+    await trx('notification_device_registrations').insert({
+      user_id: learnerId,
+      device_token: 'seed-device-token-ios',
+      platform: 'ios',
+      app_version: '1.0.0',
+      os_version: '17.4',
+      locale: 'en-GB',
+      last_registered_at: trx.fn.now(),
+      metadata: JSON.stringify({ seed: true, environment: 'staging' }),
+      created_at: trx.fn.now(),
+      updated_at: trx.fn.now()
+    });
+
+    await trx('billing_receipt_submissions').insert([
+      {
+        public_id: crypto.randomUUID(),
+        user_id: learnerId,
+        platform: 'ios',
+        product_id: 'growth-insiders-annual',
+        transaction_id: 'seed-transaction-1001',
+        purchase_token: 'mock-purchase-token',
+        status: 'validated',
+        retry_count: 0,
+        last_attempt_at: trx.fn.now(),
+        validated_at: trx.fn.now(),
+        payload: JSON.stringify({ source: 'seed', sandbox: true }),
+        metadata: JSON.stringify({ seed: true, receiptType: 'initial' }),
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        user_id: learnerId,
+        platform: 'android',
+        product_id: 'ops-masterclass-tutor-support',
+        transaction_id: 'seed-transaction-2001',
+        purchase_token: 'mock-addon-token',
+        status: 'pending',
+        retry_count: 1,
+        last_attempt_at: trx.fn.now(),
+        validated_at: null,
+        payload: JSON.stringify({ source: 'seed', sandbox: true, retries: 1 }),
+        metadata: JSON.stringify({ seed: true, receiptType: 'addon', retryReason: 'network-timeout' }),
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        user_id: learnerId,
+        platform: 'ios',
+        product_id: 'ops-masterclass-community-bundle',
+        transaction_id: 'seed-transaction-2002',
+        purchase_token: 'mock-bundle-token',
+        status: 'rejected',
+        last_error: 'Sandbox validation failed: receipt expired',
+        retry_count: 2,
+        last_attempt_at: trx.fn.now(),
+        validated_at: null,
+        payload: JSON.stringify({ source: 'seed', sandbox: true, lastAttempt: '2024-10-12T10:15:00Z' }),
+        metadata: JSON.stringify({ seed: true, receiptType: 'addon', escalation: 'support-case-ops-1' }),
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      }
+    ]);
 
     const adminVerificationRef = makeVerificationRef();
     const instructorVerificationRef = makeVerificationRef();
@@ -1697,7 +1785,7 @@ export async function seed(knex) {
       }
     ]);
 
-    const now = new Date();
+    const billingNow = new Date();
     const minutesAgo = (minutes) => new Date(now.getTime() - minutes * 60000).toISOString();
     const minutesFromNow = (minutes) => new Date(now.getTime() + minutes * 60000).toISOString();
 
@@ -2721,7 +2809,6 @@ export async function seed(knex) {
       approved_at: trx.fn.now()
     });
 
-    const now = new Date();
     const subscriptionPublicId = crypto.randomUUID();
     const providerIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
     const providerChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
@@ -2738,8 +2825,8 @@ export async function seed(knex) {
       times_redeemed: 1,
       is_stackable: false,
       status: 'active',
-      valid_from: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-      valid_until: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+      valid_from: new Date(billingNow.getTime() - 7 * 24 * 60 * 60 * 1000),
+      valid_until: new Date(billingNow.getTime() + 60 * 24 * 60 * 60 * 1000),
       metadata: JSON.stringify({ campaign: 'growth-insiders', createdBy: 'seed' })
     });
 
@@ -2755,8 +2842,8 @@ export async function seed(knex) {
       times_redeemed: 0,
       is_stackable: false,
       status: 'active',
-      valid_from: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
-      valid_until: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+      valid_from: new Date(billingNow.getTime() - 3 * 24 * 60 * 60 * 1000),
+      valid_until: new Date(billingNow.getTime() + 90 * 24 * 60 * 60 * 1000),
       metadata: JSON.stringify({ campaign: 'bundle-promo', createdBy: 'seed' })
     });
 
@@ -2956,6 +3043,210 @@ export async function seed(knex) {
       variance_ratio: 0,
       metadata: JSON.stringify({ seed: true, scheduleId, usageRecordId }),
       created_at: subscriptionTimestamp
+    });
+
+    const tutorSupportIntentPublicId = crypto.randomUUID();
+    const tutorSupportProviderIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
+    const tutorSupportProviderChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
+    const tutorSupportPayment = await PaymentIntentModel.create(
+      {
+        publicId: tutorSupportIntentPublicId,
+        userId: learnerId,
+        provider: 'stripe',
+        providerIntentId: tutorSupportProviderIntentId,
+        providerLatestChargeId: tutorSupportProviderChargeId,
+        status: 'succeeded',
+        currency: 'USD',
+        amountSubtotal: 49900,
+        amountDiscount: 0,
+        amountTax: 3992,
+        amountTotal: 53892,
+        amountRefunded: 0,
+        taxBreakdown: { jurisdiction: 'US-CA', rate: 0.08 },
+        metadata: {
+          public_id: tutorSupportIntentPublicId,
+          entity_type: 'catalog_item',
+          entity_id: 'ops-masterclass-tutor-support',
+          items: [
+            {
+              id: 'ops-masterclass-tutor-support',
+              name: 'Ops tutor concierge pods',
+              unitAmount: 49900,
+              quantity: 1,
+              discount: 0,
+              tax: 3992,
+              total: 53892
+            }
+          ],
+          taxableSubtotal: 49900,
+          taxableAfterDiscount: 49900,
+          source: 'seed-addon'
+        },
+        entityType: 'catalog_item',
+        entityId: 'ops-masterclass-tutor-support',
+        receiptEmail: 'noemi.carvalho@edulure.test',
+        capturedAt: subscriptionTimestamp
+      },
+      trx
+    );
+    const tutorSupportPaymentId = tutorSupportPayment.id;
+
+    await trx('payment_ledger_entries').insert({
+      payment_intent_id: tutorSupportPaymentId,
+      entry_type: 'charge',
+      amount: 53892,
+      currency: 'USD',
+      details: JSON.stringify({
+        provider: 'stripe',
+        chargeId: tutorSupportProviderChargeId,
+        paymentMethod: ['card'],
+        statementDescriptor: 'EDULURE OPS ADDON'
+      })
+    });
+
+    const [tutorSupportUsageId] = await trx('monetization_usage_records').insert({
+      public_id: crypto.randomUUID(),
+      tenant_id: 'global',
+      catalog_item_id: tutorSupportCatalogId,
+      product_code: 'ops-masterclass-tutor-support',
+      account_reference: 'ops-masterclass',
+      user_id: learnerId,
+      usage_date: subscriptionTimestamp,
+      quantity: 1,
+      unit_amount_cents: 49900,
+      amount_cents: 49900,
+      currency: 'USD',
+      source: 'seed-data',
+      external_reference: `seed-addon-usage-${subscriptionPublicId}`,
+      payment_intent_id: tutorSupportPaymentId,
+      metadata: JSON.stringify({ seed: true, bundle: 'ops-masterclass', addon: true }),
+      recorded_at: subscriptionTimestamp,
+      processed_at: subscriptionTimestamp,
+      created_at: subscriptionTimestamp,
+      updated_at: subscriptionTimestamp
+    });
+
+    await trx('monetization_revenue_schedules').insert({
+      tenant_id: 'global',
+      payment_intent_id: tutorSupportPaymentId,
+      catalog_item_id: tutorSupportCatalogId,
+      usage_record_id: tutorSupportUsageId,
+      product_code: 'ops-masterclass-tutor-support',
+      status: 'recognized',
+      recognition_method: 'immediate',
+      recognition_start: subscriptionTimestamp,
+      recognition_end: subscriptionTimestamp,
+      amount_cents: 49900,
+      recognized_amount_cents: 49900,
+      currency: 'USD',
+      revenue_account: '4000-education-services',
+      deferred_revenue_account: '2050-deferred-revenue',
+      recognized_at: subscriptionTimestamp,
+      metadata: JSON.stringify({ seed: true, recognition: 'immediate' }),
+      created_at: subscriptionTimestamp,
+      updated_at: subscriptionTimestamp
+    });
+
+    const communityBundleIntentPublicId = crypto.randomUUID();
+    const communityBundleProviderIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
+    const communityBundleProviderChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
+    const communityBundlePayment = await PaymentIntentModel.create(
+      {
+        publicId: communityBundleIntentPublicId,
+        userId: learnerId,
+        provider: 'stripe',
+        providerIntentId: communityBundleProviderIntentId,
+        providerLatestChargeId: communityBundleProviderChargeId,
+        status: 'succeeded',
+        currency: 'USD',
+        amountSubtotal: 29000,
+        amountDiscount: 0,
+        amountTax: 2320,
+        amountTotal: 31320,
+        amountRefunded: 0,
+        taxBreakdown: { jurisdiction: 'US-CA', rate: 0.08 },
+        metadata: {
+          public_id: communityBundleIntentPublicId,
+          entity_type: 'catalog_item',
+          entity_id: 'ops-masterclass-community-bundle',
+          items: [
+            {
+              id: 'ops-masterclass-community-bundle',
+              name: 'Ops Guild community access',
+              unitAmount: 29000,
+              quantity: 1,
+              discount: 0,
+              tax: 2320,
+              total: 31320
+            }
+          ],
+          taxableSubtotal: 29000,
+          taxableAfterDiscount: 29000,
+          source: 'seed-addon'
+        },
+        entityType: 'catalog_item',
+        entityId: 'ops-masterclass-community-bundle',
+        receiptEmail: 'noemi.carvalho@edulure.test',
+        capturedAt: subscriptionTimestamp
+      },
+      trx
+    );
+    const communityBundlePaymentId = communityBundlePayment.id;
+
+    await trx('payment_ledger_entries').insert({
+      payment_intent_id: communityBundlePaymentId,
+      entry_type: 'charge',
+      amount: 31320,
+      currency: 'USD',
+      details: JSON.stringify({
+        provider: 'stripe',
+        chargeId: communityBundleProviderChargeId,
+        paymentMethod: ['card'],
+        statementDescriptor: 'EDULURE OPS BUNDLE'
+      })
+    });
+
+    const [communityBundleUsageId] = await trx('monetization_usage_records').insert({
+      public_id: crypto.randomUUID(),
+      tenant_id: 'global',
+      catalog_item_id: communityBundleCatalogId,
+      product_code: 'ops-masterclass-community-bundle',
+      account_reference: 'ops-masterclass',
+      user_id: learnerId,
+      usage_date: subscriptionTimestamp,
+      quantity: 1,
+      unit_amount_cents: 29000,
+      amount_cents: 29000,
+      currency: 'USD',
+      source: 'seed-data',
+      external_reference: `seed-bundle-usage-${subscriptionPublicId}`,
+      payment_intent_id: communityBundlePaymentId,
+      metadata: JSON.stringify({ seed: true, bundle: 'ops-masterclass', addon: true }),
+      recorded_at: subscriptionTimestamp,
+      processed_at: subscriptionTimestamp,
+      created_at: subscriptionTimestamp,
+      updated_at: subscriptionTimestamp
+    });
+
+    await trx('monetization_revenue_schedules').insert({
+      tenant_id: 'global',
+      payment_intent_id: communityBundlePaymentId,
+      catalog_item_id: communityBundleCatalogId,
+      usage_record_id: communityBundleUsageId,
+      product_code: 'ops-masterclass-community-bundle',
+      status: 'recognized',
+      recognition_method: 'immediate',
+      recognition_start: subscriptionTimestamp,
+      recognition_end: subscriptionTimestamp,
+      amount_cents: 29000,
+      recognized_amount_cents: 29000,
+      currency: 'USD',
+      revenue_account: '4000-education-services',
+      deferred_revenue_account: '2050-deferred-revenue',
+      recognized_at: subscriptionTimestamp,
+      metadata: JSON.stringify({ seed: true, recognition: 'immediate' }),
+      created_at: subscriptionTimestamp,
+      updated_at: subscriptionTimestamp
     });
 
     const affiliateCommission = Math.floor(205092 * 0.2);

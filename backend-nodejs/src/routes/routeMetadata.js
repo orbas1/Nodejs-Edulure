@@ -619,6 +619,81 @@ const ROUTE_DEFINITIONS = [
     runbookUrl: 'https://runbooks.edulure.internal/payments-service-outage'
   },
   {
+    name: 'billing',
+    capability: 'mobile-billing',
+    description: 'Mobile catalog discovery and receipt validation endpoints backing in-app purchases.',
+    basePath: '/billing',
+    flagKey: 'platform.api.v1.billing',
+    defaultState: 'enabled',
+    fallbackStatus: 503,
+    disabledMessage: 'Mobile billing APIs are temporarily disabled while catalogs synchronise.',
+    audience: 'finance',
+    owners: ['payments-platform', 'mobile-experience'],
+    serviceTier: 'important',
+    tags: ['api', 'v1', 'billing'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'user',
+      allowedRoles: ['user', 'instructor', 'admin'],
+      elevatedRoles: ['admin']
+    },
+    cors: {
+      allowedMethods: ['GET', 'POST']
+    },
+    statusPageComponent: 'api-billing',
+    runbookUrl: 'https://runbooks.edulure.internal/mobile-billing-catalog'
+  },
+  {
+    name: 'notifications',
+    capability: 'mobile-notifications',
+    description: 'Notification preferences, device registration, and channel routing controls for the mobile app.',
+    basePath: '/notifications',
+    flagKey: 'platform.api.v1.notifications',
+    defaultState: 'enabled',
+    fallbackStatus: 503,
+    disabledMessage: 'Notification services are currently undergoing maintenance. Please try again shortly.',
+    audience: 'user',
+    owners: ['support-experience'],
+    serviceTier: 'important',
+    tags: ['api', 'v1', 'notifications'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'user',
+      allowedRoles: ['user', 'instructor', 'admin'],
+      elevatedRoles: ['admin']
+    },
+    cors: {
+      allowedMethods: ['GET', 'PUT', 'POST']
+    },
+    statusPageComponent: 'api-notifications',
+    runbookUrl: 'https://runbooks.edulure.internal/mobile-notifications-outage'
+  },
+  {
+    name: 'inbox',
+    capability: 'learner-support-inbox',
+    description: 'Learner inbox threads, support escalations, and messaging for the mobile client.',
+    basePath: '/inbox',
+    flagKey: 'platform.api.v1.inbox',
+    defaultState: 'enabled',
+    fallbackStatus: 503,
+    disabledMessage: 'Inbox messaging is temporarily unavailable while support cases synchronise.',
+    audience: 'user',
+    owners: ['support-experience'],
+    serviceTier: 'standard',
+    tags: ['api', 'v1', 'inbox'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'user',
+      allowedRoles: ['user', 'instructor', 'admin'],
+      elevatedRoles: ['admin']
+    },
+    cors: {
+      allowedMethods: ['GET', 'POST']
+    },
+    statusPageComponent: 'api-inbox',
+    runbookUrl: 'https://runbooks.edulure.internal/mobile-inbox-outage'
+  },
+  {
     name: 'compliance',
     capability: 'data-governance',
     description: 'GDPR, consent management, and incident governance endpoints.',
@@ -1030,6 +1105,31 @@ const ROUTE_DEFINITIONS = [
     },
     statusPageComponent: 'api-admin',
     runbookUrl: 'https://runbooks.edulure.internal/admin-api-access'
+  },
+  {
+    name: 'integrations',
+    capability: 'integration-events',
+    description: 'Partner integrations utilities including Slack event dispatch for notifications testing.',
+    basePath: '/integrations',
+    flagKey: 'platform.api.v1.integrations',
+    defaultState: 'enabled',
+    fallbackStatus: 503,
+    disabledMessage: 'Integration event APIs are paused while downstream providers recover.',
+    audience: 'user',
+    owners: ['integrations'],
+    serviceTier: 'supporting',
+    tags: ['api', 'v1', 'integrations'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'user',
+      allowedRoles: ['user', 'instructor', 'admin'],
+      elevatedRoles: ['admin']
+    },
+    cors: {
+      allowedMethods: ['POST']
+    },
+    statusPageComponent: 'api-integrations',
+    runbookUrl: 'https://runbooks.edulure.internal/integration-events-outage'
   },
   {
     name: 'integration-invites',
