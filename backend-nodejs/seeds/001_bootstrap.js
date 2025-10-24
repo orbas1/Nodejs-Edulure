@@ -3380,6 +3380,343 @@ export async function seed(knex) {
       })
     });
 
+    const [opsBlueprintId] = await trx('course_blueprints').insert({
+      public_id: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      title: 'Automation launch production blueprint',
+      stage: 'Production',
+      summary: 'Readiness scaffolding for the automation launch masterclass across modules, QA gates, and marketing syncs.',
+      target_learners: 'Operations leaders',
+      price_label: '$1,299',
+      module_count: 6,
+      readiness_score: 78.5,
+      readiness_label: 'In build',
+      total_duration_minutes: 720,
+      outstanding_tasks: JSON.stringify([
+        'Integrate simulation QA outcomes into command center module',
+        'Upload sponsor playbook addendum for enterprise cohort'
+      ]),
+      upcoming_milestones: JSON.stringify([
+        {
+          id: 'milestone-simulation-qa',
+          type: 'QA review',
+          dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          title: 'Simulation QA sign-off with enablement'
+        },
+        {
+          id: 'milestone-marketing-handoff',
+          type: 'Marketing',
+          dueAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+          title: 'Launch marketing campaign hand-off'
+        }
+      ]),
+      metadata: JSON.stringify({ cluster: 'Learning Delivery', annex: 'B2', blueprintCode: 'OPS-LAUNCH-2024' })
+    });
+
+    await trx('course_blueprint_modules').insert([
+      {
+        blueprint_id: opsBlueprintId,
+        module_id: opsModuleKickoffId,
+        title: 'Launch Command Center',
+        release_label: 'Week 1 · Day 1',
+        position: 1,
+        lesson_count: 5,
+        assignment_count: 1,
+        duration_minutes: 240,
+        outstanding_tasks: JSON.stringify(['Publish facilitator walkthrough recording']),
+        metadata: JSON.stringify({ format: 'Hybrid cohort', qaGate: 'QA passed' })
+      },
+      {
+        blueprint_id: opsBlueprintId,
+        module_id: opsModuleIncidentId,
+        title: 'Incident Simulation Drills',
+        release_label: 'Week 2 · Day 1',
+        position: 2,
+        lesson_count: 4,
+        assignment_count: 1,
+        duration_minutes: 180,
+        outstanding_tasks: JSON.stringify(['Upload simulation scoreboard template', 'Confirm escalation observers']),
+        metadata: JSON.stringify({ format: 'Live cohort', qaGate: 'Needs simulation QA' })
+      }
+    ]);
+
+    const [opsLaunchId] = await trx('course_launches').insert({
+      public_id: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      target_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      target_label: 'Target launch in 2 weeks',
+      phase: 'QA',
+      owner: 'Kai Watanabe',
+      risk_level: 'On track',
+      risk_tone: 'low',
+      activation_coverage: '68% trained',
+      confidence_score: 0.72,
+      metadata: JSON.stringify({ cluster: 'Learning Delivery', annex: 'B2', workspace: 'Lifecycle planner' })
+    });
+
+    await trx('course_launch_checklist_items').insert([
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'QA playbooks reviewed',
+        completed: true,
+        owner: 'Amina Diallo',
+        due_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ scope: 'Quality assurance' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'Incident escalation tree refreshed',
+        completed: true,
+        owner: 'Kai Watanabe',
+        due_at: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ scope: 'Operations' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'Telemetry alerts tuned',
+        completed: false,
+        owner: 'Noemi Carvalho',
+        due_at: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ scope: 'Observability' })
+      }
+    ]);
+
+    await trx('course_launch_signals').insert([
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'Sponsor video awaiting approval',
+        severity: 'medium',
+        description: 'Brand team review pending for sponsor integration clip.',
+        action_label: 'Ping brand review',
+        action_href: 'https://ops.edulure.test/reviews/sponsor-video',
+        metadata: JSON.stringify({ owner: 'Marketing', cluster: 'Annex B2' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'Compliance evidence upload required',
+        severity: 'high',
+        description: 'SOC 2 attestation needs attaching before enterprise syndication.',
+        action_label: 'Upload evidence',
+        action_href: 'https://ops.edulure.test/compliance/evidence',
+        metadata: JSON.stringify({ owner: 'Compliance', cluster: 'Annex B2' })
+      }
+    ]);
+
+    await trx('course_reviews').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        reviewer_name: 'Lina Gomez',
+        reviewer_role: 'Director of Operations',
+        reviewer_company: 'LaunchHub',
+        rating: 5,
+        headline: 'Launch readiness transformed our go-live',
+        feedback:
+          'The drip sequencing and rehearsal cadences meant our entire ops guild showed up prepared. We saw a 38% reduction in launch escalations.',
+        delivery_mode: 'Cohort',
+        experience: 'Web and mobile parity',
+        submitted_at: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ cohort: 'Autumn 2024' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        reviewer_name: 'Ops Guild Collective',
+        reviewer_role: 'Peer review board',
+        reviewer_company: 'Ops Guild',
+        rating: 4.6,
+        headline: 'Enterprise-grade runbook system',
+        feedback:
+          'Module creation workflows and refresher loops were robust enough for our multi-market programme. Mobile execution matched the desktop experience.',
+        delivery_mode: 'Hybrid cohort',
+        experience: 'Mobile parity certified',
+        submitted_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ board: 'Ops Guild review council' })
+      }
+    ]);
+
+    await trx('course_refresher_lessons').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        title: 'Quarterly incident rehearsal',
+        format: 'Live simulation',
+        cadence: 'Quarterly',
+        owner: 'Kai Watanabe',
+        status: 'Scheduled',
+        next_session_at: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
+        channel: 'Zoom studio',
+        enrollment_window: 'Opens 14 days prior',
+        metadata: JSON.stringify({ facilitator: 'Ops guild', annex: 'B2' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        title: 'Automation audit checklist',
+        format: 'Async module',
+        cadence: 'Bi-annual',
+        owner: 'Kai Watanabe',
+        status: 'Draft',
+        next_session_at: null,
+        channel: 'Learning hub',
+        enrollment_window: 'Self-paced access',
+        metadata: JSON.stringify({ facilitator: 'Automation faculty', annex: 'B2' })
+      }
+    ]);
+
+    await trx('course_recorded_assets').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        title: 'Command center war room tour',
+        format: 'Video',
+        status: 'Encoded',
+        duration_minutes: 18,
+        size_mb: 942,
+        quality: '1080p',
+        language: 'English',
+        aspect_ratio: '16:9',
+        engagement_completion_rate: 86.4,
+        tags: JSON.stringify(['command center', 'tour']),
+        audience: 'Learners',
+        updated_at_source: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ libraryShelf: 'Launch readiness', annex: 'A3' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        title: 'Incident drill facilitation',
+        format: 'Video',
+        status: 'Quality review',
+        duration_minutes: 27,
+        size_mb: 1460,
+        quality: '4K',
+        language: 'English',
+        aspect_ratio: '16:9',
+        engagement_completion_rate: 72.1,
+        tags: JSON.stringify(['incident', 'simulation']),
+        audience: 'Facilitators',
+        updated_at_source: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ libraryShelf: 'Facilitation', annex: 'A3' })
+      }
+    ]);
+
+    await trx('course_catalogue_listings').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        channel: 'Marketplace',
+        status: 'Published',
+        impressions: 18452,
+        conversions: 136,
+        conversion_rate: 0.0737,
+        price_amount: 129900,
+        price_currency: 'USD',
+        last_synced_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ listingId: 'catalog-marketplace', annex: 'A3' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        channel: 'Enterprise network',
+        status: 'Pilot',
+        impressions: 42,
+        conversions: 10,
+        conversion_rate: 0.238,
+        price_amount: 189900,
+        price_currency: 'USD',
+        last_synced_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ listingId: 'catalog-enterprise', annex: 'A3' })
+      }
+    ]);
+
+    const [opsDripSequenceId] = await trx('course_drip_sequences').insert({
+      public_id: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      cadence: 'Weekly',
+      anchor: 'enrollment-date',
+      timezone: 'America/New_York',
+      metadata: JSON.stringify({ orchestrator: 'Lifecycle automation', annex: 'B2' })
+    });
+
+    await trx('course_drip_segments').insert([
+      {
+        public_id: crypto.randomUUID(),
+        sequence_id: opsDripSequenceId,
+        label: 'Foundational cohort',
+        audience: 'New operations leaders',
+        metadata: JSON.stringify({ priority: 'primary' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        sequence_id: opsDripSequenceId,
+        label: 'Advanced operators',
+        audience: 'Returning ops guild members',
+        metadata: JSON.stringify({ priority: 'secondary' })
+      }
+    ]);
+
+    await trx('course_drip_schedules').insert([
+      {
+        public_id: crypto.randomUUID(),
+        sequence_id: opsDripSequenceId,
+        title: 'Launch Command Center',
+        release_label: 'Day 0 · 09:00 ET',
+        position: 1,
+        offset_days: 0,
+        gating: 'Immediate access',
+        prerequisites: JSON.stringify([]),
+        notifications: JSON.stringify(['Email 24h before release']),
+        workspace: 'Ops Launch HQ',
+        metadata: JSON.stringify({ moduleSlug: 'launch-command-center' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        sequence_id: opsDripSequenceId,
+        title: 'Incident Simulation Drills',
+        release_label: 'Day 8 · 09:00 ET',
+        position: 2,
+        offset_days: 7,
+        gating: 'Requires Module 1 completion',
+        prerequisites: JSON.stringify(['Launch Command Center']),
+        notifications: JSON.stringify(['Email 24h before release', 'SMS 2h before release']),
+        workspace: 'Ops Launch HQ',
+        metadata: JSON.stringify({ moduleSlug: 'incident-simulation-drills' })
+      }
+    ]);
+
+    await trx('course_mobile_experiences').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        experience_type: 'Drip modules',
+        status: 'Aligned',
+        description: 'Parity verified for all drip sequences on iOS and Android.',
+        metadata: JSON.stringify({ annex: 'A3', coverage: 'Full' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        experience_type: 'Refresher lessons',
+        status: 'Aligned',
+        description: 'Live refresher clinics available via mobile with reminders.',
+        metadata: JSON.stringify({ annex: 'A3', coverage: 'Refresher' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        experience_type: 'Recorded videos',
+        status: 'Aligned',
+        description: 'Evergreen recordings encoded for responsive playback.',
+        metadata: JSON.stringify({ annex: 'A3', coverage: 'Library' })
+      }
+    ]);
+
     const [commandCenterLessonId] = await trx('course_lessons').insert({
       course_id: opsAutomationCourseId,
       module_id: opsModuleKickoffId,

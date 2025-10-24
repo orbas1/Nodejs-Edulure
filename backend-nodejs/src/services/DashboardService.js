@@ -3813,12 +3813,28 @@ function buildCourseWorkspace({
   creationCollaborators = new Map(),
   creationSessions = new Map(),
   collaboratorDirectory = new Map(),
+  blueprints = [],
+  blueprintModules = [],
+  launches = [],
+  launchChecklist = [],
+  launchSignals = [],
+  courseReviews = [],
+  refresherLessons = [],
+  recordedAssets = [],
+  catalogueListings = [],
+  dripSequences = [],
+  dripSegments = [],
+  dripSchedules = [],
+  mobileExperiences = [],
   now = new Date()
 } = {}) {
   const workspace = {
     pipeline: [],
     production: [],
     catalogue: [],
+    creationBlueprints: [],
+    lifecycle: [],
+    library: [],
     analytics: { cohortHealth: [], velocity: { averageCompletion: 0, trending: [] } },
     assignments: {
       summary: { total: 0, dueThisWeek: 0, requiresReview: 0 },
@@ -3835,6 +3851,22 @@ function buildCourseWorkspace({
   if (!courses.length) {
     return workspace;
   }
+
+  const minutesToLabel = (minutes) => {
+    const numeric = Number(minutes);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return '—';
+    }
+    const hours = Math.floor(numeric / 60);
+    const remaining = Math.round(numeric % 60);
+    if (hours && remaining) {
+      return `${hours}h ${remaining}m`;
+    }
+    if (hours) {
+      return `${hours}h`;
+    }
+    return `${remaining}m`;
+  };
 
   const enrollmentRecords = enrollments.map((enrollment) =>
     normaliseEnrollment(enrollment, collaboratorDirectory)
@@ -3878,6 +3910,121 @@ function buildCourseWorkspace({
     const list = assignmentsByCourse.get(assignment.courseId) ?? [];
     list.push({ ...assignment, metadata: safeJsonParse(assignment.metadata, {}) });
     assignmentsByCourse.set(assignment.courseId, list);
+  });
+
+  const blueprintsByCourse = new Map();
+  blueprints.forEach((blueprint) => {
+    if (!blueprint?.courseId) return;
+    const list = blueprintsByCourse.get(blueprint.courseId) ?? [];
+    list.push(blueprint);
+    blueprintsByCourse.set(blueprint.courseId, list);
+  });
+
+  const blueprintModulesByBlueprint = new Map();
+  blueprintModules.forEach((module) => {
+    if (!module?.blueprintId) return;
+    const list = blueprintModulesByBlueprint.get(module.blueprintId) ?? [];
+    list.push(module);
+    blueprintModulesByBlueprint.set(module.blueprintId, list);
+  });
+  blueprintModulesByBlueprint.forEach((list) => {
+    list.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  });
+
+  const launchesByCourse = new Map();
+  launches.forEach((launch) => {
+    if (!launch?.courseId) return;
+    launchesByCourse.set(launch.courseId, launch);
+  });
+
+  const checklistByLaunch = new Map();
+  launchChecklist.forEach((item) => {
+    if (!item?.launchId) return;
+    const list = checklistByLaunch.get(item.launchId) ?? [];
+    list.push(item);
+    checklistByLaunch.set(item.launchId, list);
+  });
+
+  const signalsByLaunch = new Map();
+  launchSignals.forEach((signal) => {
+    if (!signal?.launchId) return;
+    const list = signalsByLaunch.get(signal.launchId) ?? [];
+    list.push(signal);
+    signalsByLaunch.set(signal.launchId, list);
+  });
+
+  const reviewsByCourse = new Map();
+  courseReviews.forEach((review) => {
+    if (!review?.courseId) return;
+    const list = reviewsByCourse.get(review.courseId) ?? [];
+    list.push(review);
+    reviewsByCourse.set(review.courseId, list);
+  });
+  reviewsByCourse.forEach((list) => {
+    list.sort((a, b) => {
+      const aDate = a.submittedAt instanceof Date ? a.submittedAt : toDate(a.submittedAt);
+      const bDate = b.submittedAt instanceof Date ? b.submittedAt : toDate(b.submittedAt);
+      return (bDate?.getTime() ?? 0) - (aDate?.getTime() ?? 0);
+    });
+  });
+
+  const refresherLessonsByCourse = new Map();
+  refresherLessons.forEach((lesson) => {
+    if (!lesson?.courseId) return;
+    const list = refresherLessonsByCourse.get(lesson.courseId) ?? [];
+    list.push(lesson);
+    refresherLessonsByCourse.set(lesson.courseId, list);
+  });
+
+  const recordedAssetsByCourse = new Map();
+  recordedAssets.forEach((asset) => {
+    if (!asset?.courseId) return;
+    const list = recordedAssetsByCourse.get(asset.courseId) ?? [];
+    list.push(asset);
+    recordedAssetsByCourse.set(asset.courseId, list);
+  });
+
+  const catalogueListingsByCourse = new Map();
+  catalogueListings.forEach((listing) => {
+    if (!listing?.courseId) return;
+    const list = catalogueListingsByCourse.get(listing.courseId) ?? [];
+    list.push(listing);
+    catalogueListingsByCourse.set(listing.courseId, list);
+  });
+
+  const dripSequencesByCourse = new Map();
+  dripSequences.forEach((sequence) => {
+    if (!sequence?.courseId) return;
+    const list = dripSequencesByCourse.get(sequence.courseId) ?? [];
+    list.push(sequence);
+    dripSequencesByCourse.set(sequence.courseId, list);
+  });
+
+  const dripSegmentsBySequence = new Map();
+  dripSegments.forEach((segment) => {
+    if (!segment?.sequenceId) return;
+    const list = dripSegmentsBySequence.get(segment.sequenceId) ?? [];
+    list.push(segment);
+    dripSegmentsBySequence.set(segment.sequenceId, list);
+  });
+
+  const dripSchedulesBySequence = new Map();
+  dripSchedules.forEach((entry) => {
+    if (!entry?.sequenceId) return;
+    const list = dripSchedulesBySequence.get(entry.sequenceId) ?? [];
+    list.push(entry);
+    dripSchedulesBySequence.set(entry.sequenceId, list);
+  });
+  dripSchedulesBySequence.forEach((list) => {
+    list.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  });
+
+  const mobileExperiencesByCourse = new Map();
+  mobileExperiences.forEach((experience) => {
+    if (!experience?.courseId) return;
+    const list = mobileExperiencesByCourse.get(experience.courseId) ?? [];
+    list.push(experience);
+    mobileExperiencesByCourse.set(experience.courseId, list);
   });
 
   const enrollmentsByCourse = new Map();
@@ -3990,6 +4137,238 @@ function buildCourseWorkspace({
   });
 
   workspace.catalogue = catalogue;
+
+  const creationBlueprints = [];
+  blueprintsByCourse.forEach((blueprintList, courseId) => {
+    const courseRecord = courseById.get(courseId);
+    blueprintList.forEach((blueprint) => {
+      const modulesForBlueprint = blueprintModulesByBlueprint.get(blueprint.id) ?? [];
+      const outstanding = Array.isArray(blueprint.outstandingTasks) ? blueprint.outstandingTasks : [];
+      const upcoming = Array.isArray(blueprint.upcomingMilestones) ? blueprint.upcomingMilestones : [];
+      creationBlueprints.push({
+        id: blueprint.publicId ?? `blueprint-${blueprint.id}`,
+        courseId,
+        name: blueprint.title,
+        stage: blueprint.stage ?? courseRecord?.status ?? 'Planning',
+        summary: blueprint.summary ?? courseRecord?.summary ?? null,
+        learners:
+          blueprint.targetLearners ??
+          (courseRecord?.enrolmentCount ? `${courseRecord.enrolmentCount} learners` : 'Learner roster pending'),
+        price: blueprint.priceLabel ?? formatCurrency(courseRecord?.priceAmount ?? 0, courseRecord?.priceCurrency ?? 'USD'),
+        moduleCount: blueprint.moduleCount ?? modulesForBlueprint.length,
+        readiness: Math.round(Number(blueprint.readinessScore ?? 0)),
+        readinessLabel: blueprint.readinessLabel ?? 'In build',
+        totalDurationLabel:
+          Number.isFinite(Number(blueprint.totalDurationMinutes)) && Number(blueprint.totalDurationMinutes) > 0
+            ? minutesToLabel(blueprint.totalDurationMinutes)
+            : modulesForBlueprint.length
+            ? `${modulesForBlueprint.length} modules`
+            : '—',
+        outstanding: outstanding.filter(Boolean),
+        upcoming: upcoming.map((milestone, index) => ({
+          id: milestone.id ?? `${blueprint.publicId ?? blueprint.id}-milestone-${index}`,
+          type: milestone.type ?? 'Milestone',
+          due: milestone.dueAt ? formatDateTime(milestone.dueAt, { dateStyle: 'medium' }) : null,
+          title: milestone.title ?? 'Upcoming checkpoint'
+        })),
+        modules: modulesForBlueprint.map((module) => ({
+          id: module.moduleId ? `module-${module.moduleId}` : `blueprint-module-${module.id}`,
+          title: module.title,
+          release: module.releaseLabel ?? null,
+          lessons: module.lessonCount ?? 0,
+          assignments: module.assignmentCount ?? 0,
+          duration: minutesToLabel(module.durationMinutes ?? 0),
+          outstanding: Array.isArray(module.outstandingTasks) ? module.outstandingTasks.filter(Boolean) : []
+        }))
+      });
+    });
+  });
+  creationBlueprints.sort((a, b) => b.readiness - a.readiness);
+
+  const lifecycleEntries = courses
+    .map((course) => {
+      const courseRecord = courseById.get(course.id) ?? course;
+      const moduleRecords = modulesByCourse.get(course.id) ?? [];
+      const moduleEntries = moduleRecords.map((module) => {
+        const creationMeta = module.metadata?.creation ?? {};
+        const tasks = Array.isArray(creationMeta.tasksOutstanding)
+          ? creationMeta.tasksOutstanding
+          : Array.isArray(module.metadata?.tasksOutstanding)
+          ? module.metadata.tasksOutstanding
+          : [];
+        const lastUpdatedIso = creationMeta.lastUpdatedAt ?? module.updatedAt ?? courseRecord.updatedAt ?? null;
+        const lastUpdatedLabel = lastUpdatedIso
+          ? formatRelativeDay(new Date(lastUpdatedIso), now)
+          : 'Recently updated';
+        return {
+          id: module.publicId ?? `module-${module.id}`,
+          title: module.title,
+          status: creationMeta.status ?? 'Draft',
+          owner: creationMeta.owner ?? 'Unassigned',
+          lastUpdated: lastUpdatedLabel,
+          qualityGate: creationMeta.qualityGate ?? 'N/A',
+          tasksOutstanding: tasks.filter(Boolean)
+        };
+      });
+
+      const launchRecord = launchesByCourse.get(course.id) ?? null;
+      const checklistItems = launchRecord ? checklistByLaunch.get(launchRecord.id) ?? [] : [];
+      const signalItems = launchRecord ? signalsByLaunch.get(launchRecord.id) ?? [] : [];
+
+      const sequenceList = dripSequencesByCourse.get(course.id) ?? [];
+      const primarySequence = sequenceList[0] ?? null;
+      const segmentList = primarySequence ? dripSegmentsBySequence.get(primarySequence.id) ?? [] : [];
+      const scheduleList = primarySequence ? dripSchedulesBySequence.get(primarySequence.id) ?? [] : [];
+
+      const refresherList = refresherLessonsByCourse.get(course.id) ?? [];
+      const recordedList = recordedAssetsByCourse.get(course.id) ?? [];
+      const catalogueList = catalogueListingsByCourse.get(course.id) ?? [];
+      const reviewList = reviewsByCourse.get(course.id) ?? [];
+      const mobileList = mobileExperiencesByCourse.get(course.id) ?? [];
+
+      const ratingValues = reviewList
+        .map((review) => Number(review.rating ?? 0))
+        .filter((value) => Number.isFinite(value) && value > 0);
+      const reviewSummary = ratingValues.length
+        ? `${(ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length).toFixed(1)}/5 · ${reviewList.length} reviews`
+        : null;
+
+      return {
+        id: courseRecord.publicId ?? `lifecycle-${course.id}`,
+        courseId: course.id,
+        courseTitle: courseRecord.title,
+        stage: launchRecord?.phase ?? courseRecord.status ?? 'Planning',
+        reviewSummary,
+        launch: {
+          target: launchRecord?.targetDate ? launchRecord.targetDate.toISOString() : null,
+          targetLabel:
+            launchRecord?.targetLabel ??
+            (launchRecord?.targetDate ? formatDateTime(launchRecord.targetDate, { dateStyle: 'medium' }) : 'Date pending'),
+          phase: launchRecord?.phase ?? 'Planning',
+          owner: launchRecord?.owner ?? 'Unassigned',
+          riskLevel: launchRecord?.riskLevel ?? 'On track',
+          riskTone: launchRecord?.riskTone ?? 'low',
+          activationCoverage: launchRecord?.activationCoverage ?? '0% trained',
+          confidence: Number(launchRecord?.confidenceScore ?? 0),
+          checklist: checklistItems.map((item) => ({
+            id: item.publicId ?? `check-${item.id}`,
+            label: item.label,
+            completed: item.completed === true,
+            owner: item.owner ?? launchRecord?.owner ?? 'Unassigned',
+            due: item.dueAt ? item.dueAt.toISOString() : null
+          })),
+          signals: signalItems.map((signal) => ({
+            id: signal.publicId ?? `signal-${signal.id}`,
+            label: signal.label,
+            severity: signal.severity ?? 'info',
+            description: signal.description ?? null,
+            action: signal.actionLabel ?? null,
+            actionHref: signal.actionHref ?? null
+          }))
+        },
+        mobile: {
+          status: mobileList[0]?.status ?? 'Pending review',
+          experiences: mobileList
+            .map((experience) => experience.experienceType ?? experience.description)
+            .filter(Boolean)
+        },
+        drip: {
+          cadence: primarySequence?.cadence ?? 'Weekly',
+          anchor: primarySequence?.anchor ?? 'enrollment',
+          timezone: primarySequence?.timezone ?? 'UTC',
+          segments: segmentList.map((segment) => segment.label ?? segment.audience).filter(Boolean),
+          schedule: scheduleList.map((entry) => ({
+            id: entry.publicId ?? `drip-${entry.id}`,
+            title: entry.title,
+            releaseLabel:
+              entry.releaseLabel ??
+              (Number.isFinite(Number(entry.offsetDays)) ? `Day ${entry.offsetDays}` : 'Scheduled release'),
+            gating: entry.gating ?? 'Immediate access',
+            prerequisites: entry.prerequisites ?? [],
+            notifications: entry.notifications ?? [],
+            workspace: entry.workspace ?? entry.metadata?.workspace ?? null
+          }))
+        },
+        modules: moduleEntries,
+        refresherLessons: refresherList.map((lesson) => ({
+          id: lesson.publicId ?? `refresher-${lesson.id}`,
+          title: lesson.title,
+          format: lesson.format ?? 'Live session',
+          cadence: lesson.cadence ?? 'Ad-hoc',
+          owner: lesson.owner ?? 'Unassigned',
+          status: lesson.status ?? 'Scheduled',
+          nextSession: lesson.nextSessionAt
+            ? formatRelativeDay(lesson.nextSessionAt, now)
+            : 'Scheduling required',
+          channel: lesson.channel ?? 'Learning hub',
+          enrollmentWindow: lesson.enrollmentWindow ?? 'TBA'
+        })),
+        recordedVideos: recordedList.map((asset) => ({
+          id: asset.publicId ?? `recorded-${asset.id}`,
+          title: asset.title,
+          duration: minutesToLabel(asset.durationMinutes ?? 0),
+          quality: asset.quality ?? 'HD',
+          status: asset.status ?? 'Draft',
+          updated: asset.updatedAtSource
+            ? formatRelativeDay(asset.updatedAtSource, now)
+            : asset.updatedAt
+            ? formatRelativeDay(asset.updatedAt, now)
+            : 'Recently updated',
+          size: asset.sizeMb ? `${asset.sizeMb}MB` : null,
+          language: asset.language ?? 'English',
+          aspectRatio: asset.aspectRatio ?? '16:9'
+        })),
+        catalogue: catalogueList.map((listing) => ({
+          id: listing.publicId ?? `catalog-${listing.id}`,
+          channel: listing.channel,
+          status: listing.status,
+          price: formatCurrency(listing.priceAmount ?? 0, listing.priceCurrency ?? 'USD'),
+          impressions: listing.impressions ?? 0,
+          conversions: listing.conversions ?? 0,
+          conversionRate:
+            listing.conversionRate !== null && listing.conversionRate !== undefined
+              ? `${(Number(listing.conversionRate) * 100).toFixed(2)}%`
+              : '—',
+          lastSynced: listing.lastSyncedAt ? formatRelativeDay(listing.lastSyncedAt, now) : 'Not synced'
+        })),
+        reviews: reviewList.map((review) => ({
+          id: review.publicId ?? `review-${review.id}`,
+          reviewer: review.reviewerName ?? 'Reviewer',
+          role: review.reviewerRole ?? null,
+          company: review.reviewerCompany ?? null,
+          rating: review.rating ?? null,
+          headline: review.headline ?? null,
+          feedback: review.feedback ?? null,
+          submittedAt: review.submittedAt ? formatRelativeDay(review.submittedAt, now) : null,
+          delivery: review.deliveryMode ?? null,
+          experience: review.experience ?? null
+        }))
+      };
+    })
+    .filter((entry) => entry.modules.length || entry.launch.checklist.length || entry.refresherLessons.length);
+
+  const libraryAssets = recordedAssets.map((asset) => {
+    const courseRecord = courseById.get(asset.courseId);
+    const updatedSource = asset.updatedAtSource ?? asset.updatedAt ?? null;
+    return {
+      id: asset.publicId ?? `asset-${asset.id}`,
+      courseId: asset.courseId,
+      courseTitle: courseRecord?.title ?? 'Course',
+      title: asset.title,
+      format: asset.format ?? 'Video',
+      status: asset.status ?? 'Draft',
+      durationMinutes: asset.durationMinutes ?? 0,
+      durationLabel: minutesToLabel(asset.durationMinutes ?? 0),
+      updated: updatedSource ? formatRelativeDay(updatedSource, now) : 'Recently updated',
+      audience: asset.audience ?? 'Learners',
+      tags: Array.isArray(asset.tags) ? asset.tags : [],
+      engagement: { completionRate: asset.engagementCompletionRate ?? null }
+    };
+  });
+
+  workspace.creationBlueprints = creationBlueprints;
+  workspace.lifecycle = lifecycleEntries;
+  workspace.library = libraryAssets;
 
   const cohortMap = new Map();
   enrollmentRecords.forEach((enrollment) => {
@@ -4400,6 +4779,19 @@ export function buildInstructorDashboard({
   creationCollaborators = new Map(),
   creationSessions = new Map(),
   collaboratorDirectory = new Map(),
+  blueprints = [],
+  blueprintModules = [],
+  launches = [],
+  launchChecklist = [],
+  launchSignals = [],
+  courseReviews = [],
+  refresherLessons = [],
+  recordedAssets = [],
+  catalogueListings = [],
+  dripSequences = [],
+  dripSegments = [],
+  dripSchedules = [],
+  mobileExperiences = [],
   tutorProfiles = [],
   tutorAvailability = [],
   tutorBookings = [],
@@ -4732,6 +5124,19 @@ export function buildInstructorDashboard({
     creationCollaborators,
     creationSessions,
     collaboratorDirectory,
+    blueprints,
+    blueprintModules,
+    launches,
+    launchChecklist,
+    launchSignals,
+    courseReviews,
+    refresherLessons,
+    recordedAssets,
+    catalogueListings,
+    dripSequences,
+    dripSegments,
+    dripSchedules,
+    mobileExperiences,
     now
   });
 
@@ -5376,7 +5781,20 @@ export default class DashboardService {
       creationProjects: [],
       creationCollaborators: new Map(),
       creationSessions: new Map(),
-      collaboratorDirectory: new Map()
+      collaboratorDirectory: new Map(),
+      blueprints: [],
+      blueprintModules: [],
+      launches: [],
+      launchChecklist: [],
+      launchSignals: [],
+      courseReviews: [],
+      refresherLessons: [],
+      recordedAssets: [],
+      catalogueListings: [],
+      dripSequences: [],
+      dripSegments: [],
+      dripSchedules: [],
+      mobileExperiences: []
     };
 
     try {
@@ -5395,26 +5813,99 @@ export default class DashboardService {
           { default: CourseLessonModel },
           { default: CourseAssignmentModel },
           { default: CourseEnrollmentModel },
-          { default: CourseProgressModel }
+          { default: CourseProgressModel },
+          { default: CourseBlueprintModel },
+          { default: CourseBlueprintModuleModel },
+          { default: CourseLaunchModel },
+          { default: CourseLaunchChecklistItemModel },
+          { default: CourseLaunchSignalModel },
+          { default: CourseReviewModel },
+          { default: CourseRefresherLessonModel },
+          { default: CourseRecordedAssetModel },
+          { default: CourseCatalogueListingModel },
+          { default: CourseDripSequenceModel },
+          { default: CourseDripSegmentModel },
+          { default: CourseDripScheduleModel },
+          { default: CourseMobileExperienceModel }
         ] = await Promise.all([
           import('../models/CourseModuleModel.js'),
           import('../models/CourseLessonModel.js'),
           import('../models/CourseAssignmentModel.js'),
           import('../models/CourseEnrollmentModel.js'),
-          import('../models/CourseProgressModel.js')
+          import('../models/CourseProgressModel.js'),
+          import('../models/CourseBlueprintModel.js'),
+          import('../models/CourseBlueprintModuleModel.js'),
+          import('../models/CourseLaunchModel.js'),
+          import('../models/CourseLaunchChecklistItemModel.js'),
+          import('../models/CourseLaunchSignalModel.js'),
+          import('../models/CourseReviewModel.js'),
+          import('../models/CourseRefresherLessonModel.js'),
+          import('../models/CourseRecordedAssetModel.js'),
+          import('../models/CourseCatalogueListingModel.js'),
+          import('../models/CourseDripSequenceModel.js'),
+          import('../models/CourseDripSegmentModel.js'),
+          import('../models/CourseDripScheduleModel.js'),
+          import('../models/CourseMobileExperienceModel.js')
         ]);
 
-        const [modules, lessons, assignments, enrollments] = await Promise.all([
+        const [
+          modules,
+          lessons,
+          assignments,
+          enrollments,
+          blueprints,
+          launches,
+          reviews,
+          refresherLessons,
+          recordedAssets,
+          catalogueListings,
+          dripSequences,
+          mobileExperiences
+        ] = await Promise.all([
           CourseModuleModel.listByCourseIds(courseIds),
           CourseLessonModel.listByCourseIds(courseIds),
           CourseAssignmentModel.listByCourseIds(courseIds),
-          CourseEnrollmentModel.listByCourseIds(courseIds)
+          CourseEnrollmentModel.listByCourseIds(courseIds),
+          CourseBlueprintModel.listByCourseIds(courseIds),
+          CourseLaunchModel.listByCourseIds(courseIds),
+          CourseReviewModel.listByCourseIds(courseIds),
+          CourseRefresherLessonModel.listByCourseIds(courseIds),
+          CourseRecordedAssetModel.listByCourseIds(courseIds),
+          CourseCatalogueListingModel.listByCourseIds(courseIds),
+          CourseDripSequenceModel.listByCourseIds(courseIds),
+          CourseMobileExperienceModel.listByCourseIds(courseIds)
         ]);
 
-        const enrollmentIds = enrollments.map((enrollment) => enrollment.id);
-        const progress = enrollmentIds.length
+        const enrollmentIds = enrollments.map((enrollment) => enrollment.id).filter(Boolean);
+        const courseProgressRows = enrollmentIds.length
           ? await CourseProgressModel.listByEnrollmentIds(enrollmentIds)
           : [];
+
+        let blueprintModules = [];
+        const blueprintIds = blueprints.map((blueprint) => blueprint.id).filter(Boolean);
+        if (blueprintIds.length) {
+          blueprintModules = await CourseBlueprintModuleModel.listByBlueprintIds(blueprintIds);
+        }
+
+        let launchChecklist = [];
+        let launchSignals = [];
+        const launchIds = launches.map((launch) => launch.id).filter(Boolean);
+        if (launchIds.length) {
+          [launchChecklist, launchSignals] = await Promise.all([
+            CourseLaunchChecklistItemModel.listByLaunchIds(launchIds),
+            CourseLaunchSignalModel.listByLaunchIds(launchIds)
+          ]);
+        }
+
+        let dripSegments = [];
+        let dripSchedules = [];
+        const sequenceIds = dripSequences.map((sequence) => sequence.id).filter(Boolean);
+        if (sequenceIds.length) {
+          [dripSegments, dripSchedules] = await Promise.all([
+            CourseDripSegmentModel.listBySequenceIds(sequenceIds),
+            CourseDripScheduleModel.listBySequenceIds(sequenceIds)
+          ]);
+        }
 
         courseWorkspaceInput = {
           ...courseWorkspaceInput,
@@ -5422,7 +5913,20 @@ export default class DashboardService {
           lessons,
           assignments,
           enrollments,
-          courseProgress: progress
+          courseProgress: courseProgressRows,
+          blueprints,
+          blueprintModules,
+          launches,
+          launchChecklist,
+          launchSignals,
+          courseReviews: reviews,
+          refresherLessons,
+          recordedAssets,
+          catalogueListings,
+          dripSequences,
+          dripSegments,
+          dripSchedules,
+          mobileExperiences
         };
       }
     } catch (error) {
@@ -6040,7 +6544,20 @@ export default class DashboardService {
         creationProjects: courseWorkspaceInput?.creationProjects ?? [],
         creationCollaborators: courseWorkspaceInput?.creationCollaborators ?? new Map(),
         creationSessions: courseWorkspaceInput?.creationSessions ?? new Map(),
-        collaboratorDirectory: courseWorkspaceInput?.collaboratorDirectory ?? new Map()
+        collaboratorDirectory: courseWorkspaceInput?.collaboratorDirectory ?? new Map(),
+        blueprints: courseWorkspaceInput?.blueprints ?? [],
+        blueprintModules: courseWorkspaceInput?.blueprintModules ?? [],
+        launches: courseWorkspaceInput?.launches ?? [],
+        launchChecklist: courseWorkspaceInput?.launchChecklist ?? [],
+        launchSignals: courseWorkspaceInput?.launchSignals ?? [],
+        courseReviews: courseWorkspaceInput?.courseReviews ?? [],
+        refresherLessons: courseWorkspaceInput?.refresherLessons ?? [],
+        recordedAssets: courseWorkspaceInput?.recordedAssets ?? [],
+        catalogueListings: courseWorkspaceInput?.catalogueListings ?? [],
+        dripSequences: courseWorkspaceInput?.dripSequences ?? [],
+        dripSegments: courseWorkspaceInput?.dripSegments ?? [],
+        dripSchedules: courseWorkspaceInput?.dripSchedules ?? [],
+        mobileExperiences: courseWorkspaceInput?.mobileExperiences ?? []
       }) ?? undefined;
     let operatorSnapshot;
     if (['admin', 'operator'].includes(user.role)) {

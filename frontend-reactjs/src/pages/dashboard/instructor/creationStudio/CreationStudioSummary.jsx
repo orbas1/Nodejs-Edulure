@@ -61,6 +61,31 @@ const SIGNAL_NUMBER_FORMATTER = new Intl.NumberFormat('en-US', {
   useGrouping: false
 });
 
+function formatVelocityMinutes(minutes) {
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return '—';
+  }
+  if (minutes < 60) {
+    return `${Math.round(minutes)}m per deliverable`;
+  }
+  const hours = minutes / 60;
+  return `${hours.toFixed(hours >= 10 ? 0 : 1)}h per deliverable`;
+}
+
+function formatHistoryTimestamp(timestamp) {
+  if (!timestamp) return '—';
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return typeof timestamp === 'string' ? timestamp : '—';
+  }
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
 function resolveSignalWeight(weight) {
   const numericWeight = Number(weight ?? 0);
   if (!Number.isFinite(numericWeight)) {
@@ -161,14 +186,70 @@ export default function CreationStudioSummary({
   const total = summary.total ?? 0;
   const flagDisabled = recommendationsEvaluation ? recommendationsEvaluation.enabled === false : false;
   const latestRun = recommendationsMeta?.generatedAt ?? null;
+  const historyEntries = Array.isArray(recommendationsMeta?.history)
+    ? recommendationsMeta.history
+        .slice()
+        .reverse()
+        .slice(0, 5)
+        .map((entry, index) => ({
+          id: entry?.id ?? `history-${index}`,
+          generatedAt: entry?.generatedAt ?? entry?.timestamp ?? null,
+          actions: entry?.actionsEvaluated ?? entry?.actionsSuggested ?? null,
+          acceptanceRate: entry?.acceptanceRate ?? null,
+          notes: entry?.notes ?? entry?.summary ?? null
+        }))
+    : [];
+  const velocityMinutes = Number(summary.velocityMinutes ?? summary.velocity ?? 0);
+  const qualityScore = summary.qualityScore ?? summary.averageQualityScore ?? null;
+  const reviewSlaHours = summary.reviewSlaHours ?? summary.reviewLeadTimeHours ?? null;
+  const backlogSize = summary.reviewQueueLength ?? summary.reviewBacklog ?? null;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-        {CARD_CONFIG.map((card) => (
-          <SummaryCard key={card.id} card={card} value={summary[card.id] ?? 0} />
-        ))}
-      </section>
+      <div className="space-y-4">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+          {CARD_CONFIG.map((card) => (
+            <SummaryCard key={card.id} card={card} value={summary[card.id] ?? 0} />
+          ))}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Production health</p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-900">Quality & velocity benchmarks</h3>
+          <p className="mt-2 text-sm text-slate-600">
+            Track throughput, review speed, and approval quality so studio leaders can rebalance staffing or escalate blockers
+            before launch windows slip.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Velocity</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{formatVelocityMinutes(velocityMinutes)}</p>
+              <p className="mt-1 text-xs text-slate-500">Average production time per deliverable.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Quality score</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">
+                {qualityScore !== null && qualityScore !== undefined ? Number(qualityScore).toFixed(1) : '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Composite rubric score across peer & compliance reviews.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Review SLA</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">
+                {Number.isFinite(Number(reviewSlaHours)) ? `${Math.round(reviewSlaHours)}h` : '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Average turnaround time for reviewer decisions.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Review backlog</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">
+                {Number.isFinite(Number(backlogSize)) ? backlogSize : '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Pending items awaiting approval across the studio.</p>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <aside className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Creation mix</p>
@@ -307,6 +388,32 @@ export default function CreationStudioSummary({
               ? ` Historical runs recorded: ${recommendationsMeta.history.length}.`
               : ''}
           </p>
+
+          {historyEntries.length ? (
+            <section className="mt-6 border-t border-slate-200 pt-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Recommendation history</p>
+              <ol className="mt-3 space-y-3 text-sm text-slate-600">
+                {historyEntries.map((entry) => (
+                  <li key={entry.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <span className="font-semibold text-slate-900">{formatHistoryTimestamp(entry.generatedAt)}</span>
+                      {Number.isFinite(Number(entry.acceptanceRate)) ? (
+                        <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-primary">
+                          {Math.round(Number(entry.acceptanceRate) * 100)}% adoption
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      {Number.isFinite(Number(entry.actions)) ? (
+                        <span className="rounded-full bg-white px-2 py-1">{entry.actions} actions</span>
+                      ) : null}
+                      {entry.notes ? <span className="text-slate-500">{entry.notes}</span> : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
         </section>
       </aside>
     </div>
