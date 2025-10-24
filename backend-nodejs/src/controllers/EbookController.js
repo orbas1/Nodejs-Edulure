@@ -113,13 +113,82 @@ const purchaseSchema = Joi.object({
   }).optional()
 });
 
-function normaliseArray(value) {
-  if (!value) return undefined;
-  if (Array.isArray(value)) return value;
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
+function normaliseArray(value, { uppercase = false, maxItems = 25, maxLength = 120 } = {}) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const values = Array.isArray(value)
+    ? value
+    : String(value)
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+  if (!values.length) {
+    return undefined;
+  }
+
+  const normalised = [];
+  const seen = new Set();
+
+  for (const entry of values) {
+    if (normalised.length >= maxItems) {
+      break;
+    }
+
+    const trimmed = String(entry).trim().slice(0, maxLength);
+    if (!trimmed) {
+      continue;
+    }
+
+    const valueToStore = uppercase ? trimmed.toUpperCase() : trimmed;
+    const dedupeKey = uppercase ? valueToStore : valueToStore.toLowerCase();
+
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    normalised.push(valueToStore);
+  }
+
+  return normalised.length ? normalised : undefined;
+}
+
+function normalisePagination({ limit, offset }, { maxLimit = 200, defaultLimit = 50 } = {}) {
+  const parseNumber = (value, { min = 0, max = Number.MAX_SAFE_INTEGER, fallback = 0 } = {}) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return fallback;
+    }
+    return Math.min(Math.max(Math.trunc(numeric), min), max);
+  };
+
+  const resolvedLimit = parseNumber(limit, { min: 1, max: maxLimit, fallback: defaultLimit });
+  const resolvedOffset = parseNumber(offset, { min: 0, max: Number.MAX_SAFE_INTEGER, fallback: 0 });
+
+  return { limit: resolvedLimit, offset: resolvedOffset };
+}
+
+function sanitiseMetadata(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'object') {
+    return {};
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_error) {
+    return {};
+  }
 }
 
 function toCents(amount) {
@@ -142,10 +211,11 @@ export default class EbookController {
         coverImageUrl: payload.coverImageUrl || undefined,
         sampleDownloadUrl: payload.sampleDownloadUrl || undefined,
         audiobookUrl: payload.audiobookUrl || undefined,
-        authors: normaliseArray(payload.authors),
-        tags: normaliseArray(payload.tags),
-        categories: normaliseArray(payload.categories),
-        languages: normaliseArray(payload.languages),
+        authors: normaliseArray(payload.authors, { maxItems: 10 }),
+        tags: normaliseArray(payload.tags, { maxItems: 15 }),
+        categories: normaliseArray(payload.categories, { maxItems: 10 }),
+        languages: normaliseArray(payload.languages, { uppercase: true, maxItems: 8, maxLength: 8 }),
+        metadata: sanitiseMetadata(payload.metadata),
         releaseAt: payload.releaseAt ? new Date(payload.releaseAt) : null
       });
 
@@ -170,10 +240,11 @@ export default class EbookController {
         coverImageUrl: payload.coverImageUrl || undefined,
         sampleDownloadUrl: payload.sampleDownloadUrl || undefined,
         audiobookUrl: payload.audiobookUrl || undefined,
-        authors: normaliseArray(payload.authors),
-        tags: normaliseArray(payload.tags),
-        categories: normaliseArray(payload.categories),
-        languages: normaliseArray(payload.languages),
+        authors: normaliseArray(payload.authors, { maxItems: 10 }),
+        tags: normaliseArray(payload.tags, { maxItems: 15 }),
+        categories: normaliseArray(payload.categories, { maxItems: 10 }),
+        languages: normaliseArray(payload.languages, { uppercase: true, maxItems: 8, maxLength: 8 }),
+        metadata: sanitiseMetadata(payload.metadata),
         releaseAt: payload.releaseAt ? new Date(payload.releaseAt) : undefined
       });
 
@@ -207,7 +278,12 @@ export default class EbookController {
   static async catalogue(req, res, next) {
     try {
       const query = await catalogueQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
-      const result = await EbookService.listInstructorCatalogue(req.user.id, query);
+      const { limit, offset } = normalisePagination(query, { maxLimit: 100, defaultLimit: 25 });
+      const result = await EbookService.listInstructorCatalogue(req.user.id, {
+        ...query,
+        limit,
+        offset
+      });
       return success(res, { data: result, message: 'Ebook catalogue fetched' });
     } catch (error) {
       if (error.isJoi) {
@@ -221,14 +297,17 @@ export default class EbookController {
   static async marketplace(req, res, next) {
     try {
       const query = await marketplaceQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
-      const categories = normaliseArray(query.categories);
-      const tags = normaliseArray(query.tags);
-      const languages = normaliseArray(query.languages);
+      const categories = normaliseArray(query.categories, { maxItems: 15 });
+      const tags = normaliseArray(query.tags, { maxItems: 25 });
+      const languages = normaliseArray(query.languages, { uppercase: true, maxItems: 8, maxLength: 8 });
+      const { limit, offset } = normalisePagination(query, { maxLimit: 200, defaultLimit: 24 });
       const result = await EbookService.listMarketplace({
         ...query,
         categories,
         tags,
         languages,
+        limit,
+        offset,
         minPrice: query.minPrice !== undefined ? toCents(query.minPrice) : undefined,
         maxPrice: query.maxPrice !== undefined ? toCents(query.maxPrice) : undefined
       });
