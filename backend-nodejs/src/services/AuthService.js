@@ -12,132 +12,10 @@ import LearnerOnboardingResponseModel from '../models/LearnerOnboardingResponseM
 import { emailVerificationService } from './EmailVerificationService.js';
 import { sessionRegistry } from './SessionRegistry.js';
 import TwoFactorService from './TwoFactorService.js';
+import { serializeUser } from './serializers/userSerializer.js';
 
 function hashRefreshToken(token) {
   return crypto.createHmac('sha256', env.security.jwtRefreshSecret).update(token).digest('hex');
-}
-
-function parseStoredAddress(address) {
-  if (!address) {
-    return null;
-  }
-
-  if (typeof address === 'object' && !Array.isArray(address)) {
-    return Object.keys(address).length ? address : null;
-  }
-
-  if (typeof address !== 'string') {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(address);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const entries = Object.entries(parsed).reduce((acc, [key, value]) => {
-        if (typeof value === 'string' && value.trim().length > 0) {
-          acc[key] = value.trim();
-        }
-        return acc;
-      }, {});
-      return Object.keys(entries).length ? entries : null;
-    }
-  } catch (_error) {
-    // Fall back to treating legacy string addresses as the primary street address.
-    if (address.trim().length > 0) {
-      return { streetAddress: address.trim() };
-    }
-  }
-
-  if (address.trim().length > 0) {
-    return { streetAddress: address.trim() };
-  }
-
-  return null;
-}
-
-function parseJsonObject(value, fallback) {
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-  if (typeof value === 'object' && !Array.isArray(value)) {
-    return value;
-  }
-  if (typeof value !== 'string') {
-    return fallback;
-  }
-  try {
-    const parsed = JSON.parse(value);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed;
-    }
-  } catch (_error) {
-    return fallback;
-  }
-  return fallback;
-}
-
-function normalisePinnedNavigation(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  const deduped = new Set();
-  value.forEach((entry) => {
-    if (typeof entry !== 'string') {
-      return;
-    }
-    const trimmed = entry.trim();
-    if (trimmed.length) {
-      deduped.add(trimmed);
-    }
-  });
-  return Array.from(deduped);
-}
-
-function parseDashboardPreferences(value) {
-  const parsed = parseJsonObject(value, {});
-  return {
-    ...parsed,
-    pinnedNavigation: normalisePinnedNavigation(parsed?.pinnedNavigation)
-  };
-}
-
-function toNonNegativeInteger(value) {
-  const numeric = Number(value ?? 0);
-  if (!Number.isFinite(numeric)) {
-    return 0;
-  }
-  return Math.max(0, Math.trunc(numeric));
-}
-
-function sanitizeUserRecord(user) {
-  const dashboardPreferences = parseDashboardPreferences(
-    user.dashboardPreferences ?? user.dashboard_preferences ?? {}
-  );
-  const activeLiveRoom =
-    parseActiveLiveRoom(user.activeLiveRoom ?? user.active_live_room ?? null) ??
-    (dashboardPreferences.activeLiveRoom ? parseActiveLiveRoom(dashboardPreferences.activeLiveRoom) : null);
-
-  return {
-    id: user.id,
-    firstName: user.firstName ?? user.first_name,
-    lastName: user.lastName ?? user.last_name,
-    email: user.email,
-    role: user.role,
-    age: user.age,
-    address: parseStoredAddress(user.address),
-    dashboardPreferences,
-    pinnedNavigation: dashboardPreferences.pinnedNavigation,
-    unreadCommunityCount: toNonNegativeInteger(user.unreadCommunityCount ?? user.unread_community_count),
-    pendingPayouts: toNonNegativeInteger(user.pendingPayouts ?? user.pending_payouts),
-    activeLiveRoom,
-    twoFactorEnabled: TwoFactorService.isTwoFactorEnabled(user),
-    twoFactorEnrolledAt: user.twoFactorEnrolledAt ?? user.two_factor_enrolled_at ?? null,
-    twoFactorLastVerifiedAt: user.twoFactorLastVerifiedAt ?? user.two_factor_last_verified_at ?? null,
-    createdAt: user.createdAt ?? user.created_at,
-    updatedAt: user.updatedAt ?? user.updated_at,
-    emailVerifiedAt: user.emailVerifiedAt ?? user.email_verified_at ?? null,
-    lastLoginAt: user.lastLoginAt ?? user.last_login_at ?? null
-  };
 }
 
 function buildVerificationMetadata(user) {
@@ -154,54 +32,6 @@ function toIso(value) {
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function parseActiveLiveRoom(value) {
-  const parsed = parseJsonObject(value, null);
-  if (!parsed) {
-    return null;
-  }
-
-  const id = typeof parsed.id === 'string' ? parsed.id.trim() : '';
-  if (!id) {
-    return null;
-  }
-
-  const normalised = {
-    id,
-    title:
-      typeof parsed.title === 'string' && parsed.title.trim().length > 0 ? parsed.title.trim() : undefined,
-    startedAt: toIso(parsed.startedAt ?? parsed.started_at ?? null) ?? undefined,
-    endsAt: toIso(parsed.endsAt ?? parsed.ends_at ?? null) ?? undefined,
-    courseId:
-      typeof parsed.courseId === 'string' && parsed.courseId.trim().length > 0
-        ? parsed.courseId.trim()
-        : typeof parsed.course_id === 'string' && parsed.course_id.trim().length > 0
-          ? parsed.course_id.trim()
-          : undefined,
-    communityId:
-      typeof parsed.communityId === 'string' && parsed.communityId.trim().length > 0
-        ? parsed.communityId.trim()
-        : typeof parsed.community_id === 'string' && parsed.community_id.trim().length > 0
-          ? parsed.community_id.trim()
-          : undefined,
-    hostRole:
-      typeof parsed.hostRole === 'string' && parsed.hostRole.trim().length > 0
-        ? parsed.hostRole.trim()
-        : typeof parsed.role === 'string' && parsed.role.trim().length > 0
-          ? parsed.role.trim()
-          : undefined,
-    roomUrl:
-      typeof parsed.roomUrl === 'string' && parsed.roomUrl.trim().length > 0 ? parsed.roomUrl.trim() : undefined
-  };
-
-  Object.keys(normalised).forEach((key) => {
-    if (normalised[key] === undefined) {
-      delete normalised[key];
-    }
-  });
-
-  return normalised;
 }
 
 function buildSessionPayload(session) {
@@ -294,7 +124,7 @@ export default class AuthService {
 
       return {
         data: {
-          user: sanitizeUserRecord(user),
+          user: serializeUser(user),
           verification: {
             status: 'pending',
             expiresAt: verification.expiresAt.toISOString()
@@ -484,7 +314,7 @@ export default class AuthService {
         trx
       );
 
-      return this.buildAuthResponse(sanitizeUserRecord(refreshedUser), session);
+      return this.buildAuthResponse(serializeUser(refreshedUser), session);
     });
   }
 
@@ -492,7 +322,7 @@ export default class AuthService {
     const user = await emailVerificationService.verifyToken(token, context);
     return {
       data: {
-        user: sanitizeUserRecord(user),
+        user: serializeUser(user),
         verification: buildVerificationMetadata(user)
       }
     };
@@ -570,7 +400,7 @@ export default class AuthService {
         trx
       );
 
-      return this.buildAuthResponse(sanitizeUserRecord(user), newSession);
+      return this.buildAuthResponse(serializeUser(user), newSession);
     });
   }
 

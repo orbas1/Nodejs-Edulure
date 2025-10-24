@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS users (
   role ENUM('user', 'instructor', 'admin') NOT NULL DEFAULT 'user',
   age INT UNSIGNED NULL,
   address VARCHAR(255) NULL,
+  dashboard_preferences JSON NOT NULL DEFAULT (JSON_OBJECT('pinnedNavigation', JSON_ARRAY())),
+  unread_community_count INT UNSIGNED NOT NULL DEFAULT 0,
+  pending_payouts INT UNSIGNED NOT NULL DEFAULT 0,
+  active_live_room JSON NULL,
   two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0,
   two_factor_secret VARBINARY(255) NULL,
   two_factor_enrolled_at TIMESTAMP NULL DEFAULT NULL,
@@ -22,5 +26,6 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at TIMESTAMP NULL DEFAULT NULL,
   UNIQUE KEY users_email_unique (email),
-  INDEX idx_users_role (role)
+  INDEX idx_users_role (role),
+  INDEX idx_users_deleted_at (deleted_at)
 ) ENGINE=InnoDB;

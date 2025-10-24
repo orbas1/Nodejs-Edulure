@@ -120,7 +120,41 @@ export class MonetizationReconciliationJob {
             end: windowEndIso
           });
 
-          tenantSummaries.push({ tenantId, recognition, reconciliation });
+          const alertCount = Array.isArray(reconciliation?.metadata?.alerts)
+            ? reconciliation.metadata.alerts.length
+            : 0;
+          const acknowledgementCount = Array.isArray(reconciliation?.metadata?.acknowledgements)
+            ? reconciliation.metadata.acknowledgements.length
+            : 0;
+
+          if (alertCount > 0) {
+            this.logger.warn(
+              {
+                tenantId,
+                alertCount,
+                severity: reconciliation?.metadata?.severity ?? 'unknown',
+                alerts: reconciliation?.metadata?.alerts?.slice(0, 3) ?? [],
+                acknowledgements: acknowledgementCount
+              },
+              'Monetization reconciliation surfaced finance alerts'
+            );
+          }
+
+          tenantSummaries.push({
+            tenantId,
+            recognition,
+            reconciliation: {
+              id: reconciliation?.id ?? null,
+              status: reconciliation?.status ?? 'unknown',
+              severity: reconciliation?.metadata?.severity ?? 'normal',
+              alertCount,
+              acknowledgementCount,
+              varianceCents: reconciliation?.varianceCents ?? 0,
+              varianceBps: reconciliation?.metadata?.varianceBps ?? 0,
+              windowStart: reconciliation?.windowStart ?? windowStartIso,
+              windowEnd: reconciliation?.windowEnd ?? windowEndIso
+            }
+          });
         } catch (error) {
           failures.push({ tenantId, error });
           this.logger.error({ err: error, tenantId, trigger }, 'Monetization reconciliation failed for tenant');

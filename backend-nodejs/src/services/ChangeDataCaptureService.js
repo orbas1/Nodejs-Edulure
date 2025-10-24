@@ -34,6 +34,7 @@ export class ChangeDataCaptureService {
     entityId,
     operation,
     payload,
+    schemaVersion = '1.0',
     correlationId,
     dryRun = false,
     nextAttemptAt,
@@ -44,6 +45,20 @@ export class ChangeDataCaptureService {
     }
 
     const now = new Date();
+    const normalisedPayload = normaliseJson(payload);
+    const schemaMetadata = {
+      version: schemaVersion,
+      recordedAt: now.toISOString(),
+      domain
+    };
+    const enrichedPayload =
+      normalisedPayload && typeof normalisedPayload === 'object'
+        ? {
+            ...normalisedPayload,
+            _schema: { ...(normalisedPayload._schema ?? {}), ...schemaMetadata }
+          }
+        : { value: normalisedPayload ?? null, _schema: schemaMetadata };
+
     const eventPayload = {
       event_uuid: crypto.randomUUID(),
       domain,
@@ -53,7 +68,7 @@ export class ChangeDataCaptureService {
       status: status.toLowerCase(),
       dry_run: Boolean(dryRun),
       correlation_id: correlationId ?? crypto.randomUUID().slice(0, 32),
-      payload: normaliseJson(payload),
+      payload: enrichedPayload,
       next_attempt_at: nextAttemptAt ?? now
     };
 

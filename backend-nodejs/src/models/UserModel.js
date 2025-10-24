@@ -25,6 +25,26 @@ function serialiseNullableJson(value) {
   }
 }
 
+function serialiseTwoFactorSecret(secret) {
+  if (secret === undefined || secret === null) {
+    return null;
+  }
+
+  if (Buffer.isBuffer(secret)) {
+    return secret;
+  }
+
+  if (typeof secret === 'string') {
+    const trimmed = secret.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return Buffer.from(trimmed, 'utf8');
+  }
+
+  return null;
+}
+
 function toUnsignedInt(value) {
   const numeric = Number(value ?? 0);
   if (!Number.isFinite(numeric)) {
@@ -80,7 +100,7 @@ export default class UserModel {
       pending_payouts: toUnsignedInt(user.pendingPayouts),
       active_live_room: serialiseNullableJson(user.activeLiveRoom),
       two_factor_enabled: user.twoFactorEnabled ? 1 : 0,
-      two_factor_secret: user.twoFactorSecret ?? null,
+      two_factor_secret: serialiseTwoFactorSecret(user.twoFactorSecret),
       two_factor_enrolled_at: user.twoFactorEnrolledAt ?? null,
       two_factor_last_verified_at: user.twoFactorLastVerifiedAt ?? null
     };
@@ -139,7 +159,7 @@ export default class UserModel {
       payload.two_factor_enabled = updates.twoFactorEnabled ? 1 : 0;
     }
     if (updates.twoFactorSecret !== undefined) {
-      payload.two_factor_secret = updates.twoFactorSecret ?? null;
+      payload.two_factor_secret = serialiseTwoFactorSecret(updates.twoFactorSecret);
     }
     if (updates.twoFactorEnrolledAt !== undefined) {
       payload.two_factor_enrolled_at = updates.twoFactorEnrolledAt ?? null;

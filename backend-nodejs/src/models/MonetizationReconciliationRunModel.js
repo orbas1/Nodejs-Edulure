@@ -65,6 +65,14 @@ function mapRow(row) {
 }
 
 export default class MonetizationReconciliationRunModel {
+  static async findById(id, connection = db) {
+    if (!id) {
+      return null;
+    }
+    const row = await connection(TABLE).where({ id }).first();
+    return mapRow(row);
+  }
+
   static async create(payload, connection = db) {
     const insertPayload = {
       tenant_id: normaliseTenantId(payload.tenantId),
@@ -100,6 +108,52 @@ export default class MonetizationReconciliationRunModel {
       .orderBy('created_at', 'desc')
       .limit(Math.min(limit, 100));
     return rows.map(mapRow);
+  }
+
+  static async updateMetadata(id, mutator, connection = db) {
+    if (!id) {
+      throw new Error('id is required to update reconciliation metadata');
+    }
+
+    const row = await connection(TABLE).where({ id }).first();
+    if (!row) {
+      return null;
+    }
+
+    const currentMetadata = parseJson(row.metadata);
+    const nextMetadata =
+      typeof mutator === 'function' ? mutator({ ...currentMetadata }) : { ...currentMetadata, ...mutator };
+
+    await connection(TABLE)
+      .where({ id })
+      .update({ metadata: JSON.stringify(nextMetadata ?? {}), updated_at: connection.fn.now() });
+
+    const updatedRow = await connection(TABLE).where({ id }).first();
+    return mapRow(updatedRow);
+  }
+
+  static async appendAcknowledgement({ id, acknowledgement }, connection = db) {
+    if (!id) {
+      throw new Error('id is required to append an acknowledgement');
+    }
+    if (!acknowledgement) {
+      throw new Error('acknowledgement payload is required');
+    }
+
+    return this.updateMetadata(
+      id,
+      (metadata = {}) => {
+        const existing = Array.isArray(metadata.acknowledgements) ? [...metadata.acknowledgements] : [];
+        existing.push(acknowledgement);
+        const trimmed = existing.slice(-20);
+        return {
+          ...metadata,
+          acknowledgements: trimmed,
+          lastAcknowledgedAt: acknowledgement.acknowledgedAt ?? metadata.lastAcknowledgedAt ?? null
+        };
+      },
+      connection
+    );
   }
 
   static async distinctTenants(connection = db) {

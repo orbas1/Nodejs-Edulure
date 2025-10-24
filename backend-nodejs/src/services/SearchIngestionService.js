@@ -3,6 +3,7 @@ import logger from '../config/logger.js';
 import { env } from '../config/env.js';
 import { INDEX_DEFINITIONS, searchClusterService } from './SearchClusterService.js';
 import { recordSearchOperation, recordSearchIngestionRun } from '../observability/metrics.js';
+import { getEntityScoreWeights } from '../config/searchRankingConfig.js';
 
 function safeJsonParse(value, fallback) {
   if (!value) {
@@ -275,7 +276,14 @@ export class SearchIngestionService {
     const postCount = normalizeNumber(row.postCount, 0);
     const eventCount = normalizeNumber(row.eventCount, 0);
     const reactionCount = normalizeNumber(row.reactionCount, 0);
-    const trendScore = Math.round(memberCount * 0.35 + postCount * 2 + resourceCount * 1.6 + eventCount * 2.4 + reactionCount * 0.5);
+    const weights = getEntityScoreWeights('communities');
+    const trendScore = Math.round(
+      memberCount * weights.members +
+        postCount * weights.posts +
+        resourceCount * weights.resources +
+        eventCount * weights.events +
+        reactionCount * weights.reactions
+    );
 
     return {
       id: row.id,

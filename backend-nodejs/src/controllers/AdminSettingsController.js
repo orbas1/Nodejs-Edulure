@@ -153,6 +153,15 @@ const thirdPartyUpdateSchema = Joi.object({
   .min(1)
   .messages({ 'object.min': 'Provide at least one third-party credential field to update.' });
 
+const operationalOverviewQuerySchema = Joi.object({
+  environment: Joi.string().trim().max(120).allow('', null),
+  tenantScope: Joi.alternatives().try(
+    Joi.array().items(Joi.string().trim().max(120)),
+    Joi.string().trim().max(120).allow('', null)
+  ),
+  includeDetails: Joi.boolean().truthy('true', '1', 'yes').falsy('false', '0', 'no').default(false)
+});
+
 const adminProfileLeadershipSchema = Joi.object({
   id: Joi.string().trim().max(64).optional(),
   name: Joi.string().trim().max(160).required(),
@@ -447,6 +456,35 @@ const monetizationUpdateSchema = Joi.object({
   .message('At least one monetisation field must be provided.');
 
 export default class AdminSettingsController {
+  static async getOperationalGovernanceOverview(req, res, next) {
+    try {
+      const query = await operationalOverviewQuerySchema.validateAsync(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const tenantScopeHeader = req.headers['x-tenant-id'];
+      const tenantScope = query.tenantScope ?? tenantScopeHeader ?? 'global';
+
+      const overview = await PlatformSettingsService.getOperationalGovernanceOverview({
+        environment: query.environment || undefined,
+        tenantScope,
+        includeProviderDetails: query.includeDetails
+      });
+
+      return success(res, {
+        data: overview,
+        message: 'Operational governance overview generated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details?.map((detail) => detail.message) ?? [error.message];
+      }
+      return next(error);
+    }
+  }
+
   static async getAdminProfileSettings(_req, res, next) {
     try {
       const settings = await PlatformSettingsService.getAdminProfileSettings();
