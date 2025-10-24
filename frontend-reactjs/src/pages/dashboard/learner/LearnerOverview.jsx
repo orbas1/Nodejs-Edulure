@@ -155,6 +155,52 @@ function normaliseLearningPace(entries) {
   }));
 }
 
+function resolveUpcomingAction(event) {
+  if (!event || typeof event !== 'object') {
+    return { label: 'View details', href: null, type: null };
+  }
+
+  const actionCandidate = event.callToAction ?? event.action ?? null;
+  const labelCandidates = [event.actionLabel, event.ctaLabel, event.buttonLabel];
+  const hrefCandidates = [
+    event.actionHref,
+    event.ctaHref,
+    event.href,
+    event.url,
+    event.actionUrl,
+    event.ctaUrl
+  ];
+
+  if (actionCandidate && typeof actionCandidate === 'object') {
+    if (actionCandidate.label) labelCandidates.push(actionCandidate.label);
+    if (actionCandidate.title) labelCandidates.push(actionCandidate.title);
+    hrefCandidates.push(actionCandidate.href, actionCandidate.url, actionCandidate.link);
+  } else if (typeof actionCandidate === 'string') {
+    const directHref = sanitiseActionLink(actionCandidate);
+    if (directHref) {
+      hrefCandidates.unshift(directHref);
+    } else {
+      labelCandidates.push(actionCandidate);
+    }
+  }
+
+  let href = null;
+  for (const candidate of hrefCandidates) {
+    const sanitised = sanitiseActionLink(candidate);
+    if (sanitised) {
+      href = sanitised;
+      break;
+    }
+  }
+
+  const label = labelCandidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+  const resolvedLabel = label ?? (href ? 'Open details' : 'View details');
+  const type =
+    (typeof actionCandidate === 'object' && actionCandidate?.action) || event.actionType || event.actionKind || null;
+
+  return { label: resolvedLabel, href, type };
+}
+
 function normaliseUpcoming(upcoming) {
   if (!Array.isArray(upcoming)) return [];
   const baseDate = new Date();
@@ -165,6 +211,7 @@ function normaliseUpcoming(upcoming) {
       const end = event.endAt ?? event.end ?? event.finishAt ?? null;
       const timezone = event.timezone ?? event.tz ?? event.timeZone ?? null;
       const scheduledFor = start ?? end;
+      const { label: actionLabel, href: actionHref, type: actionType } = resolveUpcomingAction(event);
       const urgency = getDashboardUrgency(scheduledFor, { baseDate });
       return {
         id: event.id,
@@ -175,8 +222,10 @@ function normaliseUpcoming(upcoming) {
         urgencyLabel: describeDashboardUrgency(scheduledFor, { baseDate }),
         title: event.title ?? 'Upcoming session',
         host: event.host ?? 'Edulure team',
-        action: event.action ?? 'View details',
-        href: sanitiseActionLink(event.href ?? event.url ?? event.actionUrl ?? event.ctaUrl)
+        action: actionLabel,
+        actionLabel,
+        actionType,
+        href: actionHref
       };
     });
 }
