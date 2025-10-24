@@ -273,8 +273,8 @@
       - A39. Learning Content Schema (5.B)
       - A40. Community, Social & Messaging Schema (5.C)
       - A41. Commerce & Finance Schema (5.D)
-      - A42. Analytics, Governance & Observability Schema (5.E)
-      - A43. Marketing, Content & Enablement Schema (5.F)
+      - A42. Analytics, Governance & Observability Schema (5.E) ✓
+      - A43. Marketing, Content & Enablement Schema (5.F) ✓
       - A44. SDK Generated Client & Runtime Configuration (6.A)
       - A45. SDK Authentication & Session Utilities (6.B)
       - A46. Environment Provisioning & Infrastructure as Code (7.A)
