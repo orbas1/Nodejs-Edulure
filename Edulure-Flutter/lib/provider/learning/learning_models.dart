@@ -1,6 +1,8 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 
+enum ProgressSyncState { pending, syncing, synced, conflict }
+
 @immutable
 class CourseModule {
   const CourseModule({
@@ -624,7 +626,14 @@ class ModuleProgressLog {
     required this.timestamp,
     required this.notes,
     required this.completedLessons,
-  });
+    this.syncState = ProgressSyncState.pending,
+    DateTime? updatedAt,
+    this.syncedAt,
+    this.deviceId = 'unknown-device',
+    this.conflictReason,
+    this.remoteSuggestion,
+    this.revision = 0,
+  }) : updatedAt = updatedAt ?? timestamp;
 
   final String id;
   final String courseId;
@@ -632,8 +641,50 @@ class ModuleProgressLog {
   final DateTime timestamp;
   final String notes;
   final int completedLessons;
+  final ProgressSyncState syncState;
+  final DateTime updatedAt;
+  final DateTime? syncedAt;
+  final String deviceId;
+  final String? conflictReason;
+  final ModuleProgressLog? remoteSuggestion;
+  final int revision;
+
+  bool get hasConflict => syncState == ProgressSyncState.conflict;
+
+  ModuleProgressLog copyWith({
+    String? id,
+    String? courseId,
+    String? moduleId,
+    DateTime? timestamp,
+    String? notes,
+    int? completedLessons,
+    ProgressSyncState? syncState,
+    DateTime? updatedAt,
+    DateTime? syncedAt,
+    String? deviceId,
+    String? conflictReason,
+    ModuleProgressLog? remoteSuggestion,
+    int? revision,
+  }) {
+    return ModuleProgressLog(
+      id: id ?? this.id,
+      courseId: courseId ?? this.courseId,
+      moduleId: moduleId ?? this.moduleId,
+      timestamp: timestamp ?? this.timestamp,
+      notes: notes ?? this.notes,
+      completedLessons: completedLessons ?? this.completedLessons,
+      syncState: syncState ?? this.syncState,
+      updatedAt: updatedAt ?? this.updatedAt,
+      syncedAt: syncedAt ?? this.syncedAt,
+      deviceId: deviceId ?? this.deviceId,
+      conflictReason: conflictReason ?? this.conflictReason,
+      remoteSuggestion: remoteSuggestion ?? this.remoteSuggestion,
+      revision: revision ?? this.revision,
+    );
+  }
 
   factory ModuleProgressLog.fromJson(Map<String, dynamic> json) {
+    final remote = json['remoteSuggestion'];
     return ModuleProgressLog(
       id: json['id'] as String,
       courseId: json['courseId'] as String,
@@ -641,6 +692,18 @@ class ModuleProgressLog {
       timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
       notes: json['notes'] as String,
       completedLessons: (json['completedLessons'] as num?)?.toInt() ?? 0,
+      syncState: _parseSyncState(json['syncState']?.toString()),
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+          DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+          DateTime.now(),
+      syncedAt: DateTime.tryParse(json['syncedAt'] as String? ?? ''),
+      deviceId: json['deviceId']?.toString() ?? 'unknown-device',
+      conflictReason: json['conflictReason']?.toString(),
+      remoteSuggestion: remote is Map
+          ? ModuleProgressLog.fromJson(Map<String, dynamic>.from(remote as Map))
+              .copyWith(remoteSuggestion: null)
+          : null,
+      revision: (json['revision'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -652,7 +715,28 @@ class ModuleProgressLog {
       'timestamp': timestamp.toIso8601String(),
       'notes': notes,
       'completedLessons': completedLessons,
-    };
+      'syncState': describeEnum(syncState),
+      'updatedAt': updatedAt.toIso8601String(),
+      'syncedAt': syncedAt?.toIso8601String(),
+      'deviceId': deviceId,
+      'conflictReason': conflictReason,
+      'remoteSuggestion': remoteSuggestion?.copyWith(remoteSuggestion: null).toJson(),
+      'revision': revision,
+    }..removeWhere((key, value) => value == null);
+  }
+
+  static ProgressSyncState _parseSyncState(String? value) {
+    switch (value) {
+      case 'syncing':
+        return ProgressSyncState.syncing;
+      case 'synced':
+        return ProgressSyncState.synced;
+      case 'conflict':
+        return ProgressSyncState.conflict;
+      case 'pending':
+      default:
+        return ProgressSyncState.pending;
+    }
   }
 }
 
