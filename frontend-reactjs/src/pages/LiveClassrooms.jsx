@@ -18,6 +18,8 @@ import { listPublicLiveClassrooms } from '../api/catalogueApi.js';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
+import LearningClusterSummary from '../components/learning/LearningClusterSummary.jsx';
+import { getLiveClassroomCluster, summariseLearningClusters } from '../utils/learningClusters.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'events',
@@ -99,7 +101,8 @@ function createEmptyForm() {
     instructorId: '',
     topics: '',
     slug: '',
-    metadata: ''
+    metadata: '',
+    clusterKey: 'general'
   };
 }
 
@@ -523,8 +526,26 @@ export default function LiveClassrooms() {
   const [editingId, setEditingId] = useState(null);
   const [currentStep, setCurrentStep] = useState('basics');
   const [submitting, setSubmitting] = useState(false);
+  const [clusterFilter, setClusterFilter] = useState('all');
 
-  const featuredLiveClass = useMemo(() => liveClassrooms[0] ?? null, [liveClassrooms]);
+  const classroomClusterSummary = useMemo(
+    () => summariseLearningClusters({ liveClassrooms }),
+    [liveClassrooms]
+  );
+
+  const filteredLiveClassrooms = useMemo(() => {
+    if (clusterFilter === 'all') {
+      return liveClassrooms;
+    }
+    return liveClassrooms.filter((session) => getLiveClassroomCluster(session).key === clusterFilter);
+  }, [clusterFilter, liveClassrooms]);
+
+  const featuredLiveClass = useMemo(() => {
+    if (filteredLiveClassrooms.length) {
+      return filteredLiveClassrooms[0];
+    }
+    return liveClassrooms[0] ?? null;
+  }, [filteredLiveClassrooms, liveClassrooms]);
   const liveKeywords = useMemo(() => {
     if (!featuredLiveClass) {
       return [];
@@ -559,7 +580,8 @@ export default function LiveClassrooms() {
     keywords: liveKeywords,
     analytics: {
       page_type: 'live_classrooms',
-      session_count: liveClassrooms.length
+      session_count: filteredLiveClassrooms.length,
+      cluster_filter: clusterFilter
     }
   });
 
@@ -622,6 +644,15 @@ export default function LiveClassrooms() {
     setCurrentStep('basics');
   }, []);
 
+  const handleClusterSelect = useCallback((key) => {
+    setClusterFilter((current) => {
+      if (key === 'all') {
+        return 'all';
+      }
+      return current === key ? 'all' : key;
+    });
+  }, []);
+
   const handleEdit = (classroom) => {
     setMode('edit');
     setEditingId(classroom.id);
@@ -644,7 +675,8 @@ export default function LiveClassrooms() {
       instructorId: classroom.instructorId ?? '',
       topics: Array.isArray(classroom.topics) ? classroom.topics.join(', ') : '',
       slug: classroom.slug ?? '',
-      metadata: classroom.metadata ? JSON.stringify(classroom.metadata, null, 2) : ''
+      metadata: classroom.metadata ? JSON.stringify(classroom.metadata, null, 2) : '',
+      clusterKey: classroom.clusterKey ?? getLiveClassroomCluster(classroom).key
     });
   };
 
@@ -688,6 +720,17 @@ export default function LiveClassrooms() {
         topics: normaliseTopics(form.topics),
         metadata: parseMetadata(form.metadata)
       };
+
+      const predictedSession = {
+        title: payload.title,
+        summary: payload.summary,
+        description: payload.description,
+        type: payload.type,
+        topics: payload.topics
+      };
+      const manualCluster = form.clusterKey?.toLowerCase().trim();
+      const heuristicCluster = getLiveClassroomCluster(predictedSession).key;
+      payload.clusterKey = manualCluster && manualCluster !== 'general' ? manualCluster : heuristicCluster;
 
       if (mode === 'edit' && editingId) {
         await adminControlApi.updateLiveStream({ token, id: editingId, payload });
@@ -781,11 +824,13 @@ export default function LiveClassrooms() {
         <div className="mt-10 space-y-4">
           <p className="text-sm font-semibold text-slate-700">Scheduled classrooms</p>
           {loading ? <p className="text-sm text-slate-500">Loading scheduled classrooms…</p> : null}
-          {!loading && liveClassrooms.length === 0 ? (
-            <p className="text-sm text-slate-500">No live classrooms scheduled yet.</p>
+          {!loading && filteredLiveClassrooms.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              {clusterFilter === 'all' ? 'No live classrooms scheduled yet.' : 'No sessions match this learning cluster yet.'}
+            </p>
           ) : null}
           <div className="grid gap-4">
-            {liveClassrooms.map((classroom) => (
+            {filteredLiveClassrooms.map((classroom) => (
               <div
                 key={classroom.id}
                 className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-slate-600"
@@ -850,6 +895,21 @@ export default function LiveClassrooms() {
           <ExplorerSearchSection {...EXPLORER_CONFIG} />
         </section>
 
+        <section className="space-y-4">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Learning clusters</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Compare sessions by learning cluster</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Toggle between operations, growth, enablement and community programming to calibrate your live calendar.
+            </p>
+          </div>
+          <LearningClusterSummary
+            clusters={classroomClusterSummary.clusters}
+            activeKey={clusterFilter}
+            onSelect={handleClusterSelect}
+          />
+        </section>
+
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold text-slate-900">Upcoming live classrooms</h2>
@@ -861,7 +921,7 @@ export default function LiveClassrooms() {
             <p className="text-sm font-semibold text-rose-500">{error}</p>
           ) : null}
           <div className="grid gap-6 lg:grid-cols-2">
-            {liveClassrooms.map((classroom) => (
+            {filteredLiveClassrooms.map((classroom) => (
               <LiveClassroomCard
                 key={classroom.id}
                 classroom={classroom}
@@ -869,9 +929,11 @@ export default function LiveClassrooms() {
                 onCheckIn={() => handleCheckIn(classroom)}
               />
             ))}
-            {!loading && liveClassrooms.length === 0 ? (
+            {!loading && filteredLiveClassrooms.length === 0 ? (
               <p className="text-sm text-slate-500">
-                No live classrooms scheduled yet. Administrators can create sessions below to populate this surface.
+                {clusterFilter === 'all'
+                  ? 'No live classrooms scheduled yet. Administrators can create sessions below to populate this surface.'
+                  : 'No live classrooms match this learning cluster just yet.'}
               </p>
             ) : null}
             {loading ? <p className="text-sm text-slate-500">Loading live classrooms…</p> : null}

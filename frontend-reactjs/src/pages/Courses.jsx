@@ -17,6 +17,8 @@ import { isAbortError } from '../utils/errors.js';
 import { computeFileChecksum } from '../utils/uploads.js';
 import CheckoutDialog from '../components/commerce/CheckoutDialog.jsx';
 import CheckoutPriceSummary from '../components/commerce/CheckoutPriceSummary.jsx';
+import LearningClusterSummary from '../components/learning/LearningClusterSummary.jsx';
+import { getCourseCluster, summariseLearningClusters } from '../utils/learningClusters.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'courses',
@@ -92,7 +94,8 @@ function createEmptyForm() {
     isPublished: false,
     releaseAt: '',
     status: 'draft',
-    metadata: ''
+    metadata: '',
+    clusterKey: 'general'
   };
 }
 
@@ -186,6 +189,7 @@ function mapCatalogueCourse(course) {
     highlights: Array.isArray(course.highlights) ? course.highlights : [],
     instructor: course.instructorName ?? course.instructor ?? null,
     upsellBadges: Array.isArray(course.upsellBadges) ? course.upsellBadges : [],
+    clusterKey: course.clusterKey ?? (course.metadata?.clusterKey ?? 'general'),
     actions: [
       course.syllabusUrl
         ? { label: 'View syllabus', href: course.syllabusUrl }
@@ -773,6 +777,36 @@ export default function Courses() {
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
   const [uploadState, setUploadState] = useState({});
+  const [clusterFilter, setClusterFilter] = useState('all');
+
+  const courseClusterSummary = useMemo(
+    () =>
+      summariseLearningClusters({
+        courses: [...highlightCourses, ...catalogueCourses, ...liveCourses]
+      }),
+    [highlightCourses, catalogueCourses, liveCourses]
+  );
+
+  const filteredHighlightCourses = useMemo(() => {
+    if (clusterFilter === 'all') {
+      return highlightCourses;
+    }
+    return highlightCourses.filter((course) => getCourseCluster(course).key === clusterFilter);
+  }, [clusterFilter, highlightCourses]);
+
+  const filteredCatalogueCourses = useMemo(() => {
+    if (clusterFilter === 'all') {
+      return catalogueCourses;
+    }
+    return catalogueCourses.filter((course) => getCourseCluster(course).key === clusterFilter);
+  }, [clusterFilter, catalogueCourses]);
+
+  const filteredLiveCourses = useMemo(() => {
+    if (clusterFilter === 'all') {
+      return liveCourses;
+    }
+    return liveCourses.filter((course) => getCourseCluster(course).key === clusterFilter);
+  }, [clusterFilter, liveCourses]);
 
   const checkoutCurrency = checkoutCourse?.priceCurrency ?? 'USD';
   const couponValidation = useCouponValidation({
@@ -829,7 +863,12 @@ export default function Courses() {
     );
   }, [checkoutCourse, checkoutForm.quantity, couponValidation.coupon]);
 
-  const featuredCourse = useMemo(() => highlightCourses[0] ?? null, [highlightCourses]);
+  const featuredCourse = useMemo(() => {
+    if (filteredHighlightCourses.length) {
+      return filteredHighlightCourses[0];
+    }
+    return highlightCourses[0] ?? null;
+  }, [filteredHighlightCourses, highlightCourses]);
   const courseKeywords = useMemo(() => {
     if (!featuredCourse) {
       return [];
@@ -867,9 +906,10 @@ export default function Courses() {
     keywords: courseKeywords,
     analytics: {
       page_type: 'courses',
-      highlight_count: highlightCourses.length,
-      catalogue_count: catalogueCourses.length,
-      live_count: liveCourses.length
+      highlight_count: filteredHighlightCourses.length,
+      catalogue_count: filteredCatalogueCourses.length,
+      live_count: filteredLiveCourses.length,
+      cluster_filter: clusterFilter
     }
   });
 
@@ -881,6 +921,15 @@ export default function Courses() {
         ...patch
       }
     }));
+  }, []);
+
+  const handleClusterSelect = useCallback((key) => {
+    setClusterFilter((current) => {
+      if (key === 'all') {
+        return 'all';
+      }
+      return current === key ? 'all' : key;
+    });
   }, []);
 
   const handleMediaUpload = useCallback(
@@ -1314,7 +1363,8 @@ export default function Courses() {
       isPublished: Boolean(course.isPublished),
       releaseAt: toDateInput(course.releaseAt),
       status: course.status ?? 'draft',
-      metadata: course.metadata ? JSON.stringify(course.metadata, null, 2) : ''
+      metadata: course.metadata ? JSON.stringify(course.metadata, null, 2) : '',
+      clusterKey: course.clusterKey ?? getCourseCluster(course).key
     });
     setUploadState({
       thumbnailUrl: course.thumbnailUrl ? { status: 'uploaded', url: course.thumbnailUrl } : { status: 'idle' },
@@ -1368,6 +1418,22 @@ export default function Courses() {
         status: form.status,
         metadata: parseMetadata(form.metadata)
       };
+
+      const predictedCourse = {
+        ...form,
+        title: payload.title,
+        summary: payload.summary,
+        description: payload.description,
+        level: payload.level,
+        category: payload.category,
+        skills: payload.skills,
+        tags: payload.tags,
+        deliveryFormat: payload.deliveryFormat,
+        metadata: payload.metadata
+      };
+      const manualCluster = form.clusterKey?.toLowerCase().trim();
+      const heuristicCluster = getCourseCluster(predictedCourse).key;
+      payload.clusterKey = manualCluster && manualCluster !== 'general' ? manualCluster : heuristicCluster;
 
       if (mode === 'edit' && editingId) {
         await adminControlApi.updateCourse({ token, id: editingId, payload });
@@ -1434,11 +1500,13 @@ export default function Courses() {
         <div className="mt-10 space-y-4">
           <p className="text-sm font-semibold text-slate-700">Catalogue entries</p>
           {loading ? <p className="text-sm text-slate-500">Loading catalogue…</p> : null}
-          {!loading && liveCourses.length === 0 ? (
-            <p className="text-sm text-slate-500">No courses published yet.</p>
+          {!loading && filteredLiveCourses.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              {clusterFilter === 'all' ? 'No courses published yet.' : 'No admin catalogue items match this cluster.'}
+            </p>
           ) : null}
           <div className="grid gap-3">
-            {liveCourses.map((course) => (
+            {filteredLiveCourses.map((course) => (
               <div
                 key={course.id}
                 className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-slate-600"
@@ -1495,6 +1563,21 @@ export default function Courses() {
           <ExplorerSearchSection {...EXPLORER_CONFIG} />
         </section>
 
+        <section className="space-y-4">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Learning clusters</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Align courses by learning cluster</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Use the cluster navigator to compare growth, operations, enablement and community programs side by side.
+            </p>
+          </div>
+          <LearningClusterSummary
+            clusters={courseClusterSummary.clusters}
+            activeKey={clusterFilter}
+            onSelect={handleClusterSelect}
+          />
+        </section>
+
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold text-slate-900">Highlighted programs</h2>
@@ -1506,7 +1589,7 @@ export default function Courses() {
             <p className="text-sm font-semibold text-rose-500">{highlightError}</p>
           ) : null}
           <div className="grid gap-6 lg:grid-cols-2">
-            {highlightCourses.map((course) => {
+            {filteredHighlightCourses.map((course) => {
               const secondary = Array.isArray(course.actions) ? course.actions[0] : null;
               const fallbackHref = secondary?.href ?? (course.slug ? `/courses/${course.slug}` : undefined);
               const secondaryLabel = secondary?.label ?? (fallbackHref ? 'View details' : undefined);
@@ -1539,9 +1622,11 @@ export default function Courses() {
                 />
               );
             })}
-            {!highlightLoading && highlightCourses.length === 0 ? (
+            {!highlightLoading && filteredHighlightCourses.length === 0 ? (
               <p className="text-sm text-slate-500">
-                Sign in to load curated course highlights or publish a course using the console below.
+                {clusterFilter === 'all'
+                  ? 'Sign in to load curated course highlights or publish a course using the console below.'
+                  : 'No highlighted courses match this learning cluster.'}
               </p>
             ) : null}
             {highlightLoading ? <p className="text-sm text-slate-500">Loading courses…</p> : null}
@@ -1559,7 +1644,7 @@ export default function Courses() {
             <p className="text-sm font-semibold text-rose-500">{catalogueError}</p>
           ) : null}
           <div className="grid gap-6 lg:grid-cols-2">
-            {catalogueCourses.map((course) => {
+            {filteredCatalogueCourses.map((course) => {
               const mapped = mapCatalogueCourse(course);
               if (!mapped) return null;
               const secondary = Array.isArray(mapped.actions) ? mapped.actions[0] : null;
@@ -1593,9 +1678,14 @@ export default function Courses() {
                 />
               );
             })}
-            {!catalogueLoading && catalogueCourses.length === 0 ? (
-              <p className="text-sm text-slate-500">No published courses yet. Check back soon.</p>
+            {!catalogueLoading && filteredCatalogueCourses.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                {clusterFilter === 'all'
+                  ? 'No published courses yet. Check back soon.'
+                  : 'No catalogue launches match this learning cluster yet.'}
+              </p>
             ) : null}
+            {catalogueLoading ? <p className="text-sm text-slate-500">Loading catalogue…</p> : null}
           </div>
         </section>
 

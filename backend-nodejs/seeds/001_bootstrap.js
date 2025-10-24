@@ -1592,6 +1592,7 @@ export async function seed(knex) {
       mime_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       created_by: instructorId,
       published_at: trx.fn.now(),
+      cluster_key: 'operations',
       metadata: JSON.stringify({
         communityId: opsCommunityId,
         deckVersion: 1,
@@ -1669,6 +1670,7 @@ export async function seed(knex) {
       mime_type: 'application/epub+zip',
       created_by: adminId,
       published_at: trx.fn.now(),
+      cluster_key: 'growth',
       metadata: JSON.stringify({
         communityId: growthCommunityId,
         drmProfile: 'watermark-v1',
@@ -3061,6 +3063,7 @@ export async function seed(knex) {
       is_published: true,
       release_at: trx.fn.now(),
       status: 'published',
+      cluster_key: 'operations',
       metadata: JSON.stringify({
         brandColor: '#4338ca',
         certificateBackgroundUrl: automationCertificateArtwork.url,
@@ -4250,6 +4253,7 @@ export async function seed(knex) {
       start_at: liveClassroomStart,
       end_at: liveClassroomEnd,
       topics: JSON.stringify(['Automation', 'Live Operations']),
+      cluster_key: 'operations',
       metadata: JSON.stringify({
         agoraChannel: 'OPS-LAUNCH-001',
         featureFlag: 'live-simulations',

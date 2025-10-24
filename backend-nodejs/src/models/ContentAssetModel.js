@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import { normaliseClusterKey } from '../utils/learningClusters.js';
 
 const TABLE = 'content_assets';
 
@@ -20,6 +21,7 @@ const BASE_COLUMNS = [
   'mime_type as mimeType',
   'created_by as createdBy',
   'published_at as publishedAt',
+  'cluster_key as clusterKey',
   'metadata',
   'created_at as createdAt',
   'updated_at as updatedAt',
@@ -42,6 +44,7 @@ function serialise(asset) {
     mime_type: asset.mimeType ?? null,
     created_by: asset.createdBy ?? null,
     published_at: asset.publishedAt ?? null,
+    cluster_key: normaliseClusterKey(asset.clusterKey),
     metadata: JSON.stringify(asset.metadata ?? {})
   };
 }
@@ -68,6 +71,7 @@ export default class ContentAssetModel {
     if (updates.sizeBytes !== undefined) payload.size_bytes = updates.sizeBytes ?? null;
     if (updates.mimeType !== undefined) payload.mime_type = updates.mimeType ?? null;
     if (updates.publishedAt !== undefined) payload.published_at = updates.publishedAt;
+    if (updates.clusterKey !== undefined) payload.cluster_key = normaliseClusterKey(updates.clusterKey);
     if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
     await connection(TABLE).where({ id }).update({ ...payload, updated_at: connection.fn.now() });
     return this.findById(id, connection);
@@ -118,6 +122,7 @@ export default class ContentAssetModel {
 
     return {
       ...row,
+      clusterKey: normaliseClusterKey(row.clusterKey),
       metadata
     };
   }
