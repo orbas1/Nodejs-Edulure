@@ -79,9 +79,16 @@ export default function ProfileIdentityEditor({
   isSaving,
   canSubmit,
   error,
-  success
+  success,
+  errors
 }) {
   const socialLinks = Array.isArray(form.socialLinks) && form.socialLinks.length > 0 ? form.socialLinks : [{ label: '', url: '' }];
+  const validationErrors = errors ?? {};
+
+  const inputClassName = (hasError) =>
+    `mt-1 w-full rounded-xl border px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 ${
+      hasError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-200/70' : 'border-slate-200 focus:border-primary focus:ring-primary/40'
+    }`;
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -112,8 +119,12 @@ export default function ProfileIdentityEditor({
               value={form.displayName ?? ''}
               onChange={(event) => onFieldChange('displayName', event.target.value)}
               placeholder="Public name"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={inputClassName(Boolean(validationErrors.displayName))}
+              aria-invalid={Boolean(validationErrors.displayName)}
             />
+            {validationErrors.displayName ? (
+              <p className="mt-1 text-xs text-rose-600">{validationErrors.displayName}</p>
+            ) : null}
           </label>
           <label className="flex flex-col text-sm font-medium text-slate-700">
             Tagline
@@ -122,8 +133,12 @@ export default function ProfileIdentityEditor({
               value={form.tagline ?? ''}
               onChange={(event) => onFieldChange('tagline', event.target.value)}
               placeholder="Your positioning in a sentence"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={inputClassName(Boolean(validationErrors.tagline))}
+              aria-invalid={Boolean(validationErrors.tagline)}
             />
+            {validationErrors.tagline ? (
+              <p className="mt-1 text-xs text-rose-600">{validationErrors.tagline}</p>
+            ) : null}
           </label>
           <label className="flex flex-col text-sm font-medium text-slate-700">
             Location headline
@@ -132,8 +147,12 @@ export default function ProfileIdentityEditor({
               value={form.location ?? ''}
               onChange={(event) => onFieldChange('location', event.target.value)}
               placeholder="City, Country"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={inputClassName(Boolean(validationErrors.location))}
+              aria-invalid={Boolean(validationErrors.location)}
             />
+            {validationErrors.location ? (
+              <p className="mt-1 text-xs text-rose-600">{validationErrors.location}</p>
+            ) : null}
           </label>
           <div className="hidden md:block" />
           <label className="flex flex-col text-sm font-medium text-slate-700">
@@ -142,8 +161,12 @@ export default function ProfileIdentityEditor({
               type="text"
               value={form.firstName ?? ''}
               onChange={(event) => onFieldChange('firstName', event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={inputClassName(Boolean(validationErrors.firstName))}
+              aria-invalid={Boolean(validationErrors.firstName)}
             />
+            {validationErrors.firstName ? (
+              <p className="mt-1 text-xs text-rose-600">{validationErrors.firstName}</p>
+            ) : null}
           </label>
           <label className="flex flex-col text-sm font-medium text-slate-700">
             Last name
@@ -151,8 +174,12 @@ export default function ProfileIdentityEditor({
               type="text"
               value={form.lastName ?? ''}
               onChange={(event) => onFieldChange('lastName', event.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={inputClassName(Boolean(validationErrors.lastName))}
+              aria-invalid={Boolean(validationErrors.lastName)}
             />
+            {validationErrors.lastName ? (
+              <p className="mt-1 text-xs text-rose-600">{validationErrors.lastName}</p>
+            ) : null}
           </label>
           <label className="flex flex-col text-sm font-medium text-slate-700 md:col-span-2">
             Headline bio
@@ -161,8 +188,12 @@ export default function ProfileIdentityEditor({
               onChange={(event) => onFieldChange('bio', event.target.value)}
               rows={4}
               placeholder="Share what you teach, build, or mentor."
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className={inputClassName(Boolean(validationErrors.bio))}
+              aria-invalid={Boolean(validationErrors.bio)}
             />
+            {validationErrors.bio ? (
+              <p className="mt-1 text-xs text-rose-600">{validationErrors.bio}</p>
+            ) : null}
           </label>
         </div>
         <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -312,12 +343,21 @@ ProfileIdentityEditor.propTypes = {
   isSaving: PropTypes.bool,
   canSubmit: PropTypes.bool,
   error: PropTypes.string,
-  success: PropTypes.string
+  success: PropTypes.string,
+  errors: PropTypes.shape({
+    displayName: PropTypes.string,
+    tagline: PropTypes.string,
+    location: PropTypes.string,
+    firstName: PropTypes.string,
+    lastName: PropTypes.string,
+    bio: PropTypes.string
+  })
 };
 
 ProfileIdentityEditor.defaultProps = {
   isSaving: false,
   canSubmit: true,
   error: null,
-  success: null
+  success: null,
+  errors: {}
 };

@@ -436,10 +436,40 @@
          - 10.A.3 CheckoutDialog (frontend-reactjs/src/components/commerce/CheckoutDialog.jsx)
          - 10.A.4 CheckoutPriceSummary (frontend-reactjs/src/components/commerce/CheckoutPriceSummary.jsx)
          - 10.A.5 EdulureAds (frontend-reactjs/src/pages/dashboard/EdulureAds.jsx)
-      - 11.A Profile & Account Surfaces
-         - 11.A.1 Profile (frontend-reactjs/src/pages/Profile.jsx)
-      - 11.B Support & Success Workflows
-         - 11.B.1 TicketForm (frontend-reactjs/src/components/support/TicketForm.jsx)
+      - ✅ 11.A Profile & Account Surfaces — Annex A22 (Profile & Billing Management)
+         1. **Appraisal.** Within `pages/Profile.jsx`: Annex A22 now anchors inline validation, verification telemetry, and billing context so account owners receive actionable guardrails before persisting identity changes.
+         2. **Functionality.** Inline field validation blocks submission until display name, tagline, bio, and legal names satisfy length rules, while verification APIs surface status, progress, outstanding document lists, and a normalised timeline for every review touchpoint.
+         3. **Usefulness.** Validation hints, disabled saves, and contextual warnings reduce support escalations, and the verification timeline contextualises backend events so learners understand KYC state without leaving the profile surface.
+         4. **Redundancies.** Form state now shares a single validator to avoid duplicating checks across submit, change, and hydration flows, and outstanding document callouts replace one-off helper strings per requirement.
+         5. **Placeholders.** Timeline rendering gracefully falls back to seeded defaults until audit history is wired, keeping future integrations deterministic without exposing TODO copy in production.
+         6. **Duplicates.** Document upload statuses consolidate into the new timeline rather than duplicating progress strings across each requirement card.
+         7. **Improvements Needed.** Extend validation coverage to billing address fields and integrate backend-driven copy for verification step descriptions when compliance copywriters deliver final phrasing.
+         8. **Styling.** Verification alerts inherit accessible amber and primary tokens, and inline errors adopt the global rose palette to align with Annex A22 colour governance.
+         9. **Efficiency.** Validation executes locally and memoised timeline derivation avoids recalculating history when unrelated state (followers, billing) changes.
+         10. **Strengths.** Save gating, outstanding document banners, and status-aware pills broadcast trust posture to instructors and finance stakeholders without additional clicks.
+         11. **Weaknesses.** Local timeline still lacks reviewer avatars and SLA timestamps; follow-up should enrich events with compliance metadata once APIs supply it.
+         12. **Styling & Colour Review.** Timeline dots and pills respect focus/hover semantics while matching Annex typography scale, keeping parity with system preferences and billing cards.
+         13. **CSS, Orientation & Placement.** The verification card now reserves space for timeline and alerts, maintaining responsive two-column balance when paired with consent ledger and affiliate widgets.
+         14. **Text Analysis.** Guidance copy emphasises next actions (“Add a display name…”, “Document cached locally…”) and condenses instructions under 140 characters for translation readiness.
+         15. **Change Checklist Tracker.** Flag future QA to exercise save-disable logic, multi-status timelines, and outstanding document banners on staging before publishing Annex A22 updates.
+         16. **Release.** Ship alongside billing portal refresh: update release notes, brief support on new validation copy, and monitor verification submission rates to confirm friction reduction.
+      - ✅ 11.B Support & Success Workflows — Annex C1 (Learner Support Workspace)
+         1. **Appraisal.** Within `components/support/TicketForm.jsx`: Annex C1 now couples triage intake with notification governance, accessibility upgrades, and inline validation to keep success teams within the learner workspace.
+         2. **Functionality.** Learners toggle channel/category preferences, select digest cadence, and persist them to local storage per user; subject and description enforce minimum context before progressing.
+         3. **Usefulness.** Saved preferences drive consistent outreach expectations, while knowledge suggestions continue surfacing playbooks as descriptions evolve.
+         4. **Redundancies.** Consolidated error messaging eliminates duplicated validation text across step navigation and submission branches.
+         5. **Placeholders.** Preference persistence stores locally until backend preference APIs arrive, keeping UX deterministic without blocking the Annex release.
+         6. **Duplicates.** Preference toggles reuse shared option lists, preventing string drift between channels, categories, and digest selectors.
+         7. **Improvements Needed.** Wire analytics for preference saves and escalate saved state to the backend so CSM tooling can honour learner opt-ins beyond the browser.
+         8. **Styling.** Channel and category chips adopt emerald/sky accent states with hover affordances, mirroring Annex C1 severity palettes.
+         9. **Efficiency.** Focus trap and Escape handling run only when the modal is open, keeping listeners lightweight; preference updates mutate shallow clones to avoid unnecessary renders.
+         10. **Strengths.** Keyboard-trappable dialog, auto-focus, accessible alerts, and inline field errors make the support workspace compliant without sacrificing speed-to-submit.
+         11. **Weaknesses.** SMS opt-in currently assumes capability; future iteration should check tenant configuration before exposing the toggle.
+         12. **Styling & Colour Review.** Error toasts, preference pills, and callouts reuse Annex neutrals and brand primaries to maintain cross-surface cohesion.
+         13. **CSS, Orientation & Placement.** Notification settings collapse gracefully on mobile thanks to the md grid and stack-friendly spacing, keeping the ticket wizard legible in narrow panes.
+         14. **Text Analysis.** Microcopy instructs (“Save preferences”, “Describe what happened…”) and outlines commitments to reduce ambiguity for high-urgency submissions.
+         15. **Change Checklist Tracker.** Add regression cases ensuring preferences persist per user key, focus loop stays intact, and validation prevents blank submissions before release.
+         16. **Release.** Stage Annex C1 with support enablement: document hotkeys, communicate digest defaults, and monitor ticket resolution SLAs to confirm improved routing.
       - 11.C Settings, Preferences & Profile Components
          - 11.C.1 ProfileIdentityEditor (frontend-reactjs/src/components/profile/ProfileIdentityEditor.jsx)
          - 11.C.2 SettingsAccordion (frontend-reactjs/src/components/settings/SettingsAccordion.jsx)
