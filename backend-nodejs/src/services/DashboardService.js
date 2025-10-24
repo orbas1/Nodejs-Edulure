@@ -2280,6 +2280,36 @@ export function buildLearnerDashboard({
 
   const liveSessionsDetailed = liveClassrooms.map((session) => {
     const metadata = safeJsonParse(session.metadata, {});
+    const timezone = metadata.timezone ?? session.timezone ?? session.tz ?? 'Etc/UTC';
+    const location = (() => {
+      if (typeof metadata.location === 'string') {
+        return metadata.location;
+      }
+      if (metadata.location && typeof metadata.location === 'object') {
+        return (
+          metadata.location.label ??
+          metadata.location.name ??
+          metadata.location.summary ??
+          metadata.location.description ??
+          metadata.location.room ??
+          metadata.location.venue ??
+          metadata.location.city ??
+          metadata.location.region ??
+          metadata.location.address ??
+          null
+        );
+      }
+      return (
+        metadata.locationLabel ??
+        metadata.locationName ??
+        metadata.room ??
+        metadata.venue ??
+        metadata.address ??
+        metadata.city ??
+        metadata.region ??
+        null
+      );
+    })();
     const startAt = normaliseDate(session.startAt);
     const endAt = normaliseDate(session.endAt) ?? (startAt ? new Date(startAt.getTime() + 60 * 60 * 1000) : null);
     const facilitators = Array.isArray(metadata.facilitators)
@@ -2423,6 +2453,51 @@ export function buildLearnerDashboard({
       lobby: lobbyHref ?? null
     };
 
+    const primaryAction = callToAction
+      ? {
+          ...callToAction,
+          href: callToAction.href ?? joinHref ?? checkInHref ?? lobbyHref ?? null
+        }
+      : null;
+
+    const secondaryActionSource =
+      metadata.secondaryAction ??
+      metadata.secondaryCta ??
+      metadata.secondaryCTA ??
+      metadata.followUpAction ??
+      metadata.followupAction ??
+      null;
+
+    const secondaryAction = secondaryActionSource
+      ? {
+          action: secondaryActionSource.action ?? secondaryActionSource.type ?? null,
+          label:
+            secondaryActionSource.label ??
+            secondaryActionSource.title ??
+            secondaryActionSource.text ??
+            'View details',
+          href:
+            secondaryActionSource.href ??
+            secondaryActionSource.url ??
+            secondaryActionSource.link ??
+            secondaryActionSource.to ??
+            lobbyHref ??
+            null
+        }
+      : lobbyHref && (!primaryAction || primaryAction.href !== lobbyHref)
+        ? { action: 'details', label: 'View details', href: lobbyHref }
+        : null;
+
+    const tags = Array.isArray(metadata.tags) && metadata.tags.length
+      ? metadata.tags
+      : Array.isArray(session.topics) && session.topics.length
+        ? session.topics
+        : Array.isArray(metadata.topics) && metadata.topics.length
+          ? metadata.topics
+          : Array.isArray(metadata.personaTags) && metadata.personaTags.length
+            ? metadata.personaTags
+            : [];
+
     const readinessStatuses = [
       {
         id: `${session.id ?? crypto.randomUUID()}-whiteboard`,
@@ -2443,7 +2518,7 @@ export function buildLearnerDashboard({
       title: session.title ?? 'Live classroom',
       stage,
       startLabel: startAt ? formatDateTime(startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBC',
-      timezone: metadata.timezone ?? 'UTC',
+      timezone,
       community: communityName ?? metadata.community ?? 'Learner community',
       communityId,
       summary: metadata.summary ?? metadata.description ?? null,
@@ -2452,7 +2527,15 @@ export function buildLearnerDashboard({
         capacity: occupancyCapacity,
         rate: occupancyRate
       },
-      callToAction,
+      callToAction: primaryAction,
+      primaryAction: primaryAction
+        ? { label: primaryAction.label, href: primaryAction.href, action: primaryAction.action ?? null }
+        : null,
+      secondaryAction: secondaryAction
+        ? { label: secondaryAction.label, href: secondaryAction.href, action: secondaryAction.action ?? null }
+        : null,
+      ctaLabel: primaryAction?.label ?? null,
+      ctaHref: primaryAction?.href ?? null,
       status: phase,
       whiteboard,
       facilitators,
@@ -2463,6 +2546,8 @@ export function buildLearnerDashboard({
       alerts,
       pricing,
       links,
+      location,
+      tags,
       currency: metadata.currency ?? 'USD',
       eventId: metadata.eventId ?? session.publicId ?? session.id,
       startAt,

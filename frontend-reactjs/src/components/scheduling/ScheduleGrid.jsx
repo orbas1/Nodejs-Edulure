@@ -157,11 +157,43 @@ export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessio
         const relativeLabel = formatRelative(event.startAt);
         const timezoneLabel = formatTimezone(event.timezone);
         const tags = Array.isArray(event.tags) ? event.tags.slice(0, 4) : [];
-        const primaryAction = event.primaryAction ??
+        const inlineCallToAction = event.callToAction
+          ? {
+              label:
+                event.callToAction.label ??
+                event.callToAction.title ??
+                event.callToAction.text ??
+                'View details',
+              href:
+                event.callToAction.href ??
+                event.callToAction.url ??
+                event.callToAction.link ??
+                event.callToAction.to ??
+                event.ctaHref ??
+                event.href ??
+                '#'
+            }
+          : null;
+        const primaryAction =
+          event.primaryAction ??
+          inlineCallToAction ??
           (event.ctaLabel || event.ctaHref
             ? { label: event.ctaLabel ?? 'View details', href: event.ctaHref ?? event.href ?? '#' }
             : null);
-        const secondaryAction = event.secondaryAction ?? null;
+        const secondaryAction =
+          event.secondaryAction ??
+          (event.secondaryCta
+            ? {
+                label: event.secondaryCta.label ?? event.secondaryCta.title ?? 'View details',
+                href:
+                  event.secondaryCta.href ??
+                  event.secondaryCta.url ??
+                  event.secondaryCta.link ??
+                  event.secondaryCta.to ??
+                  event.href ??
+                  '#'
+              }
+            : null);
 
         const handleActivate = () => {
           if (onSelect) {

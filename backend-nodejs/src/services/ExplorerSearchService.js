@@ -4,6 +4,7 @@ import AdsPlacementService from './AdsPlacementService.js';
 import { SUPPORTED_ENTITIES as MODEL_SUPPORTED_ENTITIES } from '../models/SearchDocumentModel.js';
 import { resolveSearchProvider } from './searchProviders.js';
 import { getEntityDefaultSort } from '../config/searchRankingConfig.js';
+import { describeClusterLabel } from '../utils/learningClusters.js';
 
 function formatCurrency(price) {
   if (!price || !Number.isFinite(price.amountMinor)) {
@@ -33,6 +34,86 @@ function formatRating(rating) {
   const average = Number(rating.average).toFixed(1);
   const count = Number.isFinite(rating.count) && rating.count > 0 ? ` · ${formatNumber(rating.count)} ratings` : '';
   return `${average}★${count}`;
+}
+
+function toTitleCase(value) {
+  if (!value && value !== 0) {
+    return '';
+  }
+  return String(value)
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function deriveClusterDescriptor(hit = {}) {
+  const metadata = hit.metadata ?? {};
+  const clusterKey =
+    hit.clusterKey ??
+    metadata.clusterKey ??
+    metadata.cluster?.key ??
+    metadata.cluster ??
+    null;
+  if (!clusterKey) {
+    return null;
+  }
+  const labelCandidate = metadata.cluster?.label ?? describeClusterLabel(clusterKey);
+  return { key: clusterKey, label: labelCandidate || describeClusterLabel(clusterKey) };
+}
+
+function resolvePersonaLabel(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return null;
+  }
+  const persona =
+    metadata.persona ??
+    metadata.personaLabel ??
+    metadata.audience?.persona ??
+    metadata.audience?.primary ??
+    metadata.primaryPersona ??
+    (Array.isArray(metadata.personaTags) ? metadata.personaTags[0] : null) ??
+    (Array.isArray(metadata.tags) ? metadata.tags[0] : null) ??
+    (Array.isArray(metadata.topics) ? metadata.topics[0] : null);
+  return persona ? toTitleCase(persona) : null;
+}
+
+function computeMomentumDescriptor(popularityScore, freshnessScore, metadataMomentum = null) {
+  if (metadataMomentum && typeof metadataMomentum === 'object') {
+    const score = Number(metadataMomentum.score ?? metadataMomentum.value ?? metadataMomentum.numeric);
+    const label = metadataMomentum.label ?? null;
+    if (label && Number.isFinite(score)) {
+      return {
+        score: Math.max(0, Math.min(100, Math.round(score))),
+        label,
+        trend: metadataMomentum.trend ?? (score >= 75 ? 'accelerating' : score >= 50 ? 'steady' : 'building')
+      };
+    }
+  }
+
+  const popularity = Number(popularityScore ?? 0);
+  const freshness = Number(freshnessScore ?? 0);
+  const popularityValid = Number.isFinite(popularity);
+  const freshnessValid = Number.isFinite(freshness);
+  if (!popularityValid && !freshnessValid) {
+    return null;
+  }
+  const total = (popularityValid ? popularity : 0) + (freshnessValid ? freshness : 0);
+  const divisor = (popularityValid ? 1 : 0) + (freshnessValid ? 1 : 0) || 1;
+  const score = Math.max(0, Math.min(100, Math.round(total / divisor)));
+  let label;
+  let trend;
+  if (score >= 75) {
+    label = `High momentum (${score})`;
+    trend = 'accelerating';
+  } else if (score >= 50) {
+    label = `Steady momentum (${score})`;
+    trend = 'steady';
+  } else {
+    label = `Emerging momentum (${score})`;
+    trend = 'building';
+  }
+  return { score, label, trend };
 }
 
 function sanitiseArray(values) {
@@ -298,6 +379,16 @@ function formatDocument(entity, hit) {
     geo: null
   };
 
+  const clusterDescriptor = deriveClusterDescriptor(hit);
+  if (clusterDescriptor) {
+    base.cluster = clusterDescriptor;
+  }
+
+  const personaLabel = resolvePersonaLabel(hit.metadata);
+  if (personaLabel) {
+    base.persona = personaLabel;
+  }
+
   let fallbackAction = null;
   let defaultBadges = [];
   let fallbackHighlights = [];
@@ -469,6 +560,14 @@ function formatDocument(entity, hit) {
   );
 
   base.monetisationTag = monetisationTag ?? null;
+
+  const momentum = computeMomentumDescriptor(hit.popularityScore, hit.freshnessScore, hit.metadata?.momentum);
+  if (momentum) {
+    base.momentum = momentum;
+    base.metrics.momentum = momentum.label;
+    base.metrics.momentumScore = momentum.score;
+    base.momentumTrend = momentum.trend;
+  }
 
   return base;
 }

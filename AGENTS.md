@@ -751,6 +751,7 @@
             14. **Text Analysis.** Relative timing strings (“Starts in 2.5 hr”) and occupancy labels follow Annex copy tone—actionable, concise, and free from jargon.
             15. **Change Checklist Tracker.** QA should cover occupancy progress, persona tag rendering, CTA affordances, timezone fallbacks, and keyboard activation flows.
             16. **Full Upgrade Plan & Release Steps.** Release alongside updated live-class analytics, obtain instructor feedback on persona chips, update Annex screenshots, and monitor engagement on the upgraded grid.
+            17. **Back-end Integration.** `DashboardService.buildLearnerDashboard` now emits backend-sourced timezone, location, tag, and CTA metadata—plus normalised call-to-action pairs—so ScheduleGrid renders production-aligned Annex C4 payloads instead of local fallbacks, and the supporting seeds/migrations keep classroom metadata synced across environments when `npm --workspace backend-nodejs run migrate && run seed` executes.
       - ✓ 9.E Search & Discovery Components
          - 9.E.1 BlogSearchSection (frontend-reactjs/src/components/search/BlogSearchSection.jsx)
             1. **Appraisal.** Annex A6’s newsroom brief now lives in the component: trending tags, saved view metrics, and recent history transform the static blog search into a discovery console.
@@ -769,6 +770,7 @@
             14. **Text Analysis.** Copy emphasises newsroom actions (“Capture your favourite filters”, “Clear history”), meeting Annex tone for operational clarity.
             15. **Change Checklist Tracker.** QA should validate saved view CRUD, recents persistence, trending tag counts, pagination, and analytics cards after each release.
             16. **Full Upgrade Plan & Release Steps.** Launch by seeding real analytics data, briefing editorial ops, updating Annex screenshots, and monitoring engagement with the new summary cards.
+            17. **Back-end Integration.** Search services now emit cluster, persona, and momentum metadata via `SearchDocumentModel`, so BlogSearchSection mirrors Explorer context when the backend toggles Annex A6 features across discovery surfaces.
          - 9.E.2 ExplorerPreviewDrawer (frontend-reactjs/src/components/search/ExplorerPreviewDrawer.jsx)
             1. **Appraisal.** The preview drawer now showcases persona focus, upcoming sessions, related resources, and copy-to-clipboard share links per Annex A6 exploration requirements.
             2. **Functionality.** Memoised metrics, persona detection, and upcoming session lists feed structured blocks, while clipboard handling and focus traps keep share actions accessible.
@@ -786,6 +788,7 @@
             14. **Text Analysis.** Labels emphasise purpose (“Upcoming sessions”, “Related resources”), consistent with Annex clarity guidelines.
             15. **Change Checklist Tracker.** QA should verify persona chips, upcoming session formatting, share copy states, and related resource links before publishing Annex updates.
             16. **Full Upgrade Plan & Release Steps.** Roll out alongside analytics updates, document persona/upcoming sections in Annex A6, and capture new screenshots for enablement decks.
+            17. **Back-end Integration.** Drawer content binds directly to Explorer search payloads enriched by `SearchDocumentService` (cluster keys, persona focus, momentum labels), ensuring Annex A6 previews stay in sync with the database-backed discovery taxonomy.
          - 9.E.3 ExplorerSearchSection (frontend-reactjs/src/components/search/ExplorerSearchSection.jsx)
             1. **Appraisal.** Annex A6 explorers now launch with performance dashboards, latency snapshots, and analytics-driven facet callouts, giving operators actionable intelligence at the top of the page.
             2. **Functionality.** Latency capture, result counts, and active filter totals feed the new summary row; facet analytics render in dedicated cards, and saved searches highlight pinned entries with skeleton placeholders while `FilterChips` expose a clear-all action.
@@ -803,6 +806,7 @@
             14. **Text Analysis.** Microcopy emphasises action (“Clear history”, “Pinned”) echoing Annex tone for clarity.
             15. **Change Checklist Tracker.** QA now verifies latency output, summary counts, facet cards, pinned badges, and clear-all chips alongside baseline explorer tests.
             16. **Full Upgrade Plan & Release Steps.** Coordinate with analytics to validate facet feeds, refresh Annex docs, and brief enablement on the new telemetry row before shipping.
+            17. **Data Alignment.** `SearchDocumentService.normaliseDocument` stamps cluster keys, persona descriptors, and momentum scores; `SearchDocumentModel.deserialize` now rehydrates cluster metadata for legacy rows; migration `20250402101500_search_documents_cluster_alignment.js` plus seed `002_search_documents.js` keep the database aligned; and updated unit tests cover the enriched payloads so Explorer stays in lockstep with Annex A6 taxonomy.
          - 9.E.4 FilterChips (frontend-reactjs/src/components/search/FilterChips.jsx)
             1. **Appraisal.** Filter chips gained a shared cap (`MAX_MULTI_CHIPS`) and a clear-all affordance, ensuring Annex A6 explorers manage filter overload gracefully.
             2. **Functionality.** Multi-select chips limit rendering to 12 entries, and the new `onClearAll` prop enables bulk removal while keeping existing remove buttons accessible.
