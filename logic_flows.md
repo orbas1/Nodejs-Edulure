@@ -1251,18 +1251,40 @@ This expanded logic flows compendium should be revisited each release cycle to e
 16. **Full Upgrade Plan & Release Steps.** Phase 1 delivers countdown enforcement and modular components; Phase 2 layers expanded analytics and decline workflows; Phase 3 introduces admin reissue controls and enhanced validation; Phase 4 finalises documentation updates, partner communications, and staged rollouts with sandbox rehearsals.
 
 ### A24. Support, Knowledge & Feedback (2.I)
-- **Operational Depth:** Support features surface knowledge base, ticket submission, and feedback forms integrated with backend support services.
-- **Gaps & Risks:** Some FAQ entries outdated; implement freshness tracking. Ticket forms duplicate validation logic with backend.
-- **Resilience & Efficiency:** Cache knowledge base categories, debounce search inputs, and prefill user context for ticket submission.
-- **UX & Communications:** Provide consistent spacing, accessible typography, and friendly tone in support prompts.
-- **Change Management:** Sync content review cadences, update macros, and include support flows in regression testing.
+1. **Appraisal.** Learner support now exposes curated guides, live SLA badges, feedback loops, and escalation options that are hydrated from `SupportKnowledgeBaseService`, `LearnerSupportRepository`, and `LearnerDashboardService` so the workspace mirrors Annex A24 operational depth.
+2. **Functionality.** `SupportKnowledgeBaseService.searchArticles` adds cached query results and `describeInventory` aggregates totals, stale counts, and category freshness. `LearnerSupport.jsx` renders `KnowledgeBaseMetaSummary`, category badges, and relative update timestamps while persisting “marked helpful” choices to `localStorage` so learners retain context between sessions.
+3. **Logic Usefulness.** The new metadata snapshot (`knowledgeBaseMeta`) feeds dashboard metrics and category heuristics, ensuring SLA risk chips, queue stats, and article freshness share a single backend contract rather than disconnected calculations.
+4. **Redundancies.** Knowledge-base normalisation now lives in `SupportTicketModel.normaliseKnowledgeSuggestions` and front-end helpers, removing duplicate excerpt/category logic and stale badge computation that previously diverged between ticket suggestions and workspace cards.
+5. **Placeholders / Gaps.** Voice-call scheduling remains a stubbed CTA and helpful-vote toggles still operate client-side only; wire telemetry ingestion and backend persistence before enabling production analytics.
+6. **Duplicate Functions.** Ticket suggestion dedupe moved into shared helpers so `LearnerSupport.jsx`, `TicketForm.jsx`, and repository updates reference identical structures rather than parallel JSON parsing.
+7. **Improvements Needed.** Backfill localisation for status copy, expose knowledge-base freshness inside support reports, and surface staff-assigned case owners alongside SLA badges so learners understand who is triaging their request.
+8. **Styling Improvements.** Knowledge base summary, stale chips, and helpful-score tags adopt dashboard token classes (`rounded-3xl`, `bg-amber-100`, `text-slate-500`), keeping Annex copy consistent with dark/light modes driven by the new theme provider.
+9. **Efficiency Analysis & Improvement.** Default article lookups reuse in-memory caches for five minutes, avoiding redundant SQL when multiple learners hit the workspace. Local helpful toggles are debounced through `localStorage` rather than recalculating state on every render.
+10. **Strengths to Keep.** SLA calculations, attachment uploads, knowledge suggestions on ticket creation, and the feedback banner remain intact—now enriched with freshness data instead of being replaced.
+11. **Weaknesses to Remove.** Live concierge and telephony CTAs still link to placeholders, and knowledge-base freshness has no alerting; integrate operations alerts once Annex routing is ready.
+12. **Styling & Colour Review Changes.** Relative timestamps and stale badges honour theme tokens so dark mode and high-contrast palettes stay legible while still calling attention to ageing articles.
+13. **CSS / Orientation / Placement.** Knowledge base summaries collapse to a single column on mobile and render inline chips for top categories, preventing overflow while keeping meta insights above the article grid.
+14. **Text Analysis.** Updated copy highlights freshness (“Refreshed 3 days ago”, “Review soon”) and trims redundant disclaimers, matching Annex tone guidelines for empathetic yet action-oriented messaging.
+15. **Change Checklist Tracker.** Run `npm --workspace backend-nodejs test -- supportKnowledgeBaseService`, `npm --workspace frontend-reactjs test -- TicketForm`, reseed support articles, and validate learner dashboard hydration before shipping updates.
+16. **Full Upgrade Plan & Release Steps.** Deploy by seeding the knowledge base, verifying `/learner/support/knowledge-base` metadata, capturing updated workspace screenshots, briefing support leads on stale-article flags, and monitoring helpful-toggle analytics.
 
 ### A25. Shared Layout, Theming & Component Infrastructure (2.J)
-- **Operational Depth:** Theme providers inject design tokens, layout components manage navigation, and shared utilities enforce responsive behaviour.
-- **Gaps & Risks:** Some components bypass theme tokens, using hard-coded colours. Layout breakpoints need consolidation to avoid media query drift.
-- **Resilience & Efficiency:** Tree-shake unused components, lazy-load rarely used layouts, and monitor bundle sizes.
-- **UX & Communications:** Document component usage guidelines, maintain Storybook parity, and ensure consistent typography scales.
-- **Change Management:** Update theme tokens with changelog, run visual regression, and coordinate design reviews.
+1. **Appraisal.** A dedicated `ThemeProvider` now centralises light/dark mode, accent presets, density, radius, and contrast settings for the React shell, replacing scattered background classes with a single context the layouts consume.
+2. **Functionality.** The provider reads persisted preferences, listens to `prefers-color-scheme`, applies CSS custom properties (`--color-primary`, spacing, radius), and exposes `classes.surface`, `classes.panel`, and setters used by `App.jsx`, `MainLayout`, `DashboardLayout`, and `DashboardSettings` for real-time previews.
+3. **Logic Usefulness.** Dataset attributes (`data-theme`, `data-density`, `data-radius`, `data-contrast`) drive `tokens.css` so every surface, modal, and badge can derive consistent spacing and curvature without duplicating Tailwind overrides.
+4. **Redundancies.** Hard-coded `bg-slate-50`/`bg-white` shells in layouts were replaced with context-aware classes, removing the need for ad-hoc dark-mode patches across main and dashboard containers.
+5. **Placeholders / Gaps.** Expanded density currently falls back to the comfortable preset and accent pickers remain manual hex inputs; wire additional presets and expose contrast toggles in future iterations.
+6. **Duplicate Functions.** Theme switching no longer lives in dashboard settings state alone—`AppearanceSection` now delegates to provider setters so preview and saved values stay in sync.
+7. **Improvements Needed.** Extend provider coverage to modal portals, markdown pages, and notification drawers so every surface honours density and radius attributes, and expose accent presets through admin settings.
+8. **Styling Improvements.** `tokens.css` responds to compact density and radius (“soft”/“sharp”) settings, keeping border radii and spacing aligned with Annex theming guidance while respecting accessibility requirements.
+9. **Efficiency Analysis & Improvement.** Theme preferences cache in `localStorage`, avoiding recalculations per render, and accent variable updates touch only the root element instead of re-rendering components.
+10. **Strengths to Keep.** Layout responsiveness, skip links, quick actions, and notification panels remain unchanged—now wrapped in theme-aware containers to maintain UX parity across modes.
+11. **Weaknesses to Remove.** Some secondary components still hard-code slate borders and typography; audit cards, tables, and forms to adopt provider classes in the next cycle.
+12. **Styling & Colour Review Changes.** Accent swaps (`primary`, `emerald`, `amber`, `rose`) reuse shared presets, ensuring dashboards, marketing shells, and admin panels stay on-brand regardless of mode.
+13. **CSS / Orientation / Placement.** Data attributes let responsive grids inherit density tweaks without altering breakpoints, keeping layout structure intact while adjusting rhythm for compact mode.
+14. **Text Analysis.** Shared footers and copy blocks now inherit theme text colours automatically, removing the mismatched dark-mode footer text that previously required manual overrides.
+15. **Change Checklist Tracker.** Validate `ThemeProvider` behaviour, exercise dashboard appearance controls, smoke-test main and dashboard shells in light/dark/compact modes, and run visual regression screenshots before release.
+16. **Full Upgrade Plan & Release Steps.** Stage theme updates behind provider rollout, coordinate design review of dark-mode screenshots, verify dataset-driven CSS across browsers, document admin controls, and ship alongside refreshed design tokens.
 
 ### A26. Flutter Authentication & Identity (3.A)
 - **Operational Depth:** Dart services manage secure storage, token refresh, and biometric unlocks. Auth flows sync with backend MFA requirements and store tokens encrypted on device.

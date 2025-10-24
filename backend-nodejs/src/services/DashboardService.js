@@ -99,6 +99,8 @@ const DEFAULT_SUPPORT_METRICS = Object.freeze({
   latestUpdatedAt: null
 });
 
+const SUPPORT_KB_STALE_THRESHOLD_DAYS = 90;
+
 const DEFAULT_SYSTEM_SETTINGS = Object.freeze({
   language: 'en',
   region: 'US',
@@ -2663,6 +2665,7 @@ export function buildLearnerDashboard({
   const supportSection = {
     cases: supportCasesList,
     knowledgeBase: knowledgeBaseArticles,
+    knowledgeBaseMeta,
     contacts: DEFAULT_SUPPORT_CONTACTS,
     serviceWindow: '24/7 global support',
     metrics: {
@@ -2673,6 +2676,9 @@ export function buildLearnerDashboard({
       awaitingLearner: supportMetricsSummary.awaitingLearner,
       averageResponseMinutes: supportMetricsSummary.averageResponseMinutes,
       latestUpdatedAt: supportMetricsSummary.latestUpdatedAt,
+      knowledgeBaseArticles: knowledgeBaseMeta.totalArticles,
+      knowledgeBaseStale: knowledgeBaseMeta.staleArticles,
+      knowledgeBaseLastUpdatedAt: knowledgeBaseMeta.lastUpdatedAt,
       firstResponseMinutes: supportMetricsSummary.averageResponseMinutes || 42
     }
   };
@@ -5731,6 +5737,7 @@ export default class DashboardService {
 
     let supportCases = [];
     let knowledgeBaseArticles = DEFAULT_SUPPORT_KB;
+    let knowledgeBaseMeta = null;
     const supportMetrics = {
       open: 0,
       waiting: 0,
@@ -5833,6 +5840,14 @@ export default class DashboardService {
               return;
             }
             const minutes = Number.isFinite(Number(article.minutes)) ? Number(article.minutes) : 3;
+            const updatedAt = article.updatedAt ?? article.updated_at ?? null;
+            const freshnessDays = Number.isFinite(Number(article.freshnessDays))
+              ? Number(article.freshnessDays)
+              : null;
+            const stale =
+              article.isStale ??
+              article.stale ??
+              (typeof freshnessDays === 'number' ? freshnessDays > SUPPORT_KB_STALE_THRESHOLD_DAYS : false);
             deduped.set(id, {
               id,
               title: article.title ?? 'Support article',
@@ -5840,13 +5855,20 @@ export default class DashboardService {
               url: article.url ?? '#',
               category: article.category ?? 'General',
               minutes,
-              helpfulnessScore: Number(article.helpfulnessScore ?? 0)
+              helpfulnessScore: Number(article.helpfulnessScore ?? 0),
+              updatedAt,
+              freshnessDays,
+              stale
             });
           });
           if (deduped.size) {
             knowledgeBaseArticles = Array.from(deduped.values());
           }
         }
+
+        knowledgeBaseMeta = await SupportKnowledgeBaseService.describeInventory({
+          staleThresholdDays: SUPPORT_KB_STALE_THRESHOLD_DAYS
+        });
       } catch (knowledgeBaseError) {
         log.warn({ err: knowledgeBaseError }, 'Failed to load support knowledge base articles');
       }
@@ -5854,6 +5876,18 @@ export default class DashboardService {
       log.warn({ err: error }, 'Failed to load learner support workspace data');
       supportCases = [];
       knowledgeBaseArticles = DEFAULT_SUPPORT_KB;
+    }
+
+    if (!knowledgeBaseMeta) {
+      const staleArticles = knowledgeBaseArticles.filter((article) => article?.stale || article?.isStale).length;
+      knowledgeBaseMeta = {
+        totalArticles: knowledgeBaseArticles.length,
+        staleArticles,
+        categories: [],
+        lastUpdatedAt: null,
+        staleThresholdDays: SUPPORT_KB_STALE_THRESHOLD_DAYS,
+        generatedAt: new Date().toISOString()
+      };
     }
 
     let courseWorkspaceInput = {

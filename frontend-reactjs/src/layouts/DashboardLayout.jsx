@@ -24,6 +24,7 @@ import {
   trackNotificationPreferenceChange,
   trackDashboardSurfaceView
 } from '../lib/analytics.js';
+import { useTheme } from '../providers/ThemeProvider.jsx';
 
 function coerceNumber(value, fallback = 0) {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -309,6 +310,7 @@ export function DashboardLayoutInner() {
   const { connected: realtimeConnected } = useRealtime();
   const navigationMetadata = useContext(NavigationMetadataContext);
   const navigationInitiatives = navigationMetadata?.initiatives ?? { quickActions: [], dashboard: [] };
+  const { classes, resolvedMode } = useTheme();
 
   const availableRoles = useMemo(
     () => roles.map((role) => role.id.toLowerCase()),
@@ -516,7 +518,7 @@ export function DashboardLayoutInner() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className={`flex min-h-screen flex-col ${classes.surface}`}>
       <a className="skip-link" href="#dashboard-main">
         Skip to dashboard content
       </a>
@@ -580,7 +582,11 @@ export function DashboardLayoutInner() {
           )}
         </main>
       </div>
-      <footer className="border-t border-slate-200 bg-white/90 px-4 py-6 text-sm text-slate-500 sm:px-6 lg:px-8">
+      <footer
+        className={`border-t px-4 py-6 text-sm sm:px-6 lg:px-8 ${
+          resolvedMode === 'dark' ? 'border-slate-800' : 'border-slate-200'
+        } ${classes.panel}`}
+      >
         <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>&copy; {new Date().getFullYear()} Edulure. Operated workspaces.</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

@@ -21,6 +21,7 @@ import {
   trackNotificationOpen,
   trackNotificationPreferenceChange
 } from '../lib/analytics.js';
+import { useTheme } from '../providers/ThemeProvider.jsx';
 
 export function MainLayoutContent({
   session,
@@ -30,6 +31,7 @@ export function MainLayoutContent({
   getConfigValue,
   realtimeConnected
 }) {
+  const { classes, resolvedMode } = useTheme();
   const { initiatives } = useNavigationMetadata();
   const [searchTerm, setSearchTerm] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -147,7 +149,7 @@ export function MainLayoutContent({
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className={`flex min-h-screen flex-col ${classes.surface}`}>
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
@@ -176,7 +178,11 @@ export function MainLayoutContent({
       >
         <Outlet />
       </main>
-      <footer className="border-t border-slate-200 bg-white/90 px-4 py-6 text-sm text-slate-500 sm:px-6 lg:px-8">
+      <footer
+        className={`border-t px-4 py-6 text-sm sm:px-6 lg:px-8 ${
+          resolvedMode === 'dark' ? 'border-slate-800' : 'border-slate-200'
+        } ${classes.panel}`}
+      >
         <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>&copy; {new Date().getFullYear()} Edulure. All rights reserved.</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
