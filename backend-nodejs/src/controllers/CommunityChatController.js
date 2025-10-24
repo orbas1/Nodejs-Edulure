@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
 import CommunityChatService from '../services/CommunityChatService.js';
+import realtimeService from '../services/RealtimeService.js';
 import { success } from '../utils/httpResponse.js';
 import { env } from '../config/env.js';
 
@@ -245,12 +246,16 @@ export default class CommunityChatController {
         abortEarly: false,
         stripUnknown: true
       });
+      const { communityId, channelId } = req.params;
       const message = await CommunityChatService.postMessage(
-        req.params.communityId,
-        req.params.channelId,
+        communityId,
+        channelId,
         req.user.id,
         payload
       );
+      realtimeService.broadcastCommunityMessage(communityId, channelId, message, {
+        actorId: req.user.id
+      });
       return success(res, {
         data: message,
         message: 'Message posted',
@@ -296,13 +301,19 @@ export default class CommunityChatController {
         abortEarly: false,
         stripUnknown: true
       });
+      const { communityId, channelId } = req.params;
       const summary = await CommunityChatService.reactToMessage(
-        req.params.communityId,
-        req.params.channelId,
+        communityId,
+        channelId,
         req.user.id,
         req.params.messageId,
         payload.emoji
       );
+      realtimeService.broadcastCommunityReaction(communityId, channelId, {
+        ...summary,
+        emoji: payload.emoji,
+        actorId: req.user.id
+      });
       return success(res, {
         data: summary,
         message: 'Reaction recorded'
@@ -322,13 +333,20 @@ export default class CommunityChatController {
         abortEarly: false,
         stripUnknown: true
       });
+      const { communityId, channelId } = req.params;
       const summary = await CommunityChatService.removeReaction(
-        req.params.communityId,
-        req.params.channelId,
+        communityId,
+        channelId,
         req.user.id,
         req.params.messageId,
         payload.emoji
       );
+      realtimeService.broadcastCommunityReaction(communityId, channelId, {
+        ...summary,
+        emoji: payload.emoji,
+        actorId: req.user.id,
+        removed: true
+      });
       return success(res, {
         data: summary,
         message: 'Reaction removed'
@@ -386,14 +404,29 @@ export default class CommunityChatController {
         abortEarly: false,
         stripUnknown: true
       });
+      const communityId = Number(req.params.communityId);
+      await CommunityChatService.ensureCommunityMember(communityId, req.user.id);
+      const presencePayload = {
+        ...payload,
+        metadata: {
+          ...(payload.metadata ?? {}),
+          communityId
+        }
+      };
       const session = await CommunityChatService.updatePresence(
         req.user.id,
         req.user.sessionId,
-        payload
+        presencePayload
       );
+      const presence = await CommunityChatService.listPresence(communityId);
+      await realtimeService.broadcastCommunityPresence(communityId, presence);
       return success(res, {
         data: session,
-        message: 'Presence updated'
+        message: 'Presence updated',
+        meta: {
+          communityId,
+          presenceCount: presence.length
+        }
       });
     } catch (error) {
       if (error.isJoi) {

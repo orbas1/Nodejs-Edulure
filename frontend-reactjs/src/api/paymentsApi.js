@@ -120,12 +120,28 @@ export async function previewCoupon({ token, code, currency, signal } = {}) {
   return response?.data ?? response ?? null;
 }
 
+export async function fetchPaymentSummary({ token, params, signal } = {}) {
+  ensureToken(token);
+  const response = await httpClient.get('/payments/reports/summary', {
+    token,
+    params,
+    signal,
+    cache: {
+      ttl: 60_000,
+      tags: ['payments:summary'],
+      varyByToken: true
+    }
+  });
+  return response?.data ?? response ?? [];
+}
+
 export const paymentsApi = {
   createPaymentIntent,
   capturePayPalOrder,
   refundPayment,
   listPaymentIntents,
-  previewCoupon
+  previewCoupon,
+  fetchPaymentSummary
 };
 
 export default paymentsApi;

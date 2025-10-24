@@ -7,6 +7,8 @@ import { sessionRegistry } from './SessionRegistry.js';
 import UserModel from '../models/UserModel.js';
 import DirectMessageParticipantModel from '../models/DirectMessageParticipantModel.js';
 import courseLiveService from './CourseLiveService.js';
+import CommunityChatService from './CommunityChatService.js';
+import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
 import { createCorsOriginValidator } from '../config/corsPolicy.js';
 
 const log = logger.child({ service: 'RealtimeService' });
@@ -99,6 +101,9 @@ class RealtimeService {
       userConnections.add(socket.id);
       this.activeConnections.set(user.id, userConnections);
 
+      socket.data.joinedCommunities = new Set();
+      socket.data.joinedCommunityChannels = new Map();
+
       socket.on('inbox.join', async (payload) => {
         const threadId = Number(payload?.threadId);
         if (!Number.isFinite(threadId)) return;
@@ -162,6 +167,120 @@ class RealtimeService {
         }
       });
 
+      socket.on('community.join', async (payload = {}) => {
+        const communityId = Number(payload.communityId);
+        if (!Number.isFinite(communityId)) {
+          return;
+        }
+        try {
+          await CommunityChatService.ensureCommunityMember(communityId, user.id);
+          socket.join(`community:${communityId}`);
+          socket.data.joinedCommunities.add(communityId);
+          socket.emit('community.joined', { communityId });
+        } catch (error) {
+          log.warn({ err: error, communityId, userId: user.id }, 'community join failed');
+          socket.emit('community.error', {
+            communityId,
+            message: error?.message ?? 'Unable to join community'
+          });
+        }
+      });
+
+      socket.on('community.leave', (payload = {}) => {
+        const communityId = Number(payload.communityId);
+        if (!Number.isFinite(communityId)) {
+          return;
+        }
+
+        socket.leave(`community:${communityId}`);
+        socket.data.joinedCommunities.delete(communityId);
+
+        const joinedChannels = socket.data.joinedCommunityChannels.get(communityId);
+        if (joinedChannels) {
+          joinedChannels.forEach((channelId) => {
+            socket.leave(`community:${communityId}:channel:${channelId}`);
+          });
+          socket.data.joinedCommunityChannels.delete(communityId);
+        }
+
+        socket.emit('community.left', { communityId });
+      });
+
+      socket.on('community.channel.join', async (payload = {}) => {
+        const communityId = Number(payload.communityId);
+        const channelId = Number(payload.channelId);
+        if (!Number.isFinite(communityId) || !Number.isFinite(channelId)) {
+          return;
+        }
+
+        try {
+          await CommunityChatService.ensureChannelAccess(communityId, channelId, user.id);
+          socket.join(`community:${communityId}:channel:${channelId}`);
+          const joinedChannels = socket.data.joinedCommunityChannels.get(communityId) ?? new Set();
+          joinedChannels.add(channelId);
+          socket.data.joinedCommunityChannels.set(communityId, joinedChannels);
+          socket.emit('community.channel.joined', { communityId, channelId });
+        } catch (error) {
+          log.warn({ err: error, communityId, channelId, userId: user.id }, 'community channel join failed');
+          socket.emit('community.error', {
+            communityId,
+            channelId,
+            message: error?.message ?? 'Unable to join channel'
+          });
+        }
+      });
+
+      socket.on('community.channel.leave', (payload = {}) => {
+        const communityId = Number(payload.communityId);
+        const channelId = Number(payload.channelId);
+        if (!Number.isFinite(communityId) || !Number.isFinite(channelId)) {
+          return;
+        }
+
+        socket.leave(`community:${communityId}:channel:${channelId}`);
+        const joinedChannels = socket.data.joinedCommunityChannels.get(communityId);
+        if (joinedChannels) {
+          joinedChannels.delete(channelId);
+          if (!joinedChannels.size) {
+            socket.data.joinedCommunityChannels.delete(communityId);
+          }
+        }
+        socket.emit('community.channel.left', { communityId, channelId });
+      });
+
+      socket.on('community.typing', (payload = {}) => {
+        const communityId = Number(payload.communityId);
+        const channelId = Number(payload.channelId);
+        if (!Number.isFinite(communityId) || !Number.isFinite(channelId)) {
+          return;
+        }
+
+        if (!socket.data.joinedCommunities.has(communityId)) {
+          return;
+        }
+        const joinedChannels = socket.data.joinedCommunityChannels.get(communityId);
+        if (!joinedChannels?.has(channelId)) {
+          return;
+        }
+
+        const typingPayload = {
+          communityId,
+          channelId,
+          user: {
+            id: user.id,
+            name: user.name,
+            role: user.role
+          },
+          isTyping: Boolean(payload.isTyping),
+          metadata: payload.metadata ?? {},
+          timestamp: new Date().toISOString()
+        };
+
+        this.io
+          .to(`community:${communityId}:channel:${channelId}`)
+          .emit('community.typing', typingPayload);
+      });
+
       socket.on('disconnect', () => {
         log.info({ userId: user.id }, 'socket disconnected');
         const connections = this.activeConnections.get(user.id);
@@ -178,6 +297,30 @@ class RealtimeService {
             presence
           });
         });
+
+        const communityIds = Array.from(socket.data.joinedCommunities ?? []);
+        socket.data.joinedCommunities.clear?.();
+        socket.data.joinedCommunityChannels.clear?.();
+
+        (async () => {
+          try {
+            if (user.sessionId) {
+              await UserPresenceSessionModel.clear(user.sessionId);
+            }
+          } catch (error) {
+            log.warn({ err: error, userId: user.id }, 'failed to clear presence session on disconnect');
+          }
+
+          await Promise.all(
+            communityIds.map(async (communityId) => {
+              try {
+                await this.broadcastCommunityPresence(communityId);
+              } catch (error) {
+                log.warn({ err: error, communityId, userId: user.id }, 'failed to broadcast community presence on disconnect');
+              }
+            })
+          );
+        })();
       });
     });
 
@@ -257,6 +400,68 @@ class RealtimeService {
     this.io.to(`course:${courseId}`).emit('course.message', {
       courseId,
       message
+    });
+  }
+
+  broadcastCommunityMessage(communityId, channelId, message, metadata = {}) {
+    if (!this.io) return;
+    const numericCommunityId = Number(communityId);
+    const numericChannelId = Number(channelId);
+    if (!Number.isFinite(numericCommunityId) || !Number.isFinite(numericChannelId)) {
+      return;
+    }
+
+    const payload = {
+      communityId: numericCommunityId,
+      channelId: numericChannelId,
+      message,
+      metadata: {
+        broadcastedAt: new Date().toISOString(),
+        ...metadata
+      }
+    };
+
+    this.io.to(`community:${numericCommunityId}`).emit('community.message', payload);
+    this.io.to(`community:${numericCommunityId}:channel:${numericChannelId}`).emit('community.message', payload);
+  }
+
+  broadcastCommunityReaction(communityId, channelId, reactionSummary) {
+    if (!this.io) return;
+    const numericCommunityId = Number(communityId);
+    const numericChannelId = Number(channelId);
+    if (!Number.isFinite(numericCommunityId) || !Number.isFinite(numericChannelId)) {
+      return;
+    }
+
+    this.io
+      .to(`community:${numericCommunityId}:channel:${numericChannelId}`)
+      .emit('community.reaction', {
+        communityId: numericCommunityId,
+        channelId: numericChannelId,
+        reaction: reactionSummary
+      });
+  }
+
+  async broadcastCommunityPresence(communityId, presenceList) {
+    if (!this.io) return;
+    const numericCommunityId = Number(communityId);
+    if (!Number.isFinite(numericCommunityId)) {
+      return;
+    }
+
+    let presence = presenceList;
+    if (!presence) {
+      try {
+        presence = await CommunityChatService.listPresence(numericCommunityId);
+      } catch (error) {
+        log.warn({ err: error, communityId: numericCommunityId }, 'failed to load presence for broadcast');
+        return;
+      }
+    }
+
+    this.io.to(`community:${numericCommunityId}`).emit('community.presence', {
+      communityId: numericCommunityId,
+      presence
     });
   }
 }
