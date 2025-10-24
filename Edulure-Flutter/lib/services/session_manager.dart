@@ -18,6 +18,10 @@ class SessionManager {
   static const _notificationPreferencesBox = 'notification_preferences';
   static const _notificationOutboxBox = 'notification_outbox';
   static const _providerTransitionBox = 'provider_transition_announcements';
+  static const _billingAccountBox = 'billing_account';
+  static const _billingOutboxBox = 'billing_outbox';
+  static const _communicationOutboxBox = 'communication_outbox';
+  static const _communicationMetadataBox = 'communication_metadata';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
   static const _secureAccessTokenKey = 'session.accessToken';
@@ -43,6 +47,10 @@ class SessionManager {
     await _openBox(_notificationPreferencesBox, optional: true);
     await _openBox(_notificationOutboxBox, optional: true);
     await _openBox(_providerTransitionBox, optional: true);
+    await _openBox(_billingAccountBox, optional: true);
+    await _openBox(_billingOutboxBox, optional: true);
+    await _openBox(_communicationOutboxBox, optional: true);
+    await _openBox(_communicationMetadataBox, optional: true);
     _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
     _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
   }
@@ -63,6 +71,10 @@ class SessionManager {
   static Box get notificationOutbox => Hive.box(_notificationOutboxBox);
   static Box? get providerTransitionCache =>
       Hive.isBoxOpen(_providerTransitionBox) ? Hive.box(_providerTransitionBox) : null;
+  static Box get billingAccountCache => Hive.box(_billingAccountBox);
+  static Box get billingOutbox => Hive.box(_billingOutboxBox);
+  static Box get communicationOutbox => Hive.box(_communicationOutboxBox);
+  static Box get communicationMetadata => Hive.box(_communicationMetadataBox);
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     final sanitized = Map<String, dynamic>.from(session);
@@ -154,6 +166,10 @@ class SessionManager {
     await _clearIfAvailable(_notificationPreferencesBox);
     await _clearIfAvailable(_notificationOutboxBox);
     await _clearIfAvailable(_providerTransitionBox);
+    await _clearIfAvailable(_billingAccountBox);
+    await _clearIfAvailable(_billingOutboxBox);
+    await _clearIfAvailable(_communicationOutboxBox);
+    await _clearIfAvailable(_communicationMetadataBox);
     await SecureStorageService.instance.deleteAll(
       keys: const {
         _secureAccessTokenKey,
