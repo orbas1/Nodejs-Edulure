@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpTrayIcon, SparklesIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
-import { searchSupportKnowledgeBase } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import useSupportLauncher from '../../hooks/useSupportLauncher.js';
+import { formatDashboardRelative } from '../../utils/dashboardFormatting.js';
 
 function createAttachmentMeta(file, index) {
   const id =
@@ -42,30 +43,7 @@ function normaliseCategoryOptions(categoryOptions) {
   return categoryOptions;
 }
 
-function mapKnowledgeSuggestions(articles = []) {
-  if (!Array.isArray(articles)) {
-    return [];
-  }
-  return articles
-    .map((article, index) => {
-      if (!article) {
-        return null;
-      }
-      const id = article.id ?? article.slug ?? `kb-${index}`;
-      return {
-        id,
-        title: article.title ?? 'Support guide',
-        excerpt: article.excerpt ?? article.summary ?? article.description ?? '',
-        url: article.url ?? '#',
-        category: article.category ?? 'General',
-        minutes: Number.isFinite(Number(article.minutes)) ? Number(article.minutes) : 3
-      };
-    })
-    .filter(Boolean);
-}
-
 const SUPPORT_PREFERENCE_STORAGE_PREFIX = 'edulure:support-preferences:';
-const VALIDATION_ERROR_MESSAGE = 'Add a subject and description to submit your request.';
 const baseNotificationPreferences = Object.freeze({
   digest: 'daily',
   channels: {
@@ -155,6 +133,31 @@ function saveNotificationPreferences(storageKey, preferences) {
   }
 }
 
+function deriveUserDisplayName(user) {
+  if (!user || typeof user !== 'object') {
+    return '';
+  }
+  if (user.name) {
+    return user.name;
+  }
+  const names = [user.firstName, user.lastName].filter(Boolean);
+  if (names.length) {
+    return names.join(' ');
+  }
+  return user.username ?? user.email ?? '';
+}
+
+function isValidEmail(value) {
+  if (!value) {
+    return false;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+}
+
 function AttachmentBadge({ attachment, onRemove }) {
   return (
     <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
@@ -199,8 +202,7 @@ export default function TicketForm({
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [suggestions, setSuggestions] = useState([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [notificationPreferences, setNotificationPreferences] = useState(() =>
     createDefaultNotificationPreferences()
   );
@@ -213,14 +215,52 @@ export default function TicketForm({
     description: '',
     attachments: []
   });
+  const defaultTimezone = useMemo(() => {
+    if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+      } catch (_error) {
+        return 'UTC';
+      }
+    }
+    return 'UTC';
+  }, []);
+  const [contact, setContact] = useState(() => ({
+    name: deriveUserDisplayName(auth?.session?.user),
+    email: auth?.session?.user?.email ?? auth?.session?.user?.contactEmail ?? '',
+    timezone: defaultTimezone
+  }));
+  const {
+    suggestions,
+    loading: loadingSuggestions,
+    lastFetchedAt: suggestionsUpdatedAt,
+    cached: suggestionsFromCache,
+    stale: suggestionsAreStale,
+    error: suggestionError,
+    latestQuery,
+    search: searchKnowledgeBase,
+    reset: resetKnowledgeBase
+  } = useSupportLauncher({ token });
+
+  const clearFieldError = useCallback((field) => {
+    setFieldErrors((current) => {
+      if (!current?.[field]) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) {
+      resetKnowledgeBase();
       return;
     }
     setStep(0);
     setError(null);
-    setSuggestions([]);
+    setFieldErrors({});
     setForm({
       subject: '',
       category: defaultCategoryValue,
@@ -228,49 +268,50 @@ export default function TicketForm({
       description: '',
       attachments: []
     });
+    setContact({
+      name: deriveUserDisplayName(auth?.session?.user),
+      email: auth?.session?.user?.email ?? auth?.session?.user?.contactEmail ?? '',
+      timezone: defaultTimezone
+    });
     const storedPreferences = loadNotificationPreferences(preferenceStorageKey);
     setNotificationPreferences(mergeNotificationPreferences(storedPreferences));
     setPreferencesDirty(false);
     setPreferenceBanner(null);
-  }, [open, defaultCategoryValue, defaultPriorityValue, preferenceStorageKey]);
+  }, [
+    auth?.session?.user,
+    defaultCategoryValue,
+    defaultPriorityValue,
+    defaultTimezone,
+    open,
+    preferenceStorageKey,
+    resetKnowledgeBase
+  ]);
 
   useEffect(() => {
-    if (!open || !token) {
-      return undefined;
+    if (!open) {
+      return;
     }
     const query = `${form.subject} ${form.description}`.trim();
     if (!query) {
-      setSuggestions([]);
-      return undefined;
+      resetKnowledgeBase();
+      return;
     }
-    const controller = new AbortController();
-    setLoadingSuggestions(true);
-    searchSupportKnowledgeBase({
-      token,
-      query,
-      category: form.category,
-      limit: 5,
-      signal: controller.signal
-    })
-      .then((response) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        const articles = response?.data?.articles ?? response?.articles ?? [];
-        setSuggestions(mapKnowledgeSuggestions(articles));
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setSuggestions([]);
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoadingSuggestions(false);
-        }
-      });
-    return () => controller.abort();
-  }, [open, token, form.subject, form.description, form.category]);
+    const normalisedQuery = query.replace(/\s+/g, ' ').trim().toLowerCase();
+    const category = form.category ?? null;
+    if (latestQuery.query === normalisedQuery && latestQuery.category === category) {
+      return;
+    }
+    searchKnowledgeBase({ query, category });
+  }, [
+    form.category,
+    form.description,
+    form.subject,
+    latestQuery.category,
+    latestQuery.query,
+    open,
+    resetKnowledgeBase,
+    searchKnowledgeBase
+  ]);
 
   useEffect(() => {
     if (open && subjectInputRef.current) {
@@ -332,6 +373,26 @@ export default function TicketForm({
   const handleFieldChange = (event) => {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
+    clearFieldError(name);
+  };
+
+  const handleContactChange = (event) => {
+    const { name, value } = event.target;
+    setContact((current) => {
+      if (name === 'contactName') {
+        return { ...current, name: value };
+      }
+      if (name === 'contactEmail') {
+        return { ...current, email: value };
+      }
+      if (name === 'contactTimezone') {
+        return { ...current, timezone: value };
+      }
+      return current;
+    });
+    if (name === 'contactName' || name === 'contactEmail') {
+      clearFieldError(name);
+    }
   };
 
   const handleFileChange = (event) => {
@@ -409,10 +470,26 @@ export default function TicketForm({
   };
 
   const handleContinue = () => {
+    const nextErrors = {};
     if (!form.subject.trim()) {
-      setError(VALIDATION_ERROR_MESSAGE);
+      nextErrors.subject = 'Add a subject so we can triage quickly.';
+    }
+    const nameValue = contact.name?.trim() ?? '';
+    if (!nameValue) {
+      nextErrors.contactName = 'Share your name so we know who to reach.';
+    }
+    const emailValue = contact.email?.trim() ?? '';
+    if (!emailValue) {
+      nextErrors.contactEmail = 'Add the email address we should follow up with.';
+    } else if (!isValidEmail(emailValue)) {
+      nextErrors.contactEmail = 'Enter a valid email address.';
+    }
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors((current) => ({ ...current, ...nextErrors }));
+      setError('Complete the highlighted fields to continue.');
       return;
     }
+    setFieldErrors({});
     setError(null);
     setStep(1);
   };
@@ -422,8 +499,30 @@ export default function TicketForm({
     if (submitting) {
       return;
     }
-    if (!form.subject.trim() || !form.description.trim()) {
-      setError(VALIDATION_ERROR_MESSAGE);
+    const nextErrors = {};
+    const subjectValue = form.subject.trim();
+    const descriptionValue = form.description.trim();
+    const nameValue = contact.name?.trim() ?? '';
+    const emailValue = contact.email?.trim() ?? '';
+
+    if (!subjectValue) {
+      nextErrors.subject = 'Add a subject so we can triage quickly.';
+    }
+    if (!descriptionValue) {
+      nextErrors.description = 'Describe the issue so we can assist quickly.';
+    }
+    if (!nameValue) {
+      nextErrors.contactName = 'Share your name so we know who to reach.';
+    }
+    if (!emailValue) {
+      nextErrors.contactEmail = 'Add the email address we should follow up with.';
+    } else if (!isValidEmail(emailValue)) {
+      nextErrors.contactEmail = 'Enter a valid email address.';
+    }
+
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors((current) => ({ ...current, ...nextErrors }));
+      setError('Complete the highlighted fields to submit your request.');
       return;
     }
     setError(null);
@@ -436,13 +535,18 @@ export default function TicketForm({
     }));
     try {
       await onSubmit?.({
-        subject: form.subject.trim(),
+        subject: subjectValue,
         category: form.category,
         priority: form.priority,
-        description: form.description.trim(),
+        description: descriptionValue,
         attachments: attachmentsPayload,
         knowledgeSuggestions: suggestions,
-        notificationPreferences
+        notificationPreferences,
+        requester: {
+          name: nameValue,
+          email: emailValue,
+          timezone: contact.timezone ?? defaultTimezone
+        }
       });
       onClose?.();
     } catch (submitError) {
@@ -452,9 +556,13 @@ export default function TicketForm({
     }
   };
 
-  const isValidationError = error === VALIDATION_ERROR_MESSAGE;
-  const subjectHasError = isValidationError && !form.subject.trim();
-  const descriptionHasError = isValidationError && step === 1 && !form.description.trim();
+  const subjectHasError = Boolean(fieldErrors.subject);
+  const descriptionHasError = Boolean(fieldErrors.description);
+  const contactNameHasError = Boolean(fieldErrors.contactName);
+  const contactEmailHasError = Boolean(fieldErrors.contactEmail);
+  const contactNameErrorMessage = fieldErrors.contactName;
+  const contactEmailErrorMessage = fieldErrors.contactEmail;
+  const descriptionErrorMessage = fieldErrors.description;
   const subjectInputClasses = `mt-2 rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
     subjectHasError
       ? 'border-rose-300 text-slate-900 shadow-sm focus:border-rose-400 focus:ring-rose-200/70'
@@ -465,6 +573,18 @@ export default function TicketForm({
       ? 'border-rose-300 text-slate-900 shadow-sm focus:border-rose-400 focus:ring-rose-200/70'
       : 'border-slate-200 text-slate-900 shadow-sm focus:border-primary focus:ring-primary/30'
   }`;
+  const contactInputClasses = (hasError) =>
+    `mt-2 rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
+      hasError
+        ? 'border-rose-300 text-slate-900 shadow-sm focus:border-rose-400 focus:ring-rose-200/70'
+        : 'border-slate-200 text-slate-900 shadow-sm focus:border-primary focus:ring-primary/30'
+    }`;
+
+  const suggestionsFreshnessLabel = suggestionsFromCache
+    ? suggestionsAreStale
+      ? 'Cached guidance (stale)'
+      : 'Cached guidance'
+    : 'Latest guidance';
 
   if (!open) {
     return null;
@@ -561,6 +681,65 @@ export default function TicketForm({
               <p className="mt-2">
                 {serviceWindow}. First response under {firstResponseMinutes} minutes on average.
               </p>
+            </div>
+            <div className="md:col-span-2 space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">Contact details</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    We will send updates and follow-ups to this contact information.
+                  </p>
+                </div>
+                <span className="text-xs text-slate-400">Timezone auto-detected from your device</span>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col text-sm font-medium text-slate-700">
+                  Full name
+                  <input
+                    name="contactName"
+                    value={contact.name}
+                    onChange={handleContactChange}
+                    placeholder="Who should we follow up with?"
+                    className={contactInputClasses(contactNameHasError)}
+                    aria-invalid={contactNameHasError}
+                    aria-describedby={contactNameHasError ? 'ticket-contact-name-error' : undefined}
+                  />
+                  {contactNameHasError ? (
+                    <p id="ticket-contact-name-error" className="mt-1 text-xs text-rose-600">
+                      {contactNameErrorMessage}
+                    </p>
+                  ) : null}
+                </label>
+                <label className="flex flex-col text-sm font-medium text-slate-700">
+                  Email
+                  <input
+                    name="contactEmail"
+                    type="email"
+                    value={contact.email}
+                    onChange={handleContactChange}
+                    placeholder="you@example.com"
+                    className={contactInputClasses(contactEmailHasError)}
+                    aria-invalid={contactEmailHasError}
+                    aria-describedby={contactEmailHasError ? 'ticket-contact-email-error' : undefined}
+                    autoComplete="email"
+                  />
+                  {contactEmailHasError ? (
+                    <p id="ticket-contact-email-error" className="mt-1 text-xs text-rose-600">
+                      {contactEmailErrorMessage}
+                    </p>
+                  ) : null}
+                </label>
+              </div>
+              <label className="flex flex-col text-sm font-medium text-slate-700">
+                Timezone (optional)
+                <input
+                  name="contactTimezone"
+                  value={contact.timezone}
+                  onChange={handleContactChange}
+                  placeholder="UTC"
+                  className="mt-2 rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
             </div>
             <div className="md:col-span-2 space-y-4 rounded-2xl border border-slate-200 bg-white/70 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -683,7 +862,7 @@ export default function TicketForm({
               />
               {descriptionHasError ? (
                 <p id="ticket-description-error" className="mt-1 text-xs text-rose-600">
-                  Describe what happened so we can assist quickly.
+                  {descriptionErrorMessage ?? 'Describe what happened so we can assist quickly.'}
                 </p>
               ) : null}
             </label>
@@ -697,6 +876,25 @@ export default function TicketForm({
                 We surface knowledge base guidance while you draft so you and the support desk share the same playbooks.
               </p>
               <div className="mt-4 space-y-3">
+                {suggestionsUpdatedAt ? (
+                  <>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">
+                      {suggestionsFreshnessLabel} •{' '}
+                      {formatDashboardRelative(suggestionsUpdatedAt)}
+                    </p>
+                    {suggestionsAreStale ? (
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">
+                        We will refresh the runbooks once you are back online.
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+                {suggestionError ? (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    We could not refresh the playbooks right now. Submit your request and our crew will attach the relevant
+                    guides.
+                  </p>
+                ) : null}
                 {loadingSuggestions ? (
                   <p className="text-xs text-slate-500">Searching the knowledge base…</p>
                 ) : suggestions.length ? (

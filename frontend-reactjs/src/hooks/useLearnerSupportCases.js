@@ -167,6 +167,38 @@ function normaliseSupportCase(caseItem) {
     caseItem.escalationBreadcrumbs ?? caseItem.escalation_breadcrumbs ?? []
   );
   const metadata = safeParseJson(caseItem.metadata ?? caseItem.meta ?? {}, {});
+  const requesterRaw =
+    caseItem.requester ??
+    caseItem.requestor ??
+    metadata.requester ??
+    metadata.requestor ??
+    null;
+  const requester =
+    requesterRaw && typeof requesterRaw === 'object'
+      ? {
+          name: requesterRaw.name ?? requesterRaw.fullName ?? requesterRaw.displayName ?? null,
+          email: requesterRaw.email ?? requesterRaw.address ?? requesterRaw.contact ?? null,
+          timezone: requesterRaw.timezone ?? requesterRaw.timeZone ?? null
+        }
+      : { name: null, email: null, timezone: null };
+  const notificationPreferencesRaw =
+    caseItem.notificationPreferences ??
+    caseItem.notification_preferences ??
+    metadata.notificationPreferences ??
+    metadata.notification_preferences ??
+    null;
+  const notificationPreferences =
+    notificationPreferencesRaw && typeof notificationPreferencesRaw === 'object'
+      ? {
+          digest:
+            notificationPreferencesRaw.digest ??
+            notificationPreferencesRaw.cadence ??
+            notificationPreferencesRaw.frequency ??
+            null,
+          channels: { ...(notificationPreferencesRaw.channels ?? {}) },
+          categories: { ...(notificationPreferencesRaw.categories ?? {}) }
+        }
+      : null;
 
   return {
     id,
@@ -186,6 +218,8 @@ function normaliseSupportCase(caseItem) {
     followUpDueAt: toISOString(caseItem.followUpDueAt ?? caseItem.follow_up_due_at ?? caseItem.nextFollowUp),
     aiSummary: caseItem.aiSummary ?? caseItem.ai_summary ?? null,
     metadata,
+    requester,
+    notificationPreferences,
     tags: Array.isArray(caseItem.tags) ? caseItem.tags : [],
     messages: messagesRaw
       .map((message) => normaliseMessage(message))

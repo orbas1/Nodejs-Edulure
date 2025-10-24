@@ -1251,18 +1251,20 @@ This expanded logic flows compendium should be revisited each release cycle to e
 16. **Full Upgrade Plan & Release Steps.** Phase 1 delivers countdown enforcement and modular components; Phase 2 layers analytics and decline workflows; Phase 3 introduces admin reissue controls and enhanced validation; Phase 4 finalises documentation updates, partner communications, and staged rollouts with sandbox rehearsals.
 
 ### A24. Support, Knowledge & Feedback (2.I)
-- **Operational Depth:** Support features surface knowledge base, ticket submission, and feedback forms integrated with backend support services.
-- **Gaps & Risks:** Some FAQ entries outdated; implement freshness tracking. Ticket forms duplicate validation logic with backend.
-- **Resilience & Efficiency:** Cache knowledge base categories, debounce search inputs, and prefill user context for ticket submission.
-- **UX & Communications:** Provide consistent spacing, accessible typography, and friendly tone in support prompts.
-- **Change Management:** Sync content review cadences, update macros, and include support flows in regression testing.
+- **Operational Depth:** Support tooling now preloads contact context from the authenticated session, captures notification preferences, and persists requester metadata alongside ticket payloads so downstream agents have the same contact trail as the learner workspace. Live ticket timelines incorporate cached knowledge base suggestions, attachment previews, and SLA metadata pulled from backend orchestration.
+- **Gaps & Risks:** Knowledge base freshness still depends on external review cadences; ensure playbook audits run weekly. Offline ticket creation caches requests locally but requires a reconnect workflow before syncing attachments. Admin analytics should ingest requester timezone to avoid skewing follow-up metrics.
+- **Resilience & Efficiency:** Debounced search through `useSupportLauncher` memoises OpenAPI responses for five minutes, tags cache hits as fresh or stale, and revives expired payloads with warning copy if the knowledge service is offline. Ticket metadata persists notification channel selections and digest cadence in local storage, and submissions bundle requester context so the backend need not re-derive it.
+- **UX & Communications:** Ticket creation separates subject triage from descriptive details, surfaces inline validation and accessibility labelling, and presents knowledge suggestion freshness (“Latest guidance • 2m ago” / “Cached guidance (stale)”) with graceful degradation messaging. Case detail panels expose requester contact, timezone, and notification badges for quick reference while offline banners reassure learners that runbooks will refresh after reconnect.
+- **Change Management:** Documented schema enrichment for support cases (requester + notificationPreferences) requires dashboard hooks and backend serializers to stay aligned; regression plans include validating cached search expiry, contact validation, and audit logging of preference changes.
+- **Recent Enhancements:** Added `useSupportLauncher` hook for cached, debounced knowledge queries; extended `TicketForm` with requester inputs, inline error messaging, and suggestion status; updated `LearnerSupport` timelines to display notification preference chips and propagate requester metadata through `useLearnerSupportCases`.
 
 ### A25. Shared Layout, Theming & Component Infrastructure (2.J)
-- **Operational Depth:** Theme providers inject design tokens, layout components manage navigation, and shared utilities enforce responsive behaviour.
-- **Gaps & Risks:** Some components bypass theme tokens, using hard-coded colours. Layout breakpoints need consolidation to avoid media query drift.
-- **Resilience & Efficiency:** Tree-shake unused components, lazy-load rarely used layouts, and monitor bundle sizes.
-- **UX & Communications:** Document component usage guidelines, maintain Storybook parity, and ensure consistent typography scales.
-- **Change Management:** Update theme tokens with changelog, run visual regression, and coordinate design reviews.
+- **Operational Depth:** A dedicated `ThemeProvider` now centralises light/dark/contrast preferences, synchronising CSS data attributes with system media queries and persisting selections across reloads. Layout shells (`MainLayout`, `DashboardLayout`) consume a shared `ThemeModeToggle`, keeping navigation chrome, notifications, and dashboard shells aligned.
+- **Gaps & Risks:** Mobile viewports hide the full theme menu; ensure a compact toggle lands in the mobile drawer. Apply provider awareness to lazy-loaded routes to avoid flash-of-unstyled-content during suspense fallback.
+- **Resilience & Efficiency:** Preferences cache to local storage, and system media query listeners update React state without forcing full re-render cascades. Theme toggles memoise derived labels to avoid unnecessary recalculations in high-frequency renders.
+- **UX & Communications:** The toggle exposes explicit labels (“System (dark)”, “Auto • high contrast”) and groups contrast controls under accessible headings, reinforcing documentation guidance around design tokens. Shared button styling aligns with navigation chips and quick-create menus for visual parity.
+- **Change Management:** Documented provider adoption in `main.jsx` ensures any new root-level context wraps inside the theme provider, and layout teams must include theme toggle placement in future shell reviews. Regression plan includes verifying data attributes on the `<html>` element and ensuring high contrast combinations pass accessibility audits.
+- **Recent Enhancements:** Introduced `ThemeModeToggle` component, injected it into `AppTopBar`, and wrapped the app tree with `ThemeProvider`. Added persisted theme preferences with system listeners and removed hard-coded colour paths from support components in favour of design tokens.
 
 ### A26. Flutter Authentication & Identity (3.A)
 - **Operational Depth:** Dart services manage secure storage, token refresh, and biometric unlocks. Auth flows sync with backend MFA requirements and store tokens encrypted on device.

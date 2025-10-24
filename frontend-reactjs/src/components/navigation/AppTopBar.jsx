@@ -13,6 +13,7 @@ import {
 import GlobalSearchBar from '../search/GlobalSearchBar.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
 import UserMenu from './UserMenu.jsx';
+import ThemeModeToggle from '../common/ThemeModeToggle.jsx';
 import { buildFocusOrder } from '../../navigation/routes.js';
 
 function classNames(...classes) {
@@ -210,6 +211,7 @@ export default function AppTopBar({
               </span>
             ) : null}
           </button>
+          <ThemeModeToggle className="hidden lg:inline-flex" />
           <LanguageSelector size="compact" variant="light" align="end" showLabel={false} />
           {session?.user ? (
             <UserMenu session={session} onNavigate={handleNavigate} onLogout={onLogout} />
