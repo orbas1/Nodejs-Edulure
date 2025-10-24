@@ -146,6 +146,7 @@ export default function AppTopBar({
             type="button"
             onClick={() => handleNavigate(resolvedCallToAction.to)}
             className="hidden items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 lg:inline-flex"
+            title={resolvedCallToAction.description ?? resolvedCallToAction.label}
           >
             <BoltIcon className="h-4 w-4" />
             <span>{resolvedCallToAction.label}</span>

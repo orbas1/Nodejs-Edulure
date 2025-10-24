@@ -79,7 +79,8 @@ export default function TopBar({
   presence = null,
   onNavigate,
   messagesOpen = false,
-  notificationsOpen = false
+  notificationsOpen = false,
+  callToAction = null
 }) {
   const [localSearchValue, setLocalSearchValue] = useState('');
   const resolvedSearchValue = searchValue ?? localSearchValue;
@@ -160,6 +161,14 @@ export default function TopBar({
     }
   };
 
+  const handleCallToAction = () => {
+    if (!callToAction?.to) {
+      return;
+    }
+    trackNavigationSelect(callToAction.analyticsId ?? callToAction.to, { origin: 'community-topbar' });
+    onNavigate?.(callToAction.to);
+  };
+
   return (
     <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white px-6 py-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="flex w-full flex-col gap-3 sm:max-w-xs">
@@ -206,6 +215,17 @@ export default function TopBar({
         />
       </div>
       <div className="flex items-center justify-end gap-3 text-slate-500">
+        {callToAction ? (
+          <button
+            type="button"
+            onClick={handleCallToAction}
+            className="inline-flex items-center gap-2 rounded-2xl border border-primary/20 bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            title={callToAction.description ?? callToAction.label}
+          >
+            <BoltIcon className="h-4 w-4" />
+            <span>{callToAction.label}</span>
+          </button>
+        ) : null}
         <LanguageSelector size="compact" variant="light" align="end" showLabel={false} />
         <button
           type="button"
@@ -289,7 +309,14 @@ TopBar.propTypes = {
   }),
   onNavigate: PropTypes.func,
   messagesOpen: PropTypes.bool,
-  notificationsOpen: PropTypes.bool
+  notificationsOpen: PropTypes.bool,
+  callToAction: PropTypes.shape({
+    id: PropTypes.string,
+    label: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    to: PropTypes.string,
+    analyticsId: PropTypes.string
+  })
 };
 
 TopBar.defaultProps = {
@@ -310,5 +337,6 @@ TopBar.defaultProps = {
   presence: null,
   onNavigate: null,
   messagesOpen: false,
-  notificationsOpen: false
+  notificationsOpen: false,
+  callToAction: null
 };

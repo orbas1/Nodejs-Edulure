@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import AppTopBar from '../components/navigation/AppTopBar.jsx';
@@ -12,11 +12,12 @@ import {
   NOTIFICATION_GROUPS,
   getDashboardNavigation
 } from '../navigation/routes.js';
-import { deriveQuickActions, buildShellNotifications, derivePresence } from '../navigation/utils.js';
+import { deriveQuickActions, buildShellNotifications, derivePresence, mergeAnnexQuickActions } from '../navigation/utils.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import { useRealtime } from '../context/RealtimeContext.jsx';
+import { NavigationMetadataProvider, NavigationMetadataContext } from '../context/NavigationMetadataContext.jsx';
 import {
   trackNavigationSelect,
   trackNotificationOpen,
@@ -214,6 +215,33 @@ function buildSurfaceRegistry(dashboard, role) {
   return registry;
 }
 
+function deriveAnnexSidebarStatuses(initiatives = []) {
+  const statuses = {};
+  initiatives.forEach((initiative) => {
+    if (!initiative?.id) {
+      return;
+    }
+    const primaryTask = initiative.initiative?.operations?.tasks?.[0] ?? null;
+    if (primaryTask?.label) {
+      statuses[initiative.id] = {
+        label: primaryTask.label,
+        tone: 'alert',
+        health: null
+      };
+      return;
+    }
+    const strategyMetric = initiative.initiative?.strategy?.metrics?.[0] ?? null;
+    if (strategyMetric?.label) {
+      statuses[initiative.id] = {
+        label: strategyMetric.label,
+        tone: 'notice',
+        health: null
+      };
+    }
+  });
+  return statuses;
+}
+
 function buildDashboardNotifications(session, dashboard) {
   const baseNotifications = buildShellNotifications(session);
   if (!Array.isArray(dashboard?.alerts) || dashboard.alerts.length === 0) {
@@ -271,7 +299,7 @@ function deriveSidebarStatuses(surfaceRegistry, role) {
   return statuses;
 }
 
-export default function DashboardLayout() {
+export function DashboardLayoutInner() {
   const { role: rawRole } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -279,6 +307,8 @@ export default function DashboardLayout() {
   const { roles, dashboards, activeRole, setActiveRole, loading, error, refresh } = useDashboard();
   const { getConfigValue } = useRuntimeConfig();
   const { connected: realtimeConnected } = useRealtime();
+  const navigationMetadata = useContext(NavigationMetadataContext);
+  const navigationInitiatives = navigationMetadata?.initiatives ?? { quickActions: [], dashboard: [] };
 
   const availableRoles = useMemo(
     () => roles.map((role) => role.id.toLowerCase()),
@@ -346,11 +376,23 @@ export default function DashboardLayout() {
     });
   }, [resolvedRole]);
 
-  const quickActionIds = useMemo(() => deriveQuickActions(session?.user?.role ?? resolvedRole), [session?.user?.role, resolvedRole]);
-  const quickActions = useMemo(
-    () => QUICK_CREATE_ACTIONS.filter((action) => quickActionIds.includes(action.id)),
-    [quickActionIds]
+  const quickActionIds = useMemo(
+    () => deriveQuickActions(session?.user?.role ?? resolvedRole),
+    [session?.user?.role, resolvedRole]
   );
+
+  const annexQuickActions = useMemo(() => {
+    const annexItems = Array.isArray(navigationInitiatives.quickActions)
+      ? navigationInitiatives.quickActions
+      : [];
+    const filteredAnnex = annexItems.filter((item) => quickActionIds.includes(item.id));
+    const filteredStatic = QUICK_CREATE_ACTIONS.filter((action) => quickActionIds.includes(action.id));
+    return mergeAnnexQuickActions(filteredStatic, filteredAnnex);
+  }, [navigationInitiatives.quickActions, quickActionIds]);
+
+  const quickActions = useMemo(() => annexQuickActions.quickActions, [annexQuickActions.quickActions]);
+
+  const callToAction = useMemo(() => annexQuickActions.callToAction, [annexQuickActions.callToAction]);
 
   const notificationCount = useMemo(
     () => notifications.filter((notification) => notification.unread).length,
@@ -359,9 +401,19 @@ export default function DashboardLayout() {
 
   const presence = useMemo(() => derivePresence(session, realtimeConnected), [session, realtimeConnected]);
 
-  const sidebarStatuses = useMemo(
+  const annexSidebarStatuses = useMemo(
+    () => deriveAnnexSidebarStatuses(navigationInitiatives.dashboard),
+    [navigationInitiatives.dashboard]
+  );
+
+  const baseSidebarStatuses = useMemo(
     () => deriveSidebarStatuses(surfaceRegistry, resolvedRole),
     [surfaceRegistry, resolvedRole]
+  );
+
+  const sidebarStatuses = useMemo(
+    () => ({ ...baseSidebarStatuses, ...annexSidebarStatuses }),
+    [baseSidebarStatuses, annexSidebarStatuses]
   );
 
   const pinnedNavigation = useMemo(() => {
@@ -473,6 +525,7 @@ export default function DashboardLayout() {
         onLogout={logout}
         primaryNavigation={PRIMARY_NAVIGATION}
         quickActions={quickActions}
+        callToAction={callToAction}
         onNavigate={handleNavigate}
         onOpenNotifications={handleOpenNotifications}
         searchValue={searchTerm}
@@ -553,6 +606,18 @@ export default function DashboardLayout() {
         onNavigate={handleNavigate}
       />
     </div>
+  );
+}
+
+export default function DashboardLayout() {
+  const { session, isAuthenticated } = useAuth();
+  const metadataRole = session?.user?.role ?? (isAuthenticated ? 'user' : 'guest');
+  const metadataToken = session?.tokens?.accessToken ?? undefined;
+
+  return (
+    <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
+      <DashboardLayoutInner />
+    </NavigationMetadataProvider>
   );
 }
 

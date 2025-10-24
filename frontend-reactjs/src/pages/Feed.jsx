@@ -36,6 +36,9 @@ import {
   resolveLastActivity,
   summarisePersonaCounts
 } from '../utils/communityPersona.js';
+import { QUICK_CREATE_ACTIONS } from '../navigation/routes.js';
+import { deriveQuickActions, mergeAnnexQuickActions } from '../navigation/utils.js';
+import { useNavigationMetadata } from '../context/NavigationMetadataContext.jsx';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -174,6 +177,7 @@ export default function Feed() {
   const navigate = useNavigate();
   const token = session?.tokens?.accessToken;
   const { canAccessCommunityFeed, canPostToCommunities, canJoinCommunities } = useAuthorization();
+  const { initiatives } = useNavigationMetadata();
 
   const [communities, setCommunities] = useState([ALL_COMMUNITIES_NODE]);
   const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
@@ -221,6 +225,26 @@ export default function Feed() {
   const [isSavingResource, setIsSavingResource] = useState(false);
   const [deletingResourceId, setDeletingResourceId] = useState(null);
   const [resourceNotice, setResourceNotice] = useState(null);
+
+  const quickActionIds = useMemo(
+    () => deriveQuickActions(session?.user?.role ?? (isAuthenticated ? 'user' : null)),
+    [session?.user?.role, isAuthenticated]
+  );
+
+  const annexQuickActions = useMemo(() => {
+    const annexItems = Array.isArray(initiatives?.quickActions) ? initiatives.quickActions : [];
+    const filteredAnnex = annexItems.filter((item) => quickActionIds.includes(item.id));
+    const filteredStatic = QUICK_CREATE_ACTIONS.filter((action) => quickActionIds.includes(action.id));
+    return mergeAnnexQuickActions(filteredStatic, filteredAnnex);
+  }, [initiatives?.quickActions, quickActionIds]);
+
+  const topBarCallToAction = useMemo(() => {
+    if (!canPostToCommunities) {
+      return annexQuickActions.callToAction ?? null;
+    }
+    const preferred = annexQuickActions.quickActions.find((action) => action.id === 'create-post');
+    return preferred ?? annexQuickActions.callToAction ?? null;
+  }, [annexQuickActions.callToAction, annexQuickActions.quickActions, canPostToCommunities]);
 
   const activeCommunity = useMemo(() => {
     if (communityDetail) {
@@ -1126,6 +1150,7 @@ export default function Feed() {
           isSearching={isLoadingFeed && !isLoadingMore}
           presence={topBarPresence}
           onNavigate={handleTopBarNavigate}
+          callToAction={topBarCallToAction}
         />
         <SkewedMenu activeState={menuState} activeItem={activeMenuItem} onSelect={setActiveMenuItem} />
         <div className="overflow-hidden rounded-4xl border border-slate-200 bg-gradient-to-br from-primary/10 via-white to-slate-50 p-8 shadow-card">

@@ -58,21 +58,24 @@ export const QUICK_CREATE_ACTIONS = [
     label: 'New post',
     description: 'Publish an announcement or share a win with your community.',
     icon: PencilSquareIcon,
-    to: '/dashboard/learner/communities'
+    to: '/dashboard/learner/communities',
+    analyticsId: 'quick-action-create-post'
   },
   {
     id: 'launch-session',
     label: 'Schedule live session',
     description: 'Spin up a live classroom with chat, recordings, and attendance.',
     icon: CalendarDaysIcon,
-    to: '/dashboard/instructor/live-classes'
+    to: '/dashboard/instructor/live-classes',
+    analyticsId: 'quick-action-launch-session'
   },
   {
     id: 'upload-course',
     label: 'Upload course asset',
     description: 'Add modules, lessons, or supporting downloads to a course.',
     icon: BuildingLibraryIcon,
-    to: '/dashboard/instructor/courses/create'
+    to: '/dashboard/instructor/courses/create',
+    analyticsId: 'quick-action-upload-course'
   }
 ];
 
