@@ -1,28 +1,21 @@
 import IntegrationApiKeyModel from '../models/IntegrationApiKeyModel.js';
 import dataEncryptionService from './DataEncryptionService.js';
-
-export const PROVIDER_CATALOGUE = {
-  openai: { id: 'openai', label: 'OpenAI', rotationDefaults: 90 },
-  anthropic: { id: 'anthropic', label: 'Anthropic Claude', rotationDefaults: 90 },
-  grok: { id: 'grok', label: 'XAI Grok', rotationDefaults: 60 },
-  'azure-openai': { id: 'azure-openai', label: 'Azure OpenAI', rotationDefaults: 60 },
-  'google-vertex': { id: 'google-vertex', label: 'Google Vertex AI', rotationDefaults: 60 }
-};
+import {
+  DEFAULT_CREDENTIAL_POLICY,
+  getCredentialPolicy,
+  getProviderDefinition,
+  normaliseProviderId
+} from './IntegrationProviderRegistry.js';
 
 const ALLOWED_ENVIRONMENTS = new Set(['production', 'staging', 'sandbox']);
 const SENSITIVE_EMAIL_DOMAINS = new Set(['gmail.com', 'yahoo.com', 'hotmail.com']);
-export const MIN_ROTATION_DAYS = 30;
-export const MAX_ROTATION_DAYS = 365;
+export const MIN_ROTATION_DAYS = DEFAULT_CREDENTIAL_POLICY.minRotationDays;
+export const MAX_ROTATION_DAYS = DEFAULT_CREDENTIAL_POLICY.maxRotationDays;
 export const ROTATION_WARNING_DAYS = 14;
 export const MIN_KEY_LENGTH = 20;
 
 export function normaliseProvider(provider) {
-  if (!provider) return null;
-  const key = String(provider).toLowerCase();
-  if (PROVIDER_CATALOGUE[key]) {
-    return PROVIDER_CATALOGUE[key].id;
-  }
-  return null;
+  return normaliseProviderId(provider);
 }
 
 export function normaliseEnvironment(environment) {
@@ -36,10 +29,14 @@ export function normaliseEnvironment(environment) {
 
 export function clampRotationInterval(value, provider) {
   const parsed = Number(value);
+  const policy = getCredentialPolicy(provider);
+  const defaultDays = policy.defaultRotationDays ?? DEFAULT_CREDENTIAL_POLICY.defaultRotationDays;
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    return PROVIDER_CATALOGUE[provider]?.rotationDefaults ?? 90;
+    return defaultDays;
   }
-  return Math.min(Math.max(Math.round(parsed), MIN_ROTATION_DAYS), MAX_ROTATION_DAYS);
+
+  const clamped = Math.round(parsed);
+  return Math.min(Math.max(clamped, policy.minRotationDays), policy.maxRotationDays);
 }
 
 export function isValidEmail(value) {
@@ -160,7 +157,10 @@ export default class IntegrationApiKeyService {
       return null;
     }
 
-    const providerMeta = PROVIDER_CATALOGUE[record.provider] ?? { id: record.provider, label: record.provider };
+    const providerMeta = getProviderDefinition(record.provider) ?? {
+      id: record.provider,
+      label: record.provider
+    };
     const lastRotatedAt = record.lastRotatedAt ?? record.createdAt ?? null;
     const nextRotationAt = record.nextRotationAt ?? (lastRotatedAt ? addDays(lastRotatedAt, record.rotationIntervalDays) : null);
     const now = this.nowProvider();

@@ -66,8 +66,8 @@
       - A8. Ads, Growth & Content Marketing (1.H)
       - A9. Analytics, Intelligence & Telemetry (1.I)
       - A10. Governance, Compliance & Runtime Control (1.J)
-      - A11. Integrations, Enablement & Environment Parity (1.K)
-      - A12. Media, Storage & Asset Pipeline (1.L)
+      - A11. Integrations, Enablement & Environment Parity (1.K) ✓
+      - A12. Media, Storage & Asset Pipeline (1.L) ✓
       - A13. Release, Provider Transition & Platform Settings (1.M)
       - A14. GraphQL Gateway & HTTP Bootstrapping (1.N)
       - A15. Repositories, Data Access & Domain Events (1.O)

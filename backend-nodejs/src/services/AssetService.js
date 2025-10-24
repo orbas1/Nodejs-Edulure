@@ -10,6 +10,7 @@ import ContentAuditLogModel from '../models/ContentAuditLogModel.js';
 import EbookProgressModel from '../models/EbookProgressModel.js';
 import antivirusService from './AntivirusService.js';
 import storageService from './StorageService.js';
+import { assertMediaTypeCompliance } from './MediaTypePolicy.js';
 
 const DRM_SIGNATURE_SECRET = env.security.drmSignatureSecret;
 
@@ -74,8 +75,27 @@ function normaliseGalleryEntries(entries) {
   return items;
 }
 
+function resolveMediaKindFromAssetType(type) {
+  switch (type) {
+    case 'powerpoint':
+    case 'document':
+    case 'pdf':
+      return 'document';
+    case 'video':
+      return 'video';
+    case 'audio':
+      return 'audio';
+    case 'ebook':
+      return 'ebook';
+    default:
+      return 'image';
+  }
+}
+
 export default class AssetService {
   static async createUploadSession({ type, filename, mimeType, size, checksum, userId, visibility = 'workspace' }) {
+    const mediaKind = resolveMediaKindFromAssetType(type);
+    assertMediaTypeCompliance({ kind: mediaKind, mimeType, size });
     const prefix = `uploads/${type}/${userId}`;
     const storageKey = storageService.generateStorageKey(prefix, filename);
 

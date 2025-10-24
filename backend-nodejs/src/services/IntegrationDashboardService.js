@@ -4,21 +4,29 @@ import IntegrationSyncRunModel from '../models/IntegrationSyncRunModel.js';
 import IntegrationSyncResultModel from '../models/IntegrationSyncResultModel.js';
 import IntegrationReconciliationReportModel from '../models/IntegrationReconciliationReportModel.js';
 import integrationStatusService from './IntegrationStatusService.js';
+import { getIntegrationDescriptor } from './IntegrationProviderRegistry.js';
 
-const INTEGRATION_CATALOGUE = {
-  hubspot: {
-    id: 'hubspot',
-    label: 'HubSpot CRM',
-    category: 'crm',
-    type: 'marketing_automation'
-  },
-  salesforce: {
-    id: 'salesforce',
-    label: 'Salesforce CRM',
-    category: 'crm',
-    type: 'sales_automation'
+const DASHBOARD_INTEGRATIONS = ['hubspot', 'salesforce'];
+
+function getIntegrationMetadata(id) {
+  const normalised = typeof id === 'string' ? id.toLowerCase() : '';
+  if (!normalised || !DASHBOARD_INTEGRATIONS.includes(normalised)) {
+    return null;
   }
-};
+
+  const descriptor = getIntegrationDescriptor(normalised);
+  if (descriptor) {
+    return descriptor;
+  }
+
+  return {
+    id: normalised,
+    label: normalised,
+    category: 'integration',
+    type: 'general',
+    enabled: true
+  };
+}
 
 function isValidDate(value) {
   if (!value) return false;
@@ -245,7 +253,8 @@ export default class IntegrationDashboardService {
     const failureSince = new Date(now.getTime() - failureLookbackHours * 60 * 60 * 1000);
 
     const integrations = await Promise.all(
-      Object.values(INTEGRATION_CATALOGUE).map(async (meta) => {
+      DASHBOARD_INTEGRATIONS.map(async (integrationId) => {
+        const meta = getIntegrationMetadata(integrationId);
         const recentRuns = await this.runModel.listRecent(meta.id, { limit: runLimit }, this.db);
         const sanitisedRuns = recentRuns.map(sanitiseRun).filter(Boolean);
         const failuresRaw = await this.resultModel.listFailures(
@@ -346,7 +355,7 @@ export default class IntegrationDashboardService {
 
   async triggerManualSync(integration, { windowStartAt, windowEndAt } = {}) {
     const key = typeof integration === 'string' ? integration.toLowerCase() : '';
-    const meta = INTEGRATION_CATALOGUE[key];
+    const meta = getIntegrationMetadata(key);
     if (!meta) {
       const error = new Error('Integration not found');
       error.status = 404;

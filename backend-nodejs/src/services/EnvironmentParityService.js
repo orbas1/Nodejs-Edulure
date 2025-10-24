@@ -48,13 +48,17 @@ async function loadManifest(manifestFilePath) {
 }
 
 export class EnvironmentParityService {
-  constructor({ envConfig = env, manifestResolver } = {}) {
+  constructor({ envConfig = env, manifestResolver, cacheTtlMs } = {}) {
     this.env = envConfig;
     const manifestFilePath =
       envConfig.environment.manifestPath ?? path.join(infrastructureRoot, 'environment-manifest.json');
     this.manifestResolver =
       manifestResolver ?? (() => loadManifest(manifestFilePath));
     this.logger = logger.child({ module: 'environmentParity' });
+    const configuredTtl = cacheTtlMs ?? Number(envConfig.environment?.parityCacheTtlMs ?? 120000);
+    this.cacheTtlMs = Number.isFinite(configuredTtl) && configuredTtl > 0 ? configuredTtl : 120000;
+    this.cachedReport = null;
+    this.cacheExpiresAt = 0;
   }
 
   async describeRuntimeState({ manifest }) {
@@ -195,7 +199,12 @@ export class EnvironmentParityService {
     return 'healthy';
   }
 
-  async generateReport() {
+  async generateReport({ forceRefresh = false } = {}) {
+    const now = Date.now();
+    if (!forceRefresh && this.cachedReport && now < this.cacheExpiresAt) {
+      return { ...this.cachedReport, cached: true };
+    }
+
     const manifest = await this.manifestResolver();
     const runtime = await this.describeRuntimeState({ manifest });
     const mismatches = this.compareManifest(manifest, runtime);
@@ -203,7 +212,7 @@ export class EnvironmentParityService {
 
     const parityStatus = this.deriveParitySummary({ mismatches, dependencies });
 
-    return {
+    const report = {
       environment: {
         name: this.env.environment.name,
         provider: this.env.environment.provider,
@@ -224,8 +233,14 @@ export class EnvironmentParityService {
       },
       mismatches,
       status: parityStatus,
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
+      cached: false
     };
+
+    this.cachedReport = report;
+    this.cacheExpiresAt = now + this.cacheTtlMs;
+
+    return report;
   }
 }
 

@@ -13,6 +13,18 @@ import storageService from './StorageService.js';
 import IntegrationProviderService from './IntegrationProviderService.js';
 
 const POLL_INTERVAL_MS = 15000;
+const MAX_RETRY_ATTEMPTS = Number(env.assets?.ingestion?.maxAttempts ?? 5);
+const BASE_RETRY_DELAY_MS = Number(env.assets?.ingestion?.retryDelayMs ?? 30000);
+const MAX_RETRY_DELAY_MS = Number(env.assets?.ingestion?.retryMaxDelayMs ?? 10 * 60 * 1000);
+
+function calculateRetryDelayMs(attempt) {
+  const exponent = Math.max(0, attempt - 1);
+  const base = Number.isFinite(BASE_RETRY_DELAY_MS) && BASE_RETRY_DELAY_MS > 0 ? BASE_RETRY_DELAY_MS : 30000;
+  const maxDelay = Number.isFinite(MAX_RETRY_DELAY_MS) && MAX_RETRY_DELAY_MS > 0 ? MAX_RETRY_DELAY_MS : 10 * 60 * 1000;
+  const withoutJitter = Math.min(base * 2 ** exponent, maxDelay);
+  const jitter = 0.75 + Math.random() * 0.5;
+  return Math.round(withoutJitter * jitter);
+}
 
 class AssetIngestionService {
   constructor() {
@@ -46,8 +58,9 @@ class AssetIngestionService {
     });
 
     for (const job of jobs) {
+      let asset = null;
       try {
-        const asset = await ContentAssetModel.findById(job.assetId);
+        asset = await ContentAssetModel.findById(job.assetId);
         if (!asset) {
           throw new Error(`Asset ${job.assetId} not found for job ${job.id}`);
         }
@@ -62,8 +75,43 @@ class AssetIngestionService {
         await ContentAssetModel.markStatus(asset.id, 'ready');
       } catch (error) {
         logger.error({ err: error, jobId: job.id }, 'Failed to process ingestion job');
-        await AssetIngestionJobModel.markFailed(job.id, error.message);
-        await ContentAssetModel.markStatus(job.assetId, 'failed');
+        const attempts = Number(job.attempts ?? 0) + 1;
+        if (attempts >= MAX_RETRY_ATTEMPTS) {
+          await AssetIngestionJobModel.markFailed(job.id, error.message);
+          await ContentAssetModel.markStatus(job.assetId, 'failed');
+        } else {
+          const delayMs = calculateRetryDelayMs(attempts);
+          const retryAt = new Date(Date.now() + delayMs);
+          await AssetIngestionJobModel.scheduleRetry(job.id, {
+            lastError: error.message,
+            retryAt,
+            attempts
+          });
+
+          if (asset) {
+            await ContentAssetModel.patchById(asset.id, {
+              metadata: {
+                ...(asset.metadata ?? {}),
+                ingestion: {
+                  ...(asset.metadata?.ingestion ?? {}),
+                  stage: 'retrying',
+                  attempts,
+                  retryAt: retryAt.toISOString()
+                }
+              }
+            });
+          }
+
+          logger.info(
+            {
+              jobId: job.id,
+              assetId: job.assetId,
+              attempts,
+              retryAt: retryAt.toISOString()
+            },
+            'Scheduled asset ingestion retry'
+          );
+        }
       }
     }
   }
