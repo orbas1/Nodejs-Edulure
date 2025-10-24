@@ -1321,18 +1321,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Document legal approvals, rehearse restores, and update retention policy docs.
 
 ### A34. Data Retention Job (4.C)
-- **Operational Depth:** Purges PII past retention window, coordinating with governance settings.
-- **Gaps & Risks:** Soft-delete windows not consistently enforced; align models.
-- **Resilience & Efficiency:** Run during low-traffic windows, verify deletions, and emit audit events.
-- **UX & Communications:** Notify compliance stakeholders with detailed reports.
-- **Change Management:** Update data maps, run simulations, and secure sign-off.
+- **Operational Depth:** Scheduler now runs pre-flight simulations, executes committed passes, caches active policies through a registry, and records resume approvals in `platform_settings` so every enforcement has an auditable gate.
+- **Gaps & Risks:** Legal hold detection skips enforcement based on policy criteria but still depends on correctly structured metadata; long-running strategies remain sequential and could benefit from entity-specific concurrency controls.
+- **Resilience & Efficiency:** Exponential backoff with persisted pause tokens, anomaly alerting via domain events, and cached policy hydration reduce blast radius while keeping governance teams informed.
+- **UX & Communications:** `lastSummary` captures palette tokens, anomaly lists, and aggregated counts that render cleanly inside compliance dashboards and alerting channels.
+- **Change Management:** Coordinate with compliance to manage legal-hold metadata, rehearse pause/resume approvals, publish Prometheus thresholds, and align runbooks with the new alert workflow.
 
 ### A35. Moderation Follow-Up Job (4.D)
-- **Operational Depth:** Reviews moderated items, ensures actions completed, and escalates unresolved cases.
-- **Gaps & Risks:** Escalation thresholds hard-coded; externalise to config.
-- **Resilience & Efficiency:** Batch processing, reuse API clients, and implement retries.
-- **UX & Communications:** Provide moderators with clear summaries and guidance.
-- **Change Management:** Track playbook updates, run tabletop exercises, and monitor alert fatigue.
+- **Operational Depth:** Hydrates due follow-ups with case context, computes SLA latency, emits colour-coded domain events with retry semantics, and tracks outcomes through Prometheus counters and gauges.
+- **Gaps & Risks:** Escalation detection derives from severity and assignment heuristics; incorporate explicit escalation matrices and multi-channel notifications for high-risk cohorts.
+- **Resilience & Efficiency:** Batched hydration, retryable domain events, backlog gauges, and SLA histograms surface operational load while guarding against transient dispatcher failures.
+- **UX & Communications:** Event payloads include severity/status tokens, status colours, and SLA seconds so moderation consoles display consistent badges and timers for follow-ups.
+- **Change Management:** Update moderation playbooks to interpret the new `escalation-pending` state, wire alerts from the exported metrics, and brief incident commanders on SLA histogram reporting.
 
 ### A36. Monetization Reconciliation Job (4.E)
 - **Operational Depth:** Compares platform ledger with processor exports, logging variances for finance review.

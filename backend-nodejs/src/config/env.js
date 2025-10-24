@@ -951,6 +951,10 @@ const envSchema = z
     DATA_RETENTION_RUN_ON_STARTUP: z.coerce.boolean().default(false),
     DATA_RETENTION_MAX_FAILURES: z.coerce.number().int().min(1).max(10).default(3),
     DATA_RETENTION_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
+    DATA_RETENTION_MAX_BACKOFF_MINUTES: z.coerce.number().int().min(30).max(14 * 24 * 60).default(12 * 60),
+    DATA_RETENTION_BACKOFF_EXPONENT_BASE: z.coerce.number().min(1).max(6).default(2),
+    DATA_RETENTION_ALERT_THRESHOLD: z.coerce.number().int().min(1).default(500),
+    DATA_RETENTION_POLICY_REFRESH_MS: z.coerce.number().int().min(60_000).max(86_400_000).default(300_000),
     DATA_PARTITIONING_ENABLED: z.coerce.boolean().default(true),
     DATA_PARTITIONING_SCHEMA: z.string().optional(),
     DATA_PARTITIONING_CRON: z.string().default('30 2 * * *'),
@@ -1817,7 +1821,11 @@ export const env = {
     dryRun: raw.DATA_RETENTION_DRY_RUN,
     runOnStartup: raw.DATA_RETENTION_RUN_ON_STARTUP,
     maxConsecutiveFailures: raw.DATA_RETENTION_MAX_FAILURES,
-    failureBackoffMinutes: raw.DATA_RETENTION_FAILURE_BACKOFF_MINUTES
+    failureBackoffMinutes: raw.DATA_RETENTION_FAILURE_BACKOFF_MINUTES,
+    maxBackoffMinutes: raw.DATA_RETENTION_MAX_BACKOFF_MINUTES,
+    backoffExponentBase: raw.DATA_RETENTION_BACKOFF_EXPONENT_BASE,
+    alertThreshold: raw.DATA_RETENTION_ALERT_THRESHOLD,
+    policyRefreshIntervalMs: raw.DATA_RETENTION_POLICY_REFRESH_MS
   },
   partitioning: {
     enabled: raw.DATA_PARTITIONING_ENABLED,

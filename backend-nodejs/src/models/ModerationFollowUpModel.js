@@ -182,4 +182,19 @@ export default class ModerationFollowUpModel {
       .where({ action_id: actionId, status: 'pending' })
       .update(payload);
   }
+
+  static async countPending(connection = db) {
+    const [row] = await connection('moderation_follow_ups')
+      .where({ status: 'pending' })
+      .count({ total: '*' });
+    return Number(row?.total ?? 0);
+  }
+
+  static async countDue(now = new Date(), connection = db) {
+    const [row] = await connection('moderation_follow_ups')
+      .where('status', 'pending')
+      .andWhere('due_at', '<=', now)
+      .count({ total: '*' });
+    return Number(row?.total ?? 0);
+  }
 }
