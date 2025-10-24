@@ -711,5 +711,120 @@
             26. **Checklist.** Action items now include regenerating SDK, capturing CLI summary, listing manifest in new-files inventory, and reconciling manifest service totals against database migrations and seed snapshots.
             27. **Nav.** Clear headings point reviewers to manifest updates without scanning unrelated infrastructure notes.
             28. **Release.** Updated guides instruct teams to run the generator, publish hashes, and attach summaries to the backend change log before CAB submission.
-      - 15.A Docs & unresolved mappings
-         - 15.A.1 Documentation Coverage Gap (unresolved path)
+      - 15.A Docs & Unresolved Mappings ✓
+         - 15.A.1 Product Narrative Alignment (Annex A53 — `user_experience.md`)
+            1. **Appraise.** `user_experience.md` delivers 28-point audits per surface (e.g., 1.A Entrypoints, 1.B Navigation), yet product requirement linkage remains implicit; map each component synopsis to roadmap initiatives so PMs can trace backlog coverage.
+            2. **Function.** Embed cross-references from every audit (e.g., AdminShell, MainLayout) to corresponding product requirement IDs in `docs/product/roadmap.md` to transform descriptive notes into actionable traceability.
+            3. **Usefulness.** Clarify for PMs how each UX deficiency (e.g., duplicated navigation logic, missing skeleton loaders) ties to core outcomes—activation, retention, engagement—by annotating metrics or key results near the audit entries.
+            4. **Redundant.** Identify repeated recommendations across sections (design tokens, breadcrumb consolidation) and collapse them into a product-wide “experience parity” epic inside the annex to avoid backlog duplication.
+            5. **Placeholders.** Replace generic TODO prompts (“tests add, stories add”) with explicit product tickets and acceptance criteria referencing relevant modules (`frontend-reactjs/src/layouts/*.jsx`, `src/components/TopBar.jsx`).
+            6. **Duplicates.** `user_experience.md` often restates navigation consolidation needs; create a canonical navigation modernization initiative and reference it instead of rearticulating the same action across AdminShell, MainLayout, and TopBar.
+            7. **Improvements Needed.** Add a product impact legend (Critical, High, Medium, Low) adjacent to each recommendation to communicate sequencing priority for triage boards.
+            8. **Styling.** Harmonize terminology with product briefs (e.g., “Learner Dashboard Initiative,” “Adaptive Navigation”) to keep language aligned between design audits and product OKRs.
+            9. **Efficiency Analysis.** For each audit entry, append an estimate band (S/M/L) derived from existing implementation complexity to help PMs forecast delivery when planning sprints.
+            10. **Strengths to Keep.** Capture positive signals (responsive mega menus, modular shells) into a “retain” checklist that product discovery teams can leverage when exploring new verticals.
+            11. **Weaknesses to Remove.** Bundle shared shortcomings (hard-coded locales, missing breadcrumbs) into product debt themes and mark dependent squads to accelerate remediation sequencing.
+            12. **Palette.** Ensure the annex references brand palette updates tracked in `docs/design-system/colors.md`, signalling when product work depends on design system refreshes.
+            13. **Layout.** Document layout governance in the annex by linking to `frontend-reactjs/src/layouts/README.md` once created, so product teams understand structural impacts of requested changes.
+            14. **Text.** Encourage PM-authored copy updates for truncated menu labels by linking to `docs/content/style-guide.md`, clarifying the review source for textual revisions.
+            15. **Spacing.** Connect vertical rhythm fixes to the product accessibility initiative to underscore regulatory compliance drivers and avoid treating them as purely aesthetic tasks.
+            16. **Shape.** Map border-radius standardisation to the “Brand cohesion” objective so product leads can track acceptance testing across shells, dashboards, and marketing surfaces.
+            17. **Effects.** Tie hover/focus enhancements to the accessibility acceptance criteria; annotate which stories require VPAT updates upon completion.
+            18. **Thumbs.** Note avatar fallback workstreams within the “Profile personalization” epic to align product storytelling with the documented UX debt.
+            19. **Media.** Relate notification attachment previews to the media pipeline backlog, clarifying dependencies on backend assets and storage services.
+            20. **Buttons.** Reference the shared button system initiative within the annex, indicating design system ownership and expected handoff points to engineering.
+            21. **Interact.** Tag gesture and keyboard enhancements with the “Cross-device accessibility” objective so PMs can monitor parity milestones.
+            22. **Missing.** Flag absent breadcrumbs and skeleton loaders as gating items for the “Navigation clarity” roadmap theme, including readiness criteria before release.
+            23. **Design.** Highlight the need for modular header slots as part of the “Composable Layout Framework” epic that PMs maintain for scalability.
+            24. **Clone.** Document route metadata centralisation under a single backlog item to ensure clone-risk mitigation appears once in product reporting.
+            25. **Framework.** Reference the upcoming “Layout tokenization” product initiative that codifies spacing, typography, and color tokens for reuse.
+            26. **Checklist.** Provide a per-component readiness checklist (design sign-off, accessibility review, telemetry plan) embedded in the annex to complement the product release checklist.
+            27. **Nav.** Link to the canonical navigation map once documented (planned `docs/navigation/system.md`) so product stakeholders can evaluate new requests against current architecture.
+            28. **Release.** Outline a release gating flow: audit sign-off in `user_experience.md`, backlog ticket readiness, design approval, QA evidence, and update to release notes prior to deployment.
+         - 15.A.2 Operations & Support Readiness (Annex A54 — `user_experience.md`)
+            1. **Appraise.** Operations teams need explicit mapping from UX audits to support runbooks; annotate each deficiency with its operational risk (e.g., increased tickets due to missing breadcrumbs).
+            2. **Function.** Embed links from user experience entries to `docs/operations/` playbooks detailing incident handling for navigation or layout regressions.
+            3. **Usefulness.** Provide support-specific acceptance criteria (e.g., “mega menu accessible via keyboard reduces ticket type #427”) to quantify operational gains.
+            4. **Redundant.** Consolidate repeated support guidance across audits into a central operations appendix to prevent conflicting escalation instructions.
+            5. **Placeholders.** Replace placeholders like “tests add” with direct references to monitoring or alert updates operations expects when changes go live.
+            6. **Duplicates.** Ensure skeleton loader requirements point to a single operational readiness playbook entry, avoiding duplicate SOP updates.
+            7. **Improvements Needed.** Add instrumentation tasks (telemetry hooks, log categories) to each audit item so operations knows how to validate improvements post-release.
+            8. **Styling.** Align operations documentation tone with the standardized support vocabulary defined in `docs/operations/qa.md` to reduce misinterpretation.
+            9. **Efficiency Analysis.** Document expected reductions in average handle time (AHT) or deflection metrics once navigation and layout fixes deploy.
+            10. **Strengths to Keep.** Note operations-friendly elements already present (responsive layouts, context-driven runtime awareness) to preserve monitoring baselines.
+            11. **Weaknesses to Remove.** Highlight absence of live notification feeds as an operations gap and prescribe integration milestones with telemetry and incident tooling.
+            12. **Palette.** Document accessibility-driven contrast adjustments as compliance checkpoints that operations must verify during audits.
+            13. **Layout.** Flag spacing and responsive layout updates that may affect training screenshots, prompting updates to support guides.
+            14. **Text.** Provide canonical language for menu tooltips or truncation warnings so support scripts match the UI.
+            15. **Spacing.** Note when baseline grid changes require updates to PDF or print workflows used for compliance exports.
+            16. **Shape.** Communicate when corner radius adjustments could impact image masks or watermark overlays referenced in operations templates.
+            17. **Effects.** Document hover/focus state changes that require refreshed accessibility validation scripts within QA automation suites.
+            18. **Thumbs.** Clarify avatar fallback updates tie into account provisioning SOPs (e.g., verifying default avatars for SSO-only users).
+            19. **Media.** Associate notification attachment previews with retention policies and storage quotas operations manages.
+            20. **Buttons.** Track shared button updates requiring new step-by-step screenshots in support macros or chatbots.
+            21. **Interact.** Outline training updates for gesture support so support teams can coach mobile users effectively.
+            22. **Missing.** Identify missing breadcrumbs/skeletons as sources of confusion and describe interim mitigations for support teams until resolved.
+            23. **Design.** Flag modular header adoption as requiring updated monitoring dashboards for slot-specific performance metrics.
+            24. **Clone.** Document navigation metadata consolidation to ensure support teams reference the same route IDs when escalating issues.
+            25. **Framework.** Specify logging frameworks or observability tags to add so operations can correlate UX improvements with incident trends.
+            26. **Checklist.** Build an operational readiness checklist (monitoring, runbook updates, enablement sessions) for each audit-driven release.
+            27. **Nav.** Cross-link to routing diagnostics (`frontend-reactjs/src/routes.js`) enabling support teams to self-service route lookups during incidents.
+            28. **Release.** Define a support sign-off path requiring updated documentation, UAT transcripts, and notification to incident commanders before shipping UX changes.
+         - 15.A.3 Design System Dependencies (Annex A55 — `user_experience.md`)
+            1. **Appraise.** Distill every design token, layout, and component gap in `user_experience.md` into traceable design system backlog items.
+            2. **Function.** Map shell, navigation, and button consolidation requirements to specific Figma libraries and component variants.
+            3. **Usefulness.** Provide designers with implementation references (`frontend-reactjs/src/styles.css`, `src/components/common/`) to accelerate parity between code and design assets.
+            4. **Redundant.** Remove redundant color/token guidance from component audits once centralised documentation exists inside the design system annex.
+            5. **Placeholders.** Replace placeholder imagery/text recommendations with explicit asset sourcing instructions (e.g., marketing CDN, DAM identifiers).
+            6. **Duplicates.** Align repeated “unify button styling” guidance into one canonical design system task referencing both marketing and app shells.
+            7. **Improvements Needed.** Add design QA steps (contrast ratios, responsive breakpoints) each time user experience entries propose visual updates.
+            8. **Styling.** Document color, typography, and spacing tokens required to fulfill the audits; include the token names for engineers to implement.
+            9. **Efficiency Analysis.** Estimate design debt burn-down by quantifying components requiring redesign vs. net-new creation.
+            10. **Strengths to Keep.** Capture positive design patterns (responsive mega menu, modular layout containers) to maintain in the system library.
+            11. **Weaknesses to Remove.** Highlight inconsistent rounding and hover treatments that the design system must rectify across all component variants.
+            12. **Palette.** Note palette harmonisation work and link to brand gradient updates tracked within `docs/design-system/colors.md`.
+            13. **Layout.** Outline the plan for 8px grid enforcement and mobile drawer animations within the design system guidelines.
+            14. **Text.** Provide microcopy standards for truncated labels, tooltip usage, and accessible titles as part of the design content strategy.
+            15. **Spacing.** Document margin/padding scales to be codified in Figma and CSS variable exports.
+            16. **Shape.** Describe the canonical border-radius scale and any exceptions for media or CTA components.
+            17. **Effects.** Define hover/focus/active state tokens and motion specs aligned with reduced-motion preferences.
+            18. **Thumbs.** Capture avatar fallback styles, default imagery, and alt-text guidance for the design system asset kit.
+            19. **Media.** Specify thumbnail, preview, and hero image treatments so engineering can pull from consistent asset templates.
+            20. **Buttons.** Detail primary/secondary/tertiary button hierarchies, icon alignment rules, and loading states matching audit findings.
+            21. **Interact.** Document multi-device interaction patterns (keyboard shortcuts, swipe gestures) in design playbooks for cross-platform parity.
+            22. **Missing.** Identify missing design assets (breadcrumbs, skeleton loaders) and schedule their creation with Figma component deliverables.
+            23. **Design.** Ensure modular header slots are represented in the design system with named regions and composition guidelines.
+            24. **Clone.** Provide reusable navigation metadata components and icons to prevent duplication when new layouts are built.
+            25. **Framework.** Describe the CSS/JS framework integration plan (e.g., CSS variables, Tailwind tokens) bridging design specs to code.
+            26. **Checklist.** Create a design sign-off checklist aligned with the audit’s readiness criteria (tokens applied, accessibility verified, documentation updated).
+            27. **Nav.** Document the canonical information architecture diagram and how it maps to layout components.
+            28. **Release.** Define the design system release cadence that accompanies UX remediation—component publish, changelog entry, and notification to engineering squads.
+         - 15.A.4 Strategy & Stakeholder Communication (Annex A56 — `user_experience.md`)
+            1. **Appraise.** Translate audit findings into executive-ready narratives explaining user impact, business risk, and sequencing rationale.
+            2. **Function.** Anchor each UX remediation theme to strategic pillars (Activation, Retention, Efficiency, Trust) used in quarterly planning decks.
+            3. **Usefulness.** Provide stakeholders with metric baselines (e.g., navigation click depth, support ticket volume) and expected improvements tied to each audit remedy.
+            4. **Redundant.** Consolidate overlapping messaging about navigation debt so leadership receives a single, coherent update rather than repeating per-component summaries.
+            5. **Placeholders.** Replace vague future-work statements with concrete strategic commitments including owner, timeline, and success metric.
+            6. **Duplicates.** Ensure strategy decks reference the same canonical annex rather than reproducing bespoke versions per team.
+            7. **Improvements Needed.** Introduce a maturity scoring rubric for each user journey to communicate progress across quarters.
+            8. **Styling.** Align tone with stakeholder communications guidelines (`docs/operations/strategy.md`), emphasising outcomes over technical detail when briefing executives.
+            9. **Efficiency Analysis.** Quantify opportunity cost (engineering cycles saved by unified navigation, faster onboarding) to reinforce prioritisation.
+            10. **Strengths to Keep.** Celebrate resilient architecture (context-aware shells, modular layout) to reassure stakeholders about platform stability.
+            11. **Weaknesses to Remove.** Highlight unresolved issues (hard-coded locales, placeholder notifications) and articulate mitigation plans with target dates.
+            12. **Palette.** Reference brand alignment efforts when discussing design work so strategy narratives capture cohesive identity goals.
+            13. **Layout.** Present information architecture diagrams illustrating before/after states for navigation and layout changes.
+            14. **Text.** Ensure copy strategy (tooltips, labels) is framed as part of the broader localisation and clarity initiatives.
+            15. **Spacing.** Tie spacing and rhythm improvements to accessibility compliance benchmarks and user satisfaction metrics.
+            16. **Shape.** Position visual consistency upgrades as brand trust enhancers for enterprise prospects.
+            17. **Effects.** Communicate accessibility-first motion guidance as part of inclusive design commitments.
+            18. **Thumbs.** Leverage avatar personalization narratives to showcase community-building efforts and user recognition improvements.
+            19. **Media.** Highlight media preview enhancements as crucial for rich collaboration workflows and future monetisation pathways.
+            20. **Buttons.** Frame unified CTA styling as a conversion optimisation initiative with measurable impact on key funnels.
+            21. **Interact.** Describe gesture/keyboard parity as a differentiator for hybrid learning environments and accessibility compliance.
+            22. **Missing.** Publicly track missing components (breadcrumbs, skeleton loaders) in strategy dashboards until delivered.
+            23. **Design.** Communicate modular header strategy as foundation for future extensibility (partners, white-label experiences).
+            24. **Clone.** Explain metadata centralisation as groundwork for automation (dynamic nav, personalised journeys).
+            25. **Framework.** Tie tokenisation and layout frameworks to long-term platform investment themes (DesignOps, Federation).
+            26. **Checklist.** Provide executive-ready checklists summarising progress, blockers, and next steps for each UX initiative.
+            27. **Nav.** Include navigation revamp milestones within strategy OKRs to ensure cross-team accountability.
+            28. **Release.** Outline the communications plan: pre-release stakeholder brief, launch announcement referencing annex updates, post-release metrics review.
