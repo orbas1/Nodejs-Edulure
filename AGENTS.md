@@ -377,18 +377,18 @@
          - 3.A.4 Register (frontend-reactjs/src/pages/Register.jsx)
       - ✓ 3.B Setup & Pre-launch Handoffs — Annex A2 (Learner Onboarding & Feedback)
         1. **Appraisal.** `SetupOrchestratorService` now blends environment templating with learner onboarding telemetry, so Annex A2 prep covers infrastructure inputs, invitation handoffs, and feedback loops in a single control room.
-        2. **Functionality.** `SetupController.buildSnapshot()` awaits `LearnerOnboardingInsightsService.summarise()` alongside `describeDefaults()`, pushing readiness metrics, task catalogues, history, and preset data through both REST and the SSE stream.
-        3. **Usefulness.** `frontend-reactjs/src/pages/Setup.jsx` renders a “Learner onboarding & feedback” card summarising total responses, thirty-day trends, invite acceptance, persona leaders, and survey cadence, giving operators a launch checklist without leaving the installer.
+        2. **Functionality.** `SetupController.buildSnapshot()` awaits `LearnerOnboardingInsightsService.summarise()` alongside `describeDefaults()`, and the service now normalises invite counts across accepted/pending/expired/revoked states, computes acceptance rates, and reuses a shared Knex connection so REST and SSE payloads stay in sync while remaining unit-testable.
+        3. **Usefulness.** `frontend-reactjs/src/pages/Setup.jsx` renders a “Learner onboarding & feedback” card that surfaces total responses, thirty-day trends, acceptance rates, pending/expired/revoked invite tallies, persona leaders, and survey cadence, giving operators a launch checklist without leaving the installer.
         4. **Redundancies.** Hard-coded `DEFAULT_*` env placeholders now defer to `.env.example` values via `readEnvTemplate`, eliminating drift between documentation, installer defaults, and committed templates.
-        5. **Placeholders.** When telemetry tables are empty the insights service returns zeroed counts and null timestamps, keeping Annex messaging honest until production data flows.
+        5. **Placeholders.** Bootstrap seeds now populate accepted, pending, expired, and revoked invites plus recent `learner.survey.submitted` telemetry so Annex messaging mirrors production schemas; empty tables still return zeroed counts when environments start fresh.
         6. **Duplicates.** Cached defaults prevent repeated file reads during SSE polling, and persona breakdowns are computed once per summary to avoid redundant array allocations.
         7. **Improvements Needed.** Extend the insights service with configurable windows, rolling averages, and cohort slices so Annex A2 can compare pilot tenants or highlight funnel drop-offs automatically.
         8. **Styling.** The readiness card adopts the same `rounded-3xl` shell, slate neutrals, and uppercase kickers as the rest of the setup aside, keeping Annex visuals consistent with user_experience.md spacing rules.
-        9. **Efficiency.** SQL counts and a capped 200-row survey sample keep `LearnerOnboardingInsightsService` lightweight while caching env defaults avoids re-reading template files on every heartbeat.
+        9. **Efficiency.** SQL counts, invite status aggregation, and a capped 200-row survey sample keep `LearnerOnboardingInsightsService` lightweight while caching env defaults avoids re-reading template files on every heartbeat.
         10. **Strengths.** SSE listeners now receive merged state snapshots, so live installer runs broadcast task progress and onboarding deltas without manual refreshes.
         11. **Weaknesses.** Insights currently assume a 30-day lookback; expose configuration hooks or auto-tune the window when installers run in long-lived staging environments.
         12. **Palette.** Metrics rely on existing primary, emerald, and slate tokens—no new colour primitives were introduced, respecting Annex palette governance.
-        13. **Layout.** The card’s `sm:grid-cols-2` metric grid and stacked persona/survey panels follow the 8px/16px rhythm, keeping dense analytics scannable on narrow viewports.
+        13. **Layout.** The card’s `sm:grid-cols-2 lg:grid-cols-3` metric grid and stacked persona/survey panels follow the 8px/16px rhythm, keeping dense analytics scannable on narrow and wide viewports alike.
         14. **Text.** Microcopy (“Track sign-up momentum…”, “Finalise community pairings…”) speaks directly to Annex A2 goals, aligning tone with the onboarding handbook.
         15. **Spacing.** Utility classes (`gap-4`, `mt-4`, `space-y-1`) maintain the documented breathing room between metrics, badges, and helper copy.
         16. **Shape.** Metrics, persona chips, and action buttons continue using `rounded-full` and `rounded-2xl` geometry so the installer mirrors other dashboard shells.
@@ -398,12 +398,12 @@
         20. **Buttons.** `Run installer`, preset selectors, and task toggles now coexist with the insights card without overlap, and new data does not introduce conflicting CTAs.
         21. **Interact.** Task checkboxes, preset pills, and status controls remain keyboard accessible while the readiness card exposes static summaries that respect screen-reader order.
         22. **Missing.** Future revisions should expose alert thresholds (e.g., “<5 survey responses”) so Annex A2 can flag readiness blockers proactively.
-        23. **Design.** Insights reuse Annex A2 vocabulary (responses, invites, persona focus) and derive directly from `LearnerOnboardingResponseModel` + telemetry tables, keeping UI copy and backend schema aligned.
+        23. **Design.** Insights reuse Annex A2 vocabulary (responses, invites, persona focus) and derive directly from `LearnerOnboardingResponseModel` + telemetry tables, with seeds/migrations (`backend-nodejs/seeds/001_bootstrap.js`, `backend-nodejs/migrations/20250325103000_marketing_enrollment_flow.js`) aligned so database schema, models, and UI copy stay consistent.
         24. **Clone.** A single summariser powers both REST and SSE responses, preventing each consumer from reimplementing onboarding analytics logic.
         25. **Framework.** `LearnerOnboardingInsightsService` lives alongside other backend services, making it trivial for dashboards or docs generators to consume the same readiness snapshot.
-        26. **Checklist.** QA should validate env defaults hydrate from `.env.example`, confirm invite/response counts against seed data, and observe SSE updates when survey events are ingested.
+        26. **Checklist.** QA should validate env defaults hydrate from `.env.example`, confirm invite status counts and acceptance rates against seed data (including expired/revoked cases), run `backend-nodejs/test/learnerOnboardingInsightsService.test.js`, and observe SSE updates when survey events are ingested.
         27. **Nav.** Positioning the readiness card at the top of the installer sidebar keeps onboarding KPIs visible before operators trigger tasks or inspect logs.
-        28. **Release.** Ship by reseeding onboarding/survey tables, running `npm --prefix backend-nodejs run db:install` where needed, validating `/api/v1/setup/status`, and updating Annex A2 docs with the new readiness snapshot.
+        28. **Release.** Ship by reseeding onboarding/survey tables, running `npm --prefix backend-nodejs run db:install` where needed, validating `/api/v1/setup/status`, and updating Annex A2 docs with the new readiness snapshot and seed telemetry batch references.
          - 3.B.1 Setup (frontend-reactjs/src/pages/Setup.jsx)
       - ✓ 3.C Identity Forms & Auth Components — Annex A17 (Authentication & Setup)
         1. **Appraisal.** Identity primitives now foreground accessible progress indicators, provider context, and gated steppers so Annex A17 flows stay trustworthy across learner and instructor journeys.

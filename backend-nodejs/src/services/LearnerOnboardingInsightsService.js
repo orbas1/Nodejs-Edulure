@@ -37,11 +37,46 @@ function normalisePersona(value) {
   return trimmed.length ? trimmed : 'unspecified';
 }
 
-function countInvites(invites, predicate) {
-  if (!Array.isArray(invites)) {
-    return 0;
+function normaliseInviteStatus(invite) {
+  if (!invite) {
+    return 'pending';
   }
-  return invites.filter((invite) => predicate((invite?.status ?? invite?.state ?? '').toLowerCase())).length;
+  const rawStatus = invite?.status ?? invite?.state ?? 'pending';
+  const status = String(rawStatus).trim().toLowerCase();
+  if (status === 'accepted' || status === 'expired' || status === 'revoked') {
+    return status;
+  }
+  return 'pending';
+}
+
+function accumulateInviteCounts(invites) {
+  const counts = {
+    accepted: 0,
+    pending: 0,
+    expired: 0,
+    revoked: 0,
+    total: 0
+  };
+
+  if (!Array.isArray(invites)) {
+    return counts;
+  }
+
+  invites.forEach((invite) => {
+    const status = normaliseInviteStatus(invite);
+    if (status === 'accepted') {
+      counts.accepted += 1;
+    } else if (status === 'expired') {
+      counts.expired += 1;
+    } else if (status === 'revoked') {
+      counts.revoked += 1;
+    } else {
+      counts.pending += 1;
+    }
+    counts.total += 1;
+  });
+
+  return counts;
 }
 
 function buildPersonaBreakdown(map, total) {
@@ -54,14 +89,22 @@ function buildPersonaBreakdown(map, total) {
     .sort((a, b) => b.count - a.count);
 }
 
-async function summariseOnboardingResponses({ sinceDays }) {
+async function summariseOnboardingResponses({ sinceDays, connection }) {
+  const client = connection ?? db;
   const sinceDate = Number.isFinite(sinceDays) ? new Date(Date.now() - sinceDays * 86_400_000) : null;
-  const rows = await db('learner_onboarding_responses').select('persona', 'invites', 'submitted_at');
+  const rows = await client('learner_onboarding_responses').select('persona', 'invites', 'submitted_at');
 
   const personaCounts = new Map();
   let acceptedInvites = 0;
   let pendingInvites = 0;
+  let expiredInvites = 0;
+  let revokedInvites = 0;
+  let totalInvites = 0;
   let recentAcceptedInvites = 0;
+  let recentPendingInvites = 0;
+  let recentExpiredInvites = 0;
+  let recentRevokedInvites = 0;
+  let recentTotalInvites = 0;
   let totalRecentResponses = 0;
   let latestSubmission = null;
 
@@ -70,10 +113,12 @@ async function summariseOnboardingResponses({ sinceDays }) {
     personaCounts.set(persona, (personaCounts.get(persona) ?? 0) + 1);
 
     const invites = safeParseJson(row.invites, []);
-    const accepted = countInvites(invites, (status) => status === 'accepted');
-    const pending = countInvites(invites, (status) => status !== 'accepted');
-    acceptedInvites += accepted;
-    pendingInvites += pending;
+    const inviteCounts = accumulateInviteCounts(invites);
+    acceptedInvites += inviteCounts.accepted;
+    pendingInvites += inviteCounts.pending;
+    expiredInvites += inviteCounts.expired;
+    revokedInvites += inviteCounts.revoked;
+    totalInvites += inviteCounts.total;
 
     const submittedAtIso = toIsoString(row.submitted_at);
     if (submittedAtIso) {
@@ -84,7 +129,11 @@ async function summariseOnboardingResponses({ sinceDays }) {
         const submittedAtDate = new Date(submittedAtIso);
         if (!Number.isNaN(submittedAtDate.getTime()) && submittedAtDate >= sinceDate) {
           totalRecentResponses += 1;
-          recentAcceptedInvites += accepted;
+          recentAcceptedInvites += inviteCounts.accepted;
+          recentPendingInvites += inviteCounts.pending;
+          recentExpiredInvites += inviteCounts.expired;
+          recentRevokedInvites += inviteCounts.revoked;
+          recentTotalInvites += inviteCounts.total;
         }
       }
     }
@@ -98,14 +147,24 @@ async function summariseOnboardingResponses({ sinceDays }) {
     acceptedInvites,
     recentAcceptedInvites,
     pendingInvites,
+    recentPendingInvites,
+    expiredInvites,
+    recentExpiredInvites,
+    revokedInvites,
+    recentRevokedInvites,
+    totalInvites,
+    recentTotalInvites,
+    acceptanceRate: totalInvites > 0 ? acceptedInvites / totalInvites : 0,
+    recentAcceptanceRate: recentTotalInvites > 0 ? recentAcceptedInvites / recentTotalInvites : 0,
     lastSubmittedAt: latestSubmission,
     personaBreakdown,
     topPersona: personaBreakdown[0] ?? null
   };
 }
 
-async function summariseSurveyFeedback({ sinceDays }) {
-  const baseQuery = db(TABLES.EVENTS).where({ event_name: 'learner.survey.submitted' });
+async function summariseSurveyFeedback({ sinceDays, connection }) {
+  const client = connection ?? db;
+  const baseQuery = client(TABLES.EVENTS).where({ event_name: 'learner.survey.submitted' });
   const [allTimeRow] = await baseQuery.clone().count({ total: '*' });
   const totalResponses = Number(allTimeRow?.total ?? 0);
 
@@ -159,6 +218,15 @@ function buildFallback(windowDays) {
       acceptedInvites: 0,
       recentAcceptedInvites: 0,
       pendingInvites: 0,
+      recentPendingInvites: 0,
+      expiredInvites: 0,
+      recentExpiredInvites: 0,
+      revokedInvites: 0,
+      recentRevokedInvites: 0,
+      totalInvites: 0,
+      recentTotalInvites: 0,
+      acceptanceRate: 0,
+      recentAcceptanceRate: 0,
       lastSubmittedAt: null,
       personaBreakdown: [],
       topPersona: null
@@ -173,11 +241,11 @@ function buildFallback(windowDays) {
 }
 
 export default class LearnerOnboardingInsightsService {
-  static async summarise({ sinceDays = 30 } = {}) {
+  static async summarise({ sinceDays = 30, connection } = {}) {
     try {
       const [onboarding, feedback] = await Promise.all([
-        summariseOnboardingResponses({ sinceDays }),
-        summariseSurveyFeedback({ sinceDays })
+        summariseOnboardingResponses({ sinceDays, connection }),
+        summariseSurveyFeedback({ sinceDays, connection })
       ]);
 
       return {

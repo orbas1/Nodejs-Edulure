@@ -447,6 +447,13 @@ export default function Setup() {
   const acceptedInviteCount = Number(onboardingSummary.acceptedInvites ?? 0);
   const recentAcceptedInviteCount = Number(onboardingSummary.recentAcceptedInvites ?? 0);
   const pendingInviteCount = Number(onboardingSummary.pendingInvites ?? 0);
+  const recentPendingInviteCount = Number(onboardingSummary.recentPendingInvites ?? 0);
+  const expiredInviteCount = Number(onboardingSummary.expiredInvites ?? 0);
+  const recentExpiredInviteCount = Number(onboardingSummary.recentExpiredInvites ?? 0);
+  const revokedInviteCount = Number(onboardingSummary.revokedInvites ?? 0);
+  const recentRevokedInviteCount = Number(onboardingSummary.recentRevokedInvites ?? 0);
+  const acceptanceRatePercent = formatPercent(onboardingSummary.acceptanceRate ?? 0);
+  const recentAcceptanceRatePercent = formatPercent(onboardingSummary.recentAcceptanceRate ?? 0);
   const personaBreakdown = Array.isArray(onboardingSummary.personaBreakdown)
     ? onboardingSummary.personaBreakdown
     : [];
@@ -760,7 +767,7 @@ export default function Setup() {
                 ) : null}
               </div>
 
-              <dl className="mt-4 grid gap-4 text-sm text-slate-600 sm:grid-cols-2">
+              <dl className="mt-4 grid gap-4 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                   <dt className="text-[11px] uppercase tracking-wide text-slate-500">Onboarding responses</dt>
                   <dd className="mt-1 text-lg font-semibold text-slate-900">
@@ -785,7 +792,8 @@ export default function Setup() {
                     {formatNumber(acceptedInviteCount)}
                   </dd>
                   <p className="mt-1 text-xs text-slate-500">
-                    +{formatNumber(recentAcceptedInviteCount)} accepted in {windowLabelLower}.
+                    +{formatNumber(recentAcceptedInviteCount)} accepted in {windowLabelLower}. Acceptance rate {acceptanceRatePercent}%
+                    {recentAcceptedInviteCount ? ` (${recentAcceptanceRatePercent}% recent)` : ''}.
                   </p>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -793,7 +801,33 @@ export default function Setup() {
                   <dd className="mt-1 text-lg font-semibold text-slate-900">
                     {formatNumber(pendingInviteCount)}
                   </dd>
-                  <p className="mt-1 text-xs text-slate-500">Finalise community pairings before launch day.</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {recentPendingInviteCount
+                      ? `${formatNumber(recentPendingInviteCount)} surfaced in ${windowLabelLower}.`
+                      : 'Finalise community pairings before launch day.'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Invites expired</dt>
+                  <dd className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(expiredInviteCount)}
+                  </dd>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {recentExpiredInviteCount
+                      ? `${formatNumber(recentExpiredInviteCount)} lapsed in ${windowLabelLower}.`
+                      : 'Monitor expiry patterns to adjust outreach cadences.'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Invites revoked</dt>
+                  <dd className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(revokedInviteCount)}
+                  </dd>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {recentRevokedInviteCount
+                      ? `${formatNumber(recentRevokedInviteCount)} rescinded in ${windowLabelLower}.`
+                      : 'Review revocations with program owners before launch.'}
+                  </p>
                 </div>
               </dl>
 

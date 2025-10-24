@@ -1314,49 +1314,148 @@ export async function seed(knex) {
       }
     ]);
 
-    const inviteExpiry = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const dateDaysAgo = (days) => new Date(nowMs - days * dayMs);
+    const dateDaysFromNow = (days) => new Date(nowMs + days * dayMs);
+
     await trx('learner_onboarding_invites').insert([
       {
         invite_code: 'FLOW5-OPS-GUILD',
         email: 'flow5-preview@edulure.test',
         community_id: opsCommunityId,
-        status: 'pending',
-        expires_at: inviteExpiry,
-        metadata: JSON.stringify({ source: 'flow-five', cohort: 'ops-guild' })
+        status: 'accepted',
+        expires_at: dateDaysFromNow(21),
+        claimed_at: dateDaysAgo(5),
+        user_id: flowPreviewUserId,
+        metadata: JSON.stringify({ source: 'flow-five', cohort: 'ops-guild', acceptanceChannel: 'email' })
       },
       {
         invite_code: 'FLOW5-GROWTH-LAB',
         email: 'flow5-preview@edulure.test',
         community_id: growthCommunityId,
         status: 'pending',
-        expires_at: inviteExpiry,
-        metadata: JSON.stringify({ source: 'flow-five', cohort: 'growth-lab' })
+        expires_at: dateDaysFromNow(14),
+        metadata: JSON.stringify({ source: 'flow-five', cohort: 'growth-lab', reminderSentAt: dateDaysAgo(2).toISOString() })
+      },
+      {
+        invite_code: 'FLOW4-ARCHIVE',
+        email: 'flow5-preview@edulure.test',
+        community_id: opsCommunityId,
+        status: 'expired',
+        expires_at: dateDaysAgo(10),
+        metadata: JSON.stringify({ source: 'flow-four', cohort: 'sunset-pilot' })
+      },
+      {
+        invite_code: 'LEARNER-LAUNCH-OPS',
+        email: 'noemi.carvalho@edulure.test',
+        community_id: opsCommunityId,
+        status: 'pending',
+        expires_at: dateDaysFromNow(10),
+        metadata: JSON.stringify({ source: 'learner-program', cohort: 'ops-guild' })
+      },
+      {
+        invite_code: 'OPS-REVOCATION',
+        email: 'noemi.carvalho@edulure.test',
+        community_id: growthCommunityId,
+        status: 'revoked',
+        expires_at: dateDaysAgo(15),
+        metadata: JSON.stringify({ source: 'ops-trial', revokedBy: 'program-ops' })
+      },
+      {
+        invite_code: 'ENABLEMENT-WORKSHOP-1',
+        email: 'kai.watanabe@edulure.test',
+        community_id: opsCommunityId,
+        status: 'accepted',
+        expires_at: dateDaysFromNow(30),
+        claimed_at: dateDaysAgo(40),
+        user_id: instructorId,
+        metadata: JSON.stringify({ source: 'enablement', cohort: 'blueprints', acceptanceChannel: 'in-app' })
+      },
+      {
+        invite_code: 'ENABLEMENT-WORKSHOP-2',
+        email: 'kai.watanabe@edulure.test',
+        community_id: growthCommunityId,
+        status: 'accepted',
+        expires_at: dateDaysFromNow(45),
+        claimed_at: dateDaysAgo(38),
+        user_id: instructorId,
+        metadata: JSON.stringify({ source: 'enablement', cohort: 'blueprints', acceptanceChannel: 'email' })
       }
     ]);
 
-    await trx('learner_onboarding_responses').insert({
-      email: 'flow5-preview@edulure.test',
-      role: 'instructor',
-      first_name: 'Jordan',
-      last_name: 'Rivera',
-      persona: 'Community architect',
-      goals: JSON.stringify(['Launch Flow 5 beta', 'Automate sponsor onboarding']),
-      invites: JSON.stringify([
-        { code: 'FLOW5-OPS-GUILD', status: 'pending', communitySlug: 'learning-ops-guild' },
-        { code: 'FLOW5-GROWTH-LAB', status: 'pending', communitySlug: 'creator-growth-lab' }
-      ]),
-      preferences: JSON.stringify({
-        marketingOptIn: true,
-        timeCommitment: '4h/week',
-        interests: ['Community launches', 'Sponsor workflow']
-      }),
-      metadata: JSON.stringify({ source: 'flow-five', campaign: 'beta-seed' }),
-      terms_accepted: 1,
-      user_id: flowPreviewUserId,
-      submitted_at: trx.fn.now(),
-      created_at: trx.fn.now(),
-      updated_at: trx.fn.now()
-    });
+    await trx('learner_onboarding_responses').insert([
+      {
+        email: 'flow5-preview@edulure.test',
+        role: 'instructor',
+        first_name: 'Jordan',
+        last_name: 'Rivera',
+        persona: 'Community architect',
+        goals: JSON.stringify(['Launch Flow 5 beta', 'Automate sponsor onboarding']),
+        invites: JSON.stringify([
+          { code: 'FLOW5-OPS-GUILD', status: 'accepted', communitySlug: 'learning-ops-guild' },
+          { code: 'FLOW5-GROWTH-LAB', status: 'pending', communitySlug: 'creator-growth-lab' },
+          { code: 'FLOW4-ARCHIVE', status: 'expired', communitySlug: 'legacy-flow-four' }
+        ]),
+        preferences: JSON.stringify({
+          marketingOptIn: true,
+          timeCommitment: '4h/week',
+          interests: ['Community launches', 'Sponsor workflow']
+        }),
+        metadata: JSON.stringify({ source: 'flow-five', campaign: 'beta-seed' }),
+        terms_accepted: 1,
+        user_id: flowPreviewUserId,
+        submitted_at: dateDaysAgo(4),
+        created_at: dateDaysAgo(4),
+        updated_at: dateDaysAgo(4)
+      },
+      {
+        email: 'noemi.carvalho@edulure.test',
+        role: 'learner',
+        first_name: 'Noemi',
+        last_name: 'Carvalho',
+        persona: 'Operations lead',
+        goals: JSON.stringify(['Find readiness templates', 'Coordinate launch team updates']),
+        invites: JSON.stringify([
+          { code: 'LEARNER-LAUNCH-OPS', status: 'pending', communitySlug: 'learning-ops-guild' },
+          { code: 'OPS-REVOCATION', status: 'revoked', communitySlug: 'ops-sunset-pilot' }
+        ]),
+        preferences: JSON.stringify({
+          marketingOptIn: false,
+          timeCommitment: '2h/week',
+          interests: ['Incident playbooks', 'Launch checklists']
+        }),
+        metadata: JSON.stringify({ source: 'learner-waitlist', campaign: 'ops-accelerator' }),
+        terms_accepted: 1,
+        user_id: learnerId,
+        submitted_at: dateDaysAgo(9),
+        created_at: dateDaysAgo(9),
+        updated_at: dateDaysAgo(9)
+      },
+      {
+        email: 'kai.watanabe@edulure.test',
+        role: 'instructor',
+        first_name: 'Kai',
+        last_name: 'Watanabe',
+        persona: 'Enablement strategist',
+        goals: JSON.stringify(['Design enablement workshop series', 'Align post-launch mentoring pods']),
+        invites: JSON.stringify([
+          { code: 'ENABLEMENT-WORKSHOP-1', status: 'accepted', communitySlug: 'enablement-blueprints' },
+          { code: 'ENABLEMENT-WORKSHOP-2', status: 'accepted', communitySlug: 'enablement-blueprints' }
+        ]),
+        preferences: JSON.stringify({
+          marketingOptIn: true,
+          timeCommitment: '6h/week',
+          interests: ['Enablement journeys', 'Mentor pods']
+        }),
+        metadata: JSON.stringify({ source: 'enablement', campaign: 'blueprints' }),
+        terms_accepted: 1,
+        user_id: instructorId,
+        submitted_at: dateDaysAgo(46),
+        created_at: dateDaysAgo(46),
+        updated_at: dateDaysAgo(46)
+      }
+    ]);
 
     await trx('marketing_leads').insert({
       email: 'flow5-preview@edulure.test',
@@ -1369,8 +1468,17 @@ export async function seed(knex) {
       status: 'new',
       metadata: JSON.stringify({
         invites: [
-          { code: 'FLOW5-OPS-GUILD', community: { slug: 'learning-ops-guild' }, status: 'pending' },
-          { code: 'FLOW5-GROWTH-LAB', community: { slug: 'creator-growth-lab' }, status: 'pending' }
+          {
+            code: 'FLOW5-OPS-GUILD',
+            community: { slug: 'learning-ops-guild' },
+            status: 'accepted',
+            claimedAt: dateDaysAgo(5).toISOString()
+          },
+          {
+            code: 'FLOW5-GROWTH-LAB',
+            community: { slug: 'creator-growth-lab' },
+            status: 'pending'
+          }
         ],
         utmCampaign: 'flow-five-beta'
       }),
@@ -6761,6 +6869,8 @@ export async function seed(knex) {
       }
     };
     const telemetryIpHash = makeHash('203.0.113.42');
+    const telemetryLearnerIpHash = makeHash('198.51.100.25');
+    const telemetryInstructorIpHash = makeHash('192.0.2.17');
 
     const [telemetryBatchId] = await trx(TELEMETRY_TABLES.EVENT_BATCHES).insert({
       batch_uuid: telemetryBatchUuid,
@@ -6774,19 +6884,47 @@ export async function seed(knex) {
       metadata: JSON.stringify({ bucket: 'edulure-data-seeds', trigger: 'seed', previewCount: 1, byteLength: 4096 })
     });
 
-    await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert({
-      user_id: adminId,
-      tenant_id: 'global',
-      consent_scope: telemetryConsentScope,
-      consent_version: telemetryConsentVersion,
-      status: 'granted',
-      is_active: true,
-      recorded_at: telemetryReceivedAt,
-      effective_at: telemetryReceivedAt,
-      recorded_by: 'system',
-      evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryIpHash }),
-      metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap admin analytics consent' })
-    });
+    await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert([
+      {
+        user_id: adminId,
+        tenant_id: 'global',
+        consent_scope: telemetryConsentScope,
+        consent_version: telemetryConsentVersion,
+        status: 'granted',
+        is_active: true,
+        recorded_at: telemetryReceivedAt,
+        effective_at: telemetryReceivedAt,
+        recorded_by: 'system',
+        evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryIpHash }),
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap admin analytics consent' })
+      },
+      {
+        user_id: learnerId,
+        tenant_id: 'global',
+        consent_scope: telemetryConsentScope,
+        consent_version: telemetryConsentVersion,
+        status: 'granted',
+        is_active: true,
+        recorded_at: telemetryReceivedAt,
+        effective_at: telemetryReceivedAt,
+        recorded_by: 'system',
+        evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryLearnerIpHash }),
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap learner analytics consent' })
+      },
+      {
+        user_id: flowPreviewUserId,
+        tenant_id: 'global',
+        consent_scope: telemetryConsentScope,
+        consent_version: telemetryConsentVersion,
+        status: 'granted',
+        is_active: true,
+        recorded_at: telemetryReceivedAt,
+        effective_at: telemetryReceivedAt,
+        recorded_by: 'system',
+        evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryInstructorIpHash }),
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap instructor analytics consent' })
+      }
+    ]);
 
     const telemetryDedupe = generateTelemetryDedupeHash({
       eventName: 'governance.dashboard.loaded',
@@ -6875,18 +7013,215 @@ export async function seed(knex) {
         })
       });
 
+    const surveyBatchUuid = crypto.randomUUID();
+    const surveyBatchKey = 'warehouse/telemetry/seed-learner-surveys.jsonl.gz';
+    const surveyDayMs = 24 * 60 * 60 * 1000;
+    const surveyNow = Date.now();
+    const surveyDateDaysAgo = (days) => new Date(surveyNow - days * surveyDayMs);
+    const surveyCorrelationBase = 'learner-survey-seed';
+    const surveyBatchStartedAt = new Date(surveyNow - 10 * 60 * 1000);
+    const surveyBatchCompletedAt = new Date(surveyNow - 9 * 60 * 1000);
+    const surveyEvents = [
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(2),
+        userId: learnerId,
+        sessionId: 'learner-session-ops',
+        deviceId: 'seed-device-ios',
+        correlationId: `${surveyCorrelationBase}-ops-1`,
+        source: 'web.app',
+        payload: {
+          persona: 'operations',
+          rating: 5,
+          readinessStage: 'prelaunch',
+          cadence: 'weekly',
+          invitesAccepted: 0,
+          invitesPending: 1,
+          feedback: 'Installer steps are clear and quick to run.'
+        },
+        context: { actor: learnerId, journey: 'learner.onboarding', locale: 'en-US' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(6),
+        userId: learnerId,
+        sessionId: 'learner-session-ops',
+        deviceId: 'seed-device-ios',
+        correlationId: `${surveyCorrelationBase}-ops-2`,
+        source: 'web.app',
+        payload: {
+          persona: 'operations',
+          rating: 4,
+          readinessStage: 'configuration',
+          cadence: 'weekly',
+          invitesAccepted: 0,
+          invitesPending: 2,
+          feedback: 'Would love automatic reminders for pending invites.'
+        },
+        context: { actor: learnerId, journey: 'learner.onboarding', locale: 'en-US' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(11),
+        userId: flowPreviewUserId,
+        sessionId: 'instructor-session-community',
+        deviceId: 'seed-device-mac',
+        correlationId: `${surveyCorrelationBase}-comm-1`,
+        source: 'web.instructor',
+        payload: {
+          persona: 'community',
+          rating: 5,
+          readinessStage: 'invite-review',
+          cadence: 'biweekly',
+          invitesAccepted: 1,
+          invitesPending: 1,
+          feedback: 'Persona breakdown helps prioritise invite follow-ups.'
+        },
+        context: { actor: flowPreviewUserId, journey: 'instructor.onboarding', locale: 'en-GB' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(17),
+        userId: flowPreviewUserId,
+        sessionId: 'instructor-session-community',
+        deviceId: 'seed-device-mac',
+        correlationId: `${surveyCorrelationBase}-comm-2`,
+        source: 'web.instructor',
+        payload: {
+          persona: 'community',
+          rating: 3,
+          readinessStage: 'invite-review',
+          cadence: 'biweekly',
+          invitesAccepted: 1,
+          invitesPending: 2,
+          feedback: 'Need clearer signals when invites expire.'
+        },
+        context: { actor: flowPreviewUserId, journey: 'instructor.onboarding', locale: 'en-GB' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(33),
+        userId: learnerId,
+        sessionId: 'learner-session-ops',
+        deviceId: 'seed-device-ios',
+        correlationId: `${surveyCorrelationBase}-ops-legacy`,
+        source: 'web.app',
+        payload: {
+          persona: 'operations',
+          rating: 4,
+          readinessStage: 'discovery',
+          cadence: 'monthly',
+          invitesAccepted: 0,
+          invitesPending: 1,
+          feedback: 'Initial discovery session captured priorities.'
+        },
+        context: { actor: learnerId, journey: 'learner.onboarding', locale: 'en-US' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(65),
+        userId: flowPreviewUserId,
+        sessionId: 'instructor-session-community',
+        deviceId: 'seed-device-mac',
+        correlationId: `${surveyCorrelationBase}-comm-legacy`,
+        source: 'web.instructor',
+        payload: {
+          persona: 'community',
+          rating: 2,
+          readinessStage: 'legacy-import',
+          cadence: 'monthly',
+          invitesAccepted: 0,
+          invitesPending: 3,
+          feedback: 'Legacy cohort imports required manual CSV tweaks.'
+        },
+        context: { actor: flowPreviewUserId, journey: 'instructor.onboarding', locale: 'en-GB' }
+      }
+    ];
+
+    const [surveyBatchId] = await trx(TELEMETRY_TABLES.EVENT_BATCHES).insert({
+      batch_uuid: surveyBatchUuid,
+      status: 'exported',
+      destination: 's3',
+      events_count: surveyEvents.length,
+      started_at: surveyBatchStartedAt,
+      completed_at: surveyBatchCompletedAt,
+      file_key: surveyBatchKey,
+      checksum: makeHash('telemetry-seed-learner-surveys'),
+      metadata: JSON.stringify({
+        bucket: 'edulure-data-seeds',
+        trigger: 'seed',
+        previewCount: surveyEvents.length,
+        byteLength: 8192
+      })
+    });
+
+    const surveyEventRows = surveyEvents.map((event) => {
+      const receivedAt = new Date(event.occurredAt.getTime() + 90_000);
+      const dedupeHash = generateTelemetryDedupeHash({
+        eventName: 'learner.survey.submitted',
+        eventVersion: '2025.04',
+        occurredAt: event.occurredAt,
+        userId: event.userId,
+        sessionId: event.sessionId,
+        correlationId: event.correlationId,
+        payload: event.payload
+      });
+
+      return {
+        event_uuid: event.eventUuid,
+        tenant_id: 'global',
+        schema_version: 'v1',
+        event_name: 'learner.survey.submitted',
+        event_version: '2025.04',
+        event_source: event.source,
+        occurred_at: event.occurredAt,
+        received_at: receivedAt,
+        user_id: event.userId,
+        session_id: event.sessionId,
+        device_id: event.deviceId,
+        correlation_id: event.correlationId,
+        consent_scope: telemetryConsentScope,
+        consent_status: 'granted',
+        ingestion_status: 'exported',
+        ingestion_attempts: 1,
+        last_ingestion_attempt: receivedAt,
+        export_batch_id: surveyBatchId,
+        dedupe_hash: dedupeHash,
+        payload: JSON.stringify(event.payload),
+        context: JSON.stringify(event.context),
+        metadata: JSON.stringify({
+          seeded: true,
+          persona: event.payload.persona,
+          batchUuid: surveyBatchUuid,
+          cadence: event.payload.cadence
+        }),
+        tags: JSON.stringify(['learner', 'survey', 'seed'])
+      };
+    });
+
+    await trx(TELEMETRY_TABLES.EVENTS).insert(surveyEventRows);
+
+    const latestSurveyOccurredAt = surveyEvents.reduce(
+      (latest, event) => (latest && latest > event.occurredAt ? latest : event.occurredAt),
+      telemetryOccurredAt
+    );
+
     await trx(TELEMETRY_TABLES.FRESHNESS_MONITORS).insert([
       {
         pipeline_key: 'ingestion.raw',
-        last_event_at: telemetryOccurredAt,
+        last_event_at: latestSurveyOccurredAt,
         status: 'healthy',
         threshold_minutes: 15,
         lag_seconds: 0,
-        metadata: JSON.stringify({ lastEventId: telemetryEventId, source: 'seed' })
+        metadata: JSON.stringify({
+          lastEventId: telemetryEventId,
+          latestLearnerSurveyAt: latestSurveyOccurredAt.toISOString(),
+          source: 'seed'
+        })
       },
       {
         pipeline_key: 'warehouse.export',
-        last_event_at: telemetryOccurredAt,
+        last_event_at: latestSurveyOccurredAt,
         status: 'healthy',
         threshold_minutes: 30,
         lag_seconds: 45,
@@ -6896,8 +7231,11 @@ export async function seed(knex) {
           checkpoint: checkpointSealed,
           checkpointPreview,
           hasBacklog: false,
-          eventsExported: 1,
-          trigger: 'seed'
+          eventsExported: 1 + surveyEvents.length,
+          trigger: 'seed',
+          recentSurveyBatchUuid: surveyBatchUuid,
+          recentSurveyEvents: surveyEvents.length,
+          recentSurveyDestinationKey: surveyBatchKey
         })
       }
     ]);
@@ -6918,6 +7256,18 @@ export async function seed(knex) {
         checkpointHash,
         hasBacklog: false
       })
+    });
+
+    await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
+      run_uuid: crypto.randomUUID(),
+      tool: 'dbt',
+      model_name: 'telemetry_events_rollup',
+      status: 'success',
+      started_at: surveyBatchStartedAt,
+      completed_at: surveyBatchCompletedAt,
+      input: JSON.stringify({ trigger: 'seed', eventUuids: surveyEvents.map((event) => event.eventUuid), batchUuid: surveyBatchUuid }),
+      output: JSON.stringify({ batchUuid: surveyBatchUuid, destinationKey: surveyBatchKey, rowCount: surveyEvents.length }),
+      metadata: JSON.stringify({ trigger: 'seed', batchId: surveyBatchId, destination: 's3', hasBacklog: false })
     });
 
     const releaseChecklistEntries = [
