@@ -19,7 +19,13 @@ import {
   calculateOnboardingCompletion,
   validateOnboardingState
 } from '../utils/validation/onboarding.js';
-import { trackAuthAttempt, trackAuthAutoSave, trackAuthInteraction, trackAuthView } from '../lib/analytics.js';
+import {
+  trackAuthAttempt,
+  trackAuthAutoSave,
+  trackAuthInteraction,
+  trackAuthView,
+  trackNavigationSelect
+} from '../lib/analytics.js';
 
 const SOCIAL_ROUTES = {
   google: '/auth/oauth/google',
@@ -190,6 +196,10 @@ export default function Register() {
       progress: onboardingProgress.progress
     });
   }, [autoSaveStatus, formState.email, onboardingProgress.progress]);
+
+  const handleNavigateToLogin = useCallback(() => {
+    trackNavigationSelect('auth:login', { from: 'register' });
+  }, []);
 
   useEffect(() => {
     if (!twoFactorEnrollment?.enabled) return;
@@ -425,7 +435,11 @@ export default function Register() {
       actions={
         <span>
           Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-primary">
+          <Link
+            to="/login"
+            className="font-semibold text-primary"
+            onClick={handleNavigateToLogin}
+          >
             Sign in
           </Link>
         </span>

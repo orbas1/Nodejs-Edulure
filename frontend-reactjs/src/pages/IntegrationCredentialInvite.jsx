@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 
 import InviteSecurityChecklist from '../components/integrations/InviteSecurityChecklist.jsx';
@@ -8,6 +8,7 @@ import useIntegrationInvite from '../hooks/useIntegrationInvite.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import {
   trackIntegrationInviteEvent,
+  trackIntegrationInviteInteraction,
   trackIntegrationInviteStatus,
   trackIntegrationInviteSubmit
 } from '../lib/analytics.js';
@@ -30,6 +31,11 @@ export default function IntegrationCredentialInvite() {
     lastFetchedAt
   } = useIntegrationInvite({ inviteToken: token ?? '' });
 
+  const provider = invite?.provider ?? invite?.providerLabel ?? 'unknown';
+  const environment = invite?.environment ?? 'unspecified';
+  const touchedFieldsRef = useRef(new Set());
+  const viewStartedAtRef = useRef(null);
+
   const metaDescription = useMemo(() => {
     if (!invite) {
       return 'Securely deliver API credentials requested by the Edulure integrations team. Tokens are vaulted immediately and never displayed.';
@@ -46,18 +52,20 @@ export default function IntegrationCredentialInvite() {
     robots: 'noindex, nofollow',
     analytics: {
       page_type: 'integration_invite',
-      provider: invite?.provider ?? invite?.providerLabel ?? 'unknown',
-      environment: invite?.environment ?? 'unspecified'
+      provider,
+      environment
     }
   });
 
   useEffect(() => {
     if (!token || !invite) return;
     trackIntegrationInviteEvent('view', {
-      provider: invite.provider ?? invite.providerLabel ?? 'unknown',
-      environment: invite.environment ?? 'unspecified',
+      provider,
+      environment,
       has_expiry: Boolean(invite.expiresAt)
     });
+    touchedFieldsRef.current = new Set();
+    viewStartedAtRef.current = Date.now();
   }, [invite, token]);
 
   const documentationBanner = useMemo(() => {
@@ -92,55 +100,103 @@ export default function IntegrationCredentialInvite() {
       return;
     }
     trackIntegrationInviteStatus(documentationStatus.state, {
-      provider: invite?.provider ?? invite?.providerLabel ?? 'unknown'
+      provider,
+      environment
     });
-  }, [documentationStatus?.state, invite?.provider, invite?.providerLabel]);
+  }, [documentationStatus?.state, provider, environment]);
 
   useEffect(() => {
     if (status === 'idle' || status === 'submitting') return;
     trackIntegrationInviteStatus(status, {
-      provider: invite?.provider ?? invite?.providerLabel ?? 'unknown',
+      provider,
+      environment,
       has_message: Boolean(message)
     });
-  }, [status, invite?.provider, invite?.providerLabel, message]);
+  }, [status, provider, environment, message]);
 
   useEffect(() => {
     if (!isExpired) return;
     trackIntegrationInviteStatus('expired', {
-      provider: invite?.provider ?? invite?.providerLabel ?? 'unknown'
+      provider,
+      environment
     });
-  }, [isExpired, invite?.provider, invite?.providerLabel]);
+  }, [isExpired, provider, environment]);
+
+  useEffect(() => {
+    if (!error || loading) return;
+    trackIntegrationInviteEvent('error', {
+      provider,
+      environment,
+      code: error?.code ?? 'unknown'
+    });
+  }, [error, loading, provider, environment]);
+
+  const handleFieldChange = useCallback(
+    (field, value, { isSecret = false } = {}) => {
+      updateField(field, value);
+      if (!field) {
+        return;
+      }
+      const touched = touchedFieldsRef.current;
+      if (!touched.has(field)) {
+        touched.add(field);
+        const baseMetadata = {
+          field,
+          provider,
+          environment,
+          status,
+          is_secret: isSecret || undefined
+        };
+        if (!isSecret) {
+          const hasValue =
+            typeof value === 'string'
+              ? value.trim().length > 0
+              : value !== null && value !== undefined && value !== '';
+          baseMetadata.has_value = hasValue;
+        }
+        trackIntegrationInviteInteraction('field_change', baseMetadata);
+      }
+    },
+    [environment, provider, status, updateField]
+  );
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const provider = invite?.provider ?? invite?.providerLabel ?? 'unknown';
+    const durationSeconds =
+      viewStartedAtRef.current != null ? Number(((Date.now() - viewStartedAtRef.current) / 1000).toFixed(2)) : null;
     trackIntegrationInviteSubmit('attempt', {
       provider,
       has_rotation_override: Boolean(form.rotationIntervalDays),
-      has_expiry: Boolean(form.keyExpiresAt)
+      has_expiry: Boolean(form.keyExpiresAt),
+      environment,
+      duration_seconds: durationSeconds
     });
     const result = await submit();
     if (result?.ok) {
       trackIntegrationInviteSubmit('success', {
         provider,
-        rotation_interval: result.payload?.invite?.rotationIntervalDays ?? form.rotationIntervalDays || null
+        environment,
+        rotation_interval: result.payload?.invite?.rotationIntervalDays ?? form.rotationIntervalDays || null,
+        duration_seconds: durationSeconds
       });
     } else {
       trackIntegrationInviteSubmit('failure', {
         provider,
-        has_message: Boolean(message)
+        environment,
+        has_message: Boolean(message),
+        duration_seconds: durationSeconds
       });
     }
   };
 
   const handleRefresh = useCallback(() => {
-    const provider = invite?.provider ?? invite?.providerLabel ?? 'unknown';
     trackIntegrationInviteEvent('refresh', {
       provider,
+      environment,
       last_fetched_at: lastFetchedAt
     });
     return refresh();
-  }, [invite?.provider, invite?.providerLabel, lastFetchedAt, refresh]);
+  }, [environment, lastFetchedAt, provider, refresh]);
 
   if (loading && !invite) {
     return (
@@ -190,7 +246,7 @@ export default function IntegrationCredentialInvite() {
           <textarea
             id="invite-key"
             value={form.key}
-            onChange={(event) => updateField('key', event.target.value)}
+            onChange={(event) => handleFieldChange('key', event.target.value, { isSecret: true })}
             className="h-32 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
             placeholder="Paste your provider secret"
             required
@@ -209,7 +265,7 @@ export default function IntegrationCredentialInvite() {
               min={30}
               max={365}
               value={form.rotationIntervalDays}
-              onChange={(event) => updateField('rotationIntervalDays', event.target.value)}
+              onChange={(event) => handleFieldChange('rotationIntervalDays', event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
               placeholder={invite.rotationIntervalDays ? String(invite.rotationIntervalDays) : 'Use default cadence'}
               disabled={disableForm}
@@ -223,7 +279,7 @@ export default function IntegrationCredentialInvite() {
               id="invite-expiry"
               type="date"
               value={form.keyExpiresAt}
-              onChange={(event) => updateField('keyExpiresAt', event.target.value)}
+              onChange={(event) => handleFieldChange('keyExpiresAt', event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
               disabled={disableForm}
             />
@@ -238,7 +294,7 @@ export default function IntegrationCredentialInvite() {
               id="invite-email"
               type="email"
               value={form.actorEmail}
-              onChange={(event) => updateField('actorEmail', event.target.value)}
+              onChange={(event) => handleFieldChange('actorEmail', event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
               placeholder="you@example.com"
               disabled={disableForm}
@@ -251,7 +307,7 @@ export default function IntegrationCredentialInvite() {
             <input
               id="invite-name"
               value={form.actorName}
-              onChange={(event) => updateField('actorName', event.target.value)}
+              onChange={(event) => handleFieldChange('actorName', event.target.value)}
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
               placeholder="Full name"
               disabled={disableForm}
@@ -265,7 +321,7 @@ export default function IntegrationCredentialInvite() {
           <textarea
             id="invite-reason"
             value={form.reason}
-            onChange={(event) => updateField('reason', event.target.value)}
+            onChange={(event) => handleFieldChange('reason', event.target.value)}
             className="h-20 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
             placeholder="Add context for the rotation"
             disabled={disableForm}

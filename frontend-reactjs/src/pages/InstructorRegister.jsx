@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import AuthForm from '../components/auth/AuthForm.jsx';
 import { httpClient } from '../api/httpClient.js';
@@ -7,7 +8,13 @@ import usePageMetadata from '../hooks/usePageMetadata.js';
 import useMarketingContent from '../hooks/useMarketingContent.js';
 import { resolveSocialProofFallback } from '../data/marketing/socialProof.js';
 import { buildOnboardingDraftPayload, calculateOnboardingCompletion, validateOnboardingState } from '../utils/validation/onboarding.js';
-import { trackAuthAttempt, trackAuthAutoSave, trackAuthInteraction, trackAuthView } from '../lib/analytics.js';
+import {
+  trackAuthAttempt,
+  trackAuthAutoSave,
+  trackAuthInteraction,
+  trackAuthView,
+  trackNavigationSelect
+} from '../lib/analytics.js';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -101,6 +108,10 @@ export default function InstructorRegister() {
       progress: onboardingProgress.progress
     });
   }, [autoSaveStatus, formState.email, onboardingProgress.progress]);
+
+  const handleNavigateToLearnerRegister = useCallback(() => {
+    trackNavigationSelect('auth:register', { from: 'instructor-register' });
+  }, []);
 
   const clearFieldError = useCallback(
     (field) => {
@@ -245,9 +256,13 @@ export default function InstructorRegister() {
       actions={
         <span>
           Looking for the learner experience?{' '}
-          <a href="/register" className="font-semibold text-primary">
+          <Link
+            to="/register"
+            className="font-semibold text-primary"
+            onClick={handleNavigateToLearnerRegister}
+          >
             Go back to learner signup
-          </a>
+          </Link>
         </span>
       }
     >
