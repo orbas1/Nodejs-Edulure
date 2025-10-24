@@ -106,6 +106,7 @@ export default function InstructorCommunityChats() {
     activeChannel,
     selectChannel,
     loadChannels,
+    directMessagesState,
     messagesState,
     loadMessages,
     presenceState,
@@ -121,6 +122,7 @@ export default function InstructorCommunityChats() {
     resourcesState,
     loadResources,
     createResourceEntry,
+    sendDirectMessageToMember,
     sendMessage,
     reactToMessage,
     removeReaction,
@@ -131,7 +133,8 @@ export default function InstructorCommunityChats() {
     socialGraph
   } = useCommunityChatWorkspace({
     communityId: hasAccess ? selectedCommunityId : null,
-    token: hasAccess ? token : null
+    token: hasAccess ? token : null,
+    viewerId: session?.user?.id ?? null
   });
 
   useEffect(() => {
@@ -184,6 +187,12 @@ export default function InstructorCommunityChats() {
     [communitiesState.items]
   );
 
+  const timelineChannel = useMemo(
+    () => activeChannel?.channel ?? activeChannel ?? null,
+    [activeChannel]
+  );
+  const isDirectChannel = timelineChannel?.channelType === 'direct';
+
   const handleSendMessage = async () => {
     if (!composerState.body.trim()) {
       setWorkspaceNotice({
@@ -198,7 +207,8 @@ export default function InstructorCommunityChats() {
       ? [
           {
             url: composerState.attachmentUrl,
-            title: composerState.attachmentLabel || undefined
+            title: composerState.attachmentLabel || undefined,
+            label: composerState.attachmentLabel || undefined
           }
         ]
       : [];
@@ -207,16 +217,30 @@ export default function InstructorCommunityChats() {
       if (composerState.liveTopic) metadata.topic = composerState.liveTopic;
       if (composerState.meetingUrl) metadata.meetingUrl = composerState.meetingUrl;
     }
-    if (composerState.targetMemberId) {
-      metadata.directTargetMemberId = composerState.targetMemberId;
-    }
     try {
-      await sendMessage({
-        messageType: composerState.messageType,
-        body: composerState.body,
-        attachments,
-        metadata
-      });
+      if (composerState.targetMemberId) {
+        const channelKey = await sendDirectMessageToMember({
+          memberId: composerState.targetMemberId,
+          messageType: 'text',
+          body: composerState.body,
+          attachments,
+          metadata
+        });
+        selectChannel(channelKey);
+        await loadMessages({ channelId: channelKey, refresh: true });
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Direct message delivered',
+          detail: 'Your message was sent privately to the selected member.'
+        });
+      } else {
+        await sendMessage({
+          messageType: composerState.messageType,
+          body: composerState.body,
+          attachments,
+          metadata
+        });
+      }
       setComposerState(initialComposerState);
     } catch (error) {
       setWorkspaceNotice({
@@ -242,6 +266,16 @@ export default function InstructorCommunityChats() {
       });
     }
   };
+
+  const handleOpenDirectThread = useCallback(
+    (thread) => {
+      if (!thread?.id) return;
+      selectChannel(thread.id);
+      loadMessages({ channelId: thread.id, refresh: true });
+      setComposerState((current) => ({ ...current, targetMemberId: '' }));
+    },
+    [loadMessages, selectChannel]
+  );
 
   const handleSelectDirectRecipient = useCallback(
     (recipient) => {
@@ -560,20 +594,22 @@ export default function InstructorCommunityChats() {
           interactive={interactive}
           socialGraph={socialGraph}
           directMessages={socialGraph?.directMessages}
+          directMessagesLoading={directMessagesState.loading}
           onSelectDirectRecipient={handleSelectDirectRecipient}
+          onOpenDirectThread={handleOpenDirectThread}
         />
 
         <div className="flex flex-col gap-6">
           <MessageTimeline
-            channel={activeChannel?.channel ?? null}
+            channel={timelineChannel}
             messages={messagesState.items}
             loading={messagesState.loading}
             error={messagesState.error}
             hasMore={messagesState.hasMore}
             onLoadMore={handleLoadMoreMessages}
-            onReact={handleReactToMessage}
-            onRemoveReaction={handleRemoveReaction}
-            onModerate={handleModerateMessage}
+            onReact={isDirectChannel ? null : handleReactToMessage}
+            onRemoveReaction={isDirectChannel ? null : handleRemoveReaction}
+            onModerate={isDirectChannel ? null : handleModerateMessage}
             graph={socialGraph}
           />
 
@@ -585,6 +621,7 @@ export default function InstructorCommunityChats() {
             sending={sendingMessage}
             disabled={!interactive || !activeChannelId}
             availableRecipients={socialGraph?.recipients ?? []}
+            activeChannel={timelineChannel}
           />
         </div>
       </div>

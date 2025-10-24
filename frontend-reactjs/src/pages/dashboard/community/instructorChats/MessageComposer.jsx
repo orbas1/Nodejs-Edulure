@@ -9,7 +9,16 @@ const MESSAGE_TYPES = [
   { value: 'live', label: 'Live session' }
 ];
 
-export default function MessageComposer({ value, onChange, onSend, onReset, sending, disabled, availableRecipients }) {
+export default function MessageComposer({
+  value,
+  onChange,
+  onSend,
+  onReset,
+  sending,
+  disabled,
+  availableRecipients,
+  activeChannel
+}) {
   const handleChange = (field, next) => {
     onChange({ ...value, [field]: next });
   };
@@ -23,6 +32,36 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
     ? availableRecipients.filter((recipient) => recipient?.id && recipient?.displayName)
     : [];
 
+  const isActiveChannelDirect = activeChannel?.channelType === 'direct';
+  const isDirectTarget = Boolean(value.targetMemberId) || isActiveChannelDirect;
+  const directRecipientName = (() => {
+    if (value.targetMemberId) {
+      const match = recipientOptions.find(
+        (recipient) => String(recipient.id) === String(value.targetMemberId)
+      );
+      if (match) return match.displayName;
+    }
+    if (isActiveChannelDirect) {
+      const participants = Array.isArray(activeChannel?.participants)
+        ? activeChannel.participants
+        : [];
+      const peers = participants.filter((participant) => !participant.isViewer);
+      if (peers.length) {
+        return peers.map((participant) => participant.displayName).join(', ');
+      }
+    }
+    return null;
+  })();
+
+  const composerTitle = isDirectTarget ? 'Direct message' : 'Channel broadcast';
+  const composerDescription = isDirectTarget
+    ? directRecipientName
+      ? `Send a private update to ${directRecipientName}.`
+      : 'Send a private update to selected members.'
+    : 'Compose announcements or updates for the active channel.';
+
+  const shouldShowRecipientSelect = recipientOptions.length > 0 && !isActiveChannelDirect;
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -32,7 +71,8 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="dashboard-kicker text-slate-500">Compose update</p>
-          <h3 className="text-lg font-semibold text-slate-900">Channel broadcast</h3>
+          <h3 className="text-lg font-semibold text-slate-900">{composerTitle}</h3>
+          <p className="mt-1 text-xs text-slate-500">{composerDescription}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-xs font-medium text-slate-500">
@@ -40,6 +80,7 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
             <select
               value={value.messageType}
               onChange={(event) => handleChange('messageType', event.target.value)}
+              disabled={isDirectTarget}
               className="ml-2 rounded-full border border-slate-200 px-3 py-1 text-sm font-medium text-slate-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               {MESSAGE_TYPES.map((type) => (
@@ -49,7 +90,7 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
               ))}
             </select>
           </label>
-          {recipientOptions.length ? (
+          {shouldShowRecipientSelect ? (
             <label className="text-xs font-medium text-slate-500">
               Direct recipient
               <select
@@ -202,12 +243,14 @@ MessageComposer.propTypes = {
       presenceStatus: PropTypes.string,
       lastActiveAt: PropTypes.string
     })
-  )
+  ),
+  activeChannel: PropTypes.object
 };
 
 MessageComposer.defaultProps = {
   onReset: null,
   sending: false,
   disabled: false,
-  availableRecipients: []
+  availableRecipients: [],
+  activeChannel: null
 };

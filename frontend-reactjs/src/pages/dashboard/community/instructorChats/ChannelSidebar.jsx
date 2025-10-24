@@ -57,7 +57,9 @@ export default function ChannelSidebar({
   interactive,
   socialGraph,
   directMessages,
-  onSelectDirectRecipient
+  directMessagesLoading,
+  onSelectDirectRecipient,
+  onOpenDirectThread
 }) {
   const errorMessage = error
     ? error instanceof Error
@@ -239,7 +241,9 @@ export default function ChannelSidebar({
           </span>
         </header>
         <div className="mt-3 space-y-4 text-xs text-slate-500">
-          {directThreads.length ? (
+          {directMessagesLoading ? (
+            <p>Loading direct connections…</p>
+          ) : directThreads.length ? (
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Active threads</p>
               <ul className="mt-2 space-y-2">
@@ -248,21 +252,26 @@ export default function ChannelSidebar({
                     key={thread.id}
                     className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-700">{thread.name}</p>
-                        <p className="mt-1 text-[11px] text-slate-400">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-700">{thread.name}</p>
+                          <p className="mt-1 text-[11px] text-slate-400">
                           {thread.members.length} members ·{' '}
                           {thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleString() : 'No activity yet'}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => onSelectChannel?.(thread.id)}
-                        className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-500 transition hover:border-primary/40 hover:text-primary"
-                        aria-label={`Open direct thread ${thread.name}`}
-                        data-thread-id={thread.id}
-                      >
+                          {thread.unreadCount ? (
+                            <span className="ml-2 inline-flex items-center rounded-full bg-primary/10 px-2 py-[1px] text-[10px] font-semibold text-primary">
+                              {thread.unreadCount} unread
+                            </span>
+                          ) : null}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onOpenDirectThread?.(thread)}
+                          className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-500 transition hover:border-primary/40 hover:text-primary"
+                          aria-label={`Open direct thread ${thread.name}`}
+                          data-thread-id={thread.id}
+                        >
                         <ArrowTopRightOnSquareIcon className="h-4 w-4" aria-hidden="true" />
                         Open
                       </button>
@@ -339,7 +348,9 @@ ChannelSidebar.propTypes = {
     threads: PropTypes.array,
     suggestions: PropTypes.array
   }),
-  onSelectDirectRecipient: PropTypes.func
+  directMessagesLoading: PropTypes.bool,
+  onSelectDirectRecipient: PropTypes.func,
+  onOpenDirectThread: PropTypes.func
 };
 
 ChannelSidebar.defaultProps = {
@@ -348,5 +359,7 @@ ChannelSidebar.defaultProps = {
   activeChannelId: null,
   socialGraph: null,
   directMessages: null,
-  onSelectDirectRecipient: null
+  directMessagesLoading: false,
+  onSelectDirectRecipient: null,
+  onOpenDirectThread: null
 };
