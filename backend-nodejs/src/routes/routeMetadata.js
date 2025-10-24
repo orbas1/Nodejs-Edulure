@@ -719,6 +719,23 @@ const ROUTE_DEFINITIONS = [
     statusPageComponent: 'api-chat'
   },
   {
+    name: 'navigation',
+    capability: 'navigation-annex',
+    description: 'Navigation annex metadata, readiness tasks, and strategic mappings for shell surfaces.',
+    basePath: '/navigation',
+    flagKey: 'platform.api.v1.navigation',
+    defaultState: 'enabled',
+    fallbackStatus: 404,
+    disabledMessage: 'Navigation annex APIs are unavailable in this deployment.',
+    audience: 'user',
+    owners: ['experience-foundations'],
+    serviceTier: 'supporting',
+    tags: ['api', 'v1', 'navigation'],
+    cors: {
+      allowedMethods: ['GET']
+    }
+  },
+  {
     name: 'social',
     capability: 'social-graph',
     description: 'Follows, recommendations, and user engagement APIs.',

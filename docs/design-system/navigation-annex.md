@@ -1,21 +1,33 @@
 # Navigation design system dependencies (Annex A55)
 
-This annex lists the design system work tracked for the navigation remediation effort.
+Design dependencies for navigation remediation are stored in `navigation_annex_design_dependencies`, seeded in
+`backend-nodejs/seeds/004_navigation_annex.js`, and surfaced through `GET /api/v1/navigation/annex`. Update the
+seed data whenever tokens, QA checks, or component references change so that the annex remains the canonical source for design
+reviews.
 
 ## Token adoption
-- **Navigation surface spacing** – ensure `AppTopBar` and `AppSidebar` consume `--space-4`, `--space-6`, and `--radius-xxl`.
-- **Notification treatments** – align `AppNotificationPanel` with `--color-primary-soft`, `--shadow-card`, and responsive badge radii.
-- **Upload queue** – expose `--uploads-progress-radius` and adopt it in `InstructorCourseCreate` for the upload readiness bar.
+- **Feed shell spacing** – `--space-4` keeps header padding consistent across `AppTopBar` and feed cards.
+- **Course skeleton palette** – `--skeleton-base` standardises shimmer colours and aligns with reduced-motion expectations.
+- **Upload readiness indicator** – `--uploads-progress-radius` gives the instructor builder’s readiness pill the shared border
+  radius.
 
 ## QA checklist
-1. Verify focus-visible outlines in shell components use tokenised colour scales.
-2. Confirm skeleton shimmer respects `prefers-reduced-motion` and uses shared spacing tokens.
-3. Validate mention badges meet 4.5:1 contrast ratio in light and dark themes.
-4. Audit CTA button hierarchy across Tutor marketplace and quick actions for consistent icon placement.
-5. Ensure progress indicators share the annex radius token and animate within motion guardrails.
+1. `feed-focus-outline` – verify feed header controls expose the focus-visible ring token.
+2. `courses-motion-pref` – confirm course skeleton loaders honour the `prefers-reduced-motion` media query.
+3. `builder-progress-contrast` – ensure the instructor upload readiness indicator meets a 4.5:1 contrast ratio in light and
+   dark themes.
 
 ## Asset references
 - `frontend-reactjs/src/components/navigation/AppTopBar.jsx`
-- `frontend-reactjs/src/components/navigation/AppNotificationPanel.jsx`
+- `frontend-reactjs/src/pages/Courses.jsx`
 - `frontend-reactjs/src/pages/dashboard/InstructorCourseCreate.jsx`
 - `frontend-reactjs/src/styles/tokens.css`
+
+To inspect the live annex payload run:
+
+```bash
+curl "http://localhost:4000/api/v1/navigation/annex" | jq '.designDependencies'
+```
+
+Add new tokens or QA checks by inserting rows into `navigation_annex_design_dependencies` (or editing the seeder) so the API,
+handbook, and notification panel stay aligned.

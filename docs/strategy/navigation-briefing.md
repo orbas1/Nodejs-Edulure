@@ -1,21 +1,26 @@
 # Navigation stakeholder briefing (Annex A56)
 
-The narratives below align with the strategy pillars referenced in quarterly planning.
+Strategy narratives and metrics are stored in `navigation_annex_strategy_narratives` and
+`navigation_annex_strategy_metrics`. The seed file (`backend-nodejs/seeds/004_navigation_annex.js`) keeps the
+API, handbook, and notification panel aligned—run `npm --workspace backend-nodejs run seed` after editing it.
 
 ## Retention
-- **Feed** – reduce average click depth from 3.2 to 2.4 by centralising shell metadata.
-- **Live sessions** – shorten lead time from 18h to 10h by unifying scheduler availability APIs.
+- **Feed** – reduce average click depth from **3.2 → 2.1** by centralising the navigation registry and breadcrumbs. Track
+  `nav-click-depth` and `return-visit-rate` in analytics dashboards when the annex API exposes the updated payload.
 
 ## Activation
-- **Course discovery** – drop time-to-publish from 2d 6h to 1d 12h via skeleton loaders and ingest monitoring.
-
-## Engagement
-- **Community** – halve mention response time by consolidating notification slots and macros.
-- **Announcements** – raise announcement open rate from 57% to 68% using standardised autosave and CTA treatments.
-- **Library** – increase weekly ebook opens from 1,420 to 2,000 with consistent preview surfaces.
-
-## Expansion
-- **Tutor marketplace** – grow booking-to-view conversion from 12% to 18% with unified CTA styling.
+- **Course discovery** – improve the median time to locate a course after sign-in from **4m 20s → 2m 30s** and raise filter usage
+  from **18% → 32%** by aligning skeleton loaders and ingest monitoring.
 
 ## Efficiency
-- **Content ingest** – reduce 95th percentile asset processing from 42m to 25m using shared upload queues.
+- **Course upload readiness** – lift first-pass upload readiness from **61% → 85%** and reduce evidence archive latency from
+  **3d → 1d** by embedding readiness indicators and snapshot tasks in the instructor builder.
+
+Use the Annex API to pull these metrics into dashboards or briefings:
+
+```bash
+curl "http://localhost:4000/api/v1/navigation/annex" | jq '.strategyNarratives'
+```
+
+When adding a new narrative ensure it references a measurable metric, includes the pillar, and is seeded alongside the associated
+operations and backlog entries.

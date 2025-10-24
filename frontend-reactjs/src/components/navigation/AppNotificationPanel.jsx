@@ -26,7 +26,16 @@ export default function AppNotificationPanel({
       items: notifications.filter((notification) => notification.groupId === group.id)
     }));
   }, [notificationGroups, notifications]);
-  const { operationsChecklist, designDependencies, strategyNarratives, productBacklog } = useNavigationMetadata();
+  const {
+    operationsChecklist,
+    designDependencies,
+    strategyNarratives,
+    productBacklog,
+    status,
+    error
+  } = useNavigationMetadata();
+  const isLoading = status === 'loading';
+  const hasError = status === 'error';
 
   return (
     <Transition.Root show={open} as={Fragment}>
@@ -180,7 +189,18 @@ export default function AppNotificationPanel({
                       </span>
                     </div>
                     <ul className="mt-3 space-y-3">
-                      {operationsChecklist.length === 0 ? (
+                      {isLoading ? (
+                        <li className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
+                          Loading navigation readiness tasks…
+                        </li>
+                      ) : null}
+                      {hasError ? (
+                        <li className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-xs text-rose-600">
+                          Unable to load Annex A54 tasks right now
+                          {error?.message ? `: ${error.message}` : ''}. Please try again later.
+                        </li>
+                      ) : null}
+                      {!isLoading && !hasError && operationsChecklist.length === 0 ? (
                         <li className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
                           No outstanding operational tasks for this role.
                         </li>
@@ -236,20 +256,39 @@ export default function AppNotificationPanel({
                             {token}
                           </code>
                         ))}
+                        {isLoading && designDependencies.tokens.length === 0 ? (
+                          <span className="text-[11px] text-slate-400">Loading design tokens…</span>
+                        ) : null}
+                        {hasError && designDependencies.tokens.length === 0 ? (
+                          <span className="text-[11px] text-rose-500">Unable to load design tokens.</span>
+                        ) : null}
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm text-slate-600 shadow-sm">
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           QA steps
                         </h3>
-                        <ul className="mt-2 space-y-2 text-xs text-slate-500">
-                          {designDependencies.qa.map((item) => (
-                            <li key={item.id} className="leading-snug">
-                              {item.label}
-                            </li>
-                          ))}
-                        </ul>
+                        {isLoading && designDependencies.qa.length === 0 ? (
+                          <p className="mt-2 text-xs text-slate-400">Loading QA checks…</p>
+                        ) : hasError && designDependencies.qa.length === 0 ? (
+                          <p className="mt-2 text-xs text-rose-500">Unable to load QA steps.</p>
+                        ) : (
+                          <ul className="mt-2 space-y-2 text-xs text-slate-500">
+                            {designDependencies.qa.map((item) => (
+                              <li key={item.id} className="leading-snug">
+                                {item.label}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         <p className="mt-3 text-[11px] uppercase tracking-wide text-slate-400">
-                          References: {designDependencies.references.join(', ')}
+                          References:{' '}
+                          {designDependencies.references.length
+                            ? designDependencies.references.join(', ')
+                            : isLoading
+                              ? 'Loading references…'
+                              : hasError
+                                ? 'Unable to load references'
+                                : 'None recorded'}
                         </p>
                       </div>
                     </div>
@@ -264,6 +303,16 @@ export default function AppNotificationPanel({
                       </span>
                     </div>
                     <div className="mt-3 space-y-3">
+                      {isLoading && strategyNarratives.length === 0 ? (
+                        <article className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
+                          Loading Annex A56 briefing…
+                        </article>
+                      ) : null}
+                      {hasError && strategyNarratives.length === 0 ? (
+                        <article className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-xs text-rose-600">
+                          Unable to load Annex A56 briefing.
+                        </article>
+                      ) : null}
                       {strategyNarratives.map((pillar) => (
                         <article key={pillar.pillar} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
                           <header className="flex items-start justify-between gap-3">
@@ -305,6 +354,16 @@ export default function AppNotificationPanel({
                       </span>
                     </div>
                     <ul className="mt-3 space-y-3">
+                      {isLoading && productBacklog.length === 0 ? (
+                        <li className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
+                          Loading Annex A53 epics…
+                        </li>
+                      ) : null}
+                      {hasError && productBacklog.length === 0 ? (
+                        <li className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-xs text-rose-600">
+                          Unable to load Annex A53 backlog data.
+                        </li>
+                      ) : null}
                       {productBacklog.map((epic) => (
                         <li key={epic.id} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
                           <p className="text-sm font-semibold text-slate-900">{epic.id}</p>

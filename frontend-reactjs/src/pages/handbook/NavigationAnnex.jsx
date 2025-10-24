@@ -163,7 +163,9 @@ SectionCard.propTypes = {
 };
 
 export default function NavigationAnnex() {
-  const { initiatives } = useNavigationMetadata();
+  const { initiatives, status, refresh } = useNavigationMetadata();
+  const isLoading = status === 'loading';
+  const hasError = status === 'error';
 
   const sections = useMemo(() => {
     const items = [...initiatives.primary, ...initiatives.quickActions, ...initiatives.dashboard];
@@ -203,6 +205,23 @@ export default function NavigationAnnex() {
           remediation programme described in <code>user_experience.md</code>.
         </p>
       </header>
+      {isLoading ? (
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-sm text-slate-500">
+          Loading navigation annex records…
+        </div>
+      ) : null}
+      {hasError ? (
+        <div className="rounded-3xl border border-rose-200 bg-rose-50/70 p-6 text-sm text-rose-600">
+          Unable to load annex records.{' '}
+          <button
+            type="button"
+            onClick={refresh}
+            className="font-semibold text-rose-700 underline-offset-4 transition hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
       <nav aria-label="Quick links" className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm backdrop-blur">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Anchors</h2>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2">

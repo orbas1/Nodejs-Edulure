@@ -120,10 +120,11 @@ export default function MainLayout() {
 
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
 
-  const metadataRole = session?.user?.role ?? (isAuthenticated ? 'learner' : 'guest');
+  const metadataRole = session?.user?.role ?? (isAuthenticated ? 'user' : 'guest');
+  const metadataToken = session?.tokens?.accessToken ?? undefined;
 
   return (
-    <NavigationMetadataProvider role={metadataRole}>
+    <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
       <div className="flex min-h-screen flex-col bg-slate-50">
         <a className="skip-link" href="#main-content">
           Skip to main content

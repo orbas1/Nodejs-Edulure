@@ -711,120 +711,120 @@
             26. **Checklist.** Action items now include regenerating SDK, capturing CLI summary, listing manifest in new-files inventory, and reconciling manifest service totals against database migrations and seed snapshots.
             27. **Nav.** Clear headings point reviewers to manifest updates without scanning unrelated infrastructure notes.
             28. **Release.** Updated guides instruct teams to run the generator, publish hashes, and attach summaries to the backend change log before CAB submission.
-      - ✅ 15.A Docs & unresolved mappings (`frontend-reactjs/src/navigation/metadata.js`, `frontend-reactjs/src/context/NavigationMetadataContext.jsx`, `frontend-reactjs/src/components/navigation/AppNotificationPanel.jsx`, `frontend-reactjs/src/pages/handbook/NavigationAnnex.jsx`, `docs/product/navigation-backlog.md`, `docs/operations/navigation-readiness.md`, `docs/design-system/navigation-annex.md`, `docs/strategy/navigation-briefing.md`)
+      - ✅ 15.A Docs & unresolved mappings (`backend-nodejs/migrations/20250115104500_navigation_annex.js`, `backend-nodejs/seeds/004_navigation_annex.js`, `backend-nodejs/src/repositories/NavigationAnnexRepository.js`, `backend-nodejs/src/controllers/NavigationAnnexController.js`, `backend-nodejs/src/routes/navigation.routes.js`, `frontend-reactjs/src/api/navigationAnnexApi.js`, `frontend-reactjs/src/context/NavigationMetadataContext.jsx`, `frontend-reactjs/src/components/navigation/AppNotificationPanel.jsx`, `frontend-reactjs/src/pages/handbook/NavigationAnnex.jsx`, `docs/product/navigation-backlog.md`, `docs/operations/navigation-readiness.md`, `docs/design-system/navigation-annex.md`, `docs/strategy/navigation-briefing.md`)
          - 15.A.1 Documentation Coverage Gap (Annex A53 — Product backlog)
-            1. **Appraise.** `frontend-reactjs/src/navigation/metadata.js` now codifies UX audit items into `NAVIGATION_INITIATIVES`, giving every top-level route an explicit product epic identifier (UX-401…UX-408).
-            2. **Function.** `collectProductBacklog(role)` flattens primary navigation, quick actions, and dashboard sections so product owners receive a deduped epic list regardless of persona context.
-            3. **Usefulness.** The backlog doc at `docs/product/navigation-backlog.md` mirrors these epics with anchors that match in-app deep links (`/handbook/navigation-annex#ux-401-shell-registry`).
-            4. **Redundant.** Legacy narrative stubs inside `user_experience.md` no longer need manual cross-references; the annex consolidates routing metadata and backlog scope in one canonical source.
-            5. **Placeholders.** Product sections now link to real code touchpoints—`MainLayout.jsx`, `routes.js`, `AppTopBar.jsx`—eliminating “unresolved mapping” notes.
-            6. **Duplicates.** Deduplication is enforced via `dedupeById`, preventing repeat epics when multiple shells surface the same initiative.
-            7. **Improvements Needed.** Future automation should serialise the backlog doc directly from `NAVIGATION_INITIATIVES` to avoid manual Markdown drift.
-            8. **Styling.** `NavigationAnnex.jsx` renders backlog cards with consistent typography and tag styling, using the shared layout tokens referenced in `styles/tokens.css`.
-            9. **Efficiency.** Memoised mapping functions avoid recomputing metadata for repeated renders, keeping layout reflows minimal even as the annex grows.
-            10. **Strengths to Keep.** Strong coupling between metadata and docs ensures engineers can jump from annex anchors to code references instantly.
-            11. **Weaknesses to Remove.** Backlog still lacks automated status tracking; integrate with issue tracker to reflect progress.
-            12. **Palette.** Backlog badges reuse brand primary soft tints, aligning with shell styling to keep annex UI consistent with runtime.
-            13. **Layout.** Anchors list surfaces quick navigation to each epic, mirroring the structure described in `user_experience.md` for traceability.
-            14. **Text.** Epic descriptions in the backlog doc highlight objectives, scope, and deliverables tied to concrete files instead of generic prose.
-            15. **Spacing.** Section cards adopt `rounded-3xl` containers and tokenised padding to maintain readability on long-form annex pages.
-            16. **Shape.** Tag chips within the annex display the same rounded styles as navigation quick actions, reinforcing visual identity.
-            17. **Effects.** Interactive links use the shared focus ring tokens ensuring annex navigation remains accessible.
-            18. **Thumbs.** Quick access buttons open the underlying surface (e.g., `/courses`) so backlog owners can validate UI expectations directly.
-            19. **Media.** Handbook entries reference screenshot-ready components (TopBar, AppSidebar, InstructorCourseCreate) flagged for future documentation runs.
-            20. **Buttons.** Execution-plan links route to `NavigationAnnex` anchors, avoiding dead-end Markdown references.
-            21. **Interact.** Set-based origin tracking lists every navigation item contributing to an epic, clarifying cross-surface ownership.
-            22. **Missing.** Outstanding future work includes hooking backlog epics into analytics dashboards for automated status widgets.
-            23. **Design.** Annex cards inherit shared design tokens so product narratives align with the same grids used elsewhere in the shell.
-            24. **Clone.** Metadata functions remove the need for teams to recreate navigation matrices in spreadsheets—everything flows from a single JS source.
-            25. **Framework.** `NavigationMetadataProvider` wraps the shell so React children consume backlog, operations, and design data without bespoke wiring.
-            26. **Checklist.** Product review now requires confirming backlog anchors resolve, metadata exports include latest routes, and annex docs stay in sync.
-            27. **Nav.** `NavigationAnnex` quick links replicate the canonical navigation order, easing cross-checks during usability audits.
-            28. **Release.** Shipping backlog updates involves editing `navigation/metadata.js`, regenerating annex docs, and validating the handbook route before publishing release notes.
+            1. **Appraise.** `navigation_annex_backlog_items` now stores the Annex A53 backlog introduced in migration `backend-nodejs/migrations/20250115104500_navigation_annex.js`, replacing ad-hoc Markdown summaries with canonical records.
+            2. **Function.** `NavigationAnnexRepository.describe` aggregates backlog rows, dedupes epics, and exposes them through `GET /api/v1/navigation/annex` so the handbook and notification panel use the same payload.
+            3. **Usefulness.** `frontend-reactjs/src/api/navigationAnnexApi.js` normalises the response and `NavigationMetadataContext.jsx` feeds it into the UI, giving every surface up-to-date backlog data without duplicating logic.
+            4. **Redundant.** The static `frontend-reactjs/src/navigation/metadata.js` file was removed, eliminating divergent route metadata definitions.
+            5. **Placeholders.** Seed data in `backend-nodejs/seeds/004_navigation_annex.js` provides deterministic epics (UX-401, UX-402, OPS-218, OPS-219) so environments share the same backlog until live editing arrives. The legacy SQL script remains available under `backend-nodejs/database/seeders/003_seed_navigation_annex.sql` for manual maintenance but is no longer the source of truth.
+            6. **Duplicates.** Repository sorting collapses multiple rows per nav item into a single initiative, preventing duplicate backlog cards in the handbook.
+            7. **Improvements Needed.** Extend the seeds to cover additional navigation items and add automated tests around `NavigationAnnexRepository` to guard against regression.
+            8. **Styling.** `NavigationAnnex.jsx` gained loading and error states while preserving the existing annex layout and typography.
+            9. **Efficiency.** The repository queries each annex table once, memoising results inside the request cycle, and the frontend caches results for one minute via `httpClient` response caching.
+            10. **Strengths to Keep.** `docs/product/navigation-backlog.md` now documents how the seeds, migration, and API tie together so future updates remain traceable.
+            11. **Weaknesses to Remove.** Backlog edits still require manual seeder updates; plan a lightweight admin form or CLI wrapper to reduce friction.
+            12. **Palette.** Handbook sections reuse existing slate and primary tokens, avoiding new palette debt while surfacing real backlog content.
+            13. **Layout.** Section grouping in `NavigationAnnex.jsx` now key off annex data, ensuring anchors and quick links stay aligned with the database.
+            14. **Text.** Updated docs call out the migration and API endpoints, giving contributors concrete instructions for maintaining Annex A53.
+            15. **Spacing.** Loading and error callouts respect the 8px grid and rounded corners used elsewhere in the handbook.
+            16. **Shape.** The backlog chips still rely on rounded pills, keeping parity with other annex sections.
+            17. **Effects.** Notification panel rows maintain existing hover/focus treatments while new annex data is injected.
+            18. **Thumbs.** Product epics reference evidence capture (screenshots, logs) inside `docs/product/navigation-backlog.md`, reminding teams to attach artefacts during reviews.
+            19. **Media.** The backlog doc instructs teams to archive performance captures and breadcrumbs alongside annex updates.
+            20. **Buttons.** “View execution plan” links now route through `NavigationMetadataProvider` navigation callbacks, using the new annex hrefs.
+            21. **Interact.** `NavigationMetadataContext` exposes a `refresh` helper so handbook readers can pull fresh data without reloading the page.
+            22. **Missing.** Add integration tests that hit `/api/v1/navigation/annex` with different roles to verify scoping logic once fixtures expand.
+            23. **Design.** The annex card layout remains unchanged, but now displays real impacted files drawn from the database rather than prose.
+            24. **Clone.** Removing the local metadata file prevents future drift between docs, notifications, and handbook content.
+            25. **Framework.** Repository logic is plain Knex and JSON parsing, making it easy to port to other services that need annex data.
+            26. **Checklist.** `docs/product/navigation-backlog.md` now walks through updating `backend-nodejs/seeds/004_navigation_annex.js`, reseeding the database, and validating the Annex API for release readiness.
+            27. **Nav.** Route metadata now flows from the database, so anchors like `/handbook/navigation-annex#feed-registry` map directly to seeded backlog entries.
+            28. **Release.** Ship backlog changes by applying the navigation annex migration if needed, rerunning the seed script, validating `/api/v1/navigation/annex`, and smoke-testing the handbook.
          - 15.A.2 Operations Coverage Gap (Annex A54 — Runbooks & enablement)
-            1. **Appraise.** Operational requirements now live in `docs/operations/navigation-readiness.md`, breaking down runbooks per remediation stream.
-            2. **Function.** `buildOperationalChecklist(role)` filters annex tasks by persona, feeding `AppNotificationPanel` with role-aware readiness items.
-            3. **Usefulness.** Notification panel surfaces cadence, owner, and quick navigation to `/handbook/navigation-annex` anchors, reducing release friction for ops.
-            4. **Redundant.** Manual checklists previously scattered across comments are superseded by the structured annex runbook.
-            5. **Placeholders.** Every operations task now links to a live handbook section; no TODO placeholders remain in the UI or docs.
-            6. **Duplicates.** Deduped tasks ensure moderators or instructors don’t see the same runbook callout twice even when multiple nav items share a checklist.
-            7. **Improvements Needed.** Automate status capture (complete/deferred) inside the panel so operations can log progress without leaving the shell.
-            8. **Styling.** Operational chips adopt brand colours with accessible contrast, following design system guidance documented in the annex.
-            9. **Efficiency.** Checklist derivation runs in-memory and memoised, avoiding additional API calls while still reflecting metadata updates instantly.
-            10. **Strengths to Keep.** Integration between documentation and UI keeps runbooks front-of-mind during navigation workstreams.
-            11. **Weaknesses to Remove.** Ops tasks currently open handbook routes via router navigation; consider background prefetch for offline awareness.
-            12. **Palette.** Warning and success accents follow annex tone guidelines, giving teams instant visual cues on urgency.
-            13. **Layout.** Notification panel gains an operations column with consistent padding/spacing so checklists read cleanly alongside preferences.
-            14. **Text.** Task copy emphasises actionable verbs (“Verify registry export”, “Warm CDN caches”) aligned with operations playbook style.
-            15. **Spacing.** Additional section spacing in the panel keeps annex sections scannable without overwhelming the notification view.
-            16. **Shape.** Pills and cards reuse rounded corners to mirror shell components, maintaining familiarity.
-            17. **Effects.** Hover/focus states reuse tokenised transitions to keep interactive affordances accessible.
-            18. **Thumbs.** Operations handbook emphasises capturing screenshots and audit artefacts, supporting post-release retrospectives.
-            19. **Media.** Runbooks reference CDN cache warming and mention evidence capture, priming teams for asset gathering.
-            20. **Buttons.** “View runbook” call-to-action in the panel ensures one-click access to detailed procedures.
-            21. **Interact.** Panel triggers `onNavigate` so teams land on anchored sections without losing shell context.
-            22. **Missing.** Future iteration should expose completion toggles directly in the UI to update runbook status.
-            23. **Design.** Operational section headers clearly label Annex A54 to align with stakeholder expectations.
-            24. **Clone.** Single metadata source eliminates bespoke Notion or spreadsheet trackers for the same readiness tasks.
-            25. **Framework.** Handbook route (`/handbook/navigation-annex`) renders the same metadata-driven content, ensuring parity between UI and docs.
-            26. **Checklist.** Release managers must confirm operations tasks appear for each persona and that runbook links resolve pre-ship.
-            27. **Nav.** Handbook navigation includes anchors for every operational stream, enabling quick orientation during incidents.
-            28. **Release.** Ops go/no-go now requires verifying annex sections, capturing evidence, and updating the notification panel before declaring readiness.
+            1. **Appraise.** `navigation_annex_operation_tasks` captures Annex A54 checklists, ensuring operational tasks align with seeded backlog items.
+            2. **Function.** Repository logic filters tasks by role and `include_in_checklist`, feeding `AppNotificationPanel` and `docs/operations/navigation-readiness.md` with identical data.
+            3. **Usefulness.** Loading states and error copy in `AppNotificationPanel.jsx` make annex availability visible to operators instead of silently failing.
+            4. **Redundant.** Manual instructions referencing `mapNavigationToInitiatives` were removed; the new API serves as the single source of truth.
+            5. **Placeholders.** Seeds provide operational tasks for feed, course discovery, quick actions, and upload readiness until dynamic authoring is delivered.
+            6. **Duplicates.** Task keys (e.g., `ops-feed-registry-audit`) are unique in the table, preventing duplicate checklist entries when multiple roles share a surface.
+            7. **Improvements Needed.** Add automated coverage to verify `include_in_checklist` and cadence sorting when more roles are introduced.
+            8. **Styling.** Error banners in the notification panel reuse existing rose colour tokens to highlight annex fetch issues without introducing new styles.
+            9. **Efficiency.** Role filtering occurs server-side and the frontend caches responses, reducing redundant work when users reopen the panel.
+            10. **Strengths to Keep.** `docs/operations/navigation-readiness.md` now enumerates each annex task with references to the seeded keys, guiding release managers.
+            11. **Weaknesses to Remove.** Ownership of annex seeds is not yet codified; assign maintainers per runbook section to avoid stale data.
+            12. **Palette.** Notification chips and banners continue using the established slate and primary palette.
+            13. **Layout.** Checklist rows retain the flexible grid introduced previously, accommodating annex data without overflow.
+            14. **Text.** Operational docs instruct teams to query `/api/v1/navigation/annex?role=instructor` so they can verify seeds from tooling.
+            15. **Spacing.** Loading and error list items respect the standard padding and gap tokens.
+            16. **Shape.** Checklist cards maintain rounded-rectangle styling, ensuring annex tasks feel native to the panel.
+            17. **Effects.** Interactions (hover/focus) remained intact for the “View runbook” CTA thanks to unobtrusive data injections.
+            18. **Thumbs.** Tasks call for archiving evidence (e.g., screenshots, console logs) reinforcing operational accountability.
+            19. **Media.** Readiness docs now reference screenshot capture requirements tied to annex task IDs.
+            20. **Buttons.** Runbook links point at updated anchors within the operations handbook, using annex hrefs seeded in the database.
+            21. **Interact.** Operators can revisit the panel after refreshing the annex API to confirm tasks cleared, aided by the new loading states.
+            22. **Missing.** Add CLI tooling to insert annex tasks during incident retros once requirements expand beyond the seed set.
+            23. **Design.** The operations section header still brands the list as Annex A54, reinforcing context while new data streams in.
+            24. **Clone.** Eliminating hard-coded checklists avoids copy-paste drift between docs, UI, and runbooks.
+            25. **Framework.** Annex tasks are plain SQL rows, making it easy for other services to consume them if needed.
+            26. **Checklist.** Release checklist now requires updating seeds, verifying the API response, and confirming notification panel rendering during staging sign-off.
+            27. **Nav.** Runbook anchors (e.g., `#navigation-registry-validation`) are referenced directly from annex hrefs stored in the database.
+            28. **Release.** Ship operational updates by seeding new tasks, re-running `npm --workspace backend-nodejs run seed`, validating `/api/v1/navigation/annex`, and rehearsing the runbook.
          - 15.A.3 Design System Dependencies (Annex A55 — `user_experience.md`)
-            1. **Appraise.** Design dependencies documented in `docs/design-system/navigation-annex.md` enumerate token adoption across TopBar, AppNotificationPanel, and InstructorCourseCreate.
-            2. **Function.** `collectDesignDependencies` aggregates tokens, QA steps, and reference files so designers see a single list of required updates.
-            3. **Usefulness.** Notification panel exposes Annex A55 tokens inline, giving engineers quick reminders while reviewing alerts.
-            4. **Redundant.** Prior scattered TODOs about skeleton shimmer and button hierarchy are consolidated into the annex doc and metadata exports.
-            5. **Placeholders.** Placeholder guidance for upload progress styling is replaced by a real `uploadProgress` bar using the new `--uploads-progress-radius` token.
-            6. **Duplicates.** Token lists dedupe entries across navigation items, preventing conflicting instructions between marketing and dashboard shells.
-            7. **Improvements Needed.** Integrate automated linting to ensure components consume required tokens, preventing regression into ad-hoc styling.
-            8. **Styling.** Instructor upload bar, annex cards, and operations chips all consume shared CSS variables ensuring brand fidelity.
-            9. **Efficiency.** Central metadata avoids repeated imports; components read from context instead of fetching bespoke design configs.
-            10. **Strengths to Keep.** Shared token library in `styles/tokens.css` now includes `--uploads-progress-radius`, enabling consistent progress visualisation.
-            11. **Weaknesses to Remove.** Some legacy components still hard-code spacing; schedule migration using annex QA list.
-            12. **Palette.** Annex doc clarifies palette usage (primary soft tones, card shadows) to keep UI accessible.
-            13. **Layout.** Handbook cards use grid layout mirroring shell spacing to serve as living documentation of design intent.
-            14. **Text.** QA steps emphasise accessibility checks (contrast ratios, reduced motion) aligning with `user_experience.md` audits.
-            15. **Spacing.** Annex ensures 8px grid enforcement by explicitly calling out token usage; upload bar respects these tokens in code.
-            16. **Shape.** Border radius tokens apply to navigation chips and progress bars, avoiding mismatched rounding.
-            17. **Effects.** Hover/focus transitions across annex UI respect tokenised motion durations.
-            18. **Thumbs.** Notification panel now highlights avatar fallbacks and asset references, nudging designers to maintain consistency.
-            19. **Media.** Library previews and upload assets are flagged for consistent treatments in the design annex.
-            20. **Buttons.** Annex covers CTA hierarchy, ensuring Tutor marketplace and quick actions stay aligned.
-            21. **Interact.** Design doc points to multi-device interaction patterns, dovetailing with shell metadata for future gestures.
-            22. **Missing.** Figma library cross-links remain TODO; include once shared libraries ingest annex tokens.
-            23. **Design.** Metadata-driven annex keeps design specs in sync with actual code, reducing guesswork for designers.
-            24. **Clone.** Removing duplicate colour guidance across audits lowers maintenance overhead.
-            25. **Framework.** CSS variable additions ensure frameworks (React, Flutter) can ingest the same tokens.
-            26. **Checklist.** Designers must verify annex token adoption, QA steps, and references before sign-off.
-            27. **Nav.** Handbook anchors group design work per epic, ensuring nothing falls through during cross-team reviews.
-            28. **Release.** Design sign-off now includes annex verification alongside UI regression tests and docs updates.
+            1. **Appraise.** Design dependencies are now persisted in `navigation_annex_design_dependencies`, aligning Annex A55 with the actual token usage across navigation surfaces.
+            2. **Function.** The repository groups tokens, QA checks, and references per navigation item and surfaces aggregate data for the notification panel and handbook.
+            3. **Usefulness.** `docs/design-system/navigation-annex.md` references the database-backed annex so designers know exactly how to update seeds when tokens shift.
+            4. **Redundant.** The removed metadata module no longer duplicated token lists; the annex API is authoritative.
+            5. **Placeholders.** Seeds cover feed spacing, course skeleton palettes, and instructor upload progress tokens until further design dependencies are catalogued.
+            6. **Duplicates.** Dependency keys enforce uniqueness (e.g., `feed-focus-outline`), avoiding repeated QA steps across surfaces.
+            7. **Improvements Needed.** Expand seeds to capture additional navigation components and add automated linting to ensure components adopt required tokens.
+            8. **Styling.** Notification panel chips and QA lists now show live annex data while keeping original design treatments.
+            9. **Efficiency.** Aggregated sets dedupe tokens/refs so repeated entries are collapsed before reaching the UI.
+            10. **Strengths to Keep.** The annex API supports future consumers (e.g., Storybook) without adding bespoke endpoints.
+            11. **Weaknesses to Remove.** Manual seed edits risk human error; consider exposing a design ops CLI for safer updates.
+            12. **Palette.** No new palette requirements—existing token badges continue using neutral slate styles.
+            13. **Layout.** Design annex sections in the handbook still align with the responsive grid while listing seeded dependencies.
+            14. **Text.** QA copy references specific accessibility targets (focus-visible, prefers-reduced-motion) lifted from the seeds.
+            15. **Spacing.** Token chips and QA lists honour the same spacing tokens as before, now populated dynamically.
+            16. **Shape.** Rounded token capsules mirror other design system callouts, reinforcing consistency.
+            17. **Effects.** Hover styles for reference links remain unchanged, confirming data injection didn’t regress focus cues.
+            18. **Thumbs.** Annex instructions still call for capturing contrast checks and screenshots to document design sign-off.
+            19. **Media.** Handbook references point designers back to source files for visual audits.
+            20. **Buttons.** No new buttons added; existing interactions remain stable with live data.
+            21. **Interact.** Designers can refresh the annex context to verify token updates once seeds are rerun.
+            22. **Missing.** Add automated comparison between Figma tokens and annex seeds to flag drift.
+            23. **Design.** Annex-driven data ensures design reviews use the same references displayed in the UI.
+            24. **Clone.** Removing hard-coded lists prevents divergence between design docs and application state.
+            25. **Framework.** Simple SQL-backed storage keeps annex data portable across web and mobile pipelines.
+            26. **Checklist.** `docs/design-system/navigation-annex.md` documents how to run the curl command against `/api/v1/navigation/annex` to verify design dependencies.
+            27. **Nav.** Handbook anchors still segment design tasks by navigation item, now sourced from seeded data.
+            28. **Release.** Design sign-off requires updating seeds, seeding the database, validating the API output, and confirming notification panel plus handbook rendering.
          - 15.A.4 Strategy & Stakeholder Communication (Annex A56 — `user_experience.md`)
-            1. **Appraise.** Strategic narratives captured in `docs/strategy/navigation-briefing.md` align audit findings to the Activation, Retention, Engagement, Expansion, and Efficiency pillars.
-            2. **Function.** `collectStrategyNarratives` groups metrics by pillar, letting `AppNotificationPanel` render executive-ready summaries alongside operational alerts.
-            3. **Usefulness.** Stakeholders can skim Annex A56 metrics (click depth, booking conversion, asset processing) without leaving the shell.
-            4. **Redundant.** Repeating messaging across decks is replaced by the central handbook, ensuring a single truth for leadership updates.
-            5. **Placeholders.** Strategy statements now include concrete targets rather than vague future goals.
-            6. **Duplicates.** Grouping by pillar prevents metrics from appearing multiple times when nav items share the same strategic theme.
-            7. **Improvements Needed.** Wire annex metrics into analytics dashboards for automatic progress updates.
-            8. **Styling.** Strategy cards in the notification panel use consistent badge styling to communicate context (“Strategy”) clearly.
-            9. **Efficiency.** Narrative aggregation occurs once per render cycle and memoises results, minimising render overhead.
-            10. **Strengths to Keep.** Cohesive messaging ties audit remediation directly to business outcomes, easing stakeholder buy-in.
-            11. **Weaknesses to Remove.** Add owner and timeline metadata to each metric in a future iteration for accountability.
-            12. **Palette.** Strategy sections use soft primary backgrounds to differentiate from operational urgency cues.
-            13. **Layout.** Pillar cards stack responsively within the notification panel so narratives remain legible on narrow viewports.
-            14. **Text.** Copy emphasises measurable outcomes (percentages, durations) as requested in `user_experience.md`.
-            15. **Spacing.** Balanced whitespace in handbook and panel keeps multi-line narratives readable.
-            16. **Shape.** Rounded cards echo other annex sections, reinforcing design coherence.
-            17. **Effects.** Focus-visible styling ensures keyboard users can explore metrics without losing context.
-            18. **Thumbs.** Narrative cards highlight community avatars/engagement goals, reinforcing trust and recognition themes.
-            19. **Media.** Metrics reference preview improvements and scheduling experiences, indicating where future visuals should be captured.
-            20. **Buttons.** Narrative sections avoid extra CTAs to keep stakeholder summaries concise and action-focused.
-            21. **Interact.** In-app narratives encourage cross-functional dialogue directly from the shell, reducing reliance on slide decks.
-            22. **Missing.** Future work should attach baseline data sources for audit trails (e.g., analytics dashboards) to each metric.
-            23. **Design.** Strategy doc emphasises tone aligned with `docs/operations/strategy.md`, keeping executive comms consistent.
-            24. **Clone.** Canonical annex eliminates bespoke stakeholder PDFs per team.
-            25. **Framework.** Metadata exports pave the way for generating quarterly OKR briefings programmatically.
-            26. **Checklist.** Strategic review now requires validating metric deltas, annex copy, and stakeholder briefing updates before release comms.
-            27. **Nav.** Handbook anchors match pillars, making it easy to reference specific narratives during leadership reviews.
-            28. **Release.** Communications plan now cites annex updates—pre-brief leadership, launch announcements referencing annex anchors, and follow-up metrics reviews post release.
+            1. **Appraise.** Strategy pillars, narratives, and metrics are stored in `navigation_annex_strategy_narratives` and `navigation_annex_strategy_metrics`, synchronising Annex A56 across interfaces.
+            2. **Function.** `NavigationAnnexRepository` groups metrics by pillar and surfaces aggregated narratives for the notification panel and docs.
+            3. **Usefulness.** `docs/strategy/navigation-briefing.md` now maps seeded metrics (e.g., `nav-click-depth`, `upload-readiness-pass-rate`) directly to API output, aiding stakeholder briefings.
+            4. **Redundant.** Previous prose-only goals have been replaced with measurable targets seeded in the database.
+            5. **Placeholders.** Initial seeds cover retention, activation, and efficiency pillars while leaving room to expand coverage.
+            6. **Duplicates.** Metric keys are unique per narrative, preventing duplicate KPI cards in the UI.
+            7. **Improvements Needed.** Hook analytics ingestion to update annex metrics automatically instead of manual seed edits.
+            8. **Styling.** Strategy cards retain existing primary badges and typography while showing dynamic data.
+            9. **Efficiency.** Narrative grouping ensures only relevant metrics are sent to the client, keeping payloads lean.
+            10. **Strengths to Keep.** The API enables dashboards or external reports to consume the same stakeholder messaging without scraping docs.
+            11. **Weaknesses to Remove.** Baseline data still requires manual verification; automate sourcing from analytics systems.
+            12. **Palette.** No palette changes—strategy cards continue using subdued primary backgrounds for readability.
+            13. **Layout.** Notification panel strategy section handles loading/error states gracefully with annex-driven content.
+            14. **Text.** Docs and UI copy emphasise measurable outcomes, reflecting seeded baseline and target values.
+            15. **Spacing.** Strategy list items keep consistent padding, ensuring metrics remain scannable.
+            16. **Shape.** Rounded cards continue to match other annex sections, now populated dynamically.
+            17. **Effects.** Hover/focus styles on metric rows remain unaffected by the data source change.
+            18. **Thumbs.** Stakeholders are prompted to archive evidence (e.g., dashboard exports) per seeded metric as part of release comms.
+            19. **Media.** Briefing doc encourages attaching analytics snapshots corresponding to annex metrics.
+            20. **Buttons.** No CTA changes; strategy section focuses on at-a-glance metrics.
+            21. **Interact.** Annex API enables tooling to fetch metrics filtered by role (e.g., instructor vs. admin) thanks to repository scoping.
+            22. **Missing.** Introduce automated alerts when annex metrics fall outside targets once analytics integrations land.
+            23. **Design.** Strategy cards remain on brand while communicating seeded KPIs, ensuring executives see accurate goals.
+            24. **Clone.** Centralising metrics in the database prevents drift between decks, docs, and UI summaries.
+            25. **Framework.** The simple schema supports future exports (CSV, PDFs) without bespoke transformations.
+            26. **Checklist.** `docs/strategy/navigation-briefing.md` explains how to rerun seeds and validate annex data via curl, tying strategy updates to tangible steps.
+            27. **Nav.** Pillar order in the notification panel mirrors seeded display orders, keeping leadership narratives predictable.
+            28. **Release.** Update seeds, reseed the database, validate annex API output, and brief stakeholders with refreshed metrics to close Annex A56.

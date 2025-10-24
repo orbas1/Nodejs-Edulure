@@ -440,12 +440,12 @@ This compendium maps the execution paths, responsibilities, and release consider
 
 ### 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
 1. **Appraisal:** Application shell orchestrating routing, theming, internationalisation stubs, and shared component primitives used across experiences.
-2. **Functionality:** Layout components manage header/footer, sidebars, responsive breakpoints, and theme switching while providers expose contexts for analytics, auth, feature flags, and the new `NavigationMetadataProvider` powering `/handbook/navigation-annex`.
-3. **Logic Usefulness:** Centralised theming and metadata providers keep product, operations, design, and strategy mappings in sync—`AppNotificationPanel` now renders Annex A53–A56 insights alongside notifications so cross-team readiness stays visible from the shell.
+2. **Functionality:** Layout components manage header/footer, sidebars, responsive breakpoints, and theme switching while providers expose contexts for analytics, auth, and feature flags.
+3. **Logic Usefulness:** Centralised theming ensures shared tokens propagate to marketing, dashboard, and admin surfaces, while layout primitives enforce consistent spacing.
 4. **Redundancies:** Breakpoint definitions appear in CSS modules and JS utilities; consolidate into single source to avoid mismatch.
 5. **Placeholders Or non-working functions or stubs:** I18n scaffolding exists but lacks translation files; flag as TODO and guard UI toggles.
 6. **Duplicate Functions:** Theme toggling logic repeated in multiple components; centralise within theme provider to avoid state divergence.
-7. **Improvements need to make:** Add dark mode parity, integrate design tokens via CSS variables, expose layout telemetry for UX monitoring, and automate generation of navigation annex content from `navigation/metadata.js` to prevent drift.
+7. **Improvements need to make:** Add dark mode parity, integrate design tokens via CSS variables, and expose layout telemetry for UX monitoring.
 8. **Styling improvements:** Ensure typographic scale matches design-system documentation and unify spacing tokens across components.
 9. **Efficiency analysis and improvement:** Tree-shake unused icons, split vendor bundles, and memoise layout contexts.
 10. **Strengths to Keep:** Well-structured providers, accessible navigation scaffolding, and consistent design token usage.
@@ -453,7 +453,7 @@ This compendium maps the execution paths, responsibilities, and release consider
 12. **Styling and Colour review changes:** Align theme palettes with updated design tokens and ensure accessible defaults.
 13. **CSS, orientation, placement and arrangement changes:** Document layout grids and safe-area handling for different form factors.
 14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Review shared copy (footer, nav) for redundancy and clarity.
-15. **Change Checklist Tracker:** Include theming regression, layout smoke tests, navigation accessibility audits, and annex cross-checks (product backlog, operations runbook, design tokens, strategy metrics) in the release tracker.
+15. **Change Checklist Tracker:** Include theming regression, layout smoke tests, and navigation accessibility audits in release tracker.
 16. **Full Upgrade Plan & Release Steps:** Stage theming updates, run visual regression tests, update documentation, coordinate with design, and deploy with feature flag for progressive rollout.
 
 ## 3. Flutter Mobile Shell (`Edulure-Flutter/`)
@@ -1454,29 +1454,29 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Schedule refresh cadence, align with QA, and audit privacy compliance.
 
 ### A53. Product & Technical Guides (9.A)
-- **Operational Depth:** Guides articulate product narratives, user journeys, and technical architecture.
-- **Gaps & Risks:** Some diagrams outdated. Documentation lacks changelog linking guides to releases.
+- **Operational Depth:** `navigation_annex_backlog_items` seeds the Annex A53 backlog so `GET /api/v1/navigation/annex` and the handbook render the same epic summaries for each navigation surface.
+- **Gaps & Risks:** Some diagrams outdated. Documentation lacks changelog linking guides to releases; ensure seed updates include references to revised artefacts.
 - **Resilience & Efficiency:** Automate doc linting, enforce broken-link checks, and structure navigation.
 - **UX & Communications:** Maintain consistent tone, accessibility, and cross-linking.
 - **Change Management:** Version docs, align with releases, and solicit stakeholder reviews.
 
 ### A54. Operational Playbooks & Incident Response (9.B)
-- **Operational Depth:** Playbooks cover incidents, on-call rotations, and recovery procedures.
-- **Gaps & Risks:** Some scripts reference deprecated tooling. Playbook ownership unclear.
+- **Operational Depth:** `navigation_annex_operation_tasks` provides the Annex A54 checklist powering the notification panel and runbooks, keeping operational readiness steps in sync with releases.
+- **Gaps & Risks:** Some scripts reference deprecated tooling. Playbook ownership unclear; document who maintains the annex seeds.
 - **Resilience & Efficiency:** Run regular drills, update contacts, and automate alert routing.
 - **UX & Communications:** Keep instructions concise, include diagrams, and highlight escalation paths.
 - **Change Management:** Review quarterly, capture lessons learned, and archive superseded docs.
 
 ### A55. Design System Assets & UX Research (9.C)
-- **Operational Depth:** Design tokens, component libraries, and research summaries guide UI consistency.
-- **Gaps & Risks:** Token updates lag adoption in codebases. Research archives missing metadata.
+- **Operational Depth:** `navigation_annex_design_dependencies` now enumerates token adoption, QA checks, and references so design reviews consume the same annex payload as the application.
+- **Gaps & Risks:** Token updates lag adoption in codebases. Research archives missing metadata; keep annex entries current when tokens move.
 - **Resilience & Efficiency:** Automate token syncs, publish Figma export scripts, and maintain repository of findings.
 - **UX & Communications:** Ensure documentation accessible, include before/after visuals, and note accessibility results.
 - **Change Management:** Align releases with design reviews, update tokens, and communicate changes broadly.
 
 ### A56. Strategy, Valuation & Stakeholder Communication (9.D)
-- **Operational Depth:** Strategy docs, valuation models, and stakeholder updates track company direction.
-- **Gaps & Risks:** Financial models rely on manual data entry; automate imports. Stakeholder comms need version history.
+- **Operational Depth:** Strategy narratives and metrics reside in `navigation_annex_strategy_narratives` and `navigation_annex_strategy_metrics`, letting stakeholders query Annex A56 directly through the new API.
+- **Gaps & Risks:** Financial models rely on manual data entry; automate imports. Stakeholder comms need version history and should reference annex seeds for traceability.
 - **Resilience & Efficiency:** Build scripts to refresh valuation inputs, store snapshots, and secure sensitive data.
 - **UX & Communications:** Present narratives with clear visuals, consistent tone, and accessible summaries.
 - **Change Management:** Schedule executive reviews, document approvals, and archive prior versions for auditing.
