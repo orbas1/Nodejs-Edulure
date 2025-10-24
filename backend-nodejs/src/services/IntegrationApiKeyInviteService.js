@@ -218,6 +218,152 @@ function describeRotationInterval(rotationIntervalDays, provider) {
   return 'Refer to integration security policy';
 }
 
+function normaliseEmailList(values = []) {
+  const recipients = Array.isArray(values) ? values : [values];
+  const unique = new Set();
+
+  for (const candidate of recipients) {
+    if (typeof candidate !== 'string') {
+      continue;
+    }
+
+    const trimmed = candidate.trim().toLowerCase();
+    if (!trimmed) {
+      continue;
+    }
+
+    if (isValidEmail(trimmed)) {
+      unique.add(trimmed);
+    }
+  }
+
+  return Array.from(unique);
+}
+
+function getInviteDocumentationUrl(invite) {
+  return invite?.documentationUrl ?? invite?.metadata?.documentationUrl ?? null;
+}
+
+function toMailRecipientList(recipients) {
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    return null;
+  }
+
+  if (recipients.length === 1) {
+    return recipients[0];
+  }
+
+  return recipients;
+}
+
+function buildAcknowledgementEmail({ invite, actorName, documentationUrl, acknowledgedAt }) {
+  const providerLabel = invite.providerLabel ?? invite.provider ?? 'integration';
+  const alias = invite.alias ?? providerLabel;
+  const environment = invite.environment ?? 'unspecified';
+  const rotationCopy = invite.rotationDescription
+    ?? (invite.rotationIntervalDays
+      ? describeRotationInterval(invite.rotationIntervalDays, invite.provider)
+      : 'Refer to integration security policy');
+  const acknowledgementCopy = acknowledgedAt instanceof Date ? formatInviteDate(acknowledgedAt) : null;
+  const docLink = documentationUrl ?? 'https://docs.edulure.com/integrations';
+
+  const subject = `Edulure credential received — ${providerLabel} (${environment})`;
+  const greeting = actorName ? `Hi ${actorName},` : 'Hello,';
+
+  const html = `<!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <title>Credential received for ${providerLabel}</title>
+      <style>
+        body { font-family: 'Inter', Arial, sans-serif; background: #f8fafc; padding: 32px; color: #0f172a; }
+        .card { max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 18px; padding: 32px; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08); }
+        a { color: #2563eb; }
+        .meta { color: #475569; font-size: 13px; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <p>${greeting}</p>
+        <p>We received the <strong>${providerLabel}</strong> credential for <strong>${alias}</strong> (${environment}). The key is encrypted in our integrations vault and masked from administrators.</p>
+        <p>Rotation cadence: <strong>${rotationCopy}</strong>. Review the latest runbook here: <a href="${docLink}">${docLink}</a>.</p>
+        <p class="meta">Acknowledged ${acknowledgementCopy ?? 'just now'}.</p>
+        <p class="meta">We will confirm once automated connectivity checks complete. Reach out to integrations@edulure.com if anything looks unexpected.</p>
+      </div>
+    </body>
+  </html>`;
+
+  const text = [
+    greeting,
+    '',
+    `We received the ${providerLabel} credential for ${alias} (${environment}). The key is encrypted in our integrations vault and masked from administrators.`,
+    `Rotation cadence: ${rotationCopy}.`,
+    `Runbook: ${docLink}.`,
+    acknowledgementCopy ? `Acknowledged ${acknowledgementCopy}.` : 'Acknowledged just now.',
+    'We will confirm once automated connectivity checks complete. Contact integrations@edulure.com if anything looks unexpected.'
+  ].join('\n');
+
+  return { subject, html, text };
+}
+
+function buildOperationsAlertEmail({ invite, actorEmail, actorName, reason, documentationUrl, acknowledgedAt, keyId }) {
+  const providerLabel = invite.providerLabel ?? invite.provider ?? 'integration';
+  const alias = invite.alias ?? providerLabel;
+  const environment = invite.environment ?? 'unspecified';
+  const rotationCopy = invite.rotationDescription
+    ?? (invite.rotationIntervalDays
+      ? describeRotationInterval(invite.rotationIntervalDays, invite.provider)
+      : 'Refer to integration security policy');
+  const acknowledgementCopy = acknowledgedAt instanceof Date ? formatInviteDate(acknowledgedAt) : null;
+  const docLink = documentationUrl ?? 'https://docs.edulure.com/integrations';
+  const actorDescriptor = actorName ? `${actorName} <${actorEmail}>` : actorEmail;
+
+  const subject = `Integration credential fulfilled — ${providerLabel}/${alias}`;
+
+  const html = `<!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <title>Integration credential fulfilled</title>
+      <style>
+        body { font-family: 'Inter', Arial, sans-serif; background: #f1f5f9; padding: 32px; color: #0f172a; }
+        .card { max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 18px; padding: 32px; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08); }
+        .meta { color: #475569; font-size: 13px; }
+        a { color: #2563eb; }
+        ul { padding-left: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>Integration credential fulfilled</h1>
+        <p><strong>${providerLabel}</strong> (${environment}) credential submitted for alias <strong>${alias}</strong>.</p>
+        <ul>
+          <li>Submitted by: <strong>${actorDescriptor}</strong></li>
+          <li>Rotation cadence: ${rotationCopy}</li>
+          <li>Reason: ${reason ?? 'n/a'}</li>
+          <li>Key record ID: ${keyId ?? 'pending'}</li>
+        </ul>
+        <p>Runbook: <a href="${docLink}">${docLink}</a></p>
+        <p class="meta">Acknowledged ${acknowledgementCopy ?? 'just now'}.</p>
+      </div>
+    </body>
+  </html>`;
+
+  const text = [
+    'Integration credential fulfilled',
+    '',
+    `${providerLabel} (${environment}) credential submitted for alias ${alias}.`,
+    `Submitted by: ${actorDescriptor}.`,
+    `Rotation cadence: ${rotationCopy}.`,
+    `Reason: ${reason ?? 'n/a'}.`,
+    `Key record ID: ${keyId ?? 'pending'}.`,
+    `Runbook: ${docLink}.`,
+    acknowledgementCopy ? `Acknowledged ${acknowledgementCopy}.` : 'Acknowledged just now.'
+  ].join('\n');
+
+  return { subject, html, text };
+}
+
 export function sanitizeInviteToken(token) {
   const trimmed = typeof token === 'string' ? token.trim() : '';
   if (!trimmed) {
@@ -253,12 +399,42 @@ function calculateInviteExpiry(now = new Date()) {
   return expiry;
 }
 
-function createInviteMetadata({ notes, reason, requestedByName, rotationIntervalDays }) {
+function normalizeDocumentationUrl(url) {
+  if (url === undefined || url === null || (typeof url === 'string' && url.trim().length === 0)) {
+    return null;
+  }
+
+  if (typeof url !== 'string') {
+    throw Object.assign(new Error('Documentation URL must be a string'), {
+      status: 422,
+      code: 'INVITE_DOCUMENTATION_URL_INVALID'
+    });
+  }
+
+  const trimmed = url.trim();
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Unsupported protocol');
+    }
+    parsed.hash = parsed.hash ?? '';
+    return parsed.toString();
+  } catch (_error) {
+    throw Object.assign(new Error('Documentation URL must be a valid HTTP(S) link'), {
+      status: 422,
+      code: 'INVITE_DOCUMENTATION_URL_INVALID'
+    });
+  }
+}
+
+function createInviteMetadata({ notes, reason, requestedByName, rotationIntervalDays, documentationUrl }) {
   return {
     notes: notes ?? null,
     reason: reason ?? null,
     requestedByName: requestedByName ?? null,
-    rotationIntervalDays: rotationIntervalDays ?? null
+    rotationIntervalDays: rotationIntervalDays ?? null,
+    documentationUrl: documentationUrl ?? null
   };
 }
 
@@ -291,6 +467,7 @@ function sanitizeInvite(invite) {
     completedBy: invite.completedBy,
     cancelledAt: invite.cancelledAt ? invite.cancelledAt.toISOString() : null,
     cancelledBy: invite.cancelledBy,
+    documentationUrl: invite.documentationUrl ?? invite.metadata?.documentationUrl ?? null,
     metadata: invite.metadata ?? {}
   };
 }
@@ -419,7 +596,8 @@ export default class IntegrationApiKeyInviteService {
     reason,
     requestedBy,
     requestedByName,
-    apiKeyId
+    apiKeyId,
+    documentationUrl
   }, { actor = {}, requestContext = {} } = {}) {
     const normalisedProvider = normaliseProvider(provider);
     if (!normalisedProvider) {
@@ -473,11 +651,14 @@ export default class IntegrationApiKeyInviteService {
     const tokenHash = this.inviteModel.hashToken(rawToken);
     const expiresAt = calculateInviteExpiry(now);
 
+    const normalisedDocumentationUrl = normalizeDocumentationUrl(documentationUrl);
+
     const metadata = createInviteMetadata({
       notes,
       reason,
       requestedByName,
-      rotationIntervalDays: rotationDays
+      rotationIntervalDays: rotationDays,
+      documentationUrl: normalisedDocumentationUrl
     });
 
     const invite = await this.inviteModel.create(
@@ -497,7 +678,8 @@ export default class IntegrationApiKeyInviteService {
         keyExpiresAt: keyExpiryDate,
         metadata,
         lastSentAt: now,
-        sendCount: 1
+        sendCount: 1,
+        documentationUrl: normalisedDocumentationUrl
       },
       this.database
     );
@@ -692,7 +874,8 @@ export default class IntegrationApiKeyInviteService {
       expiresAt: invite.expiresAt ? invite.expiresAt.toISOString() : null,
       expiresAtDescription: formatInviteDate(invite.expiresAt),
       notes: invite.metadata?.notes ?? null,
-      reason: invite.metadata?.reason ?? null
+      reason: invite.metadata?.reason ?? null,
+      documentationUrl: invite.documentationUrl ?? invite.metadata?.documentationUrl ?? null
     };
   }
 
@@ -705,6 +888,13 @@ export default class IntegrationApiKeyInviteService {
     }
 
     const actor = actorEmail && isValidEmail(actorEmail) ? actorEmail.trim() : invite.ownerEmail;
+
+    const acknowledgementRecipients = this.#resolveAcknowledgementRecipients({
+      actorEmail: actor,
+      ownerEmail: invite.ownerEmail,
+      requestedBy: invite.requestedBy
+    });
+    const operationsRecipients = this.#resolveOperationsRecipients();
 
     const metadata = {
       ...invite.metadata,
@@ -720,6 +910,14 @@ export default class IntegrationApiKeyInviteService {
 
     const completedAt = this.nowProvider();
     metadata.fulfilledAt = completedAt.toISOString();
+    metadata.fulfilmentNotifications = {
+      ...(invite.metadata?.fulfilmentNotifications ?? {}),
+      ackRecipients: acknowledgementRecipients,
+      operationsRecipients,
+      ackSentAt: completedAt.toISOString(),
+      actorEmail: actor,
+      requestedBy: isValidEmail(invite.requestedBy) ? invite.requestedBy.trim().toLowerCase() : null
+    };
 
     let result;
     await this.database.transaction(async (trx) => {
@@ -813,10 +1011,100 @@ export default class IntegrationApiKeyInviteService {
       requestContext: context
     });
 
+    try {
+      await this.#dispatchFulfilmentNotifications({
+        invite: sanitizedInvite,
+        ackRecipients: acknowledgementRecipients,
+        operationsRecipients,
+        actorName,
+        actorEmail: actor,
+        reason,
+        documentationUrl: getInviteDocumentationUrl(sanitizedInvite),
+        acknowledgedAt: completedAt,
+        keyId: sanitizedKey.id
+      });
+    } catch (notificationError) {
+      this.logger.error(
+        { err: notificationError, inviteId: sanitizedInvite.id },
+        'Failed to dispatch integration invite fulfilment notifications'
+      );
+    }
+
     return {
       invite: completedInvite,
       apiKey: sanitizedKey
     };
+  }
+
+  #resolveOperationsRecipients() {
+    const configured = env.integrations?.invites?.acknowledgementRecipients;
+    if (!configured) {
+      return [];
+    }
+    return normaliseEmailList(configured);
+  }
+
+  #resolveAcknowledgementRecipients({ actorEmail, ownerEmail, requestedBy }) {
+    return normaliseEmailList([actorEmail, ownerEmail, requestedBy]);
+  }
+
+  async #dispatchFulfilmentNotifications({
+    invite,
+    ackRecipients,
+    operationsRecipients,
+    actorName,
+    actorEmail,
+    reason,
+    documentationUrl,
+    acknowledgedAt,
+    keyId
+  }) {
+    const tasks = [];
+
+    if (Array.isArray(ackRecipients) && ackRecipients.length > 0) {
+      const acknowledgementEmail = buildAcknowledgementEmail({
+        invite,
+        actorName,
+        documentationUrl,
+        acknowledgedAt
+      });
+      tasks.push(
+        this.mailService.sendMail({
+          to: toMailRecipientList(ackRecipients),
+          subject: acknowledgementEmail.subject,
+          html: acknowledgementEmail.html,
+          text: acknowledgementEmail.text,
+          headers: { 'X-Edulure-Template': 'integration-invite-ack' }
+        })
+      );
+    }
+
+    if (Array.isArray(operationsRecipients) && operationsRecipients.length > 0) {
+      const operationsEmail = buildOperationsAlertEmail({
+        invite,
+        actorEmail,
+        actorName,
+        reason,
+        documentationUrl,
+        acknowledgedAt,
+        keyId
+      });
+      tasks.push(
+        this.mailService.sendMail({
+          to: toMailRecipientList(operationsRecipients),
+          subject: operationsEmail.subject,
+          html: operationsEmail.html,
+          text: operationsEmail.text,
+          headers: { 'X-Edulure-Template': 'integration-invite-ops-alert' }
+        })
+      );
+    }
+
+    if (tasks.length === 0) {
+      return;
+    }
+
+    await Promise.all(tasks);
   }
 
   async #recordAuditEvent({ eventType, entityId, actor, metadata, requestContext, severity = 'notice' }) {

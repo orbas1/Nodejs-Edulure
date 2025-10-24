@@ -523,6 +523,9 @@ export default function DashboardLayout() {
             <a className="transition hover:text-primary" href="/terms">
               Terms
             </a>
+            <a className="transition hover:text-primary" href="/legal/contact">
+              Legal contact
+            </a>
           </div>
         </div>
       </footer>

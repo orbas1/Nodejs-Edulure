@@ -822,6 +822,7 @@ const envSchema = z
     CRM_MAX_CONCURRENT_JOBS: z.coerce.number().int().min(1).max(5).default(1),
     INTEGRATION_KEY_INVITE_BASE_URL: z.string().url().optional(),
     INTEGRATION_KEY_INVITE_TTL_HOURS: z.coerce.number().int().min(1).max(24 * 30).default(48),
+    INTEGRATION_KEY_INVITE_ACK_RECIPIENTS: z.string().optional(),
     WEBHOOK_BUS_ENABLED: z.coerce.boolean().default(true),
     WEBHOOK_BUS_POLL_INTERVAL_MS: z.coerce.number().int().min(100).max(60000).default(2000),
     WEBHOOK_BUS_BATCH_SIZE: z.coerce.number().int().min(1).max(200).default(25),
@@ -1660,7 +1661,8 @@ export const env = {
     },
     invites: {
       baseUrl: raw.INTEGRATION_KEY_INVITE_BASE_URL ?? raw.EMAIL_VERIFICATION_URL,
-      tokenTtlHours: raw.INTEGRATION_KEY_INVITE_TTL_HOURS
+      tokenTtlHours: raw.INTEGRATION_KEY_INVITE_TTL_HOURS,
+      acknowledgementRecipients: parseCsv(raw.INTEGRATION_KEY_INVITE_ACK_RECIPIENTS)
     },
     salesforce: {
       enabled: raw.SALESFORCE_ENABLED,

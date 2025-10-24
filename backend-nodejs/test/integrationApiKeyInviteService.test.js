@@ -6,7 +6,8 @@ vi.mock('../src/config/env.js', () => ({
     integrations: {
       invites: {
         baseUrl: 'https://ops.edulure.com',
-        tokenTtlHours: 72
+        tokenTtlHours: 72,
+        acknowledgementRecipients: ['integrations@edulure.com', 'security@edulure.com']
       }
     },
     mail: {
@@ -110,7 +111,12 @@ describe('IntegrationApiKeyInviteService', () => {
       tokenHash: 'hash-token',
       rotationIntervalDays: 90,
       keyExpiresAt: new Date('2025-03-10T10:00:00.000Z'),
-      metadata: { notes: 'Marketing automations', reason: 'Initial onboarding' },
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/rotation',
+      metadata: {
+        notes: 'Marketing automations',
+        reason: 'Initial onboarding',
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/rotation'
+      },
       lastSentAt: now,
       sendCount: 1
     });
@@ -125,7 +131,8 @@ describe('IntegrationApiKeyInviteService', () => {
       notes: 'Marketing automations',
       reason: 'Initial onboarding',
       requestedBy: 'admin@example.com',
-      requestedByName: 'Ops Admin'
+      requestedByName: 'Ops Admin',
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/rotation'
     });
 
     expect(inviteModelMock.create).toHaveBeenCalledWith(
@@ -134,7 +141,8 @@ describe('IntegrationApiKeyInviteService', () => {
         environment: 'production',
         alias: 'Content Studio Bot',
         rotationIntervalDays: 90,
-        ownerEmail: 'ops@example.com'
+        ownerEmail: 'ops@example.com',
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/rotation'
       }),
       databaseMock
     );
@@ -154,7 +162,8 @@ describe('IntegrationApiKeyInviteService', () => {
         provider: 'openai',
         providerLabel: 'OpenAI',
         status: 'pending',
-        rotationIntervalDays: 90
+        rotationIntervalDays: 90,
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/rotation'
       })
     );
     expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
@@ -278,6 +287,7 @@ describe('IntegrationApiKeyInviteService', () => {
       alias: 'Content Studio Bot',
       apiKeyId: null,
       ownerEmail: 'ops@example.com',
+      requestedBy: 'admin@example.com',
       status: 'pending',
       rotationIntervalDays: 90,
       keyExpiresAt: null,
@@ -330,6 +340,13 @@ describe('IntegrationApiKeyInviteService', () => {
       }),
       trxMock
     );
+    expect(inviteModelMock.updateById.mock.calls[0][1].metadata.fulfilmentNotifications).toEqual(
+      expect.objectContaining({
+        ackRecipients: ['ops@example.com', 'admin@example.com'],
+        operationsRecipients: ['integrations@edulure.com', 'security@edulure.com'],
+        actorEmail: 'ops@example.com'
+      })
+    );
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 5, sanitized: true }));
     expect(result.invite).toEqual(expect.objectContaining({ id: 'invite-uuid', status: 'completed' }));
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
@@ -343,6 +360,19 @@ describe('IntegrationApiKeyInviteService', () => {
         })
       })
     );
+    expect(mailServiceMock.sendMail).toHaveBeenCalledTimes(2);
+    expect(mailServiceMock.sendMail.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        to: ['ops@example.com', 'admin@example.com'],
+        headers: expect.objectContaining({ 'X-Edulure-Template': 'integration-invite-ack' })
+      })
+    );
+    expect(mailServiceMock.sendMail.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        to: ['integrations@edulure.com', 'security@edulure.com'],
+        headers: expect.objectContaining({ 'X-Edulure-Template': 'integration-invite-ops-alert' })
+      })
+    );
   });
 
   it('submits an invite by rotating an existing API key', async () => {
@@ -353,6 +383,7 @@ describe('IntegrationApiKeyInviteService', () => {
       alias: 'Content Studio Bot',
       apiKeyId: 9,
       ownerEmail: 'ops@example.com',
+      requestedBy: 'admin@example.com',
       status: 'pending',
       rotationIntervalDays: 45,
       keyExpiresAt: null,
@@ -395,6 +426,13 @@ describe('IntegrationApiKeyInviteService', () => {
       fulfilledReason: 'delegated-rotation',
       fulfilledAt: now.toISOString()
     });
+    expect(updatePayload.metadata.fulfilmentNotifications).toEqual(
+      expect.objectContaining({
+        ackRecipients: ['rotator@example.com', 'admin@example.com'],
+        operationsRecipients: ['integrations@edulure.com', 'security@edulure.com'],
+        actorEmail: 'rotator@example.com'
+      })
+    );
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 9, sanitized: true }));
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -402,6 +440,7 @@ describe('IntegrationApiKeyInviteService', () => {
         metadata: expect.objectContaining({ apiKeyId: 9, provider: 'openai' })
       })
     );
+    expect(mailServiceMock.sendMail).toHaveBeenCalledTimes(2);
   });
 
   it('persists fulfilment context metadata when provided', async () => {
@@ -412,6 +451,7 @@ describe('IntegrationApiKeyInviteService', () => {
       alias: 'Content Studio Bot',
       apiKeyId: null,
       ownerEmail: 'ops@example.com',
+      requestedBy: 'admin@example.com',
       status: 'pending',
       rotationIntervalDays: 90,
       keyExpiresAt: null,
@@ -456,6 +496,13 @@ describe('IntegrationApiKeyInviteService', () => {
       userAgent: 'Vitest Agent',
       origin: 'https://portal.edulure.com'
     });
+    expect(updatePayload.metadata.fulfilmentNotifications).toEqual(
+      expect.objectContaining({
+        ackRecipients: ['ops@example.com', 'admin@example.com'],
+        operationsRecipients: ['integrations@edulure.com', 'security@edulure.com'],
+        actorEmail: 'ops@example.com'
+      })
+    );
     expect(updatePayload.metadata.fulfilledAt).toBe(now.toISOString());
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -466,6 +513,7 @@ describe('IntegrationApiKeyInviteService', () => {
         })
       })
     );
+    expect(mailServiceMock.sendMail).toHaveBeenCalledTimes(2);
   });
 
   afterEach(() => {

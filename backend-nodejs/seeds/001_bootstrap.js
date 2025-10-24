@@ -1839,10 +1839,20 @@ export async function seed(knex) {
       completed_by: 'partner.techlead@example.com',
       last_sent_at: new Date('2025-02-17T08:35:00Z'),
       send_count: 1,
+      documentation_url: 'https://docs.edulure.com/integrations/hubspot/credentials',
       metadata: JSON.stringify({
         notes: 'Seed fulfilment for CRM onboarding',
         reason: 'initial-handoff',
-        fulfilledBy: 'partner.techlead@example.com'
+        fulfilledBy: 'partner.techlead@example.com',
+        fulfilledByName: 'Partner Tech Lead',
+        fulfilledAt: '2025-02-17T09:05:00.000Z',
+        fulfilmentNotifications: {
+          ackRecipients: ['partner.techlead@example.com', 'admin@edulure.com'],
+          operationsRecipients: ['integrations@edulure.com', 'security@edulure.com'],
+          ackSentAt: '2025-02-17T09:05:05.000Z',
+          actorEmail: 'partner.techlead@example.com',
+          requestedBy: 'admin@edulure.com'
+        }
       })
     });
 
@@ -1863,6 +1873,7 @@ export async function seed(knex) {
       key_expires_at: openAiKey.expiresAt,
       last_sent_at: new Date('2025-02-18T07:20:00Z'),
       send_count: 1,
+      documentation_url: 'https://docs.edulure.com/integrations/openai/rotation',
       metadata: JSON.stringify({
         notes: 'Awaiting partner confirmation',
         reason: 'staging-refresh',
@@ -1889,6 +1900,7 @@ export async function seed(knex) {
       cancelled_by: 'system:auto-close',
       last_sent_at: new Date('2025-01-13T11:15:00Z'),
       send_count: 2,
+      documentation_url: 'https://docs.edulure.com/integrations/anthropic/credential-handoff',
       metadata: JSON.stringify({
         autoClosed: true,
         autoClosedReason: 'key-rotated',

@@ -3,6 +3,7 @@ import logger from '../config/logger.js';
 import { TABLES as COMPLIANCE_TABLES } from '../database/domains/compliance.js';
 import changeDataCaptureService from './ChangeDataCaptureService.js';
 import AuditEventService from './AuditEventService.js';
+import DataSubjectRequestModel from '../models/DataSubjectRequestModel.js';
 
 const defaultAuditLogger = new AuditEventService();
 
@@ -41,28 +42,6 @@ function ensureJson(value) {
   }
 }
 
-function mapDsrRow(row) {
-  return {
-    id: row.id,
-    requestUuid: row.request_uuid,
-    tenantId: row.tenant_id,
-    userId: row.user_id,
-    requestType: row.request_type,
-    status: row.status,
-    submittedAt: row.submitted_at,
-    dueAt: row.due_at,
-    closedAt: row.closed_at,
-    handledBy: row.handled_by,
-    escalated: Boolean(row.escalated),
-    escalatedAt: row.escalated_at,
-    caseReference: row.case_reference,
-    slaDays: Number(row.sla_days),
-    metadata: ensureJson(row.metadata),
-    reporter: normalizeUser(row.reporter),
-    assignee: normalizeUser(row.assignee)
-  };
-}
-
 function mapConsentRow(row) {
   return {
     id: row.id,
@@ -93,11 +72,13 @@ export default class ComplianceService {
   constructor({
     connection = db,
     loggerInstance = logger.child({ module: 'compliance-service' }),
-    auditLogger = defaultAuditLogger
+    auditLogger = defaultAuditLogger,
+    dsrModel = DataSubjectRequestModel
   } = {}) {
     this.connection = connection;
     this.logger = loggerInstance;
     this.auditLogger = auditLogger;
+    this.dsrModel = dsrModel;
   }
 
   async summarisePolicyAttestations({
@@ -304,75 +285,21 @@ export default class ComplianceService {
   }
 
   async listDsrRequests({ status, dueBefore, limit = 25, offset = 0 } = {}) {
-    const query = this.connection({ dr: COMPLIANCE_TABLES.DSR_REQUESTS })
-      .select(
-        'dr.*',
-        'users.id as reporter_id',
-        'users.email as reporter_email',
-        'users.first_name as reporter_first_name',
-        'users.last_name as reporter_last_name',
-        'assignees.id as assignee_id',
-        'assignees.email as assignee_email',
-        'assignees.first_name as assignee_first_name',
-        'assignees.last_name as assignee_last_name'
-      )
-      .leftJoin('users', 'dr.user_id', 'users.id')
-      .leftJoin({ assignees: 'users' }, 'dr.handled_by', 'assignees.id')
-      .orderBy('dr.due_at', 'asc')
-      .limit(limit)
-      .offset(offset);
-
-    if (status) {
-      query.where('dr.status', status);
-    }
-
-    if (dueBefore) {
-      query.andWhere('dr.due_at', '<=', dueBefore);
-    }
-
-    const rows = await query;
-    const mapped = rows.map((row) =>
-      mapDsrRow({
-        ...row,
-        reporter: {
-          id: row.reporter_id,
-          email: row.reporter_email,
-          first_name: row.reporter_first_name,
-          last_name: row.reporter_last_name
-        },
-        assignee: {
-          id: row.assignee_id,
-          email: row.assignee_email,
-          first_name: row.assignee_first_name,
-          last_name: row.assignee_last_name
-        }
-      })
-    );
-
-    const [{ total }] = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS)
-      .modify((builder) => {
-        if (status) {
-          builder.where('status', status);
-        }
-      })
-      .count({ total: '*' });
-
-    const [{ overdue }] = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS)
-      .where('status', '!=', 'completed')
-      .andWhere('due_at', '<', this.connection.fn.now())
-      .count({ overdue: '*' });
+    const [data, total, overdue] = await Promise.all([
+      this.dsrModel.list({ status, dueBefore, limit, offset }, this.connection),
+      this.dsrModel.count({ status }, this.connection),
+      this.dsrModel.countOverdue(this.connection)
+    ]);
 
     return {
-      data: mapped,
-      total: Number(total ?? 0),
-      overdue: Number(overdue ?? 0)
+      data,
+      total,
+      overdue
     };
   }
 
   async assignDsrRequest({ requestId, assigneeId, actor, requestContext }) {
-    const updated = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS)
-      .where({ id: requestId })
-      .update({ handled_by: assigneeId, updated_at: this.connection.fn.now() });
+    const updated = await this.dsrModel.assign({ requestId, assigneeId }, this.connection);
 
     if (!updated) {
       throw new Error(`DSR request ${requestId} not found`);
@@ -398,21 +325,12 @@ export default class ComplianceService {
   }
 
   async getDsrRequestById(requestId) {
-    const row = await this.connection({ dr: COMPLIANCE_TABLES.DSR_REQUESTS })
-      .select('dr.*')
-      .where('dr.id', requestId)
-      .first();
-
-    if (!row) {
-      return null;
-    }
-
-    return mapDsrRow(row);
+    return this.dsrModel.findById(requestId, this.connection);
   }
 
   async updateDsrStatus({ requestId, status, resolutionNotes, actor, requestContext }) {
     const now = this.connection.fn.now();
-    const updates = { status, updated_at: now };
+    const updates = {};
 
     if (status === 'completed') {
       updates.closed_at = now;
@@ -423,7 +341,7 @@ export default class ComplianceService {
       updates.escalated_at = now;
     }
 
-    const updated = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS).where({ id: requestId }).update(updates);
+    const updated = await this.dsrModel.updateStatus({ requestId, status, updates }, this.connection);
     if (!updated) {
       throw new Error(`DSR request ${requestId} not found`);
     }

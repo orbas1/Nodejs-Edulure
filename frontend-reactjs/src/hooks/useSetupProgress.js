@@ -16,6 +16,24 @@ function parseEventData(event) {
   }
 }
 
+function resolveLastUpdatedAt(snapshot) {
+  const candidate =
+    snapshot?.state?.heartbeatAt ??
+    snapshot?.state?.completedAt ??
+    snapshot?.state?.updatedAt ??
+    snapshot?.state?.startedAt ??
+    null;
+
+  if (candidate) {
+    const date = new Date(candidate);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+
+  return new Date().toISOString();
+}
+
 const hasWindow = typeof window !== 'undefined';
 const hasEventSource = hasWindow && typeof window.EventSource !== 'undefined';
 
@@ -45,7 +63,7 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
     });
     setLoading(false);
     setError(null);
-    setLastUpdatedAt(new Date().toISOString());
+    setLastUpdatedAt(resolveLastUpdatedAt(data));
   }, []);
 
   const fetchSnapshot = useCallback(async () => {

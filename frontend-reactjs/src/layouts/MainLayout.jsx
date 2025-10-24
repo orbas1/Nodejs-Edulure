@@ -164,6 +164,9 @@ export default function MainLayout() {
               <a className="transition hover:text-primary" href="/terms">
                 Terms
               </a>
+              <a className="transition hover:text-primary" href="/legal/contact">
+                Legal contact
+              </a>
               <a className="transition hover:text-primary" href={`mailto:${supportEmail}`}>
                 Support
               </a>

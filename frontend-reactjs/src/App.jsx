@@ -17,6 +17,7 @@ import Courses from './pages/Courses.jsx';
 import About from './pages/About.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
+import LegalContact from './pages/LegalContact.jsx';
 import Blog from './pages/Blog.jsx';
 import BlogPost from './pages/BlogPost.jsx';
 import Communities from './pages/Communities.jsx';
@@ -159,6 +160,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/legal/contact" element={<LegalContact />} />
         <Route path="/handbook/navigation-annex" element={<NavigationAnnex />} />
         <Route path="/integrations/credential-invite/:token" element={<IntegrationCredentialInvite />} />
         <Route path="/setup" element={<Setup />} />

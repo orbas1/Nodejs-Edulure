@@ -162,6 +162,94 @@ describe('ComplianceService', () => {
     loggerStub = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), child: () => loggerStub };
   });
 
+  describe('DSR workflows', () => {
+    let dsrModel;
+
+    beforeEach(() => {
+      dsrModel = {
+        list: vi.fn().mockResolvedValue([{ id: 1 }]),
+        count: vi.fn().mockResolvedValue(2),
+        countOverdue: vi.fn().mockResolvedValue(1),
+        assign: vi.fn().mockResolvedValue(1),
+        updateStatus: vi.fn().mockResolvedValue(1),
+        findById: vi.fn().mockResolvedValue({ id: 1, status: 'pending' })
+      };
+    });
+
+    it('lists DSR requests through the model layer with counts', async () => {
+      const connection = { fn: { now: vi.fn(() => new Date('2024-02-01T00:00:00Z')) } };
+      const service = new ComplianceService({ connection, loggerInstance: loggerStub, auditLogger, dsrModel });
+
+      const result = await service.listDsrRequests({ status: 'pending', limit: 5 });
+
+      expect(dsrModel.list).toHaveBeenCalledWith({ status: 'pending', dueBefore: undefined, limit: 5, offset: 0 }, connection);
+      expect(dsrModel.count).toHaveBeenCalledWith({ status: 'pending' }, connection);
+      expect(dsrModel.countOverdue).toHaveBeenCalledWith(connection);
+      expect(result).toEqual({ data: [{ id: 1 }], total: 2, overdue: 1 });
+    });
+
+    it('assigns a DSR request, records audit events, and returns the updated record', async () => {
+      const connection = { fn: { now: vi.fn(() => new Date('2024-02-01T00:00:00Z')) } };
+      const service = new ComplianceService({ connection, loggerInstance: loggerStub, auditLogger, dsrModel });
+
+      const record = await service.assignDsrRequest({
+        requestId: 1,
+        assigneeId: 99,
+        actor: { id: 7, role: 'admin', type: 'user' },
+        requestContext: { requestId: 'req-1' }
+      });
+
+      expect(dsrModel.assign).toHaveBeenCalledWith({ requestId: 1, assigneeId: 99 }, connection);
+      expect(auditLogger.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'dsr.assigned',
+          entityId: 1
+        })
+      );
+      expect(changeDataCaptureMock.recordEvent).toHaveBeenCalledWith({
+        entityName: 'dsr_request',
+        entityId: 1,
+        operation: 'ASSIGN',
+        payload: { assigneeId: 99 }
+      });
+      expect(record).toEqual({ id: 1, status: 'pending' });
+    });
+
+    it('updates a DSR status and emits CDC plus audit metadata', async () => {
+      const connection = { fn: { now: vi.fn(() => new Date('2024-02-01T00:00:00Z')) } };
+      const service = new ComplianceService({ connection, loggerInstance: loggerStub, auditLogger, dsrModel });
+
+      dsrModel.findById.mockResolvedValue({ id: 1, status: 'completed' });
+
+      const record = await service.updateDsrStatus({
+        requestId: 1,
+        status: 'completed',
+        resolutionNotes: 'Export delivered',
+        actor: { id: 7, role: 'admin', type: 'user' },
+        requestContext: { requestId: 'req-1' }
+      });
+
+      expect(dsrModel.updateStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 1,
+          status: 'completed',
+          updates: expect.objectContaining({ closed_at: expect.any(Date) })
+        }),
+        connection
+      );
+      expect(auditLogger.record).toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: 'dsr.status_changed', entityId: 1 })
+      );
+      expect(changeDataCaptureMock.recordEvent).toHaveBeenCalledWith({
+        entityName: 'dsr_request',
+        entityId: 1,
+        operation: 'STATUS',
+        payload: { status: 'completed', resolutionNotes: 'Export delivered' }
+      });
+      expect(record).toEqual({ id: 1, status: 'completed' });
+    });
+  });
+
   it('summarises policy attestations and computes coverage by audience', async () => {
     const connection = createKnexStub({
       [COMPLIANCE_TABLES.CONSENT_POLICIES]: [

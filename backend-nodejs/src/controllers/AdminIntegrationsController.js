@@ -159,7 +159,8 @@ export async function createIntegrationApiKeyInvitation(req, res, next) {
     notes,
     reason,
     apiKeyId,
-    requestedByName
+    requestedByName,
+    documentationUrl
   } = req.body ?? {};
 
   try {
@@ -177,6 +178,7 @@ export async function createIntegrationApiKeyInvitation(req, res, next) {
       reason,
       apiKeyId,
       requestedByName,
+      documentationUrl,
       requestedBy: req.user?.email ?? req.user?.id ?? 'admin-dashboard'
     }, { actor: auditActor, requestContext });
 
