@@ -22,7 +22,12 @@ const initialComposerState = {
   attachmentLabel: '',
   liveTopic: '',
   meetingUrl: '',
-  metadataNote: ''
+  metadataNote: '',
+  notifyFollowers: false,
+  notifyFollowing: false,
+  priority: 'standard',
+  audienceSegment: 'all-members',
+  directRecipients: []
 };
 
 const initialPresenceForm = {
@@ -101,6 +106,8 @@ export default function InstructorCommunityChats() {
   const {
     interactive,
     channelsState,
+    directChannels,
+    channelGroups,
     activeChannelId,
     activeChannel,
     selectChannel,
@@ -124,6 +131,11 @@ export default function InstructorCommunityChats() {
     reactToMessage,
     removeReaction,
     moderateMessage,
+    socialGraphState,
+    socialGraphSummary,
+    followMember,
+    unfollowMember,
+    refreshSocialGraph,
     workspaceNotice,
     setWorkspaceNotice,
     refreshWorkspace
@@ -182,12 +194,52 @@ export default function InstructorCommunityChats() {
     [communitiesState.items]
   );
 
+  const connectionsSummary = useMemo(
+    () => ({
+      followers: socialGraphSummary.followers,
+      following: socialGraphSummary.following,
+      mutual: socialGraphSummary.mutual,
+      muted: socialGraphSummary.muted,
+      blocked: socialGraphSummary.blocked,
+      recommended: socialGraphSummary.recommended
+    }),
+    [socialGraphSummary]
+  );
+
+  const handleStartDirectMessage = ({ userId, displayName, channelId }) => {
+    setComposerState((previous) => ({
+      ...previous,
+      messageType: 'direct',
+      directRecipients: userId ? [String(userId)] : [],
+      body: '',
+      priority: 'priority',
+      metadataNote: displayName ? `Direct follow-up with ${displayName}` : previous.metadataNote,
+      notifyFollowers: false,
+      notifyFollowing: false
+    }));
+    if (channelId) {
+      selectChannel(channelId);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!composerState.body.trim()) {
       setWorkspaceNotice({
         tone: 'error',
         message: 'Message body required',
         detail: 'Add content to your update before sending.'
+      });
+      return;
+    }
+    if (
+      composerState.messageType === 'direct' &&
+      activeChannel?.channel?.channelType &&
+      activeChannel.channel.channelType !== 'direct'
+    ) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Select a direct channel',
+        detail: 'Choose a direct message thread before sending a direct update.'
       });
       return;
     }
@@ -201,6 +253,21 @@ export default function InstructorCommunityChats() {
         ]
       : [];
     const metadata = composerState.metadataNote ? { note: composerState.metadataNote } : {};
+    if (composerState.notifyFollowers) {
+      metadata.notifyFollowers = true;
+    }
+    if (composerState.notifyFollowing) {
+      metadata.notifyFollowing = true;
+    }
+    if (composerState.priority) {
+      metadata.priority = composerState.priority;
+    }
+    if (composerState.audienceSegment) {
+      metadata.audienceSegment = composerState.audienceSegment;
+    }
+    if (Array.isArray(composerState.directRecipients) && composerState.directRecipients.length > 0) {
+      metadata.directRecipients = composerState.directRecipients;
+    }
     if (composerState.messageType === 'live') {
       if (composerState.liveTopic) metadata.topic = composerState.liveTopic;
       if (composerState.meetingUrl) metadata.meetingUrl = composerState.meetingUrl;
@@ -448,6 +515,32 @@ export default function InstructorCommunityChats() {
     }
   };
 
+  const handleFollowMember = async (userId) => {
+    try {
+      await followMember(userId);
+      refreshSocialGraph();
+    } catch (error) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Unable to follow member',
+        detail: error?.message ?? 'Please try again.'
+      });
+    }
+  };
+
+  const handleUnfollowMember = async (userId) => {
+    try {
+      await unfollowMember(userId);
+      refreshSocialGraph();
+    } catch (error) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Unable to update follow status',
+        detail: error?.message ?? 'Please try again.'
+      });
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <DashboardStateMessage
@@ -527,6 +620,8 @@ export default function InstructorCommunityChats() {
             loadChannels();
           }}
           channels={channelsState.items}
+          directChannels={directChannels}
+          channelGroups={channelGroups}
           loading={channelsState.loading}
           error={channelsState.error}
           onRefresh={refreshWorkspace}
@@ -536,6 +631,12 @@ export default function InstructorCommunityChats() {
             loadMessages({ channelId, refresh: true });
           }}
           interactive={interactive}
+          socialGraph={socialGraphState}
+          socialSummary={connectionsSummary}
+          onFollowMember={handleFollowMember}
+          onUnfollowMember={handleUnfollowMember}
+          onStartDirectMessage={handleStartDirectMessage}
+          onRefreshSocial={refreshSocialGraph}
         />
 
         <div className="flex flex-col gap-6">
@@ -572,6 +673,7 @@ export default function InstructorCommunityChats() {
           onFormChange={setPresenceForm}
           onSubmit={handlePresenceSubmit}
           interactive={interactive}
+          summary={connectionsSummary}
         />
 
         <RoleManagementPanel
