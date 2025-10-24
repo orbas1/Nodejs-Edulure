@@ -3,6 +3,7 @@ import MarketingBlockModel from '../models/MarketingBlockModel.js';
 import MarketingPlanOfferModel from '../models/MarketingPlanOfferModel.js';
 import LearnerOnboardingInviteModel from '../models/LearnerOnboardingInviteModel.js';
 import MarketingLeadModel from '../models/MarketingLeadModel.js';
+import MarketingTestimonialModel from '../models/MarketingTestimonialModel.js';
 
 function normaliseArrayParam(value) {
   if (!value) {
@@ -43,6 +44,33 @@ export default class MarketingContentService {
     }));
   }
 
+  static async listTestimonials({ variants, surfaces } = {}) {
+    const requestedVariants = normaliseArrayParam(variants);
+    const testimonials = await MarketingTestimonialModel.list({
+      variants: requestedVariants.length ? requestedVariants : undefined
+    });
+
+    const filtered = MarketingTestimonialModel.filterBySurfaces(
+      testimonials,
+      normaliseArrayParam(surfaces)
+    );
+
+    return filtered.map((entry) => ({
+      id: entry.slug ?? `testimonial-${entry.id}`,
+      slug: entry.slug,
+      variant: entry.variant,
+      quote: entry.quote,
+      authorName: entry.authorName,
+      authorTitle: entry.authorTitle,
+      attribution: entry.attribution,
+      persona: entry.persona,
+      featuredProduct: entry.featuredProduct,
+      surfaces: entry.surfaces,
+      metadata: entry.metadata,
+      position: entry.position
+    }));
+  }
+
   static async listActiveInvites(email) {
     if (!email) {
       return [];
@@ -69,16 +97,18 @@ export default class MarketingContentService {
     }));
   }
 
-  static async getLandingContent({ types, email } = {}) {
-    const [blocks, plans, invites] = await Promise.all([
+  static async getLandingContent({ types, email, surfaces, variants } = {}) {
+    const [blocks, plans, invites, testimonials] = await Promise.all([
       this.listMarketingBlocks({ types }),
       this.listPlanOffers(),
-      this.listActiveInvites(email)
+      this.listActiveInvites(email),
+      this.listTestimonials({ variants, surfaces })
     ]);
     return {
       blocks,
       plans,
-      invites
+      invites,
+      testimonials
     };
   }
 

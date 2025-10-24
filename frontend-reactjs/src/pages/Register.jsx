@@ -6,7 +6,9 @@ import SocialSignOn from '../components/SocialSignOn.jsx';
 import { API_BASE_URL, httpClient } from '../api/httpClient.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import useOnboardingForm from '../hooks/useOnboardingForm.js';
+import useMarketingContent from '../hooks/useMarketingContent.js';
 import { fetchPasswordPolicy } from '../api/authApi.js';
+import { resolveSocialProofFallback } from '../data/marketing/socialProof.js';
 import {
   DEFAULT_PASSWORD_POLICY,
   evaluatePasswordStrength,
@@ -34,24 +36,6 @@ const ENFORCED_TWO_FACTOR_ROLES = new Set();
 const ADMIN_REQUEST_NOTE =
   "Need administrator access? Contact your organisation's Edulure operations representative to provision it securely.";
 const AUTO_SAVE_DELAY_MS = 1200;
-
-const SOCIAL_PROOF_ENTRIES = [
-  {
-    id: 'ops-director',
-    quote: '“Flow 5 onboarding kept our entire revenue pod aligned in the first week. We knew which communities to launch next.”',
-    attribution: 'Operations Director · Flow 5'
-  },
-  {
-    id: 'creator-lab',
-    quote: '“The interest tags we submitted here now power our cohort roadmap. Edulure turned those signals into real launches.”',
-    attribution: 'Program Lead · Creator Growth Lab'
-  },
-  {
-    id: 'global-campus',
-    quote: '“International onboarding used to take days. Now the regional preferences we capture sync instantly across dashboards.”',
-    attribution: 'Learning Ops Manager · Global Campus Network'
-  }
-];
 
 function pruneAddress(address) {
   if (!address || typeof address !== 'object') {
@@ -108,6 +92,10 @@ export default function Register() {
     'learner',
     onboardingOverrides
   );
+  const { data: marketingContent } = useMarketingContent({
+    surfaces: ['learner-register'],
+    variants: ['social_proof']
+  });
 
   const [passwordPolicy, setPasswordPolicy] = useState(DEFAULT_PASSWORD_POLICY);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,6 +154,25 @@ export default function Register() {
   );
 
   const personaInsight = useMemo(() => getPersonaInsight(formState.persona), [formState.persona]);
+
+  const socialProofEntries = useMemo(() => {
+    const testimonials = Array.isArray(marketingContent?.testimonials)
+      ? marketingContent.testimonials.filter((entry) => entry.variant === 'social_proof')
+      : [];
+
+    if (testimonials.length > 0) {
+      return testimonials.map((entry) => ({
+        id: entry.id ?? entry.slug,
+        quote: entry.quote,
+        attribution:
+          entry.attribution ??
+          [entry.authorName, entry.authorTitle].filter(Boolean).join(' • ') ??
+          'Edulure operator'
+      }));
+    }
+
+    return resolveSocialProofFallback('learner-register');
+  }, [marketingContent]);
 
   const handleSocialSignOn = useCallback(
     (provider) => {
@@ -358,7 +365,7 @@ export default function Register() {
         progress: onboardingProgress.progress,
         label: `${onboardingProgress.completed} of ${onboardingProgress.total} onboarding steps complete`
       }}
-      socialProof={SOCIAL_PROOF_ENTRIES}
+      socialProof={socialProofEntries}
       footer={resolveAutoSaveMessage(autoSaveStatus)}
       actions={
         <span>

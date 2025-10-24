@@ -277,40 +277,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 ## 2. Web Frontend Experience (`frontend-reactjs/`)
 
 ### 2.A Marketing, Storytelling & Acquisition (`src/pages/Home.jsx`, `src/pages/About.jsx`, `src/pages/Blog.jsx`, `src/pages/BlogPost.jsx`, `src/pages/Ebooks.jsx`, `src/pages/Terms.jsx`, `src/pages/Privacy.jsx`, `src/components/marketing/`, `src/data/marketing/`)
-1. **Appraisal:** Marketing layer delivering hero storytelling, trust signals, blog narrative, gated ebook flows, and policy pages tuned for acquisition.
-2. **Functionality:** React routes compose sections via reusable marketing components, dynamic markdown rendering, newsletter capture, and SEO metadata hooks.
-3. **Logic Usefulness:** Hooks within marketing components trigger scroll-based animations, track CTA events, and coordinate with analytics contexts.
-4. **Redundancies:** Testimonial grid variants exist in multiple pages; centralise in `components/marketing/TestimonialGrid.jsx` to reduce duplication.
-5. **Placeholders Or non-working functions or stubs:** Several blog posts reference placeholder markdown awaiting CMS sync; guard to avoid broken routes.
-6. **Duplicate Functions:** Pricing formatter logic appears across marketing and billing components; relocate to shared utility for consistent currency display.
-7. **Improvements need to make:** Integrate headless CMS, add structured data for SEO, and embed experiment hooks for hero copy tests.
-8. **Styling improvements:** Align hero gradient, CTA button styles, and testimonial cards with design tokens defined in `docs/design-system`.
-9. **Efficiency analysis and improvement:** Optimise image loading via responsive sources, preconnect fonts, and split blog bundles to cut initial payload.
-10. **Strengths to Keep:** Strong narrative flow, modular components, and analytics-friendly instrumentation.
-11. **Weaknesses to remove:** Overly verbose ebook descriptions; tighten copy to maintain focus.
-12. **Styling and Colour review changes:** Ensure CTA contrast meets accessibility, align palette with design tokens, and harmonise hover states.
-13. **CSS, orientation, placement and arrangement changes:** Review grid breakpoints for tablets and adjust spacing to avoid awkward wrapping.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Audit marketing copy for redundancy, maintain consistent tone, and enforce microcopy length guidelines.
-15. **Change Checklist Tracker:** Add marketing QA, SEO validation, and analytics tagging verification to release checklist before publishing updates.
-16. **Full Upgrade Plan & Release Steps:** Stage marketing updates in preview deployments, run accessibility and performance audits, sync CMS content, purge CDN caches, and monitor conversion metrics.
+1. **Appraisal:** Marketing surfaces orchestrate hero storytelling, product proof, and compliance messaging through coordinated React pages (`Home.jsx`, `About.jsx`, `Blog.jsx`, `Ebooks.jsx`) backed by shared data modules so acquisition journeys stay consistent across routes.
+2. **Functionality:** The routes compose `MarketingHero`, `ProductPreviewTabs`, and `ConversionPanel` with newsletter capture, case-study fallbacks, and `usePageMetadata` SEO hooks while `MarketingContentService.getLandingContent` now returns plan offers, invites, and the database-backed testimonials stored in `marketing_testimonials` through the `MarketingTestimonialModel` so React surfaces hydrate social proof from the same API.
+3. **Logic Usefulness:** `useMarketingContent` merges those API payloads with structured fallbacks, and the language context consumes the shared testimonial dictionary so localisation defaults, server data, and rendered quotes stay in lockstep while analytics events remain aligned with CTA buttons.
+4. **Redundancies:** Testimonial fallbacks and social proof quotes now originate from `src/data/marketing/testimonials.js`, which mirrors the `marketing_testimonials` seed fixtures; remaining duplication lives in plan highlight copy between `Home.jsx` and localisation entries, which should be deduped next.
+5. **Placeholders Or non-working functions or stubs:** `CASE_STUDY_FALLBACKS` and blog markdown loaders still provide placeholder summaries until the CMS feed fills in production assets; guard rails ensure empty payloads fall back to these curated defaults rather than breaking navigation.
+6. **Duplicate Functions:** Pricing presentation continues to rely on the bespoke `formatPlanPrice` helper in `Home.jsx`; extracting this into `utils/pricing.js` would let billing and marketing share currency formatting without divergence.
+7. **Improvements need to make:** Extend `usePageMetadata` usage to inject JSON-LD for hero panels, expose experiment toggles for CTA copy, and wire structured newsletter analytics to attribution dashboards so growth teams can evaluate variants.
+8. **Styling improvements:** Marketing cards and testimonials already respect design tokens via shared Tailwind utility classes, but gradients and CTA focus states should be cross-checked with the latest palette updates from `docs/design-system/tokens.md`.
+9. **Efficiency analysis and improvement:** Hero artwork leverages multiple sources yet still loads eagerly; shift to responsive `picture` tags, preload only the primary font weights, split blog bundles with Vite dynamic imports, and consider caching `marketing_testimonials` queries since registration and marketing routes now request them concurrently.
+10. **Strengths to Keep:** The narrative sequencing from hero → proof → plan highlights remains modular, instrumentation via `trackEvent` is embedded at CTA touchpoints, and centralised testimonial data keeps social validation current.
+11. **Weaknesses to remove:** Ebook descriptions and community spotlights occasionally exceed recommended line length, diluting key messages; tighten copy and surface skim-friendly bullet lists inside `EbookShowcase`.
+12. **Styling and Colour review changes:** Maintain WCAG AA contrast on CTA and badge states, ensure gradients on `ProductPreviewTabs` respect the updated brand spectrum, and keep hover/focus rings consistent across marketing buttons.
+13. **CSS, orientation, placement and arrangement changes:** Audit tablet breakpoints in `Home.jsx` grid sections—particularly `CaseStudyGrid` and `ConversionPanel`—to maintain balanced spacing and prevent narrow-column wrapping when switching between 2- and 3-column layouts.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Continue auditing translation fallbacks in `LanguageContext.jsx` so marketing copy stays concise, avoids repeated verbs, and matches the tone-of-voice guidance for acquisition journeys.
+15. **Change Checklist Tracker:** Extend the marketing release checklist to capture testimonial data refreshes, sitemap regeneration, structured data validation, and analytics tag QA before merging updates.
+16. **Full Upgrade Plan & Release Steps:** Prototype narrative or pricing changes behind preview deploys, run lighthouse and accessibility audits, sync CMS content, coordinate with marketing ops on go-live timing, clear CDN caches, and monitor conversion plus newsletter opt-in metrics post-launch.
 
 ### 2.B Authentication, Registration & Setup (`src/pages/Login.jsx`, `src/pages/Register.jsx`, `src/pages/InstructorRegister.jsx`, `src/pages/Setup.jsx`, `src/features/auth/`, `src/components/forms/`)
-1. **Appraisal:** Comprehensive onboarding flows for learners, instructors, and organisations with contextual guidance and session state management.
-2. **Functionality:** Forms use React Hook Form, validations from shared schema utilities, and call into SDK clients for login, registration, and setup steps.
-3. **Logic Usefulness:** Auth context providers maintain session tokens, MFA status, and onboarding progress to coordinate post-login routing and UI states.
-4. **Redundancies:** Form validation schemas exist separately for learner and instructor flows; consolidate to shared definitions with conditional fields.
-5. **Placeholders Or non-working functions or stubs:** Setup wizard contains TODO steps for billing and integration verification; ensure UI messaging handles prerequisites.
-6. **Duplicate Functions:** OTP input components exist in two directories; unify into a single component to guarantee consistent styling and behaviour.
-7. **Improvements need to make:** Add biometric/WebAuthn support, progressive profiling prompts, and instrumentation for drop-off analysis.
-8. **Styling improvements:** Harmonise form field spacing, button sizing, and error message styling with design-system guidelines.
-9. **Efficiency analysis and improvement:** Debounce availability checks, lazy-load seldom-used onboarding components, and prefetch dashboards post-auth.
-10. **Strengths to Keep:** Clear stepper navigation, robust validation, and adaptable layouts across device sizes.
-11. **Weaknesses to remove:** Dense copy for instructor onboarding; revise for clarity and concision.
-12. **Styling and Colour review changes:** Align role-specific accents with brand palette while meeting contrast standards.
-13. **CSS, orientation, placement and arrangement changes:** Optimise mobile layout with sticky progress indicator and safe-area awareness.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refine helper text to remove redundancy and clarify security messaging.
-15. **Change Checklist Tracker:** Update onboarding QA cases, including MFA and setup wizard paths, before each release.
-16. **Full Upgrade Plan & Release Steps:** Release behind feature flags, run usability testing, update analytics funnels, coordinate comms, and roll out after positive metrics.
+1. **Appraisal:** Login, registration, and setup flows span `Login.jsx`, `Register.jsx`, `InstructorRegister.jsx`, and `Setup.jsx`, combining shared onboarding hooks with contextual guidance to serve learners, instructors, and workspace operators.
+2. **Functionality:** Forms leverage `useOnboardingForm`, schema validation helpers in `utils/validation/onboarding.js`, and API clients to fetch password policies, submit drafts, and complete bootstrap requests, while `useMarketingContent` pulls social proof quotes from the shared `/content/marketing/blocks` endpoint backed by `marketing_testimonials`.
+3. **Logic Usefulness:** `AuthForm` components surface password-strength feedback, onboarding progress, and auto-save state; context providers ensure MFA or role information drives routing, and the shared marketing content hook keeps learner and instructor messaging aligned with the database seeds even if the API call fails thanks to structured fallbacks.
+4. **Redundancies:** Validation flows remain shared, but persona-specific helper text is hard-coded in `Register.jsx`; consider relocating these insights into localisation resources to avoid repeated strings when flows expand.
+5. **Placeholders Or non-working functions or stubs:** Setup tasks still display TODO messaging for billing or integration gating; ensure these steps surface actionable remediation when corresponding backend toggles are disabled.
+6. **Duplicate Functions:** Auto-save debouncing logic in both registration flows is nearly identical—factoring this into a reusable hook would simplify future maintenance.
+7. **Improvements need to make:** Add WebAuthn enrolment, progressive profiling prompts post-login, and deeper analytics instrumentation to capture form-level drop-off metrics.
+8. **Styling improvements:** Align button density, error messaging, and helper text spacing with the latest design-system tokens to keep parity with marketing entry points.
+9. **Efficiency analysis and improvement:** Continue debouncing API calls for availability checks, lazy-load infrequent onboarding sections, prefetch dashboard bundles after successful authentication, and cache `marketing_testimonials` responses on the client to avoid duplicate fetches when learners revisit the form.
+10. **Strengths to Keep:** Clear progress indicators, resilient draft auto-save, and robust validation help users complete onboarding with confidence across device sizes.
+11. **Weaknesses to remove:** Instructor application copy remains dense; break long paragraphs into scannable bullets and align with marketing voice guidelines.
+12. **Styling and Colour review changes:** Ensure role-specific accents and status badges comply with accessibility contrast while mirroring brand palettes between learner and instructor variants.
+13. **CSS, orientation, placement and arrangement changes:** Refine mobile grid layouts so multi-column forms stack logically, maintain sticky progress messaging within safe areas, and ensure CTA buttons remain thumb-accessible.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Consolidate persona insights and helper text into localisation modules, keep tooltips under 140 characters, and reinforce security messaging clarity.
+15. **Change Checklist Tracker:** Expand onboarding QA scripts to include shared social-proof data checks, MFA paths, and regression coverage for auto-save timing.
+16. **Full Upgrade Plan & Release Steps:** Roll enhancements behind feature flags, run usability sessions, validate analytics funnels, coordinate support documentation, and monitor conversion plus drop-off metrics before broad release.
 
 ### 2.C Learner Dashboard & Insights (`src/pages/dashboard/index.jsx`, `src/pages/dashboard/widgets/*`, `src/components/dashboard/`, `src/hooks/useLearnerDashboard.js`)
 1. **Appraisal:** Personalised learner hub aggregating progress, recommendations, streaks, certificates, billing alerts, and community prompts.
