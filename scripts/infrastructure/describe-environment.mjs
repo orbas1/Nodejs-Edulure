@@ -125,7 +125,8 @@ function buildSummary(manifest, descriptor, environmentKey) {
           changeWindows: descriptor.changeWindows ?? [],
           dockerCompose: descriptor.dockerCompose ?? null,
           observability: descriptor.observability ?? null,
-          notes: Array.isArray(descriptor.notes) ? descriptor.notes : []
+          notes: Array.isArray(descriptor.notes) ? descriptor.notes : [],
+          registryTable: 'environment_descriptors'
         }
       : null,
     terraformWorkspace: environment.path,
@@ -183,6 +184,7 @@ function renderMarkdown(summary) {
         lines.push(`  - On-call: ${descriptor.contacts.onCall}`);
       }
     }
+    lines.push(`- Registry table: \`environment_descriptors\``);
     if (Array.isArray(descriptor.notes) && descriptor.notes.length > 0) {
       lines.push('- Notes:');
       for (const note of descriptor.notes) {

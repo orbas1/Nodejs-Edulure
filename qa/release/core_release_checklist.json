@@ -91,6 +91,14 @@
       "status": "pending",
       "evidence": [],
       "lastVerifiedAt": null
+    },
+    {
+      "id": "environment-descriptor-synchronised",
+      "description": "`environment_descriptors` registry populated via npm workspace seed, descriptor export archived, and parity API queried to confirm database and manifest hashes align for the target environment.",
+      "owner": "platform",
+      "status": "pending",
+      "evidence": [],
+      "lastVerifiedAt": null
     }
   ]
 }
