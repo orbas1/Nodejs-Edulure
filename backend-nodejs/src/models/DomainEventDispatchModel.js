@@ -8,7 +8,7 @@ function normaliseDate(value) {
 
 function parseJson(value) {
   if (value === undefined || value === null) {
-    return null;
+    return {};
   }
 
   if (typeof value === 'object') {
@@ -18,24 +18,63 @@ function parseJson(value) {
   try {
     return JSON.parse(value);
   } catch (_error) {
+    return {};
+  }
+}
+
+function resolveDialect(connection = db) {
+  const client = connection?.client ?? db?.client;
+  const configuredClient = client?.config?.client ?? client?.driverName ?? '';
+  return String(configuredClient).toLowerCase();
+}
+
+function buildMetadataMergeUpdate(connection, metadata) {
+  if (!metadata || Object.keys(metadata).length === 0) {
     return null;
   }
+
+  const serialized = JSON.stringify(metadata);
+  const dialect = resolveDialect(connection);
+
+  if (dialect.includes('pg')) {
+    return connection.raw("COALESCE(metadata, '{}'::jsonb) || ?::jsonb", [serialized]);
+  }
+
+  if (dialect.includes('mysql')) {
+    return connection.raw(
+      'JSON_MERGE_PATCH(COALESCE(metadata, JSON_OBJECT()), CAST(? AS JSON))',
+      [serialized]
+    );
+  }
+
+  return serialized;
 }
 
 function mapRow(row) {
   if (!row) return null;
+  const attempts = Number(row.attempts ?? 0);
+  const metadata = parseJson(row.metadata);
+
   return {
     id: row.id,
-    eventId: row.event_id,
+    eventId: row.domain_event_id,
     status: row.status,
-    priority: row.priority,
+    deliveryChannel: row.delivery_channel ?? 'webhook',
+    attempts,
+    attemptCount: attempts,
+    maxAttempts: Number(row.max_attempts ?? 0),
     availableAt: normaliseDate(row.available_at),
-    attemptCount: Number(row.attempt_count ?? 0),
     lockedAt: normaliseDate(row.locked_at),
     lockedBy: row.locked_by ?? null,
     deliveredAt: normaliseDate(row.delivered_at),
+    failedAt: normaliseDate(row.failed_at),
     lastError: row.last_error ?? null,
-    metadata: parseJson(row.metadata),
+    lastErrorAt: normaliseDate(row.last_error_at),
+    payloadChecksum: row.payload_checksum ?? null,
+    metadata,
+    dryRun: Boolean(row.dry_run),
+    traceId: row.trace_id ?? null,
+    correlationId: row.correlation_id ?? null,
     createdAt: normaliseDate(row.created_at),
     updatedAt: normaliseDate(row.updated_at)
   };
@@ -51,17 +90,28 @@ export default class DomainEventDispatchModel {
       throw new Error('DomainEventDispatchModel.enqueue requires an event with an id');
     }
 
-    const priority = Number.isFinite(options.priority) ? Math.max(-100, Math.min(100, options.priority)) : 0;
     const availableAt = options.availableAt ? normaliseDate(options.availableAt) ?? new Date() : new Date();
     const status = options.status ?? 'pending';
-    const metadata = options.metadata ?? null;
+    const metadata = options.metadata ?? {};
+    const attempts = Number.isFinite(options.attempts) ? Math.max(0, options.attempts) : 0;
+    const maxAttempts = Number.isFinite(options.maxAttempts) ? Math.max(1, options.maxAttempts) : 12;
+    const deliveryChannel = options.deliveryChannel ?? 'webhook';
+    const payloadChecksum = options.payloadChecksum ?? `evt:${event.id}:${Date.now()}`;
 
     const payload = {
-      event_id: event.id,
+      domain_event_id: event.id,
       status,
-      priority,
+      delivery_channel: deliveryChannel,
+      attempts,
+      max_attempts: maxAttempts,
       available_at: availableAt,
-      metadata: metadata ? JSON.stringify(metadata) : null
+      locked_at: null,
+      locked_by: null,
+      payload_checksum: payloadChecksum,
+      metadata: JSON.stringify(metadata),
+      dry_run: options.dryRun === true,
+      trace_id: options.traceId ?? null,
+      correlation_id: options.correlationId ?? null
     };
 
     const [id] = await this.table(connection).insert(payload);
@@ -78,9 +128,9 @@ export default class DomainEventDispatchModel {
 
     return connection.transaction(async (trx) => {
       const rows = await trx('domain_event_dispatch_queue')
-        .whereIn('status', ['pending', 'failed'])
+        .where({ status: 'pending' })
         .andWhere('available_at', '<=', nowDate)
-        .orderBy('priority', 'desc')
+        .orderBy('available_at', 'asc')
         .orderBy('id', 'asc')
         .limit(limit)
         .forUpdate()
@@ -95,7 +145,7 @@ export default class DomainEventDispatchModel {
       await trx('domain_event_dispatch_queue')
         .whereIn('id', ids)
         .update({
-          status: 'processing',
+          status: 'delivering',
           locked_at: trx.fn.now(),
           locked_by: workerId,
           updated_at: trx.fn.now()
@@ -112,15 +162,16 @@ export default class DomainEventDispatchModel {
 
     const updates = {
       status: 'delivered',
-      delivered_at: deliveredAt,
-      updated_at: connection.fn.now(),
+      delivered_at: normaliseDate(deliveredAt) ?? new Date(),
+      attempts: connection.raw('attempts + 1'),
       locked_at: null,
       locked_by: null,
-      attempt_count: connection.raw('attempt_count + 1')
+      updated_at: connection.fn.now()
     };
 
-    if (metadata && Object.keys(metadata).length) {
-      updates.metadata = JSON.stringify(metadata);
+    const metadataUpdate = buildMetadataMergeUpdate(connection, metadata);
+    if (metadataUpdate) {
+      updates.metadata = metadataUpdate;
     }
 
     await this.table(connection).where({ id }).update(updates);
@@ -143,15 +194,18 @@ export default class DomainEventDispatchModel {
     const updates = {
       status: terminal ? 'failed' : 'pending',
       last_error: message.slice(0, 2000),
-      attempt_count: connection.raw('attempt_count + 1'),
+      last_error_at: connection.fn.now(),
+      attempts: connection.raw('attempts + 1'),
       available_at: nextAvailability,
       locked_at: null,
       locked_by: null,
+      failed_at: terminal ? connection.fn.now() : null,
       updated_at: connection.fn.now()
     };
 
-    if (metadata && Object.keys(metadata).length) {
-      updates.metadata = JSON.stringify(metadata);
+    const metadataUpdate = buildMetadataMergeUpdate(connection, metadata);
+    if (metadataUpdate) {
+      updates.metadata = metadataUpdate;
     }
 
     await this.table(connection).where({ id }).update(updates);
@@ -161,7 +215,7 @@ export default class DomainEventDispatchModel {
     const threshold = new Date(Date.now() - Math.max(timeoutMinutes, 1) * 60 * 1000);
 
     const query = this.table(connection)
-      .where({ status: 'processing' })
+      .where({ status: 'delivering' })
       .andWhere('locked_at', '<=', threshold);
 
     if (workerId) {
@@ -188,7 +242,7 @@ export default class DomainEventDispatchModel {
 
   static async countPending(connection = db) {
     const result = await this.table(connection)
-      .whereIn('status', ['pending', 'failed'])
+      .where({ status: 'pending' })
       .count({ count: '*' })
       .first();
     return Number(result?.count ?? 0);

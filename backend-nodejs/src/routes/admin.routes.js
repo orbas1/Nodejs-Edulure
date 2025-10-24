@@ -16,6 +16,11 @@ const router = createApiRouter();
 
 router.get('/settings/profile', auth('admin'), AdminSettingsController.getAdminProfileSettings);
 router.put('/settings/profile', auth('admin'), AdminSettingsController.updateAdminProfileSettings);
+router.get(
+  '/settings/operational-overview',
+  auth('admin'),
+  AdminSettingsController.getOperationalGovernanceOverview
+);
 router.get('/settings/payments', auth('admin'), AdminSettingsController.getPaymentSettings);
 router.put('/settings/payments', auth('admin'), AdminSettingsController.updatePaymentSettings);
 router.get('/settings/emails', auth('admin'), AdminSettingsController.getEmailSettings);
