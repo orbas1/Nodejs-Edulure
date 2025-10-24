@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import { useRealtime } from '../context/RealtimeContext.jsx';
 import { NavigationMetadataProvider, useNavigationMetadata } from '../context/NavigationMetadataContext.jsx';
+import { StrategyBriefingProvider } from '../context/StrategyBriefingContext.jsx';
 import {
   trackNavigationImpression,
   trackNavigationSelect,
@@ -215,15 +216,17 @@ export default function MainLayout() {
   const metadataToken = session?.tokens?.accessToken ?? undefined;
 
   return (
-    <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
-      <MainLayoutContent
-        session={session}
-        isAuthenticated={isAuthenticated}
-        logout={logout}
-        navigate={navigate}
-        getConfigValue={getConfigValue}
-        realtimeConnected={realtimeConnected}
-      />
-    </NavigationMetadataProvider>
+    <StrategyBriefingProvider role={metadataRole} token={metadataToken}>
+      <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
+        <MainLayoutContent
+          session={session}
+          isAuthenticated={isAuthenticated}
+          logout={logout}
+          navigate={navigate}
+          getConfigValue={getConfigValue}
+          realtimeConnected={realtimeConnected}
+        />
+      </NavigationMetadataProvider>
+    </StrategyBriefingProvider>
   );
 }

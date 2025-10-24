@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useNavigationMetadata } from '../../context/NavigationMetadataContext.jsx';
+import { useStrategyBriefing } from '../../context/StrategyBriefingContext.jsx';
 
 function SectionCard({ section }) {
   const { id, label, initiative, originIds, quickAccess } = section;
@@ -166,6 +167,26 @@ export default function NavigationAnnex() {
   const { initiatives, status, refresh } = useNavigationMetadata();
   const isLoading = status === 'loading';
   const hasError = status === 'error';
+  const {
+    summary: strategySummary,
+    capabilitySignals,
+    riskAdjustments,
+    recommendations,
+    generatedAt,
+    status: strategyStatus,
+    error: strategyError,
+    refresh: refreshStrategy
+  } = useStrategyBriefing();
+  const strategyLoading = strategyStatus === 'loading';
+  const strategyHasError = strategyStatus === 'error';
+  const hasValuationData = Boolean(
+    (strategySummary?.midpoint && strategySummary.midpoint.trim()) ||
+      (strategySummary?.range && strategySummary.range.trim()) ||
+      (strategySummary?.valuationDate && strategySummary.valuationDate.trim()) ||
+      capabilitySignals.length ||
+      riskAdjustments.length ||
+      recommendations.length
+  );
 
   const sections = useMemo(() => {
     const items = [...initiatives.primary, ...initiatives.quickActions, ...initiatives.dashboard];
@@ -205,6 +226,110 @@ export default function NavigationAnnex() {
           remediation programme described in <code>user_experience.md</code>.
         </p>
       </header>
+      <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Valuation & stakeholder briefing</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Annex A56 summarises the current valuation midpoint, capability signals, and stakeholder actions grounding this navigation upgrade.
+            </p>
+            {generatedAt ? (
+              <p className="mt-2 text-[11px] uppercase tracking-wide text-slate-400">Generated {new Date(generatedAt).toLocaleString()}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              refreshStrategy();
+            }}
+            className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            Refresh briefing
+          </button>
+        </div>
+        {strategyLoading && !hasValuationData ? (
+          <p className="mt-4 text-sm text-slate-500">Loading valuation briefing…</p>
+        ) : null}
+        {strategyHasError && !hasValuationData ? (
+          <p className="mt-4 text-sm text-rose-600">
+            Unable to load valuation briefing.
+            {strategyError?.message ? ` ${strategyError.message}` : ''}
+          </p>
+        ) : null}
+        {hasValuationData ? (
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4">
+              {strategySummary && (strategySummary.midpoint || strategySummary.range || strategySummary.valuationDate) ? (
+                <article className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Valuation snapshot</h3>
+                  <dl className="mt-3 space-y-2 text-sm text-slate-600">
+                    {strategySummary.midpoint ? (
+                      <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+                        <dt className="font-semibold text-slate-600">Midpoint</dt>
+                        <dd className="text-slate-700">{strategySummary.midpoint}</dd>
+                      </div>
+                    ) : null}
+                    {strategySummary.range ? (
+                      <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+                        <dt className="font-semibold text-slate-600">Range</dt>
+                        <dd className="text-slate-700">{strategySummary.range}</dd>
+                      </div>
+                    ) : null}
+                    {strategySummary.valuationDate ? (
+                      <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+                        <dt className="font-semibold text-slate-600">Valuation date</dt>
+                        <dd className="text-slate-700">{strategySummary.valuationDate}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </article>
+              ) : null}
+              {capabilitySignals.length ? (
+                <article className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Capability signals</h3>
+                  <ul className="mt-3 space-y-3 text-sm text-slate-600">
+                    {capabilitySignals.map((signal, index) => (
+                      <li key={`${signal.area}-${index}`} className="leading-snug">
+                        <p className="font-semibold text-slate-700">{signal.area}</p>
+                        <p className="mt-1 text-slate-500">{signal.signals}</p>
+                        <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{signal.impact}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ) : null}
+            </div>
+            <div className="space-y-4">
+              {riskAdjustments.length ? (
+                <article className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Risk adjustments</h3>
+                  <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                    {riskAdjustments.map((risk, index) => (
+                      <li key={`${risk.label}-${index}`} className="leading-snug">
+                        <p className="font-semibold text-slate-700">{risk.label}</p>
+                        <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{risk.impact}</p>
+                        <p className="mt-1 text-slate-500">{risk.narrative}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ) : null}
+              {recommendations.length ? (
+                <article className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recommendations</h3>
+                  <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-600">
+                    {recommendations.map((item, index) => (
+                      <li key={`recommendation-${index}`} className="leading-snug">
+                        {item}
+                      </li>
+                    ))}
+                  </ol>
+                </article>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </section>
       {isLoading ? (
         <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-sm text-slate-500">
           Loading navigation annex records…

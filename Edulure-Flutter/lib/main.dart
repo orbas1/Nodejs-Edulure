@@ -43,6 +43,7 @@ import 'screens/splash_screen.dart';
 import 'screens/user_profile_view_screen.dart';
 import 'services/language_service.dart';
 import 'widgets/capability_status_banner.dart';
+import 'core/design_tokens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -124,6 +125,13 @@ class EdulureApp extends ConsumerWidget {
           routes['/ads/governance'] = (_) => const MobileAdsGovernanceScreen();
         }
 
+        final primaryColor = DesignTokens.color('color-primary', fallback: const Color(0xFF2D62FF));
+        final secondaryColor = DesignTokens.color('color-emerald', fallback: const Color(0xFF10B981));
+        final surfaceColor = DesignTokens.color('color-surface', fallback: Colors.white);
+        final backgroundColor = DesignTokens.color('color-surface-muted', fallback: const Color(0xFFF8FAFC));
+        final textColor = DesignTokens.color('color-text', fallback: const Color(0xFF0F172A));
+        final cardRadius = DesignTokens.spacing('radius-lg', fallback: 20);
+
         return MaterialApp(
           title: 'Edulure',
           debugShowCheckedModeBanner: false,
@@ -136,12 +144,27 @@ class EdulureApp extends ConsumerWidget {
           ],
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF2D62FF),
-              primary: const Color(0xFF2D62FF),
-              secondary: const Color(0xFFFF7A59),
+              seedColor: primaryColor,
+              primary: primaryColor,
+              secondary: secondaryColor,
+              surface: surfaceColor,
+              background: backgroundColor,
             ),
-            scaffoldBackgroundColor: Colors.white,
-            textTheme: textTheme,
+            scaffoldBackgroundColor: surfaceColor,
+            textTheme: textTheme.apply(bodyColor: textColor, displayColor: textColor),
+            appBarTheme: AppBarTheme(
+              backgroundColor: surfaceColor,
+              foregroundColor: textColor,
+              elevation: 0,
+            ),
+            cardTheme: CardTheme(
+              color: surfaceColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(cardRadius),
+              ),
+              elevation: 1,
+            ),
+            visualDensity: VisualDensity.adaptivePlatformDensity,
             useMaterial3: true,
           ),
           routes: routes,

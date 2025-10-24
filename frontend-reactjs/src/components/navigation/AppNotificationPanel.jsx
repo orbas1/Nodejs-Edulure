@@ -5,6 +5,7 @@ import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/ou
 
 import { NOTIFICATION_GROUPS } from '../../navigation/routes.js';
 import { useNavigationMetadata } from '../../context/NavigationMetadataContext.jsx';
+import { useStrategyBriefing } from '../../context/StrategyBriefingContext.jsx';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -34,8 +35,26 @@ export default function AppNotificationPanel({
     status,
     error
   } = useNavigationMetadata();
+  const {
+    summary: strategySummary,
+    capabilitySignals,
+    riskAdjustments,
+    recommendations,
+    status: strategyStatus,
+    error: strategyError
+  } = useStrategyBriefing();
   const isLoading = status === 'loading';
   const hasError = status === 'error';
+  const strategyLoading = strategyStatus === 'loading';
+  const strategyHasError = strategyStatus === 'error';
+  const hasValuationData = Boolean(
+    (strategySummary?.midpoint && strategySummary.midpoint.trim()) ||
+      (strategySummary?.range && strategySummary.range.trim()) ||
+      (strategySummary?.valuationDate && strategySummary.valuationDate.trim()) ||
+      capabilitySignals.length ||
+      riskAdjustments.length ||
+      recommendations.length
+  );
 
   return (
     <Transition.Root show={open} as={Fragment}>
@@ -303,6 +322,81 @@ export default function AppNotificationPanel({
                       </span>
                     </div>
                     <div className="mt-3 space-y-3">
+                      {strategyLoading && !hasValuationData ? (
+                        <article className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
+                          Loading valuation snapshot…
+                        </article>
+                      ) : null}
+                      {strategyHasError && !hasValuationData ? (
+                        <article className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-xs text-rose-600">
+                          Unable to load valuation briefing.
+                        </article>
+                      ) : null}
+                      {strategySummary && (strategySummary.midpoint || strategySummary.range || strategySummary.valuationDate) ? (
+                        <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Valuation snapshot</h3>
+                          <dl className="mt-3 space-y-2 text-sm text-slate-600">
+                            {strategySummary.midpoint ? (
+                              <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+                                <dt className="font-semibold text-slate-600">Midpoint</dt>
+                                <dd className="text-slate-700">{strategySummary.midpoint}</dd>
+                              </div>
+                            ) : null}
+                            {strategySummary.range ? (
+                              <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+                                <dt className="font-semibold text-slate-600">Range</dt>
+                                <dd className="text-slate-700">{strategySummary.range}</dd>
+                              </div>
+                            ) : null}
+                            {strategySummary.valuationDate ? (
+                              <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+                                <dt className="font-semibold text-slate-600">Valuation date</dt>
+                                <dd className="text-slate-700">{strategySummary.valuationDate}</dd>
+                              </div>
+                            ) : null}
+                          </dl>
+                        </article>
+                      ) : null}
+                      {capabilitySignals.length ? (
+                        <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Capability signals</h3>
+                          <ul className="mt-2 space-y-3 text-xs text-slate-500">
+                            {capabilitySignals.map((signal, index) => (
+                              <li key={`${signal.area}-${index}`} className="leading-snug">
+                                <p className="font-semibold text-slate-700">{signal.area}</p>
+                                <p className="mt-1 text-slate-500">{signal.signals}</p>
+                                <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{signal.impact}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </article>
+                      ) : null}
+                      {riskAdjustments.length ? (
+                        <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Risk adjustments</h3>
+                          <ul className="mt-2 space-y-2 text-xs text-slate-500">
+                            {riskAdjustments.map((risk, index) => (
+                              <li key={`${risk.label}-${index}`} className="leading-snug">
+                                <span className="font-semibold text-slate-700">{risk.label}</span>{' '}
+                                <span className="text-[11px] uppercase tracking-wide text-slate-400">{risk.impact}</span>
+                                <p className="mt-1 text-slate-500">{risk.narrative}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </article>
+                      ) : null}
+                      {recommendations.length ? (
+                        <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recommendations</h3>
+                          <ol className="mt-2 list-decimal space-y-2 pl-5 text-xs text-slate-500">
+                            {recommendations.map((item, index) => (
+                              <li key={`recommendation-${index}`} className="leading-snug">
+                                {item}
+                              </li>
+                            ))}
+                          </ol>
+                        </article>
+                      ) : null}
                       {isLoading && strategyNarratives.length === 0 ? (
                         <article className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
                           Loading Annex A56 briefing…

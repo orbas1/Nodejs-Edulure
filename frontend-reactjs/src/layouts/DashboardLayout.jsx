@@ -18,6 +18,7 @@ import { useDashboard } from '../context/DashboardContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import { useRealtime } from '../context/RealtimeContext.jsx';
 import { NavigationMetadataProvider, NavigationMetadataContext } from '../context/NavigationMetadataContext.jsx';
+import { StrategyBriefingProvider } from '../context/StrategyBriefingContext.jsx';
 import {
   trackNavigationSelect,
   trackNotificationOpen,
@@ -615,9 +616,11 @@ export default function DashboardLayout() {
   const metadataToken = session?.tokens?.accessToken ?? undefined;
 
   return (
-    <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
-      <DashboardLayoutInner />
-    </NavigationMetadataProvider>
+    <StrategyBriefingProvider role={metadataRole} token={metadataToken}>
+      <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
+        <DashboardLayoutInner />
+      </NavigationMetadataProvider>
+    </StrategyBriefingProvider>
   );
 }
 

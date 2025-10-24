@@ -36,6 +36,7 @@ import mobileRoutes from './mobile.routes.js';
 import setupRoutes from './setup.routes.js';
 import navigationRoutes from './navigation.routes.js';
 import operatorRoutes from './operator.routes.js';
+import strategyRoutes from './strategy.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 import { buildRouteRegistry } from './registryValidator.js';
 
@@ -77,7 +78,8 @@ const routerMap = {
   media: mediaRoutes,
   setup: setupRoutes,
   navigation: navigationRoutes,
-  operator: operatorRoutes
+  operator: operatorRoutes,
+  strategy: strategyRoutes
 };
 
 export const apiRouteRegistry = buildRouteRegistry({

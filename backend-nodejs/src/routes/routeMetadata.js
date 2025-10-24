@@ -736,6 +736,23 @@ const ROUTE_DEFINITIONS = [
     }
   },
   {
+    name: 'strategy',
+    capability: 'navigation-strategy-briefing',
+    description: 'Strategy valuations, capability signals, and stakeholder briefing data.',
+    basePath: '/strategy',
+    flagKey: 'platform.api.v1.strategy',
+    defaultState: 'enabled',
+    fallbackStatus: 404,
+    disabledMessage: 'Strategy briefing APIs are unavailable in this deployment.',
+    audience: 'user',
+    owners: ['experience-foundations'],
+    serviceTier: 'supporting',
+    tags: ['api', 'v1', 'strategy'],
+    cors: {
+      allowedMethods: ['GET']
+    }
+  },
+  {
     name: 'social',
     capability: 'social-graph',
     description: 'Follows, recommendations, and user engagement APIs.',

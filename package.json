@@ -24,7 +24,9 @@
     "audit": "node ./scripts/security/run-npm-audit.mjs",
     "audit:ci": "node ./scripts/security/run-npm-audit.mjs --workspace backend-nodejs && node ./scripts/security/run-npm-audit.mjs --workspace frontend-reactjs && npm --workspace sdk-typescript run audit:dependencies",
     "license:report": "node ./scripts/security/generate-license-report.mjs",
-    "zap:baseline": "node ./scripts/security/verify-security-headers.mjs"
+    "zap:baseline": "node ./scripts/security/verify-security-headers.mjs",
+    "design:sync": "node ./scripts/design/sync-design-tokens.mjs",
+    "strategy:generate": "node ./scripts/strategy/generate-briefing.mjs"
   },
   "config": {
     "minimumNodeVersion": "20.12.2",
