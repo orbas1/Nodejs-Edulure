@@ -12,12 +12,15 @@ import {
   COMMUNITY_EVENT_REMINDER_STATUSES
 } from '../src/models/communityEventConstants.js';
 import { ensureSeedImage } from './_helpers/seedAssets.js';
+import { buildEnvironmentColumns, getEnvironmentDescriptor } from '../src/utils/environmentContext.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
 const incidentEncryptionKey = process.env.SECURITY_INCIDENT_ENCRYPTION_KEY
   ? Buffer.from(process.env.SECURITY_INCIDENT_ENCRYPTION_KEY, 'hex')
   : crypto.createHash('sha256').update('edulure-security-seed-key').digest();
+const seedEnvironment = getEnvironmentDescriptor();
+const createEnvironmentColumns = () => ({ ...buildEnvironmentColumns(seedEnvironment) });
 
 const sealSensitive = (value) => {
   if (!value) {
@@ -80,6 +83,11 @@ export async function seed(knex) {
     await trx('ads_campaigns').del();
     await trx('podcast_episodes').del();
     await trx('podcast_shows').del();
+    await trx('blog_media').del();
+    await trx('blog_post_tags').del();
+    await trx('blog_posts').del();
+    await trx('blog_tags').del();
+    await trx('blog_categories').del();
     await trx('live_classroom_registrations').del();
     await trx('live_classrooms').del();
     await trx('tutor_bookings').del();
@@ -91,6 +99,10 @@ export async function seed(knex) {
     await trx('ebook_highlights').del();
     await trx('ebook_chapters').del();
     await trx('ebooks').del();
+    await trx('learning_offline_module_snapshots').del();
+    await trx('learning_offline_assessment_submissions').del();
+    await trx('learning_offline_downloads').del();
+    await trx('instructor_action_queue').del();
     await trx('course_progress').del();
     await trx('course_enrollments').del();
     await trx('course_assignments').del();
@@ -1091,7 +1103,172 @@ export async function seed(knex) {
         primary_cta: JSON.stringify({ label: 'Start free trial', to: '/register' }),
         secondary_cta: JSON.stringify({ label: 'View pricing', to: '/pricing' }),
         tertiary_cta: JSON.stringify({ label: 'See how Flow 5 works', href: 'https://marketing.edulure.test/flow-5-demo' }),
-        metadata: JSON.stringify({ analyticsKey: 'flow5-hero', layout: 'split-right' })
+        metadata: JSON.stringify({ analyticsKey: 'flow5-hero', layout: 'split-right' }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({ surface: 'home-hero' })
+      },
+      {
+        slug: 'flow-five-value-pillars',
+        block_type: 'value-prop',
+        eyebrow: 'Annex A16 launch system',
+        title: 'Flow 5 pillars for marketing, onboarding, and monetisation',
+        subtitle:
+          'Pair product tours, rituals, and revenue guardrails so teams can demo, launch, and expand without chasing assets.',
+        status_label: null,
+        chips: JSON.stringify(['Pillar blueprints', 'Telemetry aware', 'Annex ready']),
+        media: JSON.stringify({}),
+        primary_cta: JSON.stringify({}),
+        secondary_cta: JSON.stringify({}),
+        tertiary_cta: JSON.stringify({}),
+        metadata: JSON.stringify({ analyticsKey: 'flow5-value-pillars' }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({
+          items: [
+            {
+              key: 'programs',
+              title: 'Program blueprints on day one',
+              helper: 'Launch cohorts without detours',
+              description:
+                'Assemble Flow 5 templates for curriculum, onboarding, and sponsor funnels the moment you sign in.',
+              analyticsId: 'pillar-programs',
+              actions: [
+                {
+                  key: 'workspace',
+                  label: 'Start a free workspace',
+                  description: 'Spin up a Flow 5 launch workspace in three minutes.',
+                  to: '/register',
+                  badge: 'New',
+                  analyticsId: 'start-workspace'
+                },
+                {
+                  key: 'templates',
+                  label: 'Browse cohort templates',
+                  description: '150+ outlines for accelerators, bootcamps, and micro-courses.',
+                  to: '/courses',
+                  analyticsId: 'browse-templates'
+                },
+                {
+                  key: 'community',
+                  label: 'Tour live communities',
+                  description: 'See how rituals, prompts, and feedback loops keep cohorts warm.',
+                  to: '/communities',
+                  analyticsId: 'tour-communities'
+                }
+              ]
+            },
+            {
+              key: 'engagement',
+              title: 'Engagement rituals that stick',
+              helper: 'Orchestrate live energy',
+              description: 'Route live classrooms, async prompts, and nudges with playbooks drawn straight from Annex A16.',
+              analyticsId: 'pillar-engagement',
+              actions: [
+                {
+                  key: 'live',
+                  label: 'Host live classrooms',
+                  description: 'Agenda templates, green-room checklists, and live overlays.',
+                  to: '/live-classrooms',
+                  analyticsId: 'host-live'
+                },
+                {
+                  key: 'automations',
+                  label: 'Automate ritual nudges',
+                  description: 'Keep members on track with moment-based playbooks.',
+                  to: '/explorer',
+                  analyticsId: 'automate-rituals'
+                },
+                {
+                  key: 'analytics',
+                  label: 'Review engagement analytics',
+                  description: 'See sentiment, attendance, and completion trends in one place.',
+                  to: '/analytics',
+                  analyticsId: 'review-analytics'
+                }
+              ]
+            },
+            {
+              key: 'revenue',
+              title: 'Revenue moments without spreadsheets',
+              helper: 'Keep payouts transparent',
+              description: 'Affiliate, sponsorship, and tutor revenue pipelines roll up under one commission model.',
+              analyticsId: 'pillar-revenue',
+              actions: [
+                {
+                  key: 'pricing',
+                  label: 'Review pricing',
+                  description: 'Flat rates with payout-ready reporting baked in.',
+                  to: '/pricing',
+                  analyticsId: 'review-pricing'
+                },
+                {
+                  key: 'sponsors',
+                  label: 'Activate sponsors',
+                  description: 'Bundle sponsor perks into every onboarding flow.',
+                  href: 'https://docs.edulure.test/flow5/sponsorships',
+                  analyticsId: 'activate-sponsors'
+                },
+                {
+                  key: 'payouts',
+                  label: 'Open payout dashboard',
+                  description: 'Monitor revenue, affiliates, and tutor commissions live.',
+                  to: '/dashboard/instructor/payouts',
+                  analyticsId: 'open-payouts'
+                }
+              ]
+            }
+          ]
+        })
+      },
+      {
+        slug: 'flow-five-value-stats',
+        block_type: 'stat',
+        eyebrow: 'Flow 5 in production',
+        title: 'Proof every cohort, community, and revenue pod moves faster',
+        subtitle: null,
+        status_label: null,
+        chips: JSON.stringify([]),
+        media: JSON.stringify({}),
+        primary_cta: JSON.stringify({}),
+        secondary_cta: JSON.stringify({}),
+        tertiary_cta: JSON.stringify({}),
+        metadata: JSON.stringify({ analyticsKey: 'flow5-value-stats' }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({
+          metrics: [
+            {
+              key: 'communities',
+              value: '168+',
+              label: 'Communities launched',
+              helper: 'Across 41 countries and six segments',
+              labelKey: 'home.stats.communities.label',
+              helperKey: 'home.stats.communities.helper'
+            },
+            {
+              key: 'creators',
+              value: '12k+',
+              label: 'Creators monetising',
+              helper: 'Flow 5 operators shipping new offers monthly',
+              labelKey: 'home.stats.creators.label',
+              helperKey: 'home.stats.creators.helper'
+            },
+            {
+              key: 'retention',
+              value: '38%',
+              label: 'Average retention lift',
+              helper: 'Comparing Flow 5 cohorts to pre-launch baselines',
+              labelKey: 'home.stats.retention.label',
+              helperKey: 'home.stats.retention.helper'
+            },
+            {
+              key: 'knowledge',
+              value: '54k',
+              label: 'Daily knowledge exchanges',
+              helper: 'Across lessons, rituals, and office hours',
+              labelKey: 'home.stats.knowledge.label',
+              helperKey: 'home.stats.knowledge.helper'
+            }
+          ]
+        })
       },
       {
         slug: 'flow-five-proof',
@@ -1113,7 +1290,15 @@ export async function seed(knex) {
         primary_cta: JSON.stringify({ label: 'Read the story', href: 'https://stories.edulure.test/flow5-ops-guild' }),
         secondary_cta: JSON.stringify({ label: 'Download checklist', href: 'https://docs.edulure.test/flow5/checklist.pdf' }),
         tertiary_cta: JSON.stringify({}),
-        metadata: JSON.stringify({ analyticsKey: 'flow5-proof', theme: 'slate' })
+        metadata: JSON.stringify({ analyticsKey: 'flow5-proof', theme: 'slate' }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({
+          metrics: [
+            { key: 'conversion-lift', value: '+28%', label: 'Marketing → enrolment', helper: null },
+            { key: 'setup-time', value: '2 weeks', label: 'Flow setup time', helper: null },
+            { key: 'nps', value: '64', label: 'NPS after onboarding', helper: null }
+          ]
+        })
       },
       {
         slug: 'flow-five-case-studies',
@@ -1179,7 +1364,9 @@ export async function seed(knex) {
               }
             }
           ]
-        })
+        }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({ items: [] })
       },
       {
         slug: 'flow-five-monetisation-ribbon',
@@ -1200,7 +1387,9 @@ export async function seed(knex) {
             'Tutor pods synced with payouts and attendance',
             'Affiliate revenue reconciled nightly'
           ]
-        })
+        }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({})
       }
     ]);
 
@@ -1321,49 +1510,148 @@ export async function seed(knex) {
       }
     ]);
 
-    const inviteExpiry = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const dateDaysAgo = (days) => new Date(nowMs - days * dayMs);
+    const dateDaysFromNow = (days) => new Date(nowMs + days * dayMs);
+
     await trx('learner_onboarding_invites').insert([
       {
         invite_code: 'FLOW5-OPS-GUILD',
         email: 'flow5-preview@edulure.test',
         community_id: opsCommunityId,
-        status: 'pending',
-        expires_at: inviteExpiry,
-        metadata: JSON.stringify({ source: 'flow-five', cohort: 'ops-guild' })
+        status: 'accepted',
+        expires_at: dateDaysFromNow(21),
+        claimed_at: dateDaysAgo(5),
+        user_id: flowPreviewUserId,
+        metadata: JSON.stringify({ source: 'flow-five', cohort: 'ops-guild', acceptanceChannel: 'email' })
       },
       {
         invite_code: 'FLOW5-GROWTH-LAB',
         email: 'flow5-preview@edulure.test',
         community_id: growthCommunityId,
         status: 'pending',
-        expires_at: inviteExpiry,
-        metadata: JSON.stringify({ source: 'flow-five', cohort: 'growth-lab' })
+        expires_at: dateDaysFromNow(14),
+        metadata: JSON.stringify({ source: 'flow-five', cohort: 'growth-lab', reminderSentAt: dateDaysAgo(2).toISOString() })
+      },
+      {
+        invite_code: 'FLOW4-ARCHIVE',
+        email: 'flow5-preview@edulure.test',
+        community_id: opsCommunityId,
+        status: 'expired',
+        expires_at: dateDaysAgo(10),
+        metadata: JSON.stringify({ source: 'flow-four', cohort: 'sunset-pilot' })
+      },
+      {
+        invite_code: 'LEARNER-LAUNCH-OPS',
+        email: 'noemi.carvalho@edulure.test',
+        community_id: opsCommunityId,
+        status: 'pending',
+        expires_at: dateDaysFromNow(10),
+        metadata: JSON.stringify({ source: 'learner-program', cohort: 'ops-guild' })
+      },
+      {
+        invite_code: 'OPS-REVOCATION',
+        email: 'noemi.carvalho@edulure.test',
+        community_id: growthCommunityId,
+        status: 'revoked',
+        expires_at: dateDaysAgo(15),
+        metadata: JSON.stringify({ source: 'ops-trial', revokedBy: 'program-ops' })
+      },
+      {
+        invite_code: 'ENABLEMENT-WORKSHOP-1',
+        email: 'kai.watanabe@edulure.test',
+        community_id: opsCommunityId,
+        status: 'accepted',
+        expires_at: dateDaysFromNow(30),
+        claimed_at: dateDaysAgo(40),
+        user_id: instructorId,
+        metadata: JSON.stringify({ source: 'enablement', cohort: 'blueprints', acceptanceChannel: 'in-app' })
+      },
+      {
+        invite_code: 'ENABLEMENT-WORKSHOP-2',
+        email: 'kai.watanabe@edulure.test',
+        community_id: growthCommunityId,
+        status: 'accepted',
+        expires_at: dateDaysFromNow(45),
+        claimed_at: dateDaysAgo(38),
+        user_id: instructorId,
+        metadata: JSON.stringify({ source: 'enablement', cohort: 'blueprints', acceptanceChannel: 'email' })
       }
     ]);
 
-    await trx('learner_onboarding_responses').insert({
-      email: 'flow5-preview@edulure.test',
-      role: 'instructor',
-      first_name: 'Jordan',
-      last_name: 'Rivera',
-      persona: 'Community architect',
-      goals: JSON.stringify(['Launch Flow 5 beta', 'Automate sponsor onboarding']),
-      invites: JSON.stringify([
-        { code: 'FLOW5-OPS-GUILD', status: 'pending', communitySlug: 'learning-ops-guild' },
-        { code: 'FLOW5-GROWTH-LAB', status: 'pending', communitySlug: 'creator-growth-lab' }
-      ]),
-      preferences: JSON.stringify({
-        marketingOptIn: true,
-        timeCommitment: '4h/week',
-        interests: ['Community launches', 'Sponsor workflow']
-      }),
-      metadata: JSON.stringify({ source: 'flow-five', campaign: 'beta-seed' }),
-      terms_accepted: 1,
-      user_id: flowPreviewUserId,
-      submitted_at: trx.fn.now(),
-      created_at: trx.fn.now(),
-      updated_at: trx.fn.now()
-    });
+    await trx('learner_onboarding_responses').insert([
+      {
+        email: 'flow5-preview@edulure.test',
+        role: 'instructor',
+        first_name: 'Jordan',
+        last_name: 'Rivera',
+        persona: 'Community architect',
+        goals: JSON.stringify(['Launch Flow 5 beta', 'Automate sponsor onboarding']),
+        invites: JSON.stringify([
+          { code: 'FLOW5-OPS-GUILD', status: 'accepted', communitySlug: 'learning-ops-guild' },
+          { code: 'FLOW5-GROWTH-LAB', status: 'pending', communitySlug: 'creator-growth-lab' },
+          { code: 'FLOW4-ARCHIVE', status: 'expired', communitySlug: 'legacy-flow-four' }
+        ]),
+        preferences: JSON.stringify({
+          marketingOptIn: true,
+          timeCommitment: '4h/week',
+          interests: ['Community launches', 'Sponsor workflow']
+        }),
+        metadata: JSON.stringify({ source: 'flow-five', campaign: 'beta-seed' }),
+        terms_accepted: 1,
+        user_id: flowPreviewUserId,
+        submitted_at: dateDaysAgo(4),
+        created_at: dateDaysAgo(4),
+        updated_at: dateDaysAgo(4)
+      },
+      {
+        email: 'noemi.carvalho@edulure.test',
+        role: 'learner',
+        first_name: 'Noemi',
+        last_name: 'Carvalho',
+        persona: 'Operations lead',
+        goals: JSON.stringify(['Find readiness templates', 'Coordinate launch team updates']),
+        invites: JSON.stringify([
+          { code: 'LEARNER-LAUNCH-OPS', status: 'pending', communitySlug: 'learning-ops-guild' },
+          { code: 'OPS-REVOCATION', status: 'revoked', communitySlug: 'ops-sunset-pilot' }
+        ]),
+        preferences: JSON.stringify({
+          marketingOptIn: false,
+          timeCommitment: '2h/week',
+          interests: ['Incident playbooks', 'Launch checklists']
+        }),
+        metadata: JSON.stringify({ source: 'learner-waitlist', campaign: 'ops-accelerator' }),
+        terms_accepted: 1,
+        user_id: learnerId,
+        submitted_at: dateDaysAgo(9),
+        created_at: dateDaysAgo(9),
+        updated_at: dateDaysAgo(9)
+      },
+      {
+        email: 'kai.watanabe@edulure.test',
+        role: 'instructor',
+        first_name: 'Kai',
+        last_name: 'Watanabe',
+        persona: 'Enablement strategist',
+        goals: JSON.stringify(['Design enablement workshop series', 'Align post-launch mentoring pods']),
+        invites: JSON.stringify([
+          { code: 'ENABLEMENT-WORKSHOP-1', status: 'accepted', communitySlug: 'enablement-blueprints' },
+          { code: 'ENABLEMENT-WORKSHOP-2', status: 'accepted', communitySlug: 'enablement-blueprints' }
+        ]),
+        preferences: JSON.stringify({
+          marketingOptIn: true,
+          timeCommitment: '6h/week',
+          interests: ['Enablement journeys', 'Mentor pods']
+        }),
+        metadata: JSON.stringify({ source: 'enablement', campaign: 'blueprints' }),
+        terms_accepted: 1,
+        user_id: instructorId,
+        submitted_at: dateDaysAgo(46),
+        created_at: dateDaysAgo(46),
+        updated_at: dateDaysAgo(46)
+      }
+    ]);
 
     await trx('marketing_leads').insert({
       email: 'flow5-preview@edulure.test',
@@ -1376,8 +1664,17 @@ export async function seed(knex) {
       status: 'new',
       metadata: JSON.stringify({
         invites: [
-          { code: 'FLOW5-OPS-GUILD', community: { slug: 'learning-ops-guild' }, status: 'pending' },
-          { code: 'FLOW5-GROWTH-LAB', community: { slug: 'creator-growth-lab' }, status: 'pending' }
+          {
+            code: 'FLOW5-OPS-GUILD',
+            community: { slug: 'learning-ops-guild' },
+            status: 'accepted',
+            claimedAt: dateDaysAgo(5).toISOString()
+          },
+          {
+            code: 'FLOW5-GROWTH-LAB',
+            community: { slug: 'creator-growth-lab' },
+            status: 'pending'
+          }
         ],
         utmCampaign: 'flow-five-beta'
       }),
@@ -1603,7 +1900,49 @@ export async function seed(knex) {
       metadata: JSON.stringify({
         communityId: opsCommunityId,
         deckVersion: 1,
-        ingestionPipeline: 'cloudconvert-v2'
+        ingestionPipeline: 'cloudconvert-v2',
+        custom: {
+          title: 'Ops launch blueprint',
+          description:
+            'Board-ready blueprint for coordinating automations, risk reviews, and sign-offs across every launch milestone.',
+          categories: ['Operations', 'Enablement'],
+          tags: ['ops', 'launch', 'readiness'],
+          media: {
+            coverImage: {
+              url: 'https://cdn.edulure.test/assets/ops-blueprint/cover.jpg',
+              alt: 'Operations launch blueprint cover art'
+            },
+            gallery: [
+              {
+                url: 'https://cdn.edulure.test/assets/ops-blueprint/workflow.jpg',
+                caption: 'Automation workflow map aligning GTM and ops teams.',
+                kind: 'image'
+              },
+              {
+                url: 'https://cdn.edulure.test/assets/ops-blueprint/checklists.jpg',
+                caption: 'Checklists templated for annex sign-off rituals.',
+                kind: 'image'
+              },
+              {
+                url: 'https://cdn.edulure.test/assets/ops-blueprint/demo.mp4',
+                caption: 'Incident rehearsal walkthrough highlighting approvals.',
+                kind: 'video'
+              }
+            ]
+          },
+          showcase: {
+            headline: 'Operational readiness in one shared workspace',
+            subheadline: 'Coordinate runbooks, telemetry, and approvals across every go-live stage.',
+            videoUrl: 'https://cdn.edulure.test/assets/ops-blueprint/showcase.mp4',
+            videoPosterUrl: 'https://cdn.edulure.test/assets/ops-blueprint/showcase-poster.jpg',
+            callToAction: {
+              label: 'Preview runbook',
+              url: 'https://marketing.edulure.test/ops-blueprint'
+            },
+            badge: 'Operations'
+          },
+          featureFlags: { showcasePinned: true }
+        }
       })
     });
 
@@ -1681,7 +2020,49 @@ export async function seed(knex) {
       metadata: JSON.stringify({
         communityId: growthCommunityId,
         drmProfile: 'watermark-v1',
-        ingestionPipeline: 'ebook-normaliser'
+        ingestionPipeline: 'ebook-normaliser',
+        custom: {
+          title: 'Creator funnel intelligence playbook',
+          description:
+            'Campaign labs, benchmarks, and automation guardrails for growth teams shipping Annex A8 experiments.',
+          categories: ['Growth', 'Marketing'],
+          tags: ['ads', 'experiments', 'analytics'],
+          media: {
+            coverImage: {
+              url: 'https://cdn.edulure.test/assets/growth-playbook/cover.jpg',
+              alt: 'Creator funnel intelligence ebook cover art'
+            },
+            gallery: [
+              {
+                url: 'https://cdn.edulure.test/assets/growth-playbook/dashboard.jpg',
+                caption: 'Acquisition telemetry dashboard from Annex A8 experiments.',
+                kind: 'image'
+              },
+              {
+                url: 'https://cdn.edulure.test/assets/growth-playbook/retention.jpg',
+                caption: 'Retention cohort breakdown with CTA experiments.',
+                kind: 'image'
+              },
+              {
+                url: 'https://cdn.edulure.test/assets/growth-playbook/trailer.mp4',
+                caption: 'Two-minute walkthrough of paid acquisition lab templates.',
+                kind: 'video'
+              }
+            ]
+          },
+          showcase: {
+            headline: 'Campaign intelligence that moves beyond CPM',
+            subheadline: 'Instrument experiments, copy variants, and affiliate offers with Annex A8 guardrails.',
+            videoUrl: 'https://cdn.edulure.test/assets/growth-playbook/showcase.mp4',
+            videoPosterUrl: 'https://cdn.edulure.test/assets/growth-playbook/showcase-poster.jpg',
+            callToAction: {
+              label: 'Read sample chapter',
+              url: 'https://marketing.edulure.test/creator-funnel-playbook'
+            },
+            badge: 'Growth'
+          },
+          featureFlags: { showcasePinned: false }
+        }
       })
     });
 
@@ -1846,6 +2227,7 @@ export async function seed(knex) {
       completed_by: 'partner.techlead@example.com',
       last_sent_at: new Date('2025-02-17T08:35:00Z'),
       send_count: 1,
+      documentation_url: 'https://docs.edulure.com/integrations/hubspot/production-handbook',
       metadata: JSON.stringify({
         notes: 'Seed fulfilment for CRM onboarding',
         reason: 'initial-handoff',
@@ -1870,6 +2252,7 @@ export async function seed(knex) {
       key_expires_at: openAiKey.expiresAt,
       last_sent_at: new Date('2025-02-18T07:20:00Z'),
       send_count: 1,
+      documentation_url: 'https://docs.edulure.com/integrations/openai/staging-credential-handoff',
       metadata: JSON.stringify({
         notes: 'Awaiting partner confirmation',
         reason: 'staging-refresh',
@@ -1896,6 +2279,7 @@ export async function seed(knex) {
       cancelled_by: 'system:auto-close',
       last_sent_at: new Date('2025-01-13T11:15:00Z'),
       send_count: 2,
+      documentation_url: 'https://docs.edulure.com/integrations/anthropic/credential-rotation',
       metadata: JSON.stringify({
         autoClosed: true,
         autoClosedReason: 'key-rotated',
@@ -1991,7 +2375,22 @@ export async function seed(knex) {
       is_public: true,
       release_at: trx.fn.now(),
       cover_image_url: growthPlaybookCover.url,
-      metadata: JSON.stringify({ cohort: 'beta-ops', featureFlag: 'explorer-ads-insights' })
+      sample_download_url: 'https://cdn.edulure.test/ebooks/creator-funnel-sample.pdf',
+      audiobook_url: 'https://cdn.edulure.test/ebooks/creator-funnel-audiobook.mp3',
+      metadata: JSON.stringify({
+        cohort: 'beta-ops',
+        featureFlag: 'explorer-ads-insights',
+        custom: {
+          analytics: {
+            funnelId: 'annex-a8-funnel',
+            campaignKey: 'creator-lab-2025'
+          },
+          preview: {
+            chapters: ['diagnostic-dashboards', 'forecasting-campaign-velocity'],
+            releaseNotesUrl: 'https://marketing.edulure.test/creator-funnel-release'
+          }
+        }
+      })
     });
 
     const [introChapterId] = await trx('ebook_chapters').insert({
@@ -2061,6 +2460,171 @@ export async function seed(knex) {
       last_location: 'chapter-2-section-4',
       time_spent_seconds: 2643
     });
+
+    const [productInsightsCategoryId] = await trx('blog_categories').insert({
+      slug: 'product-insights',
+      name: 'Product & Platform',
+      description: 'Release retros, adoption metrics, and platform momentum.',
+      display_order: 1,
+      is_featured: true
+    });
+
+    const [growthCategoryId] = await trx('blog_categories').insert({
+      slug: 'growth-experiments',
+      name: 'Growth Experiments',
+      description: 'Ads, funnels, and GTM learnings that inform Annex A8 plans.',
+      display_order: 2,
+      is_featured: true
+    });
+
+    const [governanceCategoryId] = await trx('blog_categories').insert({
+      slug: 'governance-transparency',
+      name: 'Governance & Transparency',
+      description: 'Legal, compliance, and company updates supporting Annex C7.',
+      display_order: 3,
+      is_featured: false
+    });
+
+    const [operationsTagId] = await trx('blog_tags').insert({
+      slug: 'operations',
+      name: 'Operations'
+    });
+    const [adsTagId] = await trx('blog_tags').insert({ slug: 'ads', name: 'Ads & Acquisition' });
+    const [complianceTagId] = await trx('blog_tags').insert({ slug: 'compliance', name: 'Compliance' });
+    const [communityTagId] = await trx('blog_tags').insert({ slug: 'community', name: 'Community' });
+
+    const [opsTrustPostId] = await trx('blog_posts').insert({
+      slug: 'ops-trust-blueprint-feb-2025',
+      title: 'Ops trust blueprint: shipping Annex C7 readiness in 30 days',
+      excerpt:
+        'How Blackwellen’s enablement and operations guild automated Annex C7 controls, evidence capture, and executive reporting.',
+      content: [
+        '# Ops trust blueprint',
+        '',
+        '## Highlights',
+        '- Automated policy audits feed Annex C7 trackers and trust centre evidence.',
+        '- Slack runbooks keep breach notifications, DPIAs, and risk reviews inside SLA.',
+        '- Combined telemetry exposes review gaps in under an hour with audit-ready exports.'
+      ].join('\\n'),
+      author_id: adminId,
+      category_id: productInsightsCategoryId,
+      status: 'published',
+      published_at: trx.fn.now(),
+      metadata: JSON.stringify({
+        hero: {
+          image: 'https://cdn.edulure.test/blog/ops-trust-hero.jpg',
+          alt: 'Operators reviewing compliance dashboards'
+        },
+        seo: {
+          canonical: 'https://www.edulure.com/blog/ops-trust-blueprint-feb-2025',
+          focusKeywords: ['Annex C7', 'trust centre']
+        },
+        summary: 'Detailed breakdown of the Annex C7 rollout with evidence capture tooling.'
+      }),
+      is_featured: true,
+      reading_time_minutes: 8,
+      view_count: 1280
+    });
+
+    const [growthLiftPostId] = await trx('blog_posts').insert({
+      slug: 'annex-a8-campaign-lift',
+      title: 'Annex A8 experiments that lifted paid acquisition 23%',
+      excerpt:
+        'A deep dive into creative rotations, CTA governance, and affiliate boosts that moved Annex A8 campaign metrics.',
+      content: [
+        '# Annex A8 campaign lift',
+        '',
+        '1. Hypothesis-driven ad rotations synced with CTA guardrails.',
+        '2. Persona landing pages mirrored metadata from the marketing asset editor.',
+        '3. Affiliate offers embedded compliance copy and dynamic caps to protect spend.'
+      ].join('\\n'),
+      author_id: instructorId,
+      category_id: growthCategoryId,
+      status: 'published',
+      published_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      metadata: JSON.stringify({
+        hero: {
+          image: 'https://cdn.edulure.test/blog/annex-a8-campaigns.jpg',
+          alt: 'Marketing team reviewing campaign performance charts'
+        },
+        seo: {
+          canonical: 'https://www.edulure.com/blog/annex-a8-campaign-lift',
+          focusKeywords: ['Annex A8', 'campaign analytics']
+        },
+        summary: 'Practical guardrails for growth squads balancing experimentation with Annex A8 compliance.'
+      }),
+      is_featured: true,
+      reading_time_minutes: 6,
+      view_count: 986
+    });
+
+    const [transparencyRoadmapPostId] = await trx('blog_posts').insert({
+      slug: 'legal-transparency-roadmap-q2',
+      title: 'Legal transparency roadmap: Q2 filings, audits, and hiring',
+      excerpt:
+        'Company, careers, and legal updates covering regulator engagement, transparency docs, and upcoming compliance hires.',
+      content: [
+        '# Legal transparency roadmap',
+        '',
+        '- Quarterly filings prepared for ICO and Companies House.',
+        '- Privacy centre adds printable audit packs for enterprise councils.',
+        '- New governance counsel and trust engineer roles opening in London and remote.'
+      ].join('\\n'),
+      author_id: adminId,
+      category_id: governanceCategoryId,
+      status: 'published',
+      published_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      metadata: JSON.stringify({
+        hero: {
+          image: 'https://cdn.edulure.test/blog/legal-transparency.jpg',
+          alt: 'Legal and compliance team reviewing transparency dashboards'
+        },
+        seo: {
+          canonical: 'https://www.edulure.com/blog/legal-transparency-roadmap-q2',
+          focusKeywords: ['Annex C7', 'legal transparency']
+        },
+        summary: 'Transparency updates spanning governance reports, talent plans, and policy evidence packs.'
+      }),
+      is_featured: false,
+      reading_time_minutes: 7,
+      view_count: 742
+    });
+
+    await trx('blog_post_tags').insert([
+      { post_id: opsTrustPostId, tag_id: operationsTagId },
+      { post_id: opsTrustPostId, tag_id: complianceTagId },
+      { post_id: growthLiftPostId, tag_id: adsTagId },
+      { post_id: growthLiftPostId, tag_id: operationsTagId },
+      { post_id: transparencyRoadmapPostId, tag_id: complianceTagId },
+      { post_id: transparencyRoadmapPostId, tag_id: communityTagId }
+    ]);
+
+    await trx('blog_media').insert([
+      {
+        post_id: opsTrustPostId,
+        media_url: 'https://cdn.edulure.test/blog/ops-trust-hero.jpg',
+        alt_text: 'Operations and compliance leads collaborating at a dashboard wall',
+        media_type: 'image',
+        display_order: 0,
+        metadata: JSON.stringify({ variant: 'hero', width: 1600, height: 900 })
+      },
+      {
+        post_id: growthLiftPostId,
+        media_url: 'https://cdn.edulure.test/blog/annex-a8-campaigns.jpg',
+        alt_text: 'Paid acquisition metrics showing conversion lift',
+        media_type: 'image',
+        display_order: 0,
+        metadata: JSON.stringify({ variant: 'hero', width: 1600, height: 900 })
+      },
+      {
+        post_id: transparencyRoadmapPostId,
+        media_url: 'https://cdn.edulure.test/blog/legal-transparency.jpg',
+        alt_text: 'Legal team reviewing quarterly transparency checklist',
+        media_type: 'image',
+        display_order: 0,
+        metadata: JSON.stringify({ variant: 'hero', width: 1600, height: 900 })
+      }
+    ]);
 
     const [opsRoadmapPostId] = await trx('community_posts')
       .insert({
@@ -3387,6 +3951,343 @@ export async function seed(knex) {
       })
     });
 
+    const [opsBlueprintId] = await trx('course_blueprints').insert({
+      public_id: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      title: 'Automation launch production blueprint',
+      stage: 'Production',
+      summary: 'Readiness scaffolding for the automation launch masterclass across modules, QA gates, and marketing syncs.',
+      target_learners: 'Operations leaders',
+      price_label: '$1,299',
+      module_count: 6,
+      readiness_score: 78.5,
+      readiness_label: 'In build',
+      total_duration_minutes: 720,
+      outstanding_tasks: JSON.stringify([
+        'Integrate simulation QA outcomes into command center module',
+        'Upload sponsor playbook addendum for enterprise cohort'
+      ]),
+      upcoming_milestones: JSON.stringify([
+        {
+          id: 'milestone-simulation-qa',
+          type: 'QA review',
+          dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          title: 'Simulation QA sign-off with enablement'
+        },
+        {
+          id: 'milestone-marketing-handoff',
+          type: 'Marketing',
+          dueAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+          title: 'Launch marketing campaign hand-off'
+        }
+      ]),
+      metadata: JSON.stringify({ cluster: 'Learning Delivery', annex: 'B2', blueprintCode: 'OPS-LAUNCH-2024' })
+    });
+
+    await trx('course_blueprint_modules').insert([
+      {
+        blueprint_id: opsBlueprintId,
+        module_id: opsModuleKickoffId,
+        title: 'Launch Command Center',
+        release_label: 'Week 1 · Day 1',
+        position: 1,
+        lesson_count: 5,
+        assignment_count: 1,
+        duration_minutes: 240,
+        outstanding_tasks: JSON.stringify(['Publish facilitator walkthrough recording']),
+        metadata: JSON.stringify({ format: 'Hybrid cohort', qaGate: 'QA passed' })
+      },
+      {
+        blueprint_id: opsBlueprintId,
+        module_id: opsModuleIncidentId,
+        title: 'Incident Simulation Drills',
+        release_label: 'Week 2 · Day 1',
+        position: 2,
+        lesson_count: 4,
+        assignment_count: 1,
+        duration_minutes: 180,
+        outstanding_tasks: JSON.stringify(['Upload simulation scoreboard template', 'Confirm escalation observers']),
+        metadata: JSON.stringify({ format: 'Live cohort', qaGate: 'Needs simulation QA' })
+      }
+    ]);
+
+    const [opsLaunchId] = await trx('course_launches').insert({
+      public_id: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      target_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      target_label: 'Target launch in 2 weeks',
+      phase: 'QA',
+      owner: 'Kai Watanabe',
+      risk_level: 'On track',
+      risk_tone: 'low',
+      activation_coverage: '68% trained',
+      confidence_score: 0.72,
+      metadata: JSON.stringify({ cluster: 'Learning Delivery', annex: 'B2', workspace: 'Lifecycle planner' })
+    });
+
+    await trx('course_launch_checklist_items').insert([
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'QA playbooks reviewed',
+        completed: true,
+        owner: 'Amina Diallo',
+        due_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ scope: 'Quality assurance' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'Incident escalation tree refreshed',
+        completed: true,
+        owner: 'Kai Watanabe',
+        due_at: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ scope: 'Operations' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'Telemetry alerts tuned',
+        completed: false,
+        owner: 'Noemi Carvalho',
+        due_at: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ scope: 'Observability' })
+      }
+    ]);
+
+    await trx('course_launch_signals').insert([
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'Sponsor video awaiting approval',
+        severity: 'medium',
+        description: 'Brand team review pending for sponsor integration clip.',
+        action_label: 'Ping brand review',
+        action_href: 'https://ops.edulure.test/reviews/sponsor-video',
+        metadata: JSON.stringify({ owner: 'Marketing', cluster: 'Annex B2' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        launch_id: opsLaunchId,
+        label: 'Compliance evidence upload required',
+        severity: 'high',
+        description: 'SOC 2 attestation needs attaching before enterprise syndication.',
+        action_label: 'Upload evidence',
+        action_href: 'https://ops.edulure.test/compliance/evidence',
+        metadata: JSON.stringify({ owner: 'Compliance', cluster: 'Annex B2' })
+      }
+    ]);
+
+    await trx('course_reviews').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        reviewer_name: 'Lina Gomez',
+        reviewer_role: 'Director of Operations',
+        reviewer_company: 'LaunchHub',
+        rating: 5,
+        headline: 'Launch readiness transformed our go-live',
+        feedback:
+          'The drip sequencing and rehearsal cadences meant our entire ops guild showed up prepared. We saw a 38% reduction in launch escalations.',
+        delivery_mode: 'Cohort',
+        experience: 'Web and mobile parity',
+        submitted_at: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ cohort: 'Autumn 2024' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        reviewer_name: 'Ops Guild Collective',
+        reviewer_role: 'Peer review board',
+        reviewer_company: 'Ops Guild',
+        rating: 4.6,
+        headline: 'Enterprise-grade runbook system',
+        feedback:
+          'Module creation workflows and refresher loops were robust enough for our multi-market programme. Mobile execution matched the desktop experience.',
+        delivery_mode: 'Hybrid cohort',
+        experience: 'Mobile parity certified',
+        submitted_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ board: 'Ops Guild review council' })
+      }
+    ]);
+
+    await trx('course_refresher_lessons').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        title: 'Quarterly incident rehearsal',
+        format: 'Live simulation',
+        cadence: 'Quarterly',
+        owner: 'Kai Watanabe',
+        status: 'Scheduled',
+        next_session_at: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
+        channel: 'Zoom studio',
+        enrollment_window: 'Opens 14 days prior',
+        metadata: JSON.stringify({ facilitator: 'Ops guild', annex: 'B2' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        title: 'Automation audit checklist',
+        format: 'Async module',
+        cadence: 'Bi-annual',
+        owner: 'Kai Watanabe',
+        status: 'Draft',
+        next_session_at: null,
+        channel: 'Learning hub',
+        enrollment_window: 'Self-paced access',
+        metadata: JSON.stringify({ facilitator: 'Automation faculty', annex: 'B2' })
+      }
+    ]);
+
+    await trx('course_recorded_assets').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        title: 'Command center war room tour',
+        format: 'Video',
+        status: 'Encoded',
+        duration_minutes: 18,
+        size_mb: 942,
+        quality: '1080p',
+        language: 'English',
+        aspect_ratio: '16:9',
+        engagement_completion_rate: 86.4,
+        tags: JSON.stringify(['command center', 'tour']),
+        audience: 'Learners',
+        updated_at_source: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ libraryShelf: 'Launch readiness', annex: 'A3' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        title: 'Incident drill facilitation',
+        format: 'Video',
+        status: 'Quality review',
+        duration_minutes: 27,
+        size_mb: 1460,
+        quality: '4K',
+        language: 'English',
+        aspect_ratio: '16:9',
+        engagement_completion_rate: 72.1,
+        tags: JSON.stringify(['incident', 'simulation']),
+        audience: 'Facilitators',
+        updated_at_source: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ libraryShelf: 'Facilitation', annex: 'A3' })
+      }
+    ]);
+
+    await trx('course_catalogue_listings').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        channel: 'Marketplace',
+        status: 'Published',
+        impressions: 18452,
+        conversions: 136,
+        conversion_rate: 0.0737,
+        price_amount: 129900,
+        price_currency: 'USD',
+        last_synced_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ listingId: 'catalog-marketplace', annex: 'A3' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        channel: 'Enterprise network',
+        status: 'Pilot',
+        impressions: 42,
+        conversions: 10,
+        conversion_rate: 0.238,
+        price_amount: 189900,
+        price_currency: 'USD',
+        last_synced_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ listingId: 'catalog-enterprise', annex: 'A3' })
+      }
+    ]);
+
+    const [opsDripSequenceId] = await trx('course_drip_sequences').insert({
+      public_id: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      cadence: 'Weekly',
+      anchor: 'enrollment-date',
+      timezone: 'America/New_York',
+      metadata: JSON.stringify({ orchestrator: 'Lifecycle automation', annex: 'B2' })
+    });
+
+    await trx('course_drip_segments').insert([
+      {
+        public_id: crypto.randomUUID(),
+        sequence_id: opsDripSequenceId,
+        label: 'Foundational cohort',
+        audience: 'New operations leaders',
+        metadata: JSON.stringify({ priority: 'primary' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        sequence_id: opsDripSequenceId,
+        label: 'Advanced operators',
+        audience: 'Returning ops guild members',
+        metadata: JSON.stringify({ priority: 'secondary' })
+      }
+    ]);
+
+    await trx('course_drip_schedules').insert([
+      {
+        public_id: crypto.randomUUID(),
+        sequence_id: opsDripSequenceId,
+        title: 'Launch Command Center',
+        release_label: 'Day 0 · 09:00 ET',
+        position: 1,
+        offset_days: 0,
+        gating: 'Immediate access',
+        prerequisites: JSON.stringify([]),
+        notifications: JSON.stringify(['Email 24h before release']),
+        workspace: 'Ops Launch HQ',
+        metadata: JSON.stringify({ moduleSlug: 'launch-command-center' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        sequence_id: opsDripSequenceId,
+        title: 'Incident Simulation Drills',
+        release_label: 'Day 8 · 09:00 ET',
+        position: 2,
+        offset_days: 7,
+        gating: 'Requires Module 1 completion',
+        prerequisites: JSON.stringify(['Launch Command Center']),
+        notifications: JSON.stringify(['Email 24h before release', 'SMS 2h before release']),
+        workspace: 'Ops Launch HQ',
+        metadata: JSON.stringify({ moduleSlug: 'incident-simulation-drills' })
+      }
+    ]);
+
+    await trx('course_mobile_experiences').insert([
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        experience_type: 'Drip modules',
+        status: 'Aligned',
+        description: 'Parity verified for all drip sequences on iOS and Android.',
+        metadata: JSON.stringify({ annex: 'A3', coverage: 'Full' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        experience_type: 'Refresher lessons',
+        status: 'Aligned',
+        description: 'Live refresher clinics available via mobile with reminders.',
+        metadata: JSON.stringify({ annex: 'A3', coverage: 'Refresher' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        course_id: opsAutomationCourseId,
+        experience_type: 'Recorded videos',
+        status: 'Aligned',
+        description: 'Evergreen recordings encoded for responsive playback.',
+        metadata: JSON.stringify({ annex: 'A3', coverage: 'Library' })
+      }
+    ]);
+
     const [commandCenterLessonId] = await trx('course_lessons').insert({
       course_id: opsAutomationCourseId,
       module_id: opsModuleKickoffId,
@@ -3462,6 +4363,102 @@ export async function seed(knex) {
         completed: false,
         progress_percent: 25,
         metadata: JSON.stringify({ lastLocation: 'section-2', note: 'Review telemetry thresholds' })
+      }
+    ]);
+
+    const opsCoursePublic = await trx('courses')
+      .select('public_id')
+      .where({ id: opsAutomationCourseId })
+      .first();
+    const opsModuleIncident = await trx('course_modules')
+      .select('slug')
+      .where({ id: opsModuleIncidentId })
+      .first();
+    const opsAsset = await trx('content_assets')
+      .select('public_id')
+      .where({ id: opsPlaybookAssetId })
+      .first();
+
+    const opsCoursePublicId = opsCoursePublic?.public_id ?? `course-${opsAutomationCourseId}`;
+    const opsModuleIncidentSlug = opsModuleIncident?.slug ?? 'incident-simulation-drills';
+    const opsAssetPublicId = opsAsset?.public_id ?? `asset-${opsPlaybookAssetId}`;
+
+    await trx('learning_offline_downloads').insert({
+      id: crypto.randomUUID(),
+      user_id: learnerId,
+      asset_public_id: opsAssetPublicId,
+      asset_id: opsPlaybookAssetId,
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleIncidentId,
+      course_public_id: opsCoursePublicId,
+      module_slug: opsModuleIncidentSlug,
+      filename: 'learning-ops-blueprint.pptx',
+      state: 'completed',
+      progress_ratio: 1,
+      file_path: '/offline/content/learning-ops-blueprint.pptx',
+      queued_at: trx.fn.now(),
+      completed_at: trx.fn.now(),
+      metadata: JSON.stringify({ annex: 'A28', seeded: true })
+    });
+
+    const automationAssignment = await trx('course_assignments')
+      .select('id')
+      .where({ course_id: opsAutomationCourseId, title: 'Automation Readiness Audit' })
+      .first();
+
+    await trx('learning_offline_assessment_submissions').insert({
+      id: crypto.randomUUID(),
+      user_id: learnerId,
+      client_submission_id: 'seed-automation-audit',
+      assignment_id: automationAssignment?.id ?? null,
+      assessment_key:
+        automationAssignment?.id != null
+          ? `assignment:${automationAssignment.id}`
+          : 'automation-readiness-audit',
+      state: 'queued',
+      payload: JSON.stringify({ draftScore: null, attachments: [], rubricVersion: 1 }),
+      queued_at: trx.fn.now(),
+      metadata: JSON.stringify({ annex: 'B6', seeded: true })
+    });
+
+    await trx('learning_offline_module_snapshots').insert({
+      id: crypto.randomUUID(),
+      user_id: learnerId,
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleIncidentId,
+      course_public_id: opsCoursePublicId,
+      module_slug: opsModuleIncidentSlug,
+      completion_ratio: 0.42,
+      notes: 'Seeded offline progress sync for Annex B6 audit.',
+      metadata: JSON.stringify({ annex: 'B6', seeded: true }),
+      captured_at: trx.fn.now()
+    });
+
+    await trx('instructor_action_queue').insert([
+      {
+        id: crypto.randomUUID(),
+        user_id: instructorId,
+        client_action_id: 'seed-announcement',
+        action_type: 'announcement',
+        state: 'processing',
+        payload: JSON.stringify({
+          audience: 'Ops Automation Cohort',
+          subject: 'Offline sync announcement',
+          priority: 'urgent'
+        }),
+        queued_at: trx.fn.now(),
+        processed_at: trx.fn.now(),
+        metadata: JSON.stringify({ annex: 'A29', seeded: true })
+      },
+      {
+        id: crypto.randomUUID(),
+        user_id: instructorId,
+        client_action_id: 'seed-attendance',
+        action_type: 'attendance',
+        state: 'queued',
+        payload: JSON.stringify({ sessionId: 'ops-live-101', attendees: 28, capturedOffline: true }),
+        queued_at: trx.fn.now(),
+        metadata: JSON.stringify({ annex: 'C4', seeded: true })
       }
     ]);
 
@@ -4946,7 +5943,8 @@ export async function seed(knex) {
       filters: JSON.stringify({ courses: { level: ['advanced'] } }),
       global_filters: JSON.stringify({ languages: ['en'] }),
       sort_preferences: JSON.stringify({ courses: 'rating', communities: 'trending' }),
-      metadata: JSON.stringify({ source: 'seed', cohort: 'operations' })
+      metadata: JSON.stringify({ source: 'seed', cohort: 'operations' }),
+      ...createEnvironmentColumns()
     });
 
     await trx('explorer_search_event_entities').insert([
@@ -5085,7 +6083,8 @@ export async function seed(knex) {
         clicks: 205,
         conversions: 58,
         average_latency_ms: 198,
-        metadata: JSON.stringify({ cohort: 'operations', previewDigests: previewDigestsByEntity.all })
+        metadata: JSON.stringify({ cohort: 'operations', previewDigests: previewDigestsByEntity.all }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -5097,7 +6096,8 @@ export async function seed(knex) {
         clicks: 68,
         conversions: 14,
         average_latency_ms: 182,
-        metadata: JSON.stringify({ category: 'operations', previewDigests: previewDigestsByEntity.communities })
+        metadata: JSON.stringify({ category: 'operations', previewDigests: previewDigestsByEntity.communities }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -5109,7 +6109,8 @@ export async function seed(knex) {
         clicks: 92,
         conversions: 33,
         average_latency_ms: 166,
-        metadata: JSON.stringify({ track: 'automation', previewDigests: previewDigestsByEntity.courses })
+        metadata: JSON.stringify({ track: 'automation', previewDigests: previewDigestsByEntity.courses }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -5121,7 +6122,8 @@ export async function seed(knex) {
         clicks: 45,
         conversions: 11,
         average_latency_ms: 132,
-        metadata: JSON.stringify({ locale: 'global', previewDigests: previewDigestsByEntity.tutors })
+        metadata: JSON.stringify({ locale: 'global', previewDigests: previewDigestsByEntity.tutors }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsYesterday,
@@ -5133,7 +6135,8 @@ export async function seed(knex) {
         clicks: 248,
         conversions: 66,
         average_latency_ms: 187,
-        metadata: JSON.stringify({ cohort: 'growth', previewDigests: previewDigestsByEntity.all })
+        metadata: JSON.stringify({ cohort: 'growth', previewDigests: previewDigestsByEntity.all }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsYesterday,
@@ -5145,7 +6148,8 @@ export async function seed(knex) {
         clicks: 84,
         conversions: 19,
         average_latency_ms: 170,
-        metadata: JSON.stringify({ category: 'growth', previewDigests: previewDigestsByEntity.communities })
+        metadata: JSON.stringify({ category: 'growth', previewDigests: previewDigestsByEntity.communities }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsYesterday,
@@ -5157,7 +6161,8 @@ export async function seed(knex) {
         clicks: 118,
         conversions: 35,
         average_latency_ms: 158,
-        metadata: JSON.stringify({ track: 'commerce', previewDigests: previewDigestsByEntity.courses })
+        metadata: JSON.stringify({ track: 'commerce', previewDigests: previewDigestsByEntity.courses }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsYesterday,
@@ -5169,7 +6174,8 @@ export async function seed(knex) {
         clicks: 46,
         conversions: 12,
         average_latency_ms: 128,
-        metadata: JSON.stringify({ locale: 'emea', previewDigests: previewDigestsByEntity.tutors })
+        metadata: JSON.stringify({ locale: 'emea', previewDigests: previewDigestsByEntity.tutors }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsToday,
@@ -5181,7 +6187,8 @@ export async function seed(knex) {
         clicks: 261,
         conversions: 74,
         average_latency_ms: 176,
-        metadata: JSON.stringify({ cohort: 'live-classroom', previewDigests: previewDigestsByEntity.all })
+        metadata: JSON.stringify({ cohort: 'live-classroom', previewDigests: previewDigestsByEntity.all }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsToday,
@@ -5193,7 +6200,8 @@ export async function seed(knex) {
         clicks: 88,
         conversions: 22,
         average_latency_ms: 164,
-        metadata: JSON.stringify({ category: 'live', previewDigests: previewDigestsByEntity.communities })
+        metadata: JSON.stringify({ category: 'live', previewDigests: previewDigestsByEntity.communities }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsToday,
@@ -5205,7 +6213,8 @@ export async function seed(knex) {
         clicks: 128,
         conversions: 38,
         average_latency_ms: 152,
-        metadata: JSON.stringify({ track: 'delivery', previewDigests: previewDigestsByEntity.courses })
+        metadata: JSON.stringify({ track: 'delivery', previewDigests: previewDigestsByEntity.courses }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsToday,
@@ -5217,7 +6226,8 @@ export async function seed(knex) {
         clicks: 45,
         conversions: 14,
         average_latency_ms: 121,
-        metadata: JSON.stringify({ locale: 'amer', previewDigests: previewDigestsByEntity.tutors })
+        metadata: JSON.stringify({ locale: 'amer', previewDigests: previewDigestsByEntity.tutors }),
+        ...createEnvironmentColumns()
       }
     ]);
 
@@ -5227,7 +6237,8 @@ export async function seed(knex) {
         severity: 'warning',
         message: 'Zero-result rate for tutors exceeded 18% in the last 24h',
         metadata: JSON.stringify({ zeroRate: 0.19, entity: 'tutors' }),
-        detected_at: new Date(analyticsToday.getTime() - 6 * 60 * 60 * 1000)
+        detected_at: new Date(analyticsToday.getTime() - 6 * 60 * 60 * 1000),
+        ...createEnvironmentColumns()
       },
       {
         alert_code: 'explorer.click-through-rate',
@@ -5235,7 +6246,8 @@ export async function seed(knex) {
         message: 'Explorer CTR recovered above baseline after experiment rollout',
         metadata: JSON.stringify({ ctr: 0.032, experiment: 'explorer.personalised-facets' }),
         detected_at: new Date(analyticsYesterday.getTime() + 8 * 60 * 60 * 1000),
-        resolved_at: analyticsToday
+        resolved_at: analyticsToday,
+        ...createEnvironmentColumns()
       }
     ]);
 
@@ -5248,7 +6260,8 @@ export async function seed(knex) {
         metric_value: 360 + i * 8,
         lower_bound: 320 + i * 6,
         upper_bound: 410 + i * 9,
-        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.35 })
+        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.35 }),
+        ...createEnvironmentColumns()
       });
       await trx('analytics_forecasts').insert({
         forecast_code: 'explorer.click-through-rate',
@@ -5256,7 +6269,8 @@ export async function seed(knex) {
         metric_value: Number((0.031 + i * 0.0005).toFixed(4)),
         lower_bound: Number((0.027 + i * 0.0004).toFixed(4)),
         upper_bound: Number((0.036 + i * 0.0006).toFixed(4)),
-        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.4 })
+        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.4 }),
+        ...createEnvironmentColumns()
       });
     }
 
@@ -6939,6 +7953,8 @@ export async function seed(knex) {
       }
     };
     const telemetryIpHash = makeHash('203.0.113.42');
+    const telemetryLearnerIpHash = makeHash('198.51.100.25');
+    const telemetryInstructorIpHash = makeHash('192.0.2.17');
 
     const [telemetryBatchId] = await trx(TELEMETRY_TABLES.EVENT_BATCHES).insert({
       batch_uuid: telemetryBatchUuid,
@@ -6952,19 +7968,47 @@ export async function seed(knex) {
       metadata: JSON.stringify({ bucket: 'edulure-data-seeds', trigger: 'seed', previewCount: 1, byteLength: 4096 })
     });
 
-    await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert({
-      user_id: adminId,
-      tenant_id: 'global',
-      consent_scope: telemetryConsentScope,
-      consent_version: telemetryConsentVersion,
-      status: 'granted',
-      is_active: true,
-      recorded_at: telemetryReceivedAt,
-      effective_at: telemetryReceivedAt,
-      recorded_by: 'system',
-      evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryIpHash }),
-      metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap admin analytics consent' })
-    });
+    await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert([
+      {
+        user_id: adminId,
+        tenant_id: 'global',
+        consent_scope: telemetryConsentScope,
+        consent_version: telemetryConsentVersion,
+        status: 'granted',
+        is_active: true,
+        recorded_at: telemetryReceivedAt,
+        effective_at: telemetryReceivedAt,
+        recorded_by: 'system',
+        evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryIpHash }),
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap admin analytics consent' })
+      },
+      {
+        user_id: learnerId,
+        tenant_id: 'global',
+        consent_scope: telemetryConsentScope,
+        consent_version: telemetryConsentVersion,
+        status: 'granted',
+        is_active: true,
+        recorded_at: telemetryReceivedAt,
+        effective_at: telemetryReceivedAt,
+        recorded_by: 'system',
+        evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryLearnerIpHash }),
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap learner analytics consent' })
+      },
+      {
+        user_id: flowPreviewUserId,
+        tenant_id: 'global',
+        consent_scope: telemetryConsentScope,
+        consent_version: telemetryConsentVersion,
+        status: 'granted',
+        is_active: true,
+        recorded_at: telemetryReceivedAt,
+        effective_at: telemetryReceivedAt,
+        recorded_by: 'system',
+        evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryInstructorIpHash }),
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap instructor analytics consent' })
+      }
+    ]);
 
     const telemetryDedupe = generateTelemetryDedupeHash({
       eventName: 'governance.dashboard.loaded',
@@ -7053,18 +8097,215 @@ export async function seed(knex) {
         })
       });
 
+    const surveyBatchUuid = crypto.randomUUID();
+    const surveyBatchKey = 'warehouse/telemetry/seed-learner-surveys.jsonl.gz';
+    const surveyDayMs = 24 * 60 * 60 * 1000;
+    const surveyNow = Date.now();
+    const surveyDateDaysAgo = (days) => new Date(surveyNow - days * surveyDayMs);
+    const surveyCorrelationBase = 'learner-survey-seed';
+    const surveyBatchStartedAt = new Date(surveyNow - 10 * 60 * 1000);
+    const surveyBatchCompletedAt = new Date(surveyNow - 9 * 60 * 1000);
+    const surveyEvents = [
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(2),
+        userId: learnerId,
+        sessionId: 'learner-session-ops',
+        deviceId: 'seed-device-ios',
+        correlationId: `${surveyCorrelationBase}-ops-1`,
+        source: 'web.app',
+        payload: {
+          persona: 'operations',
+          rating: 5,
+          readinessStage: 'prelaunch',
+          cadence: 'weekly',
+          invitesAccepted: 0,
+          invitesPending: 1,
+          feedback: 'Installer steps are clear and quick to run.'
+        },
+        context: { actor: learnerId, journey: 'learner.onboarding', locale: 'en-US' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(6),
+        userId: learnerId,
+        sessionId: 'learner-session-ops',
+        deviceId: 'seed-device-ios',
+        correlationId: `${surveyCorrelationBase}-ops-2`,
+        source: 'web.app',
+        payload: {
+          persona: 'operations',
+          rating: 4,
+          readinessStage: 'configuration',
+          cadence: 'weekly',
+          invitesAccepted: 0,
+          invitesPending: 2,
+          feedback: 'Would love automatic reminders for pending invites.'
+        },
+        context: { actor: learnerId, journey: 'learner.onboarding', locale: 'en-US' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(11),
+        userId: flowPreviewUserId,
+        sessionId: 'instructor-session-community',
+        deviceId: 'seed-device-mac',
+        correlationId: `${surveyCorrelationBase}-comm-1`,
+        source: 'web.instructor',
+        payload: {
+          persona: 'community',
+          rating: 5,
+          readinessStage: 'invite-review',
+          cadence: 'biweekly',
+          invitesAccepted: 1,
+          invitesPending: 1,
+          feedback: 'Persona breakdown helps prioritise invite follow-ups.'
+        },
+        context: { actor: flowPreviewUserId, journey: 'instructor.onboarding', locale: 'en-GB' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(17),
+        userId: flowPreviewUserId,
+        sessionId: 'instructor-session-community',
+        deviceId: 'seed-device-mac',
+        correlationId: `${surveyCorrelationBase}-comm-2`,
+        source: 'web.instructor',
+        payload: {
+          persona: 'community',
+          rating: 3,
+          readinessStage: 'invite-review',
+          cadence: 'biweekly',
+          invitesAccepted: 1,
+          invitesPending: 2,
+          feedback: 'Need clearer signals when invites expire.'
+        },
+        context: { actor: flowPreviewUserId, journey: 'instructor.onboarding', locale: 'en-GB' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(33),
+        userId: learnerId,
+        sessionId: 'learner-session-ops',
+        deviceId: 'seed-device-ios',
+        correlationId: `${surveyCorrelationBase}-ops-legacy`,
+        source: 'web.app',
+        payload: {
+          persona: 'operations',
+          rating: 4,
+          readinessStage: 'discovery',
+          cadence: 'monthly',
+          invitesAccepted: 0,
+          invitesPending: 1,
+          feedback: 'Initial discovery session captured priorities.'
+        },
+        context: { actor: learnerId, journey: 'learner.onboarding', locale: 'en-US' }
+      },
+      {
+        eventUuid: crypto.randomUUID(),
+        occurredAt: surveyDateDaysAgo(65),
+        userId: flowPreviewUserId,
+        sessionId: 'instructor-session-community',
+        deviceId: 'seed-device-mac',
+        correlationId: `${surveyCorrelationBase}-comm-legacy`,
+        source: 'web.instructor',
+        payload: {
+          persona: 'community',
+          rating: 2,
+          readinessStage: 'legacy-import',
+          cadence: 'monthly',
+          invitesAccepted: 0,
+          invitesPending: 3,
+          feedback: 'Legacy cohort imports required manual CSV tweaks.'
+        },
+        context: { actor: flowPreviewUserId, journey: 'instructor.onboarding', locale: 'en-GB' }
+      }
+    ];
+
+    const [surveyBatchId] = await trx(TELEMETRY_TABLES.EVENT_BATCHES).insert({
+      batch_uuid: surveyBatchUuid,
+      status: 'exported',
+      destination: 's3',
+      events_count: surveyEvents.length,
+      started_at: surveyBatchStartedAt,
+      completed_at: surveyBatchCompletedAt,
+      file_key: surveyBatchKey,
+      checksum: makeHash('telemetry-seed-learner-surveys'),
+      metadata: JSON.stringify({
+        bucket: 'edulure-data-seeds',
+        trigger: 'seed',
+        previewCount: surveyEvents.length,
+        byteLength: 8192
+      })
+    });
+
+    const surveyEventRows = surveyEvents.map((event) => {
+      const receivedAt = new Date(event.occurredAt.getTime() + 90_000);
+      const dedupeHash = generateTelemetryDedupeHash({
+        eventName: 'learner.survey.submitted',
+        eventVersion: '2025.04',
+        occurredAt: event.occurredAt,
+        userId: event.userId,
+        sessionId: event.sessionId,
+        correlationId: event.correlationId,
+        payload: event.payload
+      });
+
+      return {
+        event_uuid: event.eventUuid,
+        tenant_id: 'global',
+        schema_version: 'v1',
+        event_name: 'learner.survey.submitted',
+        event_version: '2025.04',
+        event_source: event.source,
+        occurred_at: event.occurredAt,
+        received_at: receivedAt,
+        user_id: event.userId,
+        session_id: event.sessionId,
+        device_id: event.deviceId,
+        correlation_id: event.correlationId,
+        consent_scope: telemetryConsentScope,
+        consent_status: 'granted',
+        ingestion_status: 'exported',
+        ingestion_attempts: 1,
+        last_ingestion_attempt: receivedAt,
+        export_batch_id: surveyBatchId,
+        dedupe_hash: dedupeHash,
+        payload: JSON.stringify(event.payload),
+        context: JSON.stringify(event.context),
+        metadata: JSON.stringify({
+          seeded: true,
+          persona: event.payload.persona,
+          batchUuid: surveyBatchUuid,
+          cadence: event.payload.cadence
+        }),
+        tags: JSON.stringify(['learner', 'survey', 'seed'])
+      };
+    });
+
+    await trx(TELEMETRY_TABLES.EVENTS).insert(surveyEventRows);
+
+    const latestSurveyOccurredAt = surveyEvents.reduce(
+      (latest, event) => (latest && latest > event.occurredAt ? latest : event.occurredAt),
+      telemetryOccurredAt
+    );
+
     await trx(TELEMETRY_TABLES.FRESHNESS_MONITORS).insert([
       {
         pipeline_key: 'ingestion.raw',
-        last_event_at: telemetryOccurredAt,
+        last_event_at: latestSurveyOccurredAt,
         status: 'healthy',
         threshold_minutes: 15,
         lag_seconds: 0,
-        metadata: JSON.stringify({ lastEventId: telemetryEventId, source: 'seed' })
+        metadata: JSON.stringify({
+          lastEventId: telemetryEventId,
+          latestLearnerSurveyAt: latestSurveyOccurredAt.toISOString(),
+          source: 'seed'
+        })
       },
       {
         pipeline_key: 'warehouse.export',
-        last_event_at: telemetryOccurredAt,
+        last_event_at: latestSurveyOccurredAt,
         status: 'healthy',
         threshold_minutes: 30,
         lag_seconds: 45,
@@ -7074,8 +8315,11 @@ export async function seed(knex) {
           checkpoint: checkpointSealed,
           checkpointPreview,
           hasBacklog: false,
-          eventsExported: 1,
-          trigger: 'seed'
+          eventsExported: 1 + surveyEvents.length,
+          trigger: 'seed',
+          recentSurveyBatchUuid: surveyBatchUuid,
+          recentSurveyEvents: surveyEvents.length,
+          recentSurveyDestinationKey: surveyBatchKey
         })
       }
     ]);
@@ -7096,6 +8340,18 @@ export async function seed(knex) {
         checkpointHash,
         hasBacklog: false
       })
+    });
+
+    await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
+      run_uuid: crypto.randomUUID(),
+      tool: 'dbt',
+      model_name: 'telemetry_events_rollup',
+      status: 'success',
+      started_at: surveyBatchStartedAt,
+      completed_at: surveyBatchCompletedAt,
+      input: JSON.stringify({ trigger: 'seed', eventUuids: surveyEvents.map((event) => event.eventUuid), batchUuid: surveyBatchUuid }),
+      output: JSON.stringify({ batchUuid: surveyBatchUuid, destinationKey: surveyBatchKey, rowCount: surveyEvents.length }),
+      metadata: JSON.stringify({ trigger: 'seed', batchId: surveyBatchId, destination: 's3', hasBacklog: false })
     });
 
     const releaseChecklistEntries = [

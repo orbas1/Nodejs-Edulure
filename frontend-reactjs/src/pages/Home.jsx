@@ -619,11 +619,12 @@ export default function Home() {
   return (
     <div className="bg-slate-50 text-slate-900">
       <MarketingHero
+        marketingContent={marketingData}
         block={heroBlock}
         eyebrow={heroEyebrow}
         statusLabel={heroStatusLabel}
         languageSelector={{
-          desktop: <LanguageSelector size="compact" variant="dark" align="end" />,
+          desktop: <LanguageSelector size="compact" variant="dark" align="end" />, 
           mobile: <LanguageSelector size="compact" variant="dark" align="start" fullWidth />
         }}
         chips={heroChips}

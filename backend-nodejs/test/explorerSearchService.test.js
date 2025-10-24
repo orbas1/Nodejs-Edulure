@@ -40,7 +40,10 @@ describe('ExplorerSearchService', () => {
           metadata: {
             tags: ['ops'],
             enrolmentCount: 1200,
-            releaseAt: '2024-03-01T00:00:00Z'
+            releaseAt: '2024-03-01T00:00:00Z',
+            cluster: { key: 'operations', label: 'Operations' },
+            persona: 'Ops Leaders',
+            momentum: { score: 88, label: 'High momentum (88)', trend: 'accelerating' }
           },
           level: 'advanced',
           price: { currency: 'USD', amountMinor: 4900 },
@@ -54,7 +57,8 @@ describe('ExplorerSearchService', () => {
           previewHighlights: ['Level: Advanced', '1200 learners'],
           ctaLinks: [{ label: 'View course', href: '/courses/operations-mastery', type: 'primary' }],
           badges: [{ type: 'level', label: 'Advanced' }],
-          monetisationTag: 'Premium course'
+          monetisationTag: 'Premium course',
+          clusterKey: 'operations'
         }
       ],
       total: 1,
@@ -71,7 +75,13 @@ describe('ExplorerSearchService', () => {
           entityId: 'tutor-ava',
           title: 'Ava Sinclair',
           description: 'Ops coach',
-          metadata: { skills: ['ops'], headline: 'Ops coach' },
+          metadata: {
+            skills: ['ops'],
+            headline: 'Ops coach',
+            cluster: { key: 'enablement', label: 'Enablement' },
+            persona: 'Ops Coaches',
+            momentum: { score: 72, label: 'Steady momentum (72)', trend: 'steady' }
+          },
           price: { currency: 'USD', amountMinor: 12500 },
           rating: { average: 4.8, count: 64 },
           completedSessions: 45,
@@ -85,7 +95,8 @@ describe('ExplorerSearchService', () => {
           previewHighlights: ['Verified tutor', 'Responds in 12m'],
           ctaLinks: [{ label: 'Hire tutor', href: '/tutors/ava-sinclair', type: 'primary' }],
           badges: [{ type: 'verified', label: 'Verified' }],
-          monetisationTag: 'Verified tutor'
+          monetisationTag: 'Verified tutor',
+          clusterKey: 'enablement'
         }
       ],
       total: 1,
@@ -132,7 +143,16 @@ describe('ExplorerSearchService', () => {
         ctaLinks: [{ href: '/courses/operations-mastery', type: 'primary', label: 'View course' }]
       },
       badges: [{ type: 'level', label: 'Advanced' }],
-      monetisationTag: 'Premium course'
+      monetisationTag: 'Premium course',
+      cluster: { key: 'operations', label: 'Operations' },
+      persona: 'Ops Leaders',
+      momentum: { score: 88, label: 'High momentum (88)', trend: 'accelerating' }
+    });
+    expect(result.results.courses.hits[0].metrics).toMatchObject({
+      enrolments: '1,200',
+      releaseAt: '2024-03-01T00:00:00Z',
+      momentum: 'High momentum (88)',
+      momentumScore: 88
     });
     expect(result.results.tutors.hits[0]).toMatchObject({
       title: 'Ava Sinclair',
@@ -142,7 +162,15 @@ describe('ExplorerSearchService', () => {
         summary: 'Ops coaching and mentorship',
         highlights: ['Verified tutor', 'Responds in 12m']
       },
-      monetisationTag: 'Verified tutor'
+      monetisationTag: 'Verified tutor',
+      cluster: { key: 'enablement', label: 'Enablement' },
+      persona: 'Ops Coaches',
+      momentum: { score: 72, label: 'Steady momentum (72)', trend: 'steady' }
+    });
+    expect(result.results.tutors.hits[0].metrics).toMatchObject({
+      isVerified: true,
+      momentum: 'Steady momentum (72)',
+      momentumScore: 72
     });
 
     expect(adsServiceMock.placementsForSearch).toHaveBeenCalledWith({

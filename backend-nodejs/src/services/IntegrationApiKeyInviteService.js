@@ -179,6 +179,36 @@ function resolveProviderMeta(provider) {
   return { id: provider, label: provider };
 }
 
+function normaliseDocumentationUrl(url) {
+  if (url === undefined || url === null) {
+    return null;
+  }
+
+  const raw = String(url).trim();
+  if (!raw) {
+    return null;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (_error) {
+    throw Object.assign(new Error('Documentation URL must be a valid http(s) link'), { status: 422 });
+  }
+
+  if (!parsed.hostname) {
+    throw Object.assign(new Error('Documentation URL must include a host'), { status: 422 });
+  }
+
+  const protocol = parsed.protocol.toLowerCase();
+  const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  if (protocol !== 'https:' && !(protocol === 'http:' && isLocalhost)) {
+    throw Object.assign(new Error('Documentation URL must use https'), { status: 422 });
+  }
+
+  return parsed.toString();
+}
+
 export function sanitizeInviteToken(token) {
   const trimmed = typeof token === 'string' ? token.trim() : '';
   if (!trimmed) {
@@ -214,12 +244,13 @@ function calculateInviteExpiry(now = new Date()) {
   return expiry;
 }
 
-function createInviteMetadata({ notes, reason, requestedByName, rotationIntervalDays }) {
+function createInviteMetadata({ notes, reason, requestedByName, rotationIntervalDays, documentationUrl }) {
   return {
     notes: notes ?? null,
     reason: reason ?? null,
     requestedByName: requestedByName ?? null,
-    rotationIntervalDays: rotationIntervalDays ?? null
+    rotationIntervalDays: rotationIntervalDays ?? null,
+    documentationUrl: documentationUrl ?? null
   };
 }
 
@@ -248,6 +279,23 @@ function sanitizeInvite(invite) {
     completedBy: invite.completedBy,
     cancelledAt: invite.cancelledAt ? invite.cancelledAt.toISOString() : null,
     cancelledBy: invite.cancelledBy,
+    documentationUrl:
+      invite.documentationUrl
+        ?? (typeof invite.metadata?.documentationUrl === 'string' && invite.metadata.documentationUrl.trim()
+          ? invite.metadata.documentationUrl.trim()
+          : null),
+    reason:
+      typeof invite.metadata?.reason === 'string' && invite.metadata.reason.trim()
+        ? invite.metadata.reason.trim()
+        : null,
+    notes:
+      typeof invite.metadata?.notes === 'string' && invite.metadata.notes.trim()
+        ? invite.metadata.notes.trim()
+        : null,
+    requestedByName:
+      typeof invite.metadata?.requestedByName === 'string' && invite.metadata.requestedByName.trim()
+        ? invite.metadata.requestedByName.trim()
+        : null,
     metadata: invite.metadata ?? {}
   };
 }
@@ -376,6 +424,7 @@ export default class IntegrationApiKeyInviteService {
     reason,
     requestedBy,
     requestedByName,
+    documentationUrl,
     apiKeyId
   }, { actor = {}, requestContext = {} } = {}) {
     const normalisedProvider = normaliseProvider(provider);
@@ -430,11 +479,14 @@ export default class IntegrationApiKeyInviteService {
     const tokenHash = this.inviteModel.hashToken(rawToken);
     const expiresAt = calculateInviteExpiry(now);
 
+    const documentationLink = normaliseDocumentationUrl(documentationUrl);
+
     const metadata = createInviteMetadata({
       notes,
       reason,
       requestedByName,
-      rotationIntervalDays: rotationDays
+      rotationIntervalDays: rotationDays,
+      documentationUrl: documentationLink
     });
 
     const invite = await this.inviteModel.create(
@@ -454,7 +506,8 @@ export default class IntegrationApiKeyInviteService {
         keyExpiresAt: keyExpiryDate,
         metadata,
         lastSentAt: now,
-        sendCount: 1
+        sendCount: 1,
+        documentationUrl: documentationLink
       },
       this.database
     );
@@ -484,6 +537,7 @@ export default class IntegrationApiKeyInviteService {
         expiresAt: sanitizedInvite.expiresAt,
         requestedBy: requestedBy ?? null,
         requestedByName: requestedByName ?? null,
+        documentationUrl: sanitizedInvite.documentationUrl,
         requestOrigin: requestContext?.origin ?? null,
         hasExistingKey: Boolean(sanitizedInvite.apiKeyId)
       },
@@ -558,6 +612,7 @@ export default class IntegrationApiKeyInviteService {
         alias: sanitizedInvite.alias,
         ownerEmail: sanitizedInvite.ownerEmail,
         sendCount: sanitizedInvite.sendCount,
+        documentationUrl: sanitizedInvite.documentationUrl,
         requestOrigin: requestContext?.origin ?? null,
         requestedByName: sanitizedInvite.metadata?.requestedByName ?? requestedByName ?? null
       },
@@ -610,6 +665,7 @@ export default class IntegrationApiKeyInviteService {
         alias: sanitizedInvite.alias,
         ownerEmail: sanitizedInvite.ownerEmail,
         cancelledBy: sanitizedInvite.cancelledBy ?? null,
+        documentationUrl: sanitizedInvite.documentationUrl,
         requestOrigin: requestContext?.origin ?? null
       },
       requestContext
@@ -644,8 +700,19 @@ export default class IntegrationApiKeyInviteService {
       keyExpiresAt: invite.keyExpiresAt ? invite.keyExpiresAt.toISOString() : null,
       requestedAt: invite.requestedAt ? invite.requestedAt.toISOString() : null,
       expiresAt: invite.expiresAt ? invite.expiresAt.toISOString() : null,
-      notes: invite.metadata?.notes ?? null,
-      reason: invite.metadata?.reason ?? null
+      notes:
+        typeof invite.metadata?.notes === 'string' && invite.metadata.notes.trim()
+          ? invite.metadata.notes.trim()
+          : null,
+      reason:
+        typeof invite.metadata?.reason === 'string' && invite.metadata.reason.trim()
+          ? invite.metadata.reason.trim()
+          : null,
+      documentationUrl:
+        invite.documentationUrl
+        ?? (typeof invite.metadata?.documentationUrl === 'string' && invite.metadata.documentationUrl.trim()
+          ? invite.metadata.documentationUrl.trim()
+          : null)
     };
   }
 
@@ -758,6 +825,7 @@ export default class IntegrationApiKeyInviteService {
         rotationIntervalDays: rotationDays,
         keyExpiresAt: sanitizedInvite.keyExpiresAt,
         apiKeyId: sanitizedKey.id,
+        documentationUrl: sanitizedInvite.documentationUrl,
         requestOrigin: context.origin ?? null,
         tokenFingerprint: context.tokenFingerprint ?? null,
         fulfilledReason: reason ?? null,

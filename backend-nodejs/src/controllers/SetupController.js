@@ -1,5 +1,7 @@
 import Joi from 'joi';
 
+import logger from '../config/logger.js';
+import LearnerOnboardingInsightsService from '../services/LearnerOnboardingInsightsService.js';
 import { setupOrchestratorService } from '../services/SetupOrchestratorService.js';
 import { success } from '../utils/httpResponse.js';
 
@@ -20,33 +22,52 @@ const startSchema = Joi.object({
 });
 
 export default class SetupController {
-  static buildSnapshot() {
+  static async buildSnapshot() {
+    const [defaults, learnerReadiness] = await Promise.all([
+      setupOrchestratorService.describeDefaults(),
+      LearnerOnboardingInsightsService.summarise()
+    ]);
+
+    const state = {
+      ...setupOrchestratorService.getStatus(),
+      learnerReadiness
+    };
+
     return {
-      state: setupOrchestratorService.getStatus(),
+      state,
       tasks: setupOrchestratorService.describeTasks(),
       presets: setupOrchestratorService.describePresets(),
-      defaults: setupOrchestratorService.describeDefaults(),
+      defaults,
       history: setupOrchestratorService.getRecentRuns()
     };
   }
 
-  static async getStatus(_req, res) {
-    return success(res, {
-      status: 200,
-      message: 'Setup status retrieved',
-      data: SetupController.buildSnapshot()
-    });
+  static async getStatus(_req, res, next) {
+    try {
+      const snapshot = await SetupController.buildSnapshot();
+      return success(res, {
+        status: 200,
+        message: 'Setup status retrieved',
+        data: snapshot
+      });
+    } catch (error) {
+      return next(error);
+    }
   }
 
   static async startRun(req, res, next) {
     try {
       const payload = await startSchema.validateAsync(req.body ?? {}, { abortEarly: false, stripUnknown: true });
       const state = await setupOrchestratorService.startRun(payload);
+      const learnerReadiness = await LearnerOnboardingInsightsService.summarise();
       return success(res, {
         status: 202,
         message: 'Setup run started',
         data: {
-          state
+          state: {
+            ...state,
+            learnerReadiness
+          }
         }
       });
     } catch (error) {
@@ -65,10 +86,16 @@ export default class SetupController {
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders?.();
 
-      const sendSnapshot = () => {
-        const snapshot = SetupController.buildSnapshot();
-        res.write(`event: state\n`);
-        res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+      const sendSnapshot = async () => {
+        try {
+          const snapshot = await SetupController.buildSnapshot();
+          res.write(`event: state\n`);
+          res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+        } catch (error) {
+          logger.error({ err: error }, 'Failed to stream setup snapshot');
+          res.write(`event: error\n`);
+          res.write(`data: "snapshot-error"\n\n`);
+        }
       };
 
       sendSnapshot();

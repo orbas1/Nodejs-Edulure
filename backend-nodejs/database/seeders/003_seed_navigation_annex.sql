@@ -59,6 +59,40 @@ VALUES
       'frontend-reactjs/src/pages/dashboard/InstructorCourseCreate.jsx'
     ),
     3,
+    2
+  ),
+  (
+    'create-post',
+    'Publish community update',
+    'quick_action',
+    '/dashboard/learner/communities',
+    JSON_ARRAY('user', 'instructor'),
+    'OPS-220',
+    'Ensure quick composer flows emit analytics context and respect Annex feed readiness.',
+    '/handbook/navigation-annex#quick-compose',
+    JSON_ARRAY(
+      'frontend-reactjs/src/components/TopBar.jsx',
+      'frontend-reactjs/src/navigation/utils.js',
+      'frontend-reactjs/src/pages/Feed.jsx'
+    ),
+    2,
+    0
+  ),
+  (
+    'launch-session',
+    'Schedule live session',
+    'quick_action',
+    '/dashboard/instructor/live-classes',
+    JSON_ARRAY('instructor', 'admin'),
+    'OPS-221',
+    'Route the live-session quick action through the updated scheduler with readiness gating.',
+    '/handbook/navigation-annex#quick-live-session',
+    JSON_ARRAY(
+      'frontend-reactjs/src/components/navigation/AppTopBar.jsx',
+      'frontend-reactjs/src/layouts/DashboardLayout.jsx',
+      'frontend-reactjs/src/navigation/utils.js'
+    ),
+    1,
     1
   ),
   (
@@ -167,6 +201,38 @@ VALUES
     1
   ),
   (
+    'create-post',
+    'Publish community update',
+    'quick_action',
+    '/dashboard/learner/communities',
+    JSON_ARRAY('user', 'instructor'),
+    'ops-quick-compose-audit',
+    'Confirm the quick composer opens with role-scoped targeting and analytics context.',
+    'pre-release',
+    'quick-action-validation',
+    '/docs/operations/navigation-readiness#quick-compose',
+    'Community Operations',
+    2,
+    2,
+    1
+  ),
+  (
+    'launch-session',
+    'Schedule live session',
+    'quick_action',
+    '/dashboard/instructor/live-classes',
+    JSON_ARRAY('instructor', 'admin'),
+    'ops-quick-live-session-audit',
+    'Verify live-session quick action routes to the scheduler with readiness flags intact.',
+    'pre-release',
+    'quick-action-validation',
+    '/docs/operations/navigation-readiness#quick-live-session',
+    'Learning Operations',
+    1,
+    2,
+    1
+  ),
+  (
     'instructor-course-create',
     'Build course',
     'dashboard',
@@ -241,6 +307,54 @@ VALUES
     'frontend-reactjs/src/components/navigation/AppTopBar.jsx',
     NULL,
     3
+  ),
+  (
+    'create-post',
+    'Publish community update',
+    'quick_action',
+    '/dashboard/learner/communities',
+    JSON_ARRAY('user', 'instructor'),
+    'quick-compose-focus-outline',
+    'qa',
+    'Confirm the TopBar quick action exposes the focus-visible ring token.',
+    NULL,
+    1
+  ),
+  (
+    'create-post',
+    'Publish community update',
+    'quick_action',
+    '/dashboard/learner/communities',
+    JSON_ARRAY('user', 'instructor'),
+    'quick-compose-reference-topbar',
+    'reference',
+    'frontend-reactjs/src/components/TopBar.jsx',
+    NULL,
+    2
+  ),
+  (
+    'launch-session',
+    'Schedule live session',
+    'quick_action',
+    '/dashboard/instructor/live-classes',
+    JSON_ARRAY('instructor', 'admin'),
+    'quick-live-session-token',
+    'token',
+    '--radius-2xl',
+    'Quick action CTA keeps consistent rounded treatment across shells.',
+    1
+  ),
+  (
+    'launch-session',
+    'Schedule live session',
+    'quick_action',
+    '/dashboard/instructor/live-classes',
+    JSON_ARRAY('instructor', 'admin'),
+    'quick-live-session-reference-topbar',
+    'reference',
+    'frontend-reactjs/src/components/navigation/AppTopBar.jsx',
+    NULL,
+    2
   ),
   (
     'courses',

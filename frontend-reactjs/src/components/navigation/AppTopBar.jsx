@@ -7,7 +7,8 @@ import {
   BellIcon,
   BoltIcon,
   PlusIcon,
-  RectangleStackIcon
+  RectangleStackIcon,
+  SignalIcon
 } from '@heroicons/react/24/outline';
 
 import GlobalSearchBar from '../search/GlobalSearchBar.jsx';
@@ -140,18 +141,25 @@ export default function AppTopBar({
           </div>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
-          {resolvedCallToAction ? (
-            <button
-              type="button"
-              onClick={() => handleNavigate(resolvedCallToAction.to)}
-              className="hidden items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 lg:inline-flex"
-            >
-              <BoltIcon className="h-4 w-4" />
-              <span>{resolvedCallToAction.label}</span>
-            </button>
-          ) : null}
-          {showQuickCreate && quickActions.length > 0 ? (
-            <Menu as="div" className="relative inline-block text-left">
+        {resolvedCallToAction ? (
+          <button
+            type="button"
+            onClick={() => handleNavigate(resolvedCallToAction.to)}
+            className="hidden items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 lg:inline-flex"
+            title={resolvedCallToAction.description ?? resolvedCallToAction.label}
+          >
+            <BoltIcon className="h-4 w-4" />
+            <span>{resolvedCallToAction.label}</span>
+          </button>
+        ) : null}
+        {typeof presence?.realtime === 'boolean' ? (
+          <span className="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 shadow-sm lg:inline-flex">
+            <SignalIcon className={presence.realtime ? 'h-4 w-4 text-emerald-500' : 'h-4 w-4 text-amber-500'} />
+            <span>{presence.realtime ? 'Realtime live' : 'Realtime reconnecting'}</span>
+          </span>
+        ) : null}
+        {showQuickCreate && quickActions.length > 0 ? (
+          <Menu as="div" className="relative inline-block text-left">
               <Menu.Button className="inline-flex h-11 items-center gap-2 rounded-2xl border border-primary/20 bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
                 <PlusIcon className="h-5 w-5" />
                 <span>Create</span>

@@ -1,3 +1,6 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+
 import PageHero from '../components/PageHero.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 
@@ -228,6 +231,20 @@ const reviewSummary = [
 ];
 
 export default function Privacy() {
+  const sections = useMemo(
+    () =>
+      privacyPolicy.map((section) => ({
+        ...section,
+        id: section.heading
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+      })),
+    []
+  );
+  const { hash } = useLocation();
+  const [activeSection, setActiveSection] = useState(sections[0]?.id ?? '');
+
   usePageMetadata({
     title: 'Privacy Notice · Edulure',
     description: `${companyProfile.name} explains how learner, instructor, and community data is collected, used, and protected across the Edulure platform.`,
@@ -249,14 +266,150 @@ export default function Privacy() {
     }
   });
 
+  const scrollToSection = useCallback(
+    (id) => {
+      if (typeof window === 'undefined') {
+        return;
+      }
+      const element = document.getElementById(id);
+      if (!element) {
+        return;
+      }
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      element.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+      setActiveSection(id);
+
+      try {
+        const url = new URL(window.location.href);
+        url.hash = `#${id}`;
+        window.history.replaceState(null, '', url.toString());
+      } catch (error) {
+        // Ignore history failures in restricted environments.
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!hash) {
+      return;
+    }
+    const target = hash.replace('#', '');
+    const exists = sections.some((section) => section.id === target);
+    if (!exists) {
+      return;
+    }
+    const timer = setTimeout(() => scrollToSection(target), 100);
+    return () => clearTimeout(timer);
+  }, [hash, sections, scrollToSection]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      return;
+    }
+
+    const observers = sections.map((section) => {
+      const element = document.getElementById(section.id);
+      if (!element) {
+        return null;
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              setActiveSection(section.id);
+            }
+          });
+        },
+        { rootMargin: '-45% 0px -45% 0px', threshold: 0.25 }
+      );
+
+      observer.observe(element);
+      return observer;
+    });
+
+    return () => {
+      observers.forEach((observer) => observer?.disconnect());
+    };
+  }, [sections]);
+
+  const handleAnchorClick = useCallback(
+    (event, id) => {
+      event.preventDefault();
+      scrollToSection(id);
+    },
+    [scrollToSection]
+  );
+
+  const handleMobileSelect = useCallback(
+    (event) => {
+      const { value } = event.target;
+      if (value) {
+        scrollToSection(value);
+      }
+    },
+    [scrollToSection]
+  );
+
   return (
     <div className="bg-white text-slate-700">
       <PageHero
         title="Privacy Policy"
         subtitle="Your trust matters. Learn how we protect and manage personal data across the Edulure platform."
+        cta={
+          <a
+            href="#privacy-navigation"
+            onClick={(event) => handleAnchorClick(event, sections[0]?.id ?? '')}
+            className="inline-flex items-center rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+          >
+            Review controls
+          </a>
+        }
       />
 
       <section className="mx-auto max-w-5xl space-y-10 px-6 py-16">
+        <div
+          id="privacy-navigation"
+          className="rounded-3xl border border-slate-200 bg-slate-50/70 p-6 shadow-sm"
+        >
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Jump to section</p>
+              <p className="text-sm text-slate-600">
+                Navigate between policy clauses or download the notice for your compliance records.
+              </p>
+            </div>
+            <select
+              value={activeSection}
+              onChange={handleMobileSelect}
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 md:hidden"
+            >
+              {sections.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.heading}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="mt-4 hidden flex-wrap gap-3 md:flex">
+            {sections.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                onClick={(event) => handleAnchorClick(event, section.id)}
+                className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                  activeSection === section.id
+                    ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-primary/40 hover:text-primary'
+                }`}
+              >
+                {section.heading}
+              </a>
+            ))}
+          </div>
+        </div>
+
         <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -279,8 +432,8 @@ export default function Privacy() {
           </dl>
         </div>
 
-        {privacyPolicy.map((section) => (
-          <article key={section.heading} className="space-y-4">
+        {sections.map((section) => (
+          <article key={section.id} id={section.id} className="space-y-4">
             <h2 className="text-2xl font-semibold text-slate-900">{section.heading}</h2>
             {section.paragraphs.map((paragraph) => (
               <p key={paragraph} className="leading-relaxed text-slate-600">

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/learning_persistence_service.dart';
+import '../../services/offline_learning_service.dart';
 import 'learning_models.dart';
 
 final _random = Random();
@@ -671,6 +672,10 @@ final learningPersistenceProvider = Provider<LearningPersistence>((ref) {
   return LearningPersistenceService();
 });
 
+final offlineLearningServiceProvider = Provider<OfflineLearningService>((ref) {
+  return OfflineLearningService();
+});
+
 final courseStoreProvider = StateNotifierProvider<CourseStore, List<Course>>((ref) {
   final persistence = ref.watch(learningPersistenceProvider);
   return CourseStore(persistence: persistence);
@@ -695,3 +700,89 @@ final progressStoreProvider = StateNotifierProvider<ProgressStore, List<ModulePr
   final persistence = ref.watch(learningPersistenceProvider);
   return ProgressStore(persistence: persistence);
 });
+
+final learningProgressControllerProvider = Provider<LearningProgressController>((ref) {
+  final courseStore = ref.read(courseStoreProvider.notifier);
+  final progressStore = ref.read(progressStoreProvider.notifier);
+  final offlineService = ref.watch(offlineLearningServiceProvider);
+  return LearningProgressController(
+    courseStore: courseStore,
+    progressStore: progressStore,
+    offlineLearningService: offlineService,
+  );
+});
+
+class LearningProgressController {
+  LearningProgressController({
+    required CourseStore courseStore,
+    required ProgressStore progressStore,
+    required OfflineLearningService offlineLearningService,
+  })  : _courseStore = courseStore,
+        _progressStore = progressStore,
+        _offlineLearningService = offlineLearningService;
+
+  final CourseStore _courseStore;
+  final ProgressStore _progressStore;
+  final OfflineLearningService _offlineLearningService;
+
+  Future<void> updateModuleProgress({
+    required String courseId,
+    required String moduleId,
+    required int completedLessons,
+    String? note,
+    DateTime? timestamp,
+  }) async {
+    Course? course;
+    for (final entry in _courseStore.state) {
+      if (entry.id == courseId) {
+        course = entry;
+        break;
+      }
+    }
+    if (course == null) {
+      return;
+    }
+
+    CourseModule? module;
+    for (final candidate in course.modules) {
+      if (candidate.id == moduleId) {
+        module = candidate;
+        break;
+      }
+    }
+    if (module == null) {
+      return;
+    }
+
+    final clampedValue = completedLessons.clamp(0, module.lessonCount);
+    final int adjustedLessons = clampedValue is num ? clampedValue.toInt() : completedLessons;
+
+    _courseStore.updateModuleProgress(
+      courseId: courseId,
+      moduleId: moduleId,
+      completedLessons: adjustedLessons,
+    );
+
+    final logTimestamp = timestamp ?? DateTime.now();
+    final log = _progressStore.buildLogFromForm(
+      courseId: courseId,
+      moduleId: moduleId,
+      timestamp: logTimestamp,
+      notes: (note != null && note.isNotEmpty)
+          ? note
+          : 'Updated ${module.title} to $adjustedLessons of ${module.lessonCount} lessons complete.',
+      completedLessons: adjustedLessons,
+    );
+    _progressStore.recordProgress(log);
+
+    final completionRatio = module.lessonCount == 0
+        ? 0
+        : adjustedLessons / module.lessonCount;
+    await _offlineLearningService.recordModuleProgressSnapshot(
+      courseId: courseId,
+      moduleId: moduleId,
+      completionRatio: completionRatio,
+      notes: note,
+    );
+  }
+}

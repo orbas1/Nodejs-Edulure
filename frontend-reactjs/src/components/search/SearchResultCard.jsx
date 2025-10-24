@@ -16,10 +16,12 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
   const imageUrl = extractImageUrl(hit);
   const { price, rating, enrolments, readingTime, location, availability } = extractMetrics(hit);
   const badgeLabels = buildBadgeLabels(hit);
-  const refreshedAtDate =
-    hit.freshness?.refreshedAt ? new Date(hit.freshness.refreshedAt) : null;
+  const refreshedAtDate = hit.freshness?.refreshedAt ? new Date(hit.freshness.refreshedAt) : null;
   const refreshedAtLabel =
     refreshedAtDate && !Number.isNaN(refreshedAtDate.valueOf()) ? refreshedAtDate.toLocaleString() : null;
+  const personaLabel = hit.cluster?.label ?? hit.cluster ?? hit.persona ?? null;
+  const momentumLabel = hit.metrics?.momentum ?? hit.momentum ?? null;
+  const shareHref = hit.shareUrl ?? hit.share_url ?? hit.share_link ?? hit.url ?? null;
 
   if (entityType === 'courses') {
     const actions = Array.isArray(hit.actions) ? hit.actions : [];
@@ -130,17 +132,34 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
               </button>
             ) : null}
           </div>
-            {hit.highlights?.length ? (
-              <ul className="mt-3 flex flex-wrap gap-2 text-xs text-primary">
-                {hit.highlights.slice(0, 4).map((highlight) => (
-                  <li key={highlight} className="rounded-full bg-primary/5 px-3 py-1 font-semibold">
-                    {highlight}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+          {hit.highlights?.length ? (
+            <ul className="mt-3 flex flex-wrap gap-2 text-xs text-primary">
+              {hit.highlights.slice(0, 4).map((highlight) => (
+                <li key={highlight} className="rounded-full bg-primary/5 px-3 py-1 font-semibold">
+                  {highlight}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        {personaLabel || momentumLabel ? (
+          <div className="lg:col-span-2">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              {personaLabel ? (
+                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                  Persona: {personaLabel}
+                </span>
+              ) : null}
+              {momentumLabel ? (
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-emerald-600">
+                  Momentum: {momentumLabel}
+                </span>
+              ) : null}
+            </div>
           </div>
-          {hit.tags?.length ? (
+        ) : null}
+        {hit.tags?.length ? (
+          <div className="lg:col-span-2">
             <div className="flex flex-wrap gap-2">
               {hit.tags.slice(0, 8).map((tag) => (
                 <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -148,50 +167,52 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
                 </span>
               ))}
             </div>
-          ) : null}
+          </div>
+        ) : null}
+        <div className="lg:col-span-2">
           <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
             {price ? (
               <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
                   <CurrencyDollarIcon className="h-4 w-4" /> Price
                 </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{price}</p>
-            </div>
-          ) : null}
-          {rating ? (
-            <div className="rounded-2xl bg-amber-50 p-4">
-              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-500">
-                <StarIcon className="h-4 w-4" /> Rating
-              </p>
-              <p className="mt-2 text-lg font-semibold text-amber-600">{rating}</p>
-            </div>
-          ) : null}
-          {enrolments ? (
-            <div className="rounded-2xl bg-primary/10 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Members</p>
-              <p className="mt-2 text-lg font-semibold text-primary-dark">{enrolments}</p>
-            </div>
-          ) : null}
-          {readingTime ? (
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Duration</p>
-              <p className="mt-2 text-lg font-semibold text-slate-700">{readingTime}</p>
-            </div>
-          ) : null}
-          {location ? (
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                <GlobeAltIcon className="h-4 w-4" /> Location
-              </p>
-              <p className="mt-2 text-sm font-semibold text-slate-700">{location}</p>
-            </div>
-          ) : null}
-          {availability ? (
-            <div className="rounded-2xl bg-emerald-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Next session</p>
-              <p className="mt-2 text-sm font-semibold text-emerald-600">{availability}</p>
-            </div>
-          ) : null}
+                <p className="mt-2 text-lg font-semibold text-slate-900">{price}</p>
+              </div>
+            ) : null}
+            {rating ? (
+              <div className="rounded-2xl bg-amber-50 p-4">
+                <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-500">
+                  <StarIcon className="h-4 w-4" /> Rating
+                </p>
+                <p className="mt-2 text-lg font-semibold text-amber-600">{rating}</p>
+              </div>
+            ) : null}
+            {enrolments ? (
+              <div className="rounded-2xl bg-primary/10 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Members</p>
+                <p className="mt-2 text-lg font-semibold text-primary-dark">{enrolments}</p>
+              </div>
+            ) : null}
+            {readingTime ? (
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Duration</p>
+                <p className="mt-2 text-lg font-semibold text-slate-700">{readingTime}</p>
+              </div>
+            ) : null}
+            {location ? (
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <GlobeAltIcon className="h-4 w-4" /> Location
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-700">{location}</p>
+              </div>
+            ) : null}
+            {availability ? (
+              <div className="rounded-2xl bg-emerald-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Next session</p>
+                <p className="mt-2 text-sm font-semibold text-emerald-600">{availability}</p>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -207,6 +228,17 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
               <ArrowTopRightOnSquareIcon className="h-4 w-4" />
             </a>
           ))}
+        </div>
+      ) : null}
+      {shareHref ? (
+        <div className="mt-3 text-xs text-slate-400">
+          <a
+            href={shareHref}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-primary hover:text-primary"
+          >
+            Share this result
+            <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+          </a>
         </div>
       ) : null}
     </article>
@@ -250,7 +282,18 @@ SearchResultCard.propTypes = {
         label: PropTypes.string,
         href: PropTypes.string
       })
-    )
+    ),
+    shareUrl: PropTypes.string,
+    share_url: PropTypes.string,
+    share_link: PropTypes.string,
+    cluster: PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.shape({
+        label: PropTypes.string
+      })
+    ]),
+    persona: PropTypes.string,
+    momentum: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
   }).isRequired,
   onPreview: PropTypes.func
 };

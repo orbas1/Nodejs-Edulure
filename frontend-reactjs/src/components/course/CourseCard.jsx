@@ -62,6 +62,21 @@ function resolveUpsellToneClasses(tone) {
   }
 }
 
+function resolveComplianceTone(status) {
+  if (!status) return 'bg-slate-100 text-slate-600';
+  const normalised = String(status).toLowerCase();
+  if (normalised.includes('approved') || normalised.includes('compliant')) {
+    return 'bg-emerald-100 text-emerald-700';
+  }
+  if (normalised.includes('pending') || normalised.includes('review')) {
+    return 'bg-amber-100 text-amber-700';
+  }
+  if (normalised.includes('blocked') || normalised.includes('risk')) {
+    return 'bg-rose-100 text-rose-700';
+  }
+  return 'bg-slate-100 text-slate-600';
+}
+
 function Badge({ children, tone }) {
   return (
     <span
@@ -138,12 +153,38 @@ export default function CourseCard({
     currency,
     progressPercent,
     highlights,
-    upsellBadges
+    upsellBadges,
+    complianceStatus,
+    launchWindow,
+    nextLiveSession,
+    syndication
   } = course;
 
   const hasProgress = progressPercent !== undefined && progressPercent !== null;
   const resolvedPrimaryActionLabel = primaryActionLabel ?? (primaryHref ? 'View course' : null);
   const upsells = Array.isArray(upsellBadges) ? upsellBadges.filter((entry) => entry && entry.label) : [];
+  const complianceLabel =
+    typeof complianceStatus === 'string'
+      ? complianceStatus
+      : complianceStatus?.label ?? complianceStatus?.state ?? null;
+  const complianceTone = resolveComplianceTone(complianceLabel);
+  const launchWindowLabel = launchWindow?.label
+    ? launchWindow.label
+    : launchWindow?.start
+    ? `${new Date(launchWindow.start).toLocaleDateString()}${
+        launchWindow?.end ? ` – ${new Date(launchWindow.end).toLocaleDateString()}` : ''
+      }`
+    : typeof launchWindow === 'string'
+    ? launchWindow
+    : null;
+  const nextLiveLabel = nextLiveSession?.label
+    ? nextLiveSession.label
+    : nextLiveSession?.start
+    ? `${new Date(nextLiveSession.start).toLocaleString()}`
+    : null;
+  const syndicationChannels = Array.isArray(syndication?.channels)
+    ? syndication.channels.filter(Boolean).slice(0, 4)
+    : [];
 
   return (
     <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
@@ -183,6 +224,31 @@ export default function CourseCard({
             {description ? <p className="text-sm leading-relaxed text-slate-600">{description}</p> : null}
           </div>
 
+          {(launchWindowLabel || complianceLabel || nextLiveLabel) && (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {launchWindowLabel ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Launch window</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{launchWindowLabel}</p>
+                </div>
+              ) : null}
+              {complianceLabel ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Compliance</p>
+                  <span className={clsx('mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold', complianceTone)}>
+                    {complianceLabel}
+                  </span>
+                </div>
+              ) : null}
+              {nextLiveLabel ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Next live touchpoint</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{nextLiveLabel}</p>
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {Array.isArray(highlights) && highlights.length ? (
             <ul className="flex flex-wrap gap-2 text-xs text-primary">
               {highlights.slice(0, 4).map((highlight) => (
@@ -208,6 +274,19 @@ export default function CourseCard({
             <Metric icon={ClockIcon} label="Duration" value={duration} />
             <Metric icon={UserGroupIcon} label="Learners" value={memberCount} />
           </div>
+
+          {syndicationChannels.length ? (
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Syndication</p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                {syndicationChannels.map((channel) => (
+                  <span key={channel} className="rounded-full bg-white px-3 py-1 shadow-sm">
+                    {channel}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {hasProgress ? (
             <CourseProgressBar
@@ -267,6 +346,7 @@ export default function CourseCard({
               primaryHref ? (
                 <a
                   href={primaryHref}
+                  data-course-id={course.id}
                   className="inline-flex items-center gap-2 rounded-full border border-primary px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary hover:text-white"
                 >
                   {resolvedPrimaryActionLabel}
@@ -276,6 +356,7 @@ export default function CourseCard({
                 <button
                   type="button"
                   onClick={onPrimaryAction}
+                  data-course-id={course.id}
                   className="inline-flex items-center gap-2 rounded-full border border-primary px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary hover:text-white"
                 >
                   {resolvedPrimaryActionLabel}
@@ -286,6 +367,7 @@ export default function CourseCard({
               secondaryHref ? (
                 <a
                   href={secondaryHref}
+                  data-course-id={course.id}
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
                 >
                   {secondaryActionLabel}
@@ -294,6 +376,7 @@ export default function CourseCard({
                 <button
                   type="button"
                   onClick={onSecondaryAction}
+                  data-course-id={course.id}
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
                 >
                   {secondaryActionLabel}
@@ -337,7 +420,29 @@ CourseCard.propTypes = {
         href: PropTypes.string,
         features: PropTypes.arrayOf(PropTypes.string)
       })
-    )
+    ),
+    complianceStatus: PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.shape({
+        label: PropTypes.string,
+        state: PropTypes.string
+      })
+    ]),
+    launchWindow: PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.shape({
+        start: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+        end: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+        label: PropTypes.string
+      })
+    ]),
+    nextLiveSession: PropTypes.shape({
+      label: PropTypes.string,
+      start: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)])
+    }),
+    syndication: PropTypes.shape({
+      channels: PropTypes.arrayOf(PropTypes.string)
+    })
   }).isRequired,
   primaryHref: PropTypes.string,
   onPrimaryAction: PropTypes.func,

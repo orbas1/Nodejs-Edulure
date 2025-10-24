@@ -1,7 +1,7 @@
 import db from '../config/database.js';
 import logger from '../config/logger.js';
 import ExplorerSearchDailyMetricModel from '../models/ExplorerSearchDailyMetricModel.js';
-import { normaliseClusterKey } from '../utils/learningClusters.js';
+import { describeClusterLabel, normaliseClusterKey } from '../utils/learningClusters.js';
 
 const ENTITY_PRIORITY = {
   courses: 'high',
@@ -339,6 +339,30 @@ function normaliseScore(value) {
   return Number(numeric.toFixed(4));
 }
 
+function describeMomentum(popularityScore, freshnessScore) {
+  const popularity = Number(popularityScore ?? 0);
+  const freshness = Number(freshnessScore ?? 0);
+  const popularityValid = Number.isFinite(popularity);
+  const freshnessValid = Number.isFinite(freshness);
+
+  if (!popularityValid && !freshnessValid) {
+    return { score: 0, label: 'Emerging momentum (0)', trend: 'building' };
+  }
+
+  const total = (popularityValid ? popularity : 0) + (freshnessValid ? freshness : 0);
+  const divisor = (popularityValid ? 1 : 0) + (freshnessValid ? 1 : 0) || 1;
+  const average = total / divisor;
+  const score = Math.max(0, Math.min(100, Math.round(average)));
+
+  if (score >= 75) {
+    return { score, label: `High momentum (${score})`, trend: 'accelerating' };
+  }
+  if (score >= 50) {
+    return { score, label: `Steady momentum (${score})`, trend: 'steady' };
+  }
+  return { score, label: `Emerging momentum (${score})`, trend: 'building' };
+}
+
 function toDateOrNull(value) {
   if (!value) {
     return null;
@@ -617,6 +641,51 @@ export class SearchDocumentService {
       metadata.monetisation?.tag ??
       null;
 
+    const clusterKey = normaliseClusterKey(
+      document.clusterKey ??
+        document.cluster_key ??
+        metadata.clusterKey ??
+        metadata.cluster_key ??
+        metadata.cluster?.key ??
+        metadata.cluster ??
+        (Array.isArray(metadata.tags) ? metadata.tags[0] : null) ??
+        (Array.isArray(metadata.topics) ? metadata.topics[0] : null) ??
+        resolvedCategory ??
+        'general'
+    );
+    const clusterLabel = describeClusterLabel(clusterKey);
+
+    const personaCandidate =
+      document.persona ??
+      document.personaLabel ??
+      metadata.persona ??
+      metadata.personaLabel ??
+      metadata.audience?.persona ??
+      metadata.audience?.primary ??
+      metadata.focus ??
+      (Array.isArray(metadata.personaTags) ? metadata.personaTags[0] : null) ??
+      (Array.isArray(metadata.tags) ? metadata.tags[0] : null) ??
+      (Array.isArray(metadata.topics) ? metadata.topics[0] : null) ??
+      null;
+
+    if (personaCandidate) {
+      metadata.persona = personaCandidate;
+      metadata.personaLabel = personaCandidate;
+    }
+
+    metadata.clusterKey = clusterKey;
+    metadata.cluster =
+      metadata.cluster && typeof metadata.cluster === 'object'
+        ? { key: metadata.cluster.key ?? clusterKey, label: metadata.cluster.label ?? clusterLabel }
+        : { key: clusterKey, label: clusterLabel };
+
+    const momentum = describeMomentum(popularityScore, freshnessScore);
+    metadata.momentum = {
+      score: momentum.score,
+      label: momentum.label,
+      trend: momentum.trend
+    };
+
     return {
       entity_type: resolvedEntityType.toLowerCase(),
       entity_id: String(rawEntityId),
@@ -654,7 +723,8 @@ export class SearchDocumentService {
       preview_highlights: JSON.stringify(previewHighlights),
       cta_links: JSON.stringify(ctaLinks),
       badges: JSON.stringify(badges),
-      monetisation_tag: monetisationTag ?? null
+      monetisation_tag: monetisationTag ?? null,
+      cluster_key: clusterKey
     };
   }
 
@@ -827,6 +897,12 @@ export class SearchDocumentService {
         row.level ? { type: 'level', label: toTitleCase(row.level) } : null,
         row.delivery_format ? { type: 'format', label: toTitleCase(row.delivery_format) } : null
       ]);
+      const clusterLabel = describeClusterLabel(clusterKey);
+      const personaLabel = row.level
+        ? toTitleCase(row.level)
+        : tags.length
+          ? toTitleCase(tags[0])
+          : null;
 
       return {
         entityType: 'courses',
@@ -861,6 +937,9 @@ export class SearchDocumentService {
           languages,
           tags,
           clusterKey,
+          cluster: { key: clusterKey, label: clusterLabel },
+          persona: personaLabel,
+          personaLabel,
           rating: {
             average: Number(row.rating_average ?? 0),
             count: Number(row.rating_count ?? 0)
@@ -957,6 +1036,27 @@ export class SearchDocumentService {
         community.visibility ? { type: 'visibility', label: toTitleCase(community.visibility) } : null,
         metadata.country ? { type: 'region', label: metadata.country } : null
       ]);
+      const clusterKey = normaliseClusterKey(
+        metadata.clusterKey ??
+          metadata.cluster?.key ??
+          topics[0] ??
+          tags[0] ??
+          community.visibility ??
+          'community'
+      );
+      const clusterLabel = describeClusterLabel(clusterKey);
+      const personaLabel = metadata.persona ?? metadata.personaLabel ?? metadata.focus ?? topics[0] ?? tags[0] ?? null;
+
+      metadata.clusterKey = clusterKey;
+      metadata.cluster =
+        metadata.cluster && typeof metadata.cluster === 'object'
+          ? { key: metadata.cluster.key ?? clusterKey, label: metadata.cluster.label ?? clusterLabel }
+          : { key: clusterKey, label: clusterLabel };
+
+      if (personaLabel) {
+        metadata.persona = personaLabel;
+        metadata.personaLabel = personaLabel;
+      }
 
       return {
         entityType: 'communities',
@@ -978,6 +1078,7 @@ export class SearchDocumentService {
         ctaLinks,
         badges,
         monetisationTag,
+        clusterKey,
         metadata: {
           visibility: community.visibility,
           topics,
@@ -986,6 +1087,10 @@ export class SearchDocumentService {
           memberCount,
           postCount,
           ownerId: community.owner_id ?? null,
+          clusterKey,
+          cluster: { key: clusterKey, label: clusterLabel },
+          persona: personaLabel,
+          personaLabel,
           preview: {
             summary: community.description ?? metadata.summary ?? null,
             imageUrl: metadata.coverImageUrl ?? community.cover_image_url ?? null,
@@ -1086,6 +1191,12 @@ export class SearchDocumentService {
         categories[0] ? { type: 'category', label: toTitleCase(categories[0]) } : null,
         languages[0] ? { type: 'language', label: languages[0].toUpperCase() } : null
       ]);
+      const clusterLabel = describeClusterLabel(clusterKey);
+      const personaLabel = tags[0]
+        ? toTitleCase(tags[0])
+        : categories[0]
+          ? toTitleCase(categories[0])
+          : authors[0] ?? null;
 
       return {
         entityType: 'ebooks',
@@ -1117,6 +1228,9 @@ export class SearchDocumentService {
           categories,
           languages,
           clusterKey,
+          cluster: { key: clusterKey, label: clusterLabel },
+          persona: personaLabel,
+          personaLabel,
           readingTimeMinutes: Number(ebook.reading_time_minutes ?? 0),
           price: {
             currency: ebook.price_currency ?? 'USD',
@@ -1204,6 +1318,22 @@ export class SearchDocumentService {
         tutor.is_verified ? { type: 'verified', label: 'Verified' } : null,
         ...skills.slice(0, 2).map((skill) => ({ type: 'skill', label: toTitleCase(skill) }))
       ]);
+      const clusterKey = normaliseClusterKey(
+        metadata.clusterKey ?? metadata.cluster?.key ?? skills[0] ?? tutor.country ?? 'tutor'
+      );
+      const clusterLabel = describeClusterLabel(clusterKey);
+      const personaLabel = metadata.persona ?? metadata.personaLabel ?? metadata.specialty ?? skills[0] ?? null;
+
+      metadata.clusterKey = clusterKey;
+      metadata.cluster =
+        metadata.cluster && typeof metadata.cluster === 'object'
+          ? { key: metadata.cluster.key ?? clusterKey, label: metadata.cluster.label ?? clusterLabel }
+          : { key: clusterKey, label: clusterLabel };
+
+      if (personaLabel) {
+        metadata.persona = personaLabel;
+        metadata.personaLabel = personaLabel;
+      }
 
       return {
         entityType: 'tutors',
@@ -1230,12 +1360,17 @@ export class SearchDocumentService {
         ctaLinks,
         badges,
         monetisationTag,
+        clusterKey,
         metadata: {
           userId: tutor.user_id,
           skills,
           languages,
           timezones,
           country: tutor.country ?? null,
+          clusterKey,
+          cluster: { key: clusterKey, label: clusterLabel },
+          persona: personaLabel,
+          personaLabel,
           hourlyRate: {
             currency: tutor.hourly_rate_currency ?? 'USD',
             amount: Number(tutor.hourly_rate_amount ?? 0)

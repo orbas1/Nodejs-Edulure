@@ -1,9 +1,63 @@
 import PropTypes from 'prop-types';
-import { useState } from 'react';
-import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline';
+import { useMemo, useState } from 'react';
+import {
+  BellIcon,
+  ChatBubbleLeftEllipsisIcon,
+  BoltIcon,
+  CurrencyDollarIcon,
+  SignalIcon
+} from '@heroicons/react/24/outline';
 import CommunitySwitcher from './CommunitySwitcher.jsx';
 import GlobalSearchBar from './search/GlobalSearchBar.jsx';
 import LanguageSelector from './navigation/LanguageSelector.jsx';
+import { trackNavigationSelect } from '../lib/analytics.js';
+
+function PresenceBadge({ badge, onNavigate }) {
+  if (!badge) return null;
+  const Icon = badge.icon ?? BoltIcon;
+  const handleClick = () => {
+    if (badge.to) {
+      onNavigate?.(badge.to, badge.analyticsId);
+    }
+  };
+
+  const content = (
+    <span className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm">
+      <Icon className="h-4 w-4" />
+      <span>{badge.label}</span>
+    </span>
+  );
+
+  if (!badge.to) {
+    return content;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
+    >
+      <Icon className="h-4 w-4" />
+      <span>{badge.label}</span>
+    </button>
+  );
+}
+
+PresenceBadge.propTypes = {
+  badge: PropTypes.shape({
+    label: PropTypes.string.isRequired,
+    to: PropTypes.string,
+    icon: PropTypes.elementType,
+    analyticsId: PropTypes.string
+  }),
+  onNavigate: PropTypes.func
+};
+
+PresenceBadge.defaultProps = {
+  badge: null,
+  onNavigate: null
+};
 
 export default function TopBar({
   communities,
@@ -21,10 +75,41 @@ export default function TopBar({
   onOpenMessages,
   onOpenNotifications,
   profileImageUrl = 'https://i.pravatar.cc/100?img=15',
-  profileAlt = 'Your profile'
+  profileAlt = 'Your profile',
+  presence = null,
+  onNavigate,
+  messagesOpen = false,
+  notificationsOpen = false,
+  callToAction = null
 }) {
   const [localSearchValue, setLocalSearchValue] = useState('');
   const resolvedSearchValue = searchValue ?? localSearchValue;
+
+  const presenceBadges = useMemo(() => {
+    if (!presence) return [];
+    const badges = [];
+    if (presence.liveSession) {
+      badges.push({
+        id: 'live-session',
+        label: presence.liveSession.label ?? 'Live session in progress',
+        to: presence.liveSession.to ?? null,
+        icon: BoltIcon,
+        analyticsId: 'community-live-session'
+      });
+    }
+    if (presence.pendingPayout) {
+      badges.push({
+        id: 'pending-payout',
+        label: presence.pendingPayout.label ?? 'Review pending payout',
+        to: presence.pendingPayout.to ?? null,
+        icon: CurrencyDollarIcon,
+        analyticsId: 'community-payout-review'
+      });
+    }
+    return badges;
+  }, [presence]);
+
+  const realtimeState = presence?.realtime;
 
   const handleSearchChange = (value, event) => {
     if (typeof onSearchChange === 'function') {
@@ -56,20 +141,37 @@ export default function TopBar({
   };
 
   const handleOpenMessages = () => {
+    trackNavigationSelect('community-messages', { origin: 'community-topbar' });
     if (typeof onOpenMessages === 'function') {
       onOpenMessages();
     }
   };
 
   const handleOpenNotifications = () => {
+    trackNavigationSelect('community-notifications', { origin: 'community-topbar' });
     if (typeof onOpenNotifications === 'function') {
       onOpenNotifications();
     }
   };
 
+  const handlePresenceNavigate = (target, analyticsId) => {
+    if (target) {
+      trackNavigationSelect(analyticsId ?? 'community-presence', { origin: 'community-topbar' });
+      onNavigate?.(target);
+    }
+  };
+
+  const handleCallToAction = () => {
+    if (!callToAction?.to) {
+      return;
+    }
+    trackNavigationSelect(callToAction.analyticsId ?? callToAction.to, { origin: 'community-topbar' });
+    onNavigate?.(callToAction.to);
+  };
+
   return (
     <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white px-6 py-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex w-full flex-col gap-2 sm:max-w-xs">
+      <div className="flex w-full flex-col gap-3 sm:max-w-xs">
         <CommunitySwitcher
           communities={communities}
           selected={selectedCommunity}
@@ -82,6 +184,25 @@ export default function TopBar({
             {error}
           </span>
         )}
+        {presenceBadges.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {presenceBadges.map((badge) => (
+              <PresenceBadge key={badge.id} badge={badge} onNavigate={handlePresenceNavigate} />
+            ))}
+          </div>
+        ) : null}
+        {typeof realtimeState === 'boolean' ? (
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <SignalIcon
+              className={
+                realtimeState
+                  ? 'h-4 w-4 text-emerald-500'
+                  : 'h-4 w-4 text-slate-300'
+              }
+            />
+            <span>{realtimeState ? 'Realtime connected' : 'Realtime reconnecting'}</span>
+          </div>
+        ) : null}
       </div>
       <div className="w-full sm:flex-1">
         <GlobalSearchBar
@@ -94,6 +215,17 @@ export default function TopBar({
         />
       </div>
       <div className="flex items-center justify-end gap-3 text-slate-500">
+        {callToAction ? (
+          <button
+            type="button"
+            onClick={handleCallToAction}
+            className="inline-flex items-center gap-2 rounded-2xl border border-primary/20 bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            title={callToAction.description ?? callToAction.label}
+          >
+            <BoltIcon className="h-4 w-4" />
+            <span>{callToAction.label}</span>
+          </button>
+        ) : null}
         <LanguageSelector size="compact" variant="light" align="end" showLabel={false} />
         <button
           type="button"
@@ -101,6 +233,8 @@ export default function TopBar({
           aria-label="Open community messages"
           title="Open community messages"
           onClick={handleOpenMessages}
+          aria-expanded={messagesOpen}
+          aria-pressed={messagesOpen}
         >
           <ChatBubbleLeftEllipsisIcon className="h-5 w-5" />
           {messageCount > 0 ? (
@@ -115,6 +249,8 @@ export default function TopBar({
           aria-label="Open community notifications"
           title="Open community notifications"
           onClick={handleOpenNotifications}
+          aria-expanded={notificationsOpen}
+          aria-pressed={notificationsOpen}
         >
           <BellIcon className="h-5 w-5" />
           {notificationCount > 0 ? (
@@ -159,5 +295,48 @@ TopBar.propTypes = {
   onOpenMessages: PropTypes.func,
   onOpenNotifications: PropTypes.func,
   profileImageUrl: PropTypes.string,
-  profileAlt: PropTypes.string
+  profileAlt: PropTypes.string,
+  presence: PropTypes.shape({
+    liveSession: PropTypes.shape({
+      label: PropTypes.string,
+      to: PropTypes.string
+    }),
+    pendingPayout: PropTypes.shape({
+      label: PropTypes.string,
+      to: PropTypes.string
+    }),
+    realtime: PropTypes.bool
+  }),
+  onNavigate: PropTypes.func,
+  messagesOpen: PropTypes.bool,
+  notificationsOpen: PropTypes.bool,
+  callToAction: PropTypes.shape({
+    id: PropTypes.string,
+    label: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    to: PropTypes.string,
+    analyticsId: PropTypes.string
+  })
+};
+
+TopBar.defaultProps = {
+  selectedCommunity: null,
+  isLoading: false,
+  error: null,
+  searchValue: undefined,
+  onSearchChange: null,
+  onSearchSubmit: null,
+  onSuggestionSelect: null,
+  isSearching: false,
+  messageCount: 0,
+  notificationCount: 0,
+  onOpenMessages: null,
+  onOpenNotifications: null,
+  profileImageUrl: 'https://i.pravatar.cc/100?img=15',
+  profileAlt: 'Your profile',
+  presence: null,
+  onNavigate: null,
+  messagesOpen: false,
+  notificationsOpen: false,
+  callToAction: null
 };

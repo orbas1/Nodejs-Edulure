@@ -47,11 +47,12 @@ function normaliseDesignDependencies(raw = {}) {
 }
 
 function normaliseInitiativeBucket(items = []) {
-  return ensureArray(items).map((item) => ({
+  return ensureArray(items).map((item, index) => ({
     id: item.id,
     label: item.label ?? item.name ?? null,
     to: item.to ?? null,
     category: item.category ?? null,
+    sortOrder: typeof item.sortOrder === 'number' ? item.sortOrder : index,
     initiative: {
       product: item.initiative?.product ?? null,
       operations: item.initiative?.operations ?? { tasks: [] },

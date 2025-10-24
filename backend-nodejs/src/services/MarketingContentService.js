@@ -26,9 +26,35 @@ function normaliseString(value) {
 }
 
 export default class MarketingContentService {
-  static async listMarketingBlocks({ types } = {}) {
-    const blockTypes = normaliseArrayParam(types);
-    return MarketingBlockModel.list({ types: blockTypes });
+  static async listMarketingBlocks({ types, variants, surfaces } = {}) {
+    const requestedTypes = normaliseArrayParam(types);
+    const requestedVariants = normaliseArrayParam(variants);
+    const blockTypes = Array.from(new Set([...requestedTypes, ...requestedVariants])).filter(Boolean);
+    const requestedSurfaces = normaliseArrayParam(surfaces).map((surface) =>
+      typeof surface === 'string' ? surface.trim().toLowerCase() : null
+    ).filter(Boolean);
+
+    const blocks = await MarketingBlockModel.list({ types: blockTypes });
+
+    if (requestedSurfaces.length === 0) {
+      return blocks;
+    }
+
+    const surfaceSet = new Set(requestedSurfaces);
+
+    return blocks.filter((block) => {
+      const blockSurfaces = Array.isArray(block.surfaces)
+        ? block.surfaces
+            .map((surface) => (typeof surface === 'string' ? surface.trim().toLowerCase() : null))
+            .filter(Boolean)
+        : [];
+
+      if (blockSurfaces.length === 0) {
+        return true;
+      }
+
+      return blockSurfaces.some((surface) => surfaceSet.has(surface));
+    });
   }
 
   static async listPlanOffers(options = {}) {
@@ -99,7 +125,7 @@ export default class MarketingContentService {
 
   static async getLandingContent({ types, email, surfaces, variants } = {}) {
     const [blocks, plans, invites, testimonials] = await Promise.all([
-      this.listMarketingBlocks({ types }),
+      this.listMarketingBlocks({ types, variants, surfaces }),
       this.listPlanOffers(),
       this.listActiveInvites(email),
       this.listTestimonials({ variants, surfaces })

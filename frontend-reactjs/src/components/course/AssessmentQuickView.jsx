@@ -55,6 +55,20 @@ export default function AssessmentQuickView({ assessment, onAction, actionLabel,
     typeof assessment.score === 'number' && Number.isFinite(assessment.score)
       ? `Score ${Math.round(assessment.score)}%`
       : null;
+  const passingScoreLabel =
+    typeof assessment.passingScore === 'number' && Number.isFinite(assessment.passingScore)
+      ? `Pass mark ${Math.round(assessment.passingScore)}%`
+      : null;
+  const proctoringLabel = assessment.proctoring?.status
+    ? `Proctoring · ${assessment.proctoring.status}${assessment.proctoring.provider ? ` (${assessment.proctoring.provider})` : ''}`
+    : null;
+  const windowLabel = assessment.window?.start
+    ? `${new Date(assessment.window.start).toLocaleString()} – ${assessment.window?.end ? new Date(assessment.window.end).toLocaleString() : 'No end'}`
+    : assessment.window?.label ?? null;
+  const attemptCapLabel =
+    typeof assessment.attemptsRemaining === 'number' && Number.isFinite(assessment.attemptsRemaining)
+      ? `${assessment.attemptsRemaining} attempt${assessment.attemptsRemaining === 1 ? '' : 's'} left`
+      : null;
 
   const ActionTag = href ? 'a' : 'button';
   const actionProps = href
@@ -93,15 +107,28 @@ export default function AssessmentQuickView({ assessment, onAction, actionLabel,
         {scoreLabel ? (
           <span className="rounded-full bg-white px-2 py-1 text-slate-600">{scoreLabel}</span>
         ) : null}
+        {passingScoreLabel ? (
+          <span className="rounded-full bg-white px-2 py-1 text-slate-600">{passingScoreLabel}</span>
+        ) : null}
+        {attemptCapLabel ? (
+          <span className="rounded-full bg-white px-2 py-1 text-slate-600">{attemptCapLabel}</span>
+        ) : null}
         {assessment.durationMinutes ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-slate-600">
             <CalendarDaysIcon className="h-3.5 w-3.5" /> {assessment.durationMinutes} mins
           </span>
         ) : null}
+        {proctoringLabel ? (
+          <span className="rounded-full bg-white px-2 py-1 text-slate-600">{proctoringLabel}</span>
+        ) : null}
       </div>
+      {windowLabel ? (
+        <p className="mt-3 text-xs text-slate-500">Window · {windowLabel}</p>
+      ) : null}
       {(href || onAction) && actionLabel ? (
         <ActionTag
           {...actionProps}
+          data-assessment-id={assessment.id}
           className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary hover:text-primary"
         >
           {actionLabel}
@@ -127,7 +154,18 @@ AssessmentQuickView.propTypes = {
     completed: PropTypes.bool,
     attempts: PropTypes.number,
     score: PropTypes.number,
-    durationMinutes: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+    durationMinutes: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    passingScore: PropTypes.number,
+    attemptsRemaining: PropTypes.number,
+    proctoring: PropTypes.shape({
+      status: PropTypes.string,
+      provider: PropTypes.string
+    }),
+    window: PropTypes.shape({
+      start: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+      end: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+      label: PropTypes.string
+    })
   }).isRequired,
   onAction: PropTypes.func,
   actionLabel: PropTypes.string,

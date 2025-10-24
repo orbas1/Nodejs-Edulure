@@ -7,6 +7,7 @@ import usePageMetadata from '../hooks/usePageMetadata.js';
 import useMarketingContent from '../hooks/useMarketingContent.js';
 import { resolveSocialProofFallback } from '../data/marketing/socialProof.js';
 import { buildOnboardingDraftPayload, calculateOnboardingCompletion, validateOnboardingState } from '../utils/validation/onboarding.js';
+import { trackAuthAttempt, trackAuthAutoSave, trackAuthInteraction, trackAuthView } from '../lib/analytics.js';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -49,6 +50,13 @@ export default function InstructorRegister() {
     }
   });
 
+  useEffect(() => {
+    trackAuthView('instructor-register', {
+      autosave: true,
+      sections: ['profile', 'experience', 'audience', 'marketing']
+    });
+  }, []);
+
   const overrides = useMemo(() => ({ role: 'instructor' }), []);
   const { formState, errors, setErrors, updateField } = useOnboardingForm('instructor', overrides);
   const { data: marketingContent } = useMarketingContent({
@@ -86,6 +94,14 @@ export default function InstructorRegister() {
     return resolveSocialProofFallback('instructor-register');
   }, [marketingContent]);
 
+  useEffect(() => {
+    if (autoSaveStatus === 'idle') return;
+    trackAuthAutoSave('instructor-register', autoSaveStatus, {
+      has_email: Boolean(formState.email),
+      progress: onboardingProgress.progress
+    });
+  }, [autoSaveStatus, formState.email, onboardingProgress.progress]);
+
   const clearFieldError = useCallback(
     (field) => {
       setErrors((prev) => {
@@ -107,7 +123,9 @@ export default function InstructorRegister() {
   };
 
   const toggleMarketingOptIn = () => {
-    updateField('marketingOptIn', !formState.marketingOptIn);
+    const nextValue = !formState.marketingOptIn;
+    updateField('marketingOptIn', nextValue);
+    trackAuthInteraction('instructor-register', 'marketing_opt_in_toggle', { enabled: nextValue });
   };
 
   const handleTermsChange = (event) => {
@@ -160,6 +178,9 @@ export default function InstructorRegister() {
     setErrors(validation.errors);
     if (!validation.isValid) {
       setError('Please review the highlighted fields.');
+      trackAuthAttempt('instructor-register', 'validation_error', {
+        error_count: Object.keys(validation.errors ?? {}).length
+      });
       return;
     }
 
@@ -182,14 +203,25 @@ export default function InstructorRegister() {
       delete payload.invites;
     }
 
+    trackAuthAttempt('instructor-register', 'submit', {
+      has_invites: Boolean(payload.invites?.length),
+      marketing_opt_in: cleaned.marketingOptIn
+    });
+
     try {
       setIsSubmitting(true);
       await httpClient.post('/dashboard/learner/onboarding/bootstrap', payload);
+      trackAuthAttempt('instructor-register', 'success', {
+        has_invites: Boolean(payload.invites?.length)
+      });
       setSuccess('Thanks for applying! Our instructor success team will review your submission and reach out within 48 hours.');
     } catch (err) {
       const message =
         err?.original?.response?.data?.message ?? err?.message ?? 'Unable to submit your instructor application right now.';
       setError(message);
+      trackAuthAttempt('instructor-register', 'failure', {
+        code: err?.original?.response?.data?.code ?? err?.code ?? 'unknown'
+      });
     } finally {
       setIsSubmitting(false);
     }

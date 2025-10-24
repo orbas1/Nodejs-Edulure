@@ -672,4 +672,46 @@ button:focus-visible {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  .dashboard-skeleton.dashboard-skeleton-streaming::after {
+    animation: none !important;
+    opacity: 0.35;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .bg-slate-50\/70,
+  .bg-white\/70,
+  .bg-white\/80,
+  .bg-white\/90,
+  .bg-white\/95,
+  .bg-slate-50\/60 {
+    background-color: #ffffff !important;
+  }
+
+  .shadow-sm,
+  .shadow,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl,
+  .shadow-card,
+  .shadow-card-strong,
+  .shadow-cta,
+  .shadow-media {
+    box-shadow: none !important;
+  }
+
+  .marketing-hero,
+  .marketing-shell,
+  .case-study-grid,
+  .conversion-panel,
+  .monetization-ribbon {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
 }

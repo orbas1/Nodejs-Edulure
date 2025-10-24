@@ -1,5 +1,7 @@
 import { del, get, keys, set } from 'idb-keyval';
 
+import { getEnvironmentCacheKey, getEnvironmentContext, resolveEnvironmentDescriptor } from './environment.js';
+
 const noopLogger = {
   error: () => {}
 };
@@ -21,10 +23,26 @@ function normaliseTtl(defaultTtl, overrideTtl) {
   return null;
 }
 
-export function createPersistentCache(namespace, { ttlMs, logger = noopLogger } = {}) {
+export function createPersistentCache(
+  namespace,
+  { ttlMs, logger = noopLogger, schemaVersion = 1, environmentResolver = getEnvironmentContext } = {}
+) {
   if (!namespace) {
     throw new Error('A namespace is required to create a persistent cache');
   }
+
+  const resolveEnvironmentKey = () => {
+    try {
+      const descriptor = resolveEnvironmentDescriptor(
+        typeof environmentResolver === 'function' ? environmentResolver() : environmentResolver
+      );
+      return getEnvironmentCacheKey(descriptor);
+    } catch (error) {
+      logger.error?.(`Failed to resolve environment key for ${namespace}`, error);
+      const fallbackDescriptor = resolveEnvironmentDescriptor(getEnvironmentContext());
+      return getEnvironmentCacheKey(fallbackDescriptor);
+    }
+  };
 
   async function read(key) {
     try {
@@ -34,6 +52,17 @@ export function createPersistentCache(namespace, { ttlMs, logger = noopLogger } 
       }
 
       if (entry.expiresAt && entry.expiresAt < Date.now()) {
+        await del(buildKey(namespace, key));
+        return null;
+      }
+
+      const currentEnvironmentKey = resolveEnvironmentKey();
+      if (entry.environmentKey && entry.environmentKey !== currentEnvironmentKey) {
+        await del(buildKey(namespace, key));
+        return null;
+      }
+
+      if (entry.schemaVersion && entry.schemaVersion !== schemaVersion) {
         await del(buildKey(namespace, key));
         return null;
       }
@@ -49,16 +78,19 @@ export function createPersistentCache(namespace, { ttlMs, logger = noopLogger } 
     const ttl = normaliseTtl(ttlMs, ttlOverride);
     const storedAt = Date.now();
     const expiresAt = ttl === null ? null : storedAt + ttl;
+    const environmentKey = resolveEnvironmentKey();
     try {
       await set(buildKey(namespace, key), {
         value,
         storedAt,
-        expiresAt
+        expiresAt,
+        schemaVersion,
+        environmentKey
       });
-      return { storedAt, expiresAt };
+      return { storedAt, expiresAt, environmentKey, schemaVersion };
     } catch (error) {
       logger.error?.(`Failed to persist cache entry for ${namespace}:${key}`, error);
-      return { storedAt, expiresAt };
+      return { storedAt, expiresAt, environmentKey, schemaVersion };
     }
   }
 

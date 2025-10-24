@@ -1,4 +1,9 @@
 import db from '../config/database.js';
+import {
+  applyEnvironmentFilter,
+  buildEnvironmentColumns,
+  getEnvironmentDescriptor
+} from '../utils/environmentContext.js';
 
 function parseJson(value, fallback = {}) {
   if (value === null || value === undefined) {
@@ -118,7 +123,14 @@ function toDomain(row) {
     globalFilters: parseJson(row.global_filters, {}),
     sortPreferences: parseJson(row.sort_preferences, {}),
     metadata: parseJson(row.metadata, {}),
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    environment: {
+      key: row.environment_key ?? null,
+      name: row.environment_name ?? null,
+      tier: row.environment_tier ?? null,
+      region: row.environment_region ?? null,
+      workspace: row.environment_workspace ?? null
+    }
   };
 }
 
@@ -131,6 +143,8 @@ export default class ExplorerSearchEventModel {
     const traceId = toOptionalString(payload.traceId);
     const resultTotal = toNonNegativeInteger(payload.resultTotal);
     const latency = toLatency(payload.latencyMs);
+    const environmentDescriptor = getEnvironmentDescriptor(payload.environment);
+    const environmentColumns = buildEnvironmentColumns(environmentDescriptor);
 
     const insertPayload = {
       event_uuid: eventUuid,
@@ -144,7 +158,8 @@ export default class ExplorerSearchEventModel {
       filters: serialiseJson(payload.filters ?? {}),
       global_filters: serialiseJson(payload.globalFilters ?? {}),
       sort_preferences: serialiseJson(payload.sortPreferences ?? {}),
-      metadata: serialiseJson(payload.metadata ?? {})
+      metadata: serialiseJson(payload.metadata ?? {}),
+      ...environmentColumns
     };
 
     const [id] = await connection('explorer_search_events').insert(insertPayload);
@@ -162,8 +177,10 @@ export default class ExplorerSearchEventModel {
     return toDomain(row);
   }
 
-  static async listBetween({ since, until }, connection = db) {
+  static async listBetween({ since, until, environment }, connection = db) {
+    const envDescriptor = getEnvironmentDescriptor(environment);
     const query = connection('explorer_search_events').select('*');
+    applyEnvironmentFilter(query, envDescriptor);
     const sinceDate = normaliseDateBoundary(since, 'since');
     const untilDate = normaliseDateBoundary(until, 'until');
     if (sinceDate && untilDate && sinceDate > untilDate) {
@@ -180,8 +197,9 @@ export default class ExplorerSearchEventModel {
     return rows.map(toDomain);
   }
 
-  static async topQueries({ since, limit = 5, zeroResultOnly = false }, connection = db) {
+  static async topQueries({ since, limit = 5, zeroResultOnly = false, environment }, connection = db) {
     const safeLimit = normaliseLimit(limit, 5);
+    const envDescriptor = getEnvironmentDescriptor(environment);
     const query = connection('explorer_search_events')
       .select(
         connection.raw('LOWER(TRIM(query)) AS normalized_query'),
@@ -191,6 +209,7 @@ export default class ExplorerSearchEventModel {
       .groupByRaw('LOWER(TRIM(query))')
       .orderBy('searches', 'desc')
       .limit(safeLimit);
+    applyEnvironmentFilter(query, envDescriptor);
 
     const sinceDate = normaliseDateBoundary(since, 'since');
     if (sinceDate) {
@@ -206,14 +225,17 @@ export default class ExplorerSearchEventModel {
       .map((row) => ({ query: row.normalized_query, searches: Number(row.searches ?? 0) }));
   }
 
-  static async aggregateRange({ since }, connection = db) {
-    const query = connection('explorer_search_events').select(
-      connection.raw('COUNT(*) AS searches'),
-      connection.raw('SUM(CASE WHEN is_zero_result THEN 1 ELSE 0 END) AS zeroResults'),
-      connection.raw('SUM(result_total) AS totalResults'),
-      connection.raw('AVG(latency_ms) AS averageLatencyMs'),
-      connection.raw('COUNT(DISTINCT user_id) AS uniqueUsers')
-    );
+  static async aggregateRange({ since, environment }, connection = db) {
+    const envDescriptor = getEnvironmentDescriptor(environment);
+    const query = connection('explorer_search_events')
+      .select(
+        connection.raw('COUNT(*) AS searches'),
+        connection.raw('SUM(CASE WHEN is_zero_result THEN 1 ELSE 0 END) AS zeroResults'),
+        connection.raw('SUM(result_total) AS totalResults'),
+        connection.raw('AVG(latency_ms) AS averageLatencyMs'),
+        connection.raw('COUNT(DISTINCT user_id) AS uniqueUsers')
+      );
+    applyEnvironmentFilter(query, envDescriptor);
     const sinceDate = normaliseDateBoundary(since, 'since');
     if (sinceDate) {
       query.andWhere('created_at', '>=', sinceDate);

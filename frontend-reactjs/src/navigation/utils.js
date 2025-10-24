@@ -73,3 +73,70 @@ export function derivePresence(session, realtimeConnected) {
   return presence;
 }
 
+function toMap(items = []) {
+  const map = new Map();
+  items.forEach((item, index) => {
+    if (!item || !item.id) {
+      return;
+    }
+    map.set(item.id, { ...item, index });
+  });
+  return map;
+}
+
+export function mergeAnnexQuickActions(staticActions = [], annexActions = []) {
+  const staticMap = toMap(staticActions);
+  const annexMap = toMap(annexActions);
+  const ids = new Set([...staticMap.keys(), ...annexMap.keys()]);
+  const merged = [];
+
+  ids.forEach((id) => {
+    const base = staticMap.get(id);
+    const annex = annexMap.get(id);
+    if (!base && !annex) {
+      return;
+    }
+
+    const label = annex?.label ?? base?.label ?? id;
+    const description =
+      annex?.initiative?.product?.summary ??
+      annex?.initiative?.operations?.tasks?.[0]?.label ??
+      base?.description ??
+      '';
+    const to = annex?.to ?? base?.to ?? '#';
+    const analyticsId = annex?.initiative?.product?.epicId ?? base?.analyticsId ?? id;
+    const operationsTask = annex?.initiative?.operations?.tasks?.[0] ?? null;
+    const runbookHref = operationsTask?.href ?? annex?.initiative?.product?.backlogRef ?? null;
+
+    merged.push({
+      id,
+      label,
+      description,
+      to,
+      icon: base?.icon ?? null,
+      analyticsId,
+      initiative: annex?.initiative ?? null,
+      category: annex?.category ?? base?.category ?? 'quick_action',
+      sortOrder: annex?.sortOrder ?? annex?.index ?? base?.index ?? 999,
+      meta: {
+        runbookHref,
+        operationsTask
+      }
+    });
+  });
+
+  merged.sort((a, b) => {
+    const orderDiff = (a.sortOrder ?? 999) - (b.sortOrder ?? 999);
+    if (orderDiff !== 0) {
+      return orderDiff;
+    }
+    return String(a.label ?? '').localeCompare(String(b.label ?? ''));
+  });
+
+  const callToAction = annexActions.length
+    ? merged.find((item) => annexMap.has(item.id)) ?? merged[0] ?? null
+    : merged[0] ?? null;
+
+  return { quickActions: merged, callToAction };
+}
+

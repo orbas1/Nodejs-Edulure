@@ -9,6 +9,9 @@ class SessionManager {
   static const _downloadsBox = 'content_downloads';
   static const _ebookProgressBox = 'ebook_progress';
   static const _readerSettingsBox = 'ebook_reader_settings';
+  static const _learningOfflineBox = 'learning_offline_downloads';
+  static const _learningAssessmentBox = 'learning_assessment_outbox';
+  static const _learningProgressBox = 'learning_progress_snapshots';
   static const _dashboardBox = 'dashboard_snapshots';
   static const _privacyBox = 'privacy_preferences';
   static const _creationProjectsBox = 'creation_projects';
@@ -22,6 +25,7 @@ class SessionManager {
   static const _billingOutboxBox = 'billing_outbox';
   static const _communicationOutboxBox = 'communication_outbox';
   static const _communicationMetadataBox = 'communication_metadata';
+  static const _instructorActionQueueBox = 'instructor_action_queue';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
   static const _secureAccessTokenKey = 'session.accessToken';
@@ -38,6 +42,9 @@ class SessionManager {
     await _openBox(_downloadsBox, optional: true);
     await _openBox(_ebookProgressBox, optional: true);
     await _openBox(_readerSettingsBox, optional: true);
+    await _openBox(_learningOfflineBox, optional: true);
+    await _openBox(_learningAssessmentBox, optional: true);
+    await _openBox(_learningProgressBox, optional: true);
     await _openBox(_dashboardBox);
     await _openBox(_privacyBox, optional: true);
     await _openBox(_creationProjectsBox, optional: true);
@@ -51,6 +58,7 @@ class SessionManager {
     await _openBox(_billingOutboxBox, optional: true);
     await _openBox(_communicationOutboxBox, optional: true);
     await _openBox(_communicationMetadataBox, optional: true);
+    await _openBox(_instructorActionQueueBox, optional: true);
     _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
     _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
   }
@@ -60,6 +68,9 @@ class SessionManager {
   static Box get downloadsCache => Hive.box(_downloadsBox);
   static Box get ebookProgressCache => Hive.box(_ebookProgressBox);
   static Box get readerSettingsCache => Hive.box(_readerSettingsBox);
+  static Box get learningDownloadQueue => Hive.box(_learningOfflineBox);
+  static Box get assessmentOutbox => Hive.box(_learningAssessmentBox);
+  static Box get learningProgressSnapshots => Hive.box(_learningProgressBox);
   static Box get dashboardCache => Hive.box(_dashboardBox);
   static Box get privacyPreferences => Hive.box(_privacyBox);
   static Box get creationProjectsCache => Hive.box(_creationProjectsBox);
@@ -75,6 +86,7 @@ class SessionManager {
   static Box get billingOutbox => Hive.box(_billingOutboxBox);
   static Box get communicationOutbox => Hive.box(_communicationOutboxBox);
   static Box get communicationMetadata => Hive.box(_communicationMetadataBox);
+  static Box get instructorActionQueue => Hive.box(_instructorActionQueueBox);
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     final sanitized = Map<String, dynamic>.from(session);
@@ -158,6 +170,9 @@ class SessionManager {
     await _clearIfAvailable(_downloadsBox);
     await _clearIfAvailable(_ebookProgressBox);
     await _clearIfAvailable(_readerSettingsBox);
+    await _clearIfAvailable(_learningOfflineBox);
+    await _clearIfAvailable(_learningAssessmentBox);
+    await _clearIfAvailable(_learningProgressBox);
     await _clearIfAvailable(_privacyBox);
     await _clearIfAvailable(_creationProjectsBox);
     await _clearIfAvailable(_creationActionBox);
@@ -170,6 +185,7 @@ class SessionManager {
     await _clearIfAvailable(_billingOutboxBox);
     await _clearIfAvailable(_communicationOutboxBox);
     await _clearIfAvailable(_communicationMetadataBox);
+    await _clearIfAvailable(_instructorActionQueueBox);
     await SecureStorageService.instance.deleteAll(
       keys: const {
         _secureAccessTokenKey,
