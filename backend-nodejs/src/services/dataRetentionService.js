@@ -179,8 +179,13 @@ async function publishRetentionEvent({
   policy,
   status,
   details,
-  dryRun
+  dryRun,
+  emitEvents = true
 }) {
+  if (!emitEvents) {
+    return;
+  }
+
   try {
     await changeDataCaptureService.recordEvent({
       domain: 'governance',
@@ -212,7 +217,8 @@ export async function enforceRetentionPolicies({
   policies: providedPolicies,
   dbClient = db,
   alertThreshold = DEFAULT_ALERT_THRESHOLD,
-  onAlert
+  onAlert,
+  emitEvents = true
 } = {}) {
   const resolvedMode = mode ?? (dryRun ? 'simulate' : 'commit');
   const simulate = resolvedMode === 'simulate';
@@ -225,6 +231,8 @@ export async function enforceRetentionPolicies({
     ? providedPolicies.map((policy) => (policy.entityName ? policy : mapPolicyRow(policy)))
     : await fetchActivePolicies(dbClient);
 
+  const shouldEmitEvents = Boolean(emitEvents) && !simulate;
+
   for (const policy of policies) {
     const policyLogger = runLogger.child({ policyId: policy.id, entityName: policy.entityName });
 
@@ -234,6 +242,30 @@ export async function enforceRetentionPolicies({
         entityName: policy.entityName,
         action: policy.action,
         status: 'skipped-inactive'
+      });
+      continue;
+    }
+
+    if (policy.criteria?.legalHold === true || policy.criteria?.legalHold?.active === true) {
+      policyLogger.warn('Retention policy under legal hold; skipping enforcement');
+      const legalHoldReason =
+        policy.criteria?.legalHold?.reason ?? 'policy marked with legalHold criteria flag';
+      const legalHoldOwner = policy.criteria?.legalHold?.owner ?? null;
+      executionResults.push({
+        policyId: policy.id,
+        entityName: policy.entityName,
+        action: policy.action,
+        status: 'skipped-legal-hold',
+        reason: legalHoldReason,
+        owner: legalHoldOwner
+      });
+      await publishRetentionEvent({
+        runId,
+        policy,
+        status: 'skipped-legal-hold',
+        details: { reason: legalHoldReason, owner: legalHoldOwner },
+        dryRun: true,
+        emitEvents: shouldEmitEvents
       });
       continue;
     }
@@ -277,7 +309,8 @@ export async function enforceRetentionPolicies({
           return {
             affectedRows: 0,
             sampleIds,
-            context: strategy.context ?? {}
+            context: strategy.context ?? {},
+            reason: strategy.reason
           };
         }
 
@@ -310,7 +343,8 @@ export async function enforceRetentionPolicies({
         return {
           affectedRows,
           sampleIds,
-          context: strategy.context ?? {}
+          context: strategy.context ?? {},
+          reason: strategy.reason
         };
       });
 
@@ -318,12 +352,13 @@ export async function enforceRetentionPolicies({
         policyId: policy.id,
         entityName: policy.entityName,
         action: policy.action,
-        status: 'executed',
+        status: runDry ? 'simulated' : 'executed',
         affectedRows: result.affectedRows,
         sampleIds: result.sampleIds,
         dryRun: runDry,
         description: policy.description,
-        context: result.context ?? {}
+        context: result.context ?? {},
+        reason: result.reason
       };
 
       executionResults.push(outcome);
@@ -340,9 +375,10 @@ export async function enforceRetentionPolicies({
       await publishRetentionEvent({
         runId,
         policy,
-        status: 'executed',
+        status: runDry ? 'simulated' : 'executed',
         details: outcome,
-        dryRun: runDry
+        dryRun: runDry,
+        emitEvents: shouldEmitEvents
       });
     } catch (error) {
       policyLogger.error({ err: error }, 'Failed to enforce data retention policy');
@@ -359,7 +395,8 @@ export async function enforceRetentionPolicies({
         policy,
         status: 'failed',
         details: failure,
-        dryRun: runDry
+        dryRun: runDry,
+        emitEvents: shouldEmitEvents
       });
     }
   }

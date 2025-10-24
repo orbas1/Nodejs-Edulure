@@ -317,6 +317,37 @@ const consentMutationErrorRate = new promClient.Gauge({
   labelNames: ['operation', 'tenant_id']
 });
 
+const dataRetentionPoliciesProcessedTotal = new promClient.Counter({
+  name: 'edulure_data_retention_policies_processed_total',
+  help: 'Count of data retention policy executions grouped by status',
+  labelNames: ['status']
+});
+
+const dataRetentionJobLastRunTimestamp = new promClient.Gauge({
+  name: 'edulure_data_retention_last_run_timestamp',
+  help: 'Unix timestamp of the last completed data retention job grouped by outcome',
+  labelNames: ['result']
+});
+
+const moderationFollowUpProcessedTotal = new promClient.Counter({
+  name: 'edulure_moderation_follow_up_processed_total',
+  help: 'Count of moderation follow-up outcomes grouped by result',
+  labelNames: ['result']
+});
+
+const moderationFollowUpLatencySeconds = new promClient.Histogram({
+  name: 'edulure_moderation_follow_up_latency_seconds',
+  help: 'Histogram of time between follow-up creation and completion grouped by severity',
+  labelNames: ['severity'],
+  buckets: [60, 300, 900, 1800, 3600, 7200, 21_600, 43_200, 86_400]
+});
+
+const moderationFollowUpBacklogGauge = new promClient.Gauge({
+  name: 'edulure_moderation_follow_up_backlog',
+  help: 'Number of pending moderation follow-ups grouped by bucket',
+  labelNames: ['bucket']
+});
+
 const consentMutationOutcomes = new Map();
 
 registry.registerMetric(httpRequestsTotal);
@@ -367,6 +398,11 @@ registry.registerMetric(explorerSearchInteractionsTotal);
 registry.registerMetric(consentMutationAttemptsTotal);
 registry.registerMetric(consentMutationErrorsTotal);
 registry.registerMetric(consentMutationErrorRate);
+registry.registerMetric(dataRetentionPoliciesProcessedTotal);
+registry.registerMetric(dataRetentionJobLastRunTimestamp);
+registry.registerMetric(moderationFollowUpProcessedTotal);
+registry.registerMetric(moderationFollowUpLatencySeconds);
+registry.registerMetric(moderationFollowUpBacklogGauge);
 
 const originalResetMetrics =
   typeof registry.resetMetrics === 'function' ? registry.resetMetrics.bind(registry) : null;
@@ -1080,3 +1116,11 @@ export function getMetricsRegistry() {
 
 const allowedIpEntries = parseIpList(env.observability.metrics.allowedIps);
 env.observability.metrics.allowedIps = allowedIpEntries;
+
+export {
+  dataRetentionPoliciesProcessedTotal,
+  dataRetentionJobLastRunTimestamp,
+  moderationFollowUpProcessedTotal,
+  moderationFollowUpLatencySeconds,
+  moderationFollowUpBacklogGauge
+};

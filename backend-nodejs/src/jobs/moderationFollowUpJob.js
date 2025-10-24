@@ -6,6 +6,11 @@ import CommunityPostModerationActionModel from '../models/CommunityPostModeratio
 import CommunityPostModerationCaseModel from '../models/CommunityPostModerationCaseModel.js';
 import ModerationFollowUpModel from '../models/ModerationFollowUpModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import {
+  moderationFollowUpBacklogGauge,
+  moderationFollowUpLatencySeconds,
+  moderationFollowUpProcessedTotal
+} from '../observability/metrics.js';
 
 function createLogger() {
   return logger.child({ module: 'moderation-follow-up-job' });
@@ -24,6 +29,47 @@ async function hydrateFollowUp(followUp) {
   };
 }
 
+const SEVERITY_TOKENS = {
+  low: 'emerald',
+  medium: 'amber',
+  high: 'ruby',
+  critical: 'ruby'
+};
+
+const ESCALATION_SEVERITIES = new Set(['high', 'critical']);
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveSeverity(severity) {
+  if (!severity) {
+    return { level: 'unknown', token: 'slate' };
+  }
+
+  const level = String(severity).toLowerCase();
+  return { level, token: SEVERITY_TOKENS[level] ?? 'slate' };
+}
+
+function computeSlaSeconds(followUp, now) {
+  const created = followUp?.createdAt ? new Date(followUp.createdAt) : null;
+  if (!created || Number.isNaN(created.getTime())) {
+    return null;
+  }
+  const diffMs = now.getTime() - created.getTime();
+  return diffMs >= 0 ? Math.round(diffMs / 1000) : 0;
+}
+
+function shouldEscalate(severityLevel, followUp, moderationCase) {
+  if (!ESCALATION_SEVERITIES.has(severityLevel)) {
+    return false;
+  }
+  if (!followUp.assignedTo && !moderationCase?.assigneeId) {
+    return true;
+  }
+  return false;
+}
+
 export class ModerationFollowUpJob {
   constructor({
     enabled = env.moderation.followUps.enabled,
@@ -32,7 +78,12 @@ export class ModerationFollowUpJob {
     batchSize = env.moderation.followUps.batchSize,
     scheduler = cron,
     nowProvider = () => new Date(),
-    loggerInstance = createLogger()
+    loggerInstance = createLogger(),
+    metrics = {
+      processedCounter: moderationFollowUpProcessedTotal,
+      latencyHistogram: moderationFollowUpLatencySeconds,
+      backlogGauge: moderationFollowUpBacklogGauge
+    }
   } = {}) {
     this.enabled = Boolean(enabled);
     this.schedule = schedule;
@@ -42,10 +93,56 @@ export class ModerationFollowUpJob {
     this.nowProvider = nowProvider;
     this.logger = loggerInstance;
     this.task = null;
+    this.metrics = metrics ?? {};
 
     if (typeof this.batchSize !== 'number' || this.batchSize <= 0) {
       throw new Error('ModerationFollowUpJob requires a positive batch size.');
     }
+  }
+
+  async recordBacklog(now) {
+    if (!this.metrics?.backlogGauge) {
+      return;
+    }
+
+    try {
+      const [pendingTotal, dueTotal] = await Promise.all([
+        ModerationFollowUpModel.countPending(),
+        ModerationFollowUpModel.countDue(now)
+      ]);
+
+      this.metrics.backlogGauge.labels('pending').set(pendingTotal);
+      this.metrics.backlogGauge.labels('due').set(dueTotal);
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Failed to record moderation follow-up backlog metrics');
+    }
+  }
+
+  recordOutcome(result, severityLevel, slaSeconds) {
+    if (this.metrics?.processedCounter) {
+      this.metrics.processedCounter.labels(result).inc();
+    }
+
+    if (slaSeconds !== null && slaSeconds !== undefined && this.metrics?.latencyHistogram) {
+      this.metrics.latencyHistogram.observe({ severity: severityLevel ?? 'unknown' }, slaSeconds);
+    }
+  }
+
+  async recordDomainEventWithRetry(event, attempts = 3) {
+    let lastError;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await DomainEventModel.record(event);
+      } catch (error) {
+        lastError = error;
+        if (attempt === attempts) {
+          throw error;
+        }
+        await delay(attempt * 100);
+      }
+    }
+
+    throw lastError;
   }
 
   start() {
@@ -97,6 +194,7 @@ export class ModerationFollowUpJob {
     }
 
     const now = this.nowProvider();
+    await this.recordBacklog(now);
     const dueFollowUps = await ModerationFollowUpModel.listDue({ now, limit: this.batchSize });
     if (!dueFollowUps.length) {
       this.logger.debug({ trigger }, 'No moderation follow-ups due');
@@ -108,8 +206,17 @@ export class ModerationFollowUpJob {
 
     for (const entry of hydrated) {
       const { followUp, action, case: moderationCase } = entry;
+      const severityInfo = resolveSeverity(moderationCase?.severity);
+      const severityLevel = severityInfo.level;
+      const severityToken = severityInfo.token;
+      const escalationRequired = shouldEscalate(severityLevel, followUp, moderationCase);
+      const status = escalationRequired ? 'escalation-pending' : 'reminder-due';
+      const statusColor = escalationRequired ? 'ruby' : 'indigo';
+      const assignedTo = followUp.assignedTo ?? action?.actorId ?? null;
+      const slaSeconds = computeSlaSeconds(followUp, now);
+
       try {
-        await DomainEventModel.record({
+        await this.recordDomainEventWithRetry({
           entityType: 'community_post',
           entityId: moderationCase?.postId ?? null,
           eventType: 'community.moderation.follow_up.due',
@@ -118,16 +225,21 @@ export class ModerationFollowUpJob {
             caseId: moderationCase?.publicId ?? followUp.caseId,
             actionId: followUp.actionId ?? null,
             communityId: moderationCase?.communityId ?? null,
-            assignedTo: followUp.assignedTo ?? action?.actorId ?? null,
+            assignedTo,
             dueAt: followUp.dueAt,
+            status,
+            severity: severityLevel,
+            severityToken,
+            statusColor,
             context: {
               followUpMetadata: followUp.metadata,
               actionMetadata: action?.metadata ?? null,
               caseStatus: moderationCase?.status ?? null,
-              caseSeverity: moderationCase?.severity ?? null
+              caseSeverity: moderationCase?.severity ?? null,
+              slaSeconds
             }
           },
-          performedBy: followUp.assignedTo ?? action?.actorId ?? null
+          performedBy: assignedTo
         });
 
         await ModerationFollowUpModel.markCompleted(followUp.id, {
@@ -136,11 +248,16 @@ export class ModerationFollowUpJob {
           metadata: {
             ...followUp.metadata,
             dispatchedAt: now,
-            trigger
+            trigger,
+            status,
+            severity: severityLevel,
+            severityToken,
+            slaSeconds
           }
         });
 
-        dispatched.push({ followUpId: followUp.id, status: 'sent' });
+        this.recordOutcome('sent', severityLevel, slaSeconds);
+        dispatched.push({ followUpId: followUp.id, status, severity: severityLevel });
       } catch (error) {
         this.logger.error(
           { err: error, followUpId: followUp.id, caseId: followUp.caseId },
@@ -152,11 +269,18 @@ export class ModerationFollowUpJob {
           metadata: {
             ...followUp.metadata,
             failure: error.message,
-            trigger
+            trigger,
+            status: 'cancelled',
+            severity: severityLevel,
+            severityToken,
+            slaSeconds
           }
         });
+        this.recordOutcome('cancelled', severityLevel, slaSeconds);
       }
     }
+
+    await this.recordBacklog(this.nowProvider());
 
     return { processed: hydrated.length, dispatched };
   }

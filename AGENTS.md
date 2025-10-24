@@ -89,8 +89,8 @@
       - A31. Flutter Notifications, Messaging & Support (3.F)
       - A32. Community Reminder Job (4.A)
       - A33. Data Partition Job (4.B)
-      - A34. Data Retention Job (4.C)
-      - A35. Moderation Follow-Up Job (4.D)
+      - A34. Data Retention Job (4.C) ✓
+      - A35. Moderation Follow-Up Job (4.D) ✓
       - A36. Monetization Reconciliation Job (4.E)
       - A37. Telemetry Warehouse Job (4.F)
       - A38. Identity & Access Schema (5.A)
