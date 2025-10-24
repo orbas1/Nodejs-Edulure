@@ -5,11 +5,13 @@ import { fetchCoursePlayer, fetchCourseLiveChat, postCourseLiveChat } from '../.
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useRealtime } from '../../context/RealtimeContext.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardSwitcherHeader from '../../components/dashboard/DashboardSwitcherHeader.jsx';
 import CourseProgressBar from '../../components/course/CourseProgressBar.jsx';
 import { CourseModuleNavigator } from '../../components/course/CourseModuleNavigator.jsx';
 import CertificatePreview from '../../components/certification/CertificatePreview.jsx';
 import AssessmentQuickView from '../../components/course/AssessmentQuickView.jsx';
 import { useLearnerDashboardContext } from '../../hooks/useLearnerDashboard.js';
+import useDashboardSurface from '../../hooks/useDashboardSurface.js';
 import useLearnerProgress from '../../hooks/useLearnerProgress.js';
 import {
   formatDashboardDate,
@@ -186,10 +188,34 @@ const normaliseFallbackModules = (modules = []) =>
 export default function CourseViewer() {
   const { courseId } = useParams();
   const { isLearner, dashboard } = useLearnerDashboardContext();
+  const { surface, refresh: refreshDashboard, trackView, trackAction } = useDashboardSurface('course-viewer', {
+    origin: 'course-viewer'
+  });
   const course = useMemo(
     () => dashboard?.courses?.active.find((item) => item.id === courseId),
     [dashboard, courseId]
   );
+  const workspaceUrl = useMemo(() => {
+    const candidate =
+      course?.workspaceUrl ??
+      course?.launchUrl ??
+      course?.learnspaceUrl ??
+      course?.links?.workspace ??
+      null;
+    if (!candidate) {
+      return null;
+    }
+    try {
+      const base = typeof window !== 'undefined' ? window.location.origin : 'https://app.edulure.com';
+      const url = new URL(candidate, base);
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        return url.href;
+      }
+      return null;
+    } catch (_error) {
+      return null;
+    }
+  }, [course]);
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const { socket } = useRealtime();
@@ -212,9 +238,27 @@ export default function CourseViewer() {
     lastUpdatedAt: progressLastUpdatedAt,
     source: progressSource
   } = useLearnerProgress(courseId);
+  const handleRefresh = useCallback(() => {
+    refreshDashboard?.();
+    refreshLearnerProgress();
+  }, [refreshDashboard, refreshLearnerProgress]);
   const nextLessonFromSummary = courseProgressSummary?.nextLesson ?? null;
   const lessonFocusRef = useRef(false);
   const [focusedLessonId, setFocusedLessonId] = useState(() => nextLessonFromSummary?.id ?? null);
+
+  const handleLaunchWorkspace = useCallback(() => {
+    if (!workspaceUrl) {
+      return;
+    }
+    trackAction('launch_workspace', { courseId, workspaceUrl });
+    if (typeof window !== 'undefined') {
+      window.open(workspaceUrl, '_blank', 'noopener');
+    }
+  }, [workspaceUrl, trackAction, courseId]);
+
+  useEffect(() => {
+    trackView({ courseId, isLearner, hasCourse: Boolean(course) });
+  }, [trackView, courseId, isLearner, course]);
 
   const appendChatMessage = useCallback((message) => {
     if (!message) return;
@@ -722,27 +766,33 @@ export default function CourseViewer() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">Course viewer</p>
-          <h1 className="text-2xl font-semibold text-slate-900">{course.title}</h1>
-          <p className="text-sm text-slate-600">Facilitated by {course.instructor}</p>
-          {nextLessonDetail ? (
-            <p className="mt-1 text-xs font-semibold text-primary">
-              Next up: {nextLessonDetail.moduleTitle} · {nextLessonDetail.lessonTitle}
-              {nextLessonDetail.status === 'scheduled' && nextLessonDetail.releaseAt
-                ? ` • Unlocks ${new Date(nextLessonDetail.releaseAt).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric'
-                  })}`
-                : ''}
-            </p>
-          ) : (
-            <p className="mt-1 text-xs font-semibold text-emerald-600">All scheduled lessons completed.</p>
-          )}
-        </div>
+      <DashboardSwitcherHeader
+        surface={surface}
+        onRefresh={handleRefresh}
+        title={course ? course.title : 'Course workspace'}
+        description={
+          nextLessonDetail
+            ? `Next up: ${nextLessonDetail.moduleTitle} · ${nextLessonDetail.lessonTitle}${
+                nextLessonDetail.status === 'scheduled' && nextLessonDetail.releaseAt
+                  ? ` • Unlocks ${new Date(nextLessonDetail.releaseAt).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric'
+                    })}`
+                  : ''
+              }`
+            : 'All scheduled lessons completed.'
+        }
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-3">
-          <button type="button" className="dashboard-primary-pill">
+          <button
+            type="button"
+            className="dashboard-primary-pill"
+            onClick={handleLaunchWorkspace}
+            disabled={!workspaceUrl}
+            title={!workspaceUrl ? 'Workspace link unavailable' : 'Open Learnspace in a new tab'}
+          >
             Launch Learnspace
           </button>
           <Link to="/dashboard/learner/courses" className="dashboard-pill">

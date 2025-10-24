@@ -4,6 +4,7 @@ import { ArrowPathIcon } from '@heroicons/react/20/solid';
 import clsx from 'clsx';
 
 import { useServiceHealth } from '../../context/ServiceHealthContext.jsx';
+import SkeletonPanel from '../loaders/SkeletonPanel.jsx';
 
 const LEVEL_CONFIG = {
   critical: {
@@ -48,9 +49,37 @@ function formatRelativeTime(value) {
 }
 
 export default function ServiceHealthBanner({ maxAlerts = 3 }) {
-  const { alerts, lastUpdated, loading, refresh } = useServiceHealth();
+  const { alerts, lastUpdated, loading, refresh, error } = useServiceHealth();
+
+  if (loading && !alerts.length) {
+    return (
+      <section className="border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto max-w-7xl px-6 py-4">
+          <SkeletonPanel lines={3} streaming ariaLabel="Loading service health updates" />
+        </div>
+      </section>
+    );
+  }
 
   if (!alerts.length) {
+    if (error) {
+      return (
+        <section className="border-b border-slate-200 bg-white/90 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-4 text-sm text-slate-600">
+            <span>Unable to load runtime health at the moment.</span>
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <ArrowPathIcon className={clsx('h-4 w-4', loading ? 'animate-spin' : '')} aria-hidden="true" />
+              Retry
+            </button>
+          </div>
+        </section>
+      );
+    }
     return null;
   }
 

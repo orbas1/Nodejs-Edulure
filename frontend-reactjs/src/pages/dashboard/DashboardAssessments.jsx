@@ -2,7 +2,6 @@ import {
   ArrowTopRightOnSquareIcon,
   BoltIcon,
   CheckCircleIcon,
-  ClockIcon,
   ClipboardDocumentCheckIcon,
   ExclamationTriangleIcon,
   PencilSquareIcon,
@@ -11,11 +10,12 @@ import {
 } from '@heroicons/react/24/outline';
 import PropTypes from 'prop-types';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardSwitcherHeader from '../../components/dashboard/DashboardSwitcherHeader.jsx';
 import AssessmentQuickView from '../../components/course/AssessmentQuickView.jsx';
 import useLearnerStudyPlan from '../../hooks/useLearnerStudyPlan.js';
+import useDashboardSurface from '../../hooks/useDashboardSurface.js';
 
 const toneStyles = {
   positive: {
@@ -942,7 +942,14 @@ GradingQueue.defaultProps = {
 };
 
 export default function DashboardAssessments() {
-  const { role, dashboard, refresh } = useOutletContext();
+  const { role, surface, refresh, trackView, context } = useDashboardSurface('assessments', {
+    origin: 'dashboard-assessments'
+  });
+  const dashboard = context?.dashboard ?? null;
+
+  useEffect(() => {
+    trackView();
+  }, [trackView]);
   const assessments = dashboard?.assessments;
   const isLearner = role === 'learner';
 
@@ -1011,20 +1018,12 @@ export default function DashboardAssessments() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="dashboard-title">{headerCopy.title}</h1>
-          <p className="dashboard-subtitle max-w-2xl">{headerCopy.description}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => refresh?.()}
-          className="dashboard-pill flex items-center gap-2 border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
-        >
-          <ClockIcon className="h-4 w-4" />
-          Sync latest data
-        </button>
-      </header>
+      <DashboardSwitcherHeader
+        title={headerCopy.title}
+        description={headerCopy.description}
+        surface={surface}
+        onRefresh={refresh}
+      />
 
       {overview.length ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

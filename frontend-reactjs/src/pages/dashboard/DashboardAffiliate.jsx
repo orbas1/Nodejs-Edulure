@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
 
+import DashboardSwitcherHeader from '../../components/dashboard/DashboardSwitcherHeader.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import {
   createAffiliateChannel,
   updateAffiliateChannel,
@@ -9,6 +10,7 @@ import {
   recordAffiliatePayout
 } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import useDashboardSurface from '../../hooks/useDashboardSurface.js';
 
 const CHANNEL_STATUSES = [
   { value: 'draft', label: 'Draft' },
@@ -315,7 +317,14 @@ PayoutForm.defaultProps = {
 };
 
 export default function DashboardAffiliate() {
-  const { role, dashboard, refresh } = useOutletContext();
+  const { role, surface, refresh, trackView, trackAction, context } = useDashboardSurface('affiliate', {
+    origin: 'dashboard-affiliate'
+  });
+  const dashboard = context?.dashboard ?? null;
+
+  useEffect(() => {
+    trackView();
+  }, [trackView]);
   const affiliate = dashboard?.affiliate ?? null;
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
@@ -494,7 +503,11 @@ export default function DashboardAffiliate() {
         ? `Exported ${filteredChannels.length} channel${filteredChannels.length === 1 ? '' : 's'}.`
         : 'Your browser blocked the download. Try again or adjust permissions.'
     });
-  }, [filteredChannels, triggerCsvDownload, setStatusMessage]);
+    trackAction('export_channels', {
+      count: filteredChannels.length,
+      success
+    });
+  }, [filteredChannels, triggerCsvDownload, setStatusMessage, trackAction]);
 
   const handleExportPayouts = useCallback(() => {
     if (!filteredPayouts.length) {
@@ -534,7 +547,11 @@ export default function DashboardAffiliate() {
         ? `Exported ${filteredPayouts.length} payout${filteredPayouts.length === 1 ? '' : 's'}.`
         : 'Your browser blocked the download. Try again or adjust permissions.'
     });
-  }, [channelLookup, filteredPayouts, triggerCsvDownload, setStatusMessage]);
+    trackAction('export_payouts', {
+      count: filteredPayouts.length,
+      success
+    });
+  }, [channelLookup, filteredPayouts, triggerCsvDownload, setStatusMessage, trackAction]);
 
   const openChannelForm = useCallback((channel) => {
     if (channel) {
@@ -599,9 +616,11 @@ export default function DashboardAffiliate() {
         if (channelForm.id) {
           await updateAffiliateChannel({ token, channelId: channelForm.id, payload });
           setStatusMessage({ type: 'success', message: 'Affiliate channel updated.' });
+          trackAction('update_channel', { status: channelForm.status });
         } else {
           await createAffiliateChannel({ token, payload });
           setStatusMessage({ type: 'success', message: 'Affiliate channel created.' });
+          trackAction('create_channel', { status: channelForm.status });
         }
         resetChannelForm();
         await refresh?.();
@@ -610,11 +629,12 @@ export default function DashboardAffiliate() {
           type: 'error',
           message: submitError instanceof Error ? submitError.message : 'Unable to save the affiliate channel.'
         });
+        trackAction('channel_error', { reason: submitError instanceof Error ? submitError.message : 'unknown' });
       } finally {
         setChannelSubmitting(false);
       }
     },
-    [channelForm, refresh, resetChannelForm, token]
+    [channelForm, refresh, resetChannelForm, token, trackAction]
   );
 
   const handleChannelDelete = useCallback(
@@ -627,15 +647,17 @@ export default function DashboardAffiliate() {
       try {
         await deleteAffiliateChannel({ token, channelId: channel.id });
         setStatusMessage({ type: 'success', message: `${channel.platform} archived.` });
+        trackAction('delete_channel', { platform: channel.platform });
         await refresh?.();
       } catch (deleteError) {
         setStatusMessage({
           type: 'error',
           message: deleteError instanceof Error ? deleteError.message : 'Unable to archive this channel right now.'
         });
+        trackAction('channel_error', { reason: deleteError instanceof Error ? deleteError.message : 'delete_failed' });
       }
     },
-    [refresh, token]
+    [refresh, token, trackAction]
   );
 
   const openPayoutForm = useCallback((channel) => {
@@ -679,6 +701,7 @@ export default function DashboardAffiliate() {
       try {
         await recordAffiliatePayout({ token, channelId: payoutForm.channelId, payload });
         setStatusMessage({ type: 'success', message: 'Payout recorded.' });
+        trackAction('record_payout', { status: payoutForm.status, channelId: payoutForm.channelId });
         resetPayoutForm();
         await refresh?.();
       } catch (submitError) {
@@ -686,11 +709,12 @@ export default function DashboardAffiliate() {
           type: 'error',
           message: submitError instanceof Error ? submitError.message : 'Unable to record the payout right now.'
         });
+        trackAction('payout_error', { reason: submitError instanceof Error ? submitError.message : 'unknown' });
       } finally {
         setPayoutSubmitting(false);
       }
     },
-    [payoutForm, refresh, resetPayoutForm, token]
+    [payoutForm, refresh, resetPayoutForm, token, trackAction]
   );
 
   if (role && !['learner', 'instructor'].includes(role)) {
@@ -714,39 +738,40 @@ export default function DashboardAffiliate() {
     );
   }
 
+  const feedbackTone =
+    statusMessage?.type === 'error'
+      ? 'error'
+      : statusMessage?.type === 'success'
+        ? 'success'
+        : statusMessage?.type === 'pending'
+          ? 'warning'
+          : 'info';
+
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="dashboard-kicker text-primary">Affiliate workspace</p>
-          <h1 className="dashboard-title">
-            {role === 'instructor' ? 'Scale trusted partner revenue streams' : 'Grow your learner pipeline with trusted partners'}
-          </h1>
-          <p className="dashboard-subtitle">
-            Capture channel performance, automate payouts, and keep referral partners motivated.
-          </p>
-        </div>
-        <button type="button" onClick={() => openChannelForm(null)} className="dashboard-primary-pill">
-          New channel
-        </button>
-      </header>
+      <DashboardSwitcherHeader
+        surface={surface}
+        onRefresh={refresh}
+        actions={[
+          {
+            id: 'new-channel',
+            label: 'New channel',
+            onSelect: () => openChannelForm(null)
+          }
+        ]}
+      />
 
       {statusMessage ? (
-        <div
-          className={`rounded-3xl border px-4 py-3 text-sm ${
-            statusMessage.type === 'error'
-              ? 'border-rose-200 bg-rose-50 text-rose-700'
-              : statusMessage.type === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : statusMessage.type === 'pending'
-                  ? 'border-amber-200 bg-amber-50 text-amber-700'
-                  : statusMessage.type === 'info'
-                    ? 'border-sky-200 bg-sky-50 text-sky-700'
-                    : 'border-slate-200 bg-slate-50 text-slate-600'
-          }`}
-        >
-          {statusMessage.message}
-        </div>
+        <DashboardActionFeedback
+          feedback={{
+            tone: feedbackTone,
+            message: statusMessage.message,
+            detail: statusMessage.detail
+          }}
+          onDismiss={() => setStatusMessage(null)}
+          persistKey="dashboard-affiliate-feedback"
+          autoDismiss={feedbackTone === 'success' ? 4500 : null}
+        />
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">

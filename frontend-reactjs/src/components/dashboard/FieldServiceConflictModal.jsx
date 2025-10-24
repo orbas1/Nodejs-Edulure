@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
+import useDashboardSurface from '../../hooks/useDashboardSurface.js';
+
 function formatTimestamp(value) {
   if (!value) return '—';
   try {
@@ -180,9 +182,21 @@ const FIELD_DEFINITIONS = [
 ];
 
 export default function FieldServiceConflictModal({ conflict, onClose, onReloadServer, onApplySuggestion }) {
+  const { surface, trackAction, refresh } = useDashboardSurface('bookings', {
+    origin: 'field-service-conflict-modal'
+  });
+
   if (!conflict) {
     return null;
   }
+
+  const serviceTone = surface?.serviceHealth === 'outage'
+    ? 'bg-rose-100 text-rose-700'
+    : surface?.serviceHealth === 'degraded'
+      ? 'bg-amber-100 text-amber-700'
+      : 'bg-emerald-100 text-emerald-700';
+
+  const lastSyncedLabel = surface?.lastSyncedAt ? formatTimestamp(surface.lastSyncedAt) : 'Unknown';
 
   const {
     serverAssignment,
@@ -225,6 +239,27 @@ export default function FieldServiceConflictModal({ conflict, onClose, onReloadS
 
   const canApplySuggestion = Boolean(onApplySuggestion) && Boolean(conflict?.suggestedPayload);
 
+  const handleReload = () => {
+    trackAction('conflict_reload_assignment', { assignmentId: conflict.assignmentId });
+    if (onReloadServer) {
+      onReloadServer();
+    }
+  };
+
+  const handleContinueEditing = () => {
+    trackAction('conflict_continue_editing', { assignmentId: conflict.assignmentId });
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleApplySuggestion = () => {
+    trackAction('conflict_apply_suggestion', { assignmentId: conflict.assignmentId, hasSuggestion: canApplySuggestion });
+    if (canApplySuggestion && onApplySuggestion) {
+      onApplySuggestion();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-8">
       <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl">
@@ -241,6 +276,28 @@ export default function FieldServiceConflictModal({ conflict, onClose, onReloadS
                 Suggested merge outcome: {suggestedAssignment.statusLabel ?? suggestedAssignment.status ?? 'Updated status'} ·{' '}
                 {suggestedAssignment.priority ?? 'standard'} priority.
               </p>
+            ) : null}
+            {surface ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-semibold ${serviceTone}`}>
+                  <span className="inline-block h-2 w-2 rounded-full bg-current" aria-hidden="true" />
+                  {surface.serviceHealth ? surface.serviceHealth.replace(/_/g, ' ') : 'Operational'}
+                </span>
+                <span>Last synced {lastSyncedLabel}</span>
+                <span>{surface.pendingCount ? `${surface.pendingCount} pending dispatches` : 'No pending dispatches'}</span>
+                {surface.stale ? (
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-primary hover:underline"
+                    onClick={() => {
+                      trackAction('conflict_refresh_surface', { assignmentId: conflict.assignmentId });
+                      refresh?.();
+                    }}
+                  >
+                    Refresh dashboard data
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <button
@@ -294,14 +351,14 @@ export default function FieldServiceConflictModal({ conflict, onClose, onReloadS
             <button
               type="button"
               className="dashboard-pill"
-              onClick={onReloadServer}
+              onClick={handleReload}
             >
               Reload latest assignment
             </button>
             <button
               type="button"
               className="dashboard-pill"
-              onClick={onClose}
+              onClick={handleContinueEditing}
             >
               Continue editing
             </button>
@@ -309,7 +366,7 @@ export default function FieldServiceConflictModal({ conflict, onClose, onReloadS
               type="button"
               className="dashboard-primary-pill"
               disabled={!canApplySuggestion}
-              onClick={canApplySuggestion ? onApplySuggestion : undefined}
+              onClick={handleApplySuggestion}
             >
               Apply merged update
             </button>

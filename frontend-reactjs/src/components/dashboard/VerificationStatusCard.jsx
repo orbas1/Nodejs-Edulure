@@ -15,17 +15,26 @@ function computeProgress(verification) {
   return Math.min(100, Math.round(ratio * 100));
 }
 
+const statusToneClass = {
+  success: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  info: 'bg-sky-100 text-sky-700 border border-sky-200',
+  danger: 'bg-rose-100 text-rose-700 border border-rose-200',
+  warning: 'bg-amber-100 text-amber-700 border border-amber-200'
+};
+
 function resolveStatusBadge(status) {
   switch (status) {
     case 'approved':
-      return 'bg-emerald-100 text-emerald-700 border border-emerald-200';
+      return { label: 'Approved', tone: 'success' };
     case 'pending_review':
-      return 'bg-sky-100 text-sky-700 border border-sky-200';
+      return { label: 'Pending review', tone: 'info' };
     case 'resubmission_required':
+      return { label: 'Resubmission required', tone: 'danger' };
     case 'rejected':
-      return 'bg-rose-100 text-rose-700 border border-rose-200';
+      return { label: 'Rejected', tone: 'danger' };
+    case 'collecting':
     default:
-      return 'bg-amber-100 text-amber-700 border border-amber-200';
+      return { label: 'Collecting documents', tone: 'warning' };
   }
 }
 
@@ -71,7 +80,7 @@ export default function VerificationStatusCard({ verification, onRefresh }) {
     );
   }, [verification]);
 
-  const statusBadge = resolveStatusBadge(verification?.status ?? 'collecting');
+  const statusDescriptor = resolveStatusBadge(verification?.status ?? 'collecting');
 
   useEffect(() => {
     const availableTypes = outstanding.length ? outstanding : requiredDocuments;
@@ -201,8 +210,12 @@ export default function VerificationStatusCard({ verification, onRefresh }) {
             soon as compliance completes the review.
           </p>
         </div>
-        <div className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-wide ${statusBadge}`}>
-          <span>{verification.status?.replace(/_/g, ' ') ?? 'collecting'}</span>
+        <div
+          className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-wide ${
+            statusToneClass[statusDescriptor.tone] ?? statusToneClass.warning
+          }`}
+        >
+          <span>{statusDescriptor.label}</span>
         </div>
       </div>
 
@@ -240,6 +253,12 @@ export default function VerificationStatusCard({ verification, onRefresh }) {
             <dd className="mt-2 text-sm text-slate-700">{formatDate(verification.lastReviewedAt)}</dd>
           </div>
         </dl>
+
+        {verification.assistiveText ? (
+          <p className="rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-500 shadow-sm">
+            {verification.assistiveText}
+          </p>
+        ) : null}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -340,7 +359,10 @@ export default function VerificationStatusCard({ verification, onRefresh }) {
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
-            Compliance contact: <span className="font-semibold text-slate-700">compliance@edulure.com</span>
+            Compliance contact:{' '}
+            <span className="font-semibold text-slate-700">
+              {verification.complianceContact ?? 'compliance@edulure.com'}
+            </span>
           </p>
           <button
             type="button"

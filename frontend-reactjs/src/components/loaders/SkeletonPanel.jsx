@@ -3,15 +3,21 @@ import clsx from 'clsx';
 
 const LINE_WIDTHS = [100, 92, 84, 76, 64];
 
-export default function SkeletonPanel({ lines, className }) {
+export default function SkeletonPanel({ lines, className, variant, ariaLabel, streaming }) {
   const safeLines = Math.min(Math.max(lines, 1), LINE_WIDTHS.length);
+  const baseClass =
+    variant === 'inline'
+      ? 'animate-pulse space-y-2 rounded-lg border border-slate-200/50 bg-slate-100/80 p-3 shadow-sm'
+      : 'animate-pulse space-y-3 rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm shadow-primary/5';
+
   return (
     <div
-      className={clsx(
-        'dashboard-card-muted animate-pulse space-y-3 rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm shadow-primary/5',
-        className
-      )}
-      aria-hidden="true"
+      className={clsx('dashboard-skeleton', streaming && 'dashboard-skeleton-streaming', baseClass, className)}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      aria-label={ariaLabel ?? 'Loading'}
+      data-streaming={streaming ? 'true' : 'false'}
     >
       {LINE_WIDTHS.slice(0, safeLines).map((width, index) => (
         <div
@@ -27,10 +33,16 @@ export default function SkeletonPanel({ lines, className }) {
 
 SkeletonPanel.propTypes = {
   lines: PropTypes.number,
-  className: PropTypes.string
+  className: PropTypes.string,
+  variant: PropTypes.oneOf(['card', 'inline']),
+  ariaLabel: PropTypes.string,
+  streaming: PropTypes.bool
 };
 
 SkeletonPanel.defaultProps = {
   lines: 4,
-  className: ''
+  className: '',
+  variant: 'card',
+  ariaLabel: 'Loading',
+  streaming: false
 };

@@ -22,6 +22,61 @@ export default function AppSidebar({
     }
   };
 
+  const renderStatusBadge = (status) => {
+    if (!status) {
+      return null;
+    }
+
+    const resolved =
+      typeof status === 'string'
+        ? { label: status, tone: 'notice' }
+        : {
+            label: status.label ?? '',
+            tone: status.tone ?? 'notice',
+            health: status.health ?? null
+          };
+
+    if (!resolved.label) {
+      return null;
+    }
+
+    const toneClass =
+      resolved.tone === 'critical'
+        ? 'bg-rose-100 text-rose-700'
+        : resolved.tone === 'alert'
+          ? 'bg-amber-100 text-amber-700'
+          : resolved.tone === 'success'
+            ? 'bg-emerald-100 text-emerald-700'
+            : 'bg-sky-100 text-sky-700';
+
+    const titlePieces = [];
+    if (resolved.health) {
+      titlePieces.push(`Service health: ${resolved.health}`);
+    }
+    titlePieces.push(typeof resolved.label === 'string' ? resolved.label : 'Status update');
+
+    return (
+      <span
+        className={`inline-flex items-center gap-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${toneClass}`}
+        title={titlePieces.join(' • ')}
+      >
+        {resolved.health ? (
+          <span
+            className={`inline-block h-2 w-2 rounded-full ${
+              resolved.health === 'degraded'
+                ? 'bg-amber-500'
+                : resolved.health === 'outage'
+                  ? 'bg-rose-500'
+                  : 'bg-emerald-500'
+            }`}
+            aria-hidden="true"
+          />
+        ) : null}
+        {resolved.label}
+      </span>
+    );
+  };
+
   const renderLink = (item) => {
     return (
       <NavLink
@@ -45,10 +100,13 @@ export default function AppSidebar({
       >
         {item.icon ? <item.icon className="h-5 w-5" aria-hidden="true" /> : <Bars3Icon className="h-5 w-5" />}
         {!collapsed ? <span className="flex-1 truncate">{item.name}</span> : null}
-        {!collapsed && statusByRoute[item.id] ? (
-          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
-            {statusByRoute[item.id]}
-          </span>
+        {!collapsed ? renderStatusBadge(statusByRoute[item.id]) : null}
+        {collapsed && statusByRoute[item.id] ? (
+          <span className="sr-only">{`Status: ${
+            typeof statusByRoute[item.id] === 'string'
+              ? statusByRoute[item.id]
+              : statusByRoute[item.id]?.label ?? 'update'
+          }`}</span>
         ) : null}
       </NavLink>
     );
