@@ -94,8 +94,8 @@
         *See Part 1.B for the end-to-end dashboard narrative including layout metadata exports and onboarding orchestration.*
       - A3. Courses, Catalogue & Creation Studio (1.C)
       - A4. Community, Events & Programming (1.D)
-      - A5. Feed, Social Graph & Direct Messaging (1.E)
-      - A6. Explorer, Search & Discovery (1.F)
+      - [x] A5. Feed, Social Graph & Direct Messaging (1.E)
+      - [x] A6. Explorer, Search & Discovery (1.F)
       - A7. Commerce, Billing & Monetisation (1.G)
       - A8. Ads, Growth & Content Marketing (1.H)
       - A9. Analytics, Intelligence & Telemetry (1.I)

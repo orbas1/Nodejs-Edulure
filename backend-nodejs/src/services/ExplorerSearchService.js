@@ -3,21 +3,7 @@ import { buildBounds, resolveCountryCoordinates } from '../utils/geo.js';
 import AdsPlacementService from './AdsPlacementService.js';
 import { SUPPORTED_ENTITIES as MODEL_SUPPORTED_ENTITIES } from '../models/SearchDocumentModel.js';
 import { resolveSearchProvider } from './searchProviders.js';
-
-const ENTITY_CONFIG = {
-  communities: {
-    defaultSort: 'trending'
-  },
-  courses: {
-    defaultSort: 'relevance'
-  },
-  ebooks: {
-    defaultSort: 'relevance'
-  },
-  tutors: {
-    defaultSort: 'relevance'
-  }
-};
+import { getEntityDefaultSort } from '../config/searchRankingConfig.js';
 
 function formatCurrency(price) {
   if (!price || !Number.isFinite(price.amountMinor)) {
@@ -529,7 +515,7 @@ export class ExplorerSearchService {
 
   resolveSort(entity, sortPreference) {
     if (!sortPreference) {
-      return ENTITY_CONFIG[entity]?.defaultSort ?? null;
+      return getEntityDefaultSort(entity);
     }
     if (typeof sortPreference === 'string') {
       return sortPreference;
@@ -540,7 +526,7 @@ export class ExplorerSearchService {
     if (typeof sortPreference === 'object' && sortPreference[entity]) {
       return sortPreference[entity];
     }
-    return ENTITY_CONFIG[entity]?.defaultSort ?? null;
+    return getEntityDefaultSort(entity);
   }
 
   async searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }) {
@@ -586,7 +572,24 @@ export class ExplorerSearchService {
     const resolvedEntities = this.normaliseEntityTypes(entityTypes);
 
     const tasks = resolvedEntities.map((entity) =>
-      this.searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets })
+      this.searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }).catch((error) => {
+        this.logger.warn({ err: error, entity }, 'Explorer search entity query failed, returning empty result');
+        const fallbackFilters = this.buildFilters(entity, filters, globalFilters);
+        const fallbackSort = this.resolveSort(entity, sort);
+        return {
+          entity,
+          hits: [],
+          totalHits: 0,
+          processingTimeMs: 0,
+          query,
+          page,
+          perPage,
+          sort: fallbackSort,
+          filter: fallbackFilters,
+          facets: {},
+          markers: []
+        };
+      })
     );
 
     const results = await Promise.all(tasks);

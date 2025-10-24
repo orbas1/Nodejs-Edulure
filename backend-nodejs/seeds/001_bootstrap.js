@@ -5173,6 +5173,7 @@ export async function seed(knex) {
       }),
       global_filters: JSON.stringify({ languages: ['en'] }),
       sort_preferences: JSON.stringify({ communities: 'trending', courses: 'rating' }),
+      delivery_channels: JSON.stringify([]),
       is_pinned: true,
       last_used_at: trx.fn.now()
     });
