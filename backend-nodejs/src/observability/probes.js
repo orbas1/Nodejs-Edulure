@@ -265,11 +265,54 @@ export function createProbeApp({
     fallbackValue: false
   });
 
+  const summaryHandler = async (req, res) => {
+    const headRequest = req.method === 'HEAD';
+    try {
+      const [liveResult, readyResult] = await Promise.all([
+        runProbe(resolvedLivenessCheck, { timeoutMs: livenessTimeoutMs, label: 'alive' }),
+        runProbe(readinessCheck, { timeoutMs: readinessTimeoutMs, label: 'ready' })
+      ]);
+      const alive = interpretFlag(liveResult, 'alive', true);
+      const ready = interpretFlag(readyResult, 'ready', false);
+      const status = ready ? 'ready' : alive ? 'degraded' : 'down';
+      const payload = {
+        service: serviceName,
+        checkedAt: new Date().toISOString(),
+        status,
+        alive,
+        ready,
+        liveness: {
+          status: alive ? 'alive' : 'down',
+          ...sanitiseResult(liveResult)
+        },
+        readiness: {
+          status: ready ? 'ready' : 'not_ready',
+          ...sanitiseResult(readyResult)
+        }
+      };
+      const statusCode = ready ? 200 : alive ? 503 : 500;
+      respond(res, payload, statusCode, headRequest);
+    } catch (error) {
+      const payload = {
+        service: serviceName,
+        checkedAt: new Date().toISOString(),
+        status: 'unknown',
+        error: error?.message ?? String(error)
+      };
+      respond(res, payload, 500, headRequest);
+    }
+  };
+
   app.get('/live', liveHandler);
   app.head('/live', liveHandler);
 
   app.get('/ready', readyHandler);
   app.head('/ready', readyHandler);
+
+  app.get('/', summaryHandler);
+  app.head('/', summaryHandler);
+  app.get('/status', summaryHandler);
+  app.head('/status', summaryHandler);
 
   return app;
 }

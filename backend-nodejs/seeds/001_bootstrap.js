@@ -6,6 +6,11 @@ import { TABLES as TELEMETRY_TABLES, generateTelemetryDedupeHash } from '../src/
 import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
+import {
+  COMMUNITY_EVENT_PARTICIPANT_STATUSES,
+  COMMUNITY_EVENT_REMINDER_CHANNELS,
+  COMMUNITY_EVENT_REMINDER_STATUSES
+} from '../src/models/communityEventConstants.js';
 import { ensureSeedImage } from './_helpers/seedAssets.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -2506,6 +2511,125 @@ export async function seed(knex) {
         metadata: JSON.stringify({ registrationUrl: 'https://events.edulure.test/growth-roundtable/register', track: 'growth' })
       }
     ]);
+
+    const [opsSummitEvent] = await trx('community_events')
+      .select('id')
+      .where({ slug: 'automation-summit-workshop' })
+      .limit(1);
+    const [growthRoundtableEvent] = await trx('community_events')
+      .select('id')
+      .where({ slug: 'creator-monetisation-roundtable' })
+      .limit(1);
+
+    const participantStatusGoing = COMMUNITY_EVENT_PARTICIPANT_STATUSES.includes('going')
+      ? 'going'
+      : COMMUNITY_EVENT_PARTICIPANT_STATUSES[0];
+    const participantStatusInterested = COMMUNITY_EVENT_PARTICIPANT_STATUSES.includes('interested')
+      ? 'interested'
+      : COMMUNITY_EVENT_PARTICIPANT_STATUSES[0];
+
+    if (opsSummitEvent?.id) {
+      await trx('community_event_participants').insert([
+        {
+          event_id: opsSummitEvent.id,
+          user_id: instructorId,
+          status: participantStatusGoing,
+          rsvp_at: new Date(),
+          reminder_scheduled_at: new Date(opsCommunitySummitStart.getTime() - 60 * 60 * 1000),
+          metadata: JSON.stringify({ cohort: 'ops-leads', notes: 'Facilitator' })
+        },
+        {
+          event_id: opsSummitEvent.id,
+          user_id: adminId,
+          status: participantStatusInterested,
+          rsvp_at: new Date(),
+          metadata: JSON.stringify({ cohort: 'exec', notes: 'Observing automation drills' })
+        }
+      ]);
+    }
+
+    if (growthRoundtableEvent?.id) {
+      await trx('community_event_participants').insert([
+        {
+          event_id: growthRoundtableEvent.id,
+          user_id: adminId,
+          status: participantStatusGoing,
+          rsvp_at: new Date(),
+          metadata: JSON.stringify({ cohort: 'growth', notes: 'Host' })
+        },
+        {
+          event_id: growthRoundtableEvent.id,
+          user_id: learnerId,
+          status: participantStatusInterested,
+          rsvp_at: new Date(),
+          metadata: JSON.stringify({ cohort: 'creators', notes: 'Invitee' })
+        }
+      ]);
+    }
+
+    const reminderStatusPending = COMMUNITY_EVENT_REMINDER_STATUSES.includes('pending')
+      ? 'pending'
+      : COMMUNITY_EVENT_REMINDER_STATUSES[0];
+    const reminderStatusSent = COMMUNITY_EVENT_REMINDER_STATUSES.includes('sent')
+      ? 'sent'
+      : COMMUNITY_EVENT_REMINDER_STATUSES[0];
+
+    const smsChannel = COMMUNITY_EVENT_REMINDER_CHANNELS.includes('sms')
+      ? 'sms'
+      : COMMUNITY_EVENT_REMINDER_CHANNELS[0];
+    const emailChannel = COMMUNITY_EVENT_REMINDER_CHANNELS.includes('email')
+      ? 'email'
+      : COMMUNITY_EVENT_REMINDER_CHANNELS[0];
+
+    if (opsSummitEvent?.id) {
+      await trx('community_event_reminders').insert([
+        {
+          event_id: opsSummitEvent.id,
+          user_id: instructorId,
+          status: reminderStatusPending,
+          channel: emailChannel,
+          remind_at: new Date(opsCommunitySummitStart.getTime() - 30 * 60 * 1000),
+          metadata: JSON.stringify({ message: 'Automation Summit starts soon. Bring the incident workbook.' })
+        },
+        {
+          event_id: opsSummitEvent.id,
+          user_id: adminId,
+          status: reminderStatusPending,
+          channel: smsChannel,
+          remind_at: new Date(opsCommunitySummitStart.getTime() - 45 * 60 * 1000),
+          metadata: JSON.stringify({
+            phoneNumber: '+15550001111',
+            manageUrl: 'https://events.edulure.test/ops-summit/manage'
+          })
+        }
+      ]);
+    }
+
+    if (growthRoundtableEvent?.id) {
+      await trx('community_event_reminders').insert([
+        {
+          event_id: growthRoundtableEvent.id,
+          user_id: learnerId,
+          status: reminderStatusPending,
+          channel: emailChannel,
+          remind_at: new Date(growthSummitStart.getTime() - 2 * 60 * 60 * 1000),
+          metadata: JSON.stringify({
+            message: 'Roundtable reminder: review the pricing experiments deck beforehand.'
+          })
+        },
+        {
+          event_id: growthRoundtableEvent.id,
+          user_id: adminId,
+          status: reminderStatusSent,
+          channel: emailChannel,
+          remind_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
+          sent_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
+          last_attempt_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
+          attempt_count: 1,
+          metadata: JSON.stringify({ message: 'Roundtable reminder sent 24h ahead.' })
+        }
+      ]);
+    }
 
     const primaryPodcastReleaseOn = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const teaserPodcastReleaseOn = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);

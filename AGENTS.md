@@ -558,9 +558,66 @@
         15. **Change Checklist Tracker.** Add coverage for `fillGaps` timelines and list option normalisation to regression suites before each release.
         16. **Full Upgrade Plan & Release Steps.** Deploy reporting changes alongside analytics schema docs, broadcast the new domain events to downstream consumers, backfill historic gaps for SLA dashboards, and validate support timelines with CX before GA.
       - 12.E Services & Integrations
+      - ✅ 12.E Services & Integrations (`backend-nodejs/src/integrations/HubSpotClient.js`, `backend-nodejs/src/services/CourseLiveService.js`, `backend-nodejs/src/observability/metrics.js`)
+        1. **Appraisal.** `HubSpotClient.request` now wraps every attempt in `recordIntegrationRequestAttempt` while `CourseLiveService` publishes presence gauges through `updateLiveCoursePresenceMetrics`, aligning external CRM syncs with live collaboration telemetry.
+        2. **Function.** Exponential backoff, audit logging, and idempotency digests remain, but duration/outcome labels now feed Prometheus histograms and `purgeStaleViewers` trims idle viewers before returning presence snapshots.
+        3. **Usefulness.** Integration counters, retry tallies, and live-session totals surface in `/metrics`, letting runbooks correlate CRM throttling with classroom participation.
+        4. **Redundancies.** A shared `recordAttemptMetrics` closure replaces repeated `Date.now()` bookkeeping, and metrics helpers eliminate bespoke logging in each retry branch.
+        5. **Placeholders or Stubs.** Future Salesforce or marketing connectors still need wiring, but they can now adopt the same metrics contract without reimplementing timers.
+        6. **Duplicate Functions.** Retry loops, audit metadata, and metrics emission share one path so new integrations avoid cloning duration/label scaffolding.
+        7. **Improvements Needed.** Extend the helper exports to GraphQL/webhook clients and ship alerts when `outcome=retry` exceeds agreed thresholds.
+        8. **Styling Improvements.** Constructor guards normalise configuration (`Math.max` on history/idle windows) so inconsistent environment values no longer slip through.
+        9. **Efficiency Analysis.** `purgeStaleViewers` and `maybeCleanupSession` reclaim memory for abandoned broadcasts while retry counters highlight 429 storms in HubSpot traffic.
+        10. **Strengths to Keep.** Structured audit logging, digest-driven idempotency, and bounded chat history continue to provide durable safety rails.
+        11. **Weaknesses to Remove.** Presence metrics still miss persona granularity and should eventually tag instructors versus learners for deeper diagnostics.
+        12. **Palette.** Structured JSON logs and Prometheus label keys keep observability dashboards colour-coded without ad-hoc formatting.
+        13. **CSS, Orientation & Placement.** Backend modules stay in domain folders—`integrations/`, `services/`, `observability/`—so ownership remains clear.
+        14. **Text Analysis.** Timeout and network faults now emit `'timeout'` or `'error'` status codes, giving SRE alerts clearer copy than generic 500s.
+        15. **Spacing.** Idle and retention windows default to 120s/900s and clamp to sensible floors, preventing outlier configs from choking cleanup loops.
+        16. **Shape.** Course sessions now enforce lifecycle boundaries (active, idle, retired) so downstream APIs never leak empty shells.
+        17. **Effects.** Retry counters, success/failure outcomes, and jittered delays expose the effect of upstream throttling directly in dashboards.
+        18. **Thumbs.** Document the live-session gauge semantics so support teams can quickly screenshot Grafana slices during incidents.
+        19. **Media.** Add sequence diagrams in `docs/observability` explaining how CRM retries and chat presence cleanups interact.
+        20. **Buttons.** Future toggles should let ops disable presence metrics or change idle cutoffs via runtime config without code edits.
+        21. **Interact.** Integration metrics couple with `/metrics` scraping, enabling operators to compare CRM traffic with live-session churn in real time.
+        22. **Missing.** Automated tests for `purgeStaleViewers` and integration retry metrics remain to be added before GA.
+        23. **Design.** Observability helpers (`recordIntegrationRequestAttempt`, `updateLiveCoursePresenceMetrics`) encapsulate cross-cutting concerns so service classes stay domain-focused.
+        24. **Clone.** Instrumentation helpers prevent future HTTP clients from cloning the same `try/catch` stats scaffolding.
+        25. **Framework.** Update backend integration playbooks to include guidance on invoking the new metrics exports.
+        26. **Checklist.** Add QA steps verifying that `CourseLiveService.reset()` zeroes gauges and HubSpot retries increment counters during smoke tests.
+        27. **Nav.** Link Prometheus metric names into the enablement runbook so operators can jump straight to dashboards.
+        28. **Release.** Roll out metrics registration, update Grafana to track the new series, and brief enablement teams on idle eviction before promoting to production.
          - 12.E.1 HubSpotClient (backend-nodejs/src/integrations/HubSpotClient.js)
          - 12.E.2 CourseLiveService (backend-nodejs/src/services/CourseLiveService.js)
-      - 12.F Async Jobs & Observability
+      - ✅ 12.F Async Jobs & Observability (`backend-nodejs/src/jobs/communityReminderJob.js`, `backend-nodejs/src/observability/probes.js`, `backend-nodejs/src/observability/metrics.js`)
+        1. **Appraisal.** `CommunityReminderJob` now emits background job counters while `communityEventConstants.js` freezes the shared status/channel enums so migrations, models, and seeds describe reminders and participants with the same taxonomy.
+        2. **Function.** Each run classifies outcomes (success, partial, idle, skipped, failure) with duration histograms, Twilio configuration short-circuits emit `outcome=skipped` metrics, and `/` plus `/status` aggregate readiness and liveness checks.
+        3. **Usefulness.** Operators can read job throughput and failure counts from `/metrics`, confirm stack health via a single JSON payload, and rely on the bootstrap seed data to exercise pending/sent reminders during local smoke tests.
+        4. **Redundancies.** The shared `recordBackgroundJobRun` eliminates bespoke logging math, Twilio sends reuse the integration metrics helper introduced for HubSpot, and the new constants module prevents duplicate status arrays in migrations, models, and seeds.
+        5. **Placeholders or Stubs.** Remaining Annex A32 jobs still lack wrappers but can now reuse the exported recorder without additional scaffolding.
+        6. **Duplicate Functions.** Twilio delivery and CRM metrics rely on the same helper, removing duplicate timer code for outbound integrations.
+        7. **Improvements Needed.** Add alerts keyed off `outcome=partial` and instrument the other queue workers with the same recorder.
+        8. **Styling Improvements.** Probe responses now package nested readiness/liveness dictionaries, standardising key casing for API consumers.
+        9. **Efficiency Analysis.** High-resolution timers convert `process.hrtime.bigint()` into milliseconds so dashboards catch sub-second variance in reminder batches.
+        10. **Strengths to Keep.** Config-driven enablement flags, audit trails, and retry loops remain while gaining transparent telemetry.
+        11. **Weaknesses to Remove.** Automated regression tests should assert that `/status` respects HEAD requests and that metrics increment as expected.
+        12. **Palette.** Health payloads stick to `ready`, `degraded`, and `down`, aligning with existing status colour tokens across ops tooling.
+        13. **Layout.** Summary responses embed `liveness` and `readiness` sections so monitoring UIs can slot them into cards without reshaping data.
+        14. **Text Analysis.** Error fields bubble up provider codes (e.g., Twilio `code`), improving pager copy when dispatches fail.
+        15. **Spacing.** Background job counters include separate `processed`, `succeeded`, and `failed` labels so dashboards can render stacked visualisations cleanly.
+        16. **Shape.** New `/` and `/status` endpoints provide canonical health entry points, reducing ad-hoc check shapes across environments.
+        17. **Effects.** Integration retries and message failures now surface as metric spikes, visualising external outage impact immediately.
+        18. **Thumbs.** Capture screenshots of Grafana tiles once dashboards ingest the new series for on-call runbooks.
+        19. **Media.** Incorporate the summary response schema into observability diagrams to explain how readiness cascades across services.
+        20. **Buttons.** The job still respects the `enabled` flag; consider surfacing that state through `/status` so operators see toggles at a glance.
+        21. **Interact.** `/status` supports HEAD for lightweight probes while returning the same aggregated story as GET.
+        22. **Missing.** Backfill Prometheus alerts for `outcome=failure` and expand probe contract tests to cover HEAD semantics and degraded states; Twilio metric stubs are now verified in unit tests.
+        23. **Design.** Observability helpers consolidate instrumentation so future queue workers and probes align without bespoke code.
+        24. **Clone.** Exported recorders prevent new jobs from rewriting the same instrumentation loops.
+        25. **Framework.** Document the background job metric schema (`edulure_background_job_runs_total`, etc.) for the platform governance pack.
+        26. **Checklist.** Add release gates verifying `/status` appears in load balancer configs and that metrics registry registers the new counters.
+        27. **Nav.** Update operational runbooks to reference `/status` and the job metric names for quick troubleshooting.
+        28. **Release.** Stage metrics on a canary worker, update dashboards, and brief on-call rotations before promoting the new observability stack.
          - 12.F.1 communityReminderJob (backend-nodejs/src/jobs/communityReminderJob.js)
          - 12.F.2 probes (backend-nodejs/src/observability/probes.js)
          - 12.F.3 backend-nodejs/src/jobs (found at backend-nodejs/src/jobs)
