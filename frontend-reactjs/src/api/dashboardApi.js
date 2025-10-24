@@ -5,11 +5,23 @@ function normaliseDashboardResponse(payload = {}) {
   const roles = Array.isArray(payload.roles) ? payload.roles : [];
   const dashboards = typeof payload.dashboards === 'object' && payload.dashboards !== null ? payload.dashboards : {};
   const searchIndex = Array.isArray(payload.searchIndex) ? payload.searchIndex : [];
+  const tenantId = payload.tenantId ?? payload.tenant ?? null;
+  const surfaceRegistry = typeof payload.surfaceRegistry === 'object' ? payload.surfaceRegistry : {};
+  const alerts = Array.isArray(payload.alerts) ? payload.alerts : [];
 
-  return { profile, roles, dashboards, searchIndex };
+  return {
+    profile,
+    roles,
+    dashboards,
+    searchIndex,
+    tenantId,
+    surfaceRegistry,
+    alerts,
+    fetchedAt: new Date().toISOString()
+  };
 }
 
-export async function fetchDashboard({ token, signal } = {}) {
+export async function fetchDashboard({ token, signal, tenantId, audience } = {}) {
   if (!token) {
     throw new Error('Authentication token is required to fetch dashboard data');
   }
@@ -17,9 +29,13 @@ export async function fetchDashboard({ token, signal } = {}) {
   const response = await httpClient.get('/dashboard/me', {
     token,
     signal,
+    params: {
+      tenantId,
+      audience
+    },
     cache: {
       ttl: 1000 * 60,
-      tags: [`dashboard:me:${token}`]
+      tags: [`dashboard:me:${token}`, tenantId ? `dashboard:tenant:${tenantId}` : null].filter(Boolean)
     }
   });
   return normaliseDashboardResponse(response);

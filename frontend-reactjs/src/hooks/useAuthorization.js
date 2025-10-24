@@ -27,7 +27,7 @@ function mergePolicies(basePolicy, communityPolicy) {
 }
 
 export function useAuthorization() {
-  const { session } = useAuth();
+  const { session, permissions, hasPermission, activeTenantId } = useAuth();
   const baseRole = session?.user?.role ? String(session.user.role).toLowerCase() : DEFAULT_COMMUNITY_ROLE;
   const derivedCommunityRole = session?.user?.communityRole
     ? String(session.user.communityRole).toLowerCase()
@@ -40,6 +40,15 @@ export function useAuthorization() {
   }, [baseRole, derivedCommunityRole]);
 
   return useMemo(() => {
+    const actorTenants = Array.isArray(session?.tenants) ? session.tenants : [];
+    const activeTenant = actorTenants.find((tenant) => tenant.id === activeTenantId) ?? actorTenants[0] ?? null;
+    const opsPermissions = {
+      canViewOperations: hasPermission('ops.dashboard.view') || baseRole === 'admin',
+      canManageSupport: hasPermission('support.cases.manage'),
+      canReviewTrustSafety: hasPermission('trust_safety.cases.review') || hasPermission('moderation.cases.review'),
+      canBroadcastIncidents: hasPermission('operations.incidents.broadcast')
+    };
+
     return {
       role: derivedCommunityRole,
       baseRole,
@@ -49,7 +58,20 @@ export function useAuthorization() {
       canJoinCommunities: Boolean(mergedPolicy.canJoin),
       canModerateCommunities: Boolean(mergedPolicy.canModerate),
       canManageCommunitySubscriptions: Boolean(mergedPolicy.canManageSubscriptions),
-      canViewCommunityLocations: Boolean(mergedPolicy.canViewLocations)
+      canViewCommunityLocations: Boolean(mergedPolicy.canViewLocations),
+      permissions,
+      hasPermission,
+      activeTenant,
+      tenants: actorTenants,
+      operations: opsPermissions
     };
-  }, [derivedCommunityRole, baseRole, mergedPolicy]);
+  }, [
+    activeTenantId,
+    baseRole,
+    derivedCommunityRole,
+    hasPermission,
+    mergedPolicy,
+    permissions,
+    session?.tenants
+  ]);
 }

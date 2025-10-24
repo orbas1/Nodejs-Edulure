@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 
 import { fetchSupportTickets } from '../api/learnerDashboardApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useRealtime } from '../context/RealtimeContext.jsx';
 import usePersistentCollection from './usePersistentCollection.js';
 
 const STORAGE_NAMESPACE = 'edulure.dashboard.supportCases.v1';
@@ -363,6 +364,7 @@ export default function useLearnerSupportCases(initialCases = [], options = {}) 
   const session = sessionOverride ?? auth?.session ?? null;
   const token = session?.tokens?.accessToken ?? null;
   const userId = userIdOverride ?? session?.user?.id ?? 'anonymous';
+  const { subscribe } = useRealtime();
   const storageKey = `${STORAGE_NAMESPACE}:${userId}`;
 
   const normalisedInitial = useMemo(() => {
@@ -530,6 +532,66 @@ export default function useLearnerSupportCases(initialCases = [], options = {}) 
     },
     [removeItem]
   );
+
+  useEffect(() => {
+    if (typeof subscribe !== 'function') {
+      return undefined;
+    }
+
+    const subscriptions = [];
+
+    subscriptions.push(
+      subscribe('support.ticket.updated', (event) => {
+        const payload = event?.payload ?? event;
+        const ticket = payload?.ticket ?? payload;
+        const normalised = normaliseSupportCase(ticket);
+        if (!normalised) {
+          return;
+        }
+        const exists = items.some((item) => item.id === normalised.id);
+        if (exists) {
+          updateItem(normalised.id, (current) => ({
+            ...current,
+            ...normalised,
+            messages: normalised.messages.length ? normalised.messages : current.messages
+          }));
+        } else {
+          addItem(normalised);
+        }
+      })
+    );
+
+    subscriptions.push(
+      subscribe('support.ticket.created', (event) => {
+        const payload = event?.payload ?? event;
+        const ticket = payload?.ticket ?? payload;
+        const normalised = normaliseSupportCase(ticket);
+        if (!normalised) {
+          return;
+        }
+        if (!items.some((item) => item.id === normalised.id)) {
+          addItem(normalised);
+        }
+      })
+    );
+
+    subscriptions.push(
+      subscribe('support.ticket.message.created', (event) => {
+        const payload = event?.payload ?? event;
+        const ticketId = payload?.ticketId ?? payload?.ticket_id ?? payload?.ticket?.id;
+        if (!ticketId) {
+          return;
+        }
+        appendMessage(ticketId, payload?.message ?? payload);
+      })
+    );
+
+    return () => {
+      subscriptions
+        .filter((unsubscribe) => typeof unsubscribe === 'function')
+        .forEach((unsubscribe) => unsubscribe());
+    };
+  }, [addItem, appendMessage, items, subscribe, updateItem]);
 
   return {
     cases,

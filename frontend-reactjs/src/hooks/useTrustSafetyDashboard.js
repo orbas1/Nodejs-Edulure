@@ -22,6 +22,9 @@ import {
   unfollowUser
 } from '../api/socialGraphApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useRealtime } from '../context/RealtimeContext.jsx';
+import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
+import { useServiceHealth } from '../context/ServiceHealthContext.jsx';
 
 const DEFAULT_SCAM_FILTERS = Object.freeze({ status: 'pending', page: 1, perPage: 20 });
 const DEFAULT_CASE_FILTERS = Object.freeze({ status: ['pending', 'in_review'], page: 1, perPage: 20 });
@@ -33,6 +36,9 @@ function mapFollowerList(response) {
 export default function useTrustSafetyDashboard() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const { subscribe } = useRealtime();
+  const { isFeatureEnabled, getFeatureVariant } = useRuntimeConfig();
+  const { impactMatrix, statusSummary } = useServiceHealth();
 
   const [verification, setVerification] = useState(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
@@ -70,6 +76,7 @@ export default function useTrustSafetyDashboard() {
     selectedCase: null,
     lastUpdated: null
   });
+  const [realtimeEvent, setRealtimeEvent] = useState(null);
 
   const refreshVerification = useCallback(async () => {
     if (!token) {
@@ -207,6 +214,45 @@ export default function useTrustSafetyDashboard() {
   useEffect(() => {
     refreshCases();
   }, [refreshCases]);
+
+  const realtimeEnabled = isFeatureEnabled('trustSafety.realtime', true);
+  const verificationStreamVariant = getFeatureVariant('trustSafety.verificationStream', 'default');
+  const moderationStreamVariant = getFeatureVariant('trustSafety.moderationStream', 'default');
+
+  useEffect(() => {
+    if (typeof subscribe !== 'function' || !realtimeEnabled) {
+      return undefined;
+    }
+
+    const unsubscribers = [];
+
+    unsubscribers.push(
+      subscribe('trust_safety.verification.updated', (event) => {
+        setRealtimeEvent({ type: 'verification', at: new Date().toISOString(), event });
+        refreshVerification();
+      })
+    );
+
+    unsubscribers.push(
+      subscribe('trust_safety.case.updated', (event) => {
+        setRealtimeEvent({ type: 'case', at: new Date().toISOString(), event });
+        refreshCases();
+      })
+    );
+
+    unsubscribers.push(
+      subscribe('trust_safety.scam_report.updated', (event) => {
+        setRealtimeEvent({ type: 'scam-report', at: new Date().toISOString(), event });
+        refreshScamReports();
+      })
+    );
+
+    return () => {
+      unsubscribers
+        .filter((unsubscribe) => typeof unsubscribe === 'function')
+        .forEach((unsubscribe) => unsubscribe());
+    };
+  }, [refreshCases, refreshScamReports, refreshVerification, realtimeEnabled, subscribe]);
 
   const selectCase = useCallback(
     async (caseId) => {
@@ -536,6 +582,12 @@ export default function useTrustSafetyDashboard() {
     feedback,
     setFeedback,
     outstandingRequests,
-    scamLastUpdated: scamState.lastUpdated
+    scamLastUpdated: scamState.lastUpdated,
+    realtimeEnabled,
+    verificationStreamVariant,
+    moderationStreamVariant,
+    realtimeEvent,
+    impactMatrix,
+    statusSummary
   };
 }

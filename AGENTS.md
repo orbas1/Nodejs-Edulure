@@ -264,14 +264,24 @@
          - 1.B.8 UserMenu (frontend-reactjs/src/components/navigation/UserMenu.jsx)
          - 1.B.9 routes (frontend-reactjs/src/navigation/routes.js)
          - 1.B.10 utils (frontend-reactjs/src/navigation/utils.js)
-      - 1.C Runtime Context Providers & Config
+      - ✓ 1.C Runtime Context Providers & Config — Annex A21 (Admin & Operations Dashboards)
          - 1.C.1 AuthContext (frontend-reactjs/src/context/AuthContext.jsx)
          - 1.C.2 DashboardContext (frontend-reactjs/src/context/DashboardContext.jsx)
          - 1.C.3 LanguageContext (frontend-reactjs/src/context/LanguageContext.jsx)
          - 1.C.4 RealtimeContext (frontend-reactjs/src/context/RealtimeContext.jsx)
          - 1.C.5 RuntimeConfigContext (frontend-reactjs/src/context/RuntimeConfigContext.jsx)
          - 1.C.6 ServiceHealthContext (frontend-reactjs/src/context/ServiceHealthContext.jsx)
-      - 1.D Hooks & Composable Logic
+        1. **Appraisal.** Auth, dashboard, runtime, realtime, and service health providers now operate as a single admin-facing mesh—session hydration, tenant context, manifest polling, and realtime orchestration share the same Annex A21 vocabulary for analytics, trust-safety, and ops dashboards.
+        2. **AuthContext.** Sessions persist enriched actor payloads (permissions, tenants, scopes) with automatic expiry timers, tenant switching calls, and refresh endpoints so admin/operators can pivot workspaces without stale tokens or missing claims.
+        3. **Tenant targeting.** DashboardContext passes the active tenant and ops audience into `/dashboard/me`, normalises section registries, and exposes `operationsSnapshot`/`getSection` helpers so Annex panels, quick actions, and alerts can target the same tenant-specific data used in governance reports.
+        4. **Ops-ready runtime config.** RuntimeConfigContext tracks fetched audiences, segments, and TTL metadata, auto-refreshes from backend hints, and adds scoped key lookups plus variant helpers, giving Annex toggles (e.g., trust-safety streams, support realtime) deterministic control.
+        5. **Realtime fabric.** RealtimeContext introduces subscription lifecycle management, event metadata (latency, last event), and emit helpers; service subscribers automatically rebind when sockets reconnect to keep Annex operations panels hydrated.
+        6. **Service health intelligence.** ServiceHealthContext emits status summaries, impact matrices, and realtime updates (via `operations.service_health.updated`), letting admin dashboards present annexed outage/evaluation data alongside capability dependencies.
+        7. **Lifecycle.** Context providers invalidate caches (`dashboard:tenant:*`), cancel inflight requests, and handle offline states so A21 dashboards degrade gracefully when tokens expire or sockets drop.
+        8. **Diagnostics.** Each provider surfaces last-synced timestamps (`lastLoadedAt`, `fetchedAt`, `connectedAt`) to align with Annex runbook checkpoints and ops audit trails.
+        9. **Extensibility.** All contexts expose typed selectors (`getDashboard`, `getSection`, `hasPermission`, `getFeatureVariant`, `getCapability`) for hooks/components to consume without duplicating Annex business rules.
+        10. **Resilience.** Timeouts, refresh loops, and error states now coerce into structured error objects so Annex dashboards can render consistent `DashboardStateMessage` payloads instead of raw thrown errors.
+      - ✓ 1.D Hooks & Composable Logic — Annex C1 (Learner Support Workspace), Annex C2 (Admin Trust-Safety)
          - 1.D.1 useAuthorization (frontend-reactjs/src/hooks/useAuthorization.js)
          - 1.D.2 useAutoDismissMessage (frontend-reactjs/src/hooks/useAutoDismissMessage.js)
          - 1.D.3 useConsentRecords (frontend-reactjs/src/hooks/useConsentRecords.js)
@@ -293,6 +303,16 @@
          - 1.D.19 useSupportDashboard (frontend-reactjs/src/hooks/useSupportDashboard.js)
          - 1.D.20 useSystemPreferencesForm (frontend-reactjs/src/hooks/useSystemPreferencesForm.js)
          - 1.D.21 useTrustSafetyDashboard (frontend-reactjs/src/hooks/useTrustSafetyDashboard.js)
+        1. **Appraisal.** Operational hooks now synchronise with Annex C1/C2 workflows: permissions, SLA badge timing, realtime queues, and service health data stream directly into learner support and trust-safety panels.
+        2. **Authorization.** `useAuthorization` merges actor tenants, permission lists, and ops capability flags so dashboards can gate support/trust-safety actions without re-reading JWT claims.
+        3. **Message UX.** `useAutoDismissMessage` adds pause/resume controls, hover/visibility guards, and imperative handles—support modals honour Annex toast timing while remaining accessible.
+        4. **Support cases.** `useLearnerSupportCases` listens to socket events (`support.ticket.*`), merges timeline updates, and keeps stats aligned with SLA metadata; local caches hydrate instantly while backend updates reconcile safely.
+        5. **Support operations.** `useSupportDashboard` blends runtime config toggles, service health summaries, realtime overview/case feeds, and persistent caches so Annex operations dashboards react instantly to queue changes.
+        6. **Trust & safety.** `useTrustSafetyDashboard` consumes realtime enforcement streams, moderation variants, and impact matrices, auto-refreshing verification/scam/case lists when Annex events fire.
+        7. **Observability.** Hooks expose `lastUpdated`, `realtimeSnapshot`, and variant keys enabling UI badges, analytics, and Annex release checklists to validate feature gating.
+        8. **Interoperability.** Support/trust-safety hooks coordinate with context providers—tenant-aware dashboard fetches, runtime flags, and service health maps ensure cross-surface parity.
+        9. **Resilience.** Network/offline fallbacks, cached responses, and error propagation keep Annex experiences usable during outages while still queuing realtime resyncs.
+        10. **Extensibility.** Public API surfaces (`operationsSnapshot`, `operations`, `statusSummary`, `realtimeEvent`) give follow-on annex tasks a canonical foundation for analytics, notifications, or cross-team integrations.
       - 1.E API Clients & Data Contracts
          - 1.E.1 adminAdsApi (frontend-reactjs/src/api/adminAdsApi.js)
          - 1.E.2 adminApi (frontend-reactjs/src/api/adminApi.js)
