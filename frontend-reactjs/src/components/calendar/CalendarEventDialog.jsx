@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { announcePolite, useFocusTrap } from '../../utils/a11y.js';
 
@@ -9,6 +9,42 @@ const EVENT_TYPES = [
   { value: 'event', label: 'Community event' }
 ];
 
+const DEFAULT_TIMEZONE = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+  } catch (_error) {
+    return 'UTC';
+  }
+})();
+
+const POPULAR_TIMEZONES = [
+  'UTC',
+  'America/New_York',
+  'America/Los_Angeles',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Asia/Singapore',
+  'Asia/Kolkata',
+  'Australia/Sydney'
+];
+
+const TIMEZONE_OPTIONS = (() => {
+  try {
+    if (typeof Intl.supportedValuesOf === 'function') {
+      const supported = Intl.supportedValuesOf('timeZone');
+      const merged = new Set([...POPULAR_TIMEZONES, ...supported]);
+      return Array.from(merged);
+    }
+  } catch (_error) {
+    // ignore and fall through to defaults
+  }
+  return POPULAR_TIMEZONES;
+})();
+
+const STORAGE_KEY = 'edulure.calendar.draft';
+const DURATION_PRESETS = [30, 45, 60, 90, 120, 150];
+
 const DEFAULT_FORM = {
   id: undefined,
   title: '',
@@ -16,6 +52,7 @@ const DEFAULT_FORM = {
   type: EVENT_TYPES[0].value,
   startAt: '',
   endAt: '',
+  timezone: DEFAULT_TIMEZONE,
   location: '',
   facilitator: '',
   capacity: '',
@@ -30,11 +67,113 @@ const FORM_LABEL_CLASS = 'text-sm font-medium text-slate-700';
 const FORM_INPUT_CLASS =
   'mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20';
 
+function parseLocalDate(value) {
+  if (!value) return null;
+  const [datePart, timePart] = String(value).split('T');
+  if (!datePart || !timePart) return null;
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour = 0, minute = 0] = timePart.split(':').map(Number);
+  if ([year, month, day, hour, minute].some((segment) => Number.isNaN(segment))) {
+    return null;
+  }
+  return new Date(year, month - 1, day, hour, minute);
+}
+
+function formatLocalDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.valueOf())) {
+    return '';
+  }
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+    date.getMinutes()
+  )}`;
+}
+
+function deriveDurationMinutes(startAt, endAt) {
+  const startDate = parseLocalDate(startAt);
+  const endDate = parseLocalDate(endAt);
+  if (!startDate || !endDate) return null;
+  const diff = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+  return diff > 0 ? diff : null;
+}
+
+function computeEndValue(startAt, durationMinutes) {
+  const startDate = parseLocalDate(startAt);
+  if (!startDate || !durationMinutes) {
+    return '';
+  }
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+  return formatLocalDate(endDate);
+}
+
+function formatDurationLabel(minutes) {
+  if (!minutes) return 'Duration not set';
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  const hours = minutes / 60;
+  if (Number.isInteger(hours)) {
+    return `${hours} hour${hours === 1 ? '' : 's'}`;
+  }
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+function formatTimezoneLabel(zone) {
+  if (!zone) return 'Local time';
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      timeZoneName: 'short'
+    }).formatToParts(new Date());
+    const namePart = parts.find((part) => part.type === 'timeZoneName');
+    return namePart ? `${zone} (${namePart.value})` : zone;
+  } catch (_error) {
+    return zone;
+  }
+}
+
+function loadDraft() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn('Unable to load calendar draft', error);
+    return null;
+  }
+}
+
+function persistDraft(draft) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+  } catch (error) {
+    console.warn('Unable to persist calendar draft', error);
+  }
+}
+
+function clearDraft() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.warn('Unable to clear calendar draft', error);
+  }
+}
+
+const TIMEZONE_OPTION_LABELS = TIMEZONE_OPTIONS.map((zone) => ({ value: zone, label: formatTimezoneLabel(zone) }));
+
 export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmit, onClose }) {
   const containerRef = useRef(null);
   const closeButtonRef = useRef(null);
   const [form, setForm] = useState(() => ({ ...DEFAULT_FORM, ...initialData }));
   const [errors, setErrors] = useState({});
+  const [durationMinutes, setDurationMinutes] = useState(() =>
+    deriveDurationMinutes(initialData?.startAt, initialData?.endAt) ?? 60
+  );
+  const [autoSyncEnd, setAutoSyncEnd] = useState(() => !initialData?.id);
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const dialogTitle = useMemo(
     () => (mode === 'edit' ? 'Update scheduled item' : 'Create new scheduled item'),
     [mode]
@@ -43,15 +182,37 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
   useFocusTrap(containerRef, { enabled: isOpen, initialFocus: closeButtonRef });
 
   useEffect(() => {
-    if (isOpen) {
-      setForm({
-        ...DEFAULT_FORM,
-        ...initialData,
-        tags: Array.isArray(initialData?.tags) ? initialData.tags.join(', ') : initialData?.tags ?? ''
-      });
-      setErrors({});
+    if (!isOpen) return;
+    const baseForm = {
+      ...DEFAULT_FORM,
+      ...initialData,
+      tags: Array.isArray(initialData?.tags) ? initialData.tags.join(', ') : initialData?.tags ?? ''
+    };
+
+    if (mode === 'create' && !initialData?.id && !draftLoaded) {
+      const stored = loadDraft();
+      if (stored?.form) {
+        setForm({
+          ...baseForm,
+          ...stored.form,
+          tags: Array.isArray(stored.form.tags)
+            ? stored.form.tags.join(', ')
+            : stored.form.tags ?? ''
+        });
+        setDurationMinutes(stored.durationMinutes ?? 60);
+        setAutoSyncEnd(stored.autoSyncEnd ?? true);
+        setErrors({});
+        setDraftLoaded(true);
+        return;
+      }
+      setDraftLoaded(true);
     }
-  }, [initialData, isOpen]);
+
+    setForm(baseForm);
+    setErrors({});
+    setDurationMinutes(deriveDurationMinutes(baseForm.startAt, baseForm.endAt) ?? 60);
+    setAutoSyncEnd(!initialData?.id);
+  }, [initialData, isOpen, mode, draftLoaded]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -80,9 +241,34 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
     return null;
   }
 
-  const updateField = (name, value) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
+  const updateField = useCallback(
+    (name, value) => {
+      setForm((prev) => {
+        const next = { ...prev, [name]: value };
+        if (name === 'startAt') {
+          if (autoSyncEnd) {
+            next.endAt = computeEndValue(value, durationMinutes) || prev.endAt;
+          }
+          const nextDuration = deriveDurationMinutes(value, prev.endAt);
+          if (nextDuration) {
+            setDurationMinutes(nextDuration);
+          }
+        }
+        if (name === 'endAt') {
+          const nextDuration = deriveDurationMinutes(prev.startAt, value);
+          if (nextDuration) {
+            setDurationMinutes(nextDuration);
+          }
+          setAutoSyncEnd(false);
+        }
+        if (name === 'timezone' && autoSyncEnd && prev.startAt) {
+          next.endAt = computeEndValue(prev.startAt, durationMinutes) || prev.endAt;
+        }
+        return next;
+      });
+    },
+    [autoSyncEnd, durationMinutes]
+  );
 
   const validate = () => {
     const nextErrors = {};
@@ -94,6 +280,9 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
     }
     if (!form.endAt) {
       nextErrors.endAt = 'End time is required.';
+    }
+    if (!form.timezone) {
+      nextErrors.timezone = 'Timezone is required.';
     }
     if (form.startAt && form.endAt) {
       const start = new Date(form.startAt);
@@ -112,6 +301,9 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
       return;
     }
     onSubmit?.(form);
+    if (mode === 'create') {
+      clearDraft();
+    }
   };
 
   const handleBackdropClick = (event) => {
@@ -119,6 +311,75 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
       onClose?.();
     }
   };
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'create') return;
+    persistDraft({ form, durationMinutes, autoSyncEnd });
+  }, [form, durationMinutes, autoSyncEnd, isOpen, mode]);
+
+  const timezoneSummary = useMemo(() => formatTimezoneLabel(form.timezone), [form.timezone]);
+  const durationLabel = useMemo(() => formatDurationLabel(durationMinutes), [durationMinutes]);
+
+  const scheduleSummary = useMemo(() => {
+    const startDate = parseLocalDate(form.startAt);
+    const endDate = parseLocalDate(form.endAt);
+    if (!startDate) {
+      return 'Awaiting start time to compose schedule summary.';
+    }
+    try {
+      const dateFormatter = new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        timeZone: form.timezone || undefined
+      });
+      const timeFormatter = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: form.timezone || undefined
+      });
+      const parts = [dateFormatter.format(startDate)];
+      parts.push(`${timeFormatter.format(startDate)}${endDate ? ` – ${timeFormatter.format(endDate)}` : ''}`);
+      parts.push(durationLabel);
+      return parts.filter(Boolean).join(' • ');
+    } catch (_error) {
+      return 'Schedule summary unavailable for the selected timezone.';
+    }
+  }, [form.startAt, form.endAt, form.timezone, durationLabel]);
+
+  const relativeSummary = useMemo(() => {
+    const startDate = parseLocalDate(form.startAt);
+    if (!startDate) return null;
+    const now = new Date();
+    const diffMs = startDate.getTime() - now.getTime();
+    const diffMinutes = Math.round(diffMs / 60000);
+    if (Number.isNaN(diffMinutes)) return null;
+    if (diffMinutes > 0) {
+      if (diffMinutes < 60) {
+        return `Starts in ${diffMinutes} minute${diffMinutes === 1 ? '' : 's'}`;
+      }
+      const diffHours = diffMinutes / 60;
+      if (diffHours < 24) {
+        return `Starts in ${diffHours.toFixed(1)} hours`;
+      }
+      const diffDays = diffHours / 24;
+      return `Starts in ${diffDays.toFixed(1)} days`;
+    }
+    if (diffMinutes === 0) {
+      return 'Starts now';
+    }
+    if (diffMinutes > -60) {
+      return `Started ${Math.abs(diffMinutes)} minute${diffMinutes === -1 ? '' : 's'} ago`;
+    }
+    const diffHours = Math.abs(diffMinutes) / 60;
+    if (diffHours < 24) {
+      return `Started ${diffHours.toFixed(1)} hours ago`;
+    }
+    const diffDays = diffHours / 24;
+    return `Started ${diffDays.toFixed(1)} days ago`;
+  }, [form.startAt]);
+
+  const timezoneOptions = useMemo(() => TIMEZONE_OPTION_LABELS, []);
 
   return (
     <div
@@ -230,6 +491,69 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
           </div>
 
           <div>
+            <label className={FORM_LABEL_CLASS} htmlFor="calendar-timezone">
+              Timezone
+            </label>
+            <select
+              id="calendar-timezone"
+              className={FORM_INPUT_CLASS}
+              value={form.timezone}
+              onChange={(event) => updateField('timezone', event.target.value)}
+            >
+              {timezoneOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {errors.timezone ? <p className="mt-1 text-xs text-rose-600">{errors.timezone}</p> : null}
+          </div>
+
+          <div>
+            <fieldset>
+              <legend className={`${FORM_LABEL_CLASS} flex items-center justify-between`}>
+                Duration presets
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                  <input
+                    type="checkbox"
+                    checked={autoSyncEnd}
+                    onChange={(event) => setAutoSyncEnd(event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                  />
+                  Auto-sync end time
+                </label>
+              </legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {DURATION_PRESETS.map((preset) => {
+                  const isActive = durationMinutes === preset;
+                  return (
+                    <button
+                      type="button"
+                      key={preset}
+                      onClick={() => {
+                        setDurationMinutes(preset);
+                        if (autoSyncEnd && form.startAt) {
+                          const nextEnd = computeEndValue(form.startAt, preset);
+                          if (nextEnd) {
+                            setForm((prev) => ({ ...prev, endAt: nextEnd }));
+                          }
+                        }
+                      }}
+                      className={
+                        isActive
+                          ? 'inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-card'
+                          : 'inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary'
+                      }
+                    >
+                      {formatDurationLabel(preset)}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </div>
+
+          <div>
             <label className={FORM_LABEL_CLASS} htmlFor="calendar-location">
               Location or stream link
             </label>
@@ -336,7 +660,12 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
 
         <div className="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs text-slate-500">
-            Your calendar item is auto-saved for this device. Promote it instantly to the community feed once created.
+            <p className="font-semibold text-slate-600">{scheduleSummary}</p>
+            <p className="mt-1">{timezoneSummary}</p>
+            {relativeSummary ? <p className="mt-1 text-primary">{relativeSummary}</p> : null}
+            <p className="mt-2 text-slate-400">
+              Your calendar item is auto-saved for this device. Promote it instantly to the community feed once created.
+            </p>
           </div>
           <div className="flex gap-3">
             <button type="button" className="dashboard-pill" onClick={onClose}>

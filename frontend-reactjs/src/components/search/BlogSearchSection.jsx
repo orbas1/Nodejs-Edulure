@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   BookmarkSquareIcon,
@@ -12,6 +12,7 @@ import {
 import { fetchBlogCategories, fetchBlogPosts, fetchBlogTags } from '../../api/blogApi.js';
 
 const STORAGE_KEY = 'edulure.blog-search.views';
+const RECENT_STORAGE_KEY = 'edulure.blog-search.recents';
 
 function persistViews(views) {
   try {
@@ -34,7 +35,28 @@ function loadViews() {
   }
 }
 
-function BlogCard({ post }) {
+function persistRecents(recents) {
+  try {
+    window.localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(recents));
+  } catch (error) {
+    console.warn('Unable to persist recent blog activity', error);
+  }
+}
+
+function loadRecents() {
+  try {
+    const raw = window.localStorage.getItem(RECENT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch (error) {
+    console.warn('Unable to load recent blog activity', error);
+    return [];
+  }
+}
+
+function BlogCard({ post, onOpen }) {
   return (
     <article className="flex flex-col gap-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
       <div className="flex flex-col gap-2">
@@ -65,6 +87,7 @@ function BlogCard({ post }) {
         <a
           href={`/blog/${post.slug}`}
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary-dark"
+          onClick={() => onOpen?.(post)}
         >
           Read post
           <MagnifyingGlassIcon className="h-4 w-4" />
@@ -85,7 +108,12 @@ BlogCard.propTypes = {
     tags: PropTypes.arrayOf(PropTypes.string),
     slug: PropTypes.string,
     category: PropTypes.string
-  }).isRequired
+  }).isRequired,
+  onOpen: PropTypes.func
+};
+
+BlogCard.defaultProps = {
+  onOpen: undefined
 };
 
 export default function BlogSearchSection() {
@@ -103,6 +131,8 @@ export default function BlogSearchSection() {
   const [viewError, setViewError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [recentPosts, setRecentPosts] = useState(() => (typeof window !== 'undefined' ? loadRecents() : []));
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
   useEffect(() => {
     fetchBlogCategories().then(setCategories).catch(() => setCategories([]));
@@ -113,6 +143,11 @@ export default function BlogSearchSection() {
     if (typeof window === 'undefined') return;
     persistViews(savedViews);
   }, [savedViews]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    persistRecents(recentPosts);
+  }, [recentPosts]);
 
   const appliedTags = useMemo(() => new Set(filters.tags ?? []), [filters.tags]);
 
@@ -132,6 +167,7 @@ export default function BlogSearchSection() {
             total: metaPagination.total ?? metaPagination.total_items ?? 0
           });
         }
+        setLastUpdatedAt(new Date());
       })
       .catch((err) => {
         if (!active) return;
@@ -201,6 +237,34 @@ export default function BlogSearchSection() {
     setEditingName('');
   };
 
+  const handlePostOpened = useCallback((post) => {
+    if (!post) return;
+    setRecentPosts((prev) => {
+      const next = prev.filter((item) => item.slug !== post.slug);
+      next.unshift({
+        slug: post.slug,
+        title: post.title ?? post.name ?? 'Untitled post',
+        category: post.category ?? post.primaryCategory ?? null,
+        viewedAt: new Date().toISOString()
+      });
+      return next.slice(0, 5);
+    });
+  }, []);
+
+  const trendingTags = useMemo(() => {
+    if (!Array.isArray(tags)) return [];
+    return tags
+      .map((tag) => ({
+        name: tag.name ?? tag,
+        slug: tag.slug ?? tag,
+        count: Number(tag.count ?? tag.posts ?? tag.usage ?? 0)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [tags]);
+
+  const totalSavedViews = savedViews.length;
+
   return (
     <section className="rounded-4xl border border-slate-200 bg-slate-50/80 p-8 shadow-xl">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -226,6 +290,33 @@ export default function BlogSearchSection() {
           </button>
         </form>
       </header>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-3xl border border-primary/20 bg-white px-4 py-3 text-sm text-slate-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Results</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{pagination.total}</p>
+          <p className="text-[11px] text-slate-400">Matching posts across the newsroom</p>
+        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Saved views</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{totalSavedViews}</p>
+          <p className="text-[11px] text-slate-400">Reusable newsroom configurations</p>
+        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trending tag</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{trendingTags[0]?.name ?? '—'}</p>
+          <p className="text-[11px] text-slate-400">
+            {trendingTags[0]?.count ? `${trendingTags[0].count} mentions` : 'Collecting analytics'}
+          </p>
+        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Last refreshed</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{lastUpdatedAt ? lastUpdatedAt.toLocaleTimeString() : '—'}</p>
+          <p className="text-[11px] text-slate-400">
+            {lastUpdatedAt ? lastUpdatedAt.toLocaleDateString() : 'Auto refreshes on filter change'}
+          </p>
+        </div>
+      </div>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[3fr,1fr]">
         <div className="space-y-6">
@@ -300,7 +391,7 @@ export default function BlogSearchSection() {
 
           <div className="grid gap-5 md:grid-cols-2">
             {posts.map((post) => (
-              <BlogCard key={post.id ?? post.slug} post={post} />
+              <BlogCard key={post.id ?? post.slug} post={post} onOpen={handlePostOpened} />
             ))}
           </div>
 
@@ -402,6 +493,45 @@ export default function BlogSearchSection() {
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Trending tags</h3>
+            <p className="mt-2 text-xs text-slate-500">Based on newsroom metadata in the last fetch.</p>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              {trendingTags.length ? (
+                trendingTags.map((tag) => (
+                  <li key={tag.slug} className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2">
+                    <span className="font-semibold">#{tag.name}</span>
+                    <span className="text-xs text-slate-400">{tag.count || 'New'}</span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-xs text-slate-400">Tag analytics will appear after the first fetch.</li>
+              )}
+            </ul>
+          </div>
+
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Recently opened</h3>
+            <p className="mt-2 text-xs text-slate-500">Personal device history only—cleared with your browser storage.</p>
+            {recentPosts.length ? (
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                {recentPosts.map((post) => (
+                  <li key={post.slug} className="rounded-2xl bg-slate-50 px-3 py-2">
+                    <a href={`/blog/${post.slug}`} className="font-semibold text-primary transition hover:text-primary-dark">
+                      {post.title}
+                    </a>
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      {post.category ? `${post.category} • ` : ''}
+                      {post.viewedAt ? new Date(post.viewedAt).toLocaleString() : ''}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-xs text-slate-400">Open a post to build quick recall bookmarks.</p>
+            )}
           </div>
 
           <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6 shadow-sm">

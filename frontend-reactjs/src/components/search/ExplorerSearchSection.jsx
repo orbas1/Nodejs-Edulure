@@ -221,6 +221,7 @@ export default function ExplorerSearchSection({
   const refreshLabel = entityRefresh?.label ?? null;
   const refreshDate = entityRefresh?.refreshedAt ? new Date(entityRefresh.refreshedAt) : null;
   const refreshExactLabel = refreshDate && !Number.isNaN(refreshDate.valueOf()) ? refreshDate.toLocaleString() : null;
+  const latencyMs = analytics?.timing?.elapsedMs ?? analytics?.timing?.latencyMs ?? null;
 
   const facetEntries = useMemo(() => {
     if (!analytics?.facets) return [];
@@ -242,6 +243,11 @@ export default function ExplorerSearchSection({
       })
       .filter(Boolean);
   }, [analytics]);
+
+  const pinnedSearch = useMemo(
+    () => (Array.isArray(savedSearches) ? savedSearches.find((search) => search.pin) ?? null : null),
+    [savedSearches]
+  );
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -424,6 +430,24 @@ export default function ExplorerSearchSection({
         </div>
       </header>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-3xl border border-primary/20 bg-white/90 px-4 py-3 text-sm text-slate-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Results</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{totalDisplay}</p>
+          <p className="text-[11px] text-slate-400">Current entity matches</p>
+        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active filters</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{activeFilters}</p>
+          <p className="text-[11px] text-slate-400">Across explorer controls</p>
+        </div>
+        <div className="rounded-3xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search latency</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{latencyMs ? `${latencyMs} ms` : '—'}</p>
+          <p className="text-[11px] text-slate-400">Edge timing snapshot</p>
+        </div>
+      </div>
+
       <div className="mt-6 grid gap-8 lg:grid-cols-[3fr,1fr] lg:gap-10">
       <div className="space-y-6">
         <div className="rounded-3xl border border-slate-100 bg-slate-50/60 p-6">
@@ -451,6 +475,7 @@ export default function ExplorerSearchSection({
             definitions={filterDefinitions}
             chips={filterChips}
             onRemove={handleRemoveFilter}
+            onClearAll={activeFilters ? clearFilters : null}
           />
         </div>
 
@@ -556,10 +581,25 @@ export default function ExplorerSearchSection({
               Capture your favourite filters and replay them instantly. Pin essentials for the team.
             </p>
             {savedSearchLoading ? (
-              <p className="mt-4 text-xs text-slate-400">Loading saved searches…</p>
+              <div className="mt-4 space-y-2">
+                {[...Array(2)].map((_, index) => (
+                  <div key={index} className="animate-pulse rounded-2xl border border-slate-200 bg-white/70 px-3 py-2">
+                    <div className="h-4 w-3/4 rounded bg-slate-200" />
+                  </div>
+                ))}
+              </div>
             ) : null}
             {savedSearchError ? (
               <p className="mt-4 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{savedSearchError}</p>
+            ) : null}
+            {pinnedSearch ? (
+              <div className="mt-4 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-slate-600">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Pinned</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{pinnedSearch.name}</p>
+                <p className="text-[11px] text-slate-400">
+                  Last updated {new Date(pinnedSearch.updatedAt).toLocaleString()}
+                </p>
+              </div>
             ) : null}
             {!savedSearchLoading && !savedSearches.length ? (
               <p className="mt-4 text-xs text-slate-400">No saved searches yet. Create one to activate rapid discovery packs.</p>
