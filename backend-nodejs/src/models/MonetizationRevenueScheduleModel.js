@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { normalizeCurrencyCode } from '../utils/currency.js';
 
 const TABLE = 'monetization_revenue_schedules';
 
@@ -90,7 +91,7 @@ export default class MonetizationRevenueScheduleModel {
       recognition_end: payload.recognitionEnd ?? connection.fn.now(),
       amount_cents: toNumber(payload.amountCents ?? 0),
       recognized_amount_cents: toNumber(payload.recognizedAmountCents ?? 0),
-      currency: (payload.currency ?? 'GBP').toUpperCase(),
+      currency: normalizeCurrencyCode(payload.currency, 'GBP'),
       revenue_account: payload.revenueAccount ?? '4000-education-services',
       deferred_revenue_account: payload.deferredRevenueAccount ?? '2050-deferred-revenue',
       recognized_at: payload.recognizedAt ?? null,

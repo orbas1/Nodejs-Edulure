@@ -67,7 +67,8 @@ const refundSchema = Joi.object({
 const summarySchema = Joi.object({
   currency: Joi.string().length(3).uppercase().optional(),
   startDate: Joi.date().iso().optional(),
-  endDate: Joi.date().iso().min(Joi.ref('startDate')).optional()
+  endDate: Joi.date().iso().min(Joi.ref('startDate')).optional(),
+  tenantId: Joi.string().trim().max(120).optional()
 });
 
 const paymentIdSchema = Joi.object({
@@ -174,8 +175,11 @@ export default class PaymentController {
 
       const summary = await PaymentService.getFinanceSummary(payload);
       return success(res, {
-        data: summary,
-        message: 'Finance summary generated'
+        data: summary.currencies,
+        message: 'Finance summary generated',
+        meta: {
+          monetization: summary.monetization
+        }
       });
     } catch (error) {
       if (error.isJoi) {

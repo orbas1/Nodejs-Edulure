@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import { normalizeCurrencyCode } from '../utils/currency.js';
 
 const TABLE = 'monetization_usage_records';
 
@@ -101,7 +102,7 @@ export default class MonetizationUsageRecordModel {
       quantity,
       unit_amount_cents: unitAmountCents,
       amount_cents: calculatedAmount,
-      currency: (event.currency ?? 'GBP').toUpperCase(),
+      currency: normalizeCurrencyCode(event.currency, 'GBP'),
       source: event.source ?? 'manual',
       external_reference: event.externalReference ?? null,
       payment_intent_id: event.paymentIntentId ?? null,
@@ -147,7 +148,7 @@ export default class MonetizationUsageRecordModel {
         quantity: toDecimal(quantity),
         unit_amount_cents: unitAmountCents,
         amount_cents: amount,
-        currency: (event.currency ?? existing.currency ?? 'GBP').toUpperCase(),
+        currency: normalizeCurrencyCode(event.currency ?? existing.currency, 'GBP'),
         metadata: JSON.stringify(event.metadata ?? parseJson(existing.metadata)),
         usage_date: event.usageDate ?? existing.usage_date,
         catalog_item_id: event.catalogItemId ?? existing.catalog_item_id,

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import db from '../config/database.js';
 import logger from '../config/logger.js';
 import AdsCampaignModel from '../models/AdsCampaignModel.js';
@@ -198,6 +200,161 @@ function calculateActiveDays(campaign, now = new Date()) {
   }
   const diff = Math.abs(end - start);
   return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)) + 1);
+}
+
+function averageMetric(series, field) {
+  if (!Array.isArray(series) || series.length === 0) {
+    return 0;
+  }
+  const total = series.reduce((accumulator, entry) => accumulator + Number(entry?.[field] ?? 0), 0);
+  return total / series.length;
+}
+
+function computePercentageChange(current, previous) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) {
+    return null;
+  }
+  return Number(((current - previous) / Math.abs(previous)).toFixed(4));
+}
+
+function determinePacingStatus(budgetDailyCents, avgDailySpendCents) {
+  if (!budgetDailyCents || budgetDailyCents <= 0) {
+    return 'unbounded';
+  }
+  if (avgDailySpendCents > budgetDailyCents * 1.1) {
+    return 'over';
+  }
+  if (avgDailySpendCents < budgetDailyCents * 0.6) {
+    return 'under';
+  }
+  return 'on_track';
+}
+
+function pickBestDay(series, field) {
+  if (!Array.isArray(series) || series.length === 0) {
+    return null;
+  }
+  const best = series.reduce((accumulator, entry) => {
+    if (!accumulator) {
+      return entry;
+    }
+    const currentValue = Number(entry?.[field] ?? 0);
+    const bestValue = Number(accumulator?.[field] ?? 0);
+    return currentValue > bestValue ? entry : accumulator;
+  }, null);
+
+  if (!best) {
+    return null;
+  }
+
+  return {
+    date: best.date,
+    value: Number(best?.[field] ?? 0)
+  };
+}
+
+function generateInsightRecommendations({ campaign, summary, trends, pacing, daysObserved }) {
+  const recommendations = [];
+
+  if (trends.ctrChange !== null && trends.ctrChange <= -0.1) {
+    recommendations.push({
+      type: 'creative',
+      severity: 'medium',
+      message: `Click-through rate dropped ${(Math.abs(trends.ctrChange) * 100).toFixed(1)}% over the last period.`,
+      action: 'Refresh creative assets or expand keywords to regain engagement.'
+    });
+  }
+
+  if (trends.conversionRateChange !== null && trends.conversionRateChange <= -0.15) {
+    recommendations.push({
+      type: 'conversion',
+      severity: 'medium',
+      message: `Conversion rate declined ${(Math.abs(trends.conversionRateChange) * 100).toFixed(1)}% versus the prior window.`,
+      action: 'Audit landing page relevance and confirm tracking pixels fire correctly.'
+    });
+  }
+
+  if (summary.conversions === 0 && summary.clicks >= 100) {
+    recommendations.push({
+      type: 'conversion_tracking',
+      severity: 'high',
+      message: 'No conversions recorded despite significant click volume.',
+      action: 'Verify conversion tracking events and ensure the post-click experience matches the campaign objective.'
+    });
+  }
+
+  if (summary.conversionRate < 0.02 && summary.clicks >= 150) {
+    recommendations.push({
+      type: 'funnel',
+      severity: 'high',
+      message: 'Conversion rate is below 2% for the observed period.',
+      action: 'Tighten audience targeting or iterate on offer positioning to improve relevance.'
+    });
+  }
+
+  if (pacing.status === 'over') {
+    recommendations.push({
+      type: 'budget',
+      severity: 'high',
+      message: 'Average daily spend is exceeding the configured budget.',
+      action: 'Lower bid caps or increase the daily budget to prevent early exhaustion.'
+    });
+  } else if (pacing.status === 'under' && daysObserved >= 3) {
+    recommendations.push({
+      type: 'delivery',
+      severity: 'low',
+      message: 'Campaign is underspending relative to budget.',
+      action: 'Raise bids slightly or broaden targeting segments to capture additional inventory.'
+    });
+  }
+
+  return recommendations;
+}
+
+function sanitizeRecommendationList(recommendations) {
+  if (!Array.isArray(recommendations)) {
+    return [];
+  }
+
+  return recommendations.slice(0, 10).map((recommendation) => ({
+    id: randomUUID(),
+    type: recommendation.type ?? 'general',
+    severity: recommendation.severity ?? 'medium',
+    message: recommendation.message ?? '',
+    action: recommendation.action ?? null
+  }));
+}
+
+function sanitizeSummaryForHistory(summary = {}) {
+  return {
+    impressions: Number(summary.impressions ?? 0),
+    clicks: Number(summary.clicks ?? 0),
+    conversions: Number(summary.conversions ?? 0),
+    spendCents: Number(summary.spendCents ?? 0),
+    revenueCents: Number(summary.revenueCents ?? 0),
+    ctr: Number(summary.ctr ?? 0),
+    conversionRate: Number(summary.conversionRate ?? 0),
+    cpcCents: Number(summary.cpcCents ?? 0),
+    cpaCents: Number(summary.cpaCents ?? 0),
+    avgDailySpendCents: Number(summary.avgDailySpendCents ?? 0)
+  };
+}
+
+function sanitizeTrendsForHistory(trends = {}) {
+  return {
+    ctrChange: trends.ctrChange ?? null,
+    conversionRateChange: trends.conversionRateChange ?? null,
+    spendChange: trends.spendChange ?? null,
+    sampleDays: trends.sampleDays ?? null
+  };
+}
+
+function sanitizePacingForHistory(pacing = {}) {
+  return {
+    status: pacing.status ?? null,
+    budgetDailyCents: Number(pacing.budgetDailyCents ?? 0),
+    avgDailySpendCents: Number(pacing.avgDailySpendCents ?? 0)
+  };
 }
 
 function calculatePerformanceScore({ averages, forecast, lifetime }, complianceStatus) {
@@ -607,34 +764,133 @@ export default class AdsService {
       defaultSummary()
     );
 
-    const dailySeries = orderedMetrics
-      .map((metric) => ({
-        date: toISO(metric.metricDate),
-        impressions: metric.impressions,
-        clicks: metric.clicks,
-        conversions: metric.conversions,
-        spendCents: metric.spendCents,
-        revenueCents: metric.revenueCents,
-        ctr: rate(metric.clicks, metric.impressions),
-        conversionRate: rate(metric.conversions, metric.clicks),
-        cpcCents: centsPerUnit(metric.spendCents, metric.clicks),
-        cpaCents: centsPerUnit(metric.spendCents, metric.conversions)
-      }));
+    const dailySeries = orderedMetrics.map((metric) => ({
+      date: toISO(metric.metricDate),
+      impressions: metric.impressions,
+      clicks: metric.clicks,
+      conversions: metric.conversions,
+      spendCents: metric.spendCents,
+      revenueCents: metric.revenueCents,
+      ctr: rate(metric.clicks, metric.impressions),
+      conversionRate: rate(metric.conversions, metric.clicks),
+      cpcCents: centsPerUnit(metric.spendCents, metric.clicks),
+      cpaCents: centsPerUnit(metric.spendCents, metric.conversions)
+    }));
+
+    const daysObserved = dailySeries.length;
+    const recentWindowSize = Math.min(daysObserved, 7);
+    const recentWindow = recentWindowSize ? dailySeries.slice(-recentWindowSize) : [];
+    const previousWindow = recentWindowSize
+      ? dailySeries.slice(0, Math.max(dailySeries.length - recentWindowSize, 0)).slice(-recentWindowSize)
+      : [];
+
+    const trends = {
+      ctrChange: computePercentageChange(averageMetric(recentWindow, 'ctr'), averageMetric(previousWindow, 'ctr')),
+      conversionRateChange: computePercentageChange(
+        averageMetric(recentWindow, 'conversionRate'),
+        averageMetric(previousWindow, 'conversionRate')
+      ),
+      spendChange: computePercentageChange(
+        averageMetric(recentWindow, 'spendCents'),
+        averageMetric(previousWindow, 'spendCents')
+      ),
+      sampleDays: recentWindowSize
+    };
+
+    const avgDailySpendCents = daysObserved ? Math.round(totals.spendCents / daysObserved) : 0;
+    const pacing = {
+      budgetDailyCents: Number(campaign.budgetDailyCents ?? 0),
+      avgDailySpendCents,
+      status: determinePacingStatus(Number(campaign.budgetDailyCents ?? 0), avgDailySpendCents)
+    };
+
+    const summaryMetrics = {
+      impressions: totals.impressions,
+      clicks: totals.clicks,
+      conversions: totals.conversions,
+      spendCents: totals.spendCents,
+      revenueCents: totals.revenueCents,
+      ctr: rate(totals.clicks, totals.impressions),
+      conversionRate: rate(totals.conversions, totals.clicks),
+      cpcCents: centsPerUnit(totals.spendCents, totals.clicks),
+      cpaCents: centsPerUnit(totals.spendCents, totals.conversions),
+      avgDailySpendCents,
+      pacing
+    };
+
+    const highlights = {
+      topCtrDay: pickBestDay(dailySeries, 'ctr'),
+      topConversionDay: pickBestDay(dailySeries, 'conversionRate')
+    };
+
+    const recommendations = generateInsightRecommendations({
+      campaign,
+      summary: summaryMetrics,
+      trends,
+      pacing,
+      daysObserved
+    });
+
+    const generatedAt = new Date().toISOString();
+    const history = await this.appendInsightAudit({
+      campaign,
+      actorId,
+      summary: summaryMetrics,
+      trends,
+      pacing,
+      recommendations,
+      windowDays,
+      generatedAt
+    });
 
     return {
-      summary: {
-        impressions: totals.impressions,
-        clicks: totals.clicks,
-        conversions: totals.conversions,
-        spendCents: totals.spendCents,
-        revenueCents: totals.revenueCents,
-        ctr: rate(totals.clicks, totals.impressions),
-        conversionRate: rate(totals.conversions, totals.clicks),
-        cpcCents: centsPerUnit(totals.spendCents, totals.clicks),
-        cpaCents: centsPerUnit(totals.spendCents, totals.conversions)
-      },
-      daily: dailySeries
+      summary: summaryMetrics,
+      daily: dailySeries,
+      trends,
+      highlights,
+      recommendations,
+      history
     };
+  }
+
+  static async appendInsightAudit({
+    campaign,
+    actorId,
+    summary,
+    trends,
+    pacing,
+    recommendations,
+    windowDays,
+    generatedAt
+  }) {
+    if (!campaign?.id) {
+      return Array.isArray(campaign?.metadata?.insightsHistory) ? campaign.metadata.insightsHistory : [];
+    }
+
+    const timestamp = generatedAt ?? new Date().toISOString();
+    const historyEntry = {
+      id: randomUUID(),
+      generatedAt: timestamp,
+      actorId: actorId ?? null,
+      windowDays: windowDays ?? null,
+      summary: sanitizeSummaryForHistory(summary),
+      trends: sanitizeTrendsForHistory(trends),
+      pacing: sanitizePacingForHistory(pacing),
+      recommendations: sanitizeRecommendationList(recommendations)
+    };
+
+    const metadata = { ...(campaign.metadata ?? {}) };
+    const history = Array.isArray(metadata.insightsHistory) ? [...metadata.insightsHistory, historyEntry] : [historyEntry];
+    metadata.insightsHistory = history.slice(-20);
+    metadata.lastInsight = {
+      generatedAt: timestamp,
+      actorId: actorId ?? null,
+      windowDays: windowDays ?? null,
+      recommendationCount: historyEntry.recommendations.length
+    };
+
+    await AdsCampaignModel.updateById(campaign.id, { metadata });
+    return metadata.insightsHistory;
   }
 
   static async hydrateCampaignCollection(campaigns) {

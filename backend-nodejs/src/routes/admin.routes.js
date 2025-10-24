@@ -44,6 +44,11 @@ router.post('/monetization/usage', auth('admin'), AdminMonetizationController.re
 router.get('/monetization/revenue-schedules', auth('admin'), AdminMonetizationController.listRevenueSchedules);
 router.post('/monetization/reconciliations/run', auth('admin'), AdminMonetizationController.triggerReconciliation);
 router.get('/monetization/reconciliations', auth('admin'), AdminMonetizationController.listReconciliationRuns);
+router.post(
+  '/monetization/reconciliations/:runId/acknowledgements',
+  auth('admin'),
+  AdminMonetizationController.acknowledgeReconciliation
+);
 
 router.get('/blog/posts', auth('admin'), AdminBlogController.list);
 router.post('/blog/posts', auth('admin'), AdminBlogController.create);

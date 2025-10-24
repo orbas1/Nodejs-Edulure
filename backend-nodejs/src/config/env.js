@@ -34,6 +34,18 @@ function tryParseJson(value) {
   }
 }
 
+function normalizeOptionalUrl(value) {
+  if (!value) {
+    return null;
+  }
+  try {
+    const normalised = new URL(String(value).trim());
+    return normalised.toString();
+  } catch (_error) {
+    return null;
+  }
+}
+
 function normalizeJwtKeyset(rawKeyset, fallbackSecret, explicitActiveKeyId) {
   const allowedAlgorithms = new Set(['HS256', 'HS384', 'HS512']);
   const keysetSource = tryParseJson(rawKeyset);
@@ -866,6 +878,40 @@ const envSchema = z
       .min(1)
       .max(24 * 60)
       .default(30),
+    MONETIZATION_RECONCILIATION_VARIANCE_ALERT_BPS: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(5000)
+      .default(250),
+    MONETIZATION_RECONCILIATION_VARIANCE_CRITICAL_BPS: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(10000)
+      .default(500),
+    MONETIZATION_RECONCILIATION_USAGE_ALERT_BPS: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(5000)
+      .default(200),
+    MONETIZATION_RECONCILIATION_MIN_INVOICED_CENTS: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(10_000_000_00)
+      .default(50_00),
+    MONETIZATION_RECONCILIATION_ALERT_COOLDOWN_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(24 * 60)
+      .default(120),
+    MONETIZATION_RECONCILIATION_ALERT_EMAILS: z.string().optional(),
+    MONETIZATION_RECONCILIATION_SLACK_WEBHOOK_URL: z.string().optional(),
+    MONETIZATION_RECONCILIATION_ALERT_EMAIL_SUBJECT: z.string().optional(),
+    MONETIZATION_RECONCILIATION_ALERT_ACK_URL: z.string().optional(),
     SMTP_HOST: z.string().min(1),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
     SMTP_SECURE: z.coerce.boolean().default(false),
@@ -1584,7 +1630,18 @@ export const env = {
       runOnStartup: raw.MONETIZATION_RECONCILIATION_RUN_ON_STARTUP,
       recognitionWindowDays: raw.MONETIZATION_RECOGNITION_WINDOW_DAYS,
       tenants: monetizationTenantAllowlist,
-      tenantCacheMinutes: raw.MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES
+      tenantCacheMinutes: raw.MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES,
+      varianceAlertBps: raw.MONETIZATION_RECONCILIATION_VARIANCE_ALERT_BPS,
+      varianceCriticalBps: raw.MONETIZATION_RECONCILIATION_VARIANCE_CRITICAL_BPS,
+      usageVarianceAlertBps: raw.MONETIZATION_RECONCILIATION_USAGE_ALERT_BPS,
+      minimumInvoicedCents: raw.MONETIZATION_RECONCILIATION_MIN_INVOICED_CENTS,
+      alertCooldownMinutes: raw.MONETIZATION_RECONCILIATION_ALERT_COOLDOWN_MINUTES,
+      notifications: {
+        emailRecipients: parseCsv(raw.MONETIZATION_RECONCILIATION_ALERT_EMAILS ?? ''),
+        slackWebhookUrl: normalizeOptionalUrl(raw.MONETIZATION_RECONCILIATION_SLACK_WEBHOOK_URL),
+        emailSubject: raw.MONETIZATION_RECONCILIATION_ALERT_EMAIL_SUBJECT ?? null,
+        acknowledgementUrl: normalizeOptionalUrl(raw.MONETIZATION_RECONCILIATION_ALERT_ACK_URL)
+      }
     }
   },
   domainEvents: {
