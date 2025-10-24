@@ -30,6 +30,11 @@ router.put('/:communityId/resources/:resourceId', auth(), CommunityController.up
 router.delete('/:communityId/resources/:resourceId', auth(), CommunityController.deleteResource);
 
 router.get('/:communityId/webinars', auth(), CommunityProgrammingController.listWebinars);
+router.get(
+  '/:communityId/programming/conflicts',
+  auth(),
+  CommunityProgrammingController.detectScheduleConflicts
+);
 router.post('/:communityId/webinars', auth(), CommunityProgrammingController.createWebinar);
 router.put('/:communityId/webinars/:webinarId', auth(), CommunityProgrammingController.updateWebinar);
 router.delete('/:communityId/webinars/:webinarId', auth(), CommunityProgrammingController.deleteWebinar);

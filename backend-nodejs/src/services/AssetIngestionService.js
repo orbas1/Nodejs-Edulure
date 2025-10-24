@@ -11,6 +11,7 @@ import ContentAssetModel from '../models/ContentAssetModel.js';
 import ContentAuditLogModel from '../models/ContentAuditLogModel.js';
 import storageService from './StorageService.js';
 import IntegrationProviderService from './IntegrationProviderService.js';
+import { normaliseAssetMetadata } from './serializers/creationAssetSerializer.js';
 
 const POLL_INTERVAL_MS = 15000;
 const MAX_RETRY_ATTEMPTS = Number(env.assets?.ingestion?.maxAttempts ?? 5);
@@ -89,16 +90,21 @@ class AssetIngestionService {
           });
 
           if (asset) {
-            await ContentAssetModel.patchById(asset.id, {
-              metadata: {
+            const metadata = normaliseAssetMetadata(
+              {
                 ...(asset.metadata ?? {}),
                 ingestion: {
                   ...(asset.metadata?.ingestion ?? {}),
                   stage: 'retrying',
                   attempts,
-                  retryAt: retryAt.toISOString()
+                  retryAt: retryAt.toISOString(),
+                  lastError: error.message
                 }
-              }
+              },
+              { type: asset.type }
+            );
+            await ContentAssetModel.patchById(asset.id, {
+              metadata
             });
           }
 
@@ -213,8 +219,8 @@ class AssetIngestionService {
       }
     }
 
-    await ContentAssetModel.patchById(asset.id, {
-      metadata: {
+    const metadata = normaliseAssetMetadata(
+      {
         ...(asset.metadata ?? {}),
         powerpoint: {
           pageCount: pdfTask.result.files.length,
@@ -225,7 +231,12 @@ class AssetIngestionService {
           completedAt: new Date().toISOString(),
           jobId: job.id
         }
-      }
+      },
+      { type: asset.type }
+    );
+
+    await ContentAssetModel.patchById(asset.id, {
+      metadata
     });
 
     await ContentAuditLogModel.record({
@@ -333,8 +344,8 @@ class AssetIngestionService {
       }
     }
 
-    await ContentAssetModel.patchById(asset.id, {
-      metadata: {
+    const metadataPatch = normaliseAssetMetadata(
+      {
         ...(asset.metadata ?? {}),
         ebook: {
           title: metadata['dc:title'] ?? asset.originalFilename,
@@ -348,7 +359,12 @@ class AssetIngestionService {
           completedAt: new Date().toISOString(),
           jobId: job.id
         }
-      }
+      },
+      { type: asset.type }
+    );
+
+    await ContentAssetModel.patchById(asset.id, {
+      metadata: metadataPatch
     });
 
     await ContentAuditLogModel.record({

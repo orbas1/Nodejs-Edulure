@@ -2,11 +2,16 @@ import db from '../config/database.js';
 import CommunityModel from '../models/CommunityModel.js';
 import CommunityMemberModel from '../models/CommunityMemberModel.js';
 import CommunityWebinarModel from '../models/CommunityWebinarModel.js';
+import CommunityEventModel from '../models/CommunityEventModel.js';
 import CommunityPodcastEpisodeModel from '../models/CommunityPodcastEpisodeModel.js';
 import CommunityGrowthExperimentModel from '../models/CommunityGrowthExperimentModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 
 const MANAGER_ROLES = new Set(['owner', 'admin', 'moderator']);
+const DEFAULT_CONFLICT_WINDOW_DAYS = 14;
+const MIN_OVERLAP_MINUTES_DEFAULT = 30;
+const MILLISECONDS_IN_MINUTE = 60 * 1000;
+const SEVERITY_SCORE = { none: 0, low: 1, medium: 2, high: 3 };
 
 function isActiveMembership(membership) {
   return membership?.status === 'active';
@@ -61,6 +66,104 @@ function normaliseStatusList(value) {
   return list.length ? list : undefined;
 }
 
+function coerceDate(value, fallback) {
+  if (!value) {
+    return fallback ? new Date(fallback.getTime()) : null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return fallback ? new Date(fallback.getTime()) : null;
+  }
+  return date;
+}
+
+function computeEndFromDuration(start, durationMinutes, fallbackMinutes) {
+  if (!start) return null;
+  const duration = Number.isFinite(Number(durationMinutes)) ? Number(durationMinutes) : fallbackMinutes;
+  const safeDuration = Math.max(5, Math.min(720, duration));
+  return new Date(start.getTime() + safeDuration * MILLISECONDS_IN_MINUTE);
+}
+
+function computeOverlapMinutes(a, b) {
+  if (!a?.start || !a?.end || !b?.start || !b?.end) {
+    return 0;
+  }
+  const start = Math.max(a.start.getTime(), b.start.getTime());
+  const end = Math.min(a.end.getTime(), b.end.getTime());
+  if (end <= start) {
+    return 0;
+  }
+  return Math.round((end - start) / MILLISECONDS_IN_MINUTE);
+}
+
+function mapEventToSchedule(event) {
+  const metadata = ensurePlainObject(event.metadata);
+  const start = event.startAt ? new Date(event.startAt) : null;
+  const end = event.endAt ? new Date(event.endAt) : computeEndFromDuration(start, metadata.durationMinutes, 90);
+  return {
+    kind: 'event',
+    id: event.id,
+    title: event.title,
+    status: event.status,
+    visibility: event.visibility,
+    start,
+    end,
+    timezone: event.timezone ?? 'UTC',
+    location: metadata.locationName ?? event.locationName ?? null,
+    metadata
+  };
+}
+
+function mapWebinarToSchedule(webinar) {
+  const metadata = ensurePlainObject(webinar.metadata);
+  const start = webinar.startAt ? new Date(webinar.startAt) : null;
+  const end = computeEndFromDuration(start, metadata.durationMinutes ?? metadata.duration_minutes, 60);
+  return {
+    kind: 'webinar',
+    id: webinar.id,
+    title: webinar.topic,
+    status: webinar.status,
+    visibility: metadata.visibility ?? 'members',
+    host: webinar.host,
+    start,
+    end,
+    metadata
+  };
+}
+
+function ensurePlainObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value;
+}
+
+function computeSeverity(a, b, overlapMinutes) {
+  const highImpactStatuses = new Set(['live', 'announced']);
+  const highVisibility = new Set(['public']);
+  const aHigh = highImpactStatuses.has(String(a.status ?? '').toLowerCase()) || highVisibility.has(String(a.visibility ?? '').toLowerCase());
+  const bHigh = highImpactStatuses.has(String(b.status ?? '').toLowerCase()) || highVisibility.has(String(b.visibility ?? '').toLowerCase());
+
+  if (overlapMinutes >= 75 || (aHigh && bHigh && overlapMinutes >= 30)) {
+    return 'high';
+  }
+  if (overlapMinutes >= 45 || aHigh || bHigh) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+function buildRecommendation(a, b, overlapMinutes) {
+  const shiftMinutes = overlapMinutes + 15;
+  if (SEVERITY_SCORE[computeSeverity(a, b, overlapMinutes)] >= SEVERITY_SCORE.high) {
+    return `Reschedule "${b.title}" or "${a.title}" by at least ${shiftMinutes} minutes to avoid double booking.`;
+  }
+  if (overlapMinutes >= 45) {
+    return `Consider pushing "${b.title}" back by ${shiftMinutes} minutes so attendees can transition from "${a.title}".`;
+  }
+  return `Add a ${Math.max(15, shiftMinutes)} minute buffer between "${a.title}" and "${b.title}" to protect setup time.`;
+}
+
 export default class CommunityProgrammingService {
   static async ensureContext(communityIdentifier, userId) {
     const community = await resolveCommunity(communityIdentifier);
@@ -105,6 +208,129 @@ export default class CommunityProgrammingService {
         limit: webinars.limit,
         offset: webinars.offset
       }
+    };
+  }
+
+  static async detectScheduleConflicts(communityIdentifier, actor, options = {}) {
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
+    assertManageAccess(membership, actor?.role);
+
+    const now = new Date();
+    const windowStart = coerceDate(options.from ?? options.windowStart, now);
+    const defaultEnd = new Date(windowStart.getTime() + DEFAULT_CONFLICT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const windowEnd = coerceDate(options.to ?? options.windowEnd, defaultEnd);
+
+    if (!windowStart || !windowEnd || windowEnd <= windowStart) {
+      const error = new Error('Conflict analysis window must be positive and non-empty');
+      error.status = 400;
+      throw error;
+    }
+
+    const minimumOverlapMinutes = Number.isFinite(Number(options.minimumOverlapMinutes))
+      ? Math.max(5, Math.min(720, Number(options.minimumOverlapMinutes)))
+      : MIN_OVERLAP_MINUTES_DEFAULT;
+
+    const [events, webinars] = await Promise.all([
+      CommunityEventModel.listForCommunity(community.id, {
+        from: windowStart.toISOString(),
+        to: windowEnd.toISOString(),
+        status: ['scheduled', 'live'],
+        order: 'asc',
+        limit: 200
+      }),
+      CommunityWebinarModel.listForCommunity(community.id, {
+        status: ['announced', 'live', 'draft'],
+        order: 'asc',
+        limit: 200
+      })
+    ]);
+
+    const eventItems = Array.isArray(events) ? events : [];
+    const webinarItems = Array.isArray(webinars?.items) ? webinars.items : [];
+
+    const scheduleEntries = [
+      ...eventItems.map(mapEventToSchedule),
+      ...webinarItems.map(mapWebinarToSchedule)
+    ].filter((entry) => entry.start && entry.end && entry.end > entry.start);
+
+    scheduleEntries.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    const conflicts = [];
+    for (let index = 0; index < scheduleEntries.length; index += 1) {
+      const current = scheduleEntries[index];
+      for (let other = index + 1; other < scheduleEntries.length; other += 1) {
+        const candidate = scheduleEntries[other];
+        if (!candidate.start || candidate.start >= current.end) {
+          break;
+        }
+        const overlapMinutes = computeOverlapMinutes(current, candidate);
+        if (overlapMinutes >= minimumOverlapMinutes) {
+          const overlapStart = new Date(Math.max(current.start.getTime(), candidate.start.getTime()));
+          const overlapEnd = new Date(Math.min(current.end.getTime(), candidate.end.getTime()));
+          const severity = computeSeverity(current, candidate, overlapMinutes);
+          conflicts.push({
+            id: `${current.kind}-${current.id}__${candidate.kind}-${candidate.id}`,
+            severity,
+            overlapMinutes,
+            overlapWindow: {
+              start: overlapStart.toISOString(),
+              end: overlapEnd.toISOString()
+            },
+            items: [
+              {
+                kind: current.kind,
+                id: current.id,
+                title: current.title,
+                status: current.status,
+                visibility: current.visibility,
+                startAt: current.start.toISOString(),
+                endAt: current.end.toISOString(),
+                timezone: current.timezone ?? community.timezone ?? 'UTC',
+                location: current.location ?? null
+              },
+              {
+                kind: candidate.kind,
+                id: candidate.id,
+                title: candidate.title,
+                status: candidate.status,
+                visibility: candidate.visibility,
+                startAt: candidate.start.toISOString(),
+                endAt: candidate.end.toISOString(),
+                timezone: candidate.timezone ?? community.timezone ?? 'UTC',
+                location: candidate.location ?? null
+              }
+            ],
+            recommendation: buildRecommendation(current, candidate, overlapMinutes)
+          });
+        }
+      }
+    }
+
+    const highestSeverity = conflicts.reduce((acc, conflict) => {
+      return SEVERITY_SCORE[conflict.severity] > SEVERITY_SCORE[acc] ? conflict.severity : acc;
+    }, conflicts.length ? 'low' : 'none');
+
+    const conflictRate = scheduleEntries.length
+      ? Number(((conflicts.length * 2) / scheduleEntries.length).toFixed(2))
+      : 0;
+
+    return {
+      window: {
+        from: windowStart.toISOString(),
+        to: windowEnd.toISOString()
+      },
+      minimumOverlapMinutes,
+      totals: {
+        events: eventItems.length,
+        webinars: webinarItems.length,
+        scheduleEntries: scheduleEntries.length,
+        conflicts: conflicts.length
+      },
+      summary: {
+        highestSeverity,
+        conflictRate
+      },
+      conflicts
     };
   }
 
