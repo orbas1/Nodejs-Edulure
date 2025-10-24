@@ -21,6 +21,12 @@ import {
   createCommunityEvent
 } from '../../../../api/communityApi.js';
 import {
+  createDirectThread,
+  listDirectMessages,
+  markDirectThreadRead,
+  sendDirectMessage
+} from '../../../../api/directMessageApi.js';
+import {
   fetchFollowers,
   fetchFollowing,
   fetchFollowRecommendations,
@@ -33,6 +39,8 @@ import {
 const MESSAGE_PAGE_SIZE = 30;
 
 const emptyCollection = { items: [], loading: false, error: null };
+
+const DIRECT_CHANNEL_PREFIX = 'direct-';
 
 const DEFAULT_CAPABILITIES = {
   post: false,
@@ -84,26 +92,34 @@ const normaliseMessage = (message) => {
   if (!message) return null;
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const metadata = typeof message.metadata === 'object' && message.metadata !== null ? message.metadata : {};
-  const author = message.author ?? {};
+  const author = message.author ?? message.sender ?? {};
   const displayName = [author.firstName, author.lastName]
     .filter((part) => Boolean(part && part.trim()))
     .join(' ');
+  const rawStatus = message.status ?? metadata.status ?? 'visible';
+  const normalisedStatus = ['sent', 'delivered', 'read'].includes(rawStatus)
+    ? 'visible'
+    : rawStatus;
+
   return {
     id: String(message.id),
-    channelId: message.channelId,
+    channelId:
+      message.channelId ??
+      (message.threadId ? `${DIRECT_CHANNEL_PREFIX}${message.threadId}` : null),
     body: message.body ?? '',
     messageType: message.messageType ?? 'text',
     attachments,
     metadata,
-    status: message.status ?? 'visible',
+    status: normalisedStatus,
     pinned: Boolean(message.pinned),
     threadRootId: message.threadRootId ?? null,
     replyToMessageId: message.replyToMessageId ?? null,
     createdAt: message.createdAt ?? message.deliveredAt ?? null,
     updatedAt: message.updatedAt ?? null,
     author: {
-      id: author.id ?? message.authorId ?? null,
-      displayName: displayName || author.email || `Member ${message.authorId ?? ''}`,
+      id: author.id ?? message.authorId ?? message.senderId ?? null,
+      displayName:
+        displayName || author.email || `Member ${message.authorId ?? message.senderId ?? ''}`,
       role: author.role ?? null,
       email: author.email ?? null
     },
@@ -222,6 +238,14 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
     }));
   }, []);
 
+  const getChannelEntry = useCallback(
+    (channelId) => {
+      if (!channelId) return null;
+      return channelsState.items.find((entry) => entry.id === String(channelId)) ?? null;
+    },
+    [channelsState.items]
+  );
+
   useEffect(() => {
     if (communityId !== lastCommunityRef.current) {
       lastCommunityRef.current = communityId;
@@ -279,6 +303,10 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       const targetChannelId = String(channelId ?? activeChannelId ?? '');
       if (!communityId || !targetChannelId) return;
 
+      const channelEntry = getChannelEntry(targetChannelId);
+      const isDirectChannel = channelEntry?.channel?.channelType === 'direct';
+      const directThreadId = channelEntry?.channel?.metadata?.threadId ?? null;
+
       setMessageCache((prev) => {
         const existing = prev[targetChannelId] ?? { ...emptyCollection, hasMore: false };
         return {
@@ -294,23 +322,36 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       });
 
       try {
-        const response = await listCommunityMessages({
-          communityId,
-          channelId: targetChannelId,
-          token,
-          limit: MESSAGE_PAGE_SIZE,
-          before,
-          signal
-        });
+        let response;
+        if (isDirectChannel) {
+          if (!directThreadId) {
+            throw new Error('Direct message thread unavailable.');
+          }
+          response = await listDirectMessages({
+            token,
+            threadId: directThreadId,
+            limit: MESSAGE_PAGE_SIZE,
+            before,
+            signal
+          });
+        } else {
+          response = await listCommunityMessages({
+            communityId,
+            channelId: targetChannelId,
+            token,
+            limit: MESSAGE_PAGE_SIZE,
+            before,
+            signal
+          });
+        }
+
         const fetched = Array.isArray(response.data)
           ? response.data.map(normaliseMessage).filter(Boolean)
           : [];
         const chronological = fetched.slice().reverse();
         setMessageCache((prev) => {
           const existing = prev[targetChannelId] ?? { ...emptyCollection, hasMore: false };
-          const nextItems = refresh
-            ? chronological
-            : [...chronological, ...(existing.items ?? [])];
+          const nextItems = refresh ? chronological : [...chronological, ...(existing.items ?? [])];
           return {
             ...prev,
             [targetChannelId]: {
@@ -321,7 +362,20 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
             }
           };
         });
-        markCommunityChannelRead({ communityId, channelId: targetChannelId, token }).catch(() => undefined);
+
+        if (isDirectChannel) {
+          const latest = chronological[chronological.length - 1];
+          if (latest) {
+            markDirectThreadRead({
+              token,
+              threadId: directThreadId,
+              messageId: latest.id,
+              timestamp: latest.createdAt
+            }).catch(() => undefined);
+          }
+        } else {
+          markCommunityChannelRead({ communityId, channelId: targetChannelId, token }).catch(() => undefined);
+        }
       } catch (error) {
         if (signal?.aborted) return;
         setMessageCache((prev) => {
@@ -338,7 +392,7 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
         publishErrorNotice(error, 'Unable to load channel history');
       }
     },
-    [activeChannelId, communityId, interactive, token, publishErrorNotice]
+    [activeChannelId, communityId, getChannelEntry, interactive, token, publishErrorNotice]
   );
 
   const loadPresence = useCallback(
@@ -555,20 +609,121 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
   }, []);
 
   const sendMessage = useCallback(
-    async ({ channelId, messageType, body, attachments = [], metadata = {} }) => {
+    async ({ channelId, messageType, body, attachments = [], metadata = {}, directRecipients = [] }) => {
       const targetChannelId = String(channelId ?? activeChannelId ?? '');
       if (!interactive || !communityId || !targetChannelId) {
         throw new Error('Select a channel before sending messages.');
       }
-      ensureCapability(['post', 'broadcast'], 'You do not have permission to publish messages.');
+
+      const channelEntry = getChannelEntry(targetChannelId);
+      const isDirectChannel = channelEntry?.channel?.channelType === 'direct';
+      const directThreadId = channelEntry?.channel?.metadata?.threadId ?? null;
+
+      const normalisedRecipients = Array.isArray(directRecipients)
+        ? Array.from(
+            new Set(
+              directRecipients
+                .map((value) => {
+                  const numeric = Number(value);
+                  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+                })
+                .filter(Boolean)
+            )
+          )
+        : [];
+
+      const capabilityKeys = new Set(['post']);
+      const pendingMessageType = messageType ?? 'text';
+      if (!isDirectChannel && ['system', 'event', 'live'].includes(pendingMessageType)) {
+        capabilityKeys.add('broadcast');
+      }
+      ensureCapability(Array.from(capabilityKeys), 'You do not have permission to publish messages.');
+
+      const resolvedMessageType = pendingMessageType === 'direct' ? 'text' : pendingMessageType;
+
       const payload = {
-        messageType: messageType ?? 'text',
+        messageType: resolvedMessageType,
         body,
         attachments,
         metadata
       };
+
       try {
-        const { data } = await postCommunityMessage({ communityId, channelId: targetChannelId, token, payload });
+        if (isDirectChannel && directThreadId) {
+          const { data } = await sendDirectMessage({ token, threadId: directThreadId, payload });
+          const message = normaliseMessage(data);
+          appendMessage(targetChannelId, message);
+          setWorkspaceNotice({
+            tone: 'success',
+            message: 'Message delivered',
+            detail: 'Sent to the selected direct conversation.'
+          });
+          if (message) {
+            markDirectThreadRead({
+              token,
+              threadId: directThreadId,
+              messageId: message.id,
+              timestamp: message.createdAt
+            }).catch(() => undefined);
+          }
+          return message;
+        }
+
+        if (pendingMessageType === 'direct') {
+          if (!normalisedRecipients.length) {
+            throw new Error('Add at least one valid recipient to start a direct conversation.');
+          }
+
+          const threadResponse = await createDirectThread({
+            token,
+            payload: {
+              ...(communityId ? { communityId } : {}),
+              participantIds: normalisedRecipients,
+              subject: typeof metadata?.note === 'string' ? metadata.note : null,
+              initialMessage: {
+                messageType: resolvedMessageType,
+                body,
+                attachments,
+                metadata
+              }
+            }
+          });
+
+          const creation = threadResponse?.data ?? {};
+          const thread = creation.thread ?? null;
+          if (!thread) {
+            throw new Error('Unable to create direct message thread.');
+          }
+
+          const newChannelId = `${DIRECT_CHANNEL_PREFIX}${thread.id}`;
+          await loadChannels();
+          selectChannel(newChannelId);
+          loadedChannelsRef.current.add(newChannelId);
+
+          const initialMessage = normaliseMessage(creation.initialMessage ?? null);
+          setMessageCache((prev) => ({
+            ...prev,
+            [newChannelId]: {
+              items: initialMessage ? [initialMessage] : [],
+              loading: false,
+              error: null,
+              hasMore: false
+            }
+          }));
+          setWorkspaceNotice({
+            tone: 'success',
+            message: 'Direct conversation started',
+            detail: 'We created a new private thread with the selected recipients.'
+          });
+          return initialMessage ?? null;
+        }
+
+        const { data } = await postCommunityMessage({
+          communityId,
+          channelId: targetChannelId,
+          token,
+          payload
+        });
         const message = normaliseMessage(data);
         appendMessage(targetChannelId, message);
         setWorkspaceNotice({
@@ -582,7 +737,18 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
         throw error;
       }
     },
-    [activeChannelId, appendMessage, communityId, ensureCapability, interactive, publishErrorNotice, token]
+    [
+      activeChannelId,
+      appendMessage,
+      communityId,
+      ensureCapability,
+      getChannelEntry,
+      interactive,
+      loadChannels,
+      publishErrorNotice,
+      selectChannel,
+      token
+    ]
   );
 
   const reactToMessage = useCallback(
@@ -590,6 +756,15 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       if (!interactive || !communityId) return;
       const targetChannelId = String(channelId ?? activeChannelId ?? '');
       if (!targetChannelId || !messageId || !emoji) return;
+      const channelEntry = getChannelEntry(targetChannelId);
+      if (channelEntry?.channel?.channelType === 'direct') {
+        setWorkspaceNotice({
+          tone: 'info',
+          message: 'Reactions unavailable in direct messages',
+          detail: 'Use the direct messaging console to respond with emoji.'
+        });
+        return;
+      }
       ensureCapability(['post', 'broadcast'], 'You do not have permission to react to messages.');
       try {
         await addCommunityMessageReaction({ communityId, channelId: targetChannelId, messageId, token, emoji });
@@ -610,7 +785,17 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
         publishErrorNotice(error, 'Unable to react to message');
       }
     },
-    [activeChannelId, communityId, ensureCapability, interactive, publishErrorNotice, token, updateMessage]
+    [
+      activeChannelId,
+      communityId,
+      ensureCapability,
+      getChannelEntry,
+      interactive,
+      publishErrorNotice,
+      setWorkspaceNotice,
+      token,
+      updateMessage
+    ]
   );
 
   const removeReaction = useCallback(
@@ -618,6 +803,10 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       if (!interactive || !communityId) return;
       const targetChannelId = String(channelId ?? activeChannelId ?? '');
       if (!targetChannelId || !messageId || !emoji) return;
+      const channelEntry = getChannelEntry(targetChannelId);
+      if (channelEntry?.channel?.channelType === 'direct') {
+        return;
+      }
       ensureCapability(['post', 'broadcast'], 'You do not have permission to modify reactions.');
       try {
         await removeCommunityMessageReaction({ communityId, channelId: targetChannelId, messageId, token, emoji });
@@ -634,7 +823,16 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
         publishErrorNotice(error, 'Unable to update reactions');
       }
     },
-    [activeChannelId, communityId, ensureCapability, interactive, publishErrorNotice, token, updateMessage]
+    [
+      activeChannelId,
+      communityId,
+      ensureCapability,
+      getChannelEntry,
+      interactive,
+      publishErrorNotice,
+      token,
+      updateMessage
+    ]
   );
 
   const moderateMessage = useCallback(
@@ -642,6 +840,15 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       if (!interactive || !communityId) return;
       const targetChannelId = String(channelId ?? activeChannelId ?? '');
       if (!targetChannelId || !messageId || !action) return;
+      const channelEntry = getChannelEntry(targetChannelId);
+      if (channelEntry?.channel?.channelType === 'direct') {
+        setWorkspaceNotice({
+          tone: 'info',
+          message: 'Moderation not available for direct messages',
+          detail: 'Manage participant privacy settings to control direct conversations.'
+        });
+        return;
+      }
       ensureCapability('moderate', 'You do not have permission to moderate messages.');
       try {
         const { data } = await moderateCommunityMessage({
@@ -665,7 +872,17 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
         throw error;
       }
     },
-    [activeChannelId, communityId, ensureCapability, interactive, publishErrorNotice, token, updateMessage]
+    [
+      activeChannelId,
+      communityId,
+      ensureCapability,
+      getChannelEntry,
+      interactive,
+      publishErrorNotice,
+      setWorkspaceNotice,
+      token,
+      updateMessage
+    ]
   );
 
   const updatePresenceStatus = useCallback(

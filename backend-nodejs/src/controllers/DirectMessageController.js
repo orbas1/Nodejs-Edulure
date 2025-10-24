@@ -10,13 +10,15 @@ const listThreadsQuerySchema = Joi.object({
     .min(1)
     .max(env.directMessages.threads.maxPageSize)
     .default(env.directMessages.threads.defaultPageSize),
-  offset: Joi.number().integer().min(0).default(0)
+  offset: Joi.number().integer().min(0).default(0),
+  communityId: Joi.number().integer().min(1).optional()
 });
 
 const createThreadSchema = Joi.object({
   participantIds: Joi.array().items(Joi.number().integer().min(1)).required(),
   subject: Joi.string().max(240).allow('', null),
   forceNew: Joi.boolean().default(false),
+  communityId: Joi.number().integer().min(1).optional(),
   initialMessage: Joi.object({
     messageType: Joi.string().valid('text', 'system', 'file').default('text'),
     body: Joi.string().trim().min(1).max(5000).required(),

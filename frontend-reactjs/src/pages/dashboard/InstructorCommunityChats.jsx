@@ -277,7 +277,8 @@ export default function InstructorCommunityChats() {
         messageType: composerState.messageType,
         body: composerState.body,
         attachments,
-        metadata
+        metadata,
+        directRecipients: composerState.directRecipients
       });
       setComposerState(initialComposerState);
     } catch (error) {
@@ -591,6 +592,8 @@ export default function InstructorCommunityChats() {
     );
   }
 
+  const isDirectChannel = activeChannel?.channel?.channelType === 'direct';
+
   return (
     <div className="space-y-8">
       <header className="space-y-3">
@@ -647,9 +650,9 @@ export default function InstructorCommunityChats() {
             error={messagesState.error}
             hasMore={messagesState.hasMore}
             onLoadMore={handleLoadMoreMessages}
-            onReact={handleReactToMessage}
-            onRemoveReaction={handleRemoveReaction}
-            onModerate={handleModerateMessage}
+            onReact={isDirectChannel ? null : handleReactToMessage}
+            onRemoveReaction={isDirectChannel ? null : handleRemoveReaction}
+            onModerate={isDirectChannel ? null : handleModerateMessage}
           />
 
           <MessageComposer

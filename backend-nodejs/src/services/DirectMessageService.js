@@ -4,6 +4,8 @@ import DirectMessageParticipantModel from '../models/DirectMessageParticipantMod
 import DirectMessageThreadModel from '../models/DirectMessageThreadModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import UserModel from '../models/UserModel.js';
+import CommunityModel from '../models/CommunityModel.js';
+import CommunityMemberModel from '../models/CommunityMemberModel.js';
 import logger from '../config/logger.js';
 import { env } from '../config/env.js';
 import realtimeService from './RealtimeService.js';
@@ -37,7 +39,13 @@ export default class DirectMessageService {
       : THREAD_DEFAULT_LIMIT;
     const requestedOffset = Number(query.offset ?? 0);
     const offset = Number.isFinite(requestedOffset) ? Math.max(Math.floor(requestedOffset), 0) : 0;
-    const threads = await DirectMessageThreadModel.listForUser(userId, { ...query, limit, offset });
+    const communityId = typeof query.communityId === 'number' ? query.communityId : undefined;
+    const threads = await DirectMessageThreadModel.listForUser(userId, {
+      communityId:
+        communityId === undefined || Number.isNaN(communityId) ? undefined : communityId,
+      limit,
+      offset
+    });
     if (!threads.length) {
       return { threads: [], limit, offset };
     }
@@ -100,9 +108,52 @@ export default class DirectMessageService {
       throw error;
     }
 
+    const hasCommunityScope = Object.prototype.hasOwnProperty.call(payload, 'communityId');
+    const communityId = hasCommunityScope ? Number(payload.communityId) : null;
+    if (hasCommunityScope && (!Number.isInteger(communityId) || communityId < 1)) {
+      const error = new Error('communityId must be a positive integer when provided');
+      error.status = 422;
+      throw error;
+    }
+
+    if (communityId) {
+      const community = await CommunityModel.findById(communityId);
+      if (!community) {
+        const error = new Error('Community not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const memberships = await CommunityMemberModel.table()
+        .where({ community_id: communityId })
+        .whereIn('user_id', uniqueIds)
+        .select(['user_id', 'status']);
+
+      const membershipMap = new Map(memberships.map((member) => [member.user_id, member]));
+      const missing = uniqueIds.filter((id) => !membershipMap.has(id));
+      if (missing.length) {
+        const error = new Error('All participants must belong to the community');
+        error.status = 403;
+        error.details = missing;
+        throw error;
+      }
+
+      const inactive = uniqueIds.filter(
+        (id) => (membershipMap.get(id)?.status ?? '').toLowerCase() !== 'active'
+      );
+      if (inactive.length) {
+        const error = new Error('Only active community members can join the thread');
+        error.status = 403;
+        error.details = inactive;
+        throw error;
+      }
+    }
+
     let thread = null;
     if (uniqueIds.length === 2 && !payload.forceNew) {
-      thread = await DirectMessageThreadModel.findThreadMatchingParticipants(uniqueIds);
+      thread = await DirectMessageThreadModel.findThreadMatchingParticipants(uniqueIds, {
+        communityId: hasCommunityScope ? communityId : undefined
+      });
     }
 
     const result = await db.transaction(async (trx) => {
@@ -110,6 +161,7 @@ export default class DirectMessageService {
       if (!activeThread) {
         activeThread = await DirectMessageThreadModel.create(
           {
+            communityId,
             subject: payload.subject ?? null,
             isGroup: uniqueIds.length > 2,
             metadata: { createdBy: creatorId }
@@ -135,7 +187,7 @@ export default class DirectMessageService {
             entityType: 'direct_message_thread',
             entityId: activeThread.id,
             eventType: 'dm.thread.created',
-            payload: { creatorId, participantCount: uniqueIds.length },
+            payload: { creatorId, participantCount: uniqueIds.length, communityId },
             performedBy: creatorId
           },
           trx
@@ -177,7 +229,7 @@ export default class DirectMessageService {
             entityType: 'direct_message',
             entityId: initialMessage.id,
             eventType: 'dm.message.created',
-            payload: { threadId: activeThread.id },
+            payload: { threadId: activeThread.id, communityId },
             performedBy: creatorId
           },
           trx
@@ -185,7 +237,7 @@ export default class DirectMessageService {
       }
 
       log.info(
-        { threadId: activeThread.id, creatorId, reused: Boolean(thread) },
+        { threadId: activeThread.id, creatorId, reused: Boolean(thread), communityId },
         'direct message thread ready'
       );
 

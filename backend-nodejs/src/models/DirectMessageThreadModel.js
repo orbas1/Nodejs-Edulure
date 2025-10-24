@@ -14,6 +14,7 @@ function mapRecord(record) {
   if (!record) return null;
   return {
     id: record.id,
+    communityId: record.community_id ?? null,
     subject: record.subject ?? null,
     isGroup: Boolean(record.is_group),
     metadata: parseJson(record.metadata, {}),
@@ -27,6 +28,7 @@ function mapRecord(record) {
 export default class DirectMessageThreadModel {
   static async create(thread, connection = db) {
     const payload = {
+      community_id: thread.communityId ?? null,
       subject: thread.subject ?? null,
       is_group: Boolean(thread.isGroup),
       metadata: JSON.stringify(thread.metadata ?? {}),
@@ -62,8 +64,8 @@ export default class DirectMessageThreadModel {
     return this.findById(id, connection);
   }
 
-  static async listForUser(userId, { limit = 20, offset = 0 } = {}, connection = db) {
-    const rows = await connection('direct_message_threads as dmt')
+  static async listForUser(userId, { limit = 20, offset = 0, communityId } = {}, connection = db) {
+    const query = connection('direct_message_threads as dmt')
       .leftJoin('direct_message_participants as dmp', 'dmt.id', 'dmp.thread_id')
       .where('dmp.user_id', userId)
       .orderBy('dmt.last_message_at', 'desc')
@@ -71,6 +73,7 @@ export default class DirectMessageThreadModel {
       .offset(offset)
       .select([
         'dmt.id',
+        'dmt.community_id',
         'dmt.subject',
         'dmt.is_group',
         'dmt.metadata',
@@ -80,10 +83,20 @@ export default class DirectMessageThreadModel {
         'dmt.updated_at'
       ]);
 
+    if (communityId !== undefined) {
+      if (communityId === null) {
+        query.andWhereNull('dmt.community_id');
+      } else {
+        query.andWhere('dmt.community_id', communityId);
+      }
+    }
+
+    const rows = await query;
+
     return rows.map((row) => mapRecord(row));
   }
 
-  static async findThreadMatchingParticipants(participantIds, connection = db) {
+  static async findThreadMatchingParticipants(participantIds, { communityId } = {}, connection = db) {
     if (!participantIds?.length) return null;
     const uniqueIds = [...new Set(participantIds)].sort();
 
@@ -93,7 +106,7 @@ export default class DirectMessageThreadModel {
       .groupBy('thread_id')
       .havingRaw('COUNT(*) = ?', [uniqueIds.length]);
 
-    const candidate = await connection('direct_message_threads as dmt')
+    const candidateQuery = connection('direct_message_threads as dmt')
       .select('dmt.id')
       .whereIn('dmt.id', subquery)
       .andWhereNotExists(function () {
@@ -101,8 +114,17 @@ export default class DirectMessageThreadModel {
           .from('direct_message_participants as others')
           .whereRaw('others.thread_id = dmt.id')
           .andWhereNotIn('others.user_id', uniqueIds);
-      })
-      .first();
+      });
+
+    if (communityId !== undefined) {
+      if (communityId === null) {
+        candidateQuery.andWhereNull('dmt.community_id');
+      } else {
+        candidateQuery.andWhere('dmt.community_id', communityId);
+      }
+    }
+
+    const candidate = await candidateQuery.first();
 
     if (!candidate) {
       return null;

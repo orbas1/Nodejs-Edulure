@@ -5,6 +5,9 @@ import db from '../config/database.js';
 import CommunityChannelMemberModel from '../models/CommunityChannelMemberModel.js';
 import CommunityChannelModel from '../models/CommunityChannelModel.js';
 import CommunityMemberModel from '../models/CommunityMemberModel.js';
+import DirectMessageModel from '../models/DirectMessageModel.js';
+import DirectMessageParticipantModel from '../models/DirectMessageParticipantModel.js';
+import DirectMessageThreadModel from '../models/DirectMessageThreadModel.js';
 import CommunityMessageModerationModel from '../models/CommunityMessageModerationModel.js';
 import CommunityMessageModel from '../models/CommunityMessageModel.js';
 import CommunityMessageReactionModel from '../models/CommunityMessageReactionModel.js';
@@ -45,8 +48,38 @@ function serializeChannel(channel) {
 const log = logger.child({ module: 'community-chat-service' });
 const CHAT_DEFAULT_PAGE_SIZE = env.chat.pagination.defaultPageSize;
 const CHAT_MAX_PAGE_SIZE = env.chat.pagination.maxPageSize;
+const DIRECT_THREAD_DEFAULT_LIMIT = env.directMessages?.threads?.defaultPageSize ?? 20;
 const PRESENCE_DEFAULT_TTL = env.chat.presence.defaultTtlMinutes;
 const PRESENCE_MAX_TTL = env.chat.presence.maxTtlMinutes;
+const DIRECT_CHANNEL_PREFIX = 'direct-';
+
+function formatDisplayName(user, fallbackId) {
+  if (!user) {
+    return fallbackId ? `Member ${fallbackId}` : 'Member';
+  }
+  const parts = [user.firstName, user.lastName].filter((part) => Boolean(part && part.trim()));
+  if (parts.length) {
+    return parts.join(' ');
+  }
+  if (user.email) {
+    return user.email;
+  }
+  return fallbackId ? `Member ${fallbackId}` : 'Member';
+}
+
+function buildDirectChannelDescription(subject, peers) {
+  if (subject) {
+    return `Direct message: ${subject}`;
+  }
+  if (!peers.length) {
+    return 'Private conversation with community members.';
+  }
+  const names = peers.slice(0, 2).map((peer) => peer.displayName);
+  if (peers.length > 2) {
+    names.push(`+${peers.length - 2}`);
+  }
+  return `Direct conversation with ${names.join(', ')}`;
+}
 
 export default class CommunityChatService {
   static async ensureCommunityMember(communityId, userId) {
@@ -429,6 +462,157 @@ export default class CommunityChatService {
         unreadCount,
         memberCount: memberCountMap.get(channel.id) ?? 0
       });
+    }
+
+    const directThreads = await DirectMessageThreadModel.listForUser(userId, {
+      limit: DIRECT_THREAD_DEFAULT_LIMIT,
+      communityId: community.id
+    });
+
+    if (directThreads.length) {
+      const directThreadIds = directThreads.map((thread) => thread.id);
+      const participantsByThread = await Promise.all(
+        directThreadIds.map((id) => DirectMessageParticipantModel.listForThread(id))
+      );
+
+      const uniqueUserIds = new Set();
+      participantsByThread.forEach((participants) => {
+        participants.forEach((participant) => {
+          uniqueUserIds.add(participant.userId);
+        });
+      });
+
+      const users = await UserModel.findByIds([...uniqueUserIds]);
+      const userMap = new Map(users.map((user) => [user.id, user]));
+
+      const latestDirectMessages = await DirectMessageModel.latestForThreads(directThreadIds);
+      const latestDirectMap = latestDirectMessages.reduce((acc, entry) => {
+        acc.set(entry.threadId, entry.message);
+        return acc;
+      }, new Map());
+
+      const otherParticipantIds = new Set();
+      participantsByThread.forEach((participants) => {
+        participants.forEach((participant) => {
+          if (participant.userId !== userId) {
+            otherParticipantIds.add(participant.userId);
+          }
+        });
+      });
+
+      let communityMembers = [];
+      if (otherParticipantIds.size) {
+        communityMembers = await CommunityMemberModel.table()
+          .where({ community_id: community.id })
+          .whereIn('user_id', [...otherParticipantIds])
+          .select(['user_id', 'role', 'status']);
+      }
+
+      const activeMemberMap = new Map(
+        communityMembers
+          .filter((member) => member.status === 'active')
+          .map((member) => [member.user_id, member])
+      );
+
+      const unreadDirectCounts = await Promise.all(
+        participantsByThread.map((participants, index) => {
+          const viewerParticipant = participants.find((participant) => participant.userId === userId);
+          return DirectMessageModel.countSince(
+            directThreadIds[index],
+            viewerParticipant?.lastReadAt
+          );
+        })
+      );
+
+      for (let index = 0; index < directThreads.length; index += 1) {
+        const thread = directThreads[index];
+        const threadParticipants = participantsByThread[index].map((participant) => ({
+          ...participant,
+          user: userMap.get(participant.userId) ?? null
+        }));
+        const viewerParticipant = threadParticipants.find((participant) => participant.userId === userId);
+        if (!viewerParticipant) {
+          continue;
+        }
+
+        if (thread.communityId && thread.communityId !== community.id) {
+          continue;
+        }
+
+        const activePeers = threadParticipants.filter(
+          (participant) => participant.userId !== userId && activeMemberMap.has(participant.userId)
+        );
+
+        if (!activePeers.length) {
+          continue;
+        }
+
+        const participantSummaries = threadParticipants.map((participant) => {
+          const memberMeta = activeMemberMap.get(participant.userId) ?? null;
+          return {
+            userId: participant.userId,
+            displayName: formatDisplayName(participant.user, participant.userId),
+            role: participant.user?.role ?? null,
+            communityRole: memberMeta?.role ?? null,
+            status: memberMeta?.status ?? null
+          };
+        });
+
+        const peerSummaries = participantSummaries.filter((summary) => summary.userId !== userId);
+
+        const channelId = `${DIRECT_CHANNEL_PREFIX}${thread.id}`;
+        const channelName = thread.subject
+          ? thread.subject
+          : activePeers
+              .map((participant) => formatDisplayName(participant.user, participant.userId))
+              .join(', ') || 'Direct message';
+
+        const directChannel = {
+          id: channelId,
+          communityId: community.id,
+          name: channelName,
+          slug: channelId,
+          channelType: 'direct',
+          description: buildDirectChannelDescription(thread.subject, peerSummaries),
+          isDefault: false,
+          metadata: {
+            threadId: thread.id,
+            participants: participantSummaries,
+            viewerParticipant: {
+              userId: viewerParticipant.userId,
+              notificationsEnabled: Boolean(viewerParticipant.notificationsEnabled),
+              muteUntil: viewerParticipant.muteUntil ?? null,
+              lastReadAt: viewerParticipant.lastReadAt ?? null,
+              lastReadMessageId: viewerParticipant.lastReadMessageId ?? null
+            },
+            lastMessagePreview: thread.lastMessagePreview ?? null,
+            lastMessageAt: thread.lastMessageAt ?? null
+          },
+          members: threadParticipants.length,
+          createdAt: thread.createdAt,
+          updatedAt: thread.updatedAt ?? thread.lastMessageAt ?? thread.createdAt
+        };
+
+        response.push({
+          channel: directChannel,
+          membership: {
+            channelId,
+            userId,
+            role: 'member',
+            notificationsEnabled: Boolean(viewerParticipant.notificationsEnabled),
+            muteUntil: viewerParticipant.muteUntil ?? null,
+            lastReadAt: viewerParticipant.lastReadAt ?? null,
+            lastReadMessageId: viewerParticipant.lastReadMessageId ?? null,
+            metadata: {
+              type: 'direct',
+              threadId: thread.id
+            }
+          },
+          latestMessage: latestDirectMap.get(thread.id) ?? null,
+          unreadCount: unreadDirectCounts[index] ?? 0,
+          memberCount: threadParticipants.length
+        });
+      }
     }
 
     return response;

@@ -5442,9 +5442,14 @@ export async function seed(knex) {
     ]);
 
     const [directThreadId] = await trx('direct_message_threads').insert({
+      community_id: opsCommunityId,
       subject: 'Launch Readiness Sync',
       is_group: false,
-      metadata: JSON.stringify({ seeded: true, playbook: 'launch-readiness' }),
+      metadata: JSON.stringify({
+        seeded: true,
+        playbook: 'launch-readiness',
+        communities: [opsCommunityId]
+      }),
       last_message_at: trx.fn.now(),
       last_message_preview: 'Checklist signed off and synced to the ops drive.'
     });

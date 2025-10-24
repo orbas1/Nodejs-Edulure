@@ -16,6 +16,14 @@ export const channelTypeMetadata = {
     recommendedRoles: ['member', 'moderator'],
     compliance: 'Messages subject to community guidelines.'
   },
+  direct: {
+    label: 'Direct message',
+    description: 'Private one-to-one or small group thread.',
+    icon: ChatBubbleBottomCenterTextIcon,
+    accent: 'bg-slate-100 text-slate-700',
+    recommendedRoles: ['member'],
+    compliance: 'Subject to participant privacy controls.'
+  },
   broadcast: {
     label: 'Broadcast',
     description: 'Announcement stream with role-gated publishing.',
