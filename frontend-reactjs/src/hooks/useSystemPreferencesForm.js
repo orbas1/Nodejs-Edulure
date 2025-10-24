@@ -127,6 +127,8 @@ export default function useSystemPreferencesForm({ token, onStatus, onAfterSave 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [lastFetchedAt, setLastFetchedAt] = useState(null);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
 
   const applyPayload = useCallback((payload) => {
     if (!payload) return;
@@ -152,6 +154,12 @@ export default function useSystemPreferencesForm({ token, onStatus, onAfterSave 
       const response = await fetchSystemPreferences({ token });
       if (response?.data) {
         applyPayload(response.data);
+        if (response.data.updatedAt) {
+          const updated = new Date(response.data.updatedAt);
+          setLastFetchedAt(Number.isNaN(updated.getTime()) ? new Date() : updated);
+        } else {
+          setLastFetchedAt(new Date());
+        }
       }
       setError(null);
     } catch (refreshError) {
@@ -200,6 +208,7 @@ export default function useSystemPreferencesForm({ token, onStatus, onAfterSave 
         }
       });
       await refresh();
+      setLastSavedAt(new Date());
       onAfterSave?.();
       onStatus?.({ type: 'success', message: 'System preferences updated.' });
     } catch (persistError) {
@@ -305,6 +314,8 @@ export default function useSystemPreferencesForm({ token, onStatus, onAfterSave 
     loading,
     saving,
     error,
+    lastFetchedAt,
+    lastSavedAt,
     refresh,
     persist,
     handleInputChange,
