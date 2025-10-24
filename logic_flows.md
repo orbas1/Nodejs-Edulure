@@ -421,40 +421,42 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Stage invites with mocked providers, rehearse expiry + acceptance flows end-to-end, update enablement docs, train partner-success teams, and roll out behind `integration-invite` flag while monitoring acceptance + escalation metrics.
 
 ### 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
-1. **Appraisal:** Embedded support launcher, help centre entries, contextual guides, and feedback capture integrated into the web shell.
-2. **Functionality:** Components open inline help drawers, search knowledge base, submit tickets, and capture quick feedback for analytics.
-3. **Logic Usefulness:** Support hooks track page context, user role, and prior interactions to surface relevant guides automatically.
-4. **Redundancies:** Help article previews duplicated between launcher and standalone support pages; centralise components.
-5. **Placeholders Or non-working functions or stubs:** Offline escalation path flagged TODO; communicate fallback instructions clearly.
-6. **Duplicate Functions:** Feedback capture logic repeated in dashboards; unify to maintain analytics consistency.
-7. **Improvements need to make:** Add AI-powered suggestions, integrate with status page, and expose case history to users.
-8. **Styling improvements:** Align support widget styling with overlay design tokens and ensure accessible focus states.
-9. **Efficiency analysis and improvement:** Lazy-load third-party scripts and cache article metadata to reduce page weight.
-10. **Strengths to Keep:** Context-aware assistance, analytics instrumentation, and accessible components.
-11. **Weaknesses to remove:** Modal stacking conflicts; rationalise trigger priority.
-12. **Styling and Colour review changes:** Ensure badges and alerts use accessible colours.
-13. **CSS, orientation, placement and arrangement changes:** Optimise placement for mobile to avoid covering primary CTAs.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refine support copy to be empathetic yet concise and remove repeated disclaimers.
-15. **Change Checklist Tracker:** Update support QA scripts, article link validation, and analytics integration tasks before releases.
-16. **Full Upgrade Plan & Release Steps:** Soft launch with subsets of users, monitor support metrics, iterate on suggestions, update docs, and roll out globally.
+1. **Appraisal:** Learner support now couples `SupportKnowledgeBaseService`, `SupportTicketModel`, and `DashboardService.buildLearnerDashboard` so `LearnerSupport.jsx`, the launcher widgets, and ticket forms surface cached guides, SLA cues, and escalation breadcrumbs drawn from the same Annex A24 dataset plus migration `20250321120000_learner_support_enhancements.js` and the aligned seeds in `001_bootstrap.js`.
+2. **Functionality:** `SupportKnowledgeBaseService.searchArticles` hydrates category-aware results with freshness scoring, `describeInventory` reports totals/stale counts, `SupportTicketModel.normaliseKnowledgeSuggestions` shares formatting between ticket suggestions and dashboards, and `LearnerSupport.jsx` renders `KnowledgeBaseMetaSummary`, case timelines, and helpful toggles that persist through the `SUPPORT_HELPFUL_STORAGE_KEY` cache.
+3. **Logic Usefulness:** A single `knowledgeBaseMeta` snapshot now powers dashboard metrics, informs `LearnerSupportRepository` queue summaries, and feeds the workspace service-health chips, guaranteeing that SLA badges, freshness flags, and article counts track the same backend record.
+4. **Redundancies:** Knowledge preview formatting, attachment parsing, and breadcrumb serialisation moved into shared helpers (`SupportTicketModel.normaliseKnowledgeSuggestions`, `normaliseBreadcrumbs`, `serialiseAttachments`) eliminating duplicate JSON parsing across `TicketForm.jsx`, API serializers, and dashboard hydration.
+5. **Placeholders or Non-working Functions:** Voice concierge scheduling, real telephony routing, and server-persisted “marked helpful” telemetry remain TODO—current CTAs surface explanatory copy and `localStorage` persistence until Annex C1 integrations land.
+6. **Duplicate Functions:** Ticket creation/update flows, dashboard hydrators, and support repositories all delegate to shared normalisers so excerpt truncation, freshness chips, and suggestion dedupe no longer exist in parallel utilities.
+7. **Improvements Needed:** Localise stale messaging, expose assigned responder details alongside SLA badges, and stream `knowledgeBaseMeta` into operator dashboards plus telemetry so operations can trend stale counts without manual exports.
+8. **Styling Improvements:** `KnowledgeBaseMetaSummary`, stale badges, and helpful-score tags adopt theme-aware classes (`rounded-3xl`, `bg-amber-100`, `text-slate-500`) while `TicketTimeline` cards inherit the shared `classes.panel` surface from the theme provider for dark/light parity.
+9. **Efficiency Analysis & Improvement:** Default article lookups memoise for five minutes, search filters apply case-insensitive SQL backed by category/helpfulness indexes, and helpful toggles debounce writes to `localStorage` rather than rerunning React state diffing every render.
+10. **Strengths to Keep:** SLA countdowns, attachment uploads, escalation breadcrumbs, and the contextual feedback banner stay intact and now gain freshness metadata, cached knowledge suggestions, and case-owner hints without regressing existing flows.
+11. **Weaknesses to Remove:** Live concierge/contact CTAs still route to placeholders, notification alerts for stale articles are manual, and offline escalation fallbacks require better exposure—queue follow-up work through Annex C1.
+12. **Styling & Colour Review Changes:** Relative timestamps, stale chips, and queue warnings respect the theme tokens (`text-slate-500`, `bg-primary/10`, `border-rose-200`) so high-contrast and dark modes stay legible while flagging ageing content.
+13. **CSS, Orientation & Placement:** Support grids collapse to a single column on small breakpoints, meta chips wrap inline without overflow, and the ticket drawer avoids covering primary CTAs by anchoring to the viewport safe area.
+14. **Text Analysis:** Workspace copy emphasises actionable guidance (“Review soon”, “Escalated to live ops”) trimmed under 140 characters, while empathy-driven tone mirrors Annex language for sensitive support messaging.
+15. **Change Checklist Tracker:** Run `npm --workspace backend-nodejs test -- supportKnowledgeBaseService`, reseed via `npm --workspace backend-nodejs run seed`, validate `/learner/support/knowledge-base` output, exercise `TicketForm` flows (web + Vitest), and confirm migrations remain applied across environments.
+16. **Full Upgrade Plan & Release Steps:** Deploy by reseeding the knowledge base (including explicit `created_at`/`updated_at` values), capturing updated screenshots, briefing support ops on stale flags, monitoring helpful-toggle analytics, and rolling out telephony integrations once Annex checks pass.
+
 
 ### 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
-1. **Appraisal:** Application shell orchestrating routing, theming, internationalisation stubs, and shared component primitives used across experiences.
-2. **Functionality:** Layout components manage header/footer, sidebars, responsive breakpoints, and theme switching while providers expose contexts for analytics, auth, and feature flags.
-3. **Logic Usefulness:** Centralised theming ensures shared tokens propagate to marketing, dashboard, and admin surfaces, while layout primitives enforce consistent spacing.
-4. **Redundancies:** Breakpoint definitions appear in CSS modules and JS utilities; consolidate into single source to avoid mismatch.
-5. **Placeholders Or non-working functions or stubs:** I18n scaffolding exists but lacks translation files; flag as TODO and guard UI toggles.
-6. **Duplicate Functions:** Theme toggling logic repeated in multiple components; centralise within theme provider to avoid state divergence.
-7. **Improvements need to make:** Add dark mode parity, integrate design tokens via CSS variables, and expose layout telemetry for UX monitoring.
-8. **Styling improvements:** Ensure typographic scale matches design-system documentation and unify spacing tokens across components.
-9. **Efficiency analysis and improvement:** Tree-shake unused icons, split vendor bundles, and memoise layout contexts.
-10. **Strengths to Keep:** Well-structured providers, accessible navigation scaffolding, and consistent design token usage.
-11. **Weaknesses to remove:** Global CSS overrides that leak into modular components; tighten scoping.
-12. **Styling and Colour review changes:** Align theme palettes with updated design tokens and ensure accessible defaults.
-13. **CSS, orientation, placement and arrangement changes:** Document layout grids and safe-area handling for different form factors.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Review shared copy (footer, nav) for redundancy and clarity.
-15. **Change Checklist Tracker:** Include theming regression, layout smoke tests, and navigation accessibility audits in release tracker.
-16. **Full Upgrade Plan & Release Steps:** Stage theming updates, run visual regression tests, update documentation, coordinate with design, and deploy with feature flag for progressive rollout.
+1. **Appraisal:** The React shell now centralises theming through `src/providers/ThemeProvider.jsx`, piping accent, density, radius, and contrast controls into `App.jsx`, `MainLayout.jsx`, `DashboardLayout.jsx`, and appearance panels so Annex A25 layouts share one context instead of duplicated state.
+2. **Functionality:** `ThemeProvider` bootstraps persisted preferences (`localStorage`), reacts to `prefers-color-scheme`, publishes `classes.surface`/`classes.panel`, and writes `data-theme`, `data-density`, `data-radius`, and `data-contrast` attributes that `src/styles/tokens.css` consumes to emit CSS custom properties.
+3. **Logic Usefulness:** Layouts consume provider classes to align background, border, and typography tokens, while `DashboardSettings.jsx` previews theme changes via provider setters—ensuring saved values and UI previews match without manual wiring.
+4. **Redundancies:** Hard-coded `bg-slate-*` shells in shared layouts and duplicated toggle handlers disappeared; theme toggles now rely on provider setters and shared hooks instead of bespoke state machines inside each layout.
+5. **Placeholders or Non-working Functions:** Density presets beyond compact/comfortable plus guided accent presets still need exposure, and theme adoption for modal portals/legacy tables remains a backlog item documented in Annex follow-ups.
+6. **Duplicate Functions:** Theme switching logic once scattered across components collapses into `useTheme` from the provider, while `tokens.css` hosts the canonical spacing/radius tokens so no component redefines them.
+7. **Improvements Needed:** Extend provider coverage to modals, markdown pages, notification drawers, and Storybook docs; expose admin-governed presets for accent/density once Annex governance signs off.
+8. **Styling Improvements:** Updated `tokens.css` maps data attributes to CSS variables for compact spacing, soft/sharp radii, and accent palettes so cards, pills, and buttons inherit accessible styling automatically.
+9. **Efficiency Analysis & Improvement:** Preference hydration runs once, context values memoise to avoid layout re-renders, and CSS variable updates touch the root element instead of cascading React renders whenever accent or mode changes.
+10. **Strengths to Keep:** Responsive grid, skip links, keyboard navigation, notification panels, and quick actions remain untouched while benefiting from consistent theming.
+11. **Weaknesses to Remove:** Some table/components still ship inline slate borders or typography overrides; schedule an audit to migrate them onto provider tokens and remove fallback CSS.
+12. **Styling & Colour Review Changes:** Accent swaps (`primary`, `emerald`, `amber`, `rose`) propagate through shared CSS variables, keeping dashboards, marketing shells, and admin panels on-brand with AA contrast guarantees.
+13. **CSS, Orientation & Placement:** Data attributes allow density tweaks without altering breakpoints, maintain safe-area padding on mobile, and keep sticky headers consistent as modes toggle.
+14. **Text Analysis:** Footer/help copy inherits provider text colours automatically, fixing the dark-mode mismatch previously patched per-layout.
+15. **Change Checklist Tracker:** Exercise theme toggles end-to-end, run regression snapshots across light/dark/compact modes, lint `tokens.css`, and ensure `DashboardSettings` controls persist across reloads.
+16. **Full Upgrade Plan & Release Steps:** Stage provider rollout, capture design sign-off screenshots, coordinate docs updates for theme configuration, validate dataset-driven CSS in browsers (Chromium/WebKit), and launch with monitoring for layout regressions.
+
 
 ## 3. Flutter Mobile Shell (`Edulure-Flutter/`)
 

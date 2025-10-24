@@ -7112,7 +7112,9 @@ export async function seed(knex) {
         minutes: 5,
         helpfulness_score: 9.6,
         pending_review: false,
-        is_draft: false
+        is_draft: false,
+        created_at: new Date('2025-02-20T09:00:00Z'),
+        updated_at: new Date('2025-03-01T10:00:00Z')
       },
       {
         slug: 'billing-reconcile-declines',
@@ -7124,7 +7126,9 @@ export async function seed(knex) {
         minutes: 4,
         helpfulness_score: 8.8,
         pending_review: true,
-        is_draft: false
+        is_draft: false,
+        created_at: new Date('2025-01-10T12:00:00Z'),
+        updated_at: new Date('2025-02-25T09:30:00Z')
       },
       {
         slug: 'course-content-refresh',
@@ -7136,7 +7140,9 @@ export async function seed(knex) {
         minutes: 6,
         helpfulness_score: 8.1,
         pending_review: false,
-        is_draft: true
+        is_draft: true,
+        created_at: new Date('2024-06-15T15:20:00Z'),
+        updated_at: new Date('2024-06-15T15:20:00Z')
       }
     ]);
 
