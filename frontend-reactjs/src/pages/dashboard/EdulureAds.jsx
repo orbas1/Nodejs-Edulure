@@ -195,6 +195,37 @@ export default function EdulureAds() {
   const campaigns = ads?.campaigns ?? [];
   const summary = ads?.summary ?? {};
 
+  const campaignHealth = useMemo(
+    () =>
+      campaigns.map((campaign) => {
+        const issues = [];
+        if (!campaign.creative?.headline) {
+          issues.push('Missing headline copy');
+        }
+        if (campaign.status === 'active' && !campaign.endAt) {
+          issues.push('Active flight has no scheduled end date');
+        }
+        if (!campaign.placements?.length) {
+          issues.push('No placements selected');
+        }
+        if (campaign.dailyBudgetCents && campaign.dailyBudgetCents < (summary?.budgetPolicy?.minimumDailyCents ?? 500)) {
+          issues.push('Daily budget below policy minimum');
+        }
+        return {
+          id: campaign.id,
+          name: campaign.name ?? `Campaign ${campaign.id}`,
+          status: campaign.status,
+          issues
+        };
+      }),
+    [campaigns, summary?.budgetPolicy?.minimumDailyCents]
+  );
+
+  const flaggedCampaigns = useMemo(
+    () => campaignHealth.filter((item) => item.issues.length > 0),
+    [campaignHealth]
+  );
+
   if (role && !ALLOWED_ROLES.has(role)) {
     return (
       <DashboardStateMessage
@@ -474,6 +505,8 @@ export default function EdulureAds() {
             submitting={editorSubmitting}
             token={token}
             mode={editorMode}
+            budgetPolicy={ads?.policy?.budget ?? summary?.budgetPolicy ?? null}
+            locale={dashboard?.locale ?? 'en-US'}
           />
         ) : (
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white/70 p-6 text-sm text-slate-500">
@@ -516,6 +549,20 @@ export default function EdulureAds() {
             </span>
           </div>
         </header>
+
+        {flaggedCampaigns.length ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="font-semibold">Campaign quality checks</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+              {flaggedCampaigns.map((item) => (
+                <li key={item.id}>
+                  <span className="font-semibold">{item.name}.</span>{' '}
+                  {item.issues.join('; ')}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
           <div className="hidden bg-slate-50 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[1.3fr_1fr_1fr_1fr_160px]">

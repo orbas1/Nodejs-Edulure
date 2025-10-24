@@ -1,8 +1,6 @@
-import {
-  CheckCircleIcon,
-  CreditCardIcon,
-  XMarkIcon
-} from '@heroicons/react/24/outline';
+import { useEffect, useMemo, useRef } from 'react';
+
+import { CheckCircleIcon, CreditCardIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 
 export default function CheckoutDialog({
@@ -13,7 +11,9 @@ export default function CheckoutDialog({
   pending,
   onSubmit,
   children,
-  priceSummary
+  priceSummary,
+  blockingIssues = [],
+  onPrefetch
 }) {
   if (!open) {
     return null;
@@ -22,10 +22,74 @@ export default function CheckoutDialog({
   const title = product?.title ?? 'Secure checkout';
   const subtitle = product?.subtitle ?? product?.description ?? null;
   const Icon = product?.icon ?? CreditCardIcon;
+  const blockingList = useMemo(
+    () => (Array.isArray(blockingIssues) ? blockingIssues.filter(Boolean) : []),
+    [blockingIssues]
+  );
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    if (!open || typeof onPrefetch !== 'function') {
+      return;
+    }
+    onPrefetch();
+  }, [onPrefetch, open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const focusable = dialogRef.current?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable?.[0];
+    const last = focusable?.[focusable.length - 1];
+    first?.focus({ preventScroll: true });
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose?.();
+        return;
+      }
+
+      if (event.key === 'Tab' && focusable?.length) {
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose, open]);
+
+  const handleOverlayClick = (event) => {
+    if (event.target === event.currentTarget) {
+      onClose?.();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-end bg-slate-900/40 px-4 py-6">
-      <div className="relative flex w-full max-w-xl flex-col gap-6 rounded-4xl border border-slate-200 bg-white/95 p-6 shadow-2xl">
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-end bg-slate-900/40 px-4 py-6"
+      onClick={handleOverlayClick}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="checkout-dialog-title"
+        aria-describedby="checkout-dialog-description"
+        className="relative flex w-full max-w-xl flex-col gap-6 rounded-4xl border border-slate-200 bg-white/95 p-6 shadow-2xl"
+      >
         <button
           type="button"
           onClick={onClose}
@@ -40,16 +104,31 @@ export default function CheckoutDialog({
             <Icon className="h-6 w-6" aria-hidden="true" />
           </span>
           <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary">Checkout</p>
-            <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
+            <p id="checkout-dialog-description" className="text-xs font-semibold uppercase tracking-[0.25em] text-primary">
+              Checkout
+            </p>
+            <h3 id="checkout-dialog-title" className="text-xl font-semibold text-slate-900">
+              {title}
+            </h3>
             {subtitle ? <p className="text-xs text-slate-500">{subtitle}</p> : null}
           </div>
         </header>
 
         {priceSummary ? <div className="-mt-2">{priceSummary}</div> : null}
 
+        {blockingList.length ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            <p className="font-semibold">Resolve the following before completing checkout:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs">
+              {blockingList.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         <form className="space-y-5" onSubmit={onSubmit}>
-          {typeof children === 'function' ? children({ pending }) : children}
+          {typeof children === 'function' ? children({ pending, blocking: blockingList }) : children}
         </form>
 
         {status ? (
@@ -59,6 +138,8 @@ export default function CheckoutDialog({
               'border border-rose-200 bg-rose-50 text-rose-700': status.type === 'error',
               'border border-primary/30 bg-primary/10 text-primary': status.type === 'pending'
             })}
+            role="status"
+            aria-live="polite"
           >
             {status.type === 'success' ? <CheckCircleIcon className="mt-0.5 h-4 w-4" aria-hidden="true" /> : null}
             <span>{status.message}</span>
