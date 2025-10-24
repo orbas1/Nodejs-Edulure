@@ -87,6 +87,8 @@ export async function seed(knex) {
     await trx('ebook_chapters').del();
     await trx('ebooks').del();
     await trx('course_progress').del();
+    await trx('learner_module_progress_logs').del();
+    await trx('learner_lesson_downloads').del();
     await trx('course_enrollments').del();
     await trx('course_assignments').del();
     await trx('course_lessons').del();
@@ -2597,6 +2599,23 @@ export async function seed(knex) {
       metadata: JSON.stringify({ cohort: '2024-Q4', enrollmentSource: 'seed' })
     });
 
+    const offlineSyncLogId = crypto.randomUUID();
+    const offlineConflictLogId = crypto.randomUUID();
+    const offlineLogWindowStart = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    const offlineLogSyncedAt = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const offlineConflictOccurredAt = new Date(Date.now() - 90 * 60 * 1000);
+    const offlineConflictUpdatedAt = new Date(Date.now() - 45 * 60 * 1000);
+    const offlineConflictReason = `Remote logged +1 lesson on ${offlineConflictUpdatedAt.toISOString()}`;
+
+    const telemetryBundleChecksum = crypto
+      .createHash('sha256')
+      .update('telemetry-offline-bundle-v1')
+      .digest('hex');
+    const commandCenterBundleChecksum = crypto
+      .createHash('sha256')
+      .update('command-center-bundle-v1')
+      .digest('hex');
+
     await trx('course_progress').insert([
       {
         enrollment_id: opsEnrollmentId,
@@ -2612,6 +2631,101 @@ export async function seed(knex) {
         completed: false,
         progress_percent: 25,
         metadata: JSON.stringify({ lastLocation: 'section-2', note: 'Review telemetry thresholds' })
+      }
+    ]);
+
+    await trx('learner_module_progress_logs').insert([
+      {
+        id: offlineSyncLogId,
+        enrollment_id: opsEnrollmentId,
+        course_id: opsAutomationCourseId,
+        module_id: opsModuleIncidentId,
+        device_id: 'seed-device',
+        completed_lessons: 2,
+        notes: 'Seeded remote sync capturing automation drill completions.',
+        sync_state: 'synced',
+        revision: 2,
+        conflict_reason: null,
+        remote_snapshot: JSON.stringify({
+          id: offlineSyncLogId,
+          courseId: opsAutomationCourseId,
+          moduleId: opsModuleIncidentId,
+          completedLessons: 2,
+          updatedAt: offlineLogSyncedAt.toISOString(),
+          deviceId: 'seed-device',
+          revision: 2,
+          notes: 'Seeded remote sync capturing automation drill completions.'
+        }),
+        metadata: JSON.stringify({ source: 'seed', surface: 'mobile-sync' }),
+        occurred_at: offlineLogWindowStart,
+        synced_at: offlineLogSyncedAt
+      },
+      {
+        id: offlineConflictLogId,
+        enrollment_id: opsEnrollmentId,
+        course_id: opsAutomationCourseId,
+        module_id: opsModuleIncidentId,
+        device_id: 'remote-coach',
+        completed_lessons: 3,
+        notes: 'Remote coach recorded an extra quiz review.',
+        sync_state: 'conflict',
+        revision: 3,
+        conflict_reason: offlineConflictReason,
+        remote_snapshot: JSON.stringify({
+          id: offlineConflictLogId,
+          courseId: opsAutomationCourseId,
+          moduleId: opsModuleIncidentId,
+          completedLessons: 2,
+          updatedAt: offlineConflictUpdatedAt.toISOString(),
+          deviceId: 'seed-device',
+          revision: 2,
+          notes: 'Device log pending acknowledgement.'
+        }),
+        metadata: JSON.stringify({ source: 'seed', surface: 'remote-sync', resolution: 'awaiting-user' }),
+        occurred_at: offlineConflictOccurredAt,
+        synced_at: null
+      }
+    ]);
+
+    await trx('learner_lesson_downloads').insert([
+      {
+        id: crypto.randomUUID(),
+        user_id: learnerId,
+        course_id: opsAutomationCourseId,
+        module_id: opsModuleIncidentId,
+        lesson_id: telemetryLessonId,
+        status: 'completed',
+        progress_percent: 100,
+        manifest_url: 'https://cdn.edulure.com/offline/telemetry-bundle.zip',
+        checksum_sha256: telemetryBundleChecksum,
+        enqueued_at: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        started_at: new Date(Date.now() - 110 * 60 * 1000),
+        completed_at: new Date(Date.now() - 95 * 60 * 1000),
+        metadata: JSON.stringify({
+          sizeBytes: 28432190,
+          format: 'zip',
+          seed: true,
+          description: 'Telemetry playbook offline bundle'
+        })
+      },
+      {
+        id: crypto.randomUUID(),
+        user_id: learnerId,
+        course_id: opsAutomationCourseId,
+        module_id: opsModuleIncidentId,
+        lesson_id: commandCenterLessonId,
+        status: 'running',
+        progress_percent: 42,
+        manifest_url: 'https://cdn.edulure.com/offline/command-center-bundle.zip',
+        checksum_sha256: commandCenterBundleChecksum,
+        enqueued_at: new Date(Date.now() - 45 * 60 * 1000),
+        started_at: new Date(Date.now() - 30 * 60 * 1000),
+        completed_at: null,
+        metadata: JSON.stringify({
+          network: 'wifi',
+          lastHeartbeatAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+          seed: true
+        })
       }
     ]);
 
@@ -2721,7 +2835,7 @@ export async function seed(knex) {
       approved_at: trx.fn.now()
     });
 
-    const now = new Date();
+    const couponTimestamp = new Date();
     const subscriptionPublicId = crypto.randomUUID();
     const providerIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
     const providerChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
@@ -2738,8 +2852,8 @@ export async function seed(knex) {
       times_redeemed: 1,
       is_stackable: false,
       status: 'active',
-      valid_from: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-      valid_until: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+      valid_from: new Date(couponTimestamp.getTime() - 7 * 24 * 60 * 60 * 1000),
+      valid_until: new Date(couponTimestamp.getTime() + 60 * 24 * 60 * 60 * 1000),
       metadata: JSON.stringify({ campaign: 'growth-insiders', createdBy: 'seed' })
     });
 

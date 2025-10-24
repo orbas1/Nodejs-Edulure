@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:dio/dio.dart';
+
 import '../provider/learning/learning_models.dart';
+import 'api_config.dart';
 import 'learning_persistence_service.dart';
+import 'session_manager.dart';
 
 class ProgressSyncResult {
   ProgressSyncResult({
@@ -18,11 +22,12 @@ class ProgressSyncResult {
 }
 
 class ProgressSyncService {
-  ProgressSyncService({LearningPersistence? persistence})
-      : _persistence = persistence ?? LearningPersistenceService();
+  ProgressSyncService({LearningPersistence? persistence, Dio? httpClient})
+      : _persistence = persistence ?? LearningPersistenceService(),
+        _httpClient = httpClient ?? ApiConfig.createHttpClient(requiresAuth: true);
 
   final LearningPersistence _persistence;
-  final Random _random = Random();
+  final Dio _httpClient;
 
   Future<ProgressSyncResult> synchronise(
     List<ModuleProgressLog> localLogs, {
@@ -77,63 +82,53 @@ class ProgressSyncService {
     }
 
     merged.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    await _pushMerged(merged);
     return ProgressSyncResult(merged: merged, conflicts: conflicts);
   }
 
   Future<List<ModuleProgressLog>> fetchRemoteProgress(List<ModuleProgressLog> localLogs) async {
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-    final localDeviceId = await _persistence.ensureDeviceId();
-    final remote = <ModuleProgressLog>[];
-
-    for (var index = 0; index < localLogs.length; index++) {
-      final log = localLogs[index];
-      if (index.isEven) {
-        remote.add(
-          log.copyWith(
-            completedLessons: log.completedLessons + max(1, _random.nextInt(2) + 1),
-            notes: log.notes.isEmpty
-                ? 'Remote update captured automatically while $localDeviceId was offline.'
-                : '${log.notes} (remote sync)',
-            updatedAt: log.updatedAt.add(const Duration(hours: 2)),
-            deviceId: 'remote-coach',
-            revision: log.revision + 1,
-            syncState: ProgressSyncState.synced,
-            remoteSuggestion: null,
-            conflictReason: null,
-          ),
-        );
-      } else {
-        remote.add(
-          log.copyWith(
-            deviceId: 'remote-coach',
-            syncState: ProgressSyncState.synced,
-            remoteSuggestion: null,
-            conflictReason: null,
-          ),
-        );
-      }
+    final token = SessionManager.getAccessToken();
+    if (token == null) {
+      throw ProgressSyncException('Authentication required to synchronise progress.');
     }
 
-    if (remote.isEmpty) {
-      final now = DateTime.now();
-      remote.add(
-        ModuleProgressLog(
-          id: 'remote-${now.microsecondsSinceEpoch}',
-          courseId: 'course-1',
-          moduleId: 'module-1',
-          timestamp: now.subtract(const Duration(hours: 3)),
-          notes: 'Remote tutor recorded quiz completions.',
-          completedLessons: 1,
-          syncState: ProgressSyncState.synced,
-          updatedAt: now.subtract(const Duration(hours: 2, minutes: 30)),
-          syncedAt: now.subtract(const Duration(hours: 2, minutes: 30)),
-          deviceId: 'remote-coach',
-          revision: 1,
-        ),
+    final deviceId = await _persistence.ensureDeviceId();
+    final payload = <String, dynamic>{
+      'deviceId': deviceId,
+      'logs': localLogs
+          .map(
+            (log) => {
+              'id': log.id,
+              'courseId': log.courseId,
+              'moduleId': log.moduleId,
+              'revision': log.revision,
+              'updatedAt': log.updatedAt.toIso8601String(),
+            },
+          )
+          .toList(growable: false),
+    };
+
+    try {
+      final response = await _httpClient.post(
+        '/learning/offline/progress-logs/preview',
+        data: payload,
+        options: _authorisedOptions(token),
       );
-    }
 
-    return remote;
+      final responseMap = _coerceMap(response.data);
+      final data = _coerceMap(responseMap['data']);
+      final logs = _coerceList(data['logs'])
+          .whereType<Map>()
+          .map((entry) => ModuleProgressLog.fromJson(Map<String, dynamic>.from(entry)))
+          .toList(growable: false);
+      return logs;
+    } on DioException catch (error) {
+      throw ProgressSyncException(
+        _resolveErrorMessage(error) ?? 'Unable to load remote progress updates.',
+      );
+    } catch (_) {
+      throw ProgressSyncException('Unable to load remote progress updates.');
+    }
   }
 
   List<ModuleProgressLog> _deduplicate(List<ModuleProgressLog> logs) {
@@ -161,4 +156,95 @@ class ProgressSyncService {
     final direction = delta >= 0 ? '+' : '';
     return 'Remote logged $direction$delta lessons (${remote.completedLessons} total) on ${remote.updatedAt.toLocal()}';
   }
+
+  Future<void> _pushMerged(List<ModuleProgressLog> logs) async {
+    if (logs.isEmpty) {
+      return;
+    }
+
+    final token = SessionManager.getAccessToken();
+    if (token == null) {
+      throw ProgressSyncException('Authentication required to synchronise progress.');
+    }
+
+    final deviceId = await _persistence.ensureDeviceId();
+    final payloadLogs = logs
+        .where((log) =>
+            log.deviceId == deviceId || log.syncState != ProgressSyncState.synced || log.hasConflict)
+        .map((log) => log.toJson())
+        .toList(growable: false);
+
+    if (payloadLogs.isEmpty) {
+      return;
+    }
+
+    try {
+      await _httpClient.post(
+        '/learning/offline/progress-logs/commit',
+        data: {
+          'deviceId': deviceId,
+          'logs': payloadLogs,
+        },
+        options: _authorisedOptions(token),
+      );
+    } on DioException catch (error) {
+      throw ProgressSyncException(
+        _resolveErrorMessage(error) ?? 'Unable to persist offline progress updates.',
+      );
+    } catch (_) {
+      throw ProgressSyncException('Unable to persist offline progress updates.');
+    }
+  }
+
+  Options _authorisedOptions(String token) {
+    final baseHeaders = Map<String, dynamic>.from(_httpClient.options.headers);
+    baseHeaders['Authorization'] = 'Bearer $token';
+    return Options(
+      headers: baseHeaders,
+      extra: {
+        ...?_httpClient.options.extra,
+        'requiresAuth': true,
+      },
+    );
+  }
+
+  Map<String, dynamic> _coerceMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value as Map);
+    }
+    return <String, dynamic>{};
+  }
+
+  List<dynamic> _coerceList(dynamic value) {
+    if (value is List<dynamic>) {
+      return value;
+    }
+    if (value is List) {
+      return List<dynamic>.from(value as List);
+    }
+    return const <dynamic>[];
+  }
+
+  String? _resolveErrorMessage(DioException error) {
+    final data = error.response?.data;
+    if (data is Map && data['message'] is String) {
+      return data['message'] as String;
+    }
+    if (data is Map && data['errors'] is List && data['errors'].isNotEmpty) {
+      return data['errors'].first.toString();
+    }
+    return error.message;
+  }
+}
+
+class ProgressSyncException implements Exception {
+  ProgressSyncException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'ProgressSyncException: $message';
 }

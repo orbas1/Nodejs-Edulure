@@ -25,7 +25,7 @@ class CourseModule {
 
   factory CourseModule.fromJson(Map<String, dynamic> json) {
     return CourseModule(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       title: json['title'] as String,
       lessonCount: (json['lessonCount'] as num?)?.toInt() ?? 0,
       durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 0,
@@ -112,7 +112,7 @@ class Course {
 
   factory Course.fromJson(Map<String, dynamic> json) {
     return Course(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       title: json['title'] as String,
       category: json['category'] as String,
       level: json['level'] as String,
@@ -268,7 +268,7 @@ class Ebook {
 
   factory Ebook.fromJson(Map<String, dynamic> json) {
     return Ebook(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       title: json['title'] as String,
       author: json['author'] as String,
       coverUrl: json['coverUrl'] as String,
@@ -406,7 +406,7 @@ class Tutor {
 
   factory Tutor.fromJson(Map<String, dynamic> json) {
     return Tutor(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       name: json['name'] as String,
       headline: json['headline'] as String,
       expertise: (json['expertise'] as List<dynamic>? ?? const <dynamic>[])
@@ -542,7 +542,7 @@ class LiveSession {
 
   factory LiveSession.fromJson(Map<String, dynamic> json) {
     return LiveSession(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       title: json['title'] as String,
       courseId: json['courseId'] as String,
       tutorId: json['tutorId'] as String,
@@ -686,9 +686,9 @@ class ModuleProgressLog {
   factory ModuleProgressLog.fromJson(Map<String, dynamic> json) {
     final remote = json['remoteSuggestion'];
     return ModuleProgressLog(
-      id: json['id'] as String,
-      courseId: json['courseId'] as String,
-      moduleId: json['moduleId'] as String,
+      id: json['id']?.toString() ?? '',
+      courseId: json['courseId']?.toString() ?? '',
+      moduleId: json['moduleId']?.toString() ?? '',
       timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
       notes: json['notes'] as String,
       completedLessons: (json['completedLessons'] as num?)?.toInt() ?? 0,

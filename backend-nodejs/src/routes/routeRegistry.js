@@ -32,6 +32,7 @@ import catalogueRoutes from './catalogue.routes.js';
 import instructorRoutes from './instructor.routes.js';
 import mediaRoutes from './media.routes.js';
 import setupRoutes from './setup.routes.js';
+import learningRoutes from './learning.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 import { buildRouteRegistry } from './registryValidator.js';
 
@@ -69,7 +70,8 @@ const routerMap = {
   release: releaseRoutes,
   catalogue: catalogueRoutes,
   media: mediaRoutes,
-  setup: setupRoutes
+  setup: setupRoutes,
+  learning: learningRoutes
 };
 
 export const apiRouteRegistry = buildRouteRegistry({

@@ -1153,6 +1153,30 @@ const ROUTE_DEFINITIONS = [
     statusPageComponent: 'api-blog'
   },
   {
+    name: 'learning',
+    capability: 'mobile-learning-offline',
+    description: 'Offline learning synchronisation, lesson downloads, and instructor operations endpoints.',
+    basePath: '/learning',
+    flagKey: 'platform.api.v1.learning',
+    defaultState: 'enabled',
+    fallbackStatus: 503,
+    disabledMessage: 'Offline learning APIs are temporarily unavailable. Please retry shortly.',
+    audience: 'user',
+    owners: ['mobile-learning'],
+    serviceTier: 'core',
+    tags: ['api', 'v1', 'learning', 'offline'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'user',
+      allowedRoles: ['user', 'instructor', 'admin']
+    },
+    cors: {
+      allowedOrigins: ['@env:app.corsOrigins'],
+      allowedMethods: ['GET', 'POST']
+    },
+    statusPageComponent: 'api-learning'
+  },
+  {
     name: 'provider-transition',
     capability: 'provider-transition-program',
     description: 'Provider transition announcements, acknowledgements, and migration status endpoints.',
