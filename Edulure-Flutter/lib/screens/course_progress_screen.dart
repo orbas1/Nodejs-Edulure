@@ -553,8 +553,9 @@ class _ProgressSyncBanner extends StatelessWidget {
 
 String _downloadKey(String courseId, String moduleId) => '$courseId::$moduleId::$moduleId';
 String _moduleTitle(Course course, String moduleId) {
-    return course.modules.firstWhere((module) => module.id == moduleId, orElse: () => course.modules.first).title;
-  }
+  return course.modules
+      .firstWhere((module) => module.id == moduleId, orElse: () => course.modules.first)
+      .title;
 }
 
 class _ProgressLogFormSheet extends ConsumerStatefulWidget {
