@@ -12,6 +12,37 @@ export async function up(knex) {
       table.string(COLUMN_NAME, 512).nullable();
     });
   }
+
+  const rows = await knex('integration_api_key_invites')
+    .select('id', 'metadata')
+    .whereNull(COLUMN_NAME)
+    .andWhereNotNull('metadata');
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return;
+  }
+
+  for (const row of rows) {
+    let documentationUrl = null;
+    try {
+      const metadata = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+      const candidate = metadata?.documentationUrl;
+      if (typeof candidate === 'string' && candidate.trim()) {
+        documentationUrl = candidate.trim();
+      }
+    } catch (_error) {
+      documentationUrl = null;
+    }
+
+    if (!documentationUrl) {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    await knex('integration_api_key_invites')
+      .where({ id: row.id })
+      .update({ [COLUMN_NAME]: documentationUrl });
+  }
 }
 
 export async function down(knex) {
