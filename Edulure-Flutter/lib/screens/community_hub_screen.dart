@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../provider/community/community_hub_controller.dart';
 import '../services/community_hub_models.dart';
 import '../widgets/calendar_entry_editor.dart';
+import '../widgets/feed/community_feed_post_card.dart';
 
 class CommunityHubScreen extends ConsumerStatefulWidget {
   const CommunityHubScreen({super.key});
@@ -241,7 +242,7 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
         var offset = 1;
         if (index < offset + filteredPosts.length) {
           final post = filteredPosts[index - offset];
-          return _FeedCard(
+          return CommunityFeedPostCard(
             post: post,
             onEdit: () => _openFeedComposer(context, controller, initial: post),
             onDelete: () => controller.deleteFeedPost(post.id),
@@ -2615,113 +2616,6 @@ class _DateTile extends StatelessWidget {
         );
         onChanged(next);
       },
-    );
-  }
-}
-
-class _FeedCard extends StatelessWidget {
-  const _FeedCard({
-    required this.post,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onTogglePin,
-    required this.onShare,
-  });
-
-  final CommunityFeedPost post;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onTogglePin;
-  final VoidCallback onShare;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: colorScheme.primary.withOpacity(0.1),
-                  child: Text(post.author.substring(0, 1).toUpperCase()),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(post.author, style: Theme.of(context).textTheme.titleSmall),
-                      Text(post.formattedTimestamp,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Pin post',
-                  onPressed: onTogglePin,
-                  icon: Icon(post.pinned ? Icons.push_pin : Icons.push_pin_outlined),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(post.title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text(post.body, style: Theme.of(context).textTheme.bodyMedium),
-            if (post.attachmentUrls.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: post.attachmentUrls
-                    .map((url) => ActionChip(
-                          avatar: const Icon(Icons.attach_file, size: 18),
-                          label: Text(Uri.parse(url).host),
-                          onPressed: onShare,
-                        ))
-                    .toList(),
-              ),
-            ],
-            if (post.tags.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 6,
-                children:
-                    post.tags.map((tag) => Chip(label: Text('#$tag'), visualDensity: VisualDensity.compact)).toList(),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                FilledButton.tonalIcon(
-                  onPressed: onShare,
-                  icon: const Icon(Icons.share_outlined),
-                  label: const Text('Share'),
-                ),
-                const SizedBox(width: 12),
-                TextButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit'),
-                ),
-                const SizedBox(width: 12),
-                TextButton.icon(
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Delete'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

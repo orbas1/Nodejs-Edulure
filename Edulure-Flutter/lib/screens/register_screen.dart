@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
+import '../core/validation/auth_validators.dart';
+import '../services/auth_error_translator.dart';
 import '../services/auth_service.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -30,9 +32,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _cityController = TextEditingController();
   final _countryController = TextEditingController();
   final _postcodeController = TextEditingController();
-
-  final _passwordPattern =
-      RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$');
 
   String _role = 'instructor';
   bool _termsAccepted = false;
@@ -92,19 +91,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         });
       });
     }
-  }
-
-  String _resolveErrorMessage(Object error) {
-    if (error is DioException) {
-      final response = error.response?.data;
-      if (response is Map && response['message'] is String) {
-        return response['message'] as String;
-      }
-      if (response is Map && response['errors'] is List && response['errors'].isNotEmpty) {
-        return response['errors'].first.toString();
-      }
-    }
-    return 'We could not complete registration right now. Please try again.';
   }
 
   String _formatSecret(String secret) {
@@ -203,18 +189,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    final ageInput = _ageController.text.trim();
-    int? age;
-    if (ageInput.isNotEmpty) {
-      age = int.tryParse(ageInput);
-      if (age == null) {
-        setState(() {
-          _error = 'Age must be a number.';
-        });
-        return;
-      }
-    }
-
     setState(() {
       _loading = true;
       _error = null;
@@ -223,6 +197,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     try {
       final authService = ref.read(authServiceProvider);
+      final ageInput = _ageController.text.trim();
+      final age = ageInput.isEmpty ? null : int.parse(ageInput);
       final address = <String, String>{};
       void addAddressField(String key, TextEditingController controller) {
         final value = controller.text.trim();
@@ -277,7 +253,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = _resolveErrorMessage(error);
+        _error = AuthErrorTranslator.translate(
+          error,
+          fallback: 'We could not complete registration right now. Please try again.',
+        );
       });
     } finally {
       if (mounted) {
@@ -346,15 +325,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           controller: _firstNameController,
                           decoration: const InputDecoration(labelText: 'First name'),
                           textInputAction: TextInputAction.next,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'First name is required';
-                            }
-                            if (value.trim().length < 2) {
-                              return 'Enter at least 2 characters';
-                            }
-                            return null;
-                          },
+                          validator: (value) =>
+                              AuthValidators.requiredName(value, field: 'first name'),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -363,12 +335,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           controller: _lastNameController,
                           decoration: const InputDecoration(labelText: 'Last name'),
                           textInputAction: TextInputAction.next,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Last name is required';
-                            }
-                            return null;
-                          },
+                          validator: (value) =>
+                              AuthValidators.requiredName(value, field: 'last name'),
                         ),
                       ),
                     ],
@@ -379,16 +347,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Email address'),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Email is required';
-                      }
-                      final emailPattern = RegExp(r'^.+@.+\..+$');
-                      if (!emailPattern.hasMatch(value.trim())) {
-                        return 'Enter a valid email address';
-                      }
-                      return null;
-                    },
+                    validator: AuthValidators.email,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
@@ -424,19 +383,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Age (optional)'),
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return null;
-                      }
-                      final age = int.tryParse(value.trim());
-                      if (age == null) {
-                        return 'Age must be a number';
-                      }
-                      if (age < 16) {
-                        return 'Minimum age is 16';
-                      }
-                      return null;
-                    },
+                    validator: AuthValidators.optionalAge,
                   ),
                   const SizedBox(height: 16),
                   const SizedBox(height: 16),
@@ -513,6 +460,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 controller: _postcodeController,
                                 decoration: const InputDecoration(labelText: 'Postcode'),
                                 textInputAction: TextInputAction.next,
+                                validator: AuthValidators.optionalPostalCode,
                               ),
                             ),
                           ],
@@ -526,30 +474,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Password'),
                     obscureText: true,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Password is required';
-                      }
-                      if (!_passwordPattern.hasMatch(value)) {
-                        return 'Use 12+ chars with upper, lower, number, and symbol';
-                      }
-                      return null;
-                    },
+                    validator: AuthValidators.strongPassword,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _confirmPasswordController,
                     decoration: const InputDecoration(labelText: 'Confirm password'),
                     obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Confirm your password';
-                      }
-                      if (value != _passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
+                    validator: (value) =>
+                        AuthValidators.confirmPassword(value, _passwordController.text),
                   ),
                   const SizedBox(height: 16),
                   SwitchListTile.adaptive(

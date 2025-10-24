@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
+import '../core/validation/auth_validators.dart';
+import '../services/auth_error_translator.dart';
 import '../services/auth_service.dart';
 import '../services/session_manager.dart';
 
@@ -27,19 +29,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   static const _otpTtlMinutes = 5;
 
-  String _resolveErrorMessage(Object error) {
-    if (error is DioException) {
-      final response = error.response?.data;
-      if (response is Map && response['message'] is String) {
-        return response['message'] as String;
-      }
-      if (response is Map && response['errors'] is List && response['errors'].isNotEmpty) {
-        return response['errors'].first.toString();
-      }
-    }
-    return 'Unable to authenticate. Please check your credentials.';
-  }
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -49,6 +38,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    final emailError = AuthValidators.email(_emailController.text);
+    if (emailError != null) {
+      setState(() {
+        _error = emailError;
+      });
+      return;
+    }
+    if (_passwordController.text.isEmpty) {
+      setState(() {
+        _error = 'Enter your password to continue.';
+      });
+      return;
+    }
+    final otpError = AuthValidators.optionalOtp(_twoFactorController.text);
+    if (_showTwoFactorField && otpError != null) {
+      setState(() {
+        _error = otpError;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -110,7 +119,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       }
       setState(() {
-        _error = _resolveErrorMessage(error);
+        _error = AuthErrorTranslator.translate(
+          error,
+          fallback: 'Unable to authenticate. Please check your credentials.',
+        );
       });
     } finally {
       if (mounted) {

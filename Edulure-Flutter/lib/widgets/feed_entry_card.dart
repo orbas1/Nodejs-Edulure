@@ -16,6 +16,8 @@ class FeedEntryCard extends StatelessWidget {
     this.onViewCommunity,
     this.showCommunity = true,
     this.community,
+    this.headerAction,
+    this.footerActions = const <Widget>[],
   });
 
   final FeedEntry entry;
@@ -26,6 +28,8 @@ class FeedEntryCard extends StatelessWidget {
   final VoidCallback? onViewCommunity;
   final bool showCommunity;
   final CommunitySummary? community;
+  final Widget? headerAction;
+  final List<Widget> footerActions;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +44,7 @@ class FeedEntryCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildPostHeader(context, post),
+              _buildPostHeader(context, post, headerAction: headerAction),
               const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -58,6 +62,10 @@ class FeedEntryCard extends StatelessWidget {
                     if (post.metadata.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       _buildMetadata(context, post),
+                    ],
+                    if (footerActions.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _buildFooterActions(),
                     ],
                   ],
                 ),
@@ -118,7 +126,7 @@ class FeedEntryCard extends StatelessWidget {
     }
   }
 
-  Widget _buildPostHeader(BuildContext context, CommunityPost post) {
+  Widget _buildPostHeader(BuildContext context, CommunityPost post, {Widget? headerAction}) {
     final time = post.publishedAt ?? post.scheduledAt;
     final formatter = DateFormat('MMM d • HH:mm');
     final timeLabel = time != null ? formatter.format(time) : 'Unscheduled';
@@ -134,6 +142,58 @@ class FeedEntryCard extends StatelessWidget {
     }
     if (onRestore != null) {
       menuItems.add(const PopupMenuItem(value: 'restore', child: Text('Restore post')));
+    }
+
+    Widget? trailing;
+    if (menuItems.isNotEmpty && headerAction != null) {
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          headerAction,
+          const SizedBox(width: 4),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'edit':
+                  onEdit?.call();
+                  break;
+                case 'archive':
+                  onArchive?.call();
+                  break;
+                case 'suppress':
+                  onModerate?.call();
+                  break;
+                case 'restore':
+                  onRestore?.call();
+                  break;
+              }
+            },
+            itemBuilder: (_) => menuItems,
+          ),
+        ],
+      );
+    } else if (menuItems.isNotEmpty) {
+      trailing = PopupMenuButton<String>(
+        onSelected: (value) {
+          switch (value) {
+            case 'edit':
+              onEdit?.call();
+              break;
+            case 'archive':
+              onArchive?.call();
+              break;
+            case 'suppress':
+              onModerate?.call();
+              break;
+            case 'restore':
+              onRestore?.call();
+              break;
+          }
+        },
+        itemBuilder: (_) => menuItems,
+      );
+    } else {
+      trailing = headerAction;
     }
 
     return ListTile(
@@ -172,27 +232,7 @@ class FeedEntryCard extends StatelessWidget {
             ),
         ],
       ),
-      trailing: menuItems.isEmpty
-          ? null
-          : PopupMenuButton<String>(
-              onSelected: (value) {
-                switch (value) {
-                  case 'edit':
-                    onEdit?.call();
-                    break;
-                  case 'archive':
-                    onArchive?.call();
-                    break;
-                  case 'suppress':
-                    onModerate?.call();
-                    break;
-                  case 'restore':
-                    onRestore?.call();
-                    break;
-                }
-              },
-              itemBuilder: (_) => menuItems,
-            ),
+      trailing: trailing,
     );
   }
 
@@ -378,6 +418,14 @@ class FeedEntryCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFooterActions() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: footerActions,
     );
   }
 }
