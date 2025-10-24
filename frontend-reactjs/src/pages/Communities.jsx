@@ -74,7 +74,32 @@ const FALLBACK_COMMUNITY_DETAIL = {
     analyticsKey: 'EDU-REVOPS-01',
     classroomReference: 'Cohort-2024-Q2',
     registrationUrl: 'https://app.edulure.com/register',
-    personas: ['operators', 'instructors']
+    personas: ['operators', 'instructors'],
+    personaSignals: {
+      operators: {
+        focus: 'Revenue orchestration & launch operations',
+        membershipShare: 0.6,
+        trending: true,
+        highlights: ['Executive briefings', 'Automation lab'],
+        sampleMembers: ['Amina Rowe', 'Leo Okafor']
+      },
+      instructors: {
+        focus: 'Instructional design & classroom enablement',
+        membershipShare: 0.4,
+        trending: false,
+        highlights: ['Curriculum guild', 'Office hour pods'],
+        sampleMembers: ['Nikhil Rao', 'Maya Patel']
+      }
+    },
+    access: {
+      model: 'invite',
+      ndaRequired: true,
+      joinUrl: 'https://app.edulure.com/communities/edulure-growth-architects/request'
+    },
+    momentum: {
+      lastActivityAt: new Date().toISOString(),
+      boost: 15
+    }
   },
   ratings: {
     average: 4.9,
@@ -585,10 +610,17 @@ export default function Communities() {
         const posts = Number(stats.posts ?? 0);
         const resourcesCount = Number(stats.resources ?? 0);
         const eventsCount = Number(stats.events ?? community?.events?.length ?? 0);
-        const lastActivityAt = resolveLastActivity(community);
-        const engagementScore = computeCommunityEngagementScore(community);
+        const lastActivityAt = community?.personaSummary?.lastActivityAt ?? resolveLastActivity(community);
+        const engagementScore = Number(
+          stats.momentumScore ?? computeCommunityEngagementScore(community)
+        );
         const coverage = Number(community?.membershipMap?.totalCountries ?? 0);
         const monetisation = community?.metadata?.monetisation ?? community?.pricingTier ?? null;
+        const ndaRequired = Boolean(
+          community?.personaSummary?.ndaRequired ?? community?.metadata?.ndaRequired
+        );
+        const focusValue = community?.metadata?.focus;
+        const focus = Array.isArray(focusValue) ? focusValue.join(', ') : focusValue ?? '';
 
         return {
           raw: community,
@@ -602,9 +634,10 @@ export default function Communities() {
           engagementScore,
           coverage,
           monetisation,
-          ndaRequired: Boolean(community?.metadata?.ndaRequired),
+          ndaRequired,
+          accessModel: community?.personaSummary?.accessModel ?? community?.visibility ?? 'public',
           description: community?.description ?? '',
-          focus: community?.metadata?.focus ?? '',
+          focus,
           status: community?.membership?.status ?? null
         };
       });

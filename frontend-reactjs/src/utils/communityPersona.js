@@ -37,6 +37,15 @@ export function extractCommunityPersonas(community) {
   const metadata = community?.metadata ?? {};
   const tags = Array.isArray(community?.tags) ? community.tags : [];
 
+  if (Array.isArray(community?.personas)) {
+    community.personas.forEach((value) => {
+      const persona = normalisePersonaToken(value);
+      if (persona) {
+        personas.add(persona);
+      }
+    });
+  }
+
   const candidateArrays = [metadata.personas, metadata.personaProfiles, metadata.audience];
   candidateArrays.forEach((collection) => {
     if (!collection) return;

@@ -577,14 +577,17 @@ export default function Feed() {
     );
     return eligible
       .map((community) => {
-        const score = computeCommunityEngagementScore(community);
+        const score = Number(
+          community?.stats?.momentumScore ?? computeCommunityEngagementScore(community)
+        );
         const personas = extractCommunityPersonas(community);
         return {
           id: community.id,
           name: community.name,
           score,
           members: Number(community?.stats?.members ?? 0),
-          lastActivityAt: resolveLastActivity(community),
+          lastActivityAt:
+            community?.personaSummary?.lastActivityAt ?? resolveLastActivity(community),
           personaLabels: personas.map(getPersonaLabel),
           node: community
         };

@@ -639,6 +639,39 @@ export async function seed(knex) {
       country: 'US',
       languages: ['en'],
       analyticsKey: 'OPS-HQ',
+      primaryPersona: 'operators',
+      personas: ['operators', 'instructors'],
+      personaSignals: {
+        operators: {
+          focus: 'Launch control, incident readiness, automation runbooks',
+          membershipShare: 0.62,
+          trending: true,
+          highlights: ['Weekly incident drills', 'Automation guild office hours'],
+          sampleMembers: ['Amina Diallo', 'Kai Watanabe', 'Noemi Carvalho']
+        },
+        instructors: {
+          focus: 'Live classroom facilitation & async curriculum enablement',
+          membershipShare: 0.38,
+          trending: false,
+          highlights: ['Instructor studio rotations', 'Peer review pods'],
+          sampleMembers: ['Leo Okafor', 'Maya Patel']
+        }
+      },
+      momentum: {
+        lastActivityAt: nowIso,
+        boost: 12,
+        recencyWindowDays: 35,
+        trailing30Days: {
+          posts: 42,
+          resources: 18,
+          events: 4
+        }
+      },
+      access: {
+        model: 'open',
+        ndaRequired: false,
+        joinUrl: 'https://app.edulure.test/communities/learning-ops-guild/join'
+      },
       ratings: {
         average: 4.94,
         totalReviews: 212,
@@ -790,6 +823,46 @@ export async function seed(knex) {
       country: 'GB',
       languages: ['en'],
       analyticsKey: 'GROWTH-LAB',
+      primaryPersona: 'operators',
+      personas: ['operators', 'partners', 'sponsors'],
+      personaSignals: {
+        operators: {
+          focus: 'Lifecycle monetisation, revenue experimentation',
+          membershipShare: 0.54,
+          trending: true,
+          highlights: ['Bi-weekly revenue retros', 'Lifecycle monetisation benchmarks'],
+          sampleMembers: ['Sofia Martínez', 'Linh Tran']
+        },
+        partners: {
+          focus: 'Agency collaborators & ecosystem advisors',
+          membershipShare: 0.28,
+          trending: false,
+          highlights: ['Agency deal room', 'Co-marketing canvases'],
+          sampleMembers: ['Elias Noor', 'Grace Osei']
+        },
+        sponsors: {
+          focus: 'Brand activations & sponsorship readiness',
+          membershipShare: 0.18,
+          trending: true,
+          highlights: ['Sponsorship pitch lab', 'Brand asset showcase'],
+          sampleMembers: ['Anika Bose']
+        }
+      },
+      momentum: {
+        lastActivityAt: nowIso,
+        boost: 18,
+        recencyWindowDays: 30,
+        trailing30Days: {
+          posts: 58,
+          resources: 21,
+          events: 6
+        }
+      },
+      access: {
+        model: 'invite',
+        ndaRequired: true,
+        joinUrl: 'https://app.edulure.test/communities/creator-growth-lab/request'
+      },
       ratings: {
         average: 4.88,
         totalReviews: 168,
