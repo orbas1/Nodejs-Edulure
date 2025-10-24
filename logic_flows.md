@@ -679,40 +679,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 ## 5. Database & Data Management (`backend-nodejs/src/models/`, `backend-nodejs/migrations/`)
 
 ### 5.A Identity & Access Schema (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
-1. **Appraisal:** Normalised identity schema covering users, sessions, two-factor challenges, and role assignments with audit metadata.
-2. **Functionality:** Supports authentication, device management, policy enforcement, and impersonation auditing for security teams.
-3. **Logic Usefulness:** Enables session revocation, access reviews, and detailed reporting across admin consoles.
-4. **Redundancies:** Legacy columns for deprecated providers persist; schedule migrations to drop and simplify models.
-5. **Placeholders Or non-working functions or stubs:** Some triggers for impersonation logging marked TODO; document gaps.
-6. **Duplicate Functions:** Address parsing logic repeats between model hooks and services; consolidate to avoid divergence.
-7. **Improvements need to make:** Introduce temporal tables for auditing, add composite indexes for frequent queries, and capture device fingerprints for analytics.
-8. **Styling improvements:** Update ER diagrams in docs to reflect new relationships and accessible colour palettes.
-9. **Efficiency analysis and improvement:** Partition session tables by activity date and add covering indexes for email lookups.
-10. **Strengths to Keep:** Strong referential integrity, audit fields, and session hashing approach.
-11. **Weaknesses to remove:** Manual cleanup of stale role assignments; automate with scheduled jobs.
-12. **Styling and Colour review changes:** Align schema documentation palette with design system for readability.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout guidance for rendering identity ERDs in admin UI.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify column descriptions and remove redundant jargon in schema docs.
-15. **Change Checklist Tracker:** Include identity migration review, session invalidation QA, and audit export checks before release.
-16. **Full Upgrade Plan & Release Steps:** Stage migrations, backfill derived data, run regression tests, update docs, and deploy during low-traffic windows.
+1. **Appraisal:** Migration `20250415120000_user_role_assignments.js` adds a dedicated assignment table with cascades and composite indexes, backed by the new `UserRoleAssignmentModel` so role governance finally lives in a first-class schema.
+2. **Functionality:** `AuthService.register`, `login`, and `refreshSession` now pipe through `serializeUserWithAuthorizations`, automatically assigning default roles, embedding aggregated `roles` claims in JWTs, and exposing `roleAssignments` via `serializeUser` responses, while `backend-nodejs/seeds/001_bootstrap.js` channels fixture creation through `UserRoleAssignmentModel.assign` so default accounts ship with live assignment metadata.
+3. **Logic Usefulness:** Downstream dashboards and API consumers can inspect role lists plus assignment metadata without custom joins, enabling access reviews and impersonation audits directly from auth payloads.
+4. **Redundancies:** Inline role-array handling inside AuthService has been replaced by `normaliseRoleIdentifier`/`buildRoleList`, removing string trimming logic duplicated across controllers and middleware.
+5. **Placeholders Or non-working functions or stubs:** `UserRoleAssignmentModel.pruneExpired` is ready but not yet wired to a scheduler; hook it into background jobs to retire expired assignments automatically.
+6. **Duplicate Functions:** Role serialisation now lives exclusively in serializer helpers and the assignment model, eliminating bespoke formatting of roles/tokens elsewhere in the auth stack.
+7. **Improvements need to make:** Layer scope-aware authorisation services, UI for assignment lifecycle management, and richer auditing around delegated role grants.
+8. **Styling improvements:** Update Annex identity ERDs to include `user_role_assignments`, using accessible palette accents to distinguish global versus scoped relationships.
+9. **Efficiency analysis and improvement:** Unique `(user_id, role_key, scope_type, scope_id, revoked_at)` constraint and supporting indexes keep lookups fast while `assign` upserts avoid duplicate rows and JWT creation reuses deduped role sets.
+10. **Strengths to Keep:** Session hashing, two-factor enforcement, and audit event recording remain intact while tokens and responses now carry full role context.
+11. **Weaknesses to remove:** `users.role` can drift from assignment records; add enforcement or migration logic to keep legacy column synchronised.
+12. **Styling and Colour review changes:** Identity documentation should highlight new assignment chips using the compliance-friendly palette shared across Annex A38 assets.
+13. **CSS, orientation, placement and arrangement changes:** Plan admin matrices that surface scope, expiry, and metadata columns derived from `serializeUser` output to keep UI aligned with backend payloads.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refresh copy in docs/tooltips to describe aggregated `roles` arrays and assignment provenance so operators know how to interpret the new payloads.
+15. **Change Checklist Tracker:** Run migration `20250415120000_user_role_assignments.js`, backfill assignments, validate JWT `roles` claims, reseed via `npm --workspace backend-nodejs run seed` to confirm `user_role_assignments` hydration, and smoke-test login/refresh flows before release.
+16. **Full Upgrade Plan & Release Steps:** Apply migrations, seed identity fixtures, deploy backend, update annex documentation, and rehearse session rotation verifying role metadata end-to-end prior to enabling in production.
 
 ### 5.B Learning Content Schema (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
-1. **Appraisal:** Extensive schema modelling courses, modules, lessons, assessments, rubrics, certificates, and asset relationships.
-2. **Functionality:** Powers curriculum authoring, sequencing, assessment grading, and certificate issuance.
-3. **Logic Usefulness:** Supports recommendation services, analytics, and offline manifest generation across platforms.
-4. **Redundancies:** Metadata columns duplicated between lessons and assets; refactor to shared table or JSON field.
-5. **Placeholders Or non-working functions or stubs:** Adaptive learning columns exist but remain unused; document roadmap.
-6. **Duplicate Functions:** Validation logic repeated across models and services; centralise to maintain consistent constraints.
-7. **Improvements need to make:** Add versioning tables, support collaborative editing metadata, and integrate prerequisites into relational graph.
-8. **Styling improvements:** Update ER diagrams and include styling hints for UI components representing modules and lessons.
-9. **Efficiency analysis and improvement:** Introduce indexes on course slug, status, and publish dates; partition high-volume assessment submissions.
-10. **Strengths to Keep:** Rich relational design and support for analytics integration.
-11. **Weaknesses to remove:** Large text columns for notes causing bloat; evaluate moving to document storage with references.
-12. **Styling and Colour review changes:** Harmonise documentation colours with design tokens for readability.
-13. **CSS, orientation, placement and arrangement changes:** Provide suggestions for rendering curriculum trees in UI.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Ensure schema documentation clearly explains fields and avoids redundant phrasing.
-15. **Change Checklist Tracker:** Update curriculum migration checklist, analytics contract review, and certificate template validation before changes.
-16. **Full Upgrade Plan & Release Steps:** Stage migrations, seed sample data, run regression on lesson player, update docs, and release.
+1. **Appraisal:** Migration `20250415121000_course_version_snapshots.js` adds course snapshot history plus version columns on modules and lessons, orchestrated by the new `CourseVersionSnapshotModel`.
+2. **Functionality:** `CourseModel.create` records an initial snapshot while `updateById` persists diffs (`changes` array + summary) after every update, providing end-to-end version history, and the bootstrap seed replays `CourseVersionSnapshotModel.recordInitial` for each fixture course so sample data carries authentic history rows.
+3. **Logic Usefulness:** Stored snapshots expose before/after payloads for analytics, rollback planning, and editorial audits without bespoke exports.
+4. **Redundancies:** Legacy TODOs around versioning are resolved—diff logic now centralised so services no longer need ad-hoc history serializers.
+5. **Placeholders Or non-working functions or stubs:** Snapshot actor attribution falls back to instructor/admin IDs; wire additional workflow context when collaborative editing launches.
+6. **Duplicate Functions:** Change detection and serialisation live solely in `CourseVersionSnapshotModel`, replacing repeated JSON diff code scattered across services.
+7. **Improvements need to make:** Increment module/lesson version numbers from orchestrators, add API endpoints for history queries, and surface diff summaries in dashboards.
+8. **Styling improvements:** Update ERDs/documentation to include snapshot tables and version columns, applying accessible colours to distinguish history flows.
+9. **Efficiency analysis and improvement:** Unique `(course_id, version)` constraint plus `recorded_at`/`actor_id` indexes keep queries efficient while stable JSON serialisation minimises compute per change.
+10. **Strengths to Keep:** Existing relational modelling, metadata serialisation, and catalogue helpers remain untouched while wrapping new history capture inside model boundaries.
+11. **Weaknesses to remove:** Snapshot payload currently stores full course JSON; consider field-level compression or archival strategy for very large metadata sets.
+12. **Styling and Colour review changes:** Document UI cues for version timelines (timestamps, summaries) aligned with Annex palette tokens used across curriculum dashboards.
+13. **CSS, orientation, placement and arrangement changes:** Provide layout guidance for diff cards/timelines leveraging `changes` arrays (field labels with before/after values) in admin tooling.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Update docs/release notes to describe automatic change summaries and highlight how the `changes` array enumerates updated fields.
+15. **Change Checklist Tracker:** Apply migration `20250415121000_course_version_snapshots.js`, confirm snapshot creation on course create/update, reseed to ensure `course_version_snapshots` captures initial fixture rows, and verify version defaults seeded to `1` for modules/lessons.
+16. **Full Upgrade Plan & Release Steps:** Migrate, reseed sample courses, rehearse editing flows to inspect snapshots, update SDK/docs, and roll out alongside UI surfaces that consume new history APIs.
 
 ### 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
 1. **Appraisal:** Comprehensive schema covering communities, programming, posts, reactions, moderation, social graph, and direct messaging.
