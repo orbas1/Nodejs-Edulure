@@ -9,7 +9,7 @@ const MESSAGE_TYPES = [
   { value: 'live', label: 'Live session' }
 ];
 
-export default function MessageComposer({ value, onChange, onSend, onReset, sending, disabled }) {
+export default function MessageComposer({ value, onChange, onSend, onReset, sending, disabled, availableRecipients }) {
   const handleChange = (field, next) => {
     onChange({ ...value, [field]: next });
   };
@@ -18,6 +18,10 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
     event.preventDefault();
     onSend();
   };
+
+  const recipientOptions = Array.isArray(availableRecipients)
+    ? availableRecipients.filter((recipient) => recipient?.id && recipient?.displayName)
+    : [];
 
   return (
     <form
@@ -45,6 +49,24 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
               ))}
             </select>
           </label>
+          {recipientOptions.length ? (
+            <label className="text-xs font-medium text-slate-500">
+              Direct recipient
+              <select
+                value={value.targetMemberId}
+                onChange={(event) => handleChange('targetMemberId', event.target.value)}
+                className="ml-2 rounded-full border border-slate-200 px-3 py-1 text-sm font-medium text-slate-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">Broadcast to channel</option>
+                {recipientOptions.map((recipient) => (
+                  <option key={recipient.id} value={recipient.id}>
+                    {recipient.displayName}
+                    {recipient.presenceStatus ? ` · ${recipient.presenceStatus}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <button
             type="button"
             onClick={() => onReset?.()}
@@ -165,17 +187,27 @@ MessageComposer.propTypes = {
     attachmentLabel: PropTypes.string,
     liveTopic: PropTypes.string,
     meetingUrl: PropTypes.string,
-    metadataNote: PropTypes.string
+    metadataNote: PropTypes.string,
+    targetMemberId: PropTypes.string
   }).isRequired,
   onChange: PropTypes.func.isRequired,
   onSend: PropTypes.func.isRequired,
   onReset: PropTypes.func,
   sending: PropTypes.bool,
-  disabled: PropTypes.bool
+  disabled: PropTypes.bool,
+  availableRecipients: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      displayName: PropTypes.string.isRequired,
+      presenceStatus: PropTypes.string,
+      lastActiveAt: PropTypes.string
+    })
+  )
 };
 
 MessageComposer.defaultProps = {
   onReset: null,
   sending: false,
-  disabled: false
+  disabled: false,
+  availableRecipients: []
 };

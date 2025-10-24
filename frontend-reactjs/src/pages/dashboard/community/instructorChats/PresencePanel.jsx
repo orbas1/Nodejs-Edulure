@@ -15,7 +15,8 @@ export default function PresencePanel({
   formValue,
   onFormChange,
   onSubmit,
-  interactive
+  interactive,
+  insights
 }) {
   const errorMessage = error
     ? error instanceof Error
@@ -45,6 +46,19 @@ export default function PresencePanel({
       <p className="mt-2 text-xs text-slate-500">
         Track live facilitators and support staff. Update your status to broadcast availability to moderators and learners.
       </p>
+
+      {insights ? (
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-500">
+          <span className="dashboard-pill px-3 py-1">Online {insights.byStatus?.online ?? 0}</span>
+          <span className="dashboard-pill px-3 py-1">Away {insights.byStatus?.away ?? 0}</span>
+          <span className="dashboard-pill px-3 py-1">Offline {insights.byStatus?.offline ?? 0}</span>
+          {insights.recent?.length ? (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-500">
+              Recent: {insights.recent.map((entry) => entry.displayName).join(', ')}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-4 space-y-3" aria-live="polite" aria-busy={loading}>
         {loading && presence.length === 0 ? (
@@ -165,9 +179,14 @@ PresencePanel.propTypes = {
   }).isRequired,
   onFormChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
-  interactive: PropTypes.bool.isRequired
+  interactive: PropTypes.bool.isRequired,
+  insights: PropTypes.shape({
+    byStatus: PropTypes.object,
+    recent: PropTypes.array
+  })
 };
 
 PresencePanel.defaultProps = {
-  error: null
+  error: null,
+  insights: null
 };

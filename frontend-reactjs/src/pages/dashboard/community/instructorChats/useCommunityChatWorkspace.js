@@ -52,6 +52,369 @@ function mergePermissions(base, override = {}) {
   }, {});
 }
 
+function resolveMemberIdentifier(author) {
+  if (!author) return null;
+  if (author.id) return String(author.id);
+  if (author.userId) return String(author.userId);
+  if (author.email) return `email:${author.email.toLowerCase()}`;
+  if (author.displayName) return `name:${author.displayName.toLowerCase()}`;
+  if (author.name) return `name:${author.name.toLowerCase()}`;
+  return null;
+}
+
+function normaliseTimestamp(value) {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return null;
+  return timestamp;
+}
+
+function median(values) {
+  if (!values?.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
+}
+
+function toMinutes(durationMs) {
+  if (typeof durationMs !== 'number' || Number.isNaN(durationMs)) return null;
+  return durationMs / 60000;
+}
+
+function deriveChannelSummary(channels, activityCounts) {
+  if (!Array.isArray(channels) || channels.length === 0) return [];
+  return channels
+    .map((entry) => {
+      const count = activityCounts.get(entry.id) ?? 0;
+      const channel = entry.channel ?? {};
+      const type = channel.channelType ?? entry.channelType ?? entry.metadata?.channelType ?? 'general';
+      return {
+        id: entry.id,
+        name: channel.name ?? entry.id,
+        type,
+        activityCount: count,
+        updatedAt: channel.updatedAt ?? entry.latestMessage?.createdAt ?? channel.updated_at ?? null
+      };
+    })
+    .sort((a, b) => b.activityCount - a.activityCount || String(a.name).localeCompare(String(b.name)))
+    .slice(0, 6);
+}
+
+function detectDirectChannel(entry) {
+  const channel = entry?.channel ?? entry ?? {};
+  const metadata = channel.metadata ?? entry.metadata ?? {};
+  const type = channel.channelType ?? entry.channelType ?? metadata.channelType;
+  if (!type && metadata.category === 'direct') return true;
+  const normalised = String(type ?? '').toLowerCase();
+  return ['direct', 'dm', 'direct_message', 'one_to_one', '1:1'].includes(normalised) || metadata.isDirect === true;
+}
+
+function buildSocialGraph({
+  channels,
+  messageCache,
+  presence,
+  roleAssignments
+}) {
+  const channelActivity = new Map();
+  const nodes = new Map();
+  const connectors = new Map();
+  const channelMembership = new Map();
+  const messageLookup = new Map();
+  const responseDurations = [];
+
+  Object.entries(messageCache).forEach(([channelId, state]) => {
+    const messages = Array.isArray(state?.items) ? state.items : [];
+    channelActivity.set(channelId, (channelActivity.get(channelId) ?? 0) + messages.length);
+    messages.forEach((message) => {
+      const resolvedChannelId = message.channelId ?? channelId;
+      const messageId = message.id ?? `${resolvedChannelId}-${Math.random()}`;
+      messageLookup.set(messageId, { ...message, channelId: resolvedChannelId });
+    });
+  });
+
+  const ensureNode = (author, channelId, timestamp) => {
+    const id = resolveMemberIdentifier(author);
+    if (!id) return null;
+    if (!nodes.has(id)) {
+      nodes.set(id, {
+        id,
+        displayName: author.displayName ?? author.name ?? author.email ?? 'Member',
+        email: author.email ?? null,
+        roles: new Set(),
+        messageCount: 0,
+        reactionCount: 0,
+        channelIds: new Set(),
+        peerIds: new Set(),
+        lastActiveAt: null,
+        presenceStatus: 'offline',
+        client: null,
+        metadata: {}
+      });
+    }
+    const node = nodes.get(id);
+    node.displayName = author.displayName ?? author.name ?? node.displayName;
+    node.messageCount += 1;
+    if (Array.isArray(author.roles)) {
+      author.roles.forEach((roleKey) => node.roles.add(roleKey));
+    }
+    if (channelId) {
+      node.channelIds.add(String(channelId));
+      const members = channelMembership.get(channelId) ?? new Set();
+      members.add(id);
+      channelMembership.set(channelId, members);
+    }
+    const createdAt = normaliseTimestamp(timestamp ?? author.lastActiveAt);
+    if (createdAt && (!node.lastActiveAt || createdAt > node.lastActiveAt)) {
+      node.lastActiveAt = createdAt;
+    }
+    return node;
+  };
+
+  messageLookup.forEach((message) => {
+    const node = ensureNode(message.author ?? {}, message.channelId, message.createdAt);
+    if (!node) return;
+    if (Array.isArray(message.reactions)) {
+      node.reactionCount += message.reactions.reduce((total, reaction) => total + (reaction.count ?? 0), 0);
+    }
+  });
+
+  messageLookup.forEach((message) => {
+    const authorId = resolveMemberIdentifier(message.author);
+    if (!authorId) return;
+    const parentId = message.replyToMessageId ?? message.threadRootId;
+    if (!parentId) return;
+    const parent = messageLookup.get(parentId);
+    if (!parent) return;
+    const parentAuthorId = resolveMemberIdentifier(parent.author);
+    if (!parentAuthorId || parentAuthorId === authorId) return;
+    const channelId = message.channelId ?? parent.channelId;
+    if (!connectors.has(authorId)) connectors.set(authorId, new Set());
+    if (!connectors.has(parentAuthorId)) connectors.set(parentAuthorId, new Set());
+    connectors.get(authorId).add(parentAuthorId);
+    connectors.get(parentAuthorId).add(authorId);
+
+    const duration = Math.max(0, (normaliseTimestamp(message.createdAt) ?? 0) - (normaliseTimestamp(parent.createdAt) ?? 0));
+    if (duration) {
+      responseDurations.push(duration);
+    }
+
+    const key = `${authorId}::${parentAuthorId}`;
+    const edgeMap = messageLookup.edgeMap ?? new Map();
+    messageLookup.edgeMap = edgeMap;
+    if (!edgeMap.has(key)) {
+      edgeMap.set(key, {
+        sourceId: authorId,
+        targetId: parentAuthorId,
+        weight: 0,
+        channels: new Set(),
+        lastInteractionAt: null
+      });
+    }
+    const existingEdge = edgeMap.get(key);
+    existingEdge.weight += 1;
+    if (channelId) {
+      existingEdge.channels.add(String(channelId));
+    }
+    const timestampValue = normaliseTimestamp(message.createdAt);
+    if (timestampValue && (!existingEdge.lastInteractionAt || timestampValue > existingEdge.lastInteractionAt)) {
+      existingEdge.lastInteractionAt = timestampValue;
+    }
+  });
+
+  const presenceLookup = new Map();
+  (Array.isArray(presence) ? presence : []).forEach((session) => {
+    if (!session?.userId) return;
+    presenceLookup.set(String(session.userId), session);
+    if (!nodes.has(String(session.userId))) {
+      nodes.set(String(session.userId), {
+        id: String(session.userId),
+        displayName: `Member ${session.userId}`,
+        email: null,
+        roles: new Set(),
+        messageCount: 0,
+        reactionCount: 0,
+        channelIds: new Set(),
+        peerIds: new Set(),
+        lastActiveAt: normaliseTimestamp(session.lastSeenAt ?? session.connectedAt),
+        presenceStatus: session.status ?? 'online',
+        client: session.client ?? 'web',
+        metadata: {}
+      });
+    }
+    const node = nodes.get(String(session.userId));
+    node.presenceStatus = session.status ?? node.presenceStatus ?? 'online';
+    node.client = session.client ?? node.client;
+    const lastSeen = normaliseTimestamp(session.lastSeenAt ?? session.connectedAt ?? session.expiresAt);
+    if (lastSeen && (!node.lastActiveAt || lastSeen > node.lastActiveAt)) {
+      node.lastActiveAt = lastSeen;
+    }
+  });
+
+  const assignments = Array.isArray(roleAssignments) ? roleAssignments : [];
+  assignments.forEach((assignment) => {
+    if (!assignment?.roleKey) return;
+    const userId = assignment.userId ? String(assignment.userId) : null;
+    if (!userId) return;
+    if (!nodes.has(userId)) {
+      nodes.set(userId, {
+        id: userId,
+        displayName: `Member ${userId}`,
+        email: null,
+        roles: new Set(),
+        messageCount: 0,
+        reactionCount: 0,
+        channelIds: new Set(),
+        peerIds: new Set(),
+        lastActiveAt: null,
+        presenceStatus: 'offline',
+        client: null,
+        metadata: {}
+      });
+    }
+    nodes.get(userId).roles.add(String(assignment.roleKey));
+  });
+
+  const nodeList = Array.from(nodes.values()).map((node) => {
+    const peers = connectors.get(node.id) ?? new Set();
+    return {
+      id: node.id,
+      displayName: node.displayName,
+      email: node.email,
+      roles: Array.from(node.roles),
+      messageCount: node.messageCount,
+      reactionCount: node.reactionCount,
+      channelCount: node.channelIds.size,
+      peerCount: peers.size,
+      lastActiveAt: node.lastActiveAt ? new Date(node.lastActiveAt).toISOString() : null,
+      presenceStatus: node.presenceStatus,
+      client: node.client,
+      metadata: node.metadata
+    };
+  });
+
+  const presenceSummary = nodeList.reduce(
+    (acc, node) => {
+      const status = node.presenceStatus ?? 'offline';
+      acc.total += 1;
+      acc.byStatus[status] = (acc.byStatus[status] ?? 0) + 1;
+      if (node.lastActiveAt) {
+        acc.recent = [...acc.recent, node].sort((a, b) => {
+          const aTime = normaliseTimestamp(a.lastActiveAt);
+          const bTime = normaliseTimestamp(b.lastActiveAt);
+          return bTime - aTime;
+        }).slice(0, 6);
+      }
+      return acc;
+    },
+    { total: 0, byStatus: {}, recent: [] }
+  );
+
+  const edges = Array.from((messageLookup.edgeMap ?? new Map()).values()).map((edge) => ({
+    ...edge,
+    channels: Array.from(edge.channels),
+    lastInteractionAt: edge.lastInteractionAt ? new Date(edge.lastInteractionAt).toISOString() : null
+  }));
+
+  const medianResponseMinutes = toMinutes(median(responseDurations));
+
+  const topConnectors = nodeList
+    .filter((node) => node.peerCount > 0 || node.messageCount > 0)
+    .sort((a, b) => b.peerCount - a.peerCount || b.messageCount - a.messageCount)
+    .slice(0, 6);
+
+  const channelSummary = deriveChannelSummary(channels ?? [], channelActivity);
+
+  const directChannels = (channels ?? [])
+    .filter((entry) => detectDirectChannel(entry))
+    .map((entry) => {
+      const channel = entry.channel ?? entry;
+      const latest = messageCache?.[entry.id]?.items?.slice(-1)[0] ?? entry.latestMessage ?? null;
+      const members = Array.from((channelMembership.get(entry.id) ?? new Set()).values());
+      return {
+        id: entry.id,
+        name: channel.name ?? 'Direct thread',
+        members,
+        lastMessageAt: latest?.createdAt ?? channel.updatedAt ?? null,
+        lastMessageSnippet: latest?.body?.slice(0, 120) ?? null
+      };
+    });
+
+  const directMemberIds = new Set(directChannels.flatMap((thread) => thread.members));
+
+  const directSuggestions = nodeList
+    .filter((node) => !directMemberIds.has(node.id))
+    .sort((a, b) => b.peerCount - a.peerCount || b.channelCount - a.channelCount)
+    .slice(0, 5)
+    .map((node) => ({
+      id: node.id,
+      displayName: node.displayName,
+      peerCount: node.peerCount,
+      channelCount: node.channelCount,
+      presenceStatus: node.presenceStatus,
+      lastActiveAt: node.lastActiveAt
+    }));
+
+  const roleStatsMap = new Map();
+  assignments.forEach((assignment) => {
+    if (!assignment?.roleKey) return;
+    const userId = assignment.userId ? String(assignment.userId) : null;
+    if (!userId) return;
+    const node = nodeList.find((member) => member.id === userId);
+    const entry = roleStatsMap.get(assignment.roleKey) ?? {
+      roleKey: assignment.roleKey,
+      members: 0,
+      online: 0,
+      away: 0
+    };
+    entry.members += 1;
+    if (node?.presenceStatus === 'online') entry.online += 1;
+    if (node?.presenceStatus === 'away') entry.away += 1;
+    roleStatsMap.set(assignment.roleKey, entry);
+  });
+
+  const roleInsights = Array.from(roleStatsMap.values()).sort((a, b) => b.members - a.members);
+
+  const viewerAssignments = assignments.filter((assignment) => assignment?.isViewer);
+  const viewerId = viewerAssignments[0]?.userId ? String(viewerAssignments[0].userId) : null;
+
+  const recipients = nodeList
+    .filter((node) => node.id !== viewerId)
+    .map((node) => ({
+      id: node.id,
+      displayName: node.displayName,
+      presenceStatus: node.presenceStatus,
+      lastActiveAt: node.lastActiveAt
+    }));
+
+  return {
+    nodes: nodeList,
+    nodeLookup: nodeList.reduce((acc, node) => {
+      acc[node.id] = node;
+      return acc;
+    }, {}),
+    edges,
+    stats: {
+      totalMembers: presenceSummary.total,
+      presence: presenceSummary,
+      response: {
+        medianMinutes: medianResponseMinutes,
+        samples: responseDurations.length
+      },
+      topChannels: channelSummary
+    },
+    topConnectors,
+    directMessages: {
+      threads: directChannels,
+      suggestions: directSuggestions
+    },
+    roleInsights,
+    recipients
+  };
+}
+
 const normaliseChannelEntry = (entry) => {
   const channel = entry?.channel ?? entry ?? {};
   return {
@@ -740,6 +1103,17 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
     [activeChannelId, messageCache]
   );
 
+  const socialGraph = useMemo(
+    () =>
+      buildSocialGraph({
+        channels: channelsState.items,
+        messageCache,
+        presence: presenceState.items,
+        roleAssignments: rolesState.assignments
+      }),
+    [channelsState.items, messageCache, presenceState.items, rolesState.assignments]
+  );
+
   return {
     interactive,
     capabilities,
@@ -769,6 +1143,7 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
     moderateMessage,
     workspaceNotice,
     setWorkspaceNotice,
-    refreshWorkspace
+    refreshWorkspace,
+    socialGraph
   };
 }

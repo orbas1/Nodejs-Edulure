@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
@@ -22,7 +22,8 @@ const initialComposerState = {
   attachmentLabel: '',
   liveTopic: '',
   meetingUrl: '',
-  metadataNote: ''
+  metadataNote: '',
+  targetMemberId: ''
 };
 
 const initialPresenceForm = {
@@ -126,7 +127,8 @@ export default function InstructorCommunityChats() {
     moderateMessage,
     workspaceNotice,
     setWorkspaceNotice,
-    refreshWorkspace
+    refreshWorkspace,
+    socialGraph
   } = useCommunityChatWorkspace({
     communityId: hasAccess ? selectedCommunityId : null,
     token: hasAccess ? token : null
@@ -205,6 +207,9 @@ export default function InstructorCommunityChats() {
       if (composerState.liveTopic) metadata.topic = composerState.liveTopic;
       if (composerState.meetingUrl) metadata.meetingUrl = composerState.meetingUrl;
     }
+    if (composerState.targetMemberId) {
+      metadata.directTargetMemberId = composerState.targetMemberId;
+    }
     try {
       await sendMessage({
         messageType: composerState.messageType,
@@ -237,6 +242,23 @@ export default function InstructorCommunityChats() {
       });
     }
   };
+
+  const handleSelectDirectRecipient = useCallback(
+    (recipient) => {
+      if (!recipient?.id) return;
+      setComposerState((current) => ({
+        ...current,
+        messageType: current.messageType === 'system' ? 'text' : current.messageType,
+        targetMemberId: recipient.id
+      }));
+      setWorkspaceNotice({
+        tone: 'info',
+        message: 'Composer ready for direct intro',
+        detail: `Messaging focus set to ${recipient.displayName}.`
+      });
+    },
+    [setWorkspaceNotice]
+  );
 
   const handleReactToMessage = async (messageId, emoji) => {
     try {
@@ -536,6 +558,9 @@ export default function InstructorCommunityChats() {
             loadMessages({ channelId, refresh: true });
           }}
           interactive={interactive}
+          socialGraph={socialGraph}
+          directMessages={socialGraph?.directMessages}
+          onSelectDirectRecipient={handleSelectDirectRecipient}
         />
 
         <div className="flex flex-col gap-6">
@@ -549,6 +574,7 @@ export default function InstructorCommunityChats() {
             onReact={handleReactToMessage}
             onRemoveReaction={handleRemoveReaction}
             onModerate={handleModerateMessage}
+            graph={socialGraph}
           />
 
           <MessageComposer
@@ -558,6 +584,7 @@ export default function InstructorCommunityChats() {
             onReset={() => setComposerState(initialComposerState)}
             sending={sendingMessage}
             disabled={!interactive || !activeChannelId}
+            availableRecipients={socialGraph?.recipients ?? []}
           />
         </div>
       </div>
@@ -572,6 +599,7 @@ export default function InstructorCommunityChats() {
           onFormChange={setPresenceForm}
           onSubmit={handlePresenceSubmit}
           interactive={interactive}
+          insights={socialGraph?.stats?.presence}
         />
 
         <RoleManagementPanel
@@ -587,6 +615,7 @@ export default function InstructorCommunityChats() {
           onAssignmentChange={setRoleAssignmentForm}
           onAssignmentSubmit={handleAssignRole}
           interactive={interactive}
+          roleInsights={socialGraph?.roleInsights ?? []}
         />
 
         <div className="grid gap-6">
