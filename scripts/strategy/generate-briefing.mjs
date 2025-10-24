@@ -34,6 +34,62 @@ function extractSection(startHeading) {
   return remainder.slice(0, endIndex).trim();
 }
 
+function collectBulletedBlocks(section) {
+  const lines = section.split('\n');
+  const blocks = [];
+  let current = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (line.startsWith('- ')) {
+      if (current) {
+        blocks.push(current.trim());
+      }
+      current = line.slice(2).trim();
+    } else if (current) {
+      current += ` ${line}`;
+    }
+  }
+
+  if (current) {
+    blocks.push(current.trim());
+  }
+
+  return blocks;
+}
+
+function collectOrderedBlocks(section) {
+  const lines = section.split('\n');
+  const blocks = [];
+  let current = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(line)) {
+      if (current) {
+        blocks.push(current.trim());
+      }
+      current = line.replace(/^\d+\.\s+/, '').trim();
+    } else if (current) {
+      current += ` ${line}`;
+    }
+  }
+
+  if (current) {
+    blocks.push(current.trim());
+  }
+
+  return blocks;
+}
+
 function extractCapabilitySignals() {
   const section = extractSection('## Feature and capability profile');
   const lines = section.split('\n').filter((line) => line.trim().startsWith('|'));
@@ -60,29 +116,39 @@ function extractCapabilitySignals() {
 
 function extractRiskAdjustments() {
   const section = extractSection('## Risk adjustments');
-  const riskPattern = /- \*\*(.+?)\s*\(([^)]+)\)\*\*:\s*(.+)/g;
-  const results = [];
-  let match;
-  while ((match = riskPattern.exec(section)) !== null) {
-    const [, label, impact, narrative] = match;
-    results.push({
-      label: label.trim(),
-      impact: impact.trim(),
-      narrative: narrative.trim()
-    });
-  }
-  return results;
+  const blocks = collectBulletedBlocks(section);
+  return blocks
+    .map((block) => {
+      if (!block.startsWith('**')) {
+        return null;
+      }
+      const withoutPrefix = block.slice(2);
+      const [emphasised, remainder = ''] = withoutPrefix.split('**', 2);
+      if (!emphasised) {
+        return null;
+      }
+      const headline = emphasised.trim().replace(/:+$/, '').trim();
+      const open = headline.lastIndexOf('(');
+      const close = headline.lastIndexOf(')');
+      if (open === -1 || close === -1 || close <= open) {
+        return null;
+      }
+      const label = headline.slice(0, open).trim();
+      const impact = headline.slice(open + 1, close).trim();
+      const narrative = remainder.replace(/^:\s*/, '').trim();
+      return {
+        label: label.trim(),
+        impact: impact.trim(),
+        narrative: narrative.trim()
+      };
+    })
+    .filter(Boolean);
 }
 
 function extractRecommendations() {
   const section = extractSection('## Recommendations');
-  const recommendationPattern = /\n?\s*\d+\.\s+(.+)/g;
-  const results = [];
-  let match;
-  while ((match = recommendationPattern.exec(section)) !== null) {
-    results.push(match[1].trim());
-  }
-  return results;
+  const blocks = collectOrderedBlocks(section);
+  return blocks.map((entry) => entry.trim());
 }
 
 const summary = extractSummary();
@@ -118,6 +184,14 @@ function buildTypeScriptModule() {
     '',
     'export function listCapabilitySignals() {',
     '  return strategyBriefing.capabilitySignals;',
+    '}',
+    '',
+    'export function listRiskAdjustments() {',
+    '  return strategyBriefing.riskAdjustments;',
+    '}',
+    '',
+    'export function listRecommendations() {',
+    '  return strategyBriefing.recommendations;',
     '}',
     ''
   ];

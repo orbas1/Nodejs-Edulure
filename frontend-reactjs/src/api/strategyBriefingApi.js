@@ -98,6 +98,22 @@ function normaliseProductBacklog(raw = []) {
   return backlog;
 }
 
+function normaliseInitiativeBucket(items = []) {
+  return ensureArray(items).map((item, index) => ({
+    id: item.id ?? item.name ?? `initiative-${index}`,
+    label: item.label ?? item.name ?? null,
+    to: item.to ?? null,
+    category: item.category ?? null,
+    sortOrder: typeof item.sortOrder === 'number' ? item.sortOrder : index,
+    initiative: {
+      product: item.initiative?.product ?? null,
+      operations: item.initiative?.operations ?? { tasks: [] },
+      design: item.initiative?.design ?? { tokens: [], qa: [], references: [] },
+      strategy: item.initiative?.strategy ?? { pillar: null, narrative: null, metrics: [] }
+    }
+  }));
+}
+
 function normaliseOperationsChecklist(raw = []) {
   return ensureArray(raw).map((task) => ({
     id: task.id ?? task.key ?? task.label ?? 'task',
@@ -111,6 +127,11 @@ function normaliseOperationsChecklist(raw = []) {
 
 function normaliseAnnex(raw = {}) {
   return {
+    initiatives: {
+      primary: normaliseInitiativeBucket(raw.initiatives?.primary),
+      quickActions: normaliseInitiativeBucket(raw.initiatives?.quickActions),
+      dashboard: normaliseInitiativeBucket(raw.initiatives?.dashboard)
+    },
     strategyNarratives: normaliseStrategyNarratives(raw.strategyNarratives),
     productBacklog: normaliseProductBacklog(raw.productBacklog),
     designDependencies: normaliseDesignDependencies(raw.designDependencies),

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import strategyBriefingApi from '../api/strategyBriefingApi.js';
 
 const defaultAnnex = {
+  initiatives: { primary: [], quickActions: [], dashboard: [] },
   strategyNarratives: [],
   productBacklog: [],
   designDependencies: { tokens: [], qa: [], references: [] },
@@ -70,7 +71,15 @@ export function StrategyBriefingProvider({ role, token, children }) {
     load(resolvedRole, token, { signal: controller.signal })
       .then((data) => {
         if (cancelled) return;
-        setState({ status: 'loaded', data: { ...defaultData, ...data }, error: null });
+        setState({
+          status: 'loaded',
+          data: {
+            ...defaultData,
+            ...data,
+            annex: { ...defaultAnnex, ...data.annex }
+          },
+          error: null
+        });
       })
       .catch((error) => {
         if (cancelled || controller.signal.aborted) {
@@ -96,7 +105,15 @@ export function StrategyBriefingProvider({ role, token, children }) {
       setState((prev) => ({ ...prev, status: 'loading', error: null }));
       try {
         const data = await load(resolvedRole, token, { signal: controller.signal });
-        setState({ status: 'loaded', data: { ...defaultData, ...data }, error: null });
+        setState({
+          status: 'loaded',
+          data: {
+            ...defaultData,
+            ...data,
+            annex: { ...defaultAnnex, ...data.annex }
+          },
+          error: null
+        });
       } catch (error) {
         if (controller.signal.aborted) {
           return;

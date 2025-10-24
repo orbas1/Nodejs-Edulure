@@ -39,6 +39,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   describeMock.mockResolvedValue({
+    initiatives: { primary: [], quickActions: [], dashboard: [] },
     strategyNarratives: [
       { pillar: 'Retention', narratives: ['Reduce clicks after sign-in'], metrics: [] }
     ],
@@ -60,7 +61,13 @@ describe('Strategy briefing HTTP routes', () => {
     expect(describeMock).toHaveBeenCalledWith({ role: 'user' });
     expect(response.body.data.summary.midpoint).toBe('£0.9M');
     expect(Array.isArray(response.body.data.capabilitySignals)).toBe(true);
+    expect(response.body.data.riskAdjustments.length).toBeGreaterThan(0);
     expect(response.body.data.annex.strategyNarratives).toHaveLength(1);
     expect(response.body.data.annex.strategyNarratives[0].pillar).toBe('Retention');
+    expect(response.body.data.annex.initiatives).toEqual({
+      primary: [],
+      quickActions: [],
+      dashboard: []
+    });
   });
 });

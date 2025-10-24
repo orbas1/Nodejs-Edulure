@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2025-10-24T17:44:48.660Z",
+  "generatedAt": "2025-10-24T18:20:46.458Z",
   "summary": {
     "midpoint": "£0.9M",
     "range": "£0.65M – £1.10M",
@@ -37,7 +37,23 @@
       "impact": "Lowers future DevOps investment; signals mature engineering (-8% risk discount)."
     }
   ],
-  "riskAdjustments": [],
+  "riskAdjustments": [
+    {
+      "label": "Product-market risk",
+      "impact": "-£190k",
+      "narrative": "No production usage or revenue yet; assumes subsequent customer validation and that a small team can convert technical readiness into commercial traction."
+    },
+    {
+      "label": "Operational load",
+      "impact": "-£100k",
+      "narrative": "Cloudflare R2, payments, mobile CI/CD, and search clusters add ongoing costs and require specialist maintenance that may exceed a solo founder’s bandwidth."
+    },
+    {
+      "label": "Positive adjustment",
+      "impact": "+£130k",
+      "narrative": "Strong governance/observability plus staged rollout plans reduce compliance friction and improve investor confidence.【F:update_template/upload_brief.md†L22-L62】【F:update_template/user_phone_app_updates/build_updates.md†L13-L33】"
+    }
+  ],
   "recommendations": [
     "**Validate early design partners** to justify the upper end of the valuation range and demonstrate conversion for payments and streak analytics.",
     "**Document infrastructure-as-code** for R2, Meilisearch, and mobile CI pipelines to reinforce operational readiness during diligence.",

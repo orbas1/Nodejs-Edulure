@@ -6,13 +6,7 @@ export default class StrategyBriefingService {
     const annex = await NavigationAnnexRepository.describe({ role });
     return {
       ...strategyBriefing,
-      annex: {
-        strategyNarratives: annex.strategyNarratives,
-        productBacklog: annex.productBacklog,
-        designDependencies: annex.designDependencies,
-        operationsChecklist: annex.operationsChecklist,
-        refreshedAt: annex.refreshedAt
-      }
+      annex
     };
   }
 }
