@@ -4,6 +4,57 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const manifestPath = path.resolve('..', 'infrastructure/environment-manifest.json');
 
+const blueprintRegistryMock = [
+  {
+    blueprintKey: 'backendService',
+    environmentName: 'dev',
+    environmentProvider: 'aws',
+    serviceName: 'backend-service',
+    blueprintVersion: '2024.06',
+    blueprintHash: '6be3c60ffc9dcdf9624a376dc5da5fe74d535cfa94362916eac25859b2a5c381',
+    modulePath: 'infrastructure/terraform/modules/backend_service',
+    moduleHash: '7c5827dc2833b557edd7930bf54ea7098bea09d5987a147ba0b37a2bd6a2c0c9',
+    ssmParameterName: '/edulure/dev/api/environment-blueprint',
+    runtimeEndpoint: 'https://dev.edulure.com/ops/runtime-blueprint.json',
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityDashboardHash: 'ca765a54a76f9255d436ef3ffbbddf256fa8c13b5f7c9b0d3984ec810b04314a',
+    alarmOutputs: ['cpu_alarm_name', 'memory_alarm_name'],
+    metadata: { tier: 'nonprod' }
+  },
+  {
+    blueprintKey: 'backendService',
+    environmentName: 'staging',
+    environmentProvider: 'aws',
+    serviceName: 'backend-service',
+    blueprintVersion: '2024.06',
+    blueprintHash: '6be3c60ffc9dcdf9624a376dc5da5fe74d535cfa94362916eac25859b2a5c381',
+    modulePath: 'infrastructure/terraform/modules/backend_service',
+    moduleHash: '7c5827dc2833b557edd7930bf54ea7098bea09d5987a147ba0b37a2bd6a2c0c9',
+    ssmParameterName: '/edulure/staging/api/environment-blueprint',
+    runtimeEndpoint: 'https://staging.edulure.com/ops/runtime-blueprint.json',
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityDashboardHash: 'ca765a54a76f9255d436ef3ffbbddf256fa8c13b5f7c9b0d3984ec810b04314a',
+    alarmOutputs: ['cpu_alarm_name', 'memory_alarm_name'],
+    metadata: { tier: 'preprod' }
+  },
+  {
+    blueprintKey: 'backendService',
+    environmentName: 'prod',
+    environmentProvider: 'aws',
+    serviceName: 'backend-service',
+    blueprintVersion: '2024.06',
+    blueprintHash: '6be3c60ffc9dcdf9624a376dc5da5fe74d535cfa94362916eac25859b2a5c381',
+    modulePath: 'infrastructure/terraform/modules/backend_service',
+    moduleHash: '7c5827dc2833b557edd7930bf54ea7098bea09d5987a147ba0b37a2bd6a2c0c9',
+    ssmParameterName: '/edulure/prod/api/environment-blueprint',
+    runtimeEndpoint: 'https://edulure.com/ops/runtime-blueprint.json',
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityDashboardHash: 'ca765a54a76f9255d436ef3ffbbddf256fa8c13b5f7c9b0d3984ec810b04314a',
+    alarmOutputs: ['cpu_alarm_name', 'memory_alarm_name'],
+    metadata: { tier: 'production' }
+  }
+];
+
 vi.mock('../src/config/env.js', () => ({
   env: {
     nodeEnv: 'test',
@@ -142,6 +193,12 @@ vi.mock('../src/config/redisClient.js', () => ({
       return 'PONG';
     }
   })
+}));
+
+vi.mock('../src/models/EnvironmentBlueprintModel.js', () => ({
+  default: {
+    listAll: vi.fn().mockResolvedValue(blueprintRegistryMock)
+  }
 }));
 
 vi.mock('../src/middleware/auth.js', () => ({

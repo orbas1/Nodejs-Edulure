@@ -13,7 +13,11 @@ function parseArgs(rawArgs) {
     format: 'json',
     includeDev: true,
     outputDir: null,
-    policyPath: null
+    policyPath: null,
+    ciMode: false,
+    summaryPath: null,
+    failOnViolation: true,
+    pipelineManifestPath: null
   };
 
   for (let index = 0; index < rawArgs.length; index += 1) {
@@ -54,6 +58,26 @@ function parseArgs(rawArgs) {
         index += 1;
         break;
       }
+      case '--ci':
+        parsed.ciMode = true;
+        break;
+      case '--summary-path': {
+        const value = rawArgs[index + 1];
+        if (!value) throw new Error('Missing value for --summary-path option.');
+        parsed.summaryPath = value;
+        index += 1;
+        break;
+      }
+      case '--no-fail-on-violation':
+        parsed.failOnViolation = false;
+        break;
+      case '--pipeline-manifest': {
+        const value = rawArgs[index + 1];
+        if (!value) throw new Error('Missing value for --pipeline-manifest option.');
+        parsed.pipelineManifestPath = value;
+        index += 1;
+        break;
+      }
       default:
         throw new Error(`Unsupported argument '${token}'.`);
     }
@@ -79,6 +103,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const reportsDir = path.resolve(repoRoot, cliOptions.outputDir ?? path.join('reports', 'licenses'));
+const ciSummaryFile = process.env.GITHUB_STEP_SUMMARY ?? null;
 
 const workspaces = [
   { name: 'root', location: repoRoot },
@@ -121,6 +146,18 @@ try {
 
 async function ensureDirectory(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
+}
+
+function resolveSummaryDestination() {
+  if (cliOptions.summaryPath) {
+    return path.isAbsolute(cliOptions.summaryPath)
+      ? cliOptions.summaryPath
+      : path.join(repoRoot, cliOptions.summaryPath);
+  }
+  if (cliOptions.ciMode && ciSummaryFile) {
+    return ciSummaryFile;
+  }
+  return null;
 }
 
 function normaliseLicense(licenseValue) {
@@ -199,6 +236,120 @@ function sortPackages(packages) {
   return [...packages].sort((a, b) => a.package.localeCompare(b.package));
 }
 
+function createMarkdownSummary(summary) {
+  const lines = [];
+  lines.push('# License Audit Summary');
+  lines.push('');
+  lines.push(`- Generated at: ${summary.generatedAt}`);
+  lines.push(`- Include dev dependencies: ${summary.includeDevDependencies ? 'Yes' : 'No'}`);
+  lines.push(`- Workspaces analysed: ${summary.reports.length}`);
+  lines.push('');
+
+  if (summary.reports.length > 0) {
+    lines.push('| Workspace | Packages | Report |');
+    lines.push('| --- | ---: | --- |');
+    for (const report of summary.reports) {
+      lines.push(`| ${report.workspace} | ${report.packageCount} | ${report.reportPath} |`);
+    }
+    lines.push('');
+  }
+
+  const totalViolations = (summary.policyBreaches?.length ?? 0) + (summary.bannedFindings?.length ?? 0);
+  if (totalViolations === 0) {
+    lines.push('✅ No policy breaches detected.');
+  } else {
+    lines.push('⚠️ **Policy findings detected**');
+    lines.push('');
+    if ((summary.policyBreaches?.length ?? 0) > 0) {
+      lines.push('### Packages missing license declarations');
+      lines.push('| Workspace | Package |');
+      lines.push('| --- | --- |');
+      for (const breach of summary.policyBreaches) {
+        lines.push(`| ${breach.workspace} | ${breach.package} |`);
+      }
+      lines.push('');
+    }
+    if ((summary.bannedFindings?.length ?? 0) > 0) {
+      lines.push('### Packages matching banned licenses');
+      lines.push('| Workspace | Package | Licenses |');
+      lines.push('| --- | --- | --- |');
+      for (const finding of summary.bannedFindings) {
+        lines.push(`| ${finding.workspace} | ${finding.package} | ${finding.licenses.join(', ') || 'unknown'} |`);
+      }
+      lines.push('');
+    }
+    if (summary.policyViolationsPath) {
+      lines.push(`Detailed findings: \`${summary.policyViolationsPath}\``);
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function createViolationSummary(bannedFindings, policyBreaches) {
+  const totalBanned = bannedFindings.length;
+  const totalMissing = policyBreaches.length;
+  const total = totalBanned + totalMissing;
+  let severity = 'none';
+  if (totalBanned > 0) {
+    severity = 'critical';
+  } else if (totalMissing > 0) {
+    severity = 'moderate';
+  }
+  return {
+    total,
+    totalBanned,
+    totalMissing,
+    severity,
+    hasViolations: total > 0
+  };
+}
+
+async function writePipelineManifest(manifestPath, summary, violationSummary, markdownSummaryPath) {
+  const destination = path.isAbsolute(manifestPath) ? manifestPath : path.join(repoRoot, manifestPath);
+  await ensureDirectory(path.dirname(destination));
+
+  const manifest = {
+    generatedAt: summary.generatedAt,
+    includeDevDependencies: summary.includeDevDependencies,
+    violationSummary,
+    reports: summary.reports,
+    policyViolationsPath: summary.policyViolationsPath ?? null,
+    markdownSummaryPath: markdownSummaryPath ? path.relative(repoRoot, markdownSummaryPath) : null,
+    ci: {
+      mode: cliOptions.ciMode,
+      failOnViolation: cliOptions.failOnViolation
+    },
+    steps: [
+      {
+        id: 'inventory',
+        title: 'Generate dependency inventory',
+        status: 'completed',
+        outputs: summary.reports.map((report) => report.reportPath)
+      },
+      {
+        id: 'policy-review',
+        title: 'Evaluate license policy',
+        status: violationSummary.hasViolations ? 'action-required' : 'passed',
+        findings: {
+          banned: summary.bannedFindings,
+          missingLicenses: summary.policyBreaches
+        }
+      },
+      {
+        id: 'publish-artifacts',
+        title: 'Publish audit artifacts',
+        status: 'completed',
+        outputs: [summary.policyViolationsPath, markdownSummaryPath ? path.relative(repoRoot, markdownSummaryPath) : null].filter(Boolean)
+      }
+    ]
+  };
+
+  await fs.writeFile(destination, JSON.stringify(manifest, null, 2));
+  return destination;
+}
+
 async function main() {
   const policy = await loadPolicy(cliOptions.policyPath);
   await ensureDirectory(reportsDir);
@@ -206,7 +357,12 @@ async function main() {
   const summary = {
     generatedAt: new Date().toISOString(),
     includeDevDependencies: cliOptions.includeDev,
-    reports: []
+    reports: [],
+    ci: {
+      mode: cliOptions.ciMode,
+      failOnViolation: cliOptions.failOnViolation,
+      summaryPath: null
+    }
   };
   const bannedFindings = [];
   const policyBreaches = [];
@@ -262,10 +418,44 @@ async function main() {
 
   summary.bannedFindings = bannedFindings;
   summary.policyBreaches = policyBreaches;
+
+  const policyViolationsPath = path.join(reportsDir, 'policy-violations.json');
   await fs.writeFile(
-    path.join(reportsDir, 'summary.json'),
-    JSON.stringify(summary, null, 2)
+    policyViolationsPath,
+    JSON.stringify({
+      generatedAt: summary.generatedAt,
+      bannedFindings,
+      policyBreaches
+    }, null, 2)
   );
+  summary.policyViolationsPath = path.relative(repoRoot, policyViolationsPath);
+
+  const summaryJsonPath = path.join(reportsDir, 'summary.json');
+  await fs.writeFile(summaryJsonPath, JSON.stringify(summary, null, 2));
+  summary.summaryJsonPath = path.relative(repoRoot, summaryJsonPath);
+
+  const markdownDestination = resolveSummaryDestination();
+  if (markdownDestination) {
+    await ensureDirectory(path.dirname(markdownDestination));
+    const markdownSummary = createMarkdownSummary(summary);
+    await fs.writeFile(markdownDestination, markdownSummary);
+    summary.ci.summaryPath = path.relative(repoRoot, markdownDestination);
+    console.log(`\n📝 License summary written to ${summary.ci.summaryPath}`);
+  }
+
+  const violationSummary = createViolationSummary(bannedFindings, policyBreaches);
+  summary.violationSummary = violationSummary;
+  if (cliOptions.pipelineManifestPath) {
+    const manifestLocation = await writePipelineManifest(
+      cliOptions.pipelineManifestPath,
+      summary,
+      violationSummary,
+      summary.ci.summaryPath
+        ? path.join(repoRoot, summary.ci.summaryPath)
+        : null
+    );
+    console.log(`📦 Pipeline manifest saved to ${path.relative(repoRoot, manifestLocation)}`);
+  }
 
   if (policyBreaches.length > 0 || bannedFindings.length > 0) {
     console.error('\n⚠️  License policy violations detected. Review reports in reports/licenses for details.');
@@ -275,7 +465,9 @@ async function main() {
     for (const finding of bannedFindings) {
       console.error(` - ${finding.package} (${finding.licenses.join(', ') || 'unknown license'}) in workspace ${finding.workspace}`);
     }
-    process.exitCode = 1;
+    if (cliOptions.failOnViolation) {
+      process.exitCode = 1;
+    }
   } else {
     console.log('\n✅ License reports generated without policy violations.');
   }

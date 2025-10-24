@@ -11,7 +11,7 @@
     },
     "backendService": {
       "path": "infrastructure/terraform/modules/backend_service",
-      "hash": "34aa9f29f26ae9b78f50916aaa1111daaf1416ce28c03e7be88cd4eff392b593"
+      "hash": "7c5827dc2833b557edd7930bf54ea7098bea09d5987a147ba0b37a2bd6a2c0c9"
     }
   },
   "environments": {
@@ -39,7 +39,7 @@
     },
     "nginx": {
       "path": "infrastructure/docker/nginx.conf",
-      "hash": "c785994ca7af98ef2110a032571dad84f33045bc0228bcd3ee5b13d4c891054c"
+      "hash": "854c272a68d7ff46fd9de445cdd682475e059bb775eb291356275f791e84c24e"
     }
   },
   "scripts": {
@@ -56,6 +56,102 @@
     "docker-compose.yml": {
       "path": "docker-compose.yml",
       "hash": "edba92c386a5ced24c16c61d0373a5c0a4d28c78f573cd2808810742ba33f8cc"
+    }
+  },
+  "blueprints": {
+    "backendService": {
+      "path": "infrastructure/terraform/modules/backend_service/blueprint.tf",
+      "hash": "6be3c60ffc9dcdf9624a376dc5da5fe74d535cfa94362916eac25859b2a5c381",
+      "version": "2024.06",
+      "service": "backend-service",
+      "provider": "aws",
+      "modulePath": "infrastructure/terraform/modules/backend_service",
+      "moduleHash": "7c5827dc2833b557edd7930bf54ea7098bea09d5987a147ba0b37a2bd6a2c0c9",
+      "observability": {
+        "grafana": {
+          "path": "infrastructure/observability/grafana/dashboards/environment-runtime.json",
+          "hash": "ca765a54a76f9255d436ef3ffbbddf256fa8c13b5f7c9b0d3984ec810b04314a"
+        },
+        "documentation": "infrastructure/observability/README.md"
+      },
+      "alarmOutputs": [
+        "cpu_alarm_name",
+        "memory_alarm_name"
+      ],
+      "metadata": {
+        "deploymentStrategy": "rolling",
+        "registryTable": "environment_blueprints"
+      },
+      "registry": {
+        "dev": {
+          "environment": "dev",
+          "provider": "aws",
+          "serviceName": "backend-service",
+          "version": "2024.06",
+          "blueprintHash": "6be3c60ffc9dcdf9624a376dc5da5fe74d535cfa94362916eac25859b2a5c381",
+          "moduleHash": "7c5827dc2833b557edd7930bf54ea7098bea09d5987a147ba0b37a2bd6a2c0c9",
+          "ssmParameter": "/edulure/dev/api/environment-blueprint",
+          "runtimeEndpoint": "https://dev.edulure.com/ops/runtime-blueprint.json",
+          "observabilityDashboardPath": "infrastructure/observability/grafana/dashboards/environment-runtime.json",
+          "observabilityDashboardHash": "ca765a54a76f9255d436ef3ffbbddf256fa8c13b5f7c9b0d3984ec810b04314a",
+          "alarmOutputs": [
+            "cpu_alarm_name",
+            "memory_alarm_name"
+          ],
+          "metadata": {
+            "tier": "nonprod",
+            "notes": "Development environment blueprint published to SSM"
+          }
+        },
+        "staging": {
+          "environment": "staging",
+          "provider": "aws",
+          "serviceName": "backend-service",
+          "version": "2024.06",
+          "blueprintHash": "6be3c60ffc9dcdf9624a376dc5da5fe74d535cfa94362916eac25859b2a5c381",
+          "moduleHash": "7c5827dc2833b557edd7930bf54ea7098bea09d5987a147ba0b37a2bd6a2c0c9",
+          "ssmParameter": "/edulure/staging/api/environment-blueprint",
+          "runtimeEndpoint": "https://staging.edulure.com/ops/runtime-blueprint.json",
+          "observabilityDashboardPath": "infrastructure/observability/grafana/dashboards/environment-runtime.json",
+          "observabilityDashboardHash": "ca765a54a76f9255d436ef3ffbbddf256fa8c13b5f7c9b0d3984ec810b04314a",
+          "alarmOutputs": [
+            "cpu_alarm_name",
+            "memory_alarm_name"
+          ],
+          "metadata": {
+            "tier": "preprod",
+            "notes": "Staging blueprint validated via deployment pipeline"
+          }
+        },
+        "prod": {
+          "environment": "prod",
+          "provider": "aws",
+          "serviceName": "backend-service",
+          "version": "2024.06",
+          "blueprintHash": "6be3c60ffc9dcdf9624a376dc5da5fe74d535cfa94362916eac25859b2a5c381",
+          "moduleHash": "7c5827dc2833b557edd7930bf54ea7098bea09d5987a147ba0b37a2bd6a2c0c9",
+          "ssmParameter": "/edulure/prod/api/environment-blueprint",
+          "runtimeEndpoint": "https://edulure.com/ops/runtime-blueprint.json",
+          "observabilityDashboardPath": "infrastructure/observability/grafana/dashboards/environment-runtime.json",
+          "observabilityDashboardHash": "ca765a54a76f9255d436ef3ffbbddf256fa8c13b5f7c9b0d3984ec810b04314a",
+          "alarmOutputs": [
+            "cpu_alarm_name",
+            "memory_alarm_name"
+          ],
+          "metadata": {
+            "tier": "production",
+            "notes": "Production blueprint governs runtime provisioning"
+          }
+        }
+      }
+    }
+  },
+  "pipelines": {
+    "deployment": {
+      "script": "scripts/release/deployment-pipeline.mjs",
+      "licenseManifest": "reports/licenses/pipeline-manifest.json",
+      "readyCheck": "scripts/release/run-readiness.mjs",
+      "blueprintRegistry": "environment_blueprints"
     }
   }
 }

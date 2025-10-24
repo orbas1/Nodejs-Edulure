@@ -206,3 +206,51 @@ variable "tags" {
   description = "Resource tags."
   default     = {}
 }
+
+variable "alarm_topic_arns" {
+  type        = list(string)
+  description = "SNS topics that receive CloudWatch alarm notifications for the service."
+  default     = []
+}
+
+variable "cpu_alarm_threshold" {
+  type        = number
+  description = "Average CPU utilization percentage that triggers the high CPU alarm."
+  default     = 80
+}
+
+variable "memory_alarm_threshold" {
+  type        = number
+  description = "Average memory utilization percentage that triggers the high memory alarm."
+  default     = 85
+}
+
+variable "alarm_evaluation_periods" {
+  type        = number
+  description = "Number of evaluation periods for CloudWatch alarms."
+  default     = 3
+}
+
+variable "alarm_datapoints_to_alarm" {
+  type        = number
+  description = "Number of datapoints that must breach the threshold to trigger the alarm."
+  default     = 2
+}
+
+variable "enable_observability_dashboard" {
+  type        = bool
+  description = "Whether to publish a CloudWatch dashboard for the service runtime."
+  default     = true
+}
+
+variable "blueprint_parameter_name" {
+  type        = string
+  description = "Optional SSM parameter name that stores the rendered environment blueprint JSON."
+  default     = null
+}
+
+variable "blueprint_metadata" {
+  type        = map(string)
+  description = "Additional metadata fields attached to the environment blueprint payload."
+  default     = {}
+}

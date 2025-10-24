@@ -625,28 +625,32 @@
          - 12.G.1 20250213143000_creation_studio (backend-nodejs/migrations/20250213143000_creation_studio.js)
          - 12.G.2 002_search_documents (backend-nodejs/seeds/002_search_documents.js)
          - 12.G.3 backend-nodejs/database/migrations (found at backend-nodejs/database/migrations)
-        1. **Appraisal.** Creation Studio schemas now share enumerations through `src/constants/creationStudio.js`, letting migrations, services, and models consume one source of truth while Annex A38–A43 is mirrored by `008_creation_studio_tables.sql` so MySQL blueprints stay in lockstep with Knex DSL defaults.
-        2. **Functionality.** `creation_projects`, `creation_templates`, collaboration tables, and version history all validate type/status/role inputs, normalise JSON payloads, and dedupe permissions before writes, while the search seed continues to rebuild documents inside the transaction to keep bootstrap atomic.
-        3. **Logic Usefulness.** Shared normalisers and governance-tag handling keep models aligned with database defaults; enumerations now flow into `CreationStudioService` to reject unsupported transitions ahead of persistence, preventing Annex drift between docs and runtime rules.
-        4. **Redundancies.** Centralised constants and helpers replaced ad-hoc enum arrays and JSON sanitisation previously scattered across services, models, and migrations, reducing duplicate validation paths.
-        5. **Placeholders or Stubs.** Seeds still short-circuit when `search_documents` or its refresh queue are absent; plan representative creation-project fixtures once catalogue samples are approved so rebuild metrics remain meaningful during QA.
-        6. **Duplicate Functions.** Inline UUID/status definitions and collaborator permission parsing have been consolidated into shared utilities—ensure future migrations import the same constants to avoid divergence.
-        7. **Improvements Needed.** Add CI coverage for MySQL/Postgres migrate+rollback cycles, backfill regression tests around the new validation guards, and extend ERD exports sourced from `008_creation_studio_tables.sql` for governance reviews.
-        8. **Styling Improvements.** Column naming now mirrors camelCase accessors (e.g. `publicId`, `contentOutline`) with JSON defaults enforced at the database; keep Annex A42 naming guidance in play for upcoming schema additions.
-        9. **Efficiency Analysis.** Indexed ownership/status fields and deduped collaborator permissions preserve fast analytics queries, while transaction-scoped search rebuilds avoid queue fragmentation during bootstrap.
-        10. **Strengths to Keep.** Enum-driven workflow states, cascade rules, and version history remain a strength—now backed by mirrored SQL blueprints and runtime validators that guarantee lineage without extra app logic.
-        11. **Weaknesses to Remove.** Annex SQL still needs automated ERD generation and dialect-specific acceptance tests—schedule documentation automation and schema checks to close the feedback loop.
-        12. **Styling & Colour Review.** Not applicable to the data layer; continue investing in descriptive constraint aliases and comment fields so BI tooling surfaces friendly labels during governance audits.
-        13. **CSS, Orientation & Placement.** Maintain migration ordering that applies creation studio artefacts before downstream enrolment tables to keep FK relationships stable throughout bootstrap sequences.
-        14. **Text Analysis.** Normalised summaries, compliance notes, and governance tags now default to localisation-ready JSON; extend Annex A43 copy guidance for new template schemas to avoid truncation.
-        15. **Change Checklist Tracker.** Run `npm --prefix backend-nodejs run migrate:latest`, `seed`, and `db:schema:check` after each change; capture diffs for `008_creation_studio_tables.sql` alongside ERD snapshots for QA sign-off.
-        16. **Full Upgrade Plan & Release Steps.** Dry-run migrations across staging clusters, validate the new guard rails with regression suites, package rollback scripts, and broadcast schema change notes to curriculum, analytics, and platform squads before release.
-      - 13.A Infrastructure Blueprints
-         - 13.A.1 infrastructure/observability (found at infrastructure/observability)
-         - 13.A.2 infrastructure/terraform/modules (found at infrastructure/terraform/modules)
-         - 13.A.3 nginx (infrastructure/docker/nginx.conf)
-      - 13.B Security & Automation Scripts
-         - 13.B.1 generate-license-report (scripts/security/generate-license-report.mjs)
+      - ✅ 13.A Infrastructure Blueprints (`infrastructure/terraform/modules/backend_service`, `infrastructure/observability`, `infrastructure/docker/nginx.conf`)
+        1. **Environment Topology.** `infrastructure/terraform/modules/backend_service` now emits CloudWatch alarms, dashboards, and SSM blueprints so Annex A46 spans compute, networking, and observability metadata in one module.
+        2. **Provisioning Controls.** CPU and memory alarms (`aws_cloudwatch_metric_alarm.cpu_high`, `.memory_high`) subscribe to configurable SNS topics, providing automated rollback hooks for deployment orchestration.
+        3. **Scaling Context.** Blueprint payload serialises desired/max task counts, target utilisation, and health-check paths, giving pipelines deterministic cues before scaling events.
+        4. **Credential Hygiene.** The SSM blueprint parameter (toggled via `blueprint_parameter_name`) stores JSON with subnet IDs, security group, and Secrets Manager references while inheriting environment tags.
+        5. **Observability Stack.** `observability.tf` publishes a CloudWatch dashboard that correlates ECS utilisation, ALB throughput, and response time while exporting hashed artefact references consumed by the blueprint registry and Grafana.
+        6. **Dashboards.** `infrastructure/observability/grafana/dashboards/environment-runtime.json` mirrors the Terraform metrics, exposes the SSM blueprint stat, and now ships with a checksum tracked by the manifest and parity service.
+        7. **Operational Docs.** `infrastructure/observability/README.md` documents data sources, alarm wiring, registry hydration (`environment_blueprints`), and how parity checks escalate blueprint drift alongside dashboard guidance.
+        8. **Runtime Exposure.** `infrastructure/docker/nginx.conf` adds an `/ops/runtime-blueprint.json` endpoint plus the `X-Env-Blueprint` header so on-call tooling can fetch the active environment manifest without backend hops.
+        9. **Caching & Security.** Blueprint endpoint responses disable caching, inherit strict headers, and default the blueprint path to `/edulure/$host/api/environment-blueprint` for deterministic lookup.
+        10. **Manifest Cohesion.** `infrastructure/environment-manifest.json` now embeds blueprint paths, hashed modules/dashboards, version metadata, and an environment-specific registry that the database seed and pipeline tooling ingest.
+        11. **Strengths to Keep.** Terraform module remains idempotent, centralises logging, hydrates the blueprint registry, and keeps deployment circuit breaker defaults intact.
+        12. **Weaknesses to Remove.** Future iterations should stream alarm state into the registry, extend parity checks to SSM payload integrity, and broaden alert coverage (e.g., throttled requests).
+        13. **Change Checklist.** Ensure SNS topics exist, provision the Grafana dashboard via IaC, and publish the SSM parameter before toggling the Nginx header in production.
+        14. **Release Steps.** Roll out to staging, verify `/ops/runtime-blueprint.json`, confirm alarms fire via synthetic load, and promote to production alongside updated pipeline manifests.
+      - ✅ 13.B Security & Automation Scripts (`scripts/security/generate-license-report.mjs`, `scripts/release/deployment-pipeline.mjs`)
+        1. **CI Integration.** License script now supports `--ci`, `--summary-path`, and `--pipeline-manifest` flags so Annex A47 outputs Markdown summaries and JSON manifests for GitHub runners.
+        2. **Policy Orchestration.** Violations render into `policy-violations.json`, Markdown digests, and aggregated severity data for downstream alerts.
+        3. **Failure Semantics.** `--no-fail-on-violation` allows gated stages to continue while still surfacing findings, aligning with approval workflows.
+        4. **Pipeline Manifest.** Generated manifest enumerates inventory, policy-review, and artifact publication steps so Annex B8 has machine-readable checkpoints.
+        5. **Deployment Blueprint.** `scripts/release/deployment-pipeline.mjs` now surfaces blueprint metadata (version, module hashes, SSM parameter, runtime endpoint) alongside Terraform directories so Annex A47/B8 runbooks reference the same registry artefacts as parity checks.
+        6. **Phase Coverage.** Pipeline plan covers build, security, infrastructure, deployment, and verification phases, including JSON/Markdown outputs that validate the live blueprint endpoint with explicit `curl` headers.
+        7. **Command Hygiene.** Markdown renderer escapes backticks, annotates blueprint registry context, and surfaces explicit commands, enabling copy-paste friendly runbooks.
+        8. **Manifest Hooks.** Environment manifest references the pipeline script, license manifest, and `environment_blueprints` registry so CI/CD tooling can locate automation outputs deterministically.
+        9. **Gaps.** Future work should ingest readiness results automatically, reconcile the blueprint registry against live SSM payloads, and attach severity scoring to npm audit output for richer dashboards.
+        10. **Release Steps.** Validate license summary generation locally, commit pipeline manifest outputs in CI artifacts, and announce new commands to release engineers.
       - ✅ 14.A TypeScript SDK & Tooling (`sdk-typescript/scripts/generate-sdk.mjs`, `sdk-typescript/src/runtime/configure.ts`, `sdk-typescript/src/runtime/client.ts`, `sdk-typescript/src/runtime/manifest.ts`, `sdk-typescript/src/generated/.manifest.json`, `sdk-typescript/src/index.ts`)
          - 14.A.1 sdk-typescript/scripts (found at sdk-typescript/scripts)
             1. **Appraise.** Within `sdk-typescript/scripts/generate-sdk.mjs` and runtime modules under `sdk-typescript/src/runtime/*`, the SDK toolchain now exposes manifest-driven metadata, client bootstrapping helpers, and documented CLI ergonomics so API consumers align with backend releases.

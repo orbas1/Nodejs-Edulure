@@ -1,0 +1,222 @@
+{
+  "uid": "environment-runtime",
+  "title": "Environment Runtime Health",
+  "tags": ["platform", "ecs", "alb"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "cluster",
+        "label": "ECS Cluster",
+        "query": "edulure-prod",
+        "current": { "text": "edulure-prod", "value": "edulure-prod" }
+      },
+      {
+        "type": "textbox",
+        "name": "service",
+        "label": "ECS Service",
+        "query": "edulure-prod-api",
+        "current": { "text": "edulure-prod-api", "value": "edulure-prod-api" }
+      },
+      {
+        "type": "textbox",
+        "name": "load_balancer",
+        "label": "ALB ARN Suffix",
+        "query": "app/edulure-prod/abcdef0123456789",
+        "current": { "text": "app/edulure-prod/abcdef0123456789", "value": "app/edulure-prod/abcdef0123456789" }
+      },
+      {
+        "type": "textbox",
+        "name": "target_group",
+        "label": "Target Group ARN Suffix",
+        "query": "targetgroup/edulure-prod/0123456789abcdef",
+        "current": { "text": "targetgroup/edulure-prod/0123456789abcdef", "value": "targetgroup/edulure-prod/0123456789abcdef" }
+      },
+      {
+        "type": "textbox",
+        "name": "blueprint",
+        "label": "SSM Blueprint Parameter",
+        "query": "/edulure/prod/api/environment-blueprint",
+        "current": { "text": "/edulure/prod/api/environment-blueprint", "value": "/edulure/prod/api/environment-blueprint" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "ECS CPU & Memory Utilisation",
+      "description": "Average CPU and memory utilisation for the selected ECS service.",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "targets": [
+        {
+          "refId": "A",
+          "namespace": "AWS/ECS",
+          "metricName": "CPUUtilization",
+          "statistics": ["Average"],
+          "dimensions": {
+            "ClusterName": "$cluster",
+            "ServiceName": "$service"
+          },
+          "region": "us-east-1",
+          "period": "60",
+          "legendFormat": "CPU Utilisation"
+        },
+        {
+          "refId": "B",
+          "namespace": "AWS/ECS",
+          "metricName": "MemoryUtilization",
+          "statistics": ["Average"],
+          "dimensions": {
+            "ClusterName": "$cluster",
+            "ServiceName": "$service"
+          },
+          "region": "us-east-1",
+          "period": "60",
+          "legendFormat": "Memory Utilisation"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "green" },
+              { "value": 75, "color": "orange" },
+              { "value": 90, "color": "red" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "ALB Request Volume & 5XX",
+      "description": "Request throughput and 5XX responses observed at the Application Load Balancer.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "targets": [
+        {
+          "refId": "A",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "RequestCount",
+          "statistics": ["Sum"],
+          "dimensions": {
+            "LoadBalancer": "$load_balancer",
+            "TargetGroup": "$target_group"
+          },
+          "period": "60",
+          "region": "us-east-1",
+          "legendFormat": "Requests"
+        },
+        {
+          "refId": "B",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "HTTPCode_Target_5XX_Count",
+          "statistics": ["Sum"],
+          "dimensions": {
+            "LoadBalancer": "$load_balancer",
+            "TargetGroup": "$target_group"
+          },
+          "period": "60",
+          "region": "us-east-1",
+          "legendFormat": "5XX Responses"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "req/s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "green" },
+              { "value": 10, "color": "orange" },
+              { "value": 50, "color": "red" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Target Response Time (p90)",
+      "description": "90th percentile response time observed at the target group.",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "targets": [
+        {
+          "refId": "A",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "TargetResponseTime",
+          "statistics": ["p90"],
+          "dimensions": {
+            "LoadBalancer": "$load_balancer",
+            "TargetGroup": "$target_group"
+          },
+          "period": "60",
+          "region": "us-east-1",
+          "legendFormat": "p90"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "green" },
+              { "value": 0.8, "color": "orange" },
+              { "value": 1.5, "color": "red" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Blueprint Parameter",
+      "description": "Reference to the SSM parameter storing the environment blueprint JSON.",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 18 },
+      "datasource": { "type": "__expr__", "uid": "grafana" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "__expr__", "uid": "grafana" },
+          "expression": "'$blueprint'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-": {
+                  "text": "Blueprint parameter"
+                }
+              }
+            }
+          ],
+          "unit": "none"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
