@@ -302,12 +302,18 @@ export default function DashboardLayout() {
     [resolvedRole, basePath]
   );
 
+  const sidebarPreferenceKey = `dashboard:sidebar-collapsed:${resolvedRole}`;
+
   const dashboardData = dashboards?.[resolvedRole] ?? null;
   const surfaceRegistry = useMemo(
     () => buildSurfaceRegistry(dashboardData, resolvedRole),
     [dashboardData, resolvedRole]
   );
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const stored = window.localStorage.getItem(sidebarPreferenceKey);
+    return stored === 'true';
+  });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState({
     communities: true,
@@ -320,6 +326,17 @@ export default function DashboardLayout() {
   useEffect(() => {
     setNotifications(buildDashboardNotifications(session, dashboardData));
   }, [session, dashboardData]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem(sidebarPreferenceKey);
+    setIsSidebarCollapsed(stored === 'true');
+  }, [sidebarPreferenceKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(sidebarPreferenceKey, isSidebarCollapsed ? 'true' : 'false');
+  }, [isSidebarCollapsed, sidebarPreferenceKey]);
 
   useEffect(() => {
     setNotificationPreferences({
