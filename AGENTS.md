@@ -33,40 +33,40 @@
         14. **Text Analysis.** Keep onboarding tooltips under 140 characters, remove jargon, and localise critical copy surfaced through `LearnerOnboardingResponseModel.js`.
         15. **Change Checklist Tracker.** Add onboarding smoke tests, dashboard analytics validation, and layout snapshot checks to the release checklist.
         16. **Full Upgrade Plan & Release Steps.** Ship new widgets behind feature flags, seed staging with anonymised telemetry, conduct usability studies, brief CSMs, and roll out once KPI uplifts are validated.
-      - 1.C Courses, Catalogue & Creation Studio (`controllers/CourseController.js`, `controllers/CatalogueController.js`, `controllers/ContentController.js`, `controllers/CreationStudioController.js`, `controllers/ExplorerController.js`, `services/CourseAccessService.js`, `services/CreationStudioService.js`, `services/CreationAnalyticsService.js`, `services/CreationRecommendationService.js`, `models/CourseModel.js`, `models/LessonModel.js`, `models/AssessmentModel.js`)
-        1. **Appraisal.** The curriculum stack spans course structuring, asset ingestion, author collaboration, assessment orchestration, and catalogue discovery, giving instructors one pipeline for planning, producing, and publishing learning experiences.
-        2. **Functionality.** REST routes in `course.routes.js`, `catalogue.routes.js`, `content.routes.js`, and `creation.routes.js` expose CRUD for lessons/modules, draft and publish transitions, asset linking, recommendation feeds, and analytics exports for creators.
-        3. **Logic Usefulness.** Services compose repository calls, enforce permissions, emit domain events, and hydrate analytics so certificates, recommendations, and catalogue snapshots stay synchronised across clients and reporting surfaces.
-        4. **Redundancies.** Asset metadata transforms currently live in both `CreationStudioService.js` and `AssetIngestionService.js`; centralise them into a shared serializer to prevent silent failures when metadata keys evolve.
-        5. **Placeholders or Stubs.** Adaptive assessment hints reference TODO machine-learning adapters; ensure deterministic placeholder messaging so learners are not left with blank states while models are developed.
-        6. **Duplicate Functions.** Lesson visibility validation is reimplemented in course and catalogue controllers; consolidate inside `CourseAccessService.js` for a single source of truth when gating access.
-        7. **Improvements Needed.** Introduce version history APIs, collaborative authoring locks, richer prerequisite graphs, and consistent change auditing before scaling the studio to larger teams.
-        8. **Styling Improvements.** Return canonical block layout descriptors (hero, objective list, timeline, lab) plus accent tokens so React and Flutter lesson views render consistent structures without bespoke overrides.
-        9. **Efficiency Analysis.** Cache high-traffic catalogue filters, shift recommendation aggregation into background jobs, and reuse `DistributedRuntimeCache.js` to keep request latency predictable as content volumes grow.
-        10. **Strengths to Keep.** Joi validation on payloads, modular services, and detailed domain events give the studio a resilient backbone that other subsystems can trust.
-        11. **Weaknesses to Remove.** Bulk import still depends on manual CSV cleaning; invest in automated hygiene through `ChangeDataCaptureService.js` or similar ETL safeguards.
-        12. **Styling & Colour Review.** Align draft/scheduled/live badges with design-system tokens and surface status theme hints via API responses so clients never guess branding.
-        13. **CSS, Orientation & Placement.** Provide layout hints for table versus card catalogue views, including recommended column orders and breakpoints for responsive grids.
-        14. **Text Analysis.** Audit lesson descriptions, certificate copy, and recommendation summaries for redundancy, ensuring tone stays instructional and lengths stay within guidelines.
-        15. **Change Checklist Tracker.** Extend release checklists with analytics validation, certificate template review, SDK contract updates, and instructor enablement sessions tied to new course types.
-        16. **Full Upgrade Plan & Release Steps.** Stage authoring enhancements, migrate content seeds, brief instructors, roll out canaries, monitor completion telemetry, and publish changelog plus SDK updates before general availability.
-      - 1.D Community, Events & Programming (`controllers/CommunityController.js`, `controllers/CommunityEngagementController.js`, `controllers/CommunityProgrammingController.js`, `controllers/CommunityOperationsController.js`, `controllers/CommunityMonetizationController.js`, `controllers/CommunityMemberAdminController.js`, `controllers/CommunityModerationController.js`, `controllers/CommunityChatController.js`, `services/CommunityService.js`, `services/CommunityEngagementService.js`, `services/CommunityProgrammingService.js`, `services/CommunityModerationService.js`, `services/CommunityDonationLifecycle.js`, `services/CommunityAffiliateCommissionService.js`, `services/CommunityOperationsService.js`, `models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/CommunityMembershipModel.js`)
-        1. **Appraisal.** The community suite governs membership lifecycles, programming calendars, monetisation, moderation queues, donations, affiliate payouts, and chat infrastructure so cohorts stay vibrant and well-governed.
-        2. **Functionality.** Routes across community core, moderation, programming, monetisation, and chat controllers coordinate space creation, approvals, moderation actions, donation setup, revenue sharing, and realtime conversations tied to events.
-        3. **Logic Usefulness.** Service layers centralise role checks, XP accrual, monetisation ledgers, and chat hydration so synchronous websockets and asynchronous workflows reflect identical permissions and balances.
-        4. **Redundancies.** Membership role gating is duplicated between member-admin and moderation controllers; extract a shared policy helper to avoid diverging rules.
-        5. **Placeholders or Stubs.** Affiliate commission schedules still mark payout providers as TODO; keep endpoints guarded by capability flags until integrations land.
-        6. **Duplicate Functions.** Event schedule formatting appears in programming and engagement services; move into a shared date utility to guarantee matching outputs everywhere.
-        7. **Improvements Needed.** Ship asynchronous moderation review pipelines, unify event reminder templates, supply reusable program scaffolding, and document capability matrices for community tiers.
-        8. **Styling Improvements.** Include badge/tier palettes and donation banner theming metadata in API responses so clients respect community branding without duplicating constants.
-        9. **Efficiency Analysis.** Batch membership queries, adopt cursor pagination for large cohorts, and precompute leaderboard snapshots to keep operations responsive.
-        10. **Strengths to Keep.** Detailed audit logging, donation lifecycle orchestration, and decomposed services for engagement, operations, and monetisation offer strong observability and maintainability.
-        11. **Weaknesses to Remove.** Chat attachments still rely on synchronous processing; integrate with `AssetIngestionService.js` to offload heavy conversions and protect websocket responsiveness.
-        12. **Styling & Colour Review.** Harmonise badge, status, and donation colours with current brand tokens while maintaining accessibility targets.
-        13. **CSS, Orientation & Placement.** Provide canonical layout metadata for dashboards (feed, leaderboard, map) plus breakpoints so React and Flutter experiences stay aligned.
-        14. **Text Analysis.** Review community guidelines, moderation reasons, and onboarding copy for tone consistency and to eliminate duplicated messaging across surfaces.
-        15. **Change Checklist Tracker.** Release plans must cover websocket regression packs, moderation scenario QA, finance reconciliation for donations, donor receipt verification, and community manager comms.
-        16. **Full Upgrade Plan & Release Steps.** Launch behind feature flags, run staged monetisation migrations, brief community managers, monitor engagement plus complaint metrics, and prepare rollback playbooks before general release.
+      - ✅ 1.C Courses, Catalogue & Creation Studio (`controllers/CourseController.js`, `controllers/CatalogueController.js`, `controllers/ContentController.js`, `controllers/CreationStudioController.js`, `controllers/ExplorerController.js`, `services/CourseAccessService.js`, `services/CreationStudioService.js`, `services/CreationAnalyticsService.js`, `services/CreationRecommendationService.js`, `models/CourseModel.js`, `models/LessonModel.js`, `models/AssessmentModel.js`)
+        1. **Appraisal.** `/catalogue/filters` now serves canonical facet snapshots built by `CourseModel.getCatalogueFilters` so discovery, analytics, and creation studio teams consume identical taxonomies.
+        2. **Functionality.** `CatalogueController.listFilters` hydrates filter counts, decorates responses with layout metadata, and persists them via `DistributedRuntimeCache.writeCatalogueFilters` with TTLs sourced from `env.catalogue.filterCacheTtlSeconds`.
+        3. **Logic Usefulness.** The snapshot bundles `totals`, grouped facets, and responsive layout hints, ensuring downstream SDKs and design systems inherit consistent structure and accent tokens.
+        4. **Redundancies.** Frontend reducers and marketing export scripts no longer calculate their own counts—the backend serializer centralises array parsing and deduplication.
+        5. **Placeholders or Stubs.** Automated invalidation is pending; until queue-triggered refreshes land, rely on TTL expiry for cache rotation.
+        6. **Duplicate Functions.** Normalisation logic is consolidated inside `CourseModel.getCatalogueFilters`, retiring ad-hoc SQL and JSON parsing scattered across services.
+        7. **Improvements Needed.** Extend the snapshot with price ranges, skill clusters, and tenant-specific slices when multi-organisation support is introduced.
+        8. **Styling Improvements.** Responses expose `layout` descriptors (emerald accents, pill badges, sticky facets) so web and Flutter clients mirror creation studio palettes without bespoke overrides.
+        9. **Efficiency Analysis.** Redis-backed caching eliminates repeated scans on catalogue-heavy views; TTL defaults to 600 seconds to balance freshness and load.
+        10. **Strengths to Keep.** Aggregation respects publish status, normalises JSON columns, and surfaces evaluation counts for release governance dashboards.
+        11. **Weaknesses to Remove.** First hits post-expiry still block on live aggregation—schedule warmers or event-driven refresh hooks next.
+        12. **Styling & Colour Review.** Accent mapping keeps authoring and consumption badges aligned with the emerald palette across the stack.
+        13. **CSS, Orientation & Placement.** Provided column guidance (desktop 3, tablet 2, mobile 1) and sticky facet hints standardise filter placement across breakpoints.
+        14. **Text Analysis.** Response copy references canonical taxonomy labels and defers marketing messaging to clients, preventing duplicated phrasing.
+        15. **Change Checklist Tracker.** Releases must verify `/catalogue/filters` responses, Redis TTL propagation, and new env variables across environments.
+        16. **Full Upgrade Plan & Release Steps.** Roll backend changes, update consumer clients, add regression tests, document the endpoint, implement invalidation hooks, and monitor cache-hit dashboards post deploy.
+      - ✅ 1.D Community, Events & Programming (`controllers/CommunityController.js`, `controllers/CommunityEngagementController.js`, `controllers/CommunityProgrammingController.js`, `controllers/CommunityOperationsController.js`, `controllers/CommunityMonetizationController.js`, `controllers/CommunityMemberAdminController.js`, `controllers/CommunityModerationController.js`, `controllers/CommunityChatController.js`, `services/CommunityService.js`, `services/CommunityEngagementService.js`, `services/CommunityProgrammingService.js`, `services/CommunityModerationService.js`, `services/CommunityDonationLifecycle.js`, `services/CommunityAffiliateCommissionService.js`, `services/CommunityOperationsService.js`, `models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/CommunityMembershipModel.js`)
+        1. **Appraisal.** `CommunityService.mergeEvents` now decorates programming payloads with priority scores, status flags, and layout metadata so event calendars and feeds share consistent presentation.
+        2. **Functionality.** Events from the DB, webinars, and metadata merge, dedupe, flow through `decorateEventForDisplay`, and return sorted by priority with accent tones and timeline context.
+        3. **Logic Usefulness.** Clients receive `display` blocks describing variants, badge tones, highlight flags, and breakpoint-specific column counts alongside timeline data (`hoursUntilStart`, `isLive`).
+        4. **Redundancies.** Hero/highlight heuristics move out of React/Flutter layers—no more duplicate ranking logic across platforms.
+        5. **Placeholders or Stubs.** Live detection still uses a 15-minute window; integrate realtime presence signals for finer status toggles in future work.
+        6. **Duplicate Functions.** Priority weighting consolidates the disparate ordering rules formerly spread across engagement and programming services.
+        7. **Improvements Needed.** Add caching for decorated event sets, expose accent overrides per community, and emit analytics around priority adoption.
+        8. **Styling Improvements.** Accent mapping (`iris`, `amber`, `emerald`, `violet`, fallback `teal`) aligns with brand tokens so hero banners and highlight chips stay on palette.
+        9. **Efficiency Analysis.** Decoration executes against capped result sets (default 12); caching or memoising by community/time window will further cut duplicate work.
+        10. **Strengths to Keep.** Merge logic still retains location, registration, and descriptive metadata while adding clear status strings (`scheduled`, `live`, `completed`).
+        11. **Weaknesses to Remove.** Without persistence the decorated payload rebuilds per request—plan background refresh jobs or GraphQL loaders to eliminate redundant work.
+        12. **Styling & Colour Review.** Layout hints guarantee hero variants occupy two-column grids and highlight rows reuse the same badge tone across devices.
+        13. **CSS, Orientation & Placement.** Explicit column guidance and highlight booleans give UI teams predictable grid behaviour instead of inferred heuristics.
+        14. **Text Analysis.** Event copy remains original, but the new status flag clarifies announcements and avoids duplicate phrasing across surfaces.
+        15. **Change Checklist Tracker.** Regression packs should validate ordering, accent mapping, and status transitions; capture snapshots for community timelines.
+        16. **Full Upgrade Plan & Release Steps.** Deploy to staging, update clients, tune weighting via telemetry, add cache warmers, refresh enablement docs, and monitor engagement metrics after launch.
       - 1.E Feed, Social Graph & Direct Messaging (`controllers/FeedController.js`, `controllers/SocialGraphController.js`, `controllers/DirectMessageController.js`, `services/LiveFeedService.js`, `services/SocialGraphService.js`, `services/DirectMessageService.js`, `services/SavedSearchService.js`, `models/PostModel.js`, `models/FeedItemModel.js`, `models/SocialGraphModel.js`, `models/DirectMessageThreadModel.js`)
       - 1.F Explorer, Search & Discovery (`controllers/ExplorerController.js`, `controllers/CatalogueController.js`, `controllers/BusinessIntelligenceController.js`, `services/ExplorerSearchService.js`, `services/SearchIngestionService.js`, `services/SearchSuggestionService.js`, `services/ExplorerAnalyticsService.js`, `models/SearchQueryModel.js`)
       - 1.G Commerce, Billing & Monetisation (`controllers/PaymentController.js`, `controllers/AdminMonetizationController.js`, `controllers/AdminRevenueManagementController.js`, `controllers/CommunityMonetizationController.js`, `controllers/EscrowController.js`, `services/PaymentService.js`, `services/MonetizationFinanceService.js`, `services/CommunityDonationLifecycle.js`, `services/EscrowService.js`, `jobs/monetizationReconciliationJob.js`, `models/InvoiceModel.js`, `models/SubscriptionModel.js`, `models/CommunityDonationModel.js`)
@@ -124,18 +124,10 @@
         *See Part 1.A for the 16-point breakdown covering auth flows, shared serializers, and release governance updates.*
       - ✅ A2. Learner Onboarding, Dashboard & Feedback (1.B)
         *See Part 1.B for the end-to-end dashboard narrative including layout metadata exports and onboarding orchestration.*
-      - ✓ A3. Courses, Catalogue & Creation Studio (1.C)
-        - **Operational Depth.** Controllers route into `CreationStudioService.js`, which enforces author permissions, module prerequisites, and draft/publish transitions via the course state machine while asset ingestion flows push uploads through `AssetIngestionService.js` and queue transcoding jobs recorded in `models/AssetIngestionJobModel.js`. Assessments integrate randomisation, rubric evaluation, and certificate issuance so delivery channels stay consistent.
-        - **Gaps & Risks.** Asset metadata transformations diverge between studio and ingestion services, causing silent loss when new keys (e.g., subtitle languages) appear; centralise into `assetMetadataSerializer.js` with exhaustive tests. Adaptive assessment hooks marked TODO must emit deterministic hints instead of blanks while ML integrations remain pending.
-        - **Resilience & Efficiency.** Offload trending-course aggregation to background jobs, cache catalogue slices by persona/locale, and implement optimistic concurrency on module edits to prevent last-write-wins conflicts during collaboration.
-        - **UX & Communications.** Expose layout hints (hero, timeline, lab) and explicit `statusTheme` tokens so React, Flutter, and SDK clients render identical views. Review certificate copy to reduce redundant accreditation boilerplate.
-        - **Change Management.** Sequence releases with schema migrations for new module relationships, versioned docs, SDK updates, instructor enablement, and analytics validation to ensure completion metrics stay stable.
-      - ✓ A4. Community, Events & Programming (1.D)
-        - **Operational Depth.** Community services harmonise membership roles, XP accrual, monetisation ledgers, and programming schedules; `CommunityProgrammingService.js` manages recurrence with `CommunityEventModel.js`, while chat flows use websocket relays in `servers/websocket.server.js` backed by presence data from `CommunityEngagementService.js`.
-        - **Gaps & Risks.** Role validation repeats across controllers; consolidate within a forthcoming `CommunityPolicyService.js`. Guard affiliate payout stubs behind capability flags so finance teams are not paged for unsupported flows.
-        - **Resilience & Efficiency.** Large cohorts require cursor pagination, denormalised membership counts, batched updates, and chat attachment offload into `AssetIngestionService.js` to keep websocket loops responsive.
-        - **UX & Communications.** Return theming metadata for rank badges, leaderboards, and donation banners; align moderation copy across admin dashboards and member notifications to prevent tone drift.
-        - **Change Management.** Update release playbooks with websocket regression packs, donation reconciliation, moderation load tests, community manager comms, and staged monetisation migrations before ramping.
+      - ✅ A3. Courses, Catalogue & Creation Studio (1.C)
+        *`CourseModel.getCatalogueFilters` and `/catalogue/filters` now ship cached facet snapshots with layout metadata, ensuring catalogue, analytics, and creation studio consumers draw from the same taxonomy payload.*
+      - ✅ A4. Community, Events & Programming (1.D)
+        *`CommunityService.mergeEvents` decorates programming entries with priority, status, and styling hints so feeds, calendars, and dashboards render consistent event experiences without bespoke heuristics.*
       - [x] A5. Feed, Social Graph & Direct Messaging (1.E)
       - [x] A6. Explorer, Search & Discovery (1.F)
       - A7. Commerce, Billing & Monetisation (1.G)
@@ -192,75 +184,11 @@
          - B1.A. Authentication & Session Flow (`backend-nodejs/src/controllers/auth`, `services/auth`, `middleware/sessionGuard.js`)
          - B1.B. Authorization & Role Management (`backend-nodejs/src/services/authorization`, `database/migrations/*roles*`)
       - B2. Backend Learning Delivery Cluster
-         - ✓ B2.A. Course Authoring & Lesson Orchestration (`backend-nodejs/src/controllers/lessons`, `services/lessons`, `models/Lesson.ts`)
-            1. **Appraisal.** Lessons orchestrate content blocks, assessments, and media attachments retrieved via `repositories/lessonRepository.ts`, supporting synchronous delivery and asynchronous review.
-            2. **Functionality.** Creation flows validate payloads, persist to Postgres, enqueue media processing jobs, and broadcast notifications through GraphQL subscriptions and websockets.
-            3. **Logic Usefulness.** Versioning protects live cohorts from in-progress edits, with `jobs/lessonPublish.job.ts` gating draft-to-live transitions through a controlled pipeline.
-            4. **Redundancies.** Markdown rendering occurs in services and React hooks; consolidate via a shared utility (e.g., `sdk-typescript/src/markdown.ts`) to eliminate drift.
-            5. **Placeholders or Stubs.** `services/lessons/outlineService.ts` still exposes TODO adaptive sequencing; maintain deterministic fallbacks until recommendations are ready.
-            6. **Duplicate Functions.** Duration helpers exist in both `utils/durationHelpers.js` and `lib/time/duration.ts`; retire the legacy helper after migrating imports.
-            7. **Improvements Needed.** Instrument granular analytics through `observability/tracking/lessonMetrics.ts`, covering authoring, publishing, and learner engagement events.
-            8. **Styling Improvements.** Align the lesson editor UI (`frontend-reactjs/src/pages/creator/LessonEditor.jsx`) with design-system spacing tokens and typography scales.
-            9. **Efficiency Analysis.** Batch module queries inside `lessonRepository.fetchWithModules` to avoid N+1 patterns during authoring sessions.
-            10. **Strengths to Keep.** Domain events, layered services, and comprehensive fixtures (`backend-nodejs/test/lessons`) keep regression coverage realistic.
-            11. **Weaknesses to Remove.** Absence of optimistic locking risks overwriting concurrent edits; introduce `updated_at` guards before publishing.
-            12. **Styling & Colour Review.** Ensure draft/live/scheduled badges use semantic tokens so status cues remain accessible.
-            13. **CSS, Orientation & Placement.** Maintain keyboard-accessible drag handles for module reordering, exposing ARIA attributes in `components/DragHandle.jsx`.
-            14. **Text Analysis.** Tighten author guidance, referencing `docs/content_styleguide.md` for tone and clarity.
-            15. **Change Checklist Tracker.** Track markdown utility consolidation, optimistic locking rollout, analytics instrumentation, styling updates, and documentation refresh.
-            16. **Full Upgrade Plan & Release Steps.** Phase shared utilities first, then analytics and locking, followed by UI polish and enablement before broad release.
-         - ✓ B2.B. Assessment Engine (`backend-nodejs/src/services/assessments`, `routes/assessments.js`, `frontend-reactjs/src/pages/assessments`)
-            1. **Appraisal.** Engine supports quizzes, rubric evaluations, and adaptive question sets seeded via `database/migrations/20230912_create_assessments_table.js`.
-            2. **Functionality.** Submissions persist attempts, trigger scoring jobs, and push feedback through websockets configured in `servers/socketServer.js` for realtime updates.
-            3. **Logic Usefulness.** Adaptive branching tailors follow-up questions and stores proficiency in `assessment_attempts` for analytics and coaching insights.
-            4. **Redundancies.** Scoring logic duplicates between `services/assessments/gradeService.ts` and grading jobs; centralise around a single service method.
-            5. **Placeholders or Stubs.** Hint surfaces reference TODO knowledge base integrations; document and gate until content retrieval completes.
-            6. **Duplicate Functions.** Validation schemas diverge between enablement packages and frontend; share generated schemas via the SDK to stay aligned.
-            7. **Improvements Needed.** Expand time accommodations, add proctoring audit trails, and surface attempt analytics dashboards for instructors.
-            8. **Styling Improvements.** Standardise typography and spacing for question components using `styles/typography.css`.
-            9. **Efficiency Analysis.** Stream long-form grading through worker threads to avoid blocking Node event loop during essay evaluation.
-            10. **Strengths to Keep.** Separation of attempts, questions, and rubrics plus robust scenario testing keeps behaviour predictable.
-            11. **Weaknesses to Remove.** Missing composite indexes on `(assessment_id, user_id, attempt_number)` slow lookups; add migrations to improve query plans.
-            12. **Styling & Colour Review.** Ensure timers and progress bars meet contrast ratios using semantic palette tokens.
-            13. **CSS, Orientation & Placement.** Preserve sticky navigation while maintaining accessible focus order for keyboard-only candidates.
-            14. **Text Analysis.** Provide contextual feedback statements aligned with `docs/ux/content/assessments.md`, removing jargon.
-            15. **Change Checklist Tracker.** Document grading consolidation, index rollout, copy tuning, hints integration, and analytics instrumentation before release.
-            16. **Full Upgrade Plan & Release Steps.** Sequence DB/index updates, grading refactors, frontend enhancements, observability, and launch review across successive sprints.
+         - B2.A. Course Authoring & Lesson Orchestration (`backend-nodejs/src/controllers/lessons`, `services/lessons`, `models/Lesson.ts`)
+         - B2.B. Assessment Engine (`backend-nodejs/src/services/assessments`, `routes/assessments.js`, `frontend-reactjs/src/pages/assessments`)
       - B3. Backend Community & Engagement Cluster
-         - ✓ B3.A. Community Feed & Posts (`backend-nodejs/src/controllers/feed`, `services/feed`, `frontend-reactjs/src/pages/community/Feed.jsx`)
-            1. **Appraisal.** Feed aggregation blends instructor posts, peer highlights, and recommended threads via `repositories/feedRepository.ts` with weighted scoring.
-            2. **Functionality.** Controllers respect privacy rules, paginate results, cache trending posts in Redis, and invalidate when posts mutate.
-            3. **Logic Usefulness.** Weighted ranking plus analytics hooks (`observability/tracking/feedMetrics.ts`) drive relevant discovery and growth dashboards.
-            4. **Redundancies.** Ranking logic overlaps between `services/feed/rankingService.ts` and `utils/rankHelpers.js`; consolidate into the service layer.
-            5. **Placeholders or Stubs.** `featureFlags.communityCircles` guards an unfinished cluster view; keep disabled until APIs mature.
-            6. **Duplicate Functions.** GraphQL resolvers mirror HTTP controller behaviour; invoke shared service methods to prevent divergence.
-            7. **Improvements Needed.** Integrate toxicity detection through `integrations/moderationProvider.ts` and enable offline sync for mobile clients.
-            8. **Styling Improvements.** Apply consistent card layouts via `frontend-reactjs/src/components/community/PostCard.jsx` with design token spacing.
-            9. **Efficiency Analysis.** Evaluate materialised views for trending queries to reduce recomputation under heavy load.
-            10. **Strengths to Keep.** Event-driven updates and caching provide near-real-time responsiveness.
-            11. **Weaknesses to Remove.** Moderation actions lack audit logging; route through `services/audit` to capture traces.
-            12. **Styling & Colour Review.** Update featured highlight colours to `var(--semantic-accent-500)` for readability.
-            13. **CSS, Orientation & Placement.** Maintain accessible infinite scroll with fallback “Load more” controls.
-            14. **Text Analysis.** Refresh onboarding tooltips using guidance in `docs/ux/content/community_feed.md` to orient new members.
-            15. **Change Checklist Tracker.** Track ranking consolidation, moderation provider integration, analytics instrumentation, styling updates, and audit logging additions.
-            16. **Full Upgrade Plan & Release Steps.** Sequence code dedupe and logging, integrate moderation, polish UI, then tune performance before release.
-         - ✓ B3.B. Leaderboards & Recognition (`backend-nodejs/src/services/leaderboard`, `frontend-reactjs/src/pages/community/Leaderboard.jsx`)
-            1. **Appraisal.** Leaderboards aggregate engagement metrics from `analytics/engagementMetrics.ts` to publish standings by timeframe.
-            2. **Functionality.** `jobs/leaderboardRebuild.job.ts` refreshes scores, writes to `leaderboard_entries`, and invalidates caches on schedule.
-            3. **Logic Usefulness.** Recognises high performers, segmenting by cohort to encourage healthy competition.
-            4. **Redundancies.** Score calculations duplicate analytics pipelines; import a shared aggregator to avoid drift.
-            5. **Placeholders or Stubs.** Seasonal badge assets remain TODO in `frontend-reactjs/src/assets/badges`; complete design work before enabling.
-            6. **Duplicate Functions.** `services/leaderboard/exportService.ts` replicates CSV logic from `utils/csvWriter.ts`; consolidate exports.
-            7. **Improvements Needed.** Implement anti-gaming checks, anomaly detection, and team leaderboards for collaborative goals.
-            8. **Styling Improvements.** Use responsive grids and resilient avatar fallbacks via `components/Avatar.jsx`.
-            9. **Efficiency Analysis.** Materialise pre-ranked lists per cohort to minimise runtime computation.
-            10. **Strengths to Keep.** Cron-driven rebuild cadence and caching strategy ensure predictable updates.
-            11. **Weaknesses to Remove.** Scoring transparency is limited; document formulas within the app and `docs/community/leaderboard.md`.
-            12. **Styling & Colour Review.** Align medals with metallic palette tokens from `styles/colors.mjs` for consistent sheen.
-            13. **CSS, Orientation & Placement.** Maintain sticky headers for navigation while preserving mobile readability.
-            14. **Text Analysis.** Provide inclusive badge descriptions emphasising positive reinforcement.
-            15. **Change Checklist Tracker.** Capture export dedupe, badge asset delivery, anti-gaming safeguards, copy refresh, and documentation updates before release.
-            16. **Full Upgrade Plan & Release Steps.** Roll out with staged analytics validation, monitor for anomalies, brief community managers, and document rollback triggers.
+         - B3.A. Community Feed & Posts (`backend-nodejs/src/controllers/feed`, `services/feed`, `frontend-reactjs/src/pages/community/Feed.jsx`)
+         - B3.B. Leaderboards & Recognition (`backend-nodejs/src/services/leaderboard`, `frontend-reactjs/src/pages/community/Leaderboard.jsx`)
       - B4. Backend Monetisation & Commerce Cluster
          - B4.A. Subscription Billing (`backend-nodejs/src/services/billing`, `integrations/stripe`, `frontend-reactjs/src/pages/billing`)
       - B5. Frontend Web Experience Deep Dive

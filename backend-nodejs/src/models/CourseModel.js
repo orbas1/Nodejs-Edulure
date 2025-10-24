@@ -110,6 +110,36 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function incrementCount(map, rawValue) {
+  if (rawValue === null || rawValue === undefined) {
+    return;
+  }
+  const value = String(rawValue).trim();
+  if (!value) {
+    return;
+  }
+  map.set(value, (map.get(value) ?? 0) + 1);
+}
+
+function incrementFromArray(map, values) {
+  if (!Array.isArray(values)) {
+    return;
+  }
+  values.forEach((entry) => incrementCount(map, entry));
+}
+
+function toSortedCountList(map, { limit } = {}) {
+  const entries = Array.from(map.entries()).sort((a, b) => {
+    if (b[1] === a[1]) {
+      return a[0].localeCompare(b[0]);
+    }
+    return b[1] - a[1];
+  });
+
+  const sliced = typeof limit === 'number' && limit > 0 ? entries.slice(0, limit) : entries;
+  return sliced.map(([value, count]) => ({ value, count }));
+}
+
 export default class CourseModel {
   static normaliseSlug(value, fallback) {
     const base = value || fallback;
@@ -224,6 +254,51 @@ export default class CourseModel {
 
     const rows = await query;
     return rows.map((row) => this.deserialize(row));
+  }
+
+  static async getCatalogueFilters({ includeUnpublished = false, tagLimit = 60 } = {}, connection = db) {
+    const query = connection(TABLE).select(
+      'category',
+      'level',
+      'languages',
+      'tags',
+      'delivery_format as deliveryFormat',
+      'metadata'
+    );
+
+    if (!includeUnpublished) {
+      query.where('status', 'published');
+    }
+
+    const rows = await query;
+    const categoryCounts = new Map();
+    const levelCounts = new Map();
+    const languageCounts = new Map();
+    const deliveryCounts = new Map();
+    const tagCounts = new Map();
+
+    rows.forEach((row) => {
+      incrementCount(categoryCounts, row.category ?? parseJson(row.metadata, {}).defaultCategory);
+      incrementCount(levelCounts, row.level ?? parseJson(row.metadata, {}).defaultLevel);
+      incrementCount(deliveryCounts, row.deliveryFormat);
+
+      incrementFromArray(languageCounts, parseStringArray(row.languages));
+      incrementFromArray(tagCounts, parseStringArray(row.tags));
+    });
+
+    const now = new Date();
+
+    return {
+      generatedAt: now.toISOString(),
+      totals: {
+        coursesEvaluated: rows.length
+      },
+      categories: toSortedCountList(categoryCounts),
+      levels: toSortedCountList(levelCounts),
+      languages: toSortedCountList(languageCounts),
+      deliveryFormats: toSortedCountList(deliveryCounts),
+      tags: toSortedCountList(tagCounts, { limit: tagLimit })
+    };
   }
 
   static async create(course, connection = db) {

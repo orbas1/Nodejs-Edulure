@@ -1434,8 +1434,16 @@ const redisKeyPrefix = normalizeRedisNamespace(raw.REDIS_KEY_PREFIX, 'edulure:ru
 const redisLockPrefix = normalizeRedisNamespace(raw.REDIS_LOCK_PREFIX, 'edulure:locks');
 const redisFeatureFlagKey = buildRedisKey(redisKeyPrefix, raw.REDIS_FEATURE_FLAG_CACHE_KEY);
 const redisRuntimeConfigKey = buildRedisKey(redisKeyPrefix, raw.REDIS_RUNTIME_CONFIG_CACHE_KEY);
+const redisCatalogueFiltersKey = buildRedisKey(
+  redisKeyPrefix,
+  raw.REDIS_CATALOGUE_FILTER_CACHE_KEY ?? 'catalogue:filters'
+);
 const redisFeatureFlagLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_FEATURE_FLAG_LOCK_KEY);
 const redisRuntimeConfigLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_RUNTIME_CONFIG_LOCK_KEY);
+const redisCatalogueFiltersLockKey = buildRedisKey(
+  redisLockPrefix,
+  raw.REDIS_CATALOGUE_FILTER_LOCK_KEY ?? 'catalogue:filters'
+);
 const redisTlsCa = maybeDecodeCertificate(raw.REDIS_TLS_CA);
 const partitionSchema = raw.DATA_PARTITIONING_SCHEMA ?? raw.DB_NAME;
 const partitionArchiveBucket = raw.DATA_PARTITIONING_ARCHIVE_BUCKET ?? storageBuckets.private;
@@ -1444,6 +1452,14 @@ const partitionMaxExportBytes = raw.DATA_PARTITIONING_MAX_EXPORT_MB
   ? raw.DATA_PARTITIONING_MAX_EXPORT_MB * 1024 * 1024
   : null;
 const partitionMaxExportRows = raw.DATA_PARTITIONING_MAX_EXPORT_ROWS ?? null;
+
+const catalogueFilterCacheTtlSeconds = (() => {
+  const parsed = Number(raw.CATALOGUE_FILTER_CACHE_TTL_SECONDS);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.max(30, Math.round(parsed));
+  }
+  return 600;
+})();
 
 export const env = {
   nodeEnv: raw.NODE_ENV,
@@ -1804,8 +1820,10 @@ export const env = {
     keys: {
       featureFlags: redisFeatureFlagKey,
       runtimeConfig: redisRuntimeConfigKey,
+      catalogueFilters: redisCatalogueFiltersKey,
       featureFlagLock: redisFeatureFlagLockKey,
-      runtimeConfigLock: redisRuntimeConfigLockKey
+      runtimeConfigLock: redisRuntimeConfigLockKey,
+      catalogueFiltersLock: redisCatalogueFiltersLockKey
     },
     commandTimeoutMs: raw.REDIS_COMMAND_TIMEOUT_MS,
     lockTtlMs: raw.REDIS_LOCK_TTL_SECONDS * 1000
@@ -2004,6 +2022,9 @@ export const env = {
       tool: raw.TELEMETRY_LINEAGE_TOOL,
       autoRecord: raw.TELEMETRY_LINEAGE_AUTO_RECORD
     }
+  },
+  catalogue: {
+    filterCacheTtlSeconds: catalogueFilterCacheTtlSeconds
   },
   release: {
     requiredGates: releaseRequiredGates,
