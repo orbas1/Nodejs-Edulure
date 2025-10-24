@@ -21,6 +21,7 @@ import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
 import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
 import OperatorDashboardService from './OperatorDashboardService.js';
+import { summariseReactions as aggregateReactionSummary } from '../services/ReactionAggregationService.js';
 
 function safeJsonParse(value, fallback) {
   if (!value) return fallback;
@@ -506,11 +507,7 @@ function parseTagsList(tags) {
 }
 
 function summariseReactions(summary) {
-  if (!summary) return 0;
-  if (typeof summary === 'number') return summary;
-  const parsed = safeJsonParse(summary, {});
-  if (typeof parsed.total === 'number') return parsed.total;
-  return Object.values(parsed).reduce((total, value) => (typeof value === 'number' ? total + value : total), 0);
+  return aggregateReactionSummary(summary).total;
 }
 
 function coercePositiveInteger(value) {
