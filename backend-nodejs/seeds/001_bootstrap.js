@@ -80,6 +80,11 @@ export async function seed(knex) {
     await trx('ads_campaigns').del();
     await trx('podcast_episodes').del();
     await trx('podcast_shows').del();
+    await trx('blog_media').del();
+    await trx('blog_post_tags').del();
+    await trx('blog_posts').del();
+    await trx('blog_tags').del();
+    await trx('blog_categories').del();
     await trx('live_classroom_registrations').del();
     await trx('live_classrooms').del();
     await trx('tutor_bookings').del();
@@ -1596,7 +1601,49 @@ export async function seed(knex) {
       metadata: JSON.stringify({
         communityId: opsCommunityId,
         deckVersion: 1,
-        ingestionPipeline: 'cloudconvert-v2'
+        ingestionPipeline: 'cloudconvert-v2',
+        custom: {
+          title: 'Ops launch blueprint',
+          description:
+            'Board-ready blueprint for coordinating automations, risk reviews, and sign-offs across every launch milestone.',
+          categories: ['Operations', 'Enablement'],
+          tags: ['ops', 'launch', 'readiness'],
+          media: {
+            coverImage: {
+              url: 'https://cdn.edulure.test/assets/ops-blueprint/cover.jpg',
+              alt: 'Operations launch blueprint cover art'
+            },
+            gallery: [
+              {
+                url: 'https://cdn.edulure.test/assets/ops-blueprint/workflow.jpg',
+                caption: 'Automation workflow map aligning GTM and ops teams.',
+                kind: 'image'
+              },
+              {
+                url: 'https://cdn.edulure.test/assets/ops-blueprint/checklists.jpg',
+                caption: 'Checklists templated for annex sign-off rituals.',
+                kind: 'image'
+              },
+              {
+                url: 'https://cdn.edulure.test/assets/ops-blueprint/demo.mp4',
+                caption: 'Incident rehearsal walkthrough highlighting approvals.',
+                kind: 'video'
+              }
+            ]
+          },
+          showcase: {
+            headline: 'Operational readiness in one shared workspace',
+            subheadline: 'Coordinate runbooks, telemetry, and approvals across every go-live stage.',
+            videoUrl: 'https://cdn.edulure.test/assets/ops-blueprint/showcase.mp4',
+            videoPosterUrl: 'https://cdn.edulure.test/assets/ops-blueprint/showcase-poster.jpg',
+            callToAction: {
+              label: 'Preview runbook',
+              url: 'https://marketing.edulure.test/ops-blueprint'
+            },
+            badge: 'Operations'
+          },
+          featureFlags: { showcasePinned: true }
+        }
       })
     });
 
@@ -1674,7 +1721,49 @@ export async function seed(knex) {
       metadata: JSON.stringify({
         communityId: growthCommunityId,
         drmProfile: 'watermark-v1',
-        ingestionPipeline: 'ebook-normaliser'
+        ingestionPipeline: 'ebook-normaliser',
+        custom: {
+          title: 'Creator funnel intelligence playbook',
+          description:
+            'Campaign labs, benchmarks, and automation guardrails for growth teams shipping Annex A8 experiments.',
+          categories: ['Growth', 'Marketing'],
+          tags: ['ads', 'experiments', 'analytics'],
+          media: {
+            coverImage: {
+              url: 'https://cdn.edulure.test/assets/growth-playbook/cover.jpg',
+              alt: 'Creator funnel intelligence ebook cover art'
+            },
+            gallery: [
+              {
+                url: 'https://cdn.edulure.test/assets/growth-playbook/dashboard.jpg',
+                caption: 'Acquisition telemetry dashboard from Annex A8 experiments.',
+                kind: 'image'
+              },
+              {
+                url: 'https://cdn.edulure.test/assets/growth-playbook/retention.jpg',
+                caption: 'Retention cohort breakdown with CTA experiments.',
+                kind: 'image'
+              },
+              {
+                url: 'https://cdn.edulure.test/assets/growth-playbook/trailer.mp4',
+                caption: 'Two-minute walkthrough of paid acquisition lab templates.',
+                kind: 'video'
+              }
+            ]
+          },
+          showcase: {
+            headline: 'Campaign intelligence that moves beyond CPM',
+            subheadline: 'Instrument experiments, copy variants, and affiliate offers with Annex A8 guardrails.',
+            videoUrl: 'https://cdn.edulure.test/assets/growth-playbook/showcase.mp4',
+            videoPosterUrl: 'https://cdn.edulure.test/assets/growth-playbook/showcase-poster.jpg',
+            callToAction: {
+              label: 'Read sample chapter',
+              url: 'https://marketing.edulure.test/creator-funnel-playbook'
+            },
+            badge: 'Growth'
+          },
+          featureFlags: { showcasePinned: false }
+        }
       })
     });
 
@@ -1984,7 +2073,22 @@ export async function seed(knex) {
       is_public: true,
       release_at: trx.fn.now(),
       cover_image_url: growthPlaybookCover.url,
-      metadata: JSON.stringify({ cohort: 'beta-ops', featureFlag: 'explorer-ads-insights' })
+      sample_download_url: 'https://cdn.edulure.test/ebooks/creator-funnel-sample.pdf',
+      audiobook_url: 'https://cdn.edulure.test/ebooks/creator-funnel-audiobook.mp3',
+      metadata: JSON.stringify({
+        cohort: 'beta-ops',
+        featureFlag: 'explorer-ads-insights',
+        custom: {
+          analytics: {
+            funnelId: 'annex-a8-funnel',
+            campaignKey: 'creator-lab-2025'
+          },
+          preview: {
+            chapters: ['diagnostic-dashboards', 'forecasting-campaign-velocity'],
+            releaseNotesUrl: 'https://marketing.edulure.test/creator-funnel-release'
+          }
+        }
+      })
     });
 
     const [introChapterId] = await trx('ebook_chapters').insert({
@@ -2054,6 +2158,171 @@ export async function seed(knex) {
       last_location: 'chapter-2-section-4',
       time_spent_seconds: 2643
     });
+
+    const [productInsightsCategoryId] = await trx('blog_categories').insert({
+      slug: 'product-insights',
+      name: 'Product & Platform',
+      description: 'Release retros, adoption metrics, and platform momentum.',
+      display_order: 1,
+      is_featured: true
+    });
+
+    const [growthCategoryId] = await trx('blog_categories').insert({
+      slug: 'growth-experiments',
+      name: 'Growth Experiments',
+      description: 'Ads, funnels, and GTM learnings that inform Annex A8 plans.',
+      display_order: 2,
+      is_featured: true
+    });
+
+    const [governanceCategoryId] = await trx('blog_categories').insert({
+      slug: 'governance-transparency',
+      name: 'Governance & Transparency',
+      description: 'Legal, compliance, and company updates supporting Annex C7.',
+      display_order: 3,
+      is_featured: false
+    });
+
+    const [operationsTagId] = await trx('blog_tags').insert({
+      slug: 'operations',
+      name: 'Operations'
+    });
+    const [adsTagId] = await trx('blog_tags').insert({ slug: 'ads', name: 'Ads & Acquisition' });
+    const [complianceTagId] = await trx('blog_tags').insert({ slug: 'compliance', name: 'Compliance' });
+    const [communityTagId] = await trx('blog_tags').insert({ slug: 'community', name: 'Community' });
+
+    const [opsTrustPostId] = await trx('blog_posts').insert({
+      slug: 'ops-trust-blueprint-feb-2025',
+      title: 'Ops trust blueprint: shipping Annex C7 readiness in 30 days',
+      excerpt:
+        'How Blackwellen’s enablement and operations guild automated Annex C7 controls, evidence capture, and executive reporting.',
+      content: [
+        '# Ops trust blueprint',
+        '',
+        '## Highlights',
+        '- Automated policy audits feed Annex C7 trackers and trust centre evidence.',
+        '- Slack runbooks keep breach notifications, DPIAs, and risk reviews inside SLA.',
+        '- Combined telemetry exposes review gaps in under an hour with audit-ready exports.'
+      ].join('\\n'),
+      author_id: adminId,
+      category_id: productInsightsCategoryId,
+      status: 'published',
+      published_at: trx.fn.now(),
+      metadata: JSON.stringify({
+        hero: {
+          image: 'https://cdn.edulure.test/blog/ops-trust-hero.jpg',
+          alt: 'Operators reviewing compliance dashboards'
+        },
+        seo: {
+          canonical: 'https://www.edulure.com/blog/ops-trust-blueprint-feb-2025',
+          focusKeywords: ['Annex C7', 'trust centre']
+        },
+        summary: 'Detailed breakdown of the Annex C7 rollout with evidence capture tooling.'
+      }),
+      is_featured: true,
+      reading_time_minutes: 8,
+      view_count: 1280
+    });
+
+    const [growthLiftPostId] = await trx('blog_posts').insert({
+      slug: 'annex-a8-campaign-lift',
+      title: 'Annex A8 experiments that lifted paid acquisition 23%',
+      excerpt:
+        'A deep dive into creative rotations, CTA governance, and affiliate boosts that moved Annex A8 campaign metrics.',
+      content: [
+        '# Annex A8 campaign lift',
+        '',
+        '1. Hypothesis-driven ad rotations synced with CTA guardrails.',
+        '2. Persona landing pages mirrored metadata from the marketing asset editor.',
+        '3. Affiliate offers embedded compliance copy and dynamic caps to protect spend.'
+      ].join('\\n'),
+      author_id: instructorId,
+      category_id: growthCategoryId,
+      status: 'published',
+      published_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      metadata: JSON.stringify({
+        hero: {
+          image: 'https://cdn.edulure.test/blog/annex-a8-campaigns.jpg',
+          alt: 'Marketing team reviewing campaign performance charts'
+        },
+        seo: {
+          canonical: 'https://www.edulure.com/blog/annex-a8-campaign-lift',
+          focusKeywords: ['Annex A8', 'campaign analytics']
+        },
+        summary: 'Practical guardrails for growth squads balancing experimentation with Annex A8 compliance.'
+      }),
+      is_featured: true,
+      reading_time_minutes: 6,
+      view_count: 986
+    });
+
+    const [transparencyRoadmapPostId] = await trx('blog_posts').insert({
+      slug: 'legal-transparency-roadmap-q2',
+      title: 'Legal transparency roadmap: Q2 filings, audits, and hiring',
+      excerpt:
+        'Company, careers, and legal updates covering regulator engagement, transparency docs, and upcoming compliance hires.',
+      content: [
+        '# Legal transparency roadmap',
+        '',
+        '- Quarterly filings prepared for ICO and Companies House.',
+        '- Privacy centre adds printable audit packs for enterprise councils.',
+        '- New governance counsel and trust engineer roles opening in London and remote.'
+      ].join('\\n'),
+      author_id: adminId,
+      category_id: governanceCategoryId,
+      status: 'published',
+      published_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      metadata: JSON.stringify({
+        hero: {
+          image: 'https://cdn.edulure.test/blog/legal-transparency.jpg',
+          alt: 'Legal and compliance team reviewing transparency dashboards'
+        },
+        seo: {
+          canonical: 'https://www.edulure.com/blog/legal-transparency-roadmap-q2',
+          focusKeywords: ['Annex C7', 'legal transparency']
+        },
+        summary: 'Transparency updates spanning governance reports, talent plans, and policy evidence packs.'
+      }),
+      is_featured: false,
+      reading_time_minutes: 7,
+      view_count: 742
+    });
+
+    await trx('blog_post_tags').insert([
+      { post_id: opsTrustPostId, tag_id: operationsTagId },
+      { post_id: opsTrustPostId, tag_id: complianceTagId },
+      { post_id: growthLiftPostId, tag_id: adsTagId },
+      { post_id: growthLiftPostId, tag_id: operationsTagId },
+      { post_id: transparencyRoadmapPostId, tag_id: complianceTagId },
+      { post_id: transparencyRoadmapPostId, tag_id: communityTagId }
+    ]);
+
+    await trx('blog_media').insert([
+      {
+        post_id: opsTrustPostId,
+        media_url: 'https://cdn.edulure.test/blog/ops-trust-hero.jpg',
+        alt_text: 'Operations and compliance leads collaborating at a dashboard wall',
+        media_type: 'image',
+        display_order: 0,
+        metadata: JSON.stringify({ variant: 'hero', width: 1600, height: 900 })
+      },
+      {
+        post_id: growthLiftPostId,
+        media_url: 'https://cdn.edulure.test/blog/annex-a8-campaigns.jpg',
+        alt_text: 'Paid acquisition metrics showing conversion lift',
+        media_type: 'image',
+        display_order: 0,
+        metadata: JSON.stringify({ variant: 'hero', width: 1600, height: 900 })
+      },
+      {
+        post_id: transparencyRoadmapPostId,
+        media_url: 'https://cdn.edulure.test/blog/legal-transparency.jpg',
+        alt_text: 'Legal team reviewing quarterly transparency checklist',
+        media_type: 'image',
+        display_order: 0,
+        metadata: JSON.stringify({ variant: 'hero', width: 1600, height: 900 })
+      }
+    ]);
 
     const [opsRoadmapPostId] = await trx('community_posts')
       .insert({

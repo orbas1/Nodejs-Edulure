@@ -360,34 +360,34 @@
          - 2.A.20 ProductPreviewTabs (frontend-reactjs/src/components/marketing/ProductPreviewTabs.jsx)
          - 2.A.21 Home (frontend-reactjs/src/pages/Home.jsx)
       - ✓ 2.B Content Marketing & Media Publishing — Annex A8 (Ads, Growth & Content Marketing)
-        1. **Appraisal.** Ebook reading, metadata management, media capture, and blog surfaces now align with Annex A8 by pairing persistent analytics hooks, structured storytelling, and marketing-safe defaults captured in `user_experience.md`.
-        2. **Functionality.** `EbookReader.jsx` persists encrypted CFI progress to `localStorage`, restores it when sessions resume, and exposes keyboard-accessible pagination, theme toggles, and font sliders that mirror learner reader controls.
-        3. **Usefulness.** `MaterialMetadataEditor.jsx` surfaces live character counters, CTA HTTPS validation, and gallery limits so marketers keep storefront copy compliant while previewing badges, pills, and video trailers exactly as commerce cards render.
-        4. **Redundancies.** CTA sanitisation, HTTPS enforcement, and preview state flow through `secureCtaUrl`, eliminating duplicate guards between edit forms and live previews while keeping marketing surfaces policy compliant.
-        5. **Placeholders or Stubs.** Blog JSON-LD exports the first twelve posts; extend the payload once backend pagination lands so analytics can ingest richer article inventories without manual edits.
-        6. **Duplicate Functions.** Shared helpers (`resolveStorageKey`, CTA sanitiser, gallery limiter) remove per-component sanitisation logic and keep persona surfaces aligned with the canonical marketing vocabulary.
-        7. **Improvements Needed.** Wire blog tag filters to server search telemetry, promote ebook collection/bookmark actions to analytics, and introduce offline-ready rendition caching for annexed course packs.
-        8. **Styling Improvements.** Character counters, CTA guardrails, and gallery limit notices use Annex A8 tint tokens, while blog and reader headers reuse 8px/16px spacing so marketing shells match the typography matrix in `user_experience.md`.
-        9. **Efficiency Analysis.** Memoised metadata (`usePageMetadata`, `secureCtaUrl`, `resultsSummary`) and debounced storage writes prevent reflows when marketers tweak copy, keeping large assets responsive during campaign prep.
-        10. **Strengths to Keep.** Marketplace cards, blog grids, and ebook purchase flows remain intact—new compliance rails sit alongside existing conversion CTAs without disrupting Annex A8 storytelling hierarchy.
-        11. **Weaknesses to Remove.** Ebook reader still lacks download/offline access toggles; planned Annex A8 follow-ups should add secure export guards and track preview-to-download funnels.
-        12. **Palette.** All new pills, counters, and banners rely on the established slate, primary, and semantic badge palette, maintaining marketing gradients and AAA contrast targets outlined in `user_experience.md` Annex B2.
-        13. **CSS, Orientation & Placement.** Blog filter nav, metadata preview cards, and avatar controls maintain responsive flex layouts and column swaps so surfaces stay legible across breakpoints without bespoke media queries.
-        14. **Text.** Microcopy emphasises compliance (“HTTPS required for placements”, “Encrypted distribution enabled”) and action-first verbs to match Annex tone guidance while keeping tooltips under 140 characters.
-        15. **Spacing.** Editors, nav chips, and preview cards respect the 8/16/24 rhythm; counters sit flush to inputs without collapsing the marketing shell’s white space budget.
-        16. **Shape.** New controls preserve rounded-full / rounded-3xl geometry so chip editors, CTA buttons, and avatar crops mirror annex marketing silhouettes.
-        17. **Effects.** Disabled gallery buttons, CTA previews, and theme toggles retain hover/focus-visible outlines, ensuring interactive affordances stay discoverable without adding bespoke motion.
-        18. **Thumbs.** Blog hero images, ebook covers, and avatar previews sanitise origins and alt text, keeping marketing assets safe for screenshots and Annex campaign decks.
-        19. **Media.** `EbookReader` validates chapter counts and displays progress, while marketing previews prevent non-HTTPS embeds from slipping into commerce placements.
-        20. **Buttons.** CTA, pagination, and theme buttons now expose `aria-pressed`, `aria-disabled`, and keyboard triggers, aligning marketing controls with Annex accessibility checklists.
-        21. **Interact.** Avatar cropping responds to arrow keys, blog summaries announce result counts via `aria-live`, and reader progress broadcasts completion updates so assistive tech stays in sync.
-        22. **Missing.** Upcoming Annex stories should attach analytics IDs to gallery actions, expose blog category descriptions in tooltips, and add server-backed search suggestions.
-        23. **Design.** JSON-LD exports, marketing previews, and persona filters match `user_experience.md` directives so marketing analytics, SEO, and CMS tooling share a single schema.
-        24. **Clone.** Shared sanitisation and storage helpers prevent future components (Flutter, SDKs) from reinventing marketing-safe logic when ingesting ebook or blog metadata.
-        25. **Framework.** `usePageMetadata` now powers blog/about SEO, while storage keys and gallery caps give backend services deterministic hooks for syncing marketing payloads.
-        26. **Checklist.** Regression should verify ebook resume points, CTA disabled states, gallery cap enforcement, blog schema output, avatar keyboard nudges, and `npm --prefix frontend-reactjs run lint`.
-        27. **Nav.** Blog filters, marketing CTAs, and reader headers expose consistent navigation cues (“Review controls”, “Read article”), matching Annex navigation copy and improving crawlability.
-        28. **Release.** Ship alongside marketing analytics updates, reseed featured blog posts for schema tests, collect SEO snapshots, and brief content ops on the HTTPS/limit guardrails before publishing Annex A8 notes.
+        1. **Appraisal.** Marketing surfaces now span storage, APIs, and seeds: `AssetService.updateMetadata` persists Annex A8-safe showcase copy, `EbookService` exposes media-rich listings with encrypted sample links, and the marketing blog is populated via the bootstrap seed so Annex notes mirror live content.
+        2. **Functionality.** `content_assets.metadata.custom` captures cover art, galleries, showcase CTAs, and feature flags; `EbookModel` reads the new `sample_download_url`/`audiobook_url` columns added in `20250308120000_course_ebook_media_enhancements.js`; `BlogService` hydrates seeded categories, tags, posts, and hero media for `Blog.jsx` and `BlogPost.jsx`.
+        3. **Usefulness.** Editors preview curated galleries, CTA guardrails, and persona categories; learners download secure samples or stream audiobooks; growth teams land on Annex A8 campaign retros seeded in `backend-nodejs/seeds/001_bootstrap.js`, keeping UI, APIs, and docs aligned.
+        4. **Redundancies.** Metadata templating lives in `AssetService`/`MarketingContentService`, replacing ad-hoc React state and ensuring slugs, CTA URLs, and gallery limits reuse the same sanitisation.
+        5. **Placeholders or Stubs.** JSON-LD still exports twelve posts, but bootstrap seeds provide three authoritative articles with hero media; extend pagination before multi-page schema support ships.
+        6. **Duplicate Functions.** CTA enforcement, HTTPS sanitisation, and gallery normalisation run through `AssetService.updateMetadata` and `ContentController.metadataUpdateSchema`, eliminating parallel helpers in React.
+        7. **Improvements Needed.** Next workstream should wire gallery analytics, ingest backend search telemetry for blog filters, and add DRM-aware offline caching for ebook samples.
+        8. **Styling Improvements.** Seeded metadata keeps Annex A8 tints, rounded geometry, and cover art consistent without manual placeholders in the editor or previews.
+        9. **Efficiency Analysis.** Server filters (`EbookModel.listMarketplace`, `BlogService.listPublicPosts`) enforce paging/search; React memoises counts and summaries so marketing dashboards stay responsive.
+        10. **Strengths to Keep.** Marketplace cards, CTA variants, and JSON-LD exports retain annex storytelling hierarchy while the seeds keep growth, ops, and governance narratives synchronised across channels.
+        11. **Weaknesses to Remove.** Offline downloads and analytics event wiring remain backlog; add queue-backed watermark issuance and CTA tracking in a follow-up.
+        12. **Palette.** Counters, CTA pills, and gallery cards reuse slate/primary palettes; seeded metadata ensures hero art honours the colour guidance in `user_experience.md` Annex B2.
+        13. **CSS, Orientation & Placement.** Responsive layouts stay intact—metadata just hydrates showcase slots and galleries, so no bespoke breakpoints were introduced.
+        14. **Text.** Microcopy (“HTTPS required”, “Encrypted sample”) follows Annex tone while referencing seeded campaign summaries so compliance teams review consistent copy.
+        15. **Spacing.** Editor forms and preview shells keep the 8/16/24 rhythm; seeded cards preserve breathing room around badges and CTA clusters.
+        16. **Shape.** Rounded-3xl shells and pill controls remain consistent; metadata-driven galleries reuse the same geometry for imagery and video.
+        17. **Effects.** Hover/focus-visible states continue to surface on pagination, CTA, and theme toggles even with seeded previews attached.
+        18. **Thumbs.** Gallery media sanitise through HTTPS constraints and seeded assets, ensuring marketing screenshots drop cleanly into annex decks.
+        19. **Media.** Ebook cards surface cover art, sample PDFs, and audiobook MP3s; blog posts hydrate hero images from `blog_media`, keeping Annex content visual.
+        20. **Buttons.** CTA, pagination, and theme buttons expose `aria-pressed`/`aria-disabled`; seeded posts include campaign CTAs so analytics can stitch funnels.
+        21. **Interact.** Avatar cropper nudge keys, blog result summaries (`aria-live`), and reader progress broadcasts remain intact, now backed by seeded data for QA.
+        22. **Missing.** Add analytics IDs for gallery actions, taxonomy tooltips for blog categories, and offline sample packaging for enterprise annex sign-off.
+        23. **Design.** Metadata, blog schema, and ebook listings mirror Annex diagrams so marketing, growth, and analytics stakeholders share a single canonical schema.
+        24. **Clone.** Shared sanitisation/storage helpers prevent Flutter, SDK, or future CMS integrations from re-implementing Annex A8 rules.
+        25. **Framework.** `usePageMetadata`, `EbookService`, and `BlogService` provide consistent SEO, analytics, and schema outputs across marketing shells.
+        26. **Checklist.** Regression verifies metadata persistence, secure CTA disabling, gallery caps, sample download signatures, blog schema output, and `npm --prefix frontend-reactjs run lint`.
+        27. **Nav.** Blog filters, marketing CTAs, and reader headers share seeded copy (“Review controls”, “Read article”), improving crawlability and annex navigation parity.
+        28. **Release.** Ship alongside marketing analytics updates, rerun `npm --prefix backend-nodejs run seed`, refresh SEO snapshots, and brief content ops on the new sample/audiobook links plus seeded campaign posts.
          - 2.B.1 EbookReader (frontend-reactjs/src/components/content/EbookReader.jsx)
          - 2.B.2 MaterialMetadataEditor (frontend-reactjs/src/components/content/MaterialMetadataEditor.jsx)
          - 2.B.3 AvatarCropper (frontend-reactjs/src/components/media/AvatarCropper.jsx)
@@ -395,34 +395,34 @@
          - 2.B.5 BlogPost (frontend-reactjs/src/pages/BlogPost.jsx)
          - 2.B.6 Ebooks (frontend-reactjs/src/pages/Ebooks.jsx)
       - ✓ 2.C Company, Careers & Legal Transparency — Annex C7 (Legal & Compliance Centre)
-        1. **Appraisal.** About, Privacy, and Terms surfaces now double as the Annex C7 legal centre: corporate facts, policy navigation, and structured data align with `user_experience.md` expectations for transparent governance hubs.
-        2. **Functionality.** `About.jsx` exports organisation schema, policy CTAs, and corporate disclosures; `Privacy.jsx` wires table-of-contents anchors with smooth scrolling, IntersectionObserver highlighting, and select-driven navigation; `Terms.jsx` retains dynamic anchor tracking for clause deep links.
-        3. **Usefulness.** Visitors can review company registration, ICO numbers, and direct policy links without leaving the page, while privacy readers jump between 29 clauses via chips or mobile dropdowns.
-        4. **Redundancies.** Slug generation, history updates, and structured metadata now live in shared helpers so anchor routing doesn’t duplicate logic across legal pages.
-        5. **Placeholders or Stubs.** Trust centre link currently targets `/docs/trust-centre`; update once the dedicated transparency hub ships so Annex breadcrumbs stay accurate.
-        6. **Duplicate Functions.** Section IDs derive from headings in one place, preventing drift between rendered anchors, navigation chips, and history state updates.
-        7. **Improvements Needed.** Automate review summary data from governance systems, expose printable/PDF exports, and localise compliance copy for non-UK tenants in future Annex C7 iterations.
-        8. **Styling Improvements.** Corporate cards, navigation rails, and disclosure lists reuse slate neutrals and shadow tokens so legal shells stay consistent with marketing surfaces without introducing bespoke gradients.
-        9. **Efficiency Analysis.** Memoised section arrays and intersection observers avoid repeated slug computation; metadata hooks run once per mount, keeping compliance pages snappy even with long-form copy.
-        10. **Strengths to Keep.** Terms’ existing anchor detection, support channel grids, and compliance messaging remain untouched while benefiting from the shared navigation and metadata improvements.
-        11. **Weaknesses to Remove.** Privacy print/export tooling and live changelog feeds remain backlog items; fold them into the policy management platform next release.
-        12. **Palette.** Legal disclosures lean on white/sand neutrals with primary accent chips, reinforcing calm, trustworthy visuals noted in `user_experience.md` Annex C7 guidance.
-        13. **CSS, Orientation & Placement.** Two-column disclosure grids collapse gracefully, navigation chips wrap on wide screens, and dropdown selectors serve mobile, matching responsive layouts documented in the UX playbook.
-        14. **Text.** Copy emphasises accountability (“Review controls”, “Access governance artefacts”) and uses consistent tone per Annex microcopy tables.
-        15. **Spacing.** Cards and nav rails observe 24px outer gutters and 12px interior gaps, keeping dense legal content readable without bloating vertical rhythm.
-        16. **Shape.** Rounded-3xl shells, pill chips, and full-width CTAs align with broader product geometry so legal hubs feel native to the Edulure brand system.
-        17. **Effects.** Focus-visible outlines and hover states remain active on navigation pills and CTA buttons, aiding keyboard review of long-form policies.
-        18. **Thumbs.** Disclosure cards and CTA badges are ready for board decks—structured headings and highlight pills make screenshots compliance-friendly.
-        19. **Media.** Organisation structured data, brand info, and corporate logos feed external crawlers while keeping visual noise low on-page.
-        20. **Buttons.** Primary CTAs link to policies, while nav chips respect reduced-motion preferences and expose accessible names for screen readers.
-        21. **Interact.** Mobile select, chip navigation, and hash updates keep compliance journeys keyboard and screen-reader friendly; privacy sections announce focus updates without layout jumps.
-        22. **Missing.** Add downloadable audit evidence (SOC, ISO certificates) and vacancy feeds to round out Annex C7 once sourcing is ready.
-        23. **Design.** Structured data and nav scaffolding mirror Annex C7 diagrams, ensuring legal, marketing, and support teams reference a single, canonical experience.
+        1. **Appraisal.** About, Privacy, and Terms pages now couple frontend navigation with backend Annex artefacts: seeds populate governance contracts, vendor assessments, review cycles, and transparency narratives while the pages surface structured data, anchors, and corporate disclosures.
+        2. **Functionality.** `About.jsx` renders organisation schema plus seeded corporate facts; `Privacy.jsx` and `Terms.jsx` reuse IntersectionObserver navigation tied to slugified headings, while backend tables (`governance_contracts`, `governance_roadmap_communications`, `consent_policies`) seeded in `001_bootstrap.js` power trust-centre APIs and dashboard parity.
+        3. **Usefulness.** Visitors review registration numbers, ICO references, policy CTAs, and seeded legal updates without leaving the hub; governance ops can cross-check disclosures against `/governance/overview` API output that mirrors the same seeds.
+        4. **Redundancies.** Anchor slugging, metadata hooks, and disclosure grids share helpers; backend governance repositories dedupe policy summaries so web pages, dashboards, and docs reference one canonical source.
+        5. **Placeholders or Stubs.** Trust centre link still points to `/docs/trust-centre`; swap once the dedicated hub ships and extend seeds with additional transparency reports.
+        6. **Duplicate Functions.** Section IDs derive from headings once; governance metrics hydrate via `NavigationAnnexRepository`, avoiding duplicate enumeration across legal surfaces.
+        7. **Improvements Needed.** Automate governance summaries from compliance tooling, expose PDF exports for policies, and localise disclosures for non-UK tenants.
+        8. **Styling Improvements.** Corporate cards, navigation rails, and disclosure lists reuse slate neutrals, seeded hero art, and Annex chip tokens, maintaining calm legal visuals.
+        9. **Efficiency Analysis.** Memoised section arrays and observers avoid repeated slug computation; backend seeds keep governance endpoints fast by denormalising status counts.
+        10. **Strengths to Keep.** Terms anchor detection, support channel grids, and compliance messaging remain while benefitting from seeded legal narratives and shared metadata.
+        11. **Weaknesses to Remove.** Printable exports and live changelog feeds remain backlog; wire them to governance APIs next release.
+        12. **Palette.** Legal disclosures lean on white/sand neutrals with primary accent chips; seeded CTAs ensure consistent colour references.
+        13. **CSS, Orientation & Placement.** Two-column grids collapse gracefully, chip navigation wraps on wide breakpoints, and dropdown selectors serve mobile as documented in the UX playbook.
+        14. **Text.** Copy emphasises accountability (“Review controls”, “Access governance artefacts”) and is backed by seeded governance data so metrics stay accurate.
+        15. **Spacing.** Cards and nav rails respect 24px gutters and 12px interior gaps, keeping dense legal content readable.
+        16. **Shape.** Rounded-3xl shells, pill chips, and CTAs align with Edulure geometry, reinforcing brand trust.
+        17. **Effects.** Focus-visible outlines and hover states remain active on navigation pills and CTAs, aiding keyboard review.
+        18. **Thumbs.** Disclosure cards and CTA badges remain screenshot-ready; seeds guarantee values for corporate facts and roadmap metrics.
+        19. **Media.** Organisation schema, brand info, and corporate logos feed crawlers while backend governance seeds keep transparency dashboards in sync.
+        20. **Buttons.** Primary CTAs point to privacy, terms, and trust artefacts; nav chips honour reduced-motion preferences and accessible names.
+        21. **Interact.** Mobile select, chip navigation, hash updates, and observer highlights keep compliance journeys keyboard and screen-reader friendly; seeded governance data powers the same anchors used in dashboards.
+        22. **Missing.** Add downloadable audit evidence (SOC, ISO), vacancy feeds, and trust-centre hub once additional APIs land.
+        23. **Design.** Structured data, nav scaffolding, and governance metrics mirror Annex C7 diagrams so legal, marketing, and support teams share context.
         24. **Clone.** Slugified IDs and metadata helpers prevent future legal pages (cookie notice, accessibility statement) from rewriting anchor or SEO plumbing.
-        25. **Framework.** `usePageMetadata` centralises analytics tagging for compliance views, giving governance dashboards consistent signals across About, Privacy, and Terms.
-        26. **Checklist.** Verify anchor navigation, IntersectionObserver highlighting, corporate fact accuracy, policy CTA destinations, and run `npm --prefix frontend-reactjs run lint` before publication.
-        27. **Nav.** Privacy chips, About CTAs, and Terms anchor lists provide consistent navigation affordances, keeping Annex C7 wayfinding uniform across company, policy, and legal sections.
-        28. **Release.** Coordinate with legal/compliance leads to validate disclosures, refresh SEO snapshots, update governance documentation, and announce the Annex C7 upgrades alongside the trust centre roadmap.
+        25. **Framework.** `usePageMetadata`, governance repositories, and consent/annex seeds centralise analytics tagging for compliance views.
+        26. **Checklist.** Verify anchor navigation, observer highlighting, corporate fact accuracy, policy CTA destinations, `/governance` API snapshots, and run `npm --prefix frontend-reactjs run lint`.
+        27. **Nav.** Privacy chips, About CTAs, Terms anchor lists, and governance APIs expose consistent navigation cues, keeping Annex C7 wayfinding uniform.
+        28. **Release.** Coordinate with legal/compliance leads, rerun seeds, refresh SEO snapshots, update governance documentation, and announce Annex C7 upgrades alongside the trust-centre roadmap.
          - 2.C.1 About (frontend-reactjs/src/pages/About.jsx)
          - 2.C.2 Privacy (frontend-reactjs/src/pages/Privacy.jsx)
          - 2.C.3 Terms (frontend-reactjs/src/pages/Terms.jsx)
