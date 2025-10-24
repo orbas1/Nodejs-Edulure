@@ -4489,6 +4489,409 @@ export function buildInstructorDashboard({
   };
 }
 
+function toInteger(value, fallback = 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value === 'string') {
+    const match = value.match(/-?\d+(?:\.\d+)?/);
+    if (match) {
+      const parsed = Number(match[0]);
+      if (Number.isFinite(parsed)) {
+        return Math.trunc(parsed);
+      }
+    }
+  }
+  return fallback;
+}
+
+function extractLatestTimestamp(values) {
+  if (!values) {
+    return null;
+  }
+  const flattened = Array.isArray(values) ? values.flat(Infinity) : [values];
+  const timestamps = flattened
+    .map((entry) => normaliseDate(entry))
+    .filter((date) => date instanceof Date && !Number.isNaN(date.getTime()))
+    .map((date) => date.getTime());
+  if (!timestamps.length) {
+    return null;
+  }
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
+function summariseBookingsSurface(dashboard) {
+  if (!dashboard) {
+    return null;
+  }
+  const base = dashboard.bookings && typeof dashboard.bookings === 'object' ? dashboard.bookings : {};
+  const tutorBookings =
+    dashboard.tutorBookings && typeof dashboard.tutorBookings === 'object' ? dashboard.tutorBookings : {};
+  const active = Array.isArray(tutorBookings.active) ? tutorBookings.active : [];
+  const history = Array.isArray(tutorBookings.history) ? tutorBookings.history : [];
+  const allTutorBookings = [...active, ...history];
+  const statusOf = (booking) => String(booking?.status ?? '').toLowerCase();
+  const pendingTutorCount = allTutorBookings.filter((booking) => {
+    const status = statusOf(booking);
+    return (
+      status === 'requested' ||
+      status === 'pending' ||
+      status === 'awaiting_confirmation' ||
+      status === 'awaiting' ||
+      status === 'reschedule_requested'
+    );
+  }).length;
+  const scheduledTutorCount = allTutorBookings.filter((booking) => {
+    const status = statusOf(booking);
+    return status === 'confirmed' || status === 'scheduled' || status === 'approved';
+  }).length;
+  const completedTutorCount = allTutorBookings.filter((booking) => statusOf(booking) === 'completed').length;
+
+  const fieldServices =
+    dashboard.fieldServices && typeof dashboard.fieldServices === 'object' ? dashboard.fieldServices : {};
+  const assignments = Array.isArray(fieldServices.assignments) ? fieldServices.assignments : [];
+  const totals =
+    fieldServices.summary && typeof fieldServices.summary === 'object' ? fieldServices.summary.totals ?? {} : {};
+  const activeAssignments = toInteger(totals.active);
+  const incidentTotal = toInteger(totals.incidents);
+  const slaBreaches = toInteger(totals.slaBreaches);
+  const riskAssignments = assignments.filter((assignment) => {
+    const risk = String(assignment?.riskLevel ?? '').toLowerCase();
+    if (['critical', 'severe', 'urgent', 'warning'].includes(risk)) {
+      return true;
+    }
+    const status = String(assignment?.status ?? '').toLowerCase();
+    return ['pending', 'pending_assignment', 'paused', 'investigating'].includes(status);
+  }).length;
+
+  const pendingCount = pendingTutorCount + activeAssignments;
+  const scheduledCount = scheduledTutorCount;
+  const openConflicts = riskAssignments + incidentTotal + slaBreaches;
+  const unreadCount = pendingTutorCount;
+
+  const lastSyncedAt = extractLatestTimestamp([
+    base.lastSyncedAt,
+    tutorBookings.syncedAt,
+    fieldServices.summary?.updatedAt,
+    fieldServices.lastUpdated,
+    fieldServices.lastSyncedAt
+  ]);
+
+  const serviceHealth =
+    openConflicts > 0
+      ? 'critical'
+      : incidentTotal > 0 || pendingCount > 4
+        ? 'degraded'
+        : pendingCount > 0
+          ? 'notice'
+          : 'operational';
+
+  const metrics =
+    Array.isArray(base.metrics) && base.metrics.length
+      ? base.metrics
+      : [
+          { label: 'Pending', value: `${pendingCount}` },
+          { label: 'Scheduled', value: `${scheduledCount}` },
+          { label: 'Conflicts', value: `${openConflicts}` }
+        ];
+
+  return {
+    ...base,
+    pendingCount,
+    scheduledCount,
+    completedCount: completedTutorCount,
+    openConflicts,
+    unreadCount,
+    serviceHealth,
+    lastSyncedAt,
+    metrics
+  };
+}
+
+function summariseEbookSurface(dashboard) {
+  if (!dashboard || !dashboard.ebooks) {
+    return null;
+  }
+  const base = typeof dashboard.ebooks === 'object' ? dashboard.ebooks : {};
+  const library = Array.isArray(base.library) ? base.library : [];
+  const completedCount = library.filter((entry) => {
+    const status = String(entry?.status ?? '').toLowerCase();
+    if (status.includes('complete')) {
+      return true;
+    }
+    const progress = Number(entry?.progress ?? entry?.progressPercent ?? 0);
+    return Number.isFinite(progress) && progress >= 100;
+  }).length;
+  const inProgressCount = library.filter((entry) => {
+    const progress = Number(entry?.progress ?? entry?.progressPercent ?? 0);
+    return Number.isFinite(progress) && progress > 0 && progress < 100;
+  }).length;
+  const notStartedCount = Math.max(library.length - completedCount - inProgressCount, 0);
+  const highlights = library.reduce(
+    (sum, entry) => sum + toInteger(entry?.highlights ?? entry?.metadata?.highlights),
+    0
+  );
+  const lastSyncedAt = extractLatestTimestamp([
+    base.syncedAt,
+    ...library.map((entry) => entry.lastOpened ?? entry.lastOpenedAt ?? entry.updatedAt)
+  ]);
+
+  const serviceHealth = completedCount || inProgressCount ? 'operational' : library.length ? 'notice' : 'attention';
+
+  return {
+    ...base,
+    libraryCount: library.length,
+    completedCount,
+    inProgressCount,
+    notStartedCount,
+    highlights,
+    unreadCount: notStartedCount,
+    lastSyncedAt,
+    serviceHealth
+  };
+}
+
+function summariseAffiliateSurface(dashboard) {
+  if (!dashboard || !dashboard.affiliate) {
+    return null;
+  }
+  const base = typeof dashboard.affiliate === 'object' ? dashboard.affiliate : {};
+  const channels = Array.isArray(base.channels) ? base.channels : [];
+  const payouts = Array.isArray(base.payouts) ? base.payouts : [];
+  const inactiveChannels = channels.filter((channel) => String(channel?.status ?? '').toLowerCase() !== 'active').length;
+  const pendingPayouts = payouts.filter((payout) => {
+    const status = String(payout?.status ?? '').toLowerCase();
+    return status === 'scheduled' || status === 'processing';
+  }).length;
+  const totalChannels = base.summary?.totalChannels ?? channels.length;
+  const activeChannels =
+    base.summary?.activeChannels ?? channels.filter((channel) => String(channel?.status ?? '').toLowerCase() === 'active').length;
+  const outstanding = base.summary?.outstanding ?? null;
+  const lastSyncedAt = extractLatestTimestamp([
+    base.summary?.updatedAt,
+    ...channels.map((channel) => channel.updatedAt ?? channel.lastSyncedAt ?? channel.syncedAt)
+  ]);
+
+  const summary = {
+    ...(base.summary ?? {}),
+    totalChannels: toInteger(totalChannels, channels.length),
+    activeChannels: toInteger(activeChannels, channels.length - inactiveChannels),
+    outstanding
+  };
+
+  const pendingCount = inactiveChannels + pendingPayouts;
+  const serviceHealth = inactiveChannels > 0 ? 'attention' : pendingPayouts > 0 ? 'notice' : 'operational';
+
+  return {
+    ...base,
+    summary,
+    alerts: inactiveChannels,
+    openTasks: pendingPayouts,
+    pendingCount,
+    lastSyncedAt,
+    serviceHealth
+  };
+}
+
+function summariseAssessmentSurface(dashboard) {
+  if (!dashboard || !dashboard.assessments) {
+    return null;
+  }
+  const base = typeof dashboard.assessments === 'object' ? dashboard.assessments : {};
+  const overview = Array.isArray(base.overview) ? base.overview : [];
+  const metricMap = overview.reduce((acc, item) => {
+    if (item?.id) {
+      acc[item.id] = item.value;
+    }
+    return acc;
+  }, {});
+  const dueSoon = toInteger(metricMap['assessments-due-soon']);
+  const overdue = toInteger(metricMap['assessments-overdue']);
+  const completedCount = toInteger(metricMap['assessments-completed']);
+  const upcomingCount = toInteger(metricMap['assessments-upcoming']);
+  const pendingReviews = toInteger(base.analytics?.pendingReviews);
+  const flaggedCount = Array.isArray(base.grading?.flagged)
+    ? base.grading.flagged.length
+    : toInteger(base.grading?.flagged);
+  const lastSyncedAt = extractLatestTimestamp([
+    base.syncedAt,
+    base.timeline?.lastUpdated,
+    ...(Array.isArray(base.timeline?.upcoming)
+      ? base.timeline.upcoming.map((item) => item.dueDate ?? item.due ?? item.startAt)
+      : []),
+    ...(Array.isArray(base.timeline?.overdue)
+      ? base.timeline.overdue.map((item) => item.dueDate ?? item.due ?? item.startAt)
+      : [])
+  ]);
+
+  const serviceHealth = overdue > 0 || pendingReviews > 0 ? 'notice' : 'operational';
+
+  return {
+    ...base,
+    dueSoon,
+    overdue,
+    completedCount,
+    upcomingCount,
+    pendingReviews,
+    flaggedCount,
+    lastSyncedAt,
+    serviceHealth
+  };
+}
+
+function summariseInboxSurface(dashboard, { now = new Date() } = {}) {
+  const source =
+    (dashboard && typeof dashboard.inbox === 'object' && dashboard.inbox) ||
+    (dashboard && typeof dashboard.support === 'object' && dashboard.support);
+  if (!source) {
+    return null;
+  }
+  const metrics = source.metrics && typeof source.metrics === 'object' ? source.metrics : {};
+  const cases = Array.isArray(source.cases) ? source.cases : [];
+  const openTickets = toInteger(metrics.open);
+  const waiting = toInteger(metrics.waiting);
+  const awaitingLearner = toInteger(metrics.awaitingLearner);
+  const averageResponseMinutes = toInteger(metrics.averageResponseMinutes);
+  const casesRisk = cases.filter((ticket) => {
+    const priority = String(ticket?.priority ?? '').toLowerCase();
+    if (priority === 'urgent' || priority === 'high') {
+      return true;
+    }
+    const status = String(ticket?.status ?? '').toLowerCase();
+    if (status === 'escalated') {
+      return true;
+    }
+    const severity = String(ticket?.metadata?.severity ?? ticket?.metadata?.risk ?? '').toLowerCase();
+    if (['critical', 'high'].includes(severity)) {
+      return true;
+    }
+    const followUp = normaliseDate(ticket?.followUpDueAt ?? ticket?.metadata?.followUpDueAt);
+    return followUp && followUp.getTime() < (now instanceof Date ? now.getTime() : Date.now());
+  }).length;
+  const unreadCount = cases.filter((ticket) => {
+    const messages = Array.isArray(ticket?.messages) ? ticket.messages : [];
+    const lastMessage = messages[messages.length - 1];
+    const status = String(ticket?.status ?? '').toLowerCase();
+    return (
+      lastMessage &&
+      lastMessage.author === 'learner' &&
+      (status === 'open' || status === 'waiting' || status === 'pending')
+    );
+  }).length;
+
+  const lastSyncedAt = extractLatestTimestamp([
+    metrics.latestUpdatedAt,
+    ...cases.map((ticket) => ticket.updatedAt ?? ticket.metadata?.updatedAt ?? ticket.messages?.slice(-1)?.[0]?.createdAt)
+  ]);
+
+  const pendingCount = waiting + awaitingLearner;
+  const serviceHealth = casesRisk > 0 ? 'degraded' : pendingCount > 0 ? 'notice' : 'operational';
+
+  return {
+    ...source,
+    openTickets,
+    pendingCount,
+    unreadCount,
+    averageResponseMinutes,
+    riskCount: casesRisk,
+    lastSyncedAt,
+    serviceHealth
+  };
+}
+
+function summariseCourseSurface(dashboard) {
+  if (!dashboard) {
+    return null;
+  }
+  const courseModule = dashboard.courses && typeof dashboard.courses === 'object' ? dashboard.courses : null;
+  if (!courseModule) {
+    return null;
+  }
+  const base = dashboard.course && typeof dashboard.course === 'object' ? dashboard.course : {};
+  const catalogue = Array.isArray(courseModule.catalogue) ? courseModule.catalogue : [];
+  const activeCourses = Array.isArray(courseModule.active) ? courseModule.active : [];
+  const goals = Array.isArray(courseModule.goals) ? courseModule.goals : [];
+  const modulesTotal = catalogue.reduce((sum, course) => sum + toInteger(course?.modules), 0);
+  const completedLessons = activeCourses.reduce((sum, course) => sum + toInteger(course?.completedLessons), 0);
+  const certificatesReady = activeCourses.filter((course) => {
+    const progress = toInteger(course?.progress ?? course?.progressPercent);
+    const status = String(course?.goal?.statusKey ?? course?.goalStatus ?? '').toLowerCase();
+    return progress >= 100 || status === 'completed' || status === 'ready';
+  }).length;
+
+  const notificationItems = Array.isArray(dashboard.notifications?.items) ? dashboard.notifications.items : [];
+  const unreadAnnouncements = notificationItems.filter((item) => {
+    const type = String(item?.type ?? '').toLowerCase();
+    return Boolean(item?.unread) || type === 'announcement' || type === 'mentor';
+  }).length;
+
+  const lastSyncedAt = extractLatestTimestamp([
+    base.lastSyncedAt,
+    ...activeCourses.map((course) => course.lastTouchedAt ?? course.goal?.dueDate),
+    ...goals.map((goal) => goal?.dueDate ?? goal?.updatedAt)
+  ]);
+
+  const serviceHealth = activeCourses.length
+    ? certificatesReady > 0
+      ? 'operational'
+      : 'notice'
+    : 'attention';
+
+  return {
+    ...base,
+    activeModules: modulesTotal,
+    completedLessons,
+    certificatesReady,
+    unreadAnnouncements,
+    lastSyncedAt,
+    serviceHealth
+  };
+}
+
+function attachDashboardSurfaceSummaries(dashboards, { now } = {}) {
+  if (!dashboards || typeof dashboards !== 'object') {
+    return;
+  }
+  const reference = normaliseDate(now) ?? new Date();
+  Object.entries(dashboards).forEach(([, dashboard]) => {
+    if (!dashboard || typeof dashboard !== 'object') {
+      return;
+    }
+
+    const bookings = summariseBookingsSurface(dashboard);
+    if (bookings) {
+      dashboard.bookings = { ...(dashboard.bookings ?? {}), ...bookings };
+    }
+
+    const ebooks = summariseEbookSurface(dashboard);
+    if (ebooks) {
+      dashboard.ebooks = { ...(dashboard.ebooks ?? {}), ...ebooks };
+    }
+
+    const affiliate = summariseAffiliateSurface(dashboard);
+    if (affiliate) {
+      dashboard.affiliate = { ...(dashboard.affiliate ?? {}), ...affiliate };
+    }
+
+    const assessments = summariseAssessmentSurface(dashboard);
+    if (assessments) {
+      dashboard.assessments = { ...(dashboard.assessments ?? {}), ...assessments };
+    }
+
+    const inbox = summariseInboxSurface(dashboard, { now: reference });
+    if (inbox) {
+      dashboard.support = { ...(dashboard.support ?? {}), ...inbox };
+      dashboard.inbox = { ...(dashboard.inbox ?? {}), ...inbox };
+    }
+
+    const courseSurface = summariseCourseSurface(dashboard);
+    if (courseSurface) {
+      dashboard.course = { ...(dashboard.course ?? {}), ...courseSurface };
+      dashboard.courseViewer = { ...(dashboard.courseViewer ?? {}), ...courseSurface };
+    }
+  });
+}
+
 export default class DashboardService {
   static async getDashboardForUser(userId, { referenceDate = new Date() } = {}) {
     const { default: UserModel } = await import('../models/UserModel.js');
@@ -5594,6 +5997,8 @@ export default class DashboardService {
         }
       };
     });
+
+    attachDashboardSurfaceSummaries(dashboards, { now: referenceDate });
 
     return {
       profile,
