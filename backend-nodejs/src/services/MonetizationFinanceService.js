@@ -1562,7 +1562,7 @@ class MonetizationFinanceService {
       .leftJoin('payment_intents as pi', 'pi.id', 'ple.payment_intent_id')
       .select({
         type: 'ple.entry_type',
-        amountCents: 'ple.amount',
+        amountCents: 'ple.amount_cents',
         recordedAt: 'ple.recorded_at',
         currency: 'ple.currency',
         metadata: 'pi.metadata'

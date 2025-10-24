@@ -20,7 +20,10 @@ function mapRecord(record) {
     lastMessageAt: record.last_message_at,
     lastMessagePreview: record.last_message_preview ?? null,
     archivedAt: record.archived_at ?? null,
-    archivedBy: record.archived_by ?? null,
+    archivedBy:
+      record.archived_by !== undefined && record.archived_by !== null
+        ? Number(record.archived_by)
+        : null,
     archiveMetadata: parseJson(record.archive_metadata, {}),
     createdAt: record.created_at,
     updatedAt: record.updated_at

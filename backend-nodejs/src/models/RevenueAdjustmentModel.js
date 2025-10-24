@@ -38,6 +38,17 @@ function parseJson(value) {
   }
 }
 
+function ensurePlainObject(value) {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_error) {
+    return {};
+  }
+}
+
 function toDate(value) {
   if (!value) {
     return null;
@@ -99,7 +110,7 @@ function toDbPayload(adjustment) {
     amount_cents: normaliseAmountCents(adjustment.amountCents),
     effective_at: adjustment.effectiveAt ?? null,
     notes: adjustment.notes ?? null,
-    metadata: JSON.stringify(adjustment.metadata ?? {}),
+    metadata: JSON.stringify(ensurePlainObject(adjustment.metadata)),
     created_by: adjustment.createdBy ?? null,
     updated_by: adjustment.updatedBy ?? null
   };
@@ -212,6 +223,10 @@ export default class RevenueAdjustmentModel {
 
   static async updateById(id, updates, connection = db) {
     const existing = await this.findById(id, connection);
+    if (!existing) {
+      return null;
+    }
+
     const payload = {};
     if (updates.reference !== undefined) payload.reference = updates.reference;
     if (updates.category !== undefined) payload.category = updates.category;
@@ -220,8 +235,19 @@ export default class RevenueAdjustmentModel {
     if (updates.amountCents !== undefined) payload.amount_cents = normaliseAmountCents(updates.amountCents);
     if (updates.effectiveAt !== undefined) payload.effective_at = updates.effectiveAt;
     if (updates.notes !== undefined) payload.notes = updates.notes;
-    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
     if (updates.updatedBy !== undefined) payload.updated_by = updates.updatedBy;
+
+    const hasMetadataPatch = Object.prototype.hasOwnProperty.call(updates, 'metadata');
+    const shouldUpdateMetadata = hasMetadataPatch || updates.updatedBy !== undefined;
+    if (shouldUpdateMetadata) {
+      const baseMetadata = ensurePlainObject(existing.metadata);
+      const patch = hasMetadataPatch ? ensurePlainObject(updates.metadata) : {};
+      const merged = { ...baseMetadata, ...patch };
+      if (updates.updatedBy !== undefined) {
+        merged.lastUpdatedBy = updates.updatedBy;
+      }
+      payload.metadata = JSON.stringify(merged);
+    }
 
     if (Object.keys(payload).length === 0) {
       return this.findById(id, connection);

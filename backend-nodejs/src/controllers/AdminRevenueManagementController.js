@@ -30,7 +30,16 @@ const adjustmentPayloadSchema = Joi.object({
   metadata: Joi.alternatives().try(Joi.object(), Joi.string().allow('', null)).default({})
 });
 
-const adjustmentUpdateSchema = adjustmentPayloadSchema.fork(['reference', 'amount', 'effectiveAt'], (schema) => schema.optional());
+const adjustmentUpdateSchema = Joi.object({
+  reference: Joi.string().trim().max(120),
+  category: Joi.string().trim().max(80),
+  status: Joi.string().valid(...ADJUSTMENT_STATUSES),
+  currency: Joi.string().length(3).uppercase(),
+  amount: Joi.number().precision(2),
+  effectiveAt: Joi.date().iso(),
+  notes: Joi.string().allow('', null),
+  metadata: Joi.alternatives().try(Joi.object(), Joi.string().allow('', null))
+}).min(1);
 
 function toArray(value) {
   if (!value) {
@@ -57,19 +66,18 @@ function toObject(value) {
   }
 }
 
-function buildAdjustmentPayload(payload, actorId) {
-  const result = {
-    metadata: {
-      ...toObject(payload.metadata),
-      lastUpdatedBy: actorId ?? null
-    }
-  };
+function buildAdjustmentPayload(payload, actorId, { includeCreator = false } = {}) {
+  const metadataPatch = toObject(payload.metadata);
+  if (actorId !== undefined && actorId !== null) {
+    metadataPatch.lastUpdatedBy = actorId;
+  }
 
+  const result = {};
   if (payload.reference !== undefined) {
     result.reference = payload.reference;
   }
   if (payload.category !== undefined) {
-    result.category = payload.category || 'general';
+    result.category = payload.category ? payload.category : 'general';
   }
   if (payload.status !== undefined) {
     result.status = payload.status;
@@ -86,9 +94,14 @@ function buildAdjustmentPayload(payload, actorId) {
   if (payload.notes !== undefined) {
     result.notes = payload.notes ?? null;
   }
-  result.updatedBy = actorId ?? null;
-  if (actorId) {
-    result.createdBy = actorId;
+  if (Object.keys(metadataPatch).length > 0) {
+    result.metadata = metadataPatch;
+  }
+  if (actorId !== undefined && actorId !== null) {
+    result.updatedBy = actorId;
+    if (includeCreator) {
+      result.createdBy = actorId;
+    }
   }
   return result;
 }
@@ -206,7 +219,9 @@ export default class AdminRevenueManagementController {
     try {
       const payload = await adjustmentPayloadSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
       const actorId = req.user?.id ?? null;
-      const record = await RevenueAdjustmentModel.create(buildAdjustmentPayload(payload, actorId));
+      const record = await RevenueAdjustmentModel.create(
+        buildAdjustmentPayload(payload, actorId, { includeCreator: true })
+      );
       return created(res, { data: record, message: 'Revenue adjustment recorded' });
     } catch (error) {
       next(error);
@@ -218,8 +233,13 @@ export default class AdminRevenueManagementController {
       const payload = await adjustmentUpdateSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
       const record = await RevenueAdjustmentModel.updateById(
         Number(req.params.adjustmentId),
-        buildAdjustmentPayload(payload, req.user?.id)
+        buildAdjustmentPayload(payload, req.user?.id ?? null)
       );
+      if (!record) {
+        const error = new Error('Revenue adjustment not found');
+        error.status = 404;
+        throw error;
+      }
       return success(res, { data: record, message: 'Revenue adjustment updated' });
     } catch (error) {
       next(error);

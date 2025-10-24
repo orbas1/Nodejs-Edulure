@@ -65,6 +65,19 @@ export default class DirectMessageService {
       return acc;
     }, new Map());
 
+    const viewerParticipants = participantsByThread.map((participants) =>
+      participants.find((participant) => participant.userId === userId) ?? null
+    );
+
+    const unreadCounts = await Promise.all(
+      viewerParticipants.map((participant, index) => {
+        if (!participant) {
+          return Promise.resolve(0);
+        }
+        return DirectMessageModel.countSince(threadIds[index], participant.lastReadAt);
+      })
+    );
+
     const results = [];
     for (let index = 0; index < threads.length; index += 1) {
       const thread = threads[index];
@@ -72,11 +85,11 @@ export default class DirectMessageService {
         ...participant,
         user: userMap.get(participant.userId) ?? null
       }));
-      const viewerParticipant = participants.find((participant) => participant.userId === userId);
+      const viewerParticipant = viewerParticipants[index];
       if (!viewerParticipant) {
         continue;
       }
-      const unreadCount = await DirectMessageModel.countSince(thread.id, viewerParticipant.lastReadAt);
+      const unreadCount = unreadCounts[index] ?? 0;
       results.push({
         thread: {
           ...thread,
