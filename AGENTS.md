@@ -132,8 +132,40 @@
         14. **Text & Copy.** Warning messages (“Telemetry export job paused after repeated failures”, “Scheduled additional telemetry export to drain backlog”) map directly onto ops scripts for clarity. 
         15. **Change Checklist Tracker.** Each release should validate S3 checksum metadata, decrypt sample checkpoints, confirm background job metrics, and review backlog flush logs in staging. 
         16. **Full Upgrade Plan & Release Steps.** Roll out encryption keys, canary the backpressure loop, verify Prometheus counters and freshness dashboards, then brief analytics teams before enabling in production. 
-      - 5.A Identity & Access Schema (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
-      - 5.B Learning Content Schema (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
+      - ✓ 5.A Identity & Access Schema (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
+        1. **Appraisal.** Migration `20250415120000_user_role_assignments.js` introduces `user_role_assignments` with referential integrity, indexes, and update triggers so role governance leaves ad-hoc columns for an auditable table.
+        2. **Functionality.** `AuthService.register`, `login`, and `refreshSession` now hydrate assignments through `serializeUserWithAuthorizations` and embed deduped `roles` arrays into JWT payloads while exposing `roleAssignments` in serialized users (`backend-nodejs/src/services/AuthService.js`).
+        3. **Logic Usefulness.** Consumers can interrogate `UserRoleAssignmentModel.listActiveByUser` plus the enriched serializer to drive access reviews, impersonation audits, and UI matrices without custom joins.
+        4. **Redundancies.** `normaliseRoleIdentifier`, `buildRoleList`, and serializer helpers consolidate role string handling, eliminating bespoke trimming logic previously scattered across auth flows.
+        5. **Placeholders.** `UserRoleAssignmentModel.pruneExpired` is ready for automation but lacks a scheduled job; wire it to background workers so expired assignments close automatically.
+        6. **Duplicate Functions.** Assignment creation/upsert logic now lives solely inside `UserRoleAssignmentModel.assign`, replacing repeated role persistence paths across services.
+        7. **Improvements Needed.** Build admin APIs/UI to manage assignments, enforce tenant scopes, and mirror changes back into `users.role` until that legacy column can be deprecated.
+        8. **Styling Improvements.** Update Annex identity ERDs and handbook callouts with the new assignment table, using accessible palette accents to distinguish scoped vs global roles.
+        9. **Efficiency Analysis.** Unique `(user_id, role_key, scope_type, scope_id, revoked_at)` constraint with supporting indexes plus assign upserts prevent duplicates, while JWT role lists reuse cached deduped arrays.
+        10. **Strengths to Keep.** Session hashing, two-factor enforcement, and audit events remain untouched while responses/tokens now deliver richer role context for downstream systems.
+        11. **Weaknesses to Remove.** Legacy `users.role` can drift from assignments; consider triggers or validation during updates until full migration is complete.
+        12. **Styling & Colour Review.** Align identity documentation chips/badges referencing assignments with compliance palette tokens described in Annex A38.
+        13. **CSS, Orientation & Placement.** Plan admin matrices showing scope, expiry, metadata, and actor columns based on the serializer’s `roleAssignments` structure.
+        14. **Text Analysis.** Refresh onboarding/tooltips to mention aggregated `roles` and assignment provenance so support teams interpret payloads accurately.
+        15. **Change Checklist Tracker.** Apply migration `20250415120000_user_role_assignments.js`, backfill roles, confirm JWT `roles` claims via smoke tests, and validate serializer output across auth endpoints.
+        16. **Full Upgrade Plan & Release Steps.** Migrate, reseed identity fixtures, deploy backend, update docs, and rehearse login/refresh flows to verify assignment metadata before enabling in production.
+      - ✓ 5.B Learning Content Schema (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
+        1. **Appraisal.** Migration `20250415121000_course_version_snapshots.js` adds `course_version_snapshots` plus module/lesson `version` columns, giving the content schema a persistent history layer.
+        2. **Functionality.** `CourseModel.create` now records an initial snapshot and `updateById` captures diffs/summary entries through `CourseVersionSnapshotModel.recordChange`, providing end-to-end change tracking (`backend-nodejs/src/models/CourseModel.js`).
+        3. **Logic Usefulness.** Snapshot JSON (`previous`/`next`) and the stored `changes` array equip analytics, editorial audits, and rollback tooling without bespoke export scripts.
+        4. **Redundancies.** Diffing and serialisation live entirely in `CourseVersionSnapshotModel`, replacing the repeated JSON comparison helpers that once lived in services/controllers.
+        5. **Placeholders.** Actor attribution currently defaults to instructors/admins; integrate workflow context so collaborative edits capture the responsible user once multi-editor tooling ships.
+        6. **Duplicate Functions.** Snapshot computation centralises stable stringify/diff logic, eliminating per-feature implementations of course history capture.
+        7. **Improvements Needed.** Increment module/lesson `version` fields from orchestrators, expose history endpoints, and visualise summaries inside admin/course authoring UIs.
+        8. **Styling Improvements.** Update ERDs and curriculum docs with the new snapshot table, employing accessible colours to call out history flows per Annex A39 guidance.
+        9. **Efficiency Analysis.** Unique `(course_id, version)` constraint and recorded-at indexes keep snapshot queries quick; JSON diffing runs once per update and reuses stable serialisation helpers.
+        10. **Strengths to Keep.** Existing catalogue helpers, metadata serialisers, and course relationships remain intact while history capture happens transparently at model level.
+        11. **Weaknesses to Remove.** Snapshot payloads store full course JSON; consider compression/archival for large metadata blobs before release data balloons.
+        12. **Styling & Colour Review.** Document how version timelines (timestamps, summaries) should inherit the established dashboard palette so UI surfaces stay consistent.
+        13. **CSS, Orientation & Placement.** Provide layout guidance for diff cards/timelines (field labels, before/after chips) using `changes` output so admin panels render history coherently.
+        14. **Text Analysis.** Ensure release notes and authoring copy mention automatic snapshotting and explain how the change summary headlines map to tracked fields.
+        15. **Change Checklist Tracker.** Run migration `20250415121000_course_version_snapshots.js`, verify snapshot rows on course create/update, and confirm module/lesson version defaults seeded to `1`.
+        16. **Full Upgrade Plan & Release Steps.** Migrate, reseed sample courses, rehearse editing flows to inspect snapshots, update SDK/docs, and deploy alongside UI consumers of the new history APIs.
       - 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
       - 5.D Commerce & Finance Schema (`models/InvoiceModel.js`, `models/SubscriptionModel.js`, `models/PaymentAttemptModel.js`, `models/EscrowPayoutModel.js`, `models/CommunityDonationModel.js`, `migrations/*billing*`, `migrations/*finance*`)
       - 5.E Analytics, Governance & Observability Schema (`models/AnalyticsAlertModel.js`, `models/TelemetryExportModel.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`, `migrations/*analytics*`, `migrations/*governance*`)
