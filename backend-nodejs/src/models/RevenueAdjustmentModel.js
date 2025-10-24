@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import { normaliseCurrencyCode, toMinorUnit } from '../utils/currency.js';
+import RevenueAdjustmentAuditModel from './RevenueAdjustmentAuditModel.js';
 
 const TABLE = 'revenue_adjustments';
 
@@ -44,16 +46,57 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function normaliseAmountCents(value) {
+  return toMinorUnit(value ?? 0, { allowNegative: true, fieldName: 'amountCents' });
+}
+
+function normaliseCurrency(value) {
+  return normaliseCurrencyCode(value, { fallback: 'USD' });
+}
+
+function snapshotForAudit(adjustment) {
+  if (!adjustment) {
+    return null;
+  }
+
+  return {
+    status: adjustment.status ?? null,
+    amountCents: adjustment.amountCents ?? 0,
+    currency: adjustment.currency ?? null,
+    effectiveAt: adjustment.effectiveAt ? new Date(adjustment.effectiveAt).toISOString() : null,
+    notes: adjustment.notes ?? null,
+    metadata: adjustment.metadata ?? {}
+  };
+}
+
+function diffAdjustments(previous, next) {
+  const before = snapshotForAudit(previous) ?? {};
+  const after = snapshotForAudit(next) ?? {};
+  const changed = [];
+
+  for (const key of Object.keys(after)) {
+    const beforeValue = JSON.stringify(before[key] ?? null);
+    const afterValue = JSON.stringify(after[key] ?? null);
+    if (beforeValue !== afterValue) {
+      changed.push(key);
+    }
+  }
+
+  return {
+    changed,
+    previousValues: changed.reduce((acc, key) => ({ ...acc, [key]: before[key] ?? null }), {}),
+    nextValues: changed.reduce((acc, key) => ({ ...acc, [key]: after[key] ?? null }), {})
+  };
+}
+
 function toDbPayload(adjustment) {
   return {
     public_id: adjustment.publicId ?? randomUUID(),
     reference: adjustment.reference,
     category: adjustment.category ?? 'general',
     status: adjustment.status ?? 'scheduled',
-    currency: adjustment.currency ?? 'USD',
-    amount_cents: Number.isFinite(Number(adjustment.amountCents))
-      ? Number(adjustment.amountCents)
-      : 0,
+    currency: normaliseCurrency(adjustment.currency),
+    amount_cents: normaliseAmountCents(adjustment.amountCents),
     effective_at: adjustment.effectiveAt ?? null,
     notes: adjustment.notes ?? null,
     metadata: JSON.stringify(adjustment.metadata ?? {}),
@@ -72,8 +115,8 @@ function deserialize(row) {
     reference: row.reference,
     category: row.category,
     status: row.status,
-    currency: row.currency,
-    amountCents: Number(row.amountCents ?? 0),
+    currency: normaliseCurrency(row.currency),
+    amountCents: normaliseAmountCents(row.amountCents),
     effectiveAt: toDate(row.effectiveAt),
     notes: row.notes ?? null,
     metadata: parseJson(row.metadata),
@@ -152,16 +195,29 @@ export default class RevenueAdjustmentModel {
   static async create(adjustment, connection = db) {
     const payload = toDbPayload(adjustment);
     const [id] = await connection(TABLE).insert(payload);
-    return this.findById(id, connection);
+    const created = await this.findById(id, connection);
+    await RevenueAdjustmentAuditModel.record(
+      {
+        adjustmentId: created.id,
+        action: 'created',
+        performedBy: created.createdBy ?? created.updatedBy ?? null,
+        changedFields: Object.keys(snapshotForAudit(created)),
+        previousValues: null,
+        nextValues: snapshotForAudit(created)
+      },
+      connection
+    );
+    return created;
   }
 
   static async updateById(id, updates, connection = db) {
+    const existing = await this.findById(id, connection);
     const payload = {};
     if (updates.reference !== undefined) payload.reference = updates.reference;
     if (updates.category !== undefined) payload.category = updates.category;
     if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.currency !== undefined) payload.currency = updates.currency;
-    if (updates.amountCents !== undefined) payload.amount_cents = updates.amountCents;
+    if (updates.currency !== undefined) payload.currency = normaliseCurrency(updates.currency);
+    if (updates.amountCents !== undefined) payload.amount_cents = normaliseAmountCents(updates.amountCents);
     if (updates.effectiveAt !== undefined) payload.effective_at = updates.effectiveAt;
     if (updates.notes !== undefined) payload.notes = updates.notes;
     if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
@@ -175,11 +231,42 @@ export default class RevenueAdjustmentModel {
       .where({ id })
       .update({ ...payload, updated_at: connection.fn.now() });
 
-    return this.findById(id, connection);
+    const updated = await this.findById(id, connection);
+    const { changed, previousValues, nextValues } = diffAdjustments(existing, updated);
+    if (changed.length) {
+      await RevenueAdjustmentAuditModel.record(
+        {
+          adjustmentId: updated.id,
+          action: 'updated',
+          performedBy: updates.updatedBy ?? updated.updatedBy ?? null,
+          changedFields: changed,
+          previousValues,
+          nextValues
+        },
+        connection
+      );
+    }
+
+    return updated;
   }
 
-  static async deleteById(id, connection = db) {
+  static async deleteById(id, { performedBy } = {}, connection = db) {
+    const existing = await this.findById(id, connection);
+    if (!existing) {
+      return;
+    }
     await connection(TABLE).where({ id }).del();
+    await RevenueAdjustmentAuditModel.record(
+      {
+        adjustmentId: existing.id,
+        action: 'deleted',
+        performedBy: performedBy ?? existing.updatedBy ?? existing.createdBy ?? null,
+        changedFields: Object.keys(snapshotForAudit(existing)),
+        previousValues: snapshotForAudit(existing),
+        nextValues: null
+      },
+      connection
+    );
   }
 
   static async summariseWindow({ since, until } = {}, connection = db) {

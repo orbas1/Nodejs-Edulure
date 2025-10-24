@@ -19,6 +19,9 @@ function mapRecord(record) {
     metadata: parseJson(record.metadata, {}),
     lastMessageAt: record.last_message_at,
     lastMessagePreview: record.last_message_preview ?? null,
+    archivedAt: record.archived_at ?? null,
+    archivedBy: record.archived_by ?? null,
+    archiveMetadata: parseJson(record.archive_metadata, {}),
     createdAt: record.created_at,
     updatedAt: record.updated_at
   };
@@ -31,7 +34,8 @@ export default class DirectMessageThreadModel {
       is_group: Boolean(thread.isGroup),
       metadata: JSON.stringify(thread.metadata ?? {}),
       last_message_at: thread.lastMessageAt ?? null,
-      last_message_preview: thread.lastMessagePreview ?? null
+      last_message_preview: thread.lastMessagePreview ?? null,
+      archive_metadata: JSON.stringify(thread.archiveMetadata ?? {})
     };
     const [id] = await connection('direct_message_threads').insert(payload);
     const row = await connection('direct_message_threads').where({ id }).first();
@@ -57,13 +61,26 @@ export default class DirectMessageThreadModel {
     if (Object.prototype.hasOwnProperty.call(updates, 'lastMessagePreview')) {
       payload.last_message_preview = updates.lastMessagePreview;
     }
+    if (Object.prototype.hasOwnProperty.call(updates, 'archivedAt')) {
+      payload.archived_at = updates.archivedAt ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'archivedBy')) {
+      payload.archived_by = updates.archivedBy ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'archiveMetadata')) {
+      payload.archive_metadata = JSON.stringify(updates.archiveMetadata ?? {});
+    }
 
     await connection('direct_message_threads').where({ id }).update(payload);
     return this.findById(id, connection);
   }
 
-  static async listForUser(userId, { limit = 20, offset = 0 } = {}, connection = db) {
-    const rows = await connection('direct_message_threads as dmt')
+  static async listForUser(
+    userId,
+    { limit = 20, offset = 0, includeArchived = false } = {},
+    connection = db
+  ) {
+    const query = connection('direct_message_threads as dmt')
       .leftJoin('direct_message_participants as dmp', 'dmt.id', 'dmp.thread_id')
       .where('dmp.user_id', userId)
       .orderBy('dmt.last_message_at', 'desc')
@@ -76,11 +93,42 @@ export default class DirectMessageThreadModel {
         'dmt.metadata',
         'dmt.last_message_at',
         'dmt.last_message_preview',
+        'dmt.archived_at',
+        'dmt.archived_by',
+        'dmt.archive_metadata',
         'dmt.created_at',
-        'dmt.updated_at'
+        'dmt.updated_at',
+        'dmp.archived_at as participant_archived_at'
       ]);
 
-    return rows.map((row) => mapRecord(row));
+    if (!includeArchived) {
+      query.andWhereNull('dmp.archived_at').andWhereNull('dmt.archived_at');
+    }
+
+    const rows = await query;
+    return rows.map((row) => {
+      const participantArchivedAt = row.participant_archived_at ?? null;
+      return {
+        ...mapRecord(row),
+        participantArchivedAt,
+        viewerArchivedAt: participantArchivedAt
+      };
+    });
+  }
+
+  static async setArchiveState(id, { archivedAt, archivedBy, archiveMetadata } = {}, connection = db) {
+    const payload = { updated_at: connection.fn.now() };
+    if (archivedAt !== undefined) {
+      payload.archived_at = archivedAt;
+    }
+    if (archivedBy !== undefined) {
+      payload.archived_by = archivedBy;
+    }
+    if (archiveMetadata !== undefined) {
+      payload.archive_metadata = JSON.stringify(archiveMetadata ?? {});
+    }
+    await connection('direct_message_threads').where({ id }).update(payload);
+    return this.findById(id, connection);
   }
 
   static async findThreadMatchingParticipants(participantIds, connection = db) {

@@ -9,14 +9,17 @@ const directMessageThreadModelMock = vi.hoisted(() => ({
   listForUser: vi.fn(),
   create: vi.fn(),
   updateThreadMetadata: vi.fn(),
-  findThreadMatchingParticipants: vi.fn()
+  findThreadMatchingParticipants: vi.fn(),
+  setArchiveState: vi.fn(),
+  findById: vi.fn()
 }));
 
 const directMessageParticipantModelMock = vi.hoisted(() => ({
   listForThread: vi.fn(),
   create: vi.fn(),
   findParticipant: vi.fn(),
-  updateLastRead: vi.fn()
+  updateLastRead: vi.fn(),
+  setArchivedState: vi.fn()
 }));
 
 const directMessageModelMock = vi.hoisted(() => ({
@@ -33,6 +36,10 @@ const userModelMock = vi.hoisted(() => ({
 
 const domainEventModelMock = vi.hoisted(() => ({
   record: vi.fn()
+}));
+
+const realtimeServiceMock = vi.hoisted(() => ({
+  broadcastThreadUpsert: vi.fn()
 }));
 
 vi.mock('../src/config/database.js', () => ({
@@ -55,6 +62,9 @@ vi.mock('../src/models/UserModel.js', () => ({
 vi.mock('../src/models/DomainEventModel.js', () => ({
   default: domainEventModelMock
 }));
+vi.mock('../src/services/RealtimeService.js', () => ({
+  default: realtimeServiceMock
+}));
 
 describe('DirectMessageService', () => {
   beforeEach(() => {
@@ -64,7 +74,8 @@ describe('DirectMessageService', () => {
       directMessageParticipantModelMock,
       directMessageModelMock,
       userModelMock,
-      domainEventModelMock
+      domainEventModelMock,
+      realtimeServiceMock
     ].forEach((mock) => {
       Object.values(mock).forEach((fn) => fn.mockReset());
     });
@@ -116,6 +127,8 @@ describe('DirectMessageService', () => {
     });
     directMessageThreadModelMock.updateThreadMetadata.mockResolvedValue({});
     directMessageParticipantModelMock.updateLastRead.mockResolvedValue({ lastReadMessageId: 902 });
+    directMessageParticipantModelMock.setArchivedState.mockResolvedValue({});
+    directMessageThreadModelMock.setArchiveState.mockResolvedValue({ id: 77 });
 
     const message = await DirectMessageService.sendMessage(77, 11, {
       body: 'Ready for the dry run checklist review.'
@@ -131,6 +144,17 @@ describe('DirectMessageService', () => {
       expect.any(Object)
     );
     expect(directMessageParticipantModelMock.updateLastRead).toHaveBeenCalled();
+    expect(directMessageParticipantModelMock.setArchivedState).toHaveBeenCalledWith(
+      77,
+      11,
+      { archivedAt: null },
+      expect.any(Object)
+    );
+    expect(directMessageThreadModelMock.setArchiveState).toHaveBeenCalledWith(
+      77,
+      { archivedAt: null, archivedBy: null },
+      expect.any(Object)
+    );
     expect(message).toEqual(expect.objectContaining({ id: 902 }));
   });
 
@@ -141,13 +165,77 @@ describe('DirectMessageService', () => {
 
     expect(directMessageThreadModelMock.listForUser).toHaveBeenCalledWith(42, {
       limit: env.directMessages.threads.maxPageSize,
-      offset: 0
+      offset: 0,
+      includeArchived: false
     });
     expect(result).toEqual({
       threads: [],
       limit: env.directMessages.threads.maxPageSize,
       offset: 0
     });
+  });
+
+  it('archives a thread and records participant state', async () => {
+    directMessageParticipantModelMock.findParticipant.mockResolvedValue({ threadId: 77, userId: 11 });
+    directMessageParticipantModelMock.listForThread.mockResolvedValue([
+      { userId: 11, archivedAt: new Date(), record: {} },
+      { userId: 22, archivedAt: new Date(), record: {} }
+    ]);
+    directMessageThreadModelMock.setArchiveState.mockResolvedValue({ id: 77, archivedAt: new Date() });
+
+    const result = await DirectMessageService.archiveThread(77, 11, { reason: 'Cleanup' });
+
+    expect(directMessageParticipantModelMock.setArchivedState).toHaveBeenCalledWith(
+      77,
+      11,
+      expect.objectContaining({ archivedAt: expect.any(Date) }),
+      expect.any(Object)
+    );
+    expect(directMessageThreadModelMock.setArchiveState).toHaveBeenCalledWith(
+      77,
+      expect.objectContaining({ archiveMetadata: { reason: 'Cleanup' }, archivedBy: 11 }),
+      expect.any(Object)
+    );
+    expect(result.thread).toEqual(expect.objectContaining({ id: 77 }));
+    expect(realtimeServiceMock.broadcastThreadUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 77 }),
+      expect.any(Array),
+      { archived: true }
+    );
+  });
+
+  it('restores a thread and clears archive state', async () => {
+    directMessageParticipantModelMock.findParticipant.mockResolvedValue({ threadId: 77, userId: 11 });
+    directMessageParticipantModelMock.listForThread
+      .mockResolvedValueOnce([
+        { userId: 11, archivedAt: new Date(), record: {} },
+        { userId: 22, archivedAt: new Date(), record: {} }
+      ])
+      .mockResolvedValueOnce([
+        { userId: 11, archivedAt: null, record: {} },
+        { userId: 22, archivedAt: null, record: {} }
+      ]);
+    directMessageThreadModelMock.setArchiveState.mockResolvedValue({ id: 77, archivedAt: null });
+
+    const result = await DirectMessageService.restoreThread(77, 11);
+
+    expect(directMessageParticipantModelMock.setArchivedState).toHaveBeenCalledWith(
+      77,
+      11,
+      { archivedAt: null },
+      expect.any(Object)
+    );
+    expect(directMessageThreadModelMock.setArchiveState).toHaveBeenCalledWith(
+      77,
+      { archivedAt: null, archivedBy: null, archiveMetadata: {} },
+      expect.any(Object)
+    );
+    expect(result.thread).toEqual(expect.objectContaining({ id: 77 }));
+    expect(realtimeServiceMock.broadcastThreadUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 77 }),
+      expect.any(Array),
+      { archived: false }
+    );
   });
 
   it('clamps direct message history pagination to the configured ceiling', async () => {

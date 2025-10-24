@@ -9,5 +9,7 @@ router.post('/threads', auth(), DirectMessageController.createThread);
 router.get('/threads/:threadId/messages', auth(), DirectMessageController.listMessages);
 router.post('/threads/:threadId/messages', auth(), DirectMessageController.sendMessage);
 router.post('/threads/:threadId/read', auth(), DirectMessageController.markRead);
+router.post('/threads/:threadId/archive', auth(), DirectMessageController.archiveThread);
+router.delete('/threads/:threadId/archive', auth(), DirectMessageController.restoreThread);
 
 export default router;

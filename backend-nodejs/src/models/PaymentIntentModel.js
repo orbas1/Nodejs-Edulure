@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
 import DataEncryptionService from '../services/DataEncryptionService.js';
+import { normaliseCurrencyCode, toMinorUnit } from '../utils/currency.js';
 
 const TABLE = 'payment_intents';
 
@@ -40,16 +41,11 @@ const BASE_COLUMNS = [
 ];
 
 function coerceAmount(value) {
-  if (value === null || value === undefined) {
+  try {
+    return toMinorUnit(value, { allowNegative: false, fieldName: 'amount' });
+  } catch (_error) {
     return 0;
   }
-
-  if (typeof value === 'number') {
-    return value;
-  }
-
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function parseJson(value) {
@@ -138,12 +134,12 @@ function toDbPayload(intent) {
     user_id: intent.userId ?? null,
     provider: intent.provider,
     status: intent.status ?? 'requires_payment_method',
-    currency: intent.currency,
-    amount_subtotal: intent.amountSubtotal,
-    amount_discount: intent.amountDiscount ?? 0,
-    amount_tax: intent.amountTax ?? 0,
-    amount_total: intent.amountTotal,
-    amount_refunded: intent.amountRefunded ?? 0,
+    currency: normaliseCurrencyCode(intent.currency),
+    amount_subtotal: toMinorUnit(intent.amountSubtotal, { fieldName: 'amountSubtotal' }),
+    amount_discount: toMinorUnit(intent.amountDiscount ?? 0, { fieldName: 'amountDiscount' }),
+    amount_tax: toMinorUnit(intent.amountTax ?? 0, { fieldName: 'amountTax' }),
+    amount_total: toMinorUnit(intent.amountTotal, { fieldName: 'amountTotal' }),
+    amount_refunded: toMinorUnit(intent.amountRefunded ?? 0, { fieldName: 'amountRefunded' }),
     tax_breakdown: JSON.stringify(intent.taxBreakdown ?? {}),
     metadata: JSON.stringify(intent.metadata ?? {}),
     coupon_id: intent.couponId ?? null,
@@ -171,7 +167,7 @@ function deserialize(record) {
     providerCaptureId: sensitive.providerCaptureId,
     providerLatestChargeId: sensitive.providerLatestChargeId,
     status: record.status,
-    currency: record.currency,
+    currency: normaliseCurrencyCode(record.currency),
     amountSubtotal: coerceAmount(record.amountSubtotal),
     amountDiscount: coerceAmount(record.amountDiscount),
     amountTax: coerceAmount(record.amountTax),
@@ -282,12 +278,22 @@ export default class PaymentIntentModel {
     };
 
     if (updates.status) payload.status = updates.status;
-    if (updates.currency) payload.currency = updates.currency;
-    if (updates.amountSubtotal !== undefined) payload.amount_subtotal = updates.amountSubtotal;
-    if (updates.amountDiscount !== undefined) payload.amount_discount = updates.amountDiscount;
-    if (updates.amountTax !== undefined) payload.amount_tax = updates.amountTax;
-    if (updates.amountTotal !== undefined) payload.amount_total = updates.amountTotal;
-    if (updates.amountRefunded !== undefined) payload.amount_refunded = updates.amountRefunded;
+    if (updates.currency) payload.currency = normaliseCurrencyCode(updates.currency);
+    if (updates.amountSubtotal !== undefined) {
+      payload.amount_subtotal = toMinorUnit(updates.amountSubtotal, { fieldName: 'amountSubtotal' });
+    }
+    if (updates.amountDiscount !== undefined) {
+      payload.amount_discount = toMinorUnit(updates.amountDiscount, { fieldName: 'amountDiscount' });
+    }
+    if (updates.amountTax !== undefined) {
+      payload.amount_tax = toMinorUnit(updates.amountTax, { fieldName: 'amountTax' });
+    }
+    if (updates.amountTotal !== undefined) {
+      payload.amount_total = toMinorUnit(updates.amountTotal, { fieldName: 'amountTotal' });
+    }
+    if (updates.amountRefunded !== undefined) {
+      payload.amount_refunded = toMinorUnit(updates.amountRefunded, { fieldName: 'amountRefunded' });
+    }
     if (updates.taxBreakdown) payload.tax_breakdown = JSON.stringify(updates.taxBreakdown);
     if (updates.metadata) payload.metadata = JSON.stringify(updates.metadata);
     if (updates.couponId !== undefined) payload.coupon_id = updates.couponId;

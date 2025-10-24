@@ -228,7 +228,9 @@ export default class AdminRevenueManagementController {
 
   static async deleteAdjustment(req, res, next) {
     try {
-      await RevenueAdjustmentModel.deleteById(Number(req.params.adjustmentId));
+      await RevenueAdjustmentModel.deleteById(Number(req.params.adjustmentId), {
+        performedBy: req.user?.id ?? null
+      });
       return success(res, { message: 'Revenue adjustment deleted', status: 204 });
     } catch (error) {
       next(error);

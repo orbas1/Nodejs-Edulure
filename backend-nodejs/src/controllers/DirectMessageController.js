@@ -10,7 +10,8 @@ const listThreadsQuerySchema = Joi.object({
     .min(1)
     .max(env.directMessages.threads.maxPageSize)
     .default(env.directMessages.threads.defaultPageSize),
-  offset: Joi.number().integer().min(0).default(0)
+  offset: Joi.number().integer().min(0).default(0),
+  includeArchived: Joi.boolean().default(false)
 });
 
 const createThreadSchema = Joi.object({
@@ -45,6 +46,10 @@ const sendMessageSchema = Joi.object({
 const markReadSchema = Joi.object({
   messageId: Joi.number().integer().min(1).optional(),
   timestamp: Joi.date().optional()
+});
+
+const archiveThreadSchema = Joi.object({
+  reason: Joi.string().max(240).allow(null, '').optional()
 });
 
 export default class DirectMessageController {
@@ -169,6 +174,32 @@ export default class DirectMessageController {
         error.status = 422;
         error.details = error.details.map((detail) => detail.message);
       }
+      return next(error);
+    }
+  }
+
+  static async archiveThread(req, res, next) {
+    try {
+      const payload = await archiveThreadSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await DirectMessageService.archiveThread(req.params.threadId, req.user.id, payload);
+      return success(res, { data: result, message: 'Thread archived' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async restoreThread(req, res, next) {
+    try {
+      const result = await DirectMessageService.restoreThread(req.params.threadId, req.user.id);
+      return success(res, { data: result, message: 'Thread restored' });
+    } catch (error) {
       return next(error);
     }
   }

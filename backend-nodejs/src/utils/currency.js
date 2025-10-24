@@ -1,43 +1,47 @@
-const CURRENCY_CODE_PATTERN = /^[A-Z]{3}$/;
+const ISO_4217_REGEX = /^[A-Z]{3}$/;
 
-function normalizeFallback(fallback) {
-  if (!fallback) {
-    return 'USD';
+function toSanitisedString(value) {
+  if (value === null || value === undefined) {
+    return '';
   }
-  const code = String(fallback).trim().toUpperCase();
-  return CURRENCY_CODE_PATTERN.test(code) ? code : 'USD';
+  return String(value).trim();
 }
 
-export function normalizeCurrencyCode(code, fallback = 'USD') {
-  const fallbackCode = normalizeFallback(fallback);
-  if (typeof code === 'string') {
-    const trimmed = code.trim().toUpperCase();
-    if (CURRENCY_CODE_PATTERN.test(trimmed)) {
-      return trimmed;
-    }
-  } else if (code !== undefined && code !== null) {
-    const coerced = String(code).trim().toUpperCase();
-    if (CURRENCY_CODE_PATTERN.test(coerced)) {
-      return coerced;
-    }
+export function normaliseCurrencyCode(value, { fallback = 'USD' } = {}) {
+  const candidate = toSanitisedString(value).toUpperCase();
+  if (candidate && ISO_4217_REGEX.test(candidate)) {
+    return candidate;
   }
-  return fallbackCode;
+  const fallbackCandidate = toSanitisedString(fallback).toUpperCase();
+  if (ISO_4217_REGEX.test(fallbackCandidate)) {
+    return fallbackCandidate;
+  }
+  throw new Error('currency must be a 3-letter ISO code');
 }
 
-export function currencyStringToCents(value) {
-  if (!value) {
+export function toMinorUnit(value, { allowNegative = false, fieldName = 'amount' } = {}) {
+  if (value === null || value === undefined || value === '') {
     return 0;
   }
-  const parsed = Number.parseFloat(value);
-  if (Number.isNaN(parsed)) {
-    return 0;
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    throw new Error(`${fieldName} must be a finite number`);
   }
-  return Math.round(parsed * 100);
+
+  const rounded = Math.round(numeric);
+  if (!allowNegative && rounded < 0) {
+    throw new Error(`${fieldName} cannot be negative`);
+  }
+  return rounded;
 }
 
-export function centsToCurrencyString(amount) {
-  if (!Number.isFinite(amount)) {
-    return '0.00';
-  }
-  return (Math.round(amount) / 100).toFixed(2);
+export function snapCurrencyPayload(payload = {}, options = {}) {
+  const { allowNegative = false, fallbackCurrency = 'USD' } = options;
+  const amountCents = toMinorUnit(payload.amountCents ?? payload.amount ?? 0, {
+    allowNegative,
+    fieldName: options.fieldName ?? 'amountCents'
+  });
+  const currency = normaliseCurrencyCode(payload.currency, { fallback: fallbackCurrency });
+  return { amountCents, currency };
 }

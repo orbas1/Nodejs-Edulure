@@ -1,6 +1,8 @@
 import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { env } from '../src/config/env.js';
+
 const communityChatServiceMock = {
   listChannels: vi.fn(),
   listMessages: vi.fn(),
@@ -18,7 +20,9 @@ const directMessageServiceMock = {
   createThread: vi.fn(),
   listMessages: vi.fn(),
   sendMessage: vi.fn(),
-  markRead: vi.fn()
+  markRead: vi.fn(),
+  archiveThread: vi.fn(),
+  restoreThread: vi.fn()
 };
 
 const realtimeServiceMock = {
@@ -309,7 +313,23 @@ describe('Direct message HTTP routes', () => {
     expect(response.body.meta.pagination.limit).toBe(5);
     expect(directMessageServiceMock.listThreads).toHaveBeenCalledWith(42, {
       limit: 5,
-      offset: 10
+      offset: 10,
+      includeArchived: false
+    });
+  });
+
+  it('allows including archived threads when requested', async () => {
+    directMessageServiceMock.listThreads.mockResolvedValue({ threads: [], limit: 10, offset: 0 });
+
+    const response = await request(app)
+      .get('/api/v1/chat/threads?includeArchived=true')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(directMessageServiceMock.listThreads).toHaveBeenCalledWith(42, {
+      limit: env.directMessages.threads.defaultPageSize,
+      offset: 0,
+      includeArchived: true
     });
   });
 
@@ -387,5 +407,32 @@ describe('Direct message HTTP routes', () => {
     expect(directMessageServiceMock.markRead).toHaveBeenCalledWith('300', 42, {
       messageId: 910
     });
+  });
+
+  it('archives a direct message thread', async () => {
+    directMessageServiceMock.archiveThread.mockResolvedValue({
+      thread: { id: 300, archivedAt: new Date().toISOString() }
+    });
+
+    const response = await request(app)
+      .post('/api/v1/chat/threads/300/archive')
+      .set('Authorization', 'Bearer token')
+      .send({ reason: 'cleanup' });
+
+    expect(response.status).toBe(200);
+    expect(directMessageServiceMock.archiveThread).toHaveBeenCalledWith('300', 42, {
+      reason: 'cleanup'
+    });
+  });
+
+  it('restores an archived direct message thread', async () => {
+    directMessageServiceMock.restoreThread.mockResolvedValue({ thread: { id: 300 } });
+
+    const response = await request(app)
+      .delete('/api/v1/chat/threads/300/archive')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(directMessageServiceMock.restoreThread).toHaveBeenCalledWith('300', 42);
   });
 });

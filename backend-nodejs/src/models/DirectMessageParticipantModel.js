@@ -23,6 +23,7 @@ function mapRecord(record) {
     lastReadAt: record.last_read_at,
     lastReadMessageId: record.last_read_message_id ?? null,
     metadata: parseJson(record.metadata, {}),
+    archivedAt: record.archived_at ?? null,
     createdAt: record.created_at,
     updatedAt: record.updated_at
   };
@@ -64,6 +65,16 @@ export default class DirectMessageParticipantModel {
       .update({
         last_read_at: timestamp ?? connection.fn.now(),
         last_read_message_id: messageId ?? null,
+        updated_at: connection.fn.now()
+      });
+    return this.findParticipant(threadId, userId, connection);
+  }
+
+  static async setArchivedState(threadId, userId, { archivedAt } = {}, connection = db) {
+    await connection('direct_message_participants')
+      .where({ thread_id: threadId, user_id: userId })
+      .update({
+        archived_at: archivedAt ?? null,
         updated_at: connection.fn.now()
       });
     return this.findParticipant(threadId, userId, connection);

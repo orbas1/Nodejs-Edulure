@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { normaliseCurrencyCode, toMinorUnit } from '../utils/currency.js';
 
 const TABLE = 'payment_ledger_entries';
 
@@ -6,7 +7,7 @@ const BASE_COLUMNS = [
   'id',
   'payment_intent_id as paymentIntentId',
   'entry_type as entryType',
-  'amount',
+  'amount_cents as amountCents',
   'currency',
   'details',
   'recorded_at as recordedAt'
@@ -27,34 +28,11 @@ function parseJson(value) {
 }
 
 function coerceAmount(value) {
-  if (value === null || value === undefined) {
+  try {
+    return toMinorUnit(value, { allowNegative: true, fieldName: 'amountCents' });
+  } catch (_error) {
     return 0;
   }
-  if (typeof value === 'number') {
-    return value;
-  }
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-function normaliseAmount(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return 0;
-  }
-  return Math.round(numeric);
-}
-
-function normaliseCurrency(value) {
-  if (!value) {
-    return 'GBP';
-  }
-  const trimmed = String(value).trim().toUpperCase();
-  if (/^[A-Z]{3}$/.test(trimmed)) {
-    return trimmed;
-  }
-  const letters = trimmed.replace(/[^A-Z]/g, '').slice(0, 3);
-  return letters.length === 3 ? letters : 'GBP';
 }
 
 function normaliseEntryType(value) {
@@ -85,15 +63,18 @@ export default class PaymentLedgerEntryModel {
       throw new Error('paymentIntentId is required to record a ledger entry');
     }
 
-    const amount = normaliseAmount(entry.amount);
-    const currency = normaliseCurrency(entry.currency);
+    const amountCents = toMinorUnit(entry.amountCents ?? entry.amount ?? 0, {
+      allowNegative: true,
+      fieldName: 'amountCents'
+    });
+    const currency = normaliseCurrencyCode(entry.currency, { fallback: 'GBP' });
     const entryType = normaliseEntryType(entry.entryType);
     const details = ensurePlainObject(entry.details);
 
     const payload = {
       payment_intent_id: entry.paymentIntentId,
       entry_type: entryType,
-      amount,
+      amount_cents: amountCents,
       currency,
       details: JSON.stringify({ ...details, currency, entryType }),
       recorded_at: entry.recordedAt ?? connection.fn.now()
@@ -119,8 +100,8 @@ export default class PaymentLedgerEntryModel {
   static deserialize(record) {
     return {
       ...record,
-      amount: coerceAmount(record.amount),
-      currency: normaliseCurrency(record.currency),
+      amountCents: coerceAmount(record.amountCents),
+      currency: normaliseCurrencyCode(record.currency, { fallback: 'GBP' }),
       entryType: normaliseEntryType(record.entryType),
       details: parseJson(record.details)
     };
