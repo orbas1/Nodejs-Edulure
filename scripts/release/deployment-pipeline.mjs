@@ -50,6 +50,31 @@ async function loadEnvironmentManifest(repoRoot) {
   return JSON.parse(contents);
 }
 
+async function loadEnvironmentDescriptor(repoRoot, manifest, environmentKey) {
+  const envEntry = manifest.environments?.[environmentKey];
+  const descriptorEntry = envEntry?.descriptor;
+  if (!descriptorEntry?.path) {
+    return null;
+  }
+
+  const absolutePath = path.join(repoRoot, descriptorEntry.path);
+
+  try {
+    const contents = await readFile(absolutePath, 'utf8');
+    const data = JSON.parse(contents);
+    return {
+      ...data,
+      __file: descriptorEntry.path,
+      __hash: descriptorEntry.hash ?? null
+    };
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
 function resolveBlueprintDescriptor(manifest, environmentKey) {
   const blueprintEntry = manifest.blueprints?.backendService;
   if (!blueprintEntry) {
@@ -102,7 +127,7 @@ function resolveBlueprintDescriptor(manifest, environmentKey) {
   };
 }
 
-function buildPipelinePlan(manifest, environmentKey) {
+function buildPipelinePlan(manifest, environmentKey, descriptor) {
   const environment = manifest.environments?.[environmentKey];
   if (!environment) {
     const available = Object.keys(manifest.environments ?? {}).join(', ');
@@ -132,9 +157,26 @@ function buildPipelinePlan(manifest, environmentKey) {
         ?? 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
       blueprintEndpoint,
       blueprintParameter: blueprint?.ssmParameter ?? null,
-      blueprintVersion: blueprint?.version ?? null
+      blueprintVersion: blueprint?.version ?? null,
+      environmentDescriptor: descriptor?.__file ?? null
     },
     blueprint,
+    environmentDescriptor: descriptor
+      ? {
+          file: descriptor.__file,
+          hash: descriptor.__hash,
+          environment: descriptor.environment ?? environmentKey,
+          domain: descriptor.domain ?? null,
+          aws: descriptor.aws ?? null,
+          blueprint: descriptor.blueprint ?? null,
+          terraformWorkspace: descriptor.terraformWorkspace ?? environment.path,
+          changeWindows: descriptor.changeWindows ?? [],
+          contacts: descriptor.contacts ?? {},
+          dockerCompose: descriptor.dockerCompose ?? null,
+          observability: descriptor.observability ?? null,
+          notes: Array.isArray(descriptor.notes) ? descriptor.notes : []
+        }
+      : null,
     phases: [
       {
         name: 'Build',
@@ -245,6 +287,9 @@ function renderMarkdown(plan) {
   if (plan.artifacts.blueprintVersion) {
     lines.push(`| Blueprint version | ${plan.artifacts.blueprintVersion} |`);
   }
+  if (plan.artifacts.environmentDescriptor) {
+    lines.push(`| Environment descriptor | ${plan.artifacts.environmentDescriptor} |`);
+  }
   lines.push('');
 
   lines.push('## Terraform Modules');
@@ -313,6 +358,66 @@ function renderMarkdown(plan) {
     lines.push('');
   }
 
+  if (plan.environmentDescriptor) {
+    const descriptor = plan.environmentDescriptor;
+    lines.push('## Environment Descriptor');
+    lines.push('');
+    lines.push(`- File: ${descriptor.file}`);
+    if (descriptor.hash) {
+      lines.push(`- Hash: ${descriptor.hash}`);
+    }
+    if (descriptor.domain) {
+      lines.push(`- Domain: ${descriptor.domain}`);
+    }
+    if (descriptor.aws) {
+      if (descriptor.aws.accountAlias) {
+        lines.push(`- AWS account: ${descriptor.aws.accountAlias}`);
+      }
+      if (descriptor.aws.region) {
+        lines.push(`- AWS region: ${descriptor.aws.region}`);
+      }
+      if (descriptor.aws.vpcId) {
+        lines.push(`- VPC: ${descriptor.aws.vpcId}`);
+      }
+    }
+    if (descriptor.blueprint) {
+      if (descriptor.blueprint.parameter) {
+        lines.push(`- Blueprint parameter: ${descriptor.blueprint.parameter}`);
+      }
+      if (descriptor.blueprint.runtimeEndpoint) {
+        lines.push(`- Blueprint endpoint: ${descriptor.blueprint.runtimeEndpoint}`);
+      }
+    }
+    if (descriptor.terraformWorkspace) {
+      lines.push(`- Terraform workspace: ${descriptor.terraformWorkspace}`);
+    }
+    if (descriptor.dockerCompose?.command) {
+      lines.push(`- Docker compose: ${descriptor.dockerCompose.command}`);
+    }
+    if (Array.isArray(descriptor.changeWindows) && descriptor.changeWindows.length > 0) {
+      lines.push('- Change windows:');
+      for (const window of descriptor.changeWindows) {
+        lines.push(`  - ${window}`);
+      }
+    }
+    if (descriptor.contacts && (descriptor.contacts.primary || descriptor.contacts.onCall)) {
+      lines.push('- Contacts:');
+      if (descriptor.contacts.primary) {
+        lines.push(`  - Primary: ${descriptor.contacts.primary}`);
+      }
+      if (descriptor.contacts.onCall) {
+        lines.push(`  - On-call: ${descriptor.contacts.onCall}`);
+      }
+    }
+    if (Array.isArray(descriptor.notes) && descriptor.notes.length > 0) {
+      lines.push('- Notes:');
+      for (const note of descriptor.notes) {
+        lines.push(`  - ${note}`);
+      }
+    }
+    lines.push('');
+  }
+
   return lines.join('\n');
 }
 
@@ -323,7 +428,8 @@ async function main() {
   const manifest = await loadEnvironmentManifest(repoRoot);
 
   const environmentKey = options.environment ?? 'staging';
-  const plan = buildPipelinePlan(manifest, environmentKey);
+  const descriptor = await loadEnvironmentDescriptor(repoRoot, manifest, environmentKey);
+  const plan = buildPipelinePlan(manifest, environmentKey, descriptor);
 
   if (options.format === 'json') {
     process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);

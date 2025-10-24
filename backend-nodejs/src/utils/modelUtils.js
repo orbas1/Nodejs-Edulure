@@ -201,3 +201,28 @@ export function writeJsonColumn(value, fallback = {}) {
   return safeJsonStringify(fallback, fallback);
 }
 
+export function readJsonArrayColumn(value, fallback = []) {
+  const parsed = safeJsonParse(value, fallback);
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+  return fallback;
+}
+
+export function writeJsonArrayColumn(value, fallback = []) {
+  if (value === undefined || value === null) {
+    return safeJsonStringify(fallback, fallback);
+  }
+
+  if (Array.isArray(value)) {
+    return safeJsonStringify(value, fallback);
+  }
+
+  if (typeof value === 'string') {
+    const parsed = safeJsonParse(value, fallback);
+    return safeJsonStringify(Array.isArray(parsed) ? parsed : fallback, fallback);
+  }
+
+  return safeJsonStringify(fallback, fallback);
+}
+

@@ -9,6 +9,7 @@ import { healthcheck as databaseHealthcheck } from '../config/database.js';
 import logger from '../config/logger.js';
 import { getRedisClient } from '../config/redisClient.js';
 import EnvironmentBlueprintModel from '../models/EnvironmentBlueprintModel.js';
+import EnvironmentDescriptorModel from '../models/EnvironmentDescriptorModel.js';
 import EnvironmentParitySnapshotModel from '../models/EnvironmentParitySnapshotModel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,6 +55,140 @@ function computeManifestHash(manifest) {
   return createHash()
     .update(serialized)
     .digest('hex');
+}
+
+function normaliseStringList(values = []) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const unique = new Set();
+  for (const entry of values) {
+    if (entry === null || entry === undefined) {
+      continue;
+    }
+    const trimmed = String(entry).trim();
+    if (trimmed) {
+      unique.add(trimmed);
+    }
+  }
+
+  return Array.from(unique).sort((a, b) => a.localeCompare(b));
+}
+
+function normaliseNoteList(values = []) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return values
+    .map((entry) => (entry === null || entry === undefined ? '' : String(entry).trim()))
+    .filter(Boolean);
+}
+
+async function loadDescriptorData(manifest, environmentKey) {
+  const descriptorEntry = manifest.environments?.[environmentKey]?.descriptor ?? {};
+  const relativePath = descriptorEntry.path
+    ?? path.join('infrastructure', 'environments', `${environmentKey}.json`);
+  const absolutePath = path.resolve(projectRoot, '..', relativePath);
+
+  try {
+    const contents = await fs.readFile(absolutePath, 'utf8');
+    return {
+      file: relativePath,
+      hash: descriptorEntry.hash ?? null,
+      payload: JSON.parse(contents)
+    };
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function deriveDescriptorExpectation({ manifest, environmentKey, descriptorData }) {
+  if (!descriptorData) {
+    return null;
+  }
+
+  const manifestEntry = manifest.environments?.[environmentKey] ?? {};
+  const blueprintEntry = manifest.blueprints?.backendService ?? {};
+  const registryRecord = blueprintEntry.registry?.[environmentKey] ?? {};
+  const payload = descriptorData.payload ?? {};
+  const aws = payload.aws ?? {};
+  const dockerCompose = payload.dockerCompose ?? {};
+  const observability = payload.observability ?? {};
+  const contacts = payload.contacts ?? {};
+
+  const parameter = payload.blueprint?.parameter
+    ?? manifestEntry.descriptor?.blueprintParameter
+    ?? registryRecord.ssmParameter
+    ?? null;
+
+  const runtimeEndpoint = payload.blueprint?.runtimeEndpoint
+    ?? manifestEntry.descriptor?.runtimeEndpoint
+    ?? registryRecord.runtimeEndpoint
+    ?? (environmentKey === 'prod'
+      ? 'https://edulure.com/ops/runtime-blueprint.json'
+      : `https://${environmentKey}.edulure.com/ops/runtime-blueprint.json`);
+
+  const serviceName = payload.blueprint?.service
+    ?? registryRecord.serviceName
+    ?? blueprintEntry.service
+    ?? 'backend-service';
+
+  return {
+    environment: payload.environment ?? environmentKey,
+    domain: payload.domain ?? null,
+    awsAccountAlias: aws.accountAlias ?? null,
+    awsRegion: aws.region ?? null,
+    awsVpcId: aws.vpcId ?? null,
+    awsPrivateSubnetTags: normaliseStringList(aws.privateSubnetTags),
+    awsPublicSubnetTags: normaliseStringList(aws.publicSubnetTags),
+    blueprintParameter: parameter,
+    blueprintRuntimeEndpoint: runtimeEndpoint,
+    blueprintServiceName: serviceName,
+    terraformWorkspace: payload.terraformWorkspace ?? manifestEntry.path ?? null,
+    dockerComposeFile: dockerCompose.file ?? 'docker-compose.yml',
+    dockerComposeCommand: dockerCompose.command ?? null,
+    dockerComposeProfiles: normaliseStringList(dockerCompose.profiles),
+    observabilityDashboardPath: observability.dashboard
+      ?? blueprintEntry.observability?.grafana?.path
+      ?? null,
+    observabilityCloudwatchDashboard: observability.cloudwatchDashboard ?? null,
+    contactsPrimary: contacts.primary ?? null,
+    contactsOnCall: contacts.onCall ?? null,
+    contactsAdditional: normaliseStringList(contacts.additional),
+    changeWindows: normaliseStringList(payload.changeWindows),
+    notes: normaliseNoteList(payload.notes),
+    metadata: {
+      manifestVersion: manifest.version ?? 1,
+      manifestEnvironmentPath: manifestEntry.path ?? null,
+      descriptorFile: descriptorData.file,
+      descriptorHash: descriptorData.hash,
+      manifestEnvironmentHash: manifestEntry.hash ?? null
+    }
+  };
+}
+
+async function buildDescriptorExpectations(manifest) {
+  const result = {};
+  const environmentKeys = Object.keys(manifest.environments ?? {});
+
+  for (const environmentKey of environmentKeys) {
+    const descriptorData = await loadDescriptorData(manifest, environmentKey);
+    const expectation = deriveDescriptorExpectation({
+      manifest,
+      environmentKey,
+      descriptorData
+    });
+
+    if (expectation) {
+      result[environmentKey] = expectation;
+    }
+  }
+
+  return result;
 }
 
 function mapMismatch(entry) {
@@ -187,11 +322,41 @@ export class EnvironmentParityService {
     };
 
     const blueprintRecords = await EnvironmentBlueprintModel.listAll();
+    const descriptorRecords = await EnvironmentDescriptorModel.listAll();
+
     const recordsByBlueprint = blueprintRecords.reduce((acc, record) => {
       if (!acc.has(record.blueprintKey)) {
         acc.set(record.blueprintKey, new Map());
       }
       acc.get(record.blueprintKey).set(record.environmentName, record);
+      return acc;
+    }, new Map());
+
+    const descriptorMap = descriptorRecords.reduce((acc, record) => {
+      acc.set(record.environmentName, {
+        environment: record.environmentName,
+        domain: record.domain ?? null,
+        awsAccountAlias: record.awsAccountAlias ?? null,
+        awsRegion: record.awsRegion ?? null,
+        awsVpcId: record.awsVpcId ?? null,
+        awsPrivateSubnetTags: normaliseStringList(record.awsPrivateSubnetTags),
+        awsPublicSubnetTags: normaliseStringList(record.awsPublicSubnetTags),
+        blueprintParameter: record.blueprintParameter ?? null,
+        blueprintRuntimeEndpoint: record.blueprintRuntimeEndpoint ?? null,
+        blueprintServiceName: record.blueprintServiceName ?? null,
+        terraformWorkspace: record.terraformWorkspace ?? null,
+        dockerComposeFile: record.dockerComposeFile ?? null,
+        dockerComposeCommand: record.dockerComposeCommand ?? null,
+        dockerComposeProfiles: normaliseStringList(record.dockerComposeProfiles),
+        observabilityDashboardPath: record.observabilityDashboardPath ?? null,
+        observabilityCloudwatchDashboard: record.observabilityCloudwatchDashboard ?? null,
+        contactsPrimary: record.contactsPrimary ?? null,
+        contactsOnCall: record.contactsOnCall ?? null,
+        contactsAdditional: normaliseStringList(record.contactsAdditional),
+        changeWindows: normaliseStringList(record.changeWindows),
+        notes: normaliseNoteList(record.notes),
+        metadata: record.metadata ?? {}
+      });
       return acc;
     }, new Map());
 
@@ -266,11 +431,12 @@ export class EnvironmentParityService {
     }
 
     sections.blueprints = await computeBlueprintSections(manifestSections.blueprints);
+    sections.descriptors = Object.fromEntries(descriptorMap.entries());
 
     return sections;
   }
 
-  compareManifest(manifest, runtime) {
+  compareManifest(manifest, runtime, { descriptorExpectations = {} } = {}) {
     const mismatches = [];
 
     function evaluate(sectionName, expectedEntries = {}, actualEntries = {}) {
@@ -317,12 +483,7 @@ export class EnvironmentParityService {
       }
     }
 
-    function normaliseAlarmList(list = []) {
-      if (!Array.isArray(list)) {
-        return [];
-      }
-      return Array.from(new Set(list.map((value) => String(value).trim()).filter(Boolean))).sort();
-    }
+    const normaliseAlarmList = normaliseStringList;
 
     function sanitizeBlueprintRecord(record) {
       if (!record) {
@@ -414,12 +575,100 @@ export class EnvironmentParityService {
       }
     }
 
+    function compareDescriptors(expectedDescriptors = {}, actualDescriptors = {}) {
+      for (const [environmentKey, expectedRecord] of Object.entries(expectedDescriptors)) {
+        const actualRecord = actualDescriptors[environmentKey];
+        if (!actualRecord) {
+          mismatches.push({
+            component: `descriptors.${environmentKey}`,
+            status: 'missing',
+            expected: expectedRecord,
+            observed: null
+          });
+          continue;
+        }
+
+        const fieldsToCompare = [
+          'domain',
+          'awsAccountAlias',
+          'awsRegion',
+          'awsVpcId',
+          'blueprintParameter',
+          'blueprintRuntimeEndpoint',
+          'blueprintServiceName',
+          'terraformWorkspace',
+          'dockerComposeFile',
+          'dockerComposeCommand',
+          'observabilityDashboardPath',
+          'observabilityCloudwatchDashboard',
+          'contactsPrimary',
+          'contactsOnCall'
+        ];
+
+        const arrayFields = [
+          'awsPrivateSubnetTags',
+          'awsPublicSubnetTags',
+          'dockerComposeProfiles',
+          'contactsAdditional',
+          'changeWindows'
+        ];
+
+        const noteFields = ['notes'];
+
+        const issues = [];
+
+        for (const field of fieldsToCompare) {
+          if ((expectedRecord?.[field] ?? null) !== (actualRecord?.[field] ?? null)) {
+            issues.push(field);
+          }
+        }
+
+        for (const field of arrayFields) {
+          const expectedValues = normaliseStringList(expectedRecord?.[field]);
+          const actualValues = normaliseStringList(actualRecord?.[field]);
+          if (expectedValues.join('|') !== actualValues.join('|')) {
+            issues.push(field);
+          }
+        }
+
+        for (const field of noteFields) {
+          const expectedValues = normaliseNoteList(expectedRecord?.[field]);
+          const actualValues = normaliseNoteList(actualRecord?.[field]);
+          if (expectedValues.join('|') !== actualValues.join('|')) {
+            issues.push(field);
+          }
+        }
+
+        if (issues.length > 0) {
+          mismatches.push({
+            component: `descriptors.${environmentKey}`,
+            status: 'mismatch',
+            expected: expectedRecord,
+            observed: actualRecord,
+            details: { fields: issues }
+          });
+        }
+      }
+
+      for (const environmentKey of Object.keys(actualDescriptors)) {
+        if (!Object.prototype.hasOwnProperty.call(expectedDescriptors, environmentKey)) {
+          mismatches.push({
+            component: `descriptors.${environmentKey}`,
+            status: 'unexpected',
+            expected: null,
+            observed: actualDescriptors[environmentKey]
+          });
+        }
+      }
+    }
+
     evaluate('modules', manifest.modules, runtime.modules);
     evaluate('environments', manifest.environments, runtime.environments);
     evaluate('docker', manifest.docker, runtime.docker);
     evaluate('scripts', manifest.scripts, runtime.scripts);
     evaluate('root', manifest.root, runtime.root);
     evaluate('blueprints', manifest.blueprints, runtime.blueprints);
+    compareDescriptors(descriptorExpectations, runtime.descriptors ?? {});
 
     return mismatches;
   }
@@ -478,7 +727,8 @@ export class EnvironmentParityService {
 
     const manifest = await this.manifestResolver();
     const runtime = await this.describeRuntimeState({ manifest });
-    const mismatches = this.compareManifest(manifest, runtime);
+    const descriptorExpectations = await buildDescriptorExpectations(manifest);
+    const mismatches = this.compareManifest(manifest, runtime, { descriptorExpectations });
     const dependencies = await this.runDependencyChecks();
 
     const parityStatus = this.deriveParitySummary({ mismatches, dependencies });
@@ -551,7 +801,8 @@ export class EnvironmentParityService {
       dependencies,
       manifest: {
         expected: manifest,
-        observed: runtime
+        observed: runtime,
+        descriptors: descriptorExpectations
       },
       mismatches,
       status: parityStatus,

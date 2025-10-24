@@ -8,7 +8,9 @@
       "description": "Change Advisory Board approved the production release window and assigned rollback ownership.",
       "owner": "operations",
       "status": "complete",
-      "evidence": ["cab/2025-01-12-minutes.pdf"],
+      "evidence": [
+        "cab/2025-01-12-minutes.pdf"
+      ],
       "lastVerifiedAt": "2025-01-13T17:00:00.000Z"
     },
     {
@@ -16,7 +18,9 @@
       "description": "Incident, rollback, and smoke-test runbooks reviewed with on-call engineering and support leads.",
       "owner": "site-reliability",
       "status": "complete",
-      "evidence": ["runbooks/2025-01-release-readiness.md"],
+      "evidence": [
+        "runbooks/2025-01-release-readiness.md"
+      ],
       "lastVerifiedAt": "2025-01-13T17:30:00.000Z"
     },
     {
@@ -24,7 +28,10 @@
       "description": "All database migrations executed against staging with integrity checks, anonymised backups, and rollback scripts captured.",
       "owner": "database",
       "status": "complete",
-      "evidence": ["db/migration-2025-01-validation.log", "db/migration-rollback-plan.md"],
+      "evidence": [
+        "db/migration-2025-01-validation.log",
+        "db/migration-rollback-plan.md"
+      ],
       "lastVerifiedAt": "2025-01-13T18:15:00.000Z"
     },
     {
@@ -32,7 +39,9 @@
       "description": "End-to-end RBAC matrix regression suite passed for instructor, learner, and operator personas across web and mobile.",
       "owner": "security",
       "status": "complete",
-      "evidence": ["security/rbac-coverage-report-2025-01.pdf"],
+      "evidence": [
+        "security/rbac-coverage-report-2025-01.pdf"
+      ],
       "lastVerifiedAt": "2025-01-14T09:45:00.000Z"
     },
     {
@@ -40,7 +49,9 @@
       "description": "Reviewed and validated CORS allow-list for production domains with CDN and identity teams; non-production origins remain blocked.",
       "owner": "platform",
       "status": "complete",
-      "evidence": ["platform/cors-approval-2025-01.md"],
+      "evidence": [
+        "platform/cors-approval-2025-01.md"
+      ],
       "lastVerifiedAt": "2025-01-14T10:15:00.000Z"
     },
     {
@@ -48,7 +59,9 @@
       "description": "Telemetry dashboards updated with release build identifiers and alert SLOs tuned for new automation surface area.",
       "owner": "observability",
       "status": "complete",
-      "evidence": ["telemetry/slo-calibration-2025-01.json"],
+      "evidence": [
+        "telemetry/slo-calibration-2025-01.json"
+      ],
       "lastVerifiedAt": "2025-01-14T11:00:00.000Z"
     },
     {
@@ -56,7 +69,9 @@
       "description": "Support and customer success teams briefed on operator dashboard changes with updated escalation playbooks and macros.",
       "owner": "support",
       "status": "complete",
-      "evidence": ["support/2025-01-14-operator-briefing.pptx"],
+      "evidence": [
+        "support/2025-01-14-operator-briefing.pptx"
+      ],
       "lastVerifiedAt": "2025-01-14T11:30:00.000Z"
     },
     {
@@ -64,8 +79,26 @@
       "description": "Security and compliance leads uploaded SOC2/ISO control attestations covering new automation, telemetry, and vendor updates.",
       "owner": "compliance",
       "status": "complete",
-      "evidence": ["compliance/2025-iso-soc-attestation.zip"],
+      "evidence": [
+        "compliance/2025-iso-soc-attestation.zip"
+      ],
       "lastVerifiedAt": "2025-01-14T12:00:00.000Z"
+    },
+    {
+      "id": "environment-blueprint-validated",
+      "description": "Environment blueprint SSM parameter, runtime endpoint, and descriptor exported via scripts/infrastructure/describe-environment.mjs with curl verification recorded for the target release window.",
+      "owner": "platform",
+      "status": "pending",
+      "evidence": [],
+      "lastVerifiedAt": null
+    },
+    {
+      "id": "environment-descriptor-synchronised",
+      "description": "`environment_descriptors` registry populated via npm workspace seed, descriptor export archived, and parity API queried to confirm database and manifest hashes align for the target environment.",
+      "owner": "platform",
+      "status": "pending",
+      "evidence": [],
+      "lastVerifiedAt": null
     }
   ]
 }

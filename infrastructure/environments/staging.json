@@ -1,0 +1,37 @@
+{
+  "environment": "staging",
+  "domain": "staging.edulure.com",
+  "aws": {
+    "accountAlias": "edulure-staging",
+    "region": "us-east-1",
+    "vpcId": "vpc-staging-edulure",
+    "privateSubnetTags": ["tier:preprod", "app:edulure-api"],
+    "publicSubnetTags": ["tier:edge", "app:edulure-alb"]
+  },
+  "blueprint": {
+    "parameter": "/edulure/staging/api/environment-blueprint",
+    "runtimeEndpoint": "https://staging.edulure.com/ops/runtime-blueprint.json",
+    "service": "backend-service"
+  },
+  "terraformWorkspace": "infrastructure/terraform/envs/staging",
+  "dockerCompose": {
+    "file": "docker-compose.yml",
+    "command": "docker compose --profile staging up --build",
+    "profiles": ["staging"]
+  },
+  "observability": {
+    "dashboard": "infrastructure/observability/grafana/dashboards/environment-runtime.json",
+    "cloudwatchDashboard": "edulure-staging-api-observability"
+  },
+  "changeWindows": [
+    "Tuesday & Thursday 16:00-20:00 UTC"
+  ],
+  "contacts": {
+    "primary": "release@edulure.com",
+    "onCall": "release-oncall@edulure.com"
+  },
+  "notes": [
+    "Release rehearsals reference this environment for CAB approvals.",
+    "Smoke tests must validate blueprint endpoint prior to change freeze."
+  ]
+}

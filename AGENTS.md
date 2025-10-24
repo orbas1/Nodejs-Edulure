@@ -132,16 +132,80 @@
         14. **Text & Copy.** Warning messages (“Telemetry export job paused after repeated failures”, “Scheduled additional telemetry export to drain backlog”) map directly onto ops scripts for clarity. 
         15. **Change Checklist Tracker.** Each release should validate S3 checksum metadata, decrypt sample checkpoints, confirm background job metrics, and review backlog flush logs in staging. 
         16. **Full Upgrade Plan & Release Steps.** Roll out encryption keys, canary the backpressure loop, verify Prometheus counters and freshness dashboards, then brief analytics teams before enabling in production. 
-      - 5.A Identity & Access Schema (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
-      - 5.B Learning Content Schema (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
+      - ✓ 5.A Identity & Access Schema (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
+        1. **Appraisal.** Migration `20250415120000_user_role_assignments.js` introduces `user_role_assignments` with referential integrity, indexes, and update triggers so role governance leaves ad-hoc columns for an auditable table.
+        2. **Functionality.** `AuthService.register`, `login`, and `refreshSession` now hydrate assignments through `serializeUserWithAuthorizations` and embed deduped `roles` arrays into JWT payloads while exposing `roleAssignments` in serialized users (`backend-nodejs/src/services/AuthService.js`), and bootstrap seeds reuse `UserRoleAssignmentModel.assign` so fixture identities populate `user_role_assignments` alongside runtime flows.
+        3. **Logic Usefulness.** Consumers can interrogate `UserRoleAssignmentModel.listActiveByUser` plus the enriched serializer to drive access reviews, impersonation audits, and UI matrices without custom joins.
+        4. **Redundancies.** `normaliseRoleIdentifier`, `buildRoleList`, and serializer helpers consolidate role string handling, eliminating bespoke trimming logic previously scattered across auth flows.
+        5. **Placeholders.** `UserRoleAssignmentModel.pruneExpired` is ready for automation but lacks a scheduled job; wire it to background workers so expired assignments close automatically.
+        6. **Duplicate Functions.** Assignment creation/upsert logic now lives solely inside `UserRoleAssignmentModel.assign`, replacing repeated role persistence paths across services.
+        7. **Improvements Needed.** Build admin APIs/UI to manage assignments, enforce tenant scopes, and mirror changes back into `users.role` until that legacy column can be deprecated.
+        8. **Styling Improvements.** Update Annex identity ERDs and handbook callouts with the new assignment table, using accessible palette accents to distinguish scoped vs global roles.
+        9. **Efficiency Analysis.** Unique `(user_id, role_key, scope_type, scope_id, revoked_at)` constraint with supporting indexes plus assign upserts prevent duplicates, while JWT role lists reuse cached deduped arrays.
+        10. **Strengths to Keep.** Session hashing, two-factor enforcement, and audit events remain untouched while responses/tokens now deliver richer role context for downstream systems.
+        11. **Weaknesses to Remove.** Legacy `users.role` can drift from assignments; consider triggers or validation during updates until full migration is complete.
+        12. **Styling & Colour Review.** Align identity documentation chips/badges referencing assignments with compliance palette tokens described in Annex A38.
+        13. **CSS, Orientation & Placement.** Plan admin matrices showing scope, expiry, metadata, and actor columns based on the serializer’s `roleAssignments` structure.
+        14. **Text Analysis.** Refresh onboarding/tooltips to mention aggregated `roles` and assignment provenance so support teams interpret payloads accurately.
+        15. **Change Checklist Tracker.** Apply migration `20250415120000_user_role_assignments.js`, backfill roles, confirm JWT `roles` claims via smoke tests, reseed to validate `user_role_assignments` fixtures, and verify serializer output across auth endpoints.
+        16. **Full Upgrade Plan & Release Steps.** Migrate, reseed identity fixtures, deploy backend, update docs, and rehearse login/refresh flows to verify assignment metadata before enabling in production.
+      - ✓ 5.B Learning Content Schema (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
+        1. **Appraisal.** Migration `20250415121000_course_version_snapshots.js` adds `course_version_snapshots` plus module/lesson `version` columns, giving the content schema a persistent history layer.
+        2. **Functionality.** `CourseModel.create` now records an initial snapshot and `updateById` captures diffs/summary entries through `CourseVersionSnapshotModel.recordChange`, providing end-to-end change tracking (`backend-nodejs/src/models/CourseModel.js`), with `backend-nodejs/seeds/001_bootstrap.js` calling `CourseVersionSnapshotModel.recordInitial` so seeded courses materialise history rows immediately.
+        3. **Logic Usefulness.** Snapshot JSON (`previous`/`next`) and the stored `changes` array equip analytics, editorial audits, and rollback tooling without bespoke export scripts.
+        4. **Redundancies.** Diffing and serialisation live entirely in `CourseVersionSnapshotModel`, replacing the repeated JSON comparison helpers that once lived in services/controllers.
+        5. **Placeholders.** Actor attribution currently defaults to instructors/admins; integrate workflow context so collaborative edits capture the responsible user once multi-editor tooling ships.
+        6. **Duplicate Functions.** Snapshot computation centralises stable stringify/diff logic, eliminating per-feature implementations of course history capture.
+        7. **Improvements Needed.** Increment module/lesson `version` fields from orchestrators, expose history endpoints, and visualise summaries inside admin/course authoring UIs.
+        8. **Styling Improvements.** Update ERDs and curriculum docs with the new snapshot table, employing accessible colours to call out history flows per Annex A39 guidance.
+        9. **Efficiency Analysis.** Unique `(course_id, version)` constraint and recorded-at indexes keep snapshot queries quick; JSON diffing runs once per update and reuses stable serialisation helpers.
+        10. **Strengths to Keep.** Existing catalogue helpers, metadata serialisers, and course relationships remain intact while history capture happens transparently at model level.
+        11. **Weaknesses to Remove.** Snapshot payloads store full course JSON; consider compression/archival for large metadata blobs before release data balloons.
+        12. **Styling & Colour Review.** Document how version timelines (timestamps, summaries) should inherit the established dashboard palette so UI surfaces stay consistent.
+        13. **CSS, Orientation & Placement.** Provide layout guidance for diff cards/timelines (field labels, before/after chips) using `changes` output so admin panels render history coherently.
+        14. **Text Analysis.** Ensure release notes and authoring copy mention automatic snapshotting and explain how the change summary headlines map to tracked fields.
+        15. **Change Checklist Tracker.** Run migration `20250415121000_course_version_snapshots.js`, verify snapshot rows on course create/update, reseed to confirm `course_version_snapshots` entries land for fixtures, and confirm module/lesson version defaults seeded to `1`.
+        16. **Full Upgrade Plan & Release Steps.** Migrate, reseed sample courses, rehearse editing flows to inspect snapshots, update SDK/docs, and deploy alongside UI consumers of the new history APIs.
       - 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
       - 5.D Commerce & Finance Schema (`models/InvoiceModel.js`, `models/SubscriptionModel.js`, `models/PaymentAttemptModel.js`, `models/EscrowPayoutModel.js`, `models/CommunityDonationModel.js`, `migrations/*billing*`, `migrations/*finance*`)
-      - 5.E Analytics, Governance & Observability Schema (`models/AnalyticsAlertModel.js`, `models/TelemetryExportModel.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`, `migrations/*analytics*`, `migrations/*governance*`)
-      - 5.F Marketing, Content & Enablement Schema (`models/BlogPostModel.js`, `models/BlogCategoryModel.js`, `models/EbookModel.js`, `models/AdsCampaignModel.js`, `models/EnablementGuideModel.js`, `models/IntegrationProviderModel.js`, `migrations/*marketing*`, `migrations/*integration*`)
-      - 6.A Generated API Client & Runtime Configuration (`src/generated/`, `src/index.ts`, `src/runtime/configure.ts`, `src/runtime/base.ts`)
-      - 6.B Authentication & Session Utilities (`src/runtime/auth.ts`, `src/runtime/tokenStore.ts`, `src/runtime/configure.ts`)
-      - 7.A Environment Provisioning & Infrastructure as Code (`infrastructure/terraform/`, `docker-compose.yml`, `infrastructure/environments/`)
-      - 7.B CI/CD Automation & Release Tooling (`scripts/`, `backend-nodejs/scripts/`, `update_template/`, `qa/`)
+- ✓ 5.E Analytics, Governance & Observability Schema (`models/AnalyticsAlertModel.js`, `models/TelemetryExportModel.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`, `migrations/*analytics*`, `migrations/*governance*`)
+      - ✓ 5.F Marketing, Content & Enablement Schema (`models/BlogPostModel.js`, `models/BlogCategoryModel.js`, `models/EbookModel.js`, `models/AdsCampaignModel.js`, `models/EnablementGuideModel.js`, `models/IntegrationProviderModel.js`, `migrations/*marketing*`, `migrations/*integration*`)
+- ✓ 6.A Generated API Client & Runtime Configuration (`src/generated/`, `src/index.ts`, `src/runtime/configure.ts`, `src/runtime/base.ts`)
+         1. **Appraisal.** `configureSdk` now orchestrates manifest metadata, normalised base URLs, and optional session initialisation so SDK consumers receive a fully prepared `OpenAPI` instance plus access to the created `SessionManager` when requested. 
+         2. **Functionality.** `ConfigureSdkOptions.auth` introduces bearer and non-bearer header strategies, auto-refresh toggles, custom header names, and lifecycle callbacks while `mergeHeaderProducers` and `normaliseHeaders` compose static + dynamic headers alongside user-agent injection. 
+         3. **Logic Usefulness.** Asynchronous token and header resolvers collapse into a single pipeline that sanitises values, enforces `allowAnonymous` guards, and throws actionable errors when tokens are required but missing, preventing silent authentication drift. 
+         4. **Redundancies.** Header formatting, manifest wiring, and user-agent fallbacks now live in `runtime/base.ts` + `configure.ts`, eliminating bespoke string coercion and ad-hoc header merges previously repeated across projects. 
+         5. **Instrumentation Hooks.** Runtime configuration now surfaces `ConfigureSdkOptions.hooks` so clients can register before/after/onError callbacks for tracing and metrics, while TODO coverage remains for optional custom `fetch` adapters and retry orchestration.
+         6. **Duplicate Functions.** Shared helpers (`formatAuthorizationHeader`, `normaliseHeaders`, `mergeHeaderProducers`) replace local string concatenation or manual loops, ensuring downstream services reuse the same casing and merge semantics. 
+         7. **Telemetry & Error Mapping.** `configureSdk` accepts structured request hooks and propagates `errorDomain` into augmented `ApiError` instances, giving adopters native tracing/logging integration points without wrapping generated clients.
+         8. **Styling Improvements.** Update README and portal snippets so option names (`auth.headerName`, `auth.autoRefresh`) mirror the runtime casing and ensure example headers demonstrate the normalised title-case output. 
+         9. **Efficiency Analysis.** Memo-free async resolvers execute exactly once per request, header sanitisation short-circuits undefined values, and session refreshes are skipped unless required, avoiding redundant auth calls. 
+         10. **Strengths to Keep.** Automatic manifest hydration, user-agent injection, credential propagation, and tree-shakeable service registry exports remain intact while layering richer runtime control. 
+         11. **Diagnostics.** Missing-token paths now raise `MissingAccessTokenError`/`SdkAuthError` instances with `sdkDomain` metadata instead of generic errors, accelerating integrator debugging while keeping legacy anonymous flows untouched.
+         12. **Styling & Colour Review.** Ensure documentation and dev portals describe the normalised header casing (`Authorization`, `User-Agent`) so branding and accessibility palettes stay consistent with Annex typography guidance. 
+         13. **CSS, Orientation & Placement Changes.** Preserve the module entry structure (`runtime/configure`, `runtime/base`, `runtime/client`) so bundlers continue to tree-shake correctly while documenting the new exports in SDK navigation menus. 
+         14. **Text Analysis, Text Placement, Text Length, Text Redundancy & Quality.** Revise runtime error copy to remain concise (“Access token is required...”), avoid duplicated phrasing across docs, and highlight optional parameters in under 140 characters for quick scanning. 
+         15. **Change Checklist Tracker.** Validate header composition with and without custom schemes, confirm session hand-off via `createSdkClient`, rerun `npm --prefix sdk-typescript run check`, and verify the `sdk.typescript.*` configuration entries are seeded before publishing Annex A44 release notes.
+         16. **Full Upgrade Plan & Release Steps.** Ship alongside updated docs, coordinate consumer migrations to the new `auth` object, exercise staging smoke tests for anonymous + authenticated flows, then tag the SDK once telemetry and CI regressions stay green. 
+      - ✓ 6.B Authentication & Session Utilities (`src/runtime/auth.ts`, `src/runtime/tokenStore.ts`, `src/runtime/configure.ts`)
+         1. **Appraisal.** `createTokenStore`, `createSessionManager`, and `createAuthorizationHeaderResolver` deliver a cohesive toolkit for managing access/refresh lifecycles, storage hydration, and header injection across environments. 
+         2. **Functionality.** Token stores hydrate from memory or browser storage, session managers guard refresh concurrency, emit lifecycle callbacks, and expose helpers for manual refresh, while auth resolvers format headers with configurable schemes and refresh behaviour. 
+         3. **Logic Usefulness.** `normaliseTokenSet`, `ensureFreshToken`, and `isExpired` harmonise timestamp handling (expiresAt/expiresIn) so refresh logic stays deterministic, and warning hooks (`onRefreshError`) surface actionable context. 
+         4. **Redundancies.** Session persistence, listener management, and header formatting move into shared utilities, replacing app-specific memory caches or duplicated bearer concatenation across repositories. 
+         5. **Placeholders or Stubs.** Browser storage adapters currently rely on plaintext JSON; plan encrypted or platform-specific adapters (e.g., React Native secure storage) before enabling Annex A45 production toggles. 
+         6. **Duplicate Functions.** `formatAuthorizationHeader` underpins both runtime configuration and standalone header builders, preventing divergent casing or spacing logic when multiple packages generate tokens. 
+         7. **Refresh Coordination.** Session managers now expose background refresh scheduling plus auto-start controls, and browser token stores listen for storage events to synchronise tokens across tabs; metrics hooks remain on the roadmap for Annex telemetry parity.
+         8. **Styling Improvements.** Document sample usage with lint-compliant formatting and align code snippets in docs/portals to the TypeScript conventions enforced by the SDK (`async/await`, explicit return types). 
+         9. **Efficiency Analysis.** Hydration defers storage reads to a single promise, listeners receive debounced updates, refreshes are deduped via shared promises, and optional `autoHydrate` skips unnecessary work for server contexts. 
+         10. **Strengths to Keep.** Event callbacks, explicit clear/update helpers, optional refresh hooks, and modular storage adapters preserve flexibility while standardising session semantics. 
+         11. **Weaknesses to Remove.** Token payloads still persist as plaintext JSON; follow-up work will introduce encrypted storage adapters and optional metrics hooks now that multi-tab synchronisation is handled centrally.
+         12. **Styling & Colour Review.** Align console warnings/errors with existing observability tone (succinct, action-oriented) and mirror Annex A45 guidance for how logging surfaces should appear in developer tooling. 
+         13. **CSS, Orientation & Placement Changes.** Keep module boundaries (`runtime/auth`, `runtime/tokenStore`) stable so bundler entry points remain predictable, and outline folder placement in SDK docs for quick discovery. 
+         14. **Text Analysis, Text Placement, Text Length, Text Redundancy & Quality.** Ensure error strings (“Access token is required...”, storage warning copy) remain precise, avoid repeated jargon, and clarify when tokens are cleared versus refreshed. 
+         15. **Change Checklist Tracker.** Exercise token store persistence, concurrent refresh guards, cross-tab synchronisation, header resolver outputs, and SDK build checks before tagging releases aligned with Annex A45.
+         16. **Full Upgrade Plan & Release Steps.** Roll out by updating consumer apps to use the shared session manager, validate storage adapters per platform, coordinate Annex documentation refresh, and publish the SDK once integration smoke tests pass. 
+      - ✓ 7.A Environment Provisioning & Infrastructure as Code (`infrastructure/terraform/`, `docker-compose.yml`, `infrastructure/environments/`)
+      - ✓ 7.B CI/CD Automation & Release Tooling (`scripts/`, `backend-nodejs/scripts/`, `update_template/`, `qa/`)
       - ✓ 7.C Observability Stack & Runtime Telemetry (`infrastructure/observability/`, `backend-nodejs/src/observability/`, `docs/operations/observability.md`)
       - ✓ 7.D Local Tooling & Developer Enablement (`file_list.md`, `EDULURE_GUIDE.md`, `backend-nodejs/README.md`, `frontend-reactjs/README.md`, `valuation/`, `scripts/setup-*`)
       - 8.A Automated Test Suites & Coverage
@@ -273,8 +337,8 @@
       - A39. Learning Content Schema (5.B)
       - A40. Community, Social & Messaging Schema (5.C)
       - A41. Commerce & Finance Schema (5.D)
-      - A42. Analytics, Governance & Observability Schema (5.E)
-      - A43. Marketing, Content & Enablement Schema (5.F)
+      - A42. Analytics, Governance & Observability Schema (5.E) ✓
+      - A43. Marketing, Content & Enablement Schema (5.F) ✓
       - A44. SDK Generated Client & Runtime Configuration (6.A)
       - A45. SDK Authentication & Session Utilities (6.B)
       - A46. Environment Provisioning & Infrastructure as Code (7.A)

@@ -166,7 +166,70 @@ function parseProfileSocialLinks(raw) {
     .filter((entry) => entry.url);
 }
 
-export function serializeUser(user) {
+function normaliseRoleAssignments(source) {
+  if (!Array.isArray(source)) {
+    return [];
+  }
+
+  return source
+    .map((assignment) => {
+      if (!assignment) {
+        return null;
+      }
+      const roleKey = assignment.roleKey ?? assignment.role_key ?? null;
+      if (typeof roleKey !== 'string' || roleKey.trim().length === 0) {
+        return null;
+      }
+
+      return {
+        id: assignment.id ?? null,
+        roleKey: roleKey.trim(),
+        scopeType: (assignment.scopeType ?? assignment.scope_type ?? 'global') || 'global',
+        scopeId: assignment.scopeId ?? assignment.scope_id ?? null,
+        assignedBy: assignment.assignedBy ?? assignment.assigned_by ?? null,
+        assignedAt: toIso(assignment.assignedAt ?? assignment.assigned_at ?? null),
+        expiresAt: toIso(assignment.expiresAt ?? assignment.expires_at ?? null),
+        metadata: parseJsonObject(assignment.metadata ?? assignment.metadata_json ?? {}, {}),
+        revokedAt: toIso(assignment.revokedAt ?? assignment.revoked_at ?? null),
+        revokedBy: assignment.revokedBy ?? assignment.revoked_by ?? null,
+        revokedReason: assignment.revokedReason ?? assignment.revoked_reason ?? null
+      };
+    })
+    .filter((assignment) => assignment !== null);
+}
+
+function collectRoles(user, options) {
+  const set = new Set();
+  const addRole = (value) => {
+    if (typeof value !== 'string') {
+      return;
+    }
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      set.add(trimmed);
+    }
+  };
+
+  addRole(user.role ?? null);
+  if (Array.isArray(user.roles)) {
+    user.roles.forEach(addRole);
+  }
+  if (Array.isArray(options.roles)) {
+    options.roles.forEach(addRole);
+  }
+
+  const assignmentSource = Array.isArray(options.roleAssignments)
+    ? options.roleAssignments
+    : Array.isArray(user.roleAssignments)
+      ? user.roleAssignments
+      : [];
+
+  assignmentSource.forEach((assignment) => addRole(assignment?.roleKey ?? assignment?.role_key));
+
+  return Array.from(set);
+}
+
+export function serializeUser(user, options = {}) {
   if (!user) {
     return null;
   }
@@ -178,6 +241,15 @@ export function serializeUser(user) {
   const activeLiveRoom =
     parseActiveLiveRoom(user.activeLiveRoom ?? user.active_live_room ?? null) ??
     (dashboardPreferences.activeLiveRoom ? parseActiveLiveRoom(dashboardPreferences.activeLiveRoom) : null);
+
+  const roleAssignments = normaliseRoleAssignments(
+    Array.isArray(options.roleAssignments)
+      ? options.roleAssignments
+      : Array.isArray(user.roleAssignments)
+        ? user.roleAssignments
+        : []
+  );
+  const roles = collectRoles({ ...user, roleAssignments }, options);
 
   return {
     id: user.id,
@@ -198,7 +270,9 @@ export function serializeUser(user) {
     createdAt: user.createdAt ?? user.created_at ?? null,
     updatedAt: user.updatedAt ?? user.updated_at ?? null,
     emailVerifiedAt: user.emailVerifiedAt ?? user.email_verified_at ?? null,
-    lastLoginAt: user.lastLoginAt ?? user.last_login_at ?? null
+    lastLoginAt: user.lastLoginAt ?? user.last_login_at ?? null,
+    roles,
+    roleAssignments
   };
 }
 
