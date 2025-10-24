@@ -147,8 +147,8 @@
       - 8.A Automated Test Suites & Coverage
       - 8.B Manual QA & Release Governance (`qa/`, `update_template/`, `docs/operations/qa.md`)
       - 8.C Test Data, Fixtures & Sandboxes (`backend-nodejs/seeds/`, `frontend-reactjs/src/testUtils/`, `Edulure-Flutter/test/fixtures/`)
-      - 9.A Product & Technical Guides (`EDULURE_GUIDE.md`, `README.md`, `user experience.md`, `docs/design-system/`)
-      - 9.B Operational Playbooks & Incident Response (`docs/operations/`, `qa/operations/`, `scripts/incident-*`)
+      - ✓ 9.A Product & Technical Guides (`EDULURE_GUIDE.md`, `README.md`, `user experience.md`, `docs/design-system/`)
+      - ✓ 9.B Operational Playbooks & Incident Response (`docs/operations/`, `qa/operations/`, `scripts/incident-*`)
       - 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
       - 9.D Strategy, Valuation & Stakeholder Communication (`valuation/`, `docs/operations/strategy.md`, `user experience.md`)
    - Annex A: Expanded Analysis Narratives

@@ -957,40 +957,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 ## 9. Documentation, Knowledge & Strategy (`EDULURE_GUIDE.md`, `docs/`, `user experience.md`, `valuation/`)
 
 ### 9.A Product & Technical Guides (`EDULURE_GUIDE.md`, `README.md`, `user experience.md`, `docs/design-system/`)
-1. **Appraisal:** Comprehensive guides explaining architecture, product strategy, user journeys, and design system foundations.
-2. **Functionality:** Provide onboarding context, architecture diagrams, UX principles, and component documentation for designers and engineers.
-3. **Logic Usefulness:** Aligns teams on vision, constraints, and execution details while enabling consistent UX.
-4. **Redundancies:** Some sections duplicate README content; consolidate to reduce maintenance.
-5. **Placeholders Or non-working functions or stubs:** Certain design system tokens flagged TBD; plan updates.
-6. **Duplicate Functions:** Component documentation overlaps across guides; centralise in design system directory.
-7. **Improvements need to make:** Add interactive component examples, localisation guidelines, and accessibility checklists.
-8. **Styling improvements:** Harmonise typography, spacing, and illustration styles across guides.
-9. **Efficiency analysis and improvement:** Introduce navigation aids, search, and cross-links for faster discovery.
-10. **Strengths to Keep:** Depth of content, cross-functional perspective, and actionable guidance.
-11. **Weaknesses to remove:** Outdated terminology; update to reflect current brand language.
-12. **Styling and Colour review changes:** Ensure docs follow brand palette while maintaining accessibility.
-13. **CSS, orientation, placement and arrangement changes:** Provide responsive layouts for long-form documentation.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Edit for clarity, reduce redundancy, and maintain consistent tone.
-15. **Change Checklist Tracker:** Document updates alongside releases, noting impacted sections and reviewers.
-16. **Full Upgrade Plan & Release Steps:** Audit guides quarterly, gather feedback, incorporate updates, and publish release notes.
+1. **Appraisal.** `EDULURE_GUIDE.md` anchors Annex A53 with end-to-end coverage—toolchains, database choices, SDK workflow, and service maps—while the top-level `README.md` frames the same estate for newcomers via its functional catalogue and repository layout tables.
+2. **Functionality.** The guide’s environment setup (Node 20.12.2, Postgres alternative, Terraform, Flutter defines) pairs with README quick-start commands, and `docs/design-system/README.md` plus `navigation-annex.md` document the token grid, QA tasks, and `GET /api/v1/navigation/annex` workflow so designers and engineers reference identical checklists.
+3. **Logic Usefulness.** Tables describing module→controller mappings, background job schedules, and integration matrices give product managers and tech leads precise pointers to source files, while `user_experience.md` records 28-point component audits (LearnerSupport, LearnerUpcoming) that UX and engineering both consume.
+4. **Redundancies.** Environment prerequisites, backend responsibilities, and integration rundowns appear in both `README.md` and `EDULURE_GUIDE.md`; deduplicating these via shared partials or explicit cross-links would shrink drift when runtimes bump.
+5. **Placeholders or stubs.** The repository still carries an empty `user experience.md` shell beside the populated `user_experience.md`, and design docs reference forthcoming Annex screenshots without embedding them, signalling assets that should either be populated or removed.
+6. **Duplicate Functions.** Functional catalogues in the README mirror the API surface map table under “Backend service” in the guide, and the design system annex repeats token adoption bullets already introduced in the design README—centralising these summaries would avoid conflicting wording or paths.
+7. **Improvements Needed.** Expand `docs/design-system/` with interactive token demos, link `user_experience.md` audits to live Storybook entries, and surface localisation and accessibility requirements alongside the existing environment/setup sections so Annex B10 remains actionable.
+8. **Styling Improvements.** Align typography, callouts, and badge styling across guides by reusing the palette/token language from `docs/design-system/README.md` and mirroring the “rounded-3xl” vocabulary already codified in `user_experience.md` component breakdowns.
+9. **Efficiency Analysis.** Readers still jump between long Markdown files; add anchored navigation indexes, `See also` cross-links (e.g., from README background jobs to the guide’s schedule table), and inline curl examples pointing to `/api/v1/navigation/annex` to cut lookup time when teams reconcile annex payloads.
+10. **Strengths to Keep.** Maintain the deep architecture walk-throughs (job inventories, webhook paths, config variable catalogues) and UX audits that already reference concrete migrations, services, and styling tokens—these unify product, engineering, and design in a single narrative.
+11. **Weaknesses to Remove.** Prune stale terms like “marketing starter” and ensure the blank `user experience.md` stub either redirects or is replaced with the living research doc; unify terminology for the navigation annex so guide/README call it by the same Annex ID.
+12. **Styling & Colour Review.** The design README already directs teams to tokenised palettes; ensure README callouts and EDULURE guide warning blocks adopt those semantic colours so accessibility guarantees made in the annex remain credible across docs.
+13. **CSS, Orientation & Placement.** Extend the `.responsive-grid` guidance to the README’s screenshot sections and link to component layout advice in `user_experience.md`, giving authors consistent breakpoints and spacing patterns for diagrams and illustrative media.
+14. **Text Analysis.** Trim redundant prose where the README and guide both describe modules, tighten long-form UX critiques into scannable bullets, and adopt consistent voice (“Learner support workspace” vs. “Support workspace”) across all documents.
+15. **Change Checklist Tracker.** Tag doc updates in `qa/release/core_release_checklist.json` (e.g., extend `support-playbook-updated` evidence to include README/guide diffs) so release reviews confirm Annex A53 artefacts stayed current with the shipped surfaces.
+16. **Full Upgrade Plan & Release Steps.** During quarterly Annex reviews, diff README vs. guide sections, purge the duplicate stub, regenerate navigation annex payloads, capture updated screenshots, and circulate release notes summarising which guides changed alongside the updated API/docs references.
 
 ### 9.B Operational Playbooks & Incident Response (`docs/operations/`, `qa/operations/`, `scripts/incident-*`)
-1. **Appraisal:** Detailed playbooks covering incident response, escalation, compliance, and operational readiness.
-2. **Functionality:** Offer step-by-step procedures, communication templates, and escalation matrices for operational teams.
-3. **Logic Usefulness:** Ensures consistent incident handling, compliance adherence, and clear accountability.
-4. **Redundancies:** Overlapping steps across runbooks; consolidate to reduce confusion.
-5. **Placeholders Or non-working functions or stubs:** Some incident templates reference TBD owners; fill gaps promptly.
-6. **Duplicate Functions:** Escalation checklists duplicated across documents; centralise in master playbook.
-7. **Improvements need to make:** Add post-incident review templates, automation hooks, and integrate with incident tooling.
-8. **Styling improvements:** Align playbook typography and colours with design system for readability during stressful events.
-9. **Efficiency analysis and improvement:** Provide quick-reference summaries, automate distribution, and integrate with chatops.
-10. **Strengths to Keep:** Thorough coverage and clear escalation paths.
-11. **Weaknesses to remove:** Manual document distribution; automate via portal or chat bots.
-12. **Styling and Colour review changes:** Ensure severity indicators meet accessibility guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout templates optimised for print and mobile reference.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Simplify language, remove redundancy, and maintain consistent voice.
-15. **Change Checklist Tracker:** Track playbook revisions, owner confirmations, and drill schedules.
-16. **Full Upgrade Plan & Release Steps:** Review with operations, run tabletop exercises, incorporate feedback, and republish.
+1. **Appraisal.** Annex A54 is embodied by `docs/operations/navigation-readiness.md` and the broader operations handbook, which catalogue CLI scripts, evidence capture, and annex API validation alongside the blue/green deployment runbook under `qa/release/runbooks/`.
+2. **Functionality.** The handbook sets escalation severities, paging order, and macro references; navigation readiness spells out `ops-*` commands plus API curls; the release runbook provides phase-by-phase toggles, cache purges, and rollback commands—together they form the incident/operations backbone despite the `scripts/incident-*` namespace being empty today.
+3. **Logic Usefulness.** Operators can trace every checklist item from annex seeds (`navigation_annex_operation_tasks`) to executable steps (PagerDuty paging, LaunchDarkly CLI toggles, AWS cache purges) with evidence drop points (`runbooks/reports/`, annex screenshots) to satisfy governance.
+4. **Redundancies.** Severity definitions and post-incident tasks appear both in `docs/operations/README.md` and the release runbook; consolidate shared sections or reference a central glossary so updates propagate once.
+5. **Placeholders or stubs.** The handbook points to `docs/operations/templates/incident-*.md`, yet that directory is absent, and the repo lacks the promised `scripts/incident-*` utilities—call out these gaps and either add the assets or update docs to note their pending status.
+6. **Duplicate Functions.** Navigation readiness repeats quick-action verification steps already automated via CLI hints; aligning on reusable script outputs (or a single Markdown include) would avoid rewriting instructions for each annex task.
+7. **Improvements Needed.** Flesh out the missing incident templates, add ChatOps snippets for paging/announcements, wire annex API checks into CI, and publish automation wrappers (shell/Node scripts) that execute the documented `ops-*` routines instead of relying on manual copy/paste.
+8. **Styling Improvements.** Apply the same semantic badge/tokens described in the design system docs to severity tables and timeline charts so teams recognise colour cues even when reading operations content during an incident.
+9. **Efficiency Analysis.** Introduce quick-reference TOCs, embed direct `curl` + `jq` commands for annex verification, and cross-link runbook phases to checklist IDs in `qa/release/core_release_checklist.json` so operators jump straight to the required evidence capture.
+10. **Strengths to Keep.** Retain the explicit timelines (T-60/T+45 windows), LaunchDarkly/AWS command blocks, and annex curl guidance—they provide exact, actionable steps that reduce ambiguity during stressful response windows.
+11. **Weaknesses to Remove.** Manual document distribution and missing automation (no script to log cache purges or flag states) slow responders; embed automated log capture and make the annex tasks accessible via the notification panel seeding described in the docs.
+12. **Styling & Colour Review.** Ensure severity callouts and command notes adopt the accessible palette from `docs/design-system/README.md`, preventing unreadable red/amber banners when exported to PDFs or wikis.
+13. **CSS, Orientation & Placement.** Optimise runbooks for dual-screen reference by adding anchored headings, printable checkboxes, and compact tables; align navigation readiness sections with mobile-friendly formatting for on-call tablets.
+14. **Text Analysis.** Clarify jargon (“ops-feed-registry-audit”) with one-line descriptors, merge repeated statements about screenshot capture, and standardise voice across operations and release docs so instructions read consistently.
+15. **Change Checklist Tracker.** Expand `qa/release/core_release_checklist.json` to include annex evidence (navigation screenshots, blue/green cutover report) and keep timestamps aligned with the `Next Review Due` metadata inside runbooks.
+16. **Full Upgrade Plan & Release Steps.** Before each release, regenerate navigation annex data via seeders, run every `ops-*` script with captured artefacts, backfill missing incident templates/scripts, update runbook review dates, and brief on-call staff with the refreshed documents and annex payload.
 
 ### 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
 1. **Appraisal:** Design system tokens, component guidelines, UX research summaries, and cross-platform theming references.
