@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import SupportKnowledgeBaseService from '../src/services/SupportKnowledgeBaseService.js';
+import SupportKnowledgeBaseService, {
+  __testables as supportKnowledgeBaseTestables
+} from '../src/services/SupportKnowledgeBaseService.js';
 import { createMockConnection } from './support/mockDb.js';
 
 const connectionRef = { current: null };
@@ -18,6 +20,8 @@ vi.mock('../src/config/database.js', () => ({
 
 describe('SupportKnowledgeBaseService', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-03-10T00:00:00.000Z'));
     connectionRef.current = createMockConnection({
       support_articles: [
         {
@@ -60,6 +64,11 @@ describe('SupportKnowledgeBaseService', () => {
     });
     dbMock.fn = connectionRef.current.fn;
     dbMock.transaction = connectionRef.current.transaction;
+    supportKnowledgeBaseTestables.clearCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('searches articles by query, category, and limit with ranking fallbacks', async () => {
@@ -90,7 +99,32 @@ describe('SupportKnowledgeBaseService', () => {
       id: 'live-classroom-reset',
       title: 'Stabilise a live classroom session',
       url: 'https://support.edulure.test/articles/live-classroom-reset',
-      minutes: 5
+      minutes: 5,
+      updatedAt: '2025-03-01T10:00:00.000Z',
+      freshnessDays: 9,
+      stale: false
     });
+  });
+
+  it('caches default article lookups to avoid repeated queries', async () => {
+    await SupportKnowledgeBaseService.searchArticles({ limit: 3 });
+    const firstCallCount = connectionRef.current.mock.calls.length;
+    await SupportKnowledgeBaseService.searchArticles({ limit: 3 });
+    expect(connectionRef.current.mock.calls.length).toBe(firstCallCount);
+  });
+
+  it('describes knowledge base inventory with freshness metrics', async () => {
+    const meta = await SupportKnowledgeBaseService.describeInventory({ staleThresholdDays: 14 });
+
+    expect(meta.totalArticles).toBe(3);
+    expect(meta.staleArticles).toBe(1);
+    expect(meta.lastUpdatedAt).toBe('2025-03-01T10:00:00.000Z');
+    expect(meta.categories).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Live classroom', articles: 1, stale: 0 }),
+        expect.objectContaining({ name: 'Billing & payments', articles: 1, stale: 0 }),
+        expect.objectContaining({ name: 'Course access', articles: 1, stale: 1 })
+      ])
+    );
   });
 });

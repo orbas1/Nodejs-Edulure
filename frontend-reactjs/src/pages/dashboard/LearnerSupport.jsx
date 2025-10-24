@@ -67,6 +67,8 @@ const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low — feedback or request' }
 ];
 
+const SUPPORT_HELPFUL_STORAGE_KEY = 'edulure:support-helpful-articles';
+
 function normaliseKnowledgeBase(articles) {
   if (!Array.isArray(articles)) {
     return [];
@@ -79,7 +81,15 @@ function normaliseKnowledgeBase(articles) {
       excerpt: article.excerpt ?? article.summary ?? 'Explore the playbook to resolve common learner requests.',
       url: article.url ?? '#',
       category: article.category ?? article.topic ?? 'Guide',
-      minutes: Number(article.minutes ?? article.readTime ?? 3)
+      minutes: Number(article.minutes ?? article.readTime ?? 3),
+      helpfulnessScore: Number.isFinite(Number(article.helpfulnessScore))
+        ? Number(article.helpfulnessScore)
+        : null,
+      updatedAt: article.updatedAt ?? article.updated_at ?? null,
+      freshnessDays: Number.isFinite(Number(article.freshnessDays))
+        ? Number(article.freshnessDays)
+        : null,
+      stale: Boolean(article.stale ?? article.isStale)
     }));
 }
 
@@ -195,17 +205,36 @@ function MessageTimeline({ messages }) {
 }
 
 function KnowledgeBaseCard({ article, helpful, onToggleHelpful }) {
+  const updatedLabel = article.updatedAt
+    ? formatDashboardRelative(article.updatedAt, { fallback: 'recently', numeric: 'auto' })
+    : 'recently';
+  const helpfulnessScore = typeof article.helpfulnessScore === 'number'
+    ? article.helpfulnessScore.toFixed(1)
+    : null;
   return (
     <article className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="space-y-3">
-        <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-          {article.category}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+            {article.category}
+          </span>
+          {article.stale ? (
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+              Review soon
+            </span>
+          ) : null}
+          {helpfulnessScore ? (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              Score {helpfulnessScore}
+            </span>
+          ) : null}
+        </div>
         <h3 className="text-lg font-semibold text-slate-900">{article.title}</h3>
         <p className="text-sm text-slate-600">{article.excerpt}</p>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-          {article.minutes} minute read
-        </p>
+        <div className="flex flex-wrap items-center gap-3 text-xs font-medium uppercase tracking-wide text-slate-400">
+          <span>{article.minutes} minute read</span>
+          <span>Updated {updatedLabel}</span>
+        </div>
       </div>
       <div className="mt-6 flex items-center gap-3 text-sm">
         <a
@@ -227,6 +256,55 @@ function KnowledgeBaseCard({ article, helpful, onToggleHelpful }) {
         </button>
       </div>
     </article>
+  );
+}
+
+function KnowledgeBaseMetaSummary({ meta }) {
+  if (!meta) {
+    return null;
+  }
+  const categories = Array.isArray(meta.categories) ? meta.categories.slice(0, 5) : [];
+  const refreshedRelative = meta.lastUpdatedAt
+    ? formatDashboardRelative(meta.lastUpdatedAt, { fallback: 'recently', numeric: 'auto' })
+    : 'recently';
+  const refreshedExact = meta.lastUpdatedAt
+    ? formatDashboardDateTime(meta.lastUpdatedAt, { fallback: 'recently' })
+    : null;
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Articles</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{meta.totalArticles}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Stale</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{meta.staleArticles}</p>
+          <p className="text-xs text-slate-500">&gt;{meta.staleThresholdDays}-day threshold</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Last refreshed</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{refreshedRelative}</p>
+          {refreshedExact ? <p className="text-xs text-slate-500">{refreshedExact}</p> : null}
+        </div>
+      </div>
+      {categories.length ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <span
+              key={category.id ?? category.name}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
+            >
+              {category.name}
+              <span className="text-slate-400">· {category.articles}</span>
+              {category.stale ? (
+                <span className="text-amber-600">({category.stale} stale)</span>
+              ) : null}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -310,6 +388,29 @@ export default function LearnerSupport() {
 
   const initialCases = useMemo(() => (Array.isArray(data?.cases) ? data.cases : []), [data?.cases]);
   const knowledgeBase = useMemo(() => normaliseKnowledgeBase(data?.knowledgeBase ?? data?.articles), [data]);
+  const knowledgeBaseMeta = useMemo(() => {
+    const rawMeta = data?.knowledgeBaseMeta ?? data?.knowledgeMeta ?? null;
+    if (!rawMeta || typeof rawMeta !== 'object') {
+      return null;
+    }
+    const categories = Array.isArray(rawMeta.categories)
+      ? rawMeta.categories.map((category) => ({
+          id: category.id ?? category.name ?? 'category',
+          name: category.name ?? category.id ?? 'Category',
+          articles: Number(category.articles ?? category.total ?? 0),
+          stale: Number(category.stale ?? category.staleCount ?? 0),
+          latestUpdatedAt: category.latestUpdatedAt ?? category.updatedAt ?? null
+        }))
+      : [];
+    return {
+      totalArticles: Number(rawMeta.totalArticles ?? rawMeta.total ?? knowledgeBase.length),
+      staleArticles: Number(rawMeta.staleArticles ?? rawMeta.stale ?? 0),
+      categories,
+      lastUpdatedAt: rawMeta.lastUpdatedAt ?? rawMeta.latestUpdatedAt ?? null,
+      staleThresholdDays: Number(rawMeta.staleThresholdDays ?? 90),
+      generatedAt: rawMeta.generatedAt ?? null
+    };
+  }, [data, knowledgeBase.length]);
   const contacts = useMemo(() => normaliseContacts(data?.contacts), [data?.contacts]);
   const serviceWindow = data?.serviceWindow ?? data?.serviceLevel?.label ?? '24/7 global support';
   const firstResponseMinutes = data?.metrics?.firstResponseMinutes ?? data?.metrics?.firstResponse ?? 42;
@@ -331,7 +432,28 @@ export default function LearnerSupport() {
   const [messageAttachments, setMessageAttachments] = useState([]);
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
-  const [helpfulArticles, setHelpfulArticles] = useState({});
+  const [helpfulArticles, setHelpfulArticles] = useState(() => {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return {};
+    }
+    try {
+      const stored = window.localStorage.getItem(SUPPORT_HELPFUL_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : {};
+    } catch (_error) {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(SUPPORT_HELPFUL_STORAGE_KEY, JSON.stringify(helpfulArticles));
+    } catch (_error) {
+      // ignore storage failures
+    }
+  }, [helpfulArticles]);
 
   useEffect(() => {
     setSelectedCaseId((current) => {
@@ -564,7 +686,7 @@ export default function LearnerSupport() {
 
   const toggleHelpfulArticle = useCallback((articleId) => {
     setHelpfulArticles((current) => ({ ...current, [articleId]: !current[articleId] }));
-  }, []);
+  }, [setHelpfulArticles]);
 
   if (!isLearner) {
     return (
@@ -981,11 +1103,24 @@ export default function LearnerSupport() {
           <div>
             <p className="dashboard-kicker">Knowledge base</p>
             <h2 className="text-lg font-semibold text-slate-900">Guides curated for your workspace</h2>
+            {knowledgeBaseMeta ? (
+              <p className="text-xs text-slate-500">
+                Refreshed{' '}
+                {knowledgeBaseMeta.lastUpdatedAt
+                  ? formatDashboardRelative(knowledgeBaseMeta.lastUpdatedAt, { fallback: 'recently', numeric: 'auto' })
+                  : 'recently'}
+                {' · '}
+                {knowledgeBaseMeta.totalArticles} articles · {knowledgeBaseMeta.staleArticles} flagged for review
+              </p>
+            ) : (
+              <p className="text-xs text-slate-500">Personalised guides update as new playbooks ship.</p>
+            )}
           </div>
           <button type="button" className="dashboard-pill" onClick={() => refresh?.()}>
             Refresh recommendations
           </button>
         </div>
+        {knowledgeBaseMeta ? <KnowledgeBaseMetaSummary meta={knowledgeBaseMeta} /> : null}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {knowledgeBase.length ? (
             knowledgeBase.map((article) => (

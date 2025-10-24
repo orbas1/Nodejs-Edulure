@@ -64,6 +64,7 @@ import CommunityCommunications from './pages/dashboard/community/CommunityCommun
 import LearnerSocial from './pages/dashboard/LearnerSocial.jsx';
 import LearnerCommunityChats from './pages/dashboard/LearnerCommunityChats.jsx';
 import NavigationAnnex from './pages/handbook/NavigationAnnex.jsx';
+import ThemeProvider from './providers/ThemeProvider.jsx';
 const DashboardLayout = lazy(() => import('./layouts/DashboardLayout.jsx'));
 const DashboardHome = lazy(() => import('./pages/dashboard/DashboardHome.jsx'));
 const LearnerFinancial = lazy(() => import('./pages/dashboard/LearnerFinancial.jsx'));
@@ -81,14 +82,15 @@ const AdminControl = lazy(() => import('./pages/dashboard/AdminControl.jsx'));
 
 function App() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600" role="status">
-          Loading the Edulure experience…
-        </div>
-      }
-    >
-      <Routes>
+    <ThemeProvider>
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600" role="status">
+            Loading the Edulure experience…
+          </div>
+        }
+      >
+        <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
@@ -350,8 +352,9 @@ function App() {
           )}
         />
       </Route>
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </ThemeProvider>
   );
 }
 

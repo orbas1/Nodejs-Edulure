@@ -16,6 +16,7 @@ import SettingsToggleField from '../../components/settings/SettingsToggleField.j
 import SettingsAccordion from '../../components/settings/SettingsAccordion.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useOutletContext } from 'react-router-dom';
+import { useTheme } from '../../providers/ThemeProvider.jsx';
 import {
   fetchAppearanceSettings,
   fetchIntegrationSettings,
@@ -468,6 +469,7 @@ function useSettingsSection({ token, fetcher, updater, fallback, sectionName }) 
 }
 
 function AppearanceSection({ state, onChange, onSubmit, saving = false, disabled = false }) {
+  const { setMode: setThemeMode, setDensity: setThemeDensity, setRadius: setThemeRadius } = useTheme();
   const updateBranding = (field, value) =>
     onChange((prev) => ({
       ...prev,
@@ -477,7 +479,7 @@ function AppearanceSection({ state, onChange, onSubmit, saving = false, disabled
       }
     }));
 
-  const updateTheme = (field, value) =>
+  const updateTheme = (field, value) => {
     onChange((prev) => ({
       ...prev,
       theme: {
@@ -485,6 +487,32 @@ function AppearanceSection({ state, onChange, onSubmit, saving = false, disabled
         [field]: value
       }
     }));
+
+    if (field === 'mode') {
+      setThemeMode(value);
+    } else if (field === 'density') {
+      const densityValue = value === 'expanded' ? 'comfortable' : value;
+      setThemeDensity(densityValue);
+    } else if (field === 'borderRadius') {
+      const mappedRadius = value === 'pill' ? 'soft' : value;
+      setThemeRadius(mappedRadius);
+    }
+  };
+
+  useEffect(() => {
+    const themeState = state?.theme ?? {};
+    if (themeState.mode) {
+      setThemeMode(themeState.mode);
+    }
+    if (themeState.density) {
+      const densityValue = themeState.density === 'expanded' ? 'comfortable' : themeState.density;
+      setThemeDensity(densityValue);
+    }
+    if (themeState.borderRadius) {
+      const mappedRadius = themeState.borderRadius === 'pill' ? 'soft' : themeState.borderRadius;
+      setThemeRadius(mappedRadius);
+    }
+  }, [state?.theme?.mode, state?.theme?.density, state?.theme?.borderRadius, setThemeMode, setThemeDensity, setThemeRadius]);
 
   const updateHero = (field, value) =>
     onChange((prev) => ({

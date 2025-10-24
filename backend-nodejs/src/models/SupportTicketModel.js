@@ -145,6 +145,14 @@ function normaliseKnowledgeSuggestions(value) {
         return null;
       }
       const id = suggestion.id ?? suggestion.slug ?? `kb-${index}`;
+      const updatedAt = suggestion.updatedAt ?? suggestion.updated_at ?? null;
+      const updatedIso = updatedAt ? toIso(updatedAt) : null;
+      const freshness = Number.isFinite(Number(suggestion.freshnessDays))
+        ? Number(suggestion.freshnessDays)
+        : null;
+      const helpfulnessScore = Number.isFinite(Number(suggestion.helpfulnessScore))
+        ? Number(suggestion.helpfulnessScore)
+        : null;
       const minutesRaw = suggestion.minutes ?? suggestion.readTime ?? suggestion.duration ?? null;
       const minutes = Number.isFinite(Number(minutesRaw)) ? Number(minutesRaw) : 3;
       return {
@@ -153,7 +161,11 @@ function normaliseKnowledgeSuggestions(value) {
         excerpt: suggestion.excerpt ?? suggestion.summary ?? suggestion.description ?? '',
         url: suggestion.url ?? suggestion.link ?? '#',
         category: suggestion.category ?? suggestion.topic ?? 'General',
-        minutes
+        minutes,
+        updatedAt: updatedIso,
+        freshnessDays: freshness,
+        helpfulnessScore,
+        stale: suggestion.stale ?? suggestion.isStale ?? false
       };
     })
     .filter(Boolean);
