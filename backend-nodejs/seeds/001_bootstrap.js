@@ -141,6 +141,11 @@ export async function seed(knex) {
     await trx('user_privacy_settings').del();
     await trx('community_posts').del();
     await trx('community_channels').del();
+    await trx('creation_project_versions').del();
+    await trx('creation_collaboration_sessions').del();
+    await trx('creation_project_collaborators').del();
+    await trx('creation_projects').del();
+    await trx('creation_templates').del();
     await trx('community_members').del();
     await trx('asset_conversion_outputs').del();
     await trx('asset_ingestion_jobs').del();
@@ -288,6 +293,12 @@ export async function seed(knex) {
       badge: 'Learner',
       colors: ['#3b82f6', '#1d4ed8']
     });
+    const flowPreviewAvatar = await ensureSeedImage('profile-jordan-rivera', {
+      title: 'Jordan Rivera',
+      subtitle: 'Sponsor pod architect',
+      badge: 'Beta',
+      colors: ['#8b5cf6', '#7c3aed']
+    });
 
     await trx('user_profiles').insert([
       {
@@ -313,6 +324,14 @@ export async function seed(knex) {
         location: 'Lisbon, PT',
         avatar_url: learnerAvatar.url,
         metadata: JSON.stringify({ role: 'learner', pronouns: 'she/her' })
+      },
+      {
+        user_id: flowPreviewUserId,
+        display_name: 'Jordan Rivera',
+        tagline: 'Sponsor pod architect',
+        location: 'Remote',
+        avatar_url: flowPreviewAvatar.url,
+        metadata: JSON.stringify({ role: 'instructor', pronouns: 'they/them', cohort: 'Flow Five beta' })
       }
     ]);
 
@@ -1262,6 +1281,39 @@ export async function seed(knex) {
         role: 'member',
         status: 'pending',
         metadata: JSON.stringify(growthMemberMetadata)
+      },
+      {
+        community_id: growthCommunityId,
+        user_id: flowPreviewUserId,
+        role: 'member',
+        status: 'trialing',
+        metadata: JSON.stringify({
+          title: 'Sponsor Pod Beta Lead',
+          roleLabel: 'Sponsor lead',
+          location: 'Remote',
+          contactEmail: 'flow5-preview@edulure.test',
+          tags: ['Beta cohort', 'Sponsor pods'],
+          recommended: false,
+          trialEndsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          avatarUrl: flowPreviewAvatar.url
+        })
+      },
+      {
+        community_id: opsCommunityId,
+        user_id: flowPreviewUserId,
+        role: 'member',
+        status: 'complimentary',
+        metadata: JSON.stringify({
+          title: 'Flow 5 Beta Liaison',
+          roleLabel: 'Complimentary guest',
+          location: 'Remote',
+          contactEmail: 'flow5-preview@edulure.test',
+          tags: ['Beta guest'],
+          recommended: true,
+          complimentaryGrantedBy: 'Amina Diallo',
+          complimentaryExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          avatarUrl: flowPreviewAvatar.url
+        })
       }
     ]);
 
@@ -2586,6 +2638,291 @@ export async function seed(knex) {
       rubric: JSON.stringify({ automationCoverage: 40, rehearsalRigor: 30, reportingClarity: 30 }),
       metadata: JSON.stringify({ submissionType: 'upload', requiresReview: true })
     });
+
+    const courseTemplateSchema = {
+      summaryTemplate:
+        'Draft the cohort welcome sequence, outline live rehearsals, and surface the telemetry dashboards required for launch readiness.',
+      outline: [
+        { id: 'overview', label: 'Programme overview', type: 'narrative' },
+        { id: 'modules', label: 'Module plan', type: 'table' },
+        { id: 'assessments', label: 'Assessments', type: 'rubric' }
+      ],
+      defaults: {
+        objectives: ['Launch automation blueprint', 'Embed telemetry guardrails'],
+        pricing: { plans: [{ label: 'Standard cohort', priceCents: 129900 }] },
+        schedule: { cadence: 'weekly', timezone: 'Etc/UTC' }
+      },
+      analyticsTargets: {
+        keywords: ['automation', 'incident readiness'],
+        audiences: ['operations leads', 'enablement managers'],
+        goals: ['cohort-completion-rate']
+      },
+      publishingChannels: ['catalogue', 'live_sessions']
+    };
+
+    const communityTemplateSchema = {
+      summaryTemplate:
+        'Stand up a community programme with recurring events, sponsor pods, and moderation coverage that protects live launch chat.',
+      outline: [
+        { id: 'community-profile', label: 'Community profile', type: 'form' },
+        { id: 'programming', label: 'Programming calendar', type: 'calendar' },
+        { id: 'moderation', label: 'Moderation workflow', type: 'checklist' }
+      ],
+      defaults: {
+        engagementPrograms: ['Launch rehearsals', 'Sponsor spotlight'],
+        moderation: { guidelines: ['No vendor spam', 'Escalate incidents'], escalationContacts: [] }
+      },
+      analyticsTargets: {
+        keywords: ['community launch', 'sponsor enablement'],
+        audiences: ['community managers', 'sponsor leads'],
+        goals: ['engagement-rate']
+      },
+      publishingChannels: ['community', 'events']
+    };
+
+    const [courseTemplateId] = await trx('creation_templates').insert({
+      type: 'course',
+      title: 'Cohort Launch Blueprint',
+      description: 'Guided structure for automation cohorts with telemetry checkpoints.',
+      schema: JSON.stringify(courseTemplateSchema),
+      version: 3,
+      is_default: true,
+      governance_tags: JSON.stringify(['ops', 'launch-readiness']),
+      created_by: instructorId,
+      published_at: trx.fn.now()
+    });
+
+    const [communityTemplateId] = await trx('creation_templates').insert({
+      type: 'community',
+      title: 'Sponsor Pod Accelerator',
+      description: 'Blueprint for communities that mix live programming with monetisation pods.',
+      schema: JSON.stringify(communityTemplateSchema),
+      version: 2,
+      is_default: false,
+      governance_tags: JSON.stringify(['community', 'sponsor-programme']),
+      created_by: adminId,
+      published_at: trx.fn.now()
+    });
+
+    const creationNow = new Date();
+    const creationIso = creationNow.toISOString();
+    const opsCourseOutline = [
+      {
+        id: 'launch-command-center',
+        label: 'Launch Command Center',
+        description: 'Define command protocols, escalation paths, and rehearsal cadences.',
+        durationMinutes: 120,
+        children: [
+          { id: 'command-blueprint', label: 'Command center blueprint', durationMinutes: 45, assetId: opsPlaybookAssetId }
+        ]
+      },
+      {
+        id: 'incident-simulation',
+        label: 'Incident Simulation Drills',
+        description: 'Rehearse telemetry outages, escalation paging, and mitigation plans.',
+        durationMinutes: 180,
+        children: [
+          { id: 'telemetry-drill', label: 'Funnel telemetry deep dive', durationMinutes: 60, assetId: growthPlaybookEbookAssetId }
+        ]
+      }
+    ];
+
+    const [opsCreationProjectId] = await trx('creation_projects').insert({
+      owner_id: instructorId,
+      type: 'course',
+      status: 'in_review',
+      title: 'Automation Command Center Build',
+      summary:
+        'Cohort experience covering command center setup, incident simulations, and telemetry dashboards for launch readiness.',
+      metadata: JSON.stringify({
+        templateId: courseTemplateId,
+        objectives: ['Codify launch rehearsal loop', 'Instrument telemetry guardrails'],
+        modules: opsCourseOutline.map((entry) => ({
+          slug: entry.id,
+          title: entry.label,
+          status: entry.id === 'incident-simulation' ? 'draft' : 'ready',
+          linkedAssetIds: entry.children.map((child) => child.assetId),
+          qualityGate: entry.id === 'incident-simulation' ? 'Needs simulation QA' : 'QA passed'
+        })),
+        compliance: { riskProfile: 'low', requiresReview: true },
+        heroAssetId: opsPlaybookAssetId,
+        owner: {
+          id: instructorId,
+          name: 'Kai Watanabe',
+          avatar: instructorAvatar.url
+        }
+      }),
+      content_outline: JSON.stringify(opsCourseOutline),
+      compliance_notes: JSON.stringify([
+        {
+          type: 'policy',
+          message: 'Confirm SOC2 policy mapping for rehearsal recordings before publishing.'
+        }
+      ]),
+      analytics_targets: JSON.stringify({
+        keywords: ['automation', 'incident response'],
+        audiences: ['operations leads'],
+        goals: ['increase-launch-readiness'],
+        markets: ['global']
+      }),
+      publishing_channels: JSON.stringify(['catalogue', 'live_sessions']),
+      review_requested_at: creationIso,
+      approved_at: null,
+      published_at: null
+    });
+
+    const communityOutline = [
+      {
+        id: 'sponsor-pod',
+        label: 'Sponsor Pod Workflows',
+        description: 'Define onboarding journeys, KPI reviews, and monetisation guardrails.',
+        durationMinutes: 60,
+        children: []
+      },
+      {
+        id: 'launch-calendar',
+        label: 'Launch Programming Calendar',
+        description: 'Map weekly rehearsal cadence and live escalation clinics.',
+        durationMinutes: 90,
+        children: []
+      }
+    ];
+
+    const [communityCreationProjectId] = await trx('creation_projects').insert({
+      owner_id: adminId,
+      type: 'community',
+      status: 'approved',
+      title: 'Ops Guild Sponsor Pod Expansion',
+      summary:
+        'Community programme layering sponsor pods, rehearsal events, and monetisation workflows for the Ops Guild.',
+      metadata: JSON.stringify({
+        templateId: communityTemplateId,
+        objectives: ['Grow sponsor-led programming', 'Standardise escalation playbooks'],
+        engagementPrograms: ['Sponsor pods', 'Weekly war rooms'],
+        moderation: {
+          guidelines: ['Escalate P1 incidents immediately', 'Archive off-topic vendor posts'],
+          escalationContacts: [
+            { name: 'Amina Diallo', email: 'amina.diallo@edulure.test' },
+            { name: 'Kai Watanabe', email: 'kai.watanabe@edulure.test' }
+          ]
+        },
+        monetisation: { tiers: ['premium-ops-lab'], sponsorshipTargets: 4 },
+        linkedCommunityId: opsCommunityId
+      }),
+      content_outline: JSON.stringify(communityOutline),
+      compliance_notes: JSON.stringify([
+        {
+          type: 'legal',
+          message: 'Review sponsor agreements for updated fulfilment terms prior to relaunch.'
+        }
+      ]),
+      analytics_targets: JSON.stringify({
+        keywords: ['sponsor programme', 'community launch'],
+        audiences: ['community managers', 'sponsor leads'],
+        goals: ['increase-event-attendance'],
+        markets: ['north-america']
+      }),
+      publishing_channels: JSON.stringify(['community', 'events']),
+      review_requested_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      approved_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      published_at: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString()
+    });
+
+    await trx('creation_project_collaborators').insert([
+      {
+        project_id: opsCreationProjectId,
+        user_id: instructorId,
+        role: 'owner',
+        permissions: JSON.stringify(['project:read', 'project:edit', 'project:submit', 'session:start'])
+      },
+      {
+        project_id: opsCreationProjectId,
+        user_id: adminId,
+        role: 'editor',
+        permissions: JSON.stringify(['project:read', 'project:edit', 'project:approve'])
+      },
+      {
+        project_id: communityCreationProjectId,
+        user_id: adminId,
+        role: 'owner',
+        permissions: JSON.stringify(['project:read', 'project:edit', 'project:publish', 'collaboration:manage'])
+      },
+      {
+        project_id: communityCreationProjectId,
+        user_id: instructorId,
+        role: 'commenter',
+        permissions: JSON.stringify(['project:read', 'comment:create'])
+      },
+      {
+        project_id: communityCreationProjectId,
+        user_id: flowPreviewUserId,
+        role: 'viewer',
+        permissions: JSON.stringify(['project:read'])
+      }
+    ]);
+
+    await trx('creation_collaboration_sessions').insert([
+      {
+        public_id: crypto.randomUUID(),
+        project_id: opsCreationProjectId,
+        participant_id: instructorId,
+        role: 'owner',
+        capabilities: JSON.stringify(['edit', 'versioning']),
+        metadata: JSON.stringify({ entryPoint: 'studio', clientVersion: 'web-2025.03.1' }),
+        joined_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        last_heartbeat_at: new Date(Date.now() - 30 * 1000).toISOString()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        project_id: opsCreationProjectId,
+        participant_id: adminId,
+        role: 'editor',
+        capabilities: JSON.stringify(['comment', 'approve']),
+        metadata: JSON.stringify({ entryPoint: 'review', clientVersion: 'web-2025.03.1' }),
+        joined_at: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+        last_heartbeat_at: new Date(Date.now() - 45 * 1000).toISOString()
+      }
+    ]);
+
+    await trx('creation_project_versions').insert([
+      {
+        project_id: opsCreationProjectId,
+        version_number: 1,
+        created_by: instructorId,
+        snapshot: JSON.stringify({
+          title: 'Automation Command Center Build',
+          contentOutline: opsCourseOutline,
+          metadata: {
+            templateId: courseTemplateId,
+            objectives: ['Codify launch rehearsal loop', 'Instrument telemetry guardrails'],
+            heroAssetId: opsPlaybookAssetId
+          },
+          updatedAt: creationIso
+        }),
+        change_summary: JSON.stringify({
+          message: 'Initial cohort scaffold with rehearsal module placeholders',
+          authoredBy: 'Kai Watanabe'
+        })
+      },
+      {
+        project_id: communityCreationProjectId,
+        version_number: 1,
+        created_by: adminId,
+        snapshot: JSON.stringify({
+          title: 'Ops Guild Sponsor Pod Expansion',
+          contentOutline: communityOutline,
+          metadata: {
+            templateId: communityTemplateId,
+            objectives: ['Grow sponsor-led programming', 'Standardise escalation playbooks'],
+            linkedCommunityId: opsCommunityId
+          }
+        }),
+        change_summary: JSON.stringify({
+          message: 'Sponsor pod accelerator blueprint approved',
+          authoredBy: 'Amina Diallo'
+        })
+      }
+    ]);
 
     const [opsEnrollmentId] = await trx('course_enrollments').insert({
       public_id: crypto.randomUUID(),

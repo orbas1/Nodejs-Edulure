@@ -3,8 +3,10 @@ import Joi from 'joi';
 import CommunityMemberAdminService from '../services/CommunityMemberAdminService.js';
 import { success } from '../utils/httpResponse.js';
 
+const memberStatusEnum = ['active', 'pending', 'suspended', 'banned', 'trial', 'trialing', 'complimentary'];
+
 const listQuerySchema = Joi.object({
-  status: Joi.string().valid('active', 'pending', 'suspended').optional(),
+  status: Joi.string().valid(...memberStatusEnum).optional(),
   role: Joi.string().valid('owner', 'admin', 'moderator', 'member').optional(),
   search: Joi.string().max(120).allow('', null)
 });
@@ -13,7 +15,7 @@ const createMemberSchema = Joi.object({
   userId: Joi.number().integer().positive(),
   email: Joi.string().email(),
   role: Joi.string().valid('owner', 'admin', 'moderator', 'member').default('member'),
-  status: Joi.string().valid('active', 'pending', 'suspended').default('active'),
+  status: Joi.string().valid(...memberStatusEnum).default('active'),
   title: Joi.string().max(120).allow('', null),
   location: Joi.string().max(120).allow('', null),
   tags: Joi.alternatives()
@@ -26,7 +28,7 @@ const createMemberSchema = Joi.object({
 
 const updateMemberSchema = Joi.object({
   role: Joi.string().valid('owner', 'admin', 'moderator', 'member'),
-  status: Joi.string().valid('active', 'pending', 'suspended'),
+  status: Joi.string().valid(...memberStatusEnum),
   title: Joi.string().max(120).allow('', null),
   location: Joi.string().max(120).allow('', null),
   tags: Joi.alternatives()

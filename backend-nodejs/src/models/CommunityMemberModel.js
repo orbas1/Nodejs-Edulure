@@ -2,8 +2,9 @@ import db from '../config/database.js';
 import { ensureIntegerInRange, readJsonColumn, writeJsonColumn } from '../utils/modelUtils.js';
 
 const TABLE = 'community_members';
-const ROLE_OPTIONS = new Set(['owner', 'admin', 'moderator', 'member']);
-const STATUS_OPTIONS = new Set(['active', 'pending', 'banned']);
+const BASE_ROLE_OPTIONS = new Set(['owner', 'admin', 'moderator', 'member']);
+const STATUS_OPTIONS = new Set(['active', 'pending', 'banned', 'suspended', 'trial', 'trialing', 'complimentary']);
+const ACTIVE_STATUS_OPTIONS = new Set(['active', 'trial', 'trialing', 'complimentary']);
 
 function normalisePrimaryId(value, fieldName) {
   if (value === undefined || value === null || value === '') {
@@ -19,9 +20,14 @@ function normaliseRole(role) {
   }
 
   const candidate = String(role).trim().toLowerCase();
-  if (!ROLE_OPTIONS.has(candidate)) {
+  if (BASE_ROLE_OPTIONS.has(candidate)) {
+    return candidate;
+  }
+
+  if (!/^[a-z0-9][a-z0-9_-]{1,59}$/.test(candidate)) {
     throw new Error(`Unsupported community role '${role}'`);
   }
+
   return candidate;
 }
 
@@ -144,9 +150,9 @@ export default class CommunityMemberModel {
       updated_at: connection.fn.now()
     };
 
-    if (normalisedStatus === 'active') {
+    if (ACTIVE_STATUS_OPTIONS.has(normalisedStatus)) {
       payload.left_at = null;
-    } else if (normalisedStatus !== 'active') {
+    } else {
       payload.left_at = connection.fn.now();
     }
 

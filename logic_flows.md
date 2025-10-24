@@ -55,12 +55,12 @@ This compendium maps the execution paths, responsibilities, and release consider
 12. **Styling and Colour review changes:** Align status badges (draft, scheduled, live) with the tonal ranges declared in the design-system tokens to keep UI consistent.
 13. **CSS, orientation, placement and arrangement changes:** Provide layout hints for table vs. card views, including recommended column orders and responsive breakpoints consumed by clients.
 14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Audit lesson descriptions and certificate copy generation for duplicate phrasing and ensure summarised content stays under recommended lengths.
-15. **Change Checklist Tracker:** Extend release checklist to confirm new course types are represented in analytics dashboards, recommendation engines, and certificate templates before launch.
+15. **Change Checklist Tracker:** Extend release checklist to confirm new course types are represented in analytics dashboards, recommendation engines, certificate templates, and seeded creation-studio templates/projects stay in sync with schema updates before launch.
 16. **Full Upgrade Plan & Release Steps:** Roll authoring enhancements to staging, migrate content seeds, update SDK types, brief instructors, perform canary release, and monitor lesson completion telemetry.
 
 ### 1.D Community, Events & Programming (`controllers/CommunityController.js`, `controllers/CommunityEngagementController.js`, `controllers/CommunityProgrammingController.js`, `controllers/CommunityOperationsController.js`, `controllers/CommunityMonetizationController.js`, `controllers/CommunityMemberAdminController.js`, `controllers/CommunityModerationController.js`, `controllers/CommunityChatController.js`, `services/CommunityService.js`, `services/CommunityEngagementService.js`, `services/CommunityProgrammingService.js`, `services/CommunityModerationService.js`, `services/CommunityDonationLifecycle.js`, `services/CommunityAffiliateCommissionService.js`, `services/CommunityOperationsService.js`, `models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/CommunityMembershipModel.js`)
 1. **Appraisal:** Rich community subsystem orchestrating membership, programming calendars, monetisation, moderation queues, donations, affiliate payouts, and chat experiences.
-2. **Functionality:** Routes under `community.routes.js`, `communityModeration.routes.js`, and `chat.routes.js` power space creation, membership approvals, moderation actions, donation setup, revenue sharing, and conversational threads tied to events.
+2. **Functionality:** Routes under `community.routes.js`, `communityModeration.routes.js`, and `chat.routes.js` power space creation, membership approvals, moderation actions, donation setup, revenue sharing, and conversational threads tied to events. Membership admin APIs now surface the expanded lifecycle statuses (`trialing`, `complimentary`, `suspended`) after aligning Joi validation, models, and schema migrations.
 3. **Logic Usefulness:** Service layer centralises role checks, experience points, monetisation ledgers, and chat hydration so both synchronous (websockets) and asynchronous workflows stay consistent.
 4. **Redundancies:** Membership role gating is re-implemented in both `CommunityMemberAdminController.js` and `CommunityModerationController.js`; a shared policy helper should own the ruleset.
 5. **Placeholders Or non-working functions or stubs:** Affiliate commission schedules include TODO placeholders for payout providers; mark them clearly and guard endpoints until implemented.
@@ -1482,7 +1482,7 @@ The annex below expands every rubric item with narrative-level depth so stakehol
 8. **Styling Improvements.** Align lesson authoring UI (`frontend-reactjs/src/pages/creator/LessonEditor.jsx`) with design system spacing tokens.
 9. **Efficiency Analysis & Improvement.** Apply query batching in `repositories/lessonRepository.fetchWithModules` to avoid N+1 on modules.
 10. **Strengths to Keep.** Clear domain events and decoupled service layer; tests mimic real flows via fixtures in `backend-nodejs/test/lessons`.
-11. **Weaknesses to Remove.** Lack of optimistic locking; add `updated_at` checks to avoid overwriting concurrent edits.
+11. **Weaknesses to Remove.** Optimistic locking now guards `CreationProjectModel.updateById` via `expectedUpdatedAt`; keep integration coverage high so clients surface refresh guidance when preconditions fail.
 12. **Styling & Colour Review Changes.** Use semantic colour tokens for status badges (draft/live/scheduled) to maintain brand cohesion.
 13. **CSS / Orientation / Placement.** Ensure module reorder drag handles remain accessible with keyboard controls (ARIA attributes in `components/DragHandle.jsx`).
 14. **Text Analysis.** Tighten instructions for authors, emphasising prerequisites and targeted outcomes; reference `docs/content_styleguide.md`.
@@ -1516,7 +1516,7 @@ The annex below expands every rubric item with narrative-level depth so stakehol
 4. **Redundancies.** `services/feed/rankingService.ts` and `utils/rankHelpers.js` overlap; consolidate the helper into the service.
 5. **Placeholders / Stubs.** `featureFlags.communityCircles` toggles a stubbed cluster view; finish the API before toggling on.
 6. **Duplicate Functions.** GraphQL resolver duplicates HTTP controller logic; share service functions to avoid divergence.
-7. **Improvements Needed.** Add toxicity detection pipeline via `integrations/moderationProvider.ts`, implement offline sync for mobile clients, and complete migration of controllers/services onto `CommunityPolicyService.js` so permission checks stay consistent across feeds, moderation, and sponsorship tooling.
+7. **Improvements Needed.** Add toxicity detection pipeline via `integrations/moderationProvider.ts`, implement offline sync for mobile clients, and finish rolling `CommunityPolicyService.js` plus the new membership status taxonomy through feed, moderation, and sponsorship tooling so permission checks stay consistent everywhere.
 8. **Styling Improvements.** Apply consistent card layout using `frontend-reactjs/src/components/community/PostCard.jsx` and align with spacing tokens.
 9. **Efficiency Analysis & Improvement.** Evaluate using materialised views for trending queries to reduce computation under heavy load.
 10. **Strengths to Keep.** Event-driven architecture for feed updates ensures near-real-time updates.
