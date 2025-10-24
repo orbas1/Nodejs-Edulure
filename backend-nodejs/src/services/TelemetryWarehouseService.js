@@ -7,6 +7,7 @@ import TelemetryExportModel from '../models/TelemetryExportModel.js';
 import TelemetryFreshnessMonitorModel from '../models/TelemetryFreshnessMonitorModel.js';
 import TelemetryLineageRunModel from '../models/TelemetryLineageRunModel.js';
 import storageService from './StorageService.js';
+import dataEncryptionService from './DataEncryptionService.js';
 import {
   recordTelemetryExport,
   recordTelemetryFreshness
@@ -34,6 +35,56 @@ function buildExportRecord(event, { batch, trigger }) {
   };
 }
 
+function buildCheckpointDescriptor({ events, batch, trigger, encryptionService }) {
+  if (!encryptionService) {
+    return { plain: null, sealed: { ciphertext: null, keyId: null, hash: null } };
+  }
+
+  if (!Array.isArray(events) || events.length === 0) {
+    return {
+      plain: null,
+      sealed: {
+        ciphertext: null,
+        keyId: encryptionService.activeKeyId ?? null,
+        hash: null
+      }
+    };
+  }
+
+  try {
+    const lastEvent = events.at(-1);
+    const payload = {
+      lastEventId: lastEvent?.id ?? null,
+      lastEventOccurredAt: lastEvent?.occurredAt ?? null,
+      exportedCount: events.length,
+      trigger,
+      batchUuid: batch?.batchUuid ?? null
+    };
+
+    const serialised = JSON.stringify(payload);
+    const { ciphertext, keyId } = encryptionService.encrypt(serialised);
+    const hash = encryptionService.hash(serialised);
+
+    return {
+      plain: payload,
+      sealed: {
+        ciphertext: ciphertext ? ciphertext.toString('base64') : null,
+        keyId: keyId ?? encryptionService.activeKeyId ?? null,
+        hash
+      }
+    };
+  } catch (_error) {
+    return {
+      plain: null,
+      sealed: {
+        ciphertext: null,
+        keyId: encryptionService.activeKeyId ?? null,
+        hash: null
+      }
+    };
+  }
+}
+
 export class TelemetryWarehouseService {
   constructor({
     eventModel = TelemetryEventModel,
@@ -41,6 +92,7 @@ export class TelemetryWarehouseService {
     freshnessModel = TelemetryFreshnessMonitorModel,
     lineageModel = TelemetryLineageRunModel,
     storage = storageService,
+    encryptionService = dataEncryptionService,
     loggerInstance = logger.child({ service: 'TelemetryWarehouseService' }),
     config = env.telemetry
   } = {}) {
@@ -50,6 +102,7 @@ export class TelemetryWarehouseService {
     this.lineageModel = lineageModel;
     this.storage = storage;
     this.logger = loggerInstance;
+    this.encryptionService = encryptionService;
 
     const exportConfig = config?.export ?? {};
     const freshnessConfig = config?.freshness ?? {};
@@ -87,14 +140,17 @@ export class TelemetryWarehouseService {
     }
 
     const batchSize = Math.max(1, limit ?? this.config.export.batchSize);
-    const events = await this.eventModel.listPendingForExport({ limit: batchSize });
+    const candidateLimit = Math.max(1, batchSize + 1);
+    const candidateEvents = await this.eventModel.listPendingForExport({ limit: candidateLimit });
+    const hasBacklog = candidateEvents.length > batchSize;
+    const events = hasBacklog ? candidateEvents.slice(0, batchSize) : candidateEvents;
 
     if (!events.length) {
       this.logger.debug({ trigger }, 'No telemetry events pending export');
       await this.freshnessModel.touchCheckpoint('warehouse.export', {
         lastEventAt: new Date(),
         thresholdMinutes: this.config.freshness.warehouseThresholdMinutes,
-        metadata: { trigger, eventsExported: 0 }
+        metadata: { trigger, eventsExported: 0, hasBacklog: false }
       });
       recordTelemetryFreshness({
         pipeline: 'warehouse.export',
@@ -125,6 +181,12 @@ export class TelemetryWarehouseService {
       .map((event) => buildExportRecord(event, { batch, trigger }))
       .map((payload) => JSON.stringify(payload))
       .join('\n');
+    const checkpoint = buildCheckpointDescriptor({
+      events,
+      batch,
+      trigger,
+      encryptionService: this.encryptionService
+    });
     let buffer = Buffer.from(serialised, 'utf8');
     let contentType = 'application/json';
     let extension = 'jsonl';
@@ -154,7 +216,14 @@ export class TelemetryWarehouseService {
         eventsCount: events.length,
         fileKey: upload.key,
         checksum: upload.checksum,
-        metadata: { bucket: upload.bucket, byteLength: buffer.length, trigger }
+        metadata: {
+          bucket: upload.bucket,
+          byteLength: buffer.length,
+          trigger,
+          checkpoint: checkpoint.sealed,
+          checkpointPreview: checkpoint.plain,
+          hasBacklog
+        }
       });
 
       const exportedAt = new Date().toISOString();
@@ -166,7 +235,8 @@ export class TelemetryWarehouseService {
             destination: key,
             exportedAt,
             trigger,
-            batchUuid: completedBatch?.batchUuid ?? batch.batchUuid
+            batchUuid: completedBatch?.batchUuid ?? batch.batchUuid,
+            checkpointHash: checkpoint.sealed.hash
           }
         }
       );
@@ -188,7 +258,10 @@ export class TelemetryWarehouseService {
           durationSeconds,
           eventsCount: events.length,
           destinationKey: key,
-          batchUuid: completedBatch?.batchUuid ?? batch.batchUuid
+          batchUuid: completedBatch?.batchUuid ?? batch.batchUuid,
+          checkpoint: checkpoint.sealed,
+          checkpointPreview: checkpoint.plain,
+          hasBacklog
         }
       });
 
@@ -217,6 +290,8 @@ export class TelemetryWarehouseService {
         exported: events.length,
         batchId: completedBatch?.id ?? batch.id,
         batchUuid: completedBatch?.batchUuid ?? batch.batchUuid,
+        batchSize,
+        hasBacklog,
         destination: {
           bucket: this.config.export.bucket,
           key,
@@ -226,6 +301,10 @@ export class TelemetryWarehouseService {
         trigger,
         durationSeconds,
         lineageRunId: lineageRun?.id ?? null,
+        checkpoint: {
+          sealed: checkpoint.sealed,
+          preview: checkpoint.plain
+        },
         preview: events
           .slice(0, 5)
           .map((event) => buildExportRecord(event, { batch: completedBatch ?? batch, trigger }))

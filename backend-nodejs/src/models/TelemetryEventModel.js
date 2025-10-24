@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { TABLES } from '../database/domains/telemetry.js';
+import jsonMergePatch from '../database/utils/jsonMergePatch.js';
 
 function parseJson(value, fallback = {}) {
   if (value === null || value === undefined) {
@@ -143,10 +144,10 @@ export default class TelemetryEventModel {
     };
 
     if (metadata && Object.keys(metadata).length > 0) {
-      updatePayload.metadata = connection.raw(
-        'JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), ?)',
-        JSON.stringify(metadata)
-      );
+      const mergeExpression = jsonMergePatch(connection, 'metadata', metadata);
+      if (mergeExpression) {
+        updatePayload.metadata = mergeExpression;
+      }
     }
 
     return connection(TABLES.EVENTS).whereIn('id', ids).update(updatePayload);
@@ -158,15 +159,21 @@ export default class TelemetryEventModel {
     }
 
     const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
+    const failureMetadata = {
+      lastError: message.slice(0, 500),
+      lastFailureAt: new Date().toISOString()
+    };
+
     const updatePayload = {
       ingestion_status: 'pending',
       ingestion_attempts: connection.raw('ingestion_attempts + 1'),
-      last_ingestion_attempt: connection.fn.now(),
-      metadata: connection.raw(
-        'JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), ?)',
-        JSON.stringify({ lastError: message.slice(0, 500), lastFailureAt: new Date().toISOString() })
-      )
+      last_ingestion_attempt: connection.fn.now()
     };
+
+    const mergeExpression = jsonMergePatch(connection, 'metadata', failureMetadata);
+    if (mergeExpression) {
+      updatePayload.metadata = mergeExpression;
+    }
 
     return connection(TABLES.EVENTS).whereIn('id', ids).update(updatePayload);
   }

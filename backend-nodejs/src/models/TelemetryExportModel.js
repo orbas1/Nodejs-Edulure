@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { TABLES } from '../database/domains/telemetry.js';
+import jsonMergePatch from '../database/utils/jsonMergePatch.js';
 
 function parseJson(value, fallback = {}) {
   if (value === null || value === undefined) {
@@ -94,12 +95,15 @@ export default class TelemetryExportModel {
       events_count: eventsCount ?? 0,
       file_key: fileKey ?? null,
       checksum: checksum ?? null,
-      completed_at: completedAt,
-      metadata: connection.raw(
-        'JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), ?)',
-        JSON.stringify(metadata)
-      )
+      completed_at: completedAt
     };
+
+    if (metadata && Object.keys(metadata).length > 0) {
+      const mergeExpression = jsonMergePatch(connection, 'metadata', metadata);
+      if (mergeExpression) {
+        updatePayload.metadata = mergeExpression;
+      }
+    }
 
     await connection(TABLES.EVENT_BATCHES).where({ id }).update(updatePayload);
     return this.findById(id, connection);
@@ -107,17 +111,23 @@ export default class TelemetryExportModel {
 
   static async markFailed(id, error, connection = db) {
     const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
-    await connection(TABLES.EVENT_BATCHES)
-      .where({ id })
-      .update({
-        status: 'failed',
-        error_message: message.slice(0, 1000),
-        completed_at: connection.fn.now(),
-        metadata: connection.raw(
-          'JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), ?)',
-          JSON.stringify({ lastError: message.slice(0, 500), failedAt: new Date().toISOString() })
-        )
-      });
+    const failureMetadata = {
+      lastError: message.slice(0, 500),
+      failedAt: new Date().toISOString()
+    };
+
+    const updatePayload = {
+      status: 'failed',
+      error_message: message.slice(0, 1000),
+      completed_at: connection.fn.now()
+    };
+
+    const mergeExpression = jsonMergePatch(connection, 'metadata', failureMetadata);
+    if (mergeExpression) {
+      updatePayload.metadata = mergeExpression;
+    }
+
+    await connection(TABLES.EVENT_BATCHES).where({ id }).update(updatePayload);
 
     return this.findById(id, connection);
   }

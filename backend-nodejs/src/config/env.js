@@ -149,6 +149,19 @@ function parseOriginList(value) {
     .filter(Boolean);
 }
 
+function parsePositiveInteger(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+
+  return Math.round(numeric);
+}
+
 const defaultSchemaGuardTables = [
   'users',
   'communities',
@@ -1359,6 +1372,8 @@ const storageBuckets = {
 
 const telemetryExportBucket = raw.TELEMETRY_EXPORT_BUCKET ?? storageBuckets.private;
 const telemetryExportPrefix = normalizePrefix(raw.TELEMETRY_EXPORT_PREFIX, 'warehouse/telemetry');
+const telemetryExportBackpressureSeconds = parsePositiveInteger(raw.TELEMETRY_EXPORT_BACKPRESSURE_SECONDS);
+const telemetryExportMaxBackpressureCycles = parsePositiveInteger(raw.TELEMETRY_EXPORT_MAX_BACKPRESSURE_CYCLES);
 const twoFactorChallengeTtlSeconds = raw.TWO_FACTOR_CHALLENGE_TTL_SECONDS;
 const twoFactorResendCooldownSeconds = raw.TWO_FACTOR_RESEND_COOLDOWN_SECONDS;
 const twoFactorMaxAttempts = raw.TWO_FACTOR_MAX_ATTEMPTS;
@@ -2046,7 +2061,9 @@ export const env = {
       compress: raw.TELEMETRY_EXPORT_COMPRESS,
       cronExpression: raw.TELEMETRY_EXPORT_CRON,
       timezone: raw.TELEMETRY_EXPORT_TIMEZONE,
-      runOnStartup: raw.TELEMETRY_EXPORT_RUN_ON_STARTUP
+      runOnStartup: raw.TELEMETRY_EXPORT_RUN_ON_STARTUP,
+      backpressureSeconds: telemetryExportBackpressureSeconds,
+      maxBackpressureCycles: telemetryExportMaxBackpressureCycles
     },
     freshness: {
       ingestionThresholdMinutes: raw.TELEMETRY_FRESHNESS_INGESTION_THRESHOLD_MINUTES,

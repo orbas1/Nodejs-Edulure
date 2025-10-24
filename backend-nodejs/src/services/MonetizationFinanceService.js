@@ -441,6 +441,18 @@ function toIsoDate(value) {
   return new Date(value).toISOString();
 }
 
+function normaliseCurrency(value) {
+  return normalizeCurrencyCode(value, env.payments?.defaultCurrency ?? 'USD');
+}
+
+function toCentInteger(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.round(numeric);
+}
+
 function addDays(isoDate, days) {
   const base = isoDate ? new Date(isoDate) : new Date();
   const clone = new Date(base.getTime());
@@ -1299,6 +1311,128 @@ class MonetizationFinanceService {
     return { status: 'recognized', processed: dueSchedules.length, amount: recognizedTotal };
   }
 
+  static async #buildCurrencyBreakdown({ tenantId, windowStart, windowEnd }, connection = db) {
+    const queryConnection = getQueryConnection(connection);
+    if (!queryConnection) {
+      return [];
+    }
+
+    const normalizedTenant = normaliseTenantId(tenantId ?? 'global');
+    const accumulators = new Map();
+
+    const getAccumulator = (currency) => {
+      const key = normaliseCurrency(currency);
+      if (!accumulators.has(key)) {
+        accumulators.set(key, {
+          currency: key,
+          invoicedCents: 0,
+          recognizedCents: 0,
+          usageCents: 0,
+          deferredCents: 0
+        });
+      }
+      return accumulators.get(key);
+    };
+
+    const paymentQuery = queryConnection('payment_intents as pi')
+      .select({ currency: 'pi.currency' })
+      .where({ 'pi.status': 'succeeded' })
+      .andWhereNotNull('pi.captured_at')
+      .groupBy('pi.currency')
+      .sum({ total: 'pi.amount_total' });
+
+    if (windowStart) {
+      paymentQuery.andWhere('pi.captured_at', '>=', windowStart);
+    }
+    if (windowEnd) {
+      paymentQuery.andWhere('pi.captured_at', '<=', windowEnd);
+    }
+
+    applyTenantMetadataScope(paymentQuery, normalizedTenant, queryConnection);
+
+    const [paymentRows, usageRows, recognizedRows, deferredRows] = await Promise.all([
+      paymentQuery,
+      queryConnection('monetization_usage_records as mur')
+        .select({ currency: 'mur.currency' })
+        .where({ 'mur.tenant_id': normalizedTenant })
+        .modify((builder) => {
+          if (windowStart) {
+            builder.andWhere('mur.usage_date', '>=', windowStart);
+          }
+          if (windowEnd) {
+            builder.andWhere('mur.usage_date', '<=', windowEnd);
+          }
+        })
+        .groupBy('mur.currency')
+        .sum({ total: 'mur.amount_cents' }),
+      queryConnection('monetization_revenue_schedules as mrs')
+        .select({ currency: 'mrs.currency' })
+        .where({ 'mrs.tenant_id': normalizedTenant, 'mrs.status': 'recognized' })
+        .modify((builder) => {
+          if (windowStart) {
+            builder.andWhere('mrs.recognized_at', '>=', windowStart);
+          }
+          if (windowEnd) {
+            builder.andWhere('mrs.recognized_at', '<=', windowEnd);
+          }
+        })
+        .groupBy('mrs.currency')
+        .sum({ total: 'mrs.recognized_amount_cents' }),
+      queryConnection('monetization_revenue_schedules as mrs')
+        .select({ currency: 'mrs.currency' })
+        .where({ 'mrs.tenant_id': normalizedTenant })
+        .andWhere('mrs.status', '!=', 'recognized')
+        .groupBy('mrs.currency')
+        .sum({ total: 'mrs.amount_cents' })
+        .sum({ recognized: 'mrs.recognized_amount_cents' })
+    ]);
+
+    for (const row of paymentRows ?? []) {
+      const accumulator = getAccumulator(row?.currency);
+      accumulator.invoicedCents = toCentInteger(row?.total ?? 0);
+    }
+
+    for (const row of usageRows ?? []) {
+      const accumulator = getAccumulator(row?.currency);
+      accumulator.usageCents = toCentInteger(row?.total ?? 0);
+    }
+
+    for (const row of recognizedRows ?? []) {
+      const accumulator = getAccumulator(row?.currency);
+      accumulator.recognizedCents = toCentInteger(row?.total ?? 0);
+    }
+
+    for (const row of deferredRows ?? []) {
+      const accumulator = getAccumulator(row?.currency);
+      const total = toCentInteger(row?.total ?? 0);
+      const recognized = toCentInteger(row?.recognized ?? 0);
+      const deferred = Math.max(0, total - recognized);
+      accumulator.deferredCents = deferred;
+    }
+
+    const breakdown = Array.from(accumulators.values()).map((entry) => {
+      const varianceCents = entry.recognizedCents - entry.invoicedCents;
+      const usageVarianceCents = entry.recognizedCents - entry.usageCents;
+      const varianceBps = entry.invoicedCents
+        ? Number(((varianceCents / entry.invoicedCents) * 10000).toFixed(2))
+        : 0;
+      const usageVarianceBps = entry.usageCents
+        ? Number(((usageVarianceCents / entry.usageCents) * 10000).toFixed(2))
+        : 0;
+
+      return {
+        ...entry,
+        varianceCents,
+        varianceBps,
+        usageVarianceCents,
+        usageVarianceBps
+      };
+    });
+
+    breakdown.sort((a, b) => Math.abs(b.varianceCents) - Math.abs(a.varianceCents));
+    return breakdown;
+  }
+
   static async runReconciliation({ tenantId = 'global', start, end } = {}, connection = db) {
     const normalizedTenant = normaliseTenantId(tenantId);
     const windowStart = toIsoDate(start ?? new Date(new Date().setUTCHours(0, 0, 0, 0)));
@@ -1365,6 +1499,10 @@ class MonetizationFinanceService {
       deferredCents
     });
     const alertDigest = computeAlertDigest(evaluation.alerts);
+    const currencyBreakdown = await this.#buildCurrencyBreakdown(
+      { tenantId: normalizedTenant, windowStart, windowEnd },
+      connection
+    );
 
     const run = await MonetizationReconciliationRunModel.create(
       {
@@ -1388,7 +1526,8 @@ class MonetizationFinanceService {
           alerts: evaluation.alerts,
           thresholds: evaluation.thresholds,
           alertCooldownMinutes: evaluation.thresholds.alertCooldownMinutes,
-          alertDigest
+          alertDigest,
+          currencyBreakdown
         }
       },
       connection

@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { TABLES } from '../database/domains/telemetry.js';
+import jsonMergePatch from '../database/utils/jsonMergePatch.js';
 
 function parseJson(value, fallback = {}) {
   if (value === null || value === undefined) {
@@ -69,27 +70,29 @@ export default class TelemetryFreshnessMonitorModel {
 
     const { status, lagSeconds } = computeStatus({ lastEventAt, thresholdMinutes });
 
-    await connection(TABLES.FRESHNESS_MONITORS)
-      .insert({
-        pipeline_key: pipelineKey,
-        last_event_at: lastEventAt,
-        status,
-        threshold_minutes: thresholdMinutes,
-        lag_seconds: lagSeconds,
-        metadata: JSON.stringify(metadata ?? {})
-      })
-      .onConflict('pipeline_key')
-      .merge({
-        last_event_at: lastEventAt,
-        status,
-        threshold_minutes: thresholdMinutes,
-        lag_seconds: lagSeconds,
-        metadata: connection.raw(
-          'JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), ?)',
-          JSON.stringify(metadata)
-        ),
-        updated_at: connection.fn.now()
-      });
+    const insertPayload = {
+      pipeline_key: pipelineKey,
+      last_event_at: lastEventAt,
+      status,
+      threshold_minutes: thresholdMinutes,
+      lag_seconds: lagSeconds,
+      metadata: JSON.stringify(metadata ?? {})
+    };
+
+    const mergePayload = {
+      last_event_at: lastEventAt,
+      status,
+      threshold_minutes: thresholdMinutes,
+      lag_seconds: lagSeconds,
+      updated_at: connection.fn.now()
+    };
+
+    const mergeExpression = jsonMergePatch(connection, 'metadata', metadata);
+    if (mergeExpression) {
+      mergePayload.metadata = mergeExpression;
+    }
+
+    await connection(TABLES.FRESHNESS_MONITORS).insert(insertPayload).onConflict('pipeline_key').merge(mergePayload);
 
     const row = await connection(TABLES.FRESHNESS_MONITORS).where({ pipeline_key: pipelineKey }).first();
     return toDomain(row);

@@ -66,8 +66,40 @@
       - ✓ 4.B Data Partition Job (`dataPartitionJob.js`)
       - 4.C Data Retention Job (`dataRetentionJob.js`)
       - 4.D Moderation Follow-Up Job (`moderationFollowUpJob.js`)
-      - 4.E Monetization Reconciliation Job (`monetizationReconciliationJob.js`)
-      - 4.F Telemetry Warehouse Job (`telemetryWarehouseJob.js`)
+      - ✓ 4.E Monetization Reconciliation Job (`monetizationReconciliationJob.js`)
+        1. **Appraisal.** The reconciliation worker now orchestrates tenant windows end-to-end, wrapping multi-currency ledger comparisons, automatic revenue recognition, and failure recovery so finance can rely on a single scheduled pipeline instead of ad-hoc scripts. 
+        2. **Functionality.** `runCycle` invokes `MonetizationFinanceService.runReconciliation` alongside the new `#buildCurrencyBreakdown` helper, then records background job metrics, updates variance history, and cascades alerts through `MonetizationAlertNotificationService` when repeated failures occur. 
+        3. **Logic Usefulness.** Each reconciliation now returns `metadata.currencyBreakdown` showing invoiced, recognised, usage, deferred, variance, and basis-point deltas per ISO currency, giving auditors immediate cross-ledger visibility. 
+        4. **Redundancies.** Aggregated job metrics via `recordBackgroundJobRun` and shared variance-history updates eliminate the bespoke logging loops previously sprinkled across finance scripts. 
+        5. **Placeholders or Stubs.** Currency breakdown currently omits manual journal overrides; extend the helper to ingest adjustment tables before exposing the digest in executive dashboards. 
+        6. **Duplicate Functions.** Historical variance tracking consolidates in `MonetizationReconciliationRunModel.updateMetadata`, removing the need for downstream services to maintain their own reconciliation timelines. 
+        7. **Improvements Needed.** Add regression coverage for the tenant pause/resume state machine and wire acknowledgement digests into notification payloads so finance can see who triaged the variance. 
+        8. **Styling & Logging.** Summary logs now emit `outcome`, `alerts`, window bounds, and tenant counts in a single structured payload, ensuring on-call responders can pivot from Splunk straight into reconciliation metadata. 
+        9. **Efficiency Analysis.** Currency aggregation reuses grouped SQL queries across payments, usage, and revenue schedules, while hrtime-based duration tracking feeds Prometheus so slow tenants are surfaced automatically. 
+        10. **Strengths to Keep.** Tenant caching, failure backoff, and the finance service’s notification heuristics continue to guard against duplicate sends while adding richer telemetry. 
+        11. **Weaknesses to Remove.** Idle tenants still inherit the global recognition window; expose per-tenant overrides once policy storage lands in `PlatformSettingModel`. 
+        12. **Telemetry & Alerts.** Failure digests hash trigger, window, and tenant IDs before dispatching high-severity alerts, giving compliance a deterministic breadcrumb trail without leaking sensitive balances. 
+        13. **Layout & Metadata.** `varianceHistory` snapshots append the latest variance, severity, acknowledgement count, and truncated currency breakdown, keeping the run record audit-ready. 
+        14. **Text & Copy.** Warning logs surface alert severities with actionable copy (“finance alerts”, “paused after repeated failures”), matching the runbook vocabulary in `docs/operations/finance`. 
+        15. **Change Checklist Tracker.** Reconciliation releases now require validating Prometheus counters, reviewing `varianceHistory` growth, inspecting alert digests, and confirming paused tenants resume after cooldown. 
+        16. **Full Upgrade Plan & Release Steps.** Stage the job with read-only finance review, backfill currency metadata, verify alert delivery in staging, then promote with metrics dashboards and audit acknowledgement walkthroughs. 
+      - ✓ 4.F Telemetry Warehouse Job (`telemetryWarehouseJob.js`)
+        1. **Appraisal.** The telemetry exporter now encrypts checkpoints, reports backlog pressure, and self-schedules additional flushes so warehouse sinks stay in lockstep with ingestion. 
+        2. **Functionality.** `exportPendingEvents` fetches `batchSize + 1` events to detect backlog, compresses payloads, uploads to storage, then seals a checkpoint digest through `DataEncryptionService`. 
+        3. **Logic Usefulness.** Summaries include `batchSize`, `hasBacklog`, and a checkpoint preview (last event id/timestamp) so downstream jobs and dashboards can reconcile cursor position without decrypting. 
+        4. **Redundancies.** Shared `buildCheckpointDescriptor` removes the brittle JSON snippets formerly scattered across freshness monitors and batch metadata. 
+        5. **Placeholders or Stubs.** Backlog detection currently reports “>= batchSize” precision; extend the event model with a lightweight count endpoint before exposing remaining record estimates. 
+        6. **Duplicate Functions.** Metrics instrumentation now flows through `recordBackgroundJobRun`, aligning telemetry exports with other queue workers and avoiding bespoke success/failure counters. 
+        7. **Improvements Needed.** Layer smoke tests that decrypt checkpoints in CI and assert checksum alignment to catch key-rotation mishaps early. 
+        8. **Styling & Logging.** Cycle logs annotate duration, outcome, backlog state, and exported count, mirroring the observability copy used in Annex 12.F so runbooks stay coherent. 
+        9. **Efficiency Analysis.** The backpressure scheduler reuses hrtime duration, configurable delay, and capped retry cycles to drain spikes without overwhelming storage or lineage processors. 
+        10. **Strengths to Keep.** Compression, lineage auto-recording, freshness checkpoints, and hashed metadata continue to provide durability while integrating securely with the new sealed cursor state. 
+        11. **Weaknesses to Remove.** CLI triggers still rely on default delays; expose per-trigger overrides so incident responders can accelerate backlog recovery without editing code. 
+        12. **Telemetry & Alerts.** Freshness monitors now store encrypted checkpoint metadata alongside hasBacklog flags, keeping observability dashboards authoritative without leaking raw cursor data. 
+        13. **Layout & Metadata.** Batch metadata and summary payloads share the same checkpoint/preview shape, ensuring the warehouse UI, API, and runbooks read identical structures. 
+        14. **Text & Copy.** Warning messages (“Telemetry export job paused after repeated failures”, “Scheduled additional telemetry export to drain backlog”) map directly onto ops scripts for clarity. 
+        15. **Change Checklist Tracker.** Each release should validate S3 checksum metadata, decrypt sample checkpoints, confirm background job metrics, and review backlog flush logs in staging. 
+        16. **Full Upgrade Plan & Release Steps.** Roll out encryption keys, canary the backpressure loop, verify Prometheus counters and freshness dashboards, then brief analytics teams before enabling in production. 
       - 5.A Identity & Access Schema (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
       - 5.B Learning Content Schema (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
       - 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
@@ -163,8 +195,8 @@
          - A35.2 backend-nodejs/src/config/env.js
             1. **Schema updates.** Zod parsing now validates follow-up thresholds, escalation roles, and analytics toggles, giving deployment pipelines deterministic config validation.
             2. **Workspace defaults.** Sensible defaults (120-minute escalation, moderator/compliance roles, “notice” audit severity) map directly to tabletop exercises outlined under “Change Management.”
-      - A36. Monetization Reconciliation Job (4.E)
-      - A37. Telemetry Warehouse Job (4.F)
+      - ✓ A36. Monetization Reconciliation Job (4.E)
+      - ✓ A37. Telemetry Warehouse Job (4.F)
       - A38. Identity & Access Schema (5.A)
       - A39. Learning Content Schema (5.B)
       - A40. Community, Social & Messaging Schema (5.C)
