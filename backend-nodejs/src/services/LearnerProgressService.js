@@ -7,6 +7,10 @@ import CourseModel from '../models/CourseModel.js';
 
 const log = logger.child({ service: 'LearnerProgressService' });
 
+const DEFAULT_GRID_CONFIG = Object.freeze({ columns: 12, gutter: 24, rowGap: 24 });
+const DEFAULT_CARD_PADDING = Object.freeze({ mobile: 16, tablet: 20, desktop: 24 });
+const DEFAULT_CARD_ASPECT_RATIO = '16:9';
+
 function toIsoString(value) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -240,6 +244,45 @@ function computeCourseSummary({
   };
 }
 
+function buildCourseCardLayoutMetadata(summary, index) {
+  const accentColor = summary?.certificateTemplate?.accentColor ?? '#4338ca';
+  const density = summary.totalLessons > 12 ? 'comfortable' : 'regular';
+  const columnSpan = index === 0 ? 12 : 6;
+
+  return {
+    padding: DEFAULT_CARD_PADDING,
+    aspectRatio: DEFAULT_CARD_ASPECT_RATIO,
+    minWidth: 320,
+    minHeight: 220,
+    maxWidth: 640,
+    density,
+    theme: {
+      accentColor
+    },
+    grid: {
+      columnSpan,
+      rowSpan: 1,
+      order: index
+    }
+  };
+}
+
+function buildDashboardLayoutFromSummaries(summaries) {
+  return {
+    grid: DEFAULT_GRID_CONFIG,
+    cards: summaries.map((summary) => ({
+      key: `course-${summary.courseId}`,
+      columnSpan: summary.layout.grid.columnSpan,
+      rowSpan: summary.layout.grid.rowSpan,
+      order: summary.layout.grid.order,
+      minWidth: summary.layout.minWidth ?? 320,
+      minHeight: summary.layout.minHeight ?? 220,
+      aspectRatio: summary.layout.aspectRatio ?? DEFAULT_CARD_ASPECT_RATIO,
+      theme: summary.layout.theme
+    }))
+  };
+}
+
 export default class LearnerProgressService {
   static async listProgressForUser(userId) {
     if (!userId) {
@@ -247,6 +290,7 @@ export default class LearnerProgressService {
         enrollments: [],
         courseSummaries: [],
         lessons: [],
+        layout: { grid: DEFAULT_GRID_CONFIG, cards: [] },
         generatedAt: new Date().toISOString()
       };
     }
@@ -258,6 +302,7 @@ export default class LearnerProgressService {
           enrollments: [],
           courseSummaries: [],
           lessons: [],
+          layout: { grid: DEFAULT_GRID_CONFIG, cards: [] },
           generatedAt: new Date().toISOString()
         };
       }
@@ -290,6 +335,13 @@ export default class LearnerProgressService {
         });
       }).filter(Boolean);
 
+      const courseSummariesWithLayout = courseSummaries.map((summary, index) => ({
+        ...summary,
+        layout: buildCourseCardLayoutMetadata(summary, index)
+      }));
+
+      const layout = buildDashboardLayoutFromSummaries(courseSummariesWithLayout);
+
       return {
         enrollments: enrollments.map((enrollment) => ({
           id: enrollment.id,
@@ -301,8 +353,9 @@ export default class LearnerProgressService {
           startedAt: toIsoString(enrollment.startedAt),
           lastAccessedAt: toIsoString(enrollment.lastAccessedAt)
         })),
-        courseSummaries,
+        courseSummaries: courseSummariesWithLayout,
         lessons: lessonList,
+        layout,
         generatedAt: new Date().toISOString()
       };
     } catch (error) {
