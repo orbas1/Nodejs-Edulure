@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
 import '../services/auth_service.dart';
+import '../services/auth_validators.dart';
 import '../services/session_manager.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -24,6 +25,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _error;
   bool _twoFactorRequired = false;
   bool _showTwoFactorField = false;
+  String? _emailFieldError;
+  String? _passwordFieldError;
+  String? _otpFieldError;
 
   static const _otpTtlMinutes = 5;
 
@@ -49,9 +53,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    final emailError = AuthValidators.email(_emailController.text);
+    final passwordError = AuthValidators.password(_passwordController.text);
+    final otpError = _showTwoFactorField
+        ? AuthValidators.otp(
+            _twoFactorController.text,
+            required: _twoFactorRequired,
+          )
+        : null;
+
+    if (emailError != null || passwordError != null || otpError != null) {
+      setState(() {
+        _emailFieldError = emailError;
+        _passwordFieldError = passwordError;
+        _otpFieldError = otpError;
+        _error = null;
+      });
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
+      _emailFieldError = null;
+      _passwordFieldError = null;
+      _otpFieldError = null;
     });
     try {
       final authService = ref.read(authServiceProvider);
@@ -71,6 +97,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _twoFactorController.clear();
         _twoFactorRequired = false;
         _showTwoFactorField = false;
+        _emailFieldError = null;
+        _passwordFieldError = null;
+        _otpFieldError = null;
       });
       // refresh feature flags in case role-based experiments toggled after sign-in
       unawaited(ref.read(featureFlagControllerProvider.notifier).refresh(force: true));
@@ -86,9 +115,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _showTwoFactorField = true;
             final details = response is Map ? response['details'] as Map? : null;
             final delivered = details?['delivered'] == true;
-            _error = delivered
-                ? 'We emailed you a six-digit security code. Enter it to continue.'
+            _otpFieldError = delivered
+                ? 'Enter the 6-digit security code sent to your email.'
                 : 'A sign-in code was recently sent. Check your inbox and try again shortly.';
+            _error = null;
           });
           return;
         }
@@ -96,7 +126,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           setState(() {
             _twoFactorRequired = true;
             _showTwoFactorField = true;
-            _error = 'The email security code you entered is invalid or expired.';
+            _otpFieldError = 'The security code you entered is invalid or expired.';
+            _error = null;
           });
           return;
         }
@@ -104,14 +135,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           setState(() {
             _twoFactorRequired = true;
             _showTwoFactorField = true;
-            _error = 'Your role requires email-based multi-factor authentication. Complete setup before signing in.';
+            _otpFieldError =
+                'Your role requires email-based multi-factor authentication. Complete setup before signing in.';
+            _error = null;
           });
           return;
         }
       }
-      setState(() {
-        _error = _resolveErrorMessage(error);
-      });
+        setState(() {
+          _error = _resolveErrorMessage(error);
+          _otpFieldError = null;
+        });
     } finally {
       if (mounted) {
         setState(() {
@@ -158,17 +192,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.username, AutofillHints.email],
                     autocorrect: false,
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      errorText: _emailFieldError,
+                    ),
                     textInputAction: TextInputAction.next,
+                    onChanged: (_) {
+                      if (_emailFieldError != null) {
+                        setState(() {
+                          _emailFieldError = null;
+                        });
+                      }
+                    },
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _passwordController,
-                    decoration: const InputDecoration(labelText: 'Password'),
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      errorText: _passwordFieldError,
+                    ),
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _loading ? null : _login(),
+                    onChanged: (_) {
+                      if (_passwordFieldError != null) {
+                        setState(() {
+                          _passwordFieldError = null;
+                        });
+                      }
+                    },
                   ),
                   const SizedBox(height: 12),
                   AnimatedSwitcher(
@@ -211,13 +265,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   labelText: 'Email security code',
-                                  helperText: _twoFactorRequired
-                                      ? 'Required to complete login'
-                                      : '6-digit code from your email inbox',
+                                  helperText: _otpFieldError != null
+                                      ? null
+                                      : _twoFactorRequired
+                                          ? 'Required to complete login'
+                                          : '6-digit code from your email inbox',
+                                  errorText: _otpFieldError,
                                 ),
                                 inputFormatters: const [FilteringTextInputFormatter.digitsOnly],
                                 maxLength: 6,
                                 buildCounter: (_, {required int currentLength, required bool isFocused, int? maxLength}) => null,
+                                onChanged: (_) {
+                                  if (_otpFieldError != null) {
+                                    setState(() {
+                                      _otpFieldError = null;
+                                    });
+                                  }
+                                },
                               ),
                             ],
                           )
@@ -227,6 +291,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               onPressed: () {
                                 setState(() {
                                   _showTwoFactorField = true;
+                                  _otpFieldError = null;
                                 });
                               },
                             child: const Text('Have an email code?'),

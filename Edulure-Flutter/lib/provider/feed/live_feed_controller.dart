@@ -2,11 +2,25 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/network/dio_provider.dart';
+import '../../core/telemetry/telemetry_service.dart';
 import '../../services/community_service.dart';
+import '../../services/feed_cache_repository.dart';
 import '../../services/live_feed_service.dart';
 
+final feedCacheRepositoryProvider = Provider<FeedCacheRepository>((ref) {
+  return FeedCacheRepository();
+});
+
 final liveFeedServiceProvider = Provider<LiveFeedService>((ref) {
-  return LiveFeedService();
+  final dio = ref.watch(dioProvider);
+  final telemetry = ref.watch(telemetryServiceProvider);
+  final cache = ref.watch(feedCacheRepositoryProvider);
+  return LiveFeedService(
+    httpClient: dio,
+    telemetry: telemetry,
+    cache: cache,
+  );
 });
 
 final communityServiceProvider = Provider<CommunityService>((ref) {
@@ -213,6 +227,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
         range: state.filters.range,
         search: state.filters.search,
         postType: state.filters.postType,
+        preferCache: false,
       );
       final combined = <FeedEntry>[...state.entries, ...snapshot.items];
       state = state.copyWith(
