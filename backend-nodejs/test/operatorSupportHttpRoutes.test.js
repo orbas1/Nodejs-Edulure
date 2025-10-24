@@ -3,7 +3,12 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const serviceMock = {
   getOverview: vi.fn(),
-  listTenants: vi.fn()
+  listTenants: vi.fn(),
+  assignTicket: vi.fn(),
+  escalateTicket: vi.fn(),
+  resolveTicket: vi.fn(),
+  scheduleBroadcast: vi.fn(),
+  updateNotificationPolicy: vi.fn()
 };
 
 vi.mock('../src/middleware/auth.js', () => ({
@@ -95,6 +100,38 @@ beforeEach(() => {
     ],
     defaultTenantId: 'global'
   });
+
+  serviceMock.assignTicket.mockResolvedValue({
+    id: 42,
+    reference: 'SUP-2042',
+    status: 'in_progress',
+    owner: 'agent-7'
+  });
+
+  serviceMock.escalateTicket.mockResolvedValue({
+    id: 42,
+    status: 'escalated',
+    escalationLevel: 'L2'
+  });
+
+  serviceMock.resolveTicket.mockResolvedValue({
+    id: 42,
+    status: 'resolved'
+  });
+
+  serviceMock.scheduleBroadcast.mockResolvedValue({
+    id: 11,
+    title: 'Status update',
+    channel: 'email',
+    status: 'scheduled'
+  });
+
+  serviceMock.updateNotificationPolicy.mockResolvedValue({
+    id: 5,
+    tenantId: 'global',
+    channels: { email: true, sms: false },
+    updatedAt: '2025-02-04T10:00:00Z'
+  });
 });
 
 describe('Operator support HTTP routes', () => {
@@ -121,6 +158,86 @@ describe('Operator support HTTP routes', () => {
     expect(serviceMock.listTenants).toHaveBeenCalledTimes(1);
     expect(response.body.data.items).toHaveLength(2);
     expect(response.body.data.defaultTenantId).toBe('global');
+  });
+
+  it('assigns a support ticket to the requesting agent', async () => {
+    const response = await request(app)
+      .patch('/api/v1/operator/support/tenants/global/tickets/42/assign')
+      .set('Authorization', 'Bearer token')
+      .send({ assigneeId: 'agent-7' });
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.assignTicket).toHaveBeenCalledWith({
+      tenantId: 'global',
+      ticketId: '42',
+      assigneeId: 'agent-7',
+      actor: { id: 7, name: null, email: null }
+    });
+    expect(response.body.data.owner).toBe('agent-7');
+  });
+
+  it('escalates a support ticket', async () => {
+    const response = await request(app)
+      .patch('/api/v1/operator/support/tenants/global/tickets/42/escalate')
+      .set('Authorization', 'Bearer token')
+      .send({ reason: 'Breaching SLA', target: 'L2' });
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.escalateTicket).toHaveBeenCalledWith({
+      tenantId: 'global',
+      ticketId: '42',
+      reason: 'Breaching SLA',
+      target: 'L2',
+      actor: { id: 7, name: null, email: null }
+    });
+    expect(response.body.data.status).toBe('escalated');
+  });
+
+  it('resolves a support ticket', async () => {
+    const response = await request(app)
+      .patch('/api/v1/operator/support/tenants/global/tickets/42/resolve')
+      .set('Authorization', 'Bearer token')
+      .send({ resolution: { summary: 'Handled via dashboard' } });
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.resolveTicket).toHaveBeenCalledWith({
+      tenantId: 'global',
+      ticketId: '42',
+      resolution: { summary: 'Handled via dashboard' },
+      actor: { id: 7, name: null, email: null }
+    });
+    expect(response.body.data.status).toBe('resolved');
+  });
+
+  it('schedules a support broadcast', async () => {
+    const response = await request(app)
+      .post('/api/v1/operator/support/tenants/global/communications/broadcasts')
+      .set('Authorization', 'Bearer token')
+      .send({ title: 'Status update', channel: 'email' });
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.scheduleBroadcast).toHaveBeenCalledWith({
+      tenantId: 'global',
+      payload: { title: 'Status update', channel: 'email' },
+      actor: { id: 7, name: null, email: null }
+    });
+    expect(response.body.data.broadcast.title).toBe('Status update');
+  });
+
+  it('updates a notification policy', async () => {
+    const response = await request(app)
+      .put('/api/v1/operator/support/tenants/global/notification-policies/5')
+      .set('Authorization', 'Bearer token')
+      .send({ channels: { email: true, sms: false } });
+
+    expect(response.status).toBe(200);
+    expect(serviceMock.updateNotificationPolicy).toHaveBeenCalledWith({
+      tenantId: 'global',
+      policyId: '5',
+      updates: { channels: { email: true, sms: false } },
+      actor: { id: 7, name: null, email: null }
+    });
+    expect(response.body.data.id).toBe(5);
   });
 });
 
