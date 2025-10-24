@@ -11,6 +11,13 @@ import CertificatePreview from '../../components/certification/CertificatePrevie
 import AssessmentQuickView from '../../components/course/AssessmentQuickView.jsx';
 import { useLearnerDashboardContext } from '../../hooks/useLearnerDashboard.js';
 import useLearnerProgress from '../../hooks/useLearnerProgress.js';
+import {
+  formatDashboardDate,
+  formatDashboardDateTime,
+  formatDashboardRelative,
+  getDashboardUrgency,
+  parseDashboardDate
+} from '../../utils/dashboardFormatting.js';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -18,52 +25,20 @@ function classNames(...classes) {
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
-const parseDate = (value) => {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-};
-
-const formatDateLabel = (date) => {
-  if (!date) return 'TBC';
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-};
-
-const formatRelativeDay = (date) => {
-  if (!date) return 'Date pending';
-  const now = new Date();
-  const diffDays = Math.round((date.getTime() - now.getTime()) / DAY_IN_MS);
-  if (diffDays > 1) return `In ${diffDays} days`;
-  if (diffDays === 1) return 'Tomorrow';
-  if (diffDays === 0) return 'Today';
-  if (diffDays === -1) return 'Yesterday';
-  if (diffDays < -1) return `${Math.abs(diffDays)} days ago`;
-  return 'Date pending';
-};
-
-const formatRelativeTimestamp = (value) => {
-  if (!value) return 'just now';
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'recently';
-  }
-  const diffSeconds = Math.round((Date.now() - date.getTime()) / 1000);
-  if (diffSeconds <= 30) return 'just now';
-  if (diffSeconds < 120) return 'about a minute ago';
-  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} minutes ago`;
-  if (diffSeconds < 7200) return 'about an hour ago';
-  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} hours ago`;
-  if (diffSeconds < 172800) return 'yesterday';
-  return `${Math.floor(diffSeconds / 86400)} days ago`;
-};
-
 const determineScheduleTone = (date) => {
-  if (!date) return 'text-slate-400';
-  const now = new Date();
-  const diffMs = date.getTime() - now.getTime();
-  if (diffMs < 0) return 'text-red-600';
-  if (diffMs <= 2 * DAY_IN_MS) return 'text-amber-500';
-  return 'text-emerald-600';
+  const urgency = getDashboardUrgency(date);
+  if (urgency === 'overdue') return 'text-red-600';
+  if (urgency === 'soon') return 'text-amber-500';
+  if (urgency === 'future') return 'text-emerald-600';
+  return 'text-slate-400';
+};
+
+const formatRelativeDayLabel = (value) => {
+  const relative = formatDashboardRelative(value, { numeric: 'auto' });
+  if (!relative) {
+    return 'Date pending';
+  }
+  return relative.charAt(0).toUpperCase() + relative.slice(1);
 };
 
 const resolveLessonType = (lesson) => {
@@ -169,7 +144,7 @@ const normaliseFallbackModules = (modules = []) =>
   modules.map((module) => {
     const lessons = Array.isArray(module.lessons) ? module.lessons : [];
     const normalisedLessons = lessons.map((lesson) => {
-      const releaseDate = parseDate(lesson.releaseAt ?? lesson.availableAt);
+      const releaseDate = parseDashboardDate(lesson.releaseAt ?? lesson.availableAt);
       return {
         id: lesson.id,
         moduleId: module.id,
@@ -178,7 +153,7 @@ const normaliseFallbackModules = (modules = []) =>
         status: lesson.status ?? (lesson.completed ? 'completed' : releaseDate && releaseDate > new Date() ? 'scheduled' : 'ready'),
         completed: Boolean(lesson.completed),
         releaseAt: lesson.releaseAt ?? (releaseDate ? releaseDate.toISOString() : null),
-        releaseLabel: lesson.releaseLabel ?? (releaseDate ? formatDateLabel(releaseDate) : null),
+        releaseLabel: lesson.releaseLabel ?? (releaseDate ? formatDashboardDate(releaseDate) : null),
         metadata: lesson.metadata ?? {},
         progressPercent: lesson.progressPercent ?? (lesson.completed ? 100 : 0),
         completedAt: lesson.completedAt ?? null,
@@ -254,8 +229,7 @@ export default function CourseViewer() {
 
   const formatChatTimestamp = (timestamp) => {
     if (!timestamp) return '';
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return formatDashboardDateTime(timestamp, { hour: '2-digit', minute: '2-digit' });
   };
 
   useEffect(() => {
@@ -412,7 +386,10 @@ export default function CourseViewer() {
           completed: Boolean(lesson.completed ?? progress?.completed),
           progressPercent: lesson.progressPercent ?? progress?.progressPercent ?? (lesson.completed ? 100 : 0),
           releaseAt,
-          releaseLabel: lesson.releaseLabel ?? progress?.releaseLabel ?? (releaseAt ? formatDateLabel(parseDate(releaseAt)) : null),
+          releaseLabel:
+            lesson.releaseLabel ??
+            progress?.releaseLabel ??
+            (releaseAt ? formatDashboardDate(releaseAt) : null),
           completedAt: lesson.completedAt ?? progress?.completedAt ?? null,
           nextActionLabel: lesson.nextActionLabel ?? progress?.nextActionLabel ?? (lesson.completed ? 'Reviewed' : 'Ready to start')
         };
@@ -499,7 +476,7 @@ export default function CourseViewer() {
     () =>
       lessonCatalogue
         .filter((lesson) => lesson.status === 'scheduled')
-        .map((lesson) => ({ ...lesson, releaseDate: parseDate(lesson.releaseAt) }))
+        .map((lesson) => ({ ...lesson, releaseDate: parseDashboardDate(lesson.releaseAt) }))
         .sort((a, b) => (a.releaseDate?.getTime() ?? Infinity) - (b.releaseDate?.getTime() ?? Infinity)),
     [lessonCatalogue]
   );
@@ -508,7 +485,7 @@ export default function CourseViewer() {
     () =>
       lessonCatalogue
         .filter((lesson) => !lesson.completed && ['ready', 'available'].includes(lesson.status ?? 'ready'))
-        .map((lesson) => ({ ...lesson, releaseDate: parseDate(lesson.releaseAt) }))
+        .map((lesson) => ({ ...lesson, releaseDate: parseDashboardDate(lesson.releaseAt) }))
         .sort((a, b) => (a.releaseDate?.getTime() ?? 0) - (b.releaseDate?.getTime() ?? 0)),
     [lessonCatalogue]
   );
@@ -519,8 +496,8 @@ export default function CourseViewer() {
         .filter((lesson) => lesson.completed)
         .map((lesson) => ({
           ...lesson,
-          completedDate: parseDate(lesson.completedAt),
-          releaseDate: parseDate(lesson.releaseAt)
+          completedDate: parseDashboardDate(lesson.completedAt),
+          releaseDate: parseDashboardDate(lesson.releaseAt)
         }))
         .sort((a, b) => {
           const aTime = a.completedDate?.getTime() ?? a.releaseDate?.getTime() ?? 0;
@@ -534,7 +511,7 @@ export default function CourseViewer() {
     (lesson) => {
       const metadata = lesson.metadata ?? {};
       const dueAt = metadata.dueAt ?? metadata.dueDate ?? metadata.due_on;
-      const dueDate = parseDate(dueAt);
+      const dueDate = parseDashboardDate(dueAt);
       if (dueDate) return dueDate;
       if (metadata.dueOffsetDays != null && courseStartDate) {
         const offset = Number(metadata.dueOffsetDays);
@@ -543,7 +520,7 @@ export default function CourseViewer() {
         }
       }
       if (lesson.releaseAt) {
-        const release = parseDate(lesson.releaseAt);
+        const release = parseDashboardDate(lesson.releaseAt);
         if (release) return release;
       }
       return null;
@@ -575,7 +552,7 @@ export default function CourseViewer() {
   const focusedLessonDueDate = focusedLesson ? computeLessonDueDate(focusedLesson) : null;
   const focusedLessonDueLabel =
     focusedLessonDueDate != null
-      ? `${formatDateLabel(focusedLessonDueDate)} · ${formatRelativeDay(focusedLessonDueDate)}`
+      ? `${formatDashboardDate(focusedLessonDueDate)} · ${formatRelativeDayLabel(focusedLessonDueDate)}`
       : null;
   const derivedActiveLessonId =
     focusedLessonId ??
@@ -612,7 +589,9 @@ export default function CourseViewer() {
     [lessonCatalogue]
   );
   const courseProgress = courseProgressSummary?.progressPercent ?? course?.progress ?? 0;
-  const progressSnapshotLabel = progressLastUpdatedAt ? formatRelativeTimestamp(progressLastUpdatedAt) : null;
+  const progressSnapshotLabel = progressLastUpdatedAt
+    ? formatDashboardRelative(progressLastUpdatedAt)
+    : null;
   const progressUsingCache = progressSource !== 'network' && progressSource !== 'initial';
   let progressInfoMessage = null;
   if (progressUsingCache) {
@@ -686,7 +665,7 @@ export default function CourseViewer() {
       {
         id: 'next-unlock',
         label: 'Next unlock',
-        value: nextScheduled?.releaseDate ? formatDateLabel(nextScheduled.releaseDate) : 'All released',
+        value: nextScheduled?.releaseDate ? formatDashboardDate(nextScheduled.releaseDate) : 'All released',
         detail: nextScheduled ? `${nextScheduled.moduleTitle} · ${nextScheduled.title}` : 'Review mastery materials',
         accent: 'from-amber-400 to-orange-500'
       },
@@ -846,6 +825,10 @@ export default function CourseViewer() {
             <p className="text-xs text-slate-500">Coordinate with peers during the session.</p>
           </div>
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              Live chat is running in preview mode while we finish the realtime service upgrade. Messages refresh in batches
+              every few seconds and reactions are not yet persisted.
+            </p>
             {chatError && (
               <p className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600" role="alert">
                 {chatError}
@@ -1104,9 +1087,9 @@ export default function CourseViewer() {
                       <p className="text-xs text-slate-500">{lesson.moduleTitle}</p>
                     </div>
                     <div className="text-right text-xs">
-                      <p className="text-sm font-semibold text-slate-900">{formatDateLabel(lesson.releaseDate)}</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatDashboardDate(lesson.releaseDate)}</p>
                       <p className={classNames('font-semibold', determineScheduleTone(lesson.releaseDate))}>
-                        {formatRelativeDay(lesson.releaseDate)}
+                        {formatRelativeDayLabel(lesson.releaseDate)}
                       </p>
                     </div>
                   </div>
@@ -1179,7 +1162,7 @@ export default function CourseViewer() {
                 <p className="text-xs text-slate-500">Complete lessons to unlock your recording archive and refresher drills.</p>
               ) : (
                 recordedLessons.map((lesson) => {
-                  const completedDate = lesson.completedDate ?? parseDate(lesson.completedAt);
+                  const completedDate = lesson.completedDate ?? parseDashboardDate(lesson.completedAt);
                   return (
                     <div
                       key={`${lesson.id}-recorded`}
@@ -1190,7 +1173,7 @@ export default function CourseViewer() {
                         <p className="text-xs text-slate-500">{lesson.moduleTitle}</p>
                       </div>
                       <div className="text-right text-xs text-slate-500">
-                        <p className="font-semibold text-slate-800">{formatDateLabel(completedDate)}</p>
+                        <p className="font-semibold text-slate-800">{formatDashboardDate(completedDate)}</p>
                         <p>{lesson.durationMinutes ? `${lesson.durationMinutes} mins` : 'Self-paced'}</p>
                       </div>
                     </div>

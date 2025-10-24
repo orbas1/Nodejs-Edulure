@@ -27,6 +27,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import useLearnerSupportCases from '../../hooks/useLearnerSupportCases.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import TicketForm from '../../components/support/TicketForm.jsx';
+import { formatDashboardDateTime, formatDashboardRelative } from '../../utils/dashboardFormatting.js';
 
 const PRIORITY_BADGES = {
   urgent: 'bg-rose-100 text-rose-700',
@@ -41,15 +42,6 @@ const STATUS_BADGES = {
   resolved: 'bg-emerald-100 text-emerald-700',
   closed: 'bg-slate-100 text-slate-600'
 };
-
-const TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit'
-});
-
-const RELATIVE_FORMATTER = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
 const CATEGORY_OPTIONS = [
   'Technical issue',
@@ -66,35 +58,6 @@ const PRIORITY_OPTIONS = [
   { value: 'normal', label: 'Normal — needs response soon' },
   { value: 'low', label: 'Low — feedback or request' }
 ];
-
-function toDate(value) {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatDateTime(value) {
-  const date = toDate(value);
-  if (!date) return 'Just now';
-  return TIME_FORMATTER.format(date);
-}
-
-function formatRelative(value) {
-  const date = toDate(value);
-  if (!date) return 'moments ago';
-  const now = new Date();
-  const diffMs = date.getTime() - now.getTime();
-  const diffMinutes = Math.round(diffMs / (60 * 1000));
-  if (Math.abs(diffMinutes) < 60) {
-    return RELATIVE_FORMATTER.format(diffMinutes, 'minute');
-  }
-  const diffHours = Math.round(diffMs / (60 * 60 * 1000));
-  if (Math.abs(diffHours) < 48) {
-    return RELATIVE_FORMATTER.format(diffHours, 'hour');
-  }
-  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
-  return RELATIVE_FORMATTER.format(diffDays, 'day');
-}
 
 function normaliseKnowledgeBase(articles) {
   if (!Array.isArray(articles)) {
@@ -202,7 +165,9 @@ function MessageTimeline({ messages }) {
               <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isLearner ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600'}`}>
                 {isLearner ? 'You' : message.author ?? 'Support'}
               </span>
-              <span className="text-xs text-slate-400">{formatDateTime(message.createdAt)}</span>
+              <span className="text-xs text-slate-400">
+                {formatDashboardDateTime(message.createdAt, { fallback: 'Just now' })}
+              </span>
             </div>
             <div
               className={`rounded-3xl px-5 py-4 text-sm leading-relaxed shadow-sm ${
@@ -674,7 +639,9 @@ export default function LearnerSupport() {
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{supportCase.subject}</p>
                       <p className="mt-1 text-xs text-slate-500">{supportCase.category}</p>
-                      <p className="mt-1 text-xs text-slate-400">Updated {formatRelative(supportCase.updatedAt)}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Updated {formatDashboardRelative(supportCase.updatedAt)}
+                      </p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <span
@@ -754,11 +721,15 @@ export default function LearnerSupport() {
                 <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Opened</p>
-                    <p className="text-sm text-slate-700">{formatDateTime(selectedCase.createdAt)}</p>
+                    <p className="text-sm text-slate-700">
+                      {formatDashboardDateTime(selectedCase.createdAt, { fallback: 'Just now' })}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Last update</p>
-                    <p className="text-sm text-slate-700">{formatDateTime(selectedCase.updatedAt)}</p>
+                    <p className="text-sm text-slate-700">
+                      {formatDashboardDateTime(selectedCase.updatedAt, { fallback: 'Just now' })}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned</p>
