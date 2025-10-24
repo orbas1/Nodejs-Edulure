@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { TABLES } from '../database/domains/telemetry.js';
+import jsonMergePatch from '../database/utils/jsonMergePatch.js';
 
 function parseJson(value, fallback = {}) {
   if (value === null || value === undefined) {
@@ -79,12 +80,13 @@ export default class TelemetryLineageRunModel {
     const updatePayload = {
       status: normalizedStatus,
       completed_at: completedAt,
-      output: JSON.stringify(output ?? {}),
-      metadata: connection.raw(
-        'JSON_MERGE_PATCH(IFNULL(metadata, JSON_OBJECT()), ?)',
-        JSON.stringify(metadata)
-      )
+      output: JSON.stringify(output ?? {})
     };
+
+    const mergeExpression = jsonMergePatch(connection, 'metadata', metadata);
+    if (mergeExpression) {
+      updatePayload.metadata = mergeExpression;
+    }
 
     if (error) {
       const message = error instanceof Error ? error.message : String(error);

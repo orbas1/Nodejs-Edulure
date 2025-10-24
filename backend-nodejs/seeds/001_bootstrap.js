@@ -3449,18 +3449,117 @@ export async function seed(knex) {
       created_at: subscriptionTimestamp
     });
 
+    const reconciliationInvoicedCents = 205092;
+    const reconciliationUsageCents = 189900;
+    const reconciliationRecognizedCents = 0;
+    const reconciliationDeferredCents = 205092;
+    const reconciliationVarianceCents = reconciliationRecognizedCents - reconciliationInvoicedCents;
+    const reconciliationVarianceRatio = reconciliationInvoicedCents
+      ? Number((reconciliationVarianceCents / reconciliationInvoicedCents).toFixed(4))
+      : 0;
+    const reconciliationVarianceBps = reconciliationInvoicedCents
+      ? Number(((reconciliationVarianceCents / reconciliationInvoicedCents) * 10000).toFixed(2))
+      : 0;
+    const reconciliationUsageVarianceCents = reconciliationRecognizedCents - reconciliationUsageCents;
+    const reconciliationUsageVarianceBps = reconciliationUsageCents
+      ? Number(((reconciliationUsageVarianceCents / reconciliationUsageCents) * 10000).toFixed(2))
+      : 0;
+
+    const reconciliationCurrencyBreakdown = [
+      {
+        currency: 'USD',
+        invoicedCents: reconciliationInvoicedCents,
+        usageCents: reconciliationUsageCents,
+        recognizedCents: reconciliationRecognizedCents,
+        deferredCents: reconciliationDeferredCents,
+        varianceCents: reconciliationVarianceCents,
+        varianceBps: reconciliationVarianceBps,
+        usageVarianceCents: reconciliationUsageVarianceCents,
+        usageVarianceBps: reconciliationUsageVarianceBps
+      }
+    ];
+
+    const reconciliationAlerts = [
+      {
+        type: 'recognized.less_than_invoiced',
+        severity: 'high',
+        message: 'Recognised revenue trails invoices by $2,050.92 for Growth Insiders annual.',
+        details: {
+          currency: 'USD',
+          invoicedCents: reconciliationInvoicedCents,
+          recognizedCents: reconciliationRecognizedCents
+        }
+      },
+      {
+        type: 'usage.recognized_gap',
+        severity: 'medium',
+        message: 'Recognised revenue trails recorded usage by $1,899.00.',
+        details: {
+          currency: 'USD',
+          usageCents: reconciliationUsageCents,
+          recognizedCents: reconciliationRecognizedCents
+        }
+      }
+    ];
+
+    const acknowledgementTimestamp = new Date(subscriptionTimestamp.getTime() + 60 * 60 * 1000).toISOString();
+    const reconciliationMetadata = {
+      seed: true,
+      scheduleId,
+      usageRecordId,
+      reconciliationMethod: 'automated',
+      generatedAt: subscriptionTimestamp.toISOString(),
+      varianceBps: reconciliationVarianceBps,
+      usageVarianceCents: reconciliationUsageVarianceCents,
+      usageVarianceBps: reconciliationUsageVarianceBps,
+      severity: 'high',
+      alerts: reconciliationAlerts,
+      thresholds: {
+        varianceAlertBps: 250,
+        varianceCriticalBps: 500,
+        usageVarianceAlertBps: 200,
+        alertCooldownMinutes: 120
+      },
+      alertCooldownMinutes: 120,
+      currencyBreakdown: reconciliationCurrencyBreakdown,
+      acknowledgements: [
+        {
+          acknowledgedAt: acknowledgementTimestamp,
+          channel: 'email',
+          operator: {
+            name: 'Rowan Ellis',
+            email: 'finance.ops@edulure.com'
+          },
+          note: 'Seed acknowledgement confirming staging reconciliation sample.'
+        }
+      ],
+      varianceHistory: [
+        {
+          recordedAt: subscriptionTimestamp.toISOString(),
+          windowStart: subscriptionTimestamp.toISOString(),
+          windowEnd: nextYear.toISOString(),
+          varianceCents: reconciliationVarianceCents,
+          varianceBps: reconciliationVarianceBps,
+          severity: 'high',
+          alertCount: reconciliationAlerts.length,
+          acknowledgementCount: 1,
+          currencyBreakdown: reconciliationCurrencyBreakdown
+        }
+      ]
+    };
+
     await trx('monetization_reconciliation_runs').insert({
       tenant_id: 'global',
       window_start: subscriptionTimestamp,
       window_end: nextYear,
       status: 'completed',
-      invoiced_cents: 205092,
-      usage_cents: 189900,
-      recognized_cents: 0,
-      deferred_cents: 205092,
-      variance_cents: -189900,
-      variance_ratio: 0,
-      metadata: JSON.stringify({ seed: true, scheduleId, usageRecordId }),
+      invoiced_cents: reconciliationInvoicedCents,
+      usage_cents: reconciliationUsageCents,
+      recognized_cents: reconciliationRecognizedCents,
+      deferred_cents: reconciliationDeferredCents,
+      variance_cents: reconciliationVarianceCents,
+      variance_ratio: reconciliationVarianceRatio,
+      metadata: JSON.stringify(reconciliationMetadata),
       created_at: subscriptionTimestamp
     });
 
@@ -6216,6 +6315,48 @@ export async function seed(knex) {
       tags: JSON.stringify(['governance', 'dashboard', 'seed'])
     });
 
+    const checkpointPreview = {
+      lastEventId: telemetryEventId,
+      lastEventOccurredAt: telemetryOccurredAt.toISOString(),
+      exportedCount: 1,
+      trigger: 'seed',
+      batchUuid: telemetryBatchUuid
+    };
+    const checkpointHash = makeHash(JSON.stringify(checkpointPreview));
+    const checkpointSealed = {
+      ciphertext: null,
+      keyId: 'seed-encryption',
+      hash: checkpointHash
+    };
+
+    const batchMetadata = {
+      bucket: 'edulure-data-seeds',
+      trigger: 'seed',
+      previewCount: 1,
+      byteLength: 4096,
+      checkpoint: checkpointSealed,
+      checkpointPreview,
+      hasBacklog: false
+    };
+
+    await trx(TELEMETRY_TABLES.EVENT_BATCHES)
+      .where({ id: telemetryBatchId })
+      .update({ metadata: JSON.stringify(batchMetadata) });
+
+    await trx(TELEMETRY_TABLES.EVENTS)
+      .where({ id: telemetryEventId })
+      .update({
+        metadata: JSON.stringify({
+          consentVersion: telemetryConsentVersion,
+          consentRecordedAt: telemetryReceivedAt,
+          batchUuid: telemetryBatchUuid,
+          seeded: true,
+          exportHint: 'governance-dashboard',
+          checkpointHash,
+          destinationKey: telemetryBatchKey
+        })
+      });
+
     await trx(TELEMETRY_TABLES.FRESHNESS_MONITORS).insert([
       {
         pipeline_key: 'ingestion.raw',
@@ -6231,7 +6372,15 @@ export async function seed(knex) {
         status: 'healthy',
         threshold_minutes: 30,
         lag_seconds: 45,
-        metadata: JSON.stringify({ batchUuid: telemetryBatchUuid, destinationKey: telemetryBatchKey })
+        metadata: JSON.stringify({
+          batchUuid: telemetryBatchUuid,
+          destinationKey: telemetryBatchKey,
+          checkpoint: checkpointSealed,
+          checkpointPreview,
+          hasBacklog: false,
+          eventsExported: 1,
+          trigger: 'seed'
+        })
       }
     ]);
 
@@ -6244,7 +6393,13 @@ export async function seed(knex) {
       completed_at: new Date('2025-04-05T10:20:05Z'),
       input: JSON.stringify({ trigger: 'seed', eventIds: [telemetryEventId], batchUuid: telemetryBatchUuid }),
       output: JSON.stringify({ batchUuid: telemetryBatchUuid, destinationKey: telemetryBatchKey, rowCount: 1 }),
-      metadata: JSON.stringify({ trigger: 'seed', batchId: telemetryBatchId, destination: 's3' })
+      metadata: JSON.stringify({
+        trigger: 'seed',
+        batchId: telemetryBatchId,
+        destination: 's3',
+        checkpointHash,
+        hasBacklog: false
+      })
     });
 
     const releaseChecklistEntries = [

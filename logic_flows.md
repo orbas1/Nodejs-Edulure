@@ -643,13 +643,13 @@ This compendium maps the execution paths, responsibilities, and release consider
 ### 4.E Monetization Reconciliation Job (`monetizationReconciliationJob.js`)
 1. **Appraisal:** A single orchestrated worker now handles revenue recognition, reconciliation, alerting, and pause/resume safeguards, replacing ad-hoc tenant scripts.
 2. **Functionality:** `runCycle` resolves tenants, recognises deferred revenue, invokes `MonetizationFinanceService.runReconciliation`, then persists outcomes, variance history, and alert state before emitting metrics.
-3. **Logic Usefulness:** Each run captures currency-aware breakdowns (invoiced, recognised, usage, deferred, variance) so finance instantly inspects discrepancies per ISO currency without drilling into databases.
+3. **Logic Usefulness:** Each run captures currency-aware breakdowns (invoiced, recognised, usage, deferred, variance) so finance instantly inspects discrepancies per ISO currency without drilling into databases, and the bootstrap seed mirrors the production payload with alerts, acknowledgements, and variance snapshots for dashboards to render immediately after install.
 4. **Redundancies:** Consolidated job metrics, variance-history updates, and failure digest hashing eliminate the bespoke loops formerly embedded across finance cron tasks.
 5. **Placeholders Or non-working functions or stubs:** Manual journal overrides are not yet folded into the currency breakdown helper; until adjustment tables are integrated the digest excludes those offsets.
 6. **Duplicate Functions:** Reconciliation metadata updates now flow through `MonetizationReconciliationRunModel.updateMetadata`, avoiding duplicate history maintenance in downstream services.
 7. **Improvements need to make:** Add regression coverage for the tenant pause/resume state machine and pipe acknowledgement digests into notifications so responders see who triaged the variance.
 8. **Styling improvements:** Structured logs emit `outcome`, `alerts`, window bounds, and tenant counts to align Splunk dashboards with finance runbooks without additional JSON reshaping.
-9. **Efficiency analysis and improvement:** Tenant caching, grouped SQL aggregation, and hrtime-derived durations feed Prometheus counters so slow tenants or noisy windows surface automatically.
+9. **Efficiency analysis and improvement:** Tenant caching, grouped SQL aggregation, hrtime-derived durations, and shared JSON merge helpers keep Prometheus counters flowing while preserving database portability across MySQL and PostgreSQL.
 10. **Strengths to Keep:** Failure backoff with cooldown-based pausing, alert digest hashing, and acknowledgement-aware metadata maintain resilient finance workflows.
 11. **Weaknesses to remove:** Idle tenants still inherit the global recognition window; introduce per-tenant overrides once policy storage lands in `PlatformSettingModel`.
 12. **Styling and Colour review changes:** Align finance dashboard palettes and alert severities with `docs/operations/finance` vocabulary to keep operations copy consistent.
@@ -661,8 +661,8 @@ This compendium maps the execution paths, responsibilities, and release consider
 ### 4.F Telemetry Warehouse Job (`telemetryWarehouseJob.js`)
 1. **Appraisal:** The exporter now encrypts checkpoints, surfaces backlog pressure, and self-schedules flushes so ingestion stays in lockstep with warehouse sinks.
 2. **Functionality:** `runCycle` delegates to `TelemetryWarehouseService.exportPendingEvents`, records metrics, handles pause/backoff states, and triggers timed follow-up runs when backpressure persists.
-3. **Logic Usefulness:** Summaries expose exported counts, batch size, backlog hints, and checkpoint previews (event id/timestamp) so downstream jobs reconcile cursor state without decrypting payloads.
-4. **Redundancies:** Shared `buildCheckpointDescriptor` and metrics instrumentation replace bespoke JSON snippets across freshness monitors and batch metadata.
+3. **Logic Usefulness:** Summaries expose exported counts, batch size, backlog hints, and checkpoint previews (event id/timestamp) so downstream jobs reconcile cursor state without decrypting payloads, with bootstrap data now shipping sealed checkpoint metadata and hashes that match production warehouse dashboards.
+4. **Redundancies:** Shared `buildCheckpointDescriptor` and metrics instrumentation replace bespoke JSON snippets across freshness monitors and batch metadata, while the database-level JSON merge helper removes duplicated vendor-specific SQL when persisting metadata.
 5. **Placeholders Or non-working functions or stubs:** Backlog detection currently reports “>= batchSize”; extend event models with a count endpoint before exposing remaining-record estimates.
 6. **Duplicate Functions:** Background job outcomes now standardise through `recordBackgroundJobRun`, keeping success/failure counters aligned with other workers.
 7. **Improvements need to make:** Add smoke tests that decrypt checkpoints under rotated keys and assert checksum alignment to catch crypto regressions early.
