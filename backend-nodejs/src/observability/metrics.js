@@ -223,6 +223,62 @@ const governanceCommunicationStatusGauge = new promClient.Gauge({
   labelNames: ['status']
 });
 
+const integrationRequestAttemptsTotal = new promClient.Counter({
+  name: 'edulure_integration_request_attempts_total',
+  help: 'Count of outbound integration request attempts grouped by provider, operation, status group, and outcome',
+  labelNames: ['provider', 'operation', 'status_group', 'outcome']
+});
+
+const integrationRequestDurationSeconds = new promClient.Histogram({
+  name: 'edulure_integration_request_duration_seconds',
+  help: 'Duration histogram for outbound integration requests grouped by provider, operation, status group, and outcome',
+  labelNames: ['provider', 'operation', 'status_group', 'outcome'],
+  buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30]
+});
+
+const integrationRequestRetryTotal = new promClient.Counter({
+  name: 'edulure_integration_request_retries_total',
+  help: 'Count of retries executed for outbound integration requests grouped by provider and operation',
+  labelNames: ['provider', 'operation']
+});
+
+const backgroundJobRunsTotal = new promClient.Counter({
+  name: 'edulure_background_job_runs_total',
+  help: 'Count of background job executions grouped by job key, trigger source, and outcome',
+  labelNames: ['job', 'trigger', 'outcome']
+});
+
+const backgroundJobDurationSeconds = new promClient.Histogram({
+  name: 'edulure_background_job_duration_seconds',
+  help: 'Duration histogram for background job executions grouped by job key, trigger source, and outcome',
+  labelNames: ['job', 'trigger', 'outcome'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300]
+});
+
+const backgroundJobProcessedItemsTotal = new promClient.Counter({
+  name: 'edulure_background_job_processed_items_total',
+  help: 'Items handled by background jobs grouped by job key and item status',
+  labelNames: ['job', 'item_status']
+});
+
+const liveCourseActiveSessionsGauge = new promClient.Gauge({
+  name: 'edulure_live_course_active_sessions',
+  help: 'Number of active in-memory live course sessions',
+  labelNames: []
+});
+
+const liveCourseActiveViewersGauge = new promClient.Gauge({
+  name: 'edulure_live_course_active_viewers',
+  help: 'Total viewers tracked across live course sessions',
+  labelNames: []
+});
+
+const liveCourseMessagesTotal = new promClient.Counter({
+  name: 'edulure_live_course_messages_total',
+  help: 'Count of chat messages posted within live course sessions',
+  labelNames: []
+});
+
 const searchOperationDurationSeconds = new promClient.Histogram({
   name: 'edulure_search_operation_duration_seconds',
   help: 'Duration histogram for Meilisearch administrative operations',
@@ -345,6 +401,15 @@ registry.registerMetric(governanceContractLifecycleGauge);
 registry.registerMetric(governanceVendorRiskGauge);
 registry.registerMetric(governanceCommunicationScheduledCounter);
 registry.registerMetric(governanceCommunicationStatusGauge);
+registry.registerMetric(integrationRequestAttemptsTotal);
+registry.registerMetric(integrationRequestDurationSeconds);
+registry.registerMetric(integrationRequestRetryTotal);
+registry.registerMetric(backgroundJobRunsTotal);
+registry.registerMetric(backgroundJobDurationSeconds);
+registry.registerMetric(backgroundJobProcessedItemsTotal);
+registry.registerMetric(liveCourseActiveSessionsGauge);
+registry.registerMetric(liveCourseActiveViewersGauge);
+registry.registerMetric(liveCourseMessagesTotal);
 registry.registerMetric(releaseRunStatusGauge);
 registry.registerMetric(releaseReadinessScoreGauge);
 registry.registerMetric(releaseGateEvaluationsTotal);
@@ -679,6 +744,107 @@ export function recordExplorerInteraction({ entityType, interactionType }) {
     entity: entityType ?? 'unknown',
     interaction_type: interactionType ?? 'unknown'
   });
+}
+
+function normaliseStatusGroup(statusCode) {
+  if (statusCode === null || statusCode === undefined) {
+    return 'unknown';
+  }
+
+  const numeric = Number(statusCode);
+  if (Number.isFinite(numeric)) {
+    if (numeric >= 200 && numeric < 300) return '2xx';
+    if (numeric >= 300 && numeric < 400) return '3xx';
+    if (numeric >= 400 && numeric < 500) return '4xx';
+    if (numeric >= 500 && numeric < 600) return '5xx';
+    return `${Math.trunc(numeric / 100)}xx`;
+  }
+
+  return String(statusCode).toLowerCase();
+}
+
+export function recordIntegrationRequestAttempt({
+  provider,
+  operation,
+  outcome,
+  statusCode,
+  durationMs,
+  isRetry = false
+} = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const labels = {
+    provider: provider ?? 'unknown',
+    operation: operation ?? 'unknown',
+    status_group: normaliseStatusGroup(statusCode),
+    outcome: outcome ?? 'unknown'
+  };
+
+  integrationRequestAttemptsTotal.inc(labels);
+  if (Number.isFinite(durationMs) && durationMs >= 0) {
+    integrationRequestDurationSeconds.observe(labels, durationMs / 1000);
+  }
+
+  if (isRetry) {
+    integrationRequestRetryTotal.inc({ provider: labels.provider, operation: labels.operation });
+  }
+}
+
+export function recordBackgroundJobRun({
+  job,
+  trigger,
+  outcome,
+  durationMs = 0,
+  processed = 0,
+  succeeded = 0,
+  failed = 0
+} = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const labels = {
+    job: job ?? 'unknown',
+    trigger: trigger ?? 'unspecified',
+    outcome: outcome ?? 'unknown'
+  };
+
+  backgroundJobRunsTotal.inc(labels);
+  if (Number.isFinite(durationMs) && durationMs >= 0) {
+    backgroundJobDurationSeconds.observe(labels, durationMs / 1000);
+  }
+
+  const safeJob = labels.job;
+  if (Number.isFinite(processed) && processed > 0) {
+    backgroundJobProcessedItemsTotal.inc({ job: safeJob, item_status: 'processed' }, processed);
+  }
+  if (Number.isFinite(succeeded) && succeeded > 0) {
+    backgroundJobProcessedItemsTotal.inc({ job: safeJob, item_status: 'succeeded' }, succeeded);
+  }
+  if (Number.isFinite(failed) && failed > 0) {
+    backgroundJobProcessedItemsTotal.inc({ job: safeJob, item_status: 'failed' }, failed);
+  }
+}
+
+export function updateLiveCoursePresenceMetrics({ sessionCount = 0, viewerCount = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const safeSessions = Number.isFinite(sessionCount) && sessionCount >= 0 ? sessionCount : 0;
+  const safeViewers = Number.isFinite(viewerCount) && viewerCount >= 0 ? viewerCount : 0;
+  liveCourseActiveSessionsGauge.set(safeSessions);
+  liveCourseActiveViewersGauge.set(safeViewers);
+}
+
+export function recordLiveCourseMessagePosted() {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  liveCourseMessagesTotal.inc();
 }
 
 export function trackPaymentCaptureMetrics({ provider, status, currency, amountTotal, taxAmount }) {

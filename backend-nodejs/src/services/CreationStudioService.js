@@ -7,6 +7,11 @@ import CreationCollaborationSessionModel from '../models/CreationCollaborationSe
 import DomainEventModel from '../models/DomainEventModel.js';
 import AdsCampaignModel from '../models/AdsCampaignModel.js';
 import deepMerge from '../utils/deepMerge.js';
+import {
+  CREATION_COLLABORATOR_ROLES,
+  CREATION_PROJECT_STATUSES,
+  CREATION_PROJECT_TYPES
+} from '../constants/creationStudio.js';
 
 const log = logger.child({ service: 'CreationStudioService' });
 
@@ -42,7 +47,9 @@ const STATUS_TRANSITIONS = {
   archived: ['draft']
 };
 
-const PROJECT_TYPES = new Set(['course', 'ebook', 'community', 'ads_asset']);
+const VALID_STATUS_SET = new Set(CREATION_PROJECT_STATUSES);
+const PROJECT_TYPES = new Set(CREATION_PROJECT_TYPES);
+const COLLABORATOR_ROLES = new Set(CREATION_COLLABORATOR_ROLES);
 
 const TYPE_METADATA_DEFAULTS = {
   course: {
@@ -117,12 +124,20 @@ function validateProjectType(type) {
   }
 }
 
+function validateProjectStatus(status) {
+  if (!VALID_STATUS_SET.has(status)) {
+    const error = new Error('Unsupported project status');
+    error.status = 422;
+    throw error;
+  }
+}
+
 function assertTransition(currentStatus, nextStatus) {
   if (currentStatus === nextStatus) {
     return;
   }
   const allowed = STATUS_TRANSITIONS[currentStatus] ?? [];
-  if (!allowed.includes(nextStatus)) {
+  if (!allowed.includes(nextStatus) || !VALID_STATUS_SET.has(nextStatus)) {
     const error = new Error(`Cannot transition project from ${currentStatus} to ${nextStatus}`);
     error.status = 409;
     throw error;
@@ -137,6 +152,14 @@ function hasPermission(actor, collaborator, permission) {
     return false;
   }
   return collaborator.permissions.includes(permission);
+}
+
+function ensureValidRole(role) {
+  if (!COLLABORATOR_ROLES.has(role)) {
+    const error = new Error('Unsupported collaborator role');
+    error.status = 422;
+    throw error;
+  }
 }
 
 function applyTemplateToProject(template, projectPayload = {}) {
@@ -335,6 +358,8 @@ export default class CreationStudioService {
   static async createProject(actor, payload) {
     ensureRole(actor, 'instructor');
     validateProjectType(payload.type);
+    const initialStatus = payload.status ?? 'draft';
+    validateProjectStatus(initialStatus);
 
     return db.transaction(async (trx) => {
       let template;
@@ -358,6 +383,8 @@ export default class CreationStudioService {
         publishingChannels: payload.publishingChannels,
         complianceNotes: payload.complianceNotes
       });
+
+      projectDraft.status = initialStatus;
 
       const project = await CreationProjectModel.create(projectDraft, trx);
 
@@ -423,6 +450,7 @@ export default class CreationStudioService {
     }
 
     const nextStatus = updates.status ?? project.status;
+    validateProjectStatus(nextStatus);
     if (nextStatus !== project.status) {
       assertTransition(project.status, nextStatus);
       if (['ready_for_review', 'in_review'].includes(nextStatus) && !hasPermission(actor, collaborator, 'project:submit')) {
@@ -521,20 +549,18 @@ export default class CreationStudioService {
     }
 
     if (payload.role) {
-      if (!DEFAULT_PERMISSIONS[payload.role]) {
-        const error = new Error('Unsupported collaborator role');
-        error.status = 422;
-        throw error;
-      }
+      ensureValidRole(payload.role);
     }
 
     return db.transaction(async (trx) => {
+      const role = payload.role ?? 'editor';
+      ensureValidRole(role);
       const record = await CreationProjectCollaboratorModel.add(
         {
           projectId: project.id,
           userId: payload.userId,
-          role: payload.role ?? 'editor',
-          permissions: mergePermissions(payload.role ?? 'editor', payload.permissions)
+          role,
+          permissions: mergePermissions(role, payload.permissions)
         },
         trx
       );

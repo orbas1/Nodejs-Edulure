@@ -15,6 +15,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
       'feature-flags',
       'runtime-config',
       'search-cluster',
+      'graphql-gateway',
       ...BACKGROUND_JOB_TARGETS,
       'probe-server'
     ],

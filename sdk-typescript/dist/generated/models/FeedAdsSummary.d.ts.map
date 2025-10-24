@@ -1,0 +1,1 @@
+{"version":3,"file":"FeedAdsSummary.d.ts","sourceRoot":"","sources":["../../../src/generated/models/FeedAdsSummary.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,aAAa,EAAE,MAAM,iBAAiB,CAAC;AACrD,MAAM,MAAM,cAAc,GAAG;IACzB,gBAAgB,EAAE,MAAM,CAAC;IACzB,eAAe,EAAE,MAAM,CAAC;IACxB,eAAe,EAAE,MAAM,CAAC;IACxB,kBAAkB,EAAE,MAAM,CAAC;IAC3B,MAAM,EAAE,aAAa,CAAC;CACzB,CAAC"}

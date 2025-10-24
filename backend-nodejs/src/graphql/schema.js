@@ -113,6 +113,43 @@ const JSONScalar = new GraphQLScalarType({
   }
 });
 
+function clampInt(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER, fallback = 0 } = {}) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.min(Math.max(Math.trunc(numeric), min), max);
+}
+
+function trimText(value, { maxLength = 250 } = {}) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const text = String(value).trim();
+  if (!text) {
+    return undefined;
+  }
+  return text.slice(0, maxLength);
+}
+
+function normaliseSearchTerm(value) {
+  return trimText(value, { maxLength: 300 });
+}
+
+function normalisePostType(value) {
+  return trimText(value, { maxLength: 60 });
+}
+
+function normalisePaginationInput({ page, perPage } = {}) {
+  const resolvedPerPage = clampInt(perPage, { min: 1, max: 100, fallback: 20 });
+  const resolvedPage = clampInt(page, { min: 1, max: 500, fallback: 1 });
+  return { page: resolvedPage, perPage: resolvedPerPage };
+}
+
+function normaliseCommunityIdentifier(value) {
+  return trimText(value, { maxLength: 120 });
+}
+
 const FeedPostStatsType = new GraphQLObjectType({
   name: 'FeedPostStats',
   fields: {
@@ -333,6 +370,7 @@ const FeedResponseType = new GraphQLObjectType({
     generatedAt: { type: DateTimeScalar },
     pagination: { type: PaginationType },
     ads: { type: FeedAdsSummaryType },
+    prefetch: { type: JSONScalar },
     items: { type: new GraphQLList(FeedItemType) },
     highlights: { type: new GraphQLList(FeedHighlightType) },
     analytics: { type: FeedAnalyticsType }
@@ -376,8 +414,8 @@ const FeedAnalyticsInputType = new GraphQLInputObjectType({
 
 function buildFilterPayload(input = {}) {
   return {
-    search: input.search,
-    postType: input.postType
+    search: normaliseSearchTerm(input.search),
+    postType: normalisePostType(input.postType)
   };
 }
 
@@ -413,12 +451,30 @@ function requirePermission(context, requiredPermissions) {
 }
 
 function buildPlacementMetadata(input = {}) {
-  if (!input.keywords || !input.keywords.length) {
+  if (!Array.isArray(input.keywords) || !input.keywords.length) {
     return {};
   }
-  return {
-    keywords: input.keywords.filter((keyword) => typeof keyword === 'string' && keyword.trim().length)
-  };
+
+  const keywords = [];
+  const seen = new Set();
+
+  for (const keyword of input.keywords) {
+    if (keywords.length >= 12) {
+      break;
+    }
+    const normalised = trimText(keyword, { maxLength: 60 });
+    if (!normalised) {
+      continue;
+    }
+    const key = normalised.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    keywords.push(normalised);
+  }
+
+  return keywords.length ? { keywords } : {};
 }
 
 const QueryType = new GraphQLObjectType({
@@ -432,12 +488,14 @@ const QueryType = new GraphQLObjectType({
       resolve: async (_root, args, context) => {
         const actor = requirePermission(context, 'feed:read');
         const input = args.input ?? {};
+        const { page, perPage } = normalisePaginationInput(input);
+        const community = normaliseCommunityIdentifier(input.community);
         return LiveFeedService.getFeed({
           actor,
           context: input.context ?? 'global',
-          community: input.community,
-          page: input.page ?? 1,
-          perPage: input.perPage ?? 20,
+          community,
+          page,
+          perPage,
           includeAnalytics: input.includeAnalytics ?? true,
           includeHighlights: input.includeHighlights ?? true,
           range: input.range ?? '30d',
@@ -453,9 +511,10 @@ const QueryType = new GraphQLObjectType({
       resolve: async (_root, args, context) => {
         requirePermission(context, ['ads:read', 'feed:read']);
         const input = args.input ?? {};
+        const limit = clampInt(input.limit, { min: 1, max: 12, fallback: 3 });
         return LiveFeedService.getPlacements({
           context: input.context ?? 'global_feed',
-          limit: input.limit ?? 3,
+          limit,
           metadata: buildPlacementMetadata(input)
         });
       }
@@ -468,10 +527,11 @@ const QueryType = new GraphQLObjectType({
       resolve: async (_root, args, context) => {
         const actor = requirePermission(context, 'feed:read');
         const input = args.input ?? {};
+        const community = normaliseCommunityIdentifier(input.community);
         return LiveFeedService.getAnalytics({
           actor,
           context: input.context ?? 'global',
-          community: input.community,
+          community,
           range: input.range ?? '30d',
           filters: buildFilterPayload(input)
         });

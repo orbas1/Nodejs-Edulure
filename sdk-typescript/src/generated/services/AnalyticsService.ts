@@ -2,6 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { BiExecutiveOverview } from '../models/BiExecutiveOverview';
 import type { ExplorerAnalyticsAlert } from '../models/ExplorerAnalyticsAlert';
 import type { ExplorerAnalyticsSummary } from '../models/ExplorerAnalyticsSummary';
 import type { ExplorerInteractionRecord } from '../models/ExplorerInteractionRecord';
@@ -76,6 +77,30 @@ export class AnalyticsService {
             errors: {
                 404: `Search event not found`,
                 422: `Validation error`,
+            },
+        });
+    }
+    /**
+     * Executive analytics overview
+     * Returns aggregated KPIs, trends, and telemetry health indicators for the executive dashboard.
+     * @param range Time window used when calculating KPI deltas and trend lines.
+     * @returns any Executive overview generated
+     * @throws ApiError
+     */
+    public static getAnalyticsBiExecutiveOverview(
+        range: '7d' | '14d' | '30d' | '90d' = '30d',
+    ): CancelablePromise<(StandardResponse & {
+        data?: BiExecutiveOverview;
+    })> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/analytics/bi/executive-overview',
+            query: {
+                'range': range,
+            },
+            errors: {
+                401: `Missing or invalid token`,
+                403: `Insufficient permissions`,
             },
         });
     }

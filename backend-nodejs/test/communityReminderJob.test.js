@@ -17,6 +17,11 @@ const logger = vi.hoisted(() => {
 const reminderModel = vi.hoisted(() => ({ listDue: vi.fn(), markProcessing: vi.fn(), markOutcome: vi.fn() }));
 const eventModel = vi.hoisted(() => ({ findById: vi.fn() }));
 const domainEventModel = vi.hoisted(() => ({ record: vi.fn() }));
+const integrationProviderService = vi.hoisted(() => ({ getTwilioClient: vi.fn() }));
+const metrics = vi.hoisted(() => ({
+  recordBackgroundJobRun: vi.fn(),
+  recordIntegrationRequestAttempt: vi.fn()
+}));
 
 vi.mock('../src/config/logger.js', () => ({
   default: logger
@@ -30,6 +35,10 @@ vi.mock('../src/models/CommunityEventModel.js', () => ({
 vi.mock('../src/models/DomainEventModel.js', () => ({
   default: domainEventModel
 }));
+vi.mock('../src/services/IntegrationProviderService.js', () => ({
+  default: integrationProviderService
+}));
+vi.mock('../src/observability/metrics.js', () => metrics);
 
 const scheduler = {
   validate: vi.fn().mockReturnValue(true),
@@ -62,6 +71,10 @@ const resetMocks = () => {
   reminderModel.markOutcome.mockReset();
   eventModel.findById.mockReset();
   domainEventModel.record.mockReset();
+  integrationProviderService.getTwilioClient.mockReset();
+  metrics.recordBackgroundJobRun.mockClear();
+  metrics.recordIntegrationRequestAttempt.mockClear();
+  integrationProviderService.getTwilioClient.mockReturnValue(null);
 };
 
 describe('CommunityReminderJob', () => {
@@ -113,6 +126,10 @@ describe('CommunityReminderJob', () => {
     expect(result).toEqual(
       expect.objectContaining({ processed: 2, dispatched: expect.any(Array) })
     );
+    expect(metrics.recordBackgroundJobRun).toHaveBeenCalledWith(
+      expect.objectContaining({ job: 'community_reminder', outcome: 'partial', processed: 2 })
+    );
+    expect(metrics.recordIntegrationRequestAttempt).not.toHaveBeenCalled();
   });
 
   it('skips work when disabled', async () => {
@@ -128,5 +145,38 @@ describe('CommunityReminderJob', () => {
     job.start();
     expect(scheduler.validate).toHaveBeenCalledWith('*/5 * * * *');
     expect(scheduler.schedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('records integration metrics when sms configuration is missing', async () => {
+    const reminders = [
+      {
+        id: 9,
+        eventId: 99,
+        userId: 104,
+        channel: 'sms',
+        remindAt: '2024-11-20T11:55:00Z',
+        metadata: { phoneNumber: '+15550009999' }
+      }
+    ];
+    reminderModel.listDue.mockResolvedValue(reminders);
+    reminderModel.markProcessing.mockResolvedValue(1);
+    eventModel.findById.mockResolvedValue({ id: 99, communityId: 5, startAt: '2024-11-20T12:30:00Z' });
+    integrationProviderService.getTwilioClient.mockReturnValue({ isConfigured: () => false });
+
+    const job = createJob();
+    const summary = await job.runCycle('manual');
+
+    expect(reminderModel.markOutcome).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({ status: 'failed', failureReason: 'sms_not_configured' })
+    );
+    expect(metrics.recordIntegrationRequestAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'twilio', outcome: 'skipped', statusCode: 'config_missing' })
+    );
+    expect(metrics.recordBackgroundJobRun).toHaveBeenCalledWith(
+      expect.objectContaining({ job: 'community_reminder', outcome: 'partial', processed: 1 })
+    );
+    expect(summary.processed).toBe(1);
+    expect(summary.dispatched).toHaveLength(1);
   });
 });

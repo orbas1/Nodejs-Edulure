@@ -1,4 +1,6 @@
 import db from '../config/database.js';
+import logger from '../config/logger.js';
+import DomainEventModel from '../models/DomainEventModel.js';
 import SupportTicketModel, { __testables as modelTestables } from '../models/SupportTicketModel.js';
 
 function groupMessagesByCase(messages) {
@@ -10,9 +12,51 @@ function groupMessagesByCase(messages) {
   }, new Map());
 }
 
+function normaliseListOptions(options = {}) {
+  const limit = (() => {
+    const numeric = Number(options.limit ?? 50);
+    if (!Number.isFinite(numeric)) {
+      return 50;
+    }
+    return Math.min(Math.max(Math.trunc(numeric), 1), 200);
+  })();
+
+  const status = typeof options.status === 'string' && options.status.trim().length
+    ? options.status.trim().toLowerCase()
+    : undefined;
+
+  return { limit, status };
+}
+
+const log = logger.child({ service: 'LearnerSupportRepository' });
+
+async function recordCaseEvent(caseId, eventType, payload = {}, performedBy) {
+  try {
+    await DomainEventModel.record({
+      entityType: 'learner_support_case',
+      entityId: caseId,
+      eventType,
+      payload,
+      performedBy
+    });
+  } catch (error) {
+    log.warn({ err: error, caseId, eventType }, 'Failed to record learner support domain event');
+  }
+}
+
 export default class LearnerSupportRepository {
-  static async listCases(userId) {
-    const cases = await db('learner_support_cases').where({ user_id: userId }).orderBy('created_at', 'desc');
+  static async listCases(userId, options = {}) {
+    const { status, limit } = normaliseListOptions(options);
+    const query = db('learner_support_cases')
+      .where({ user_id: userId })
+      .orderBy('created_at', 'desc')
+      .limit(limit);
+
+    if (status) {
+      query.andWhere({ status });
+    }
+
+    const cases = await query;
     if (!cases.length) {
       return [];
     }
@@ -44,16 +88,52 @@ export default class LearnerSupportRepository {
       );
     }
 
+    await recordCaseEvent(
+      caseId,
+      'case_created',
+      {
+        subject: caseRecord.subject,
+        category: caseRecord.category,
+        priority: caseRecord.priority,
+        status: caseRecord.status,
+        channel: caseRecord.channel,
+        messageCount: messageRecords.length
+      },
+      userId
+    );
+
     return this.findCase(userId, caseId);
   }
 
   static async updateCase(userId, caseId, updates = {}) {
+    const existing = await db('learner_support_cases').where({ user_id: userId, id: caseId }).first();
+    if (!existing) {
+      return null;
+    }
+
     const payload = SupportTicketModel.buildUpdatePayload(updates);
     if (Object.keys(payload).length === 0) {
       return this.findCase(userId, caseId);
     }
+
     await db('learner_support_cases').where({ user_id: userId, id: caseId }).update(payload);
-    return this.findCase(userId, caseId);
+    const updated = await this.findCase(userId, caseId);
+
+    const updatedFields = Object.keys(payload);
+    const statusChanged = updatedFields.includes('status') && payload.status !== existing.status;
+
+    await recordCaseEvent(
+      caseId,
+      statusChanged ? 'case_status_updated' : 'case_updated',
+      {
+        updatedFields,
+        previousStatus: existing.status,
+        nextStatus: updated?.status ?? payload.status ?? existing.status
+      },
+      userId
+    );
+
+    return updated;
   }
 
   static async addMessage(userId, caseId, message = {}) {
@@ -88,7 +168,20 @@ export default class LearnerSupportRepository {
       });
 
     const created = await db('learner_support_messages').where({ id: messageId }).first();
-    return SupportTicketModel.mapMessage(created);
+    const mapped = SupportTicketModel.mapMessage(created);
+
+    await recordCaseEvent(
+      caseId,
+      'case_message_added',
+      {
+        author: mapped.author,
+        hasAttachments: Array.isArray(mapped.attachments) && mapped.attachments.length > 0,
+        createdAt: mapped.createdAt
+      },
+      userId
+    );
+
+    return mapped;
   }
 
   static async closeCase(userId, caseId, { resolutionNote, satisfaction } = {}) {
@@ -132,11 +225,24 @@ export default class LearnerSupportRepository {
       );
     }
 
-    return this.findCase(userId, caseId);
+    const closed = await this.findCase(userId, caseId);
+
+    await recordCaseEvent(
+      caseId,
+      'case_closed',
+      {
+        satisfaction: closed?.satisfaction ?? satisfaction ?? existing.satisfaction,
+        resolutionNote: resolutionNote ?? null
+      },
+      userId
+    );
+
+    return closed;
   }
 }
 
 export const __testables = {
   ...modelTestables,
-  groupMessagesByCase
+  groupMessagesByCase,
+  normaliseListOptions
 };

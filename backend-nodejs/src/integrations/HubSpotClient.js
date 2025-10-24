@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { recordIntegrationRequestAttempt } from '../observability/metrics.js';
+
 const HUBSPOT_BATCH_LIMIT = 100;
 const DEFAULT_RETRY_BASE_DELAY_MS = 500;
 const DEFAULT_RETRY_MAX_DELAY_MS = 5000;
@@ -104,6 +106,19 @@ export default class HubSpotClient {
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
       const attemptStartedAt = Date.now();
 
+      const recordAttemptMetrics = (outcome, statusCode) => {
+        const durationMs = Date.now() - attemptStartedAt;
+        recordIntegrationRequestAttempt({
+          provider: 'hubspot',
+          operation: method,
+          outcome,
+          statusCode,
+          durationMs,
+          isRetry: attempt > 1
+        });
+        return durationMs;
+      };
+
       try {
         const response = await this.fetchImpl(url, {
           method,
@@ -113,7 +128,6 @@ export default class HubSpotClient {
         });
         clearTimeout(timeout);
 
-        const durationMs = Date.now() - attemptStartedAt;
         const metadata = {
           attempt,
           maxRetries: this.maxRetries,
@@ -155,6 +169,9 @@ export default class HubSpotClient {
             'HubSpot responded with retryable error'
           );
 
+          const retryScheduled = attempt <= this.maxRetries;
+          const durationMs = recordAttemptMetrics(retryScheduled ? 'retry' : 'failure', response.status);
+
           await this.recordAudit({
             requestMethod: method,
             requestPath: url.pathname,
@@ -165,7 +182,7 @@ export default class HubSpotClient {
             error: lastError
           });
 
-          if (attempt <= this.maxRetries) {
+          if (retryScheduled) {
             await this.sleep(backoffMs);
             continue;
           }
@@ -177,6 +194,8 @@ export default class HubSpotClient {
           const errorBody = await this.safeJson(response);
           const error = new Error(`HubSpot request failed with status ${response.status}`);
           error.details = errorBody;
+
+          const durationMs = recordAttemptMetrics('failure', response.status);
 
           await this.recordAudit({
             requestMethod: method,
@@ -195,6 +214,8 @@ export default class HubSpotClient {
 
           throw error;
         }
+
+        const durationMs = recordAttemptMetrics('success', response.status);
 
         await this.recordAudit({
           requestMethod: method,
@@ -218,8 +239,11 @@ export default class HubSpotClient {
           this.logger.error({ module: 'hubspot-client', err: error, attempt }, 'HubSpot request failed');
         }
 
-        const durationMs = Date.now() - attemptStartedAt;
-        const backoffMs = attempt <= this.maxRetries ? this.computeRetryDelayMs(attempt) : null;
+        const shouldRetry = attempt <= this.maxRetries;
+        const statusCode =
+          error?.status ?? error?.statusCode ?? (error.name === 'AbortError' ? 'timeout' : 'error');
+        const durationMs = recordAttemptMetrics(shouldRetry ? 'retry' : 'failure', statusCode);
+        const backoffMs = shouldRetry ? this.computeRetryDelayMs(attempt) : null;
         await this.recordAudit({
           requestMethod: method,
           requestPath: url.pathname,
@@ -238,7 +262,7 @@ export default class HubSpotClient {
           error
         });
 
-        if (attempt > this.maxRetries) {
+        if (!shouldRetry) {
           throw error;
         }
 

@@ -57,5 +57,25 @@ export class AnalyticsService {
             },
         });
     }
+    /**
+     * Executive analytics overview
+     * Returns aggregated KPIs, trends, and telemetry health indicators for the executive dashboard.
+     * @param range Time window used when calculating KPI deltas and trend lines.
+     * @returns any Executive overview generated
+     * @throws ApiError
+     */
+    static getAnalyticsBiExecutiveOverview(range = '30d') {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/analytics/bi/executive-overview',
+            query: {
+                'range': range,
+            },
+            errors: {
+                401: `Missing or invalid token`,
+                403: `Insufficient permissions`,
+            },
+        });
+    }
 }
 //# sourceMappingURL=AnalyticsService.js.map

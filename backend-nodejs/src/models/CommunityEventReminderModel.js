@@ -1,13 +1,17 @@
 import db from '../config/database.js';
 import {
+  COMMUNITY_EVENT_REMINDER_CHANNELS,
+  COMMUNITY_EVENT_REMINDER_STATUSES
+} from './communityEventConstants.js';
+import {
   ensureIntegerInRange,
   readJsonColumn,
   writeJsonColumn
 } from '../utils/modelUtils.js';
 
 const TABLE = 'community_event_reminders';
-const STATUS_OPTIONS = new Set(['pending', 'processing', 'sent', 'failed', 'cancelled']);
-const CHANNEL_OPTIONS = new Set(['email', 'sms', 'push', 'in_app']);
+const STATUS_OPTIONS = new Set(COMMUNITY_EVENT_REMINDER_STATUSES);
+const CHANNEL_OPTIONS = new Set(COMMUNITY_EVENT_REMINDER_CHANNELS);
 
 function normalisePrimaryId(value, fieldName) {
   if (value === undefined || value === null || value === '') {

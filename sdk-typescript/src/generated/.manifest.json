@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2025-10-24T01:51:19.811Z",
+  "specHash": "cd7312d489296daca10c603eb2fa5ce14251e9a8bc0eb859ac50e33bc42c3eb0",
+  "specTitle": "Edulure Platform API",
+  "specVersion": "1.51.0",
+  "operationCount": 172,
+  "generatorVersion": "^0.29.0",
+  "specPath": "backend-nodejs/src/docs/openapi.json",
+  "outputDir": "sdk-typescript/src/generated",
+  "services": [
+    "AdminMonetizationService",
+    "AdsService",
+    "AnalyticsService",
+    "BillingService",
+    "CommunitiesService",
+    "DefaultService",
+    "EnablementService",
+    "EnvironmentService",
+    "ExplorerService",
+    "GovernanceService",
+    "ObservabilityService",
+    "ReleaseService",
+    "SecurityOperationsService",
+    "TelemetryService"
+  ],
+  "serviceCount": 14,
+  "modelCount": 270
+}
