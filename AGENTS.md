@@ -337,7 +337,7 @@
          - 1.F.8 uploads (frontend-reactjs/src/utils/uploads.js)
          - 1.F.9 auth (frontend-reactjs/src/utils/validation/auth.js)
          - 1.F.10 onboarding (frontend-reactjs/src/utils/validation/onboarding.js)
-      - 2.A Landing & Value Proposition Surfaces
+      - ✓ 2.A Landing & Value Proposition Surfaces
          - 2.A.1 FeatureGrid (frontend-reactjs/src/components/FeatureGrid.jsx)
          - 2.A.2 PageHero (frontend-reactjs/src/components/PageHero.jsx)
          - 2.A.3 StatsBar (frontend-reactjs/src/components/StatsBar.jsx)
@@ -354,6 +354,34 @@
          - 2.A.14 ConversionPanel (frontend-reactjs/src/components/marketing/ConversionPanel.jsx)
          - 2.A.15 HeroMediaPanel (frontend-reactjs/src/components/marketing/HeroMediaPanel.jsx)
          - 2.A.16 MarketingHero (frontend-reactjs/src/components/marketing/MarketingHero.jsx)
+            1. **Appraisal.** `useLandingValueProposition.js` now hydrates hero, stats, and pillar CTAs for `MarketingHero.jsx`, `FeatureGrid.jsx`, and `StatsBar.jsx`, aligning landing copy with Annex A16 guidance from `user_experience.md`.
+            2. **Functionality.** The hook wraps `useMarketingContent` with the Annex schema in `data/marketing/valueProposition.js`, returning normalised chips, media, and CTA objects that `MarketingHero` instruments through `trackEvent` wrappers.
+            3. **Usefulness.** `MarketingHero`, `FeatureGrid`, and `StatsBar` accept `marketingContent` props so Home or campaign pages can reuse prefetched CMS blocks while still rendering Annex-ready translations and analytics payloads.
+            4. **Redundancies.** Inline feature grids and stat arrays were removed; the shared `VALUE_PROPOSITION_PILLARS` and `VALUE_PROPOSITION_STATS` definitions prevent divergent marketing copy or routing logic across acquisition components.
+            5. **Placeholders or Stubs.** Flow 5 hero media, Annex captions, and doc CTAs stay as fallbacks until marketing APIs publish richer content; the pipeline clearly marks where dynamic assets will land.
+            6. **Duplicates.** `normaliseAction` and CTA analytics IDs mean hero buttons and grid links share the same label formatting, routing checks, and event metadata instead of reimplementing logic per component.
+            7. **Improvements Needed.** Next pass should port `PageHero`, `Testimonials`, and `ConversionPanel` to the hook so every Annex A16 surface inherits the same narrative, telemetry, and translation strategy.
+            8. **Styling.** Feature pillars now include descriptive paragraphs, `rounded-3xl` shells, and primary-accent hover states that mirror Annex layout specs for value proposition cards.
+            9. **Efficiency Analysis.** `useMarketingContent` gained `disabled`/`initialData` support, letting prefetched blocks hydrate instantly without duplicate network calls while memoised hero props avoid repeated recomputation.
+            10. **Strengths to Keep.** `PrimaryHero`, `HeroMediaPanel`, and `HomeSection` remain untouched, preserving proven responsive gradients and layouts while layering Annex-driven content on top.
+            11. **Weaknesses to Remove.** Hero instrumentation now exists, but other marketing CTAs (e.g., plan pricing) still lack unified analytics—highlighted for upcoming Annex hardening.
+            12. **Palette.** Chips, stats, and CTA pills continue using established primary, emerald, and slate tokens, keeping the acquisition palette cohesive with earlier Annex releases.
+            13. **Layout.** The grid upgrades add semantic `<article>` wrappers, intro copy, and consistent gap tokens so marketing, ops, and design see the Annex density reflected across breakpoints.
+            14. **Text.** Microcopy references Annex narratives (“Annex A16 launch system”, “Flow 5 pillars…”) with translation keys, matching the tone and brevity requirements in `user_experience.md`.
+            15. **Spacing.** CTA stacks, stat clusters, and feature descriptions maintain 8/12/16px rhythms, resolving the cramped spacing previously flagged in the acquisition audit.
+            16. **Shape.** Hero, stat, and feature containers reuse `rounded-3xl`/`rounded-2xl` radii, matching Annex silhouette rules and harmonising with PrimaryHero/HeroMediaPanel treatments.
+            17. **Effects.** Feature CTAs keep shared hover/focus transitions and focus-visible outlines, ensuring interactive cues stay consistent with Annex accessibility specs.
+            18. **Thumbs.** Hero chips and stat helpers still surface semantic dots and helper lines, giving marketing teams screenshot-ready proof points for Annex reviews.
+            19. **Media.** `ensureMedia` seeds Flow 5 video/image fallbacks with Annex alt/caption text while respecting data-saver and reduced-motion preferences through `HeroMediaPanel`.
+            20. **Buttons.** CTA normalisation enforces safe routing for `/register`, `/courses`, `/communities`, pricing docs, and sponsor briefs, plus analytics IDs that downstream dashboards can trust.
+            21. **Interact.** Hero and feature CTAs emit `marketing:hero_cta` and `marketing:value_prop_action` events with surface/pillar IDs, supplying the telemetry Annex A16 called for in `user_experience.md`.
+            22. **Missing.** Extend translation helpers to `StatsBar` and monetisation ribbons, wire dynamic analytics exports, and mirror instrumentation on secondary CTAs to complete the Annex loop.
+            23. **Design.** `valueProposition.js` centralises fallback copy, badge tokens, and CTA metadata so design ops, content, and analytics reference a single Annex source of truth.
+            24. **Clone.** Shared hydration logic prevents future landing variants from cloning fallback arrays or instrumentation, keeping Annex updates maintainable.
+            25. **Framework.** `useLandingValueProposition` packages data prep, analytics context, and surface identifiers, making it trivial to plug Annex A16 storytelling into new locales or partner pages.
+            26. **Checklist.** Validate CTA analytics, feature hover states, stat fallbacks, and the new `useMarketingContent` disabled path, then run `npm --prefix frontend-reactjs run lint` (installs pending `@eslint/js`).
+            27. **Nav.** Hero analytics lean on CMS slugs/IDs so marketing dashboards and Annex docs can trace CTA performance back to precise landing surfaces.
+            28. **Release.** Coordinate CMS block updates, confirm telemetry dashboards ingest new events, reseed Annex A16 docs with shared copy, and brief go-to-market teams on the unified value proposition engine.
          - 2.A.17 MonetizationRibbon (frontend-reactjs/src/components/marketing/MonetizationRibbon.jsx)
          - 2.A.18 PlanHighlights (frontend-reactjs/src/components/marketing/PlanHighlights.jsx)
          - 2.A.19 PrimaryHero (frontend-reactjs/src/components/marketing/PrimaryHero.jsx)
