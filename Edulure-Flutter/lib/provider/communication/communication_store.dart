@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/communication_persistence_service.dart';
+import '../../services/inbox_service.dart';
 import 'communication_models.dart';
 
 final _random = Random();
@@ -223,6 +224,29 @@ class InboxStore extends PersistentCollectionStore<ConversationThread> {
     ];
   }
 
+  void upsertMessage(String threadId, InboxMessage message) {
+    state = [
+      for (final thread in state)
+        if (thread.id == threadId)
+          thread.copyWith(
+            messages: _replaceMessage(thread.messages, message),
+            updatedAt: message.sentAt,
+          )
+        else
+          thread,
+    ];
+  }
+
+  List<InboxMessage> _replaceMessage(List<InboxMessage> messages, InboxMessage incoming) {
+    final existingIndex = messages.indexWhere((item) => item.id == incoming.id);
+    if (existingIndex == -1) {
+      return [...messages, incoming];
+    }
+    final next = List<InboxMessage>.from(messages);
+    next[existingIndex] = incoming;
+    return next;
+  }
+
   void markRead(String threadId, DateTime timestamp) {
     state = [
       for (final thread in state)
@@ -312,6 +336,59 @@ class InboxStore extends PersistentCollectionStore<ConversationThread> {
       fromMe: fromMe,
       attachments: attachments,
     );
+  }
+
+  Future<InboxSyncReport> synchronizeWithService(InboxService service,
+      {bool forceRemote = false}) async {
+    final report = await service.synchronize(forceRemote: forceRemote);
+    if (report.threads.isNotEmpty) {
+      state = report.threads;
+    }
+    return report;
+  }
+
+  Future<InboxMessage> sendMessageWithService({
+    required InboxService service,
+    required String threadId,
+    required String author,
+    required String body,
+    List<MessageAttachment> attachments = const <MessageAttachment>[],
+  }) async {
+    final message = await service.sendMessage(
+      threadId: threadId,
+      author: author,
+      body: body,
+      attachments: attachments,
+    );
+    upsertMessage(threadId, message);
+    return message;
+  }
+
+  Future<void> markReadWithService({
+    required InboxService service,
+    required String threadId,
+    required DateTime timestamp,
+  }) async {
+    await service.markThreadRead(threadId: threadId, readAt: timestamp);
+    markRead(threadId, timestamp);
+  }
+
+  Future<OutboxFlushResult> flushOutboxWithService(InboxService service,
+      {SupportTicketStore? supportTickets}) async {
+    final result = await service.processOutbox();
+    for (final delivered in result.deliveredMessages) {
+      upsertMessage(delivered.threadId, delivered.message);
+    }
+    if (supportTickets != null) {
+      for (final ticket in result.updatedTickets) {
+        if (supportTickets.state.any((existing) => existing.id == ticket.id)) {
+          supportTickets.updateTicket(ticket);
+        } else {
+          supportTickets.createTicket(ticket);
+        }
+      }
+    }
+    return result;
   }
 }
 
@@ -473,10 +550,40 @@ class SupportTicketStore extends PersistentCollectionStore<SupportTicket> {
       attachments: attachments,
     );
   }
+
+  Future<SupportTicket> createTicketWithService({
+    required InboxService service,
+    required String subject,
+    required String description,
+    required String contactName,
+    required String contactEmail,
+    SupportPriority priority = SupportPriority.medium,
+    List<String> tags = const <String>[],
+  }) async {
+    final ticket = await service.createSupportTicket(
+      subject: subject,
+      description: description,
+      contactName: contactName,
+      contactEmail: contactEmail,
+      priority: priority,
+      tags: tags,
+    );
+    if (state.any((existing) => existing.id == ticket.id)) {
+      updateTicket(ticket);
+    } else {
+      createTicket(ticket);
+    }
+    return ticket;
+  }
 }
 
 final communicationPersistenceProvider = Provider<CommunicationPersistence>((ref) {
   return CommunicationPersistenceService();
+});
+
+final inboxServiceProvider = Provider<InboxService>((ref) {
+  final persistence = ref.watch(communicationPersistenceProvider);
+  return InboxService(persistence: persistence);
 });
 
 final inboxStoreProvider = StateNotifierProvider<InboxStore, List<ConversationThread>>((ref) {

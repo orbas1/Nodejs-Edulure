@@ -147,24 +147,75 @@ for (const [entityName, factory] of Object.entries(defaultStrategies)) {
   registerRetentionStrategy(entityName, factory);
 }
 
-async function executeAction(policy, buildQuery, { dryRun, softDeleteColumn, trx }) {
+const DEFAULT_VERIFICATION = Object.freeze({
+  enabled: true,
+  failOnResidual: true,
+  sampleSize: 5
+});
+
+function normaliseVerificationOptions(options = {}) {
+  if (!options || typeof options !== 'object') {
+    return { ...DEFAULT_VERIFICATION };
+  }
+
+  const sampleSizeCandidate = Number(options.sampleSize ?? DEFAULT_VERIFICATION.sampleSize);
+  const sampleSize = Number.isFinite(sampleSizeCandidate) && sampleSizeCandidate > 0
+    ? Math.min(500, Math.max(1, Math.trunc(sampleSizeCandidate)))
+    : DEFAULT_VERIFICATION.sampleSize;
+
+  return {
+    enabled: options.enabled !== false,
+    failOnResidual: options.failOnResidual !== false,
+    sampleSize,
+    metadata: options.metadata ?? null
+  };
+}
+
+async function executeAction(policy, buildQuery, { dryRun, softDeleteColumn, trx, verification }) {
+  const verificationOptions = normaliseVerificationOptions(verification);
+  const countQuery = () => buildQuery().clone();
+  const [{ total: beforeTotal }] = await countQuery().count({ total: '*' });
+  const initialCount = Number(beforeTotal ?? 0);
+
   if (dryRun) {
-    const [{ total }] = await buildQuery().count({ total: '*' });
-    return { affectedRows: Number(total ?? 0) };
+    return {
+      affectedRows: initialCount,
+      preRunCount: initialCount,
+      verification: {
+        status: 'simulated',
+        remainingRows: initialCount,
+        metadata: verificationOptions.metadata ?? null
+      }
+    };
   }
 
+  let affectedRows;
   if (policy.action === 'hard-delete') {
-    const affectedRows = await buildQuery().del();
-    return { affectedRows };
-  }
-
-  if (policy.action === 'soft-delete') {
+    affectedRows = await buildQuery().del();
+  } else if (policy.action === 'soft-delete') {
     const column = softDeleteColumn ?? 'deleted_at';
-    const affectedRows = await buildQuery().update({ [column]: trx.fn.now() });
-    return { affectedRows };
+    affectedRows = await buildQuery().update({ [column]: trx.fn.now() });
+  } else {
+    throw new Error(`Unsupported data retention action "${policy.action}"`);
   }
 
-  throw new Error(`Unsupported data retention action "${policy.action}"`);
+  let verificationResult = null;
+  if (verificationOptions.enabled) {
+    const [{ total: remainingTotal }] = await countQuery().count({ total: '*' });
+    const remainingRows = Number(remainingTotal ?? 0);
+    const status = remainingRows === 0 ? 'cleared' : 'residual';
+    verificationResult = {
+      status,
+      remainingRows,
+      metadata: verificationOptions.metadata ?? null
+    };
+  }
+
+  return {
+    affectedRows,
+    preRunCount: initialCount,
+    verification: verificationResult
+  };
 }
 
 export async function fetchActivePolicies(trx = db) {
@@ -212,7 +263,8 @@ export async function enforceRetentionPolicies({
   policies: providedPolicies,
   dbClient = db,
   alertThreshold = DEFAULT_ALERT_THRESHOLD,
-  onAlert
+  onAlert,
+  verification
 } = {}) {
   const resolvedMode = mode ?? (dryRun ? 'simulate' : 'commit');
   const simulate = resolvedMode === 'simulate';
@@ -220,6 +272,8 @@ export async function enforceRetentionPolicies({
   const runLogger = logger.child({ module: 'data-retention', dryRun: runDry, mode: resolvedMode });
   const executionResults = [];
   const runId = crypto.randomUUID();
+  const verificationOptions = normaliseVerificationOptions(verification);
+  const sampleSize = verificationOptions.sampleSize;
 
   const policies = providedPolicies
     ? providedPolicies.map((policy) => (policy.entityName ? policy : mapPolicyRow(policy)))
@@ -256,7 +310,7 @@ export async function enforceRetentionPolicies({
         const strategy = strategyFactory(policy, trx);
         const buildQuery = strategy.buildQuery;
         const idColumn = strategy.idColumn ?? 'id';
-        const sampleIds = await buildQuery().clone().limit(5).pluck(idColumn);
+        const sampleIds = await buildQuery().clone().limit(sampleSize).pluck(idColumn);
 
         if (sampleIds.length === 0) {
           policyLogger.info('No records matched retention policy');
@@ -274,18 +328,31 @@ export async function enforceRetentionPolicies({
             });
           }
 
-          return {
+          const emptyResult = {
             affectedRows: 0,
             sampleIds,
-            context: strategy.context ?? {}
+            context: strategy.context ?? {},
+            verification: {
+              status: runDry ? 'simulated' : 'cleared',
+              remainingRows: 0,
+              metadata: verificationOptions.metadata ?? null
+            },
+            preRunCount: 0
           };
+
+          return emptyResult;
         }
 
-        const { affectedRows } = await executeAction(policy, buildQuery, {
-          dryRun: runDry,
-          softDeleteColumn: strategy.softDeleteColumn,
-          trx
-        });
+        const { affectedRows, preRunCount, verification: verificationResult } = await executeAction(
+          policy,
+          buildQuery,
+          {
+            dryRun: runDry,
+            softDeleteColumn: strategy.softDeleteColumn,
+            trx,
+            verification: verificationOptions
+          }
+        );
 
         const auditPayload = {
           reason: strategy.reason,
@@ -293,7 +360,9 @@ export async function enforceRetentionPolicies({
           dryRun: runDry,
           runId,
           matchedRows: affectedRows,
-          context: strategy.context ?? {}
+          context: strategy.context ?? {},
+          verification: verificationResult ?? null,
+          preRunCount
         };
 
         if (!runDry) {
@@ -305,26 +374,71 @@ export async function enforceRetentionPolicies({
           });
         }
 
-        policyLogger.info({ affectedRows, sampleIds, dryRun: runDry, action: policy.action }, 'Retention policy enforced');
-
         return {
           affectedRows,
           sampleIds,
-          context: strategy.context ?? {}
+          context: strategy.context ?? {},
+          verification: verificationResult ?? null,
+          preRunCount
         };
       });
 
-      const outcome = {
+      const baseOutcome = {
         policyId: policy.id,
         entityName: policy.entityName,
         action: policy.action,
-        status: 'executed',
         affectedRows: result.affectedRows,
         sampleIds: result.sampleIds,
         dryRun: runDry,
         description: policy.description,
-        context: result.context ?? {}
+        context: result.context ?? {},
+        verification: result.verification ?? null,
+        preRunCount: result.preRunCount
       };
+
+      const residualDetected =
+        verificationOptions.enabled && baseOutcome.verification?.status === 'residual';
+
+      if (residualDetected) {
+        policyLogger.warn(
+          {
+            remainingRows: baseOutcome.verification.remainingRows,
+            policyId: policy.id,
+            action: policy.action
+          },
+          'Data retention verification detected residual rows'
+        );
+      }
+
+      if (residualDetected && verificationOptions.failOnResidual) {
+        const failure = {
+          ...baseOutcome,
+          status: 'failed',
+          error: `Residual rows remain (${baseOutcome.verification.remainingRows}) after enforcement`
+        };
+
+        executionResults.push(failure);
+
+        await publishRetentionEvent({
+          runId,
+          policy,
+          status: 'failed',
+          details: failure,
+          dryRun: runDry
+        });
+
+        continue;
+      }
+
+      const outcome = {
+        ...baseOutcome,
+        status: 'executed'
+      };
+
+      policyLogger.info(
+        { affectedRows: outcome.affectedRows, sampleIds: outcome.sampleIds, dryRun: runDry, action: policy.action },
+        'Retention policy enforced'
+      );
 
       executionResults.push(outcome);
 

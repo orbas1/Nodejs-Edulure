@@ -4,6 +4,26 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import errorHandler from '../src/middleware/errorHandler.js';
 
+let mockDistributedCache;
+
+vi.mock('../src/services/DistributedRuntimeCache.js', () => {
+  mockDistributedCache = {
+    readCatalogueFilters: vi.fn().mockResolvedValue(null),
+    writeCatalogueFilters: vi.fn().mockImplementation(async (value) => ({
+      value,
+      updatedAt: new Date().toISOString(),
+      version: Date.now()
+    })),
+    acquireCatalogueFiltersLock: vi.fn().mockResolvedValue(null),
+    releaseCatalogueFiltersLock: vi.fn().mockResolvedValue(true)
+  };
+
+  return {
+    distributedRuntimeCache: mockDistributedCache,
+    DistributedRuntimeCache: class {}
+  };
+});
+
 let app;
 let LiveClassroomModel;
 let CourseModel;
@@ -18,6 +38,7 @@ let countVerifiedTutorsSpy;
 let listAllTutorsSpy;
 let countAllTutorsSpy;
 let listCatalogItemsSpy;
+let getCatalogueFiltersSpy;
 
 beforeAll(async () => {
   ({ default: LiveClassroomModel } = await import('../src/models/LiveClassroomModel.js'));
@@ -35,6 +56,7 @@ beforeAll(async () => {
   listAllTutorsSpy = vi.spyOn(TutorProfileModel, 'listAll');
   countAllTutorsSpy = vi.spyOn(TutorProfileModel, 'countAll');
   listCatalogItemsSpy = vi.spyOn(MonetizationCatalogItemModel, 'listByProductCodes');
+  getCatalogueFiltersSpy = vi.spyOn(CourseModel, 'getCatalogueFilters');
 
   app = express();
   app.use(express.json());
@@ -45,6 +67,20 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   listCatalogItemsSpy.mockResolvedValue([]);
+  if (mockDistributedCache) {
+    Object.values(mockDistributedCache).forEach((entry) => {
+      if (typeof entry?.mockClear === 'function') {
+        entry.mockClear();
+      }
+    });
+    mockDistributedCache.readCatalogueFilters.mockResolvedValue(null);
+    mockDistributedCache.writeCatalogueFilters.mockImplementation(async (value) => ({
+      value,
+      updatedAt: new Date().toISOString(),
+      version: Date.now()
+    }));
+  }
+  getCatalogueFiltersSpy.mockReset();
 });
 
 describe('Catalogue HTTP routes', () => {
@@ -227,5 +263,38 @@ describe('Catalogue HTTP routes', () => {
     expect(response.status).toBe(422);
     expect(listVerifiedTutorsSpy).not.toHaveBeenCalled();
     expect(listAllTutorsSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns catalogue filters with layout and cache metadata', async () => {
+    getCatalogueFiltersSpy.mockResolvedValue({
+      generatedAt: '2025-03-30T12:00:00.000Z',
+      totals: { coursesEvaluated: 3 },
+      categories: [{ value: 'analytics', count: 2 }],
+      levels: [{ value: 'advanced', count: 2 }],
+      languages: [{ value: 'en', count: 3 }],
+      deliveryFormats: [{ value: 'cohort', count: 2 }],
+      tags: [{ value: 'automation', count: 2 }],
+      skills: [{ value: 'storytelling', count: 1 }]
+    });
+
+    const response = await request(app).get('/api/v1/catalogue/filters');
+
+    expect(response.status).toBe(200);
+    expect(getCatalogueFiltersSpy).toHaveBeenCalledTimes(1);
+    expect(response.body.data).toMatchObject({
+      generatedAt: '2025-03-30T12:00:00.000Z',
+      refreshedAt: '2025-03-30T12:00:00.000Z',
+      facets: {
+        primary: ['categories', 'levels'],
+        secondary: ['languages', 'deliveryFormats'],
+        tagCloudKey: 'tags'
+      },
+      layout: {
+        recommendedColumns: { desktop: 3, tablet: 2, mobile: 1 },
+        stickyFacets: true
+      }
+    });
+    expect(response.body.meta.cache.hit).toBe(false);
+    expect(response.body.meta.cache.ttlSeconds).toBeGreaterThanOrEqual(30);
   });
 });

@@ -111,7 +111,10 @@ export default class CommunityModel {
           "(SELECT COUNT(*) FROM community_posts WHERE community_id = c.id AND status = 'published' AND deleted_at IS NULL) as postCount"
         ),
         connection.raw(
-          "GREATEST(IFNULL((SELECT MAX(published_at) FROM community_posts WHERE community_id = c.id AND status = 'published'), '1970-01-01'), IFNULL((SELECT MAX(published_at) FROM community_resources WHERE community_id = c.id AND status = 'published'), '1970-01-01'), c.updated_at) as lastActivityAt"
+          "(SELECT COUNT(*) FROM community_events WHERE community_id = c.id AND status IN ('scheduled', 'live', 'completed')) as eventCount"
+        ),
+        connection.raw(
+          "GREATEST(IFNULL((SELECT MAX(published_at) FROM community_posts WHERE community_id = c.id AND status = 'published'), '1970-01-01'), IFNULL((SELECT MAX(published_at) FROM community_resources WHERE community_id = c.id AND status = 'published'), '1970-01-01'), IFNULL((SELECT MAX(start_at) FROM community_events WHERE community_id = c.id AND status IN ('scheduled', 'live', 'completed')), '1970-01-01'), c.updated_at) as lastActivityAt"
         )
       ])
       .where('cm.user_id', userId)
@@ -127,6 +130,7 @@ export default class CommunityModel {
       channelCount: Number(row.channelCount ?? 0),
       resourceCount: Number(row.resourceCount ?? 0),
       postCount: Number(row.postCount ?? 0),
+      eventCount: Number(row.eventCount ?? 0),
       lastActivityAt: row.lastActivityAt
     }));
   }
@@ -144,8 +148,11 @@ export default class CommunityModel {
           "(SELECT COUNT(*) FROM community_posts WHERE community_id = c.id AND status = 'published' AND deleted_at IS NULL)"
         ),
         channelCount: connection.raw("(SELECT COUNT(*) FROM community_channels WHERE community_id = c.id)"),
+        eventCount: connection.raw(
+          "(SELECT COUNT(*) FROM community_events WHERE community_id = c.id AND status IN ('scheduled', 'live', 'completed'))"
+        ),
         lastActivityAt: connection.raw(
-          "GREATEST(IFNULL((SELECT MAX(published_at) FROM community_posts WHERE community_id = c.id AND status = 'published'), '1970-01-01'), IFNULL((SELECT MAX(published_at) FROM community_resources WHERE community_id = c.id AND status = 'published'), '1970-01-01'), c.updated_at)"
+          "GREATEST(IFNULL((SELECT MAX(published_at) FROM community_posts WHERE community_id = c.id AND status = 'published'), '1970-01-01'), IFNULL((SELECT MAX(published_at) FROM community_resources WHERE community_id = c.id AND status = 'published'), '1970-01-01'), IFNULL((SELECT MAX(start_at) FROM community_events WHERE community_id = c.id AND status IN ('scheduled', 'live', 'completed')), '1970-01-01'), c.updated_at)"
         )
       })
       .where('c.id', communityId)
@@ -157,6 +164,7 @@ export default class CommunityModel {
           resourceCount: Number(row.resourceCount ?? 0),
           postCount: Number(row.postCount ?? 0),
           channelCount: Number(row.channelCount ?? 0),
+          eventCount: Number(row.eventCount ?? 0),
           lastActivityAt: row.lastActivityAt
         }
       : null;

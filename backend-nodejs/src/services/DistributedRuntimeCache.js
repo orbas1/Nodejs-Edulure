@@ -65,7 +65,7 @@ export class DistributedRuntimeCache {
     }
   }
 
-  async writeSnapshot(key, value) {
+  async writeSnapshot(key, value, { ttlMs } = {}) {
     if (!this.redis) {
       return null;
     }
@@ -81,7 +81,11 @@ export class DistributedRuntimeCache {
     };
 
     try {
-      await this.redis.set(key, JSON.stringify(payload));
+      if (Number.isFinite(ttlMs) && ttlMs > 0) {
+        await this.redis.set(key, JSON.stringify(payload), 'PX', Math.floor(ttlMs));
+      } else {
+        await this.redis.set(key, JSON.stringify(payload));
+      }
       return payload;
     } catch (error) {
       this.logger.warn({ err: error, key }, 'Failed to write distributed runtime snapshot');
@@ -146,6 +150,20 @@ export class DistributedRuntimeCache {
     return this.writeSnapshot(this.keys.runtimeConfig, entries);
   }
 
+  async readCatalogueFilters() {
+    if (!this.keys.catalogueFilters) {
+      return null;
+    }
+    return this.readSnapshot(this.keys.catalogueFilters);
+  }
+
+  async writeCatalogueFilters(filters, options = {}) {
+    if (!this.keys.catalogueFilters) {
+      return null;
+    }
+    return this.writeSnapshot(this.keys.catalogueFilters, filters, options);
+  }
+
   async acquireFeatureFlagLock() {
     return this.acquireLock(this.keys.featureFlagLock);
   }
@@ -160,6 +178,20 @@ export class DistributedRuntimeCache {
 
   async releaseRuntimeConfigLock(token) {
     return this.releaseLock(this.keys.runtimeConfigLock, token);
+  }
+
+  async acquireCatalogueFiltersLock() {
+    if (!this.keys.catalogueFiltersLock) {
+      return null;
+    }
+    return this.acquireLock(this.keys.catalogueFiltersLock);
+  }
+
+  async releaseCatalogueFiltersLock(token) {
+    if (!this.keys.catalogueFiltersLock) {
+      return false;
+    }
+    return this.releaseLock(this.keys.catalogueFiltersLock, token);
   }
 }
 

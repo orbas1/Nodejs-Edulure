@@ -22,9 +22,20 @@ export default function SystemPreferencesPanel({
   onPreferenceToggle,
   onAdPersonalisationChange,
   disableActions,
-  isSaving
+  isSaving,
+  systemLastSavedLabel,
+  personalisationLastSavedLabel,
+  onResetSystem,
+  onResetPersonalisation,
+  syncStatus
 }) {
   const previewItems = recommendationPreview?.length ? recommendationPreview : FALLBACK_RECOMMENDATION_PREVIEW;
+  const digestDisabled = disableActions || !form.notificationsEnabled;
+
+  const handleSystemSubmit = (event) => {
+    event.preventDefault();
+    onSubmit?.(event);
+  };
 
   return (
     <>
@@ -32,10 +43,32 @@ export default function SystemPreferencesPanel({
         id="learner-system-preferences"
         title="System preferences"
         description="Configure accessibility, localisation, and notification cadence across the learner experience."
-        actions={<span className="dashboard-kicker text-primary hidden sm:inline">Personalised</span>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {syncStatus ? (
+              <span
+                className="rounded-full border border-primary/40 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary"
+                aria-live="polite"
+              >
+                {syncStatus}
+              </span>
+            ) : null}
+            {systemLastSavedLabel ? (
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Saved {systemLastSavedLabel}
+              </span>
+            ) : null}
+            {onResetSystem ? (
+              <button type="button" className="dashboard-pill" onClick={onResetSystem} disabled={disableActions}>
+                Reset
+              </button>
+            ) : null}
+          </div>
+        }
         defaultOpen
+        persistenceKey="learner-system-preferences"
       >
-        <form className="space-y-6" onSubmit={onSubmit}>
+        <form className="space-y-6" onSubmit={handleSystemSubmit}>
           <div className="grid gap-4 md:grid-cols-3">
             <label className="flex flex-col text-sm font-medium text-slate-700">
               Language
@@ -86,6 +119,20 @@ export default function SystemPreferencesPanel({
               checked={form.notificationsEnabled}
               onChange={(value) => onSystemToggle('notificationsEnabled', value)}
               disabled={disableActions}
+              meta={form.notificationsEnabled ? 'On' : 'Off'}
+              supportingAction={
+                disableActions
+                  ? null
+                  : (
+                      <button
+                        type="button"
+                        className="font-semibold text-primary hover:underline"
+                        onClick={() => onSystemToggle('notificationsEnabled', !form.notificationsEnabled)}
+                      >
+                        {form.notificationsEnabled ? 'Pause notifications' : 'Resume notifications'}
+                      </button>
+                    )
+              }
             />
             <SettingsToggleField
               name="digestEnabled"
@@ -93,7 +140,13 @@ export default function SystemPreferencesPanel({
               description="Summarise learning progress and recommendations."
               checked={form.digestEnabled}
               onChange={(value) => onSystemToggle('digestEnabled', value)}
-              disabled={disableActions}
+              disabled={digestDisabled}
+              meta={form.digestEnabled ? 'On' : 'Off'}
+              supportingAction={
+                !form.notificationsEnabled ? (
+                  <span className="text-rose-500">Enable email notifications to activate the digest.</span>
+                ) : null
+              }
             />
           </div>
 
@@ -105,6 +158,7 @@ export default function SystemPreferencesPanel({
               checked={form.autoPlayMedia}
               onChange={(value) => onSystemToggle('autoPlayMedia', value)}
               disabled={disableActions}
+              meta={form.autoPlayMedia ? 'On' : 'Off'}
             />
             <SettingsToggleField
               name="highContrast"
@@ -113,6 +167,7 @@ export default function SystemPreferencesPanel({
               checked={form.highContrast}
               onChange={(value) => onSystemToggle('highContrast', value)}
               disabled={disableActions}
+              meta={form.highContrast ? 'On' : 'Off'}
             />
             <SettingsToggleField
               name="reducedMotion"
@@ -121,6 +176,7 @@ export default function SystemPreferencesPanel({
               checked={form.reducedMotion}
               onChange={(value) => onSystemToggle('reducedMotion', value)}
               disabled={disableActions}
+              meta={form.reducedMotion ? 'On' : 'Off'}
             />
           </div>
 
@@ -163,6 +219,7 @@ export default function SystemPreferencesPanel({
                 checked={Boolean(form.preferences.audioDescription)}
                 onChange={(value) => onPreferenceToggle('audioDescription', value)}
                 disabled={disableActions}
+                meta={form.preferences.audioDescription ? 'On' : 'Off'}
               />
             </div>
           </div>
@@ -179,6 +236,21 @@ export default function SystemPreferencesPanel({
         id="learner-personalisation"
         title="Personalisation"
         description="Tune recommendations, analytics consent, and sponsor visibility."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {personalisationLastSavedLabel ? (
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Saved {personalisationLastSavedLabel}
+              </span>
+            ) : null}
+            {onResetPersonalisation ? (
+              <button type="button" className="dashboard-pill" onClick={onResetPersonalisation} disabled={disableActions}>
+                Reset
+              </button>
+            ) : null}
+          </div>
+        }
+        persistenceKey="learner-personalisation"
       >
         <div className="space-y-6">
           <div>
@@ -224,6 +296,7 @@ export default function SystemPreferencesPanel({
               checked={Boolean(form.preferences.analyticsOptIn)}
               onChange={(value) => onPreferenceToggle('analyticsOptIn', value)}
               disabled={disableActions}
+              meta={form.preferences.analyticsOptIn ? 'On' : 'Off'}
             />
             <SettingsToggleField
               name="preferences.adPersonalisation"
@@ -232,6 +305,20 @@ export default function SystemPreferencesPanel({
               checked={adPersonalisationEnabled}
               onChange={onAdPersonalisationChange}
               disabled={disableActions}
+              meta={adPersonalisationEnabled ? 'On' : 'Off'}
+              supportingAction={
+                disableActions
+                  ? null
+                  : (
+                      <button
+                        type="button"
+                        className="font-semibold text-primary hover:underline"
+                        onClick={() => onAdPersonalisationChange(!adPersonalisationEnabled)}
+                      >
+                        {adPersonalisationEnabled ? 'View sponsor log' : 'Allow personalised sponsors'}
+                      </button>
+                    )
+              }
             />
             <SettingsToggleField
               name="preferences.sponsoredHighlights"
@@ -240,6 +327,7 @@ export default function SystemPreferencesPanel({
               checked={Boolean(form.preferences.sponsoredHighlights)}
               onChange={(value) => onPreferenceToggle('sponsoredHighlights', value)}
               disabled={disableActions}
+              meta={form.preferences.sponsoredHighlights ? 'On' : 'Off'}
             />
           </div>
 
@@ -317,11 +405,21 @@ SystemPreferencesPanel.propTypes = {
   onPreferenceToggle: PropTypes.func.isRequired,
   onAdPersonalisationChange: PropTypes.func.isRequired,
   disableActions: PropTypes.bool,
-  isSaving: PropTypes.bool
+  isSaving: PropTypes.bool,
+  systemLastSavedLabel: PropTypes.string,
+  personalisationLastSavedLabel: PropTypes.string,
+  onResetSystem: PropTypes.func,
+  onResetPersonalisation: PropTypes.func,
+  syncStatus: PropTypes.string
 };
 
 SystemPreferencesPanel.defaultProps = {
   recommendationPreview: undefined,
   disableActions: false,
-  isSaving: false
+  isSaving: false,
+  systemLastSavedLabel: undefined,
+  personalisationLastSavedLabel: undefined,
+  onResetSystem: undefined,
+  onResetPersonalisation: undefined,
+  syncStatus: undefined
 };

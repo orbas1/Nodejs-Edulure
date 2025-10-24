@@ -32,7 +32,7 @@ import BillingSummaryCard from '../components/billing/BillingSummaryCard.jsx';
 import ProfileIdentityEditor from '../components/profile/ProfileIdentityEditor.jsx';
 import SettingsLayout from '../components/settings/SettingsLayout.jsx';
 import SystemPreferencesPanel from '../components/settings/SystemPreferencesPanel.jsx';
-import useSystemPreferencesForm from '../hooks/useSystemPreferencesForm.js';
+import useSystemPreferencesForm, { DEFAULT_SYSTEM_FORM } from '../hooks/useSystemPreferencesForm.js';
 import useBillingPortal from '../hooks/useBillingPortal.js';
 import {
   mapFollowerItem,
@@ -707,7 +707,10 @@ export default function Profile() {
 
   const {
     form: systemPreferencesForm,
+    setForm: setSystemPreferencesForm,
     saving: systemSaving,
+    lastFetchedAt: systemPreferencesFetchedAt,
+    lastSavedAt: systemPreferencesSavedAt,
     refresh: refreshSystemPreferences,
     persist: persistSystemPreferences,
     handleInputChange: handleSystemPreferencesInputChange,
@@ -757,6 +760,42 @@ export default function Profile() {
     () => systemPendingAction || systemSaving,
     [systemPendingAction, systemSaving]
   );
+
+  const systemLayoutLastSavedAt = systemPreferencesSavedAt ?? systemPreferencesFetchedAt ?? null;
+
+  const systemLastSavedLabel = useMemo(() => {
+    if (!systemLayoutLastSavedAt) return null;
+    const resolved = systemLayoutLastSavedAt instanceof Date ? systemLayoutLastSavedAt : new Date(systemLayoutLastSavedAt);
+    if (Number.isNaN(resolved.getTime())) {
+      return null;
+    }
+    return new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      minute: '2-digit',
+      month: 'short',
+      day: 'numeric'
+    }).format(resolved);
+  }, [systemLayoutLastSavedAt]);
+
+  const handleResetSystemPreferences = useCallback(() => {
+    setSystemStatusMessage({ type: 'info', message: 'Restoring preferences from your last sync…' });
+    refreshSystemPreferences();
+  }, [refreshSystemPreferences, setSystemStatusMessage]);
+
+  const handleResetPersonalisation = useCallback(() => {
+    setSystemPreferencesForm((previous) => ({
+      ...previous,
+      preferences: {
+        ...previous.preferences,
+        analyticsOptIn: DEFAULT_SYSTEM_FORM.preferences.analyticsOptIn,
+        adPersonalisation: DEFAULT_SYSTEM_FORM.preferences.adPersonalisation,
+        sponsoredHighlights: DEFAULT_SYSTEM_FORM.preferences.sponsoredHighlights,
+        adDataUsageAcknowledged: DEFAULT_SYSTEM_FORM.preferences.adDataUsageAcknowledged,
+        recommendedTopics: [...DEFAULT_SYSTEM_FORM.preferences.recommendedTopics]
+      }
+    }));
+    setSystemStatusMessage({ type: 'info', message: 'Personalisation toggles reset. Save to apply changes.' });
+  }, [setSystemPreferencesForm, setSystemStatusMessage]);
 
   const persistSystemPreferencesAction = async () => {
     try {
@@ -1705,7 +1744,7 @@ export default function Profile() {
   const submitButtonLabel = submittingVerification ? 'Submitting…' : 'Submit for review';
 
   return (
-    <section className="bg-slate-50/70 py-16">
+    <section id="profile-top" className="bg-slate-50/70 py-16">
       <div className="mx-auto max-w-6xl space-y-10 px-6">
         <div className="overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-card">
           <div
@@ -1811,6 +1850,11 @@ export default function Profile() {
                   </button>
                 }
                 status={systemStatusBanner}
+                breadcrumbs={[
+                  { label: 'Profile', href: '#profile-top' },
+                  { label: 'Preferences' }
+                ]}
+                lastSavedAt={systemLayoutLastSavedAt}
               >
                 <SystemPreferencesPanel
                   form={systemPreferencesForm}
@@ -1825,6 +1869,11 @@ export default function Profile() {
                   onAdPersonalisationChange={handleSystemAdPersonalisationChange}
                   disableActions={disableSystemPreferences}
                   isSaving={systemPendingAction || systemSaving}
+                  systemLastSavedLabel={systemLastSavedLabel}
+                  personalisationLastSavedLabel={systemLastSavedLabel}
+                  onResetSystem={handleResetSystemPreferences}
+                  onResetPersonalisation={handleResetPersonalisation}
+                  syncStatus={systemStatusMessage?.message}
                 />
               </SettingsLayout>
             </div>

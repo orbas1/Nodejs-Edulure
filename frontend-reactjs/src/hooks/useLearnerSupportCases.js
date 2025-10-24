@@ -110,6 +110,35 @@ function normaliseBreadcrumbs(value) {
     .sort((a, b) => new Date(a.at ?? 0) - new Date(b.at ?? 0));
 }
 
+function mergeAttachments(existing = [], incoming = []) {
+  const merged = new Map();
+  [...existing, ...incoming].forEach((attachment, index) => {
+    if (!attachment) {
+      return;
+    }
+    const id = attachment.id ?? `${attachment.name ?? 'attachment'}-${index}`;
+    if (!merged.has(id)) {
+      merged.set(id, {
+        id,
+        name: attachment.name ?? attachment.filename ?? 'Attachment',
+        size: attachment.size ?? attachment.bytes ?? null,
+        url: attachment.url ?? attachment.href ?? null
+      });
+      return;
+    }
+    const current = merged.get(id);
+    merged.set(id, {
+      ...current,
+      ...attachment,
+      id,
+      name: attachment.name ?? attachment.filename ?? current.name,
+      size: attachment.size ?? attachment.bytes ?? current.size,
+      url: attachment.url ?? attachment.href ?? current.url
+    });
+  });
+  return Array.from(merged.values());
+}
+
 function normaliseMessage(message) {
   if (!message) return null;
   const createdAt = toISOString(message.createdAt ?? message.sentAt ?? new Date());
@@ -168,6 +197,34 @@ function normaliseSupportCase(caseItem) {
   );
   const metadata = safeParseJson(caseItem.metadata ?? caseItem.meta ?? {}, {});
 
+  const messagesNormalised = messagesRaw.map((message) => normaliseMessage(message)).filter(Boolean);
+  const messagesById = new Map();
+  messagesNormalised.forEach((message) => {
+    if (!messagesById.has(message.id)) {
+      messagesById.set(message.id, message);
+      return;
+    }
+    const existing = messagesById.get(message.id);
+    const existingDate = toDate(existing.createdAt);
+    const incomingDate = toDate(message.createdAt);
+    if (incomingDate && (!existingDate || incomingDate >= existingDate)) {
+      messagesById.set(message.id, {
+        ...existing,
+        ...message,
+        createdAt: toISOString(incomingDate),
+        attachments: mergeAttachments(existing.attachments, message.attachments)
+      });
+      return;
+    }
+    if (!incomingDate && !existingDate) {
+      messagesById.set(message.id, {
+        ...existing,
+        ...message,
+        attachments: mergeAttachments(existing.attachments, message.attachments)
+      });
+    }
+  });
+
   return {
     id,
     reference: caseItem.reference ?? caseItem.ref ?? null,
@@ -187,10 +244,9 @@ function normaliseSupportCase(caseItem) {
     aiSummary: caseItem.aiSummary ?? caseItem.ai_summary ?? null,
     metadata,
     tags: Array.isArray(caseItem.tags) ? caseItem.tags : [],
-    messages: messagesRaw
-      .map((message) => normaliseMessage(message))
-      .filter(Boolean)
-      .sort((a, b) => new Date(a.createdAt ?? 0) - new Date(b.createdAt ?? 0))
+    messages: Array.from(messagesById.values()).sort(
+      (a, b) => new Date(a.createdAt ?? 0) - new Date(b.createdAt ?? 0)
+    )
   };
 }
 
@@ -200,6 +256,21 @@ function enrichSupportCase(caseItem) {
   const lastLearnerMessage = [...messages].reverse().find((message) => message.author === 'learner');
   const lastSupportMessage = [...messages].reverse().find((message) => message.author !== 'learner');
   const updatedAt = toDate(caseItem.updatedAt ?? latestMessage?.createdAt ?? caseItem.createdAt);
+  const followUpDue = toDate(caseItem.followUpDueAt);
+  let slaStatus = 'none';
+  let slaMinutesRemaining = null;
+  if (followUpDue) {
+    const diffMinutes = Math.round((followUpDue.getTime() - Date.now()) / (60 * 1000));
+    slaMinutesRemaining = diffMinutes;
+    if (diffMinutes < 0) {
+      slaStatus = 'overdue';
+    } else if (diffMinutes <= 60) {
+      slaStatus = 'risk';
+    } else {
+      slaStatus = 'ok';
+    }
+  }
+  const assignmentLabel = caseItem.owner ?? caseItem.lastAgent ?? 'Learner success desk';
 
   return {
     ...caseItem,
@@ -208,7 +279,11 @@ function enrichSupportCase(caseItem) {
     lastMessageAuthor: latestMessage?.author ?? null,
     lastLearnerMessageAt: lastLearnerMessage?.createdAt ?? null,
     lastSupportMessageAt: lastSupportMessage?.createdAt ?? null,
-    updatedAtLabel: updatedAt ? DATE_FORMATTER.format(updatedAt) : 'Moments ago'
+    updatedAtLabel: updatedAt ? DATE_FORMATTER.format(updatedAt) : 'Moments ago',
+    slaStatus,
+    slaMinutesRemaining,
+    slaDueAt: followUpDue ? followUpDue.toISOString() : null,
+    assignmentLabel
   };
 }
 
