@@ -62,22 +62,52 @@ export default function SocialSignOn({ onSelect, providers }) {
 
   return (
     <div className="space-y-3">
-      {availableProviders.map((provider) => (
-        <button
-          key={provider.id}
-          type="button"
-          onClick={() => !provider.disabled && onSelect(provider.id)}
-          disabled={provider.disabled}
-          className={`flex h-12 w-full items-center justify-center gap-3 rounded-full border px-4 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring ${provider.buttonClass} ${
-            provider.disabled ? 'cursor-not-allowed opacity-60' : ''
-          }`}
-        >
-          <span className="flex h-5 w-5 items-center justify-center" aria-hidden="true">
-            {provider.icon}
-          </span>
-          <span>{provider.label}</span>
-        </button>
-      ))}
+      {availableProviders.map((provider) => {
+        const disabled = Boolean(provider.disabled);
+        const descriptionId = provider.description ? `${provider.id}-provider-description` : undefined;
+        return (
+          <button
+            key={provider.id}
+            type="button"
+            onClick={() => {
+              if (!disabled) {
+                onSelect(provider.id, provider);
+              }
+            }}
+            disabled={disabled}
+            aria-disabled={disabled}
+            data-provider={provider.id}
+            data-disabled={disabled ? 'true' : undefined}
+            aria-describedby={descriptionId}
+            title={disabled && provider.disabledReason ? provider.disabledReason : undefined}
+            className={`flex w-full items-center gap-3 rounded-full border px-4 py-3 text-left text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring ${
+              provider.buttonClass
+            } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+          >
+            <span className="flex h-10 w-10 items-center justify-center" aria-hidden="true">
+              {provider.icon}
+            </span>
+            <span className="flex flex-1 flex-col items-start">
+              <span className="flex items-center gap-2">
+                <span>{provider.label}</span>
+                {provider.badge ? (
+                  <span className="rounded-full bg-slate-900/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    {provider.badge}
+                  </span>
+                ) : null}
+              </span>
+              {provider.description ? (
+                <span id={descriptionId} className="mt-1 text-xs font-normal text-slate-500">
+                  {provider.description}
+                </span>
+              ) : null}
+              {disabled && provider.disabledReason ? (
+                <span className="mt-1 text-xs text-amber-600">{provider.disabledReason}</span>
+              ) : null}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -90,7 +120,10 @@ SocialSignOn.propTypes = {
       label: PropTypes.string.isRequired,
       buttonClass: PropTypes.string.isRequired,
       icon: PropTypes.node.isRequired,
-      disabled: PropTypes.bool
+      disabled: PropTypes.bool,
+      description: PropTypes.string,
+      badge: PropTypes.string,
+      disabledReason: PropTypes.string
     })
   )
 };

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -8,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'api_config.dart';
 import 'ebook_reader_backend.dart';
+import 'offline_learning_service.dart';
 import 'session_manager.dart';
 
 class ContentService implements EbookReaderBackend {
@@ -18,6 +20,7 @@ class ContentService implements EbookReaderBackend {
     Box<dynamic>? downloadsCache,
     Box<dynamic>? ebookProgressCache,
     Box<dynamic>? readerSettingsCache,
+    OfflineLearningService? offlineLearningService,
     Future<Directory> Function()? documentsDirectoryProvider,
   })  : _dio = client ?? ApiConfig.createHttpClient(requiresAuth: true),
         _tokenProvider = tokenProvider ?? SessionManager.getAccessToken,
@@ -25,6 +28,7 @@ class ContentService implements EbookReaderBackend {
         _downloadsCache = downloadsCache ?? SessionManager.downloadsCache,
         _ebookProgressCache = ebookProgressCache ?? SessionManager.ebookProgressCache,
         _readerSettingsCache = readerSettingsCache ?? SessionManager.readerSettingsCache,
+        _offlineLearningService = offlineLearningService ?? OfflineLearningService(),
         _documentsDirectoryProvider =
             documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 
@@ -34,6 +38,7 @@ class ContentService implements EbookReaderBackend {
   final Box<dynamic> _downloadsCache;
   final Box<dynamic> _ebookProgressCache;
   final Box<dynamic> _readerSettingsCache;
+  final OfflineLearningService _offlineLearningService;
   final Future<Directory> Function() _documentsDirectoryProvider;
 
   Future<List<ContentAsset>> fetchAssets() async {
@@ -164,9 +169,48 @@ class ContentService implements EbookReaderBackend {
     }
     final filename = asset.originalFilename;
     final filePath = '${contentDir.path}/$filename';
-    await _dio.download(token.url, filePath);
-    await _downloadsCache.put(asset.publicId, filePath);
-    return filePath;
+    final metadata = asset.customMetadata;
+    final courseId = metadata['courseId']?.toString();
+    final moduleId = metadata['moduleId']?.toString();
+    await _offlineLearningService.ensureDownloadTask(
+      assetId: asset.publicId,
+      filename: filename,
+      courseId: courseId,
+      moduleId: moduleId,
+    );
+    try {
+      await _dio.download(
+        token.url,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total <= 0) {
+            return;
+          }
+          final progress = (received / total).clamp(0, 1);
+          unawaited(
+            _offlineLearningService.markDownloadProgress(
+              assetId: asset.publicId,
+              progress: progress,
+              filename: filename,
+            ),
+          );
+        },
+      );
+      await _downloadsCache.put(asset.publicId, filePath);
+      await _offlineLearningService.markDownloadComplete(
+        assetId: asset.publicId,
+        filePath: filePath,
+        filename: filename,
+      );
+      return filePath;
+    } catch (error) {
+      await _offlineLearningService.markDownloadFailed(
+        assetId: asset.publicId,
+        errorMessage: error.toString(),
+        filename: filename,
+      );
+      rethrow;
+    }
   }
 
   Future<void> openAsset(String path) async {

@@ -1,5 +1,36 @@
 import PropTypes from 'prop-types';
 
+const RISK_TONE_CLASSES = {
+  critical: 'border-rose-200 bg-rose-50 text-rose-700',
+  high: 'border-amber-200 bg-amber-50 text-amber-700',
+  medium: 'border-amber-100 bg-amber-50 text-amber-600',
+  low: 'border-emerald-200 bg-emerald-50 text-emerald-600',
+  info: 'border-slate-200 bg-slate-100 text-slate-600'
+};
+
+function formatLaunchDate(date) {
+  if (!date) return 'Date pending';
+  const resolved = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(resolved.getTime())) {
+    return typeof date === 'string' ? date : 'Date pending';
+  }
+  return resolved.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: resolved.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+    timeZone: 'UTC'
+  });
+}
+
+function computeChecklistProgress(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { completed: 0, total: 0, percent: 0 };
+  }
+  const completed = items.filter((item) => item.completed === true).length;
+  const percent = Math.round((completed / items.length) * 100);
+  return { completed, total: items.length, percent };
+}
+
 function numberOrDash(value) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value.toLocaleString();
@@ -61,6 +92,34 @@ export default function CourseLifecyclePlanner({ lifecycles }) {
         refresherLessons: Array.isArray(course.refresherLessons) ? course.refresherLessons : [],
         recordedVideos: Array.isArray(course.recordedVideos) ? course.recordedVideos : [],
         catalogue: Array.isArray(course.catalogue) ? course.catalogue : [],
+        launch: {
+          target: course.launch?.target ?? null,
+          targetLabel: course.launch?.targetLabel ?? formatLaunchDate(course.launch?.target),
+          phase: course.launch?.phase ?? 'Planning',
+          owner: course.launch?.owner ?? 'Unassigned',
+          riskLevel: course.launch?.riskLevel ?? 'On track',
+          riskTone: course.launch?.riskTone ?? 'low',
+          activationCoverage: course.launch?.activationCoverage ?? '0% trained',
+          confidence: course.launch?.confidence ?? 0.4,
+          checklist: Array.isArray(course.launch?.checklist)
+            ? course.launch.checklist.map((item, index) => ({
+                id: item?.id ?? `${course.id}-check-${index}`,
+                label: item?.label ?? 'Checklist item',
+                completed: item?.completed === true,
+                owner: item?.owner ?? course.launch?.owner ?? 'Unassigned',
+                due: item?.due ?? null
+              }))
+            : [],
+          signals: Array.isArray(course.launch?.signals)
+            ? course.launch.signals.map((signal, index) => ({
+                id: signal?.id ?? `${course.id}-signal-${index}`,
+                label: signal?.label ?? 'Unlabelled signal',
+                severity: signal?.severity ?? 'info',
+                description: signal?.description ?? '',
+                action: signal?.action ?? null
+              }))
+            : []
+        },
         drip: {
           cadence: course.drip?.cadence ?? 'Weekly',
           anchor: course.drip?.anchor ?? 'cohort-start',
@@ -88,10 +147,40 @@ export default function CourseLifecyclePlanner({ lifecycles }) {
     );
   };
 
+  const handleChecklistIntent = (courseId, item) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('edulure:lifecycle-checklist', {
+        detail: {
+          courseId,
+          itemId: item.id,
+          completed: item.completed
+        }
+      })
+    );
+  };
+
+  const handleRiskIntent = (courseId, signal) => {
+    if (typeof window === 'undefined' || !signal?.action) return;
+    window.dispatchEvent(
+      new CustomEvent('edulure:lifecycle-risk', {
+        detail: {
+          courseId,
+          signalId: signal.id,
+          action: signal.action
+        }
+      })
+    );
+  };
+
   return (
     <section className="space-y-10">
-      {safeLifecycles.map((course) => (
-        <article key={course.id} className="dashboard-section space-y-8">
+      {safeLifecycles.map((course) => {
+        const launchProgress = computeChecklistProgress(course.launch.checklist);
+        const riskTone = RISK_TONE_CLASSES[course.launch.riskTone] ?? RISK_TONE_CLASSES.low;
+        const confidencePercent = Math.round(Math.max(0, Math.min(1, Number(course.launch.confidence ?? 0))) * 100);
+        return (
+          <article key={course.id} className="dashboard-section space-y-8">
           <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="dashboard-kicker">Lifecycle orchestration</p>
@@ -112,8 +201,70 @@ export default function CourseLifecyclePlanner({ lifecycles }) {
             </div>
           </header>
 
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Target launch</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">{course.launch.targetLabel}</p>
+              <p className="mt-2 text-xs text-slate-500">Phase · {course.launch.phase}</p>
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Launch owner</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">{course.launch.owner}</p>
+              <p className="mt-2 text-xs text-slate-500">Activation coverage · {course.launch.activationCoverage}</p>
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Confidence</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">{confidencePercent}%</p>
+              <p className="mt-2 text-xs text-slate-500">Based on checklist completion and readiness signals</p>
+            </div>
+            <div className={`rounded-3xl border p-4 shadow-sm ${riskTone}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide">Risk posture</p>
+              <p className="mt-1 text-lg font-semibold">{course.launch.riskLevel}</p>
+              <p className="mt-2 text-xs opacity-80">Signals below flag blockers or follow-ups.</p>
+            </div>
+          </div>
+
           <div className="grid gap-6 xl:grid-cols-[minmax(0,_3fr)_minmax(0,_2fr)]">
             <div className="space-y-6">
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <SectionHeader
+                  kicker="Launch readiness"
+                  title="Operational checklist"
+                  helper={`Completed ${launchProgress.completed} of ${launchProgress.total} · ${launchProgress.percent}% confidence`}
+                />
+                {course.launch.checklist.length ? (
+                  <ul className="mt-5 space-y-3">
+                    {course.launch.checklist.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                          <p className="text-xs text-slate-500">
+                            Owner · <span className="font-medium text-slate-700">{item.owner}</span>
+                            {item.due ? ` · Due ${formatLaunchDate(item.due)}` : ''}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleChecklistIntent(course.id, item)}
+                          className={`dashboard-pill px-3 py-1 text-xs font-semibold ${
+                            item.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-slate-600'
+                          }`}
+                        >
+                          {item.completed ? 'Complete' : 'Track'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    No launch checklist items logged yet. Add review gates and comms tasks to drive confidence.
+                  </p>
+                )}
+              </section>
+
               <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <SectionHeader
                   kicker="Drip automation"
@@ -252,6 +403,44 @@ export default function CourseLifecyclePlanner({ lifecycles }) {
             <div className="space-y-6">
               <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <SectionHeader
+                  kicker="Launch signals"
+                  title="Risk & escalation log"
+                  helper="Highlight blockers, pending approvals, and owner follow-ups"
+                />
+                {course.launch.signals.length ? (
+                  <ul className="mt-5 space-y-3">
+                    {course.launch.signals.map((signal) => {
+                      const tone = RISK_TONE_CLASSES[signal.severity] ?? RISK_TONE_CLASSES.info;
+                      return (
+                        <li key={signal.id} className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${tone}`}>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <p className="font-semibold">{signal.label}</p>
+                            {signal.action ? (
+                              <button
+                                type="button"
+                                onClick={() => handleRiskIntent(course.id, signal)}
+                                className="rounded-full border border-white/60 bg-white/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:bg-white"
+                              >
+                                Follow up
+                              </button>
+                            ) : null}
+                          </div>
+                          {signal.description ? (
+                            <p className="mt-2 text-xs opacity-80">{signal.description}</p>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    No risks flagged. Keep syncing compliance, marketing, and success teams to maintain on-track status.
+                  </p>
+                )}
+              </section>
+
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <SectionHeader
                   kicker="Refresher cadences"
                   title="Retention clinics"
                   helper="Protect mastery with scheduled refresh sessions"
@@ -358,7 +547,8 @@ export default function CourseLifecyclePlanner({ lifecycles }) {
             </div>
           </div>
         </article>
-      ))}
+        );
+      })}
     </section>
   );
 }
@@ -370,6 +560,34 @@ CourseLifecyclePlanner.propTypes = {
       courseTitle: PropTypes.string.isRequired,
       stage: PropTypes.string,
       reviewSummary: PropTypes.string,
+      launch: PropTypes.shape({
+        target: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+        targetLabel: PropTypes.string,
+        phase: PropTypes.string,
+        owner: PropTypes.string,
+        riskLevel: PropTypes.string,
+        riskTone: PropTypes.string,
+        activationCoverage: PropTypes.string,
+        confidence: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+        checklist: PropTypes.arrayOf(
+          PropTypes.shape({
+            id: PropTypes.string.isRequired,
+            label: PropTypes.string,
+            completed: PropTypes.bool,
+            owner: PropTypes.string,
+            due: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)])
+          })
+        ),
+        signals: PropTypes.arrayOf(
+          PropTypes.shape({
+            id: PropTypes.string.isRequired,
+            label: PropTypes.string,
+            severity: PropTypes.string,
+            description: PropTypes.string,
+            action: PropTypes.string
+          })
+        )
+      }),
       mobile: PropTypes.shape({
         status: PropTypes.string,
         experiences: PropTypes.arrayOf(PropTypes.string)

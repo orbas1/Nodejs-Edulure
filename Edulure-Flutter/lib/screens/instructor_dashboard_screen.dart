@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/course_service.dart';
 import '../services/dashboard_service.dart';
+import '../services/instructor_operations_service.dart';
 import '../services/session_manager.dart';
 
 class InstructorDashboardScreen extends StatefulWidget {
@@ -11,11 +14,35 @@ class InstructorDashboardScreen extends StatefulWidget {
   State<InstructorDashboardScreen> createState() => _InstructorDashboardScreenState();
 }
 
+class _QuickActionField {
+  const _QuickActionField(
+    this.key,
+    this.label, {
+    this.initialValue,
+    this.required = false,
+    this.keyboardType,
+    this.maxLines,
+  });
+
+  final String key;
+  final String label;
+  final String? initialValue;
+  final bool required;
+  final TextInputType? keyboardType;
+  final int? maxLines;
+}
+
 class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
   final CourseService _service = CourseService();
+  final InstructorOperationsService _operationsService = InstructorOperationsService();
   CourseDashboard? _dashboard;
   bool _loading = true;
   String? _error;
+  List<InstructorQuickAction> _quickActions = const [];
+  List<QueuedInstructorAction> _queuedActions = const [];
+  StreamSubscription<QueuedInstructorAction>? _queueSubscription;
+  bool _syncingActions = false;
+  bool _submittingAction = false;
 
   Map<String, dynamic>? get _session => SessionManager.getSession();
 
@@ -490,6 +517,368 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
   void initState() {
     super.initState();
     _load();
+    _initialiseOperations();
+  }
+
+  @override
+  void dispose() {
+    _queueSubscription?.cancel();
+    unawaited(_operationsService.dispose());
+    super.dispose();
+  }
+
+  Future<void> _initialiseOperations() async {
+    _quickActions = _operationsService.listQuickActions();
+    await _hydrateActionQueue();
+    _queueSubscription = _operationsService.queueStream.listen((_) async {
+      await _hydrateActionQueue();
+    });
+  }
+
+  Future<void> _hydrateActionQueue() async {
+    final queue = await _operationsService.loadQueuedActions();
+    if (!mounted) return;
+    setState(() {
+      _queuedActions = queue;
+    });
+  }
+
+  Future<void> _handleQuickAction(InstructorQuickAction action) async {
+    final payload = await _showQuickActionSheet(action);
+    if (payload == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _submittingAction = true;
+    });
+    final outcome = await _operationsService.runQuickAction(action, payload);
+    await _hydrateActionQueue();
+    if (!mounted) return;
+    setState(() {
+      _submittingAction = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(outcome.message)),
+    );
+  }
+
+  Future<void> _syncQueuedActions() async {
+    setState(() {
+      _syncingActions = true;
+    });
+    await _operationsService.syncQueuedActions();
+    await _hydrateActionQueue();
+    if (!mounted) return;
+    setState(() {
+      _syncingActions = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Instructor actions synced.')),
+    );
+  }
+
+  Future<Map<String, dynamic>?> _showQuickActionSheet(InstructorQuickAction action) async {
+    switch (action.type) {
+      case InstructorQuickActionType.announcement:
+        return _presentActionForm(
+          title: 'Send announcement',
+          fields: [
+            _QuickActionField('title', 'Title', required: true),
+            _QuickActionField('audience', 'Audience', initialValue: 'All learners'),
+            _QuickActionField('message', 'Message', required: true, maxLines: 4),
+          ],
+        );
+      case InstructorQuickActionType.attendance:
+        final values = await _presentActionForm(
+          title: 'Record attendance',
+          fields: [
+            _QuickActionField('session', 'Session name', required: true),
+            _QuickActionField('attendees', 'Attendees count', required: true, keyboardType: TextInputType.number),
+            _QuickActionField('notes', 'Notes', maxLines: 3),
+          ],
+        );
+        if (values == null) return null;
+        final attendees = int.tryParse(values['attendees'] ?? '0') ?? 0;
+        return {
+          'session': values['session'],
+          'attendees': attendees,
+          'notes': values['notes'] ?? '',
+        };
+      case InstructorQuickActionType.grading:
+        return _presentActionForm(
+          title: 'Approve grades',
+          fields: [
+            _QuickActionField('assessment', 'Assessment ID', required: true),
+            _QuickActionField('status', 'Status', initialValue: 'approved', required: true),
+            _QuickActionField('notes', 'Notes', maxLines: 3),
+          ],
+        );
+      case InstructorQuickActionType.schedule:
+        return _presentActionForm(
+          title: 'Reschedule session',
+          fields: [
+            _QuickActionField('session', 'Session ID', required: true),
+            _QuickActionField('newTime', 'Requested time', required: true),
+            _QuickActionField('reason', 'Reason', maxLines: 3),
+          ],
+        );
+      case InstructorQuickActionType.note:
+        return _presentActionForm(
+          title: 'Add field note',
+          fields: [
+            _QuickActionField('learner', 'Learner or cohort'),
+            _QuickActionField('note', 'Coaching note', required: true, maxLines: 4),
+          ],
+        );
+    }
+  }
+
+  Future<Map<String, dynamic>?> _presentActionForm({
+    required String title,
+    required List<_QuickActionField> fields,
+  }) async {
+    final formKey = GlobalKey<FormState>();
+    final controllers = <String, TextEditingController>{
+      for (final field in fields)
+        field.key: TextEditingController(text: field.initialValue ?? ''),
+    };
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                for (final field in fields) ...[
+                  TextFormField(
+                    controller: controllers[field.key],
+                    decoration: InputDecoration(labelText: field.label),
+                    keyboardType: field.keyboardType,
+                    maxLines: field.maxLines,
+                    validator: field.required
+                        ? (value) => value == null || value.trim().isEmpty ? 'Required field' : null
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                    const SizedBox(width: 12),
+                    FilledButton(
+                      onPressed: () {
+                        if (formKey.currentState?.validate() ?? false) {
+                          Navigator.pop<Map<String, dynamic>>(context, {
+                            for (final entry in controllers.entries) entry.key: entry.value.text.trim(),
+                          });
+                        }
+                      },
+                      child: const Text('Save'),
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+    return result;
+  }
+
+  String _formatRelativeTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    if (difference.inMinutes < 1) {
+      return 'just now';
+    }
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} min ago';
+    }
+    if (difference.inHours < 24) {
+      return '${difference.inHours} h ago';
+    }
+    return '${difference.inDays} d ago';
+  }
+
+  Widget _buildQuickActionsSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final pending = _queuedActions.where((action) => action.state == InstructorActionState.queued || action.state == InstructorActionState.processing).length;
+    final failed = _queuedActions.where((action) => action.state == InstructorActionState.failed).length;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 0,
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Instructor quick actions', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Queue announcements, attendance, and schedule changes while offline.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+                    ),
+                  ],
+                ),
+                OutlinedButton.icon(
+                  onPressed: _syncingActions || _queuedActions.isEmpty ? null : _syncQueuedActions,
+                  icon: _syncingActions
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.sync),
+                  label: Text(_syncingActions ? 'Syncing…' : 'Sync queue'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: _quickActions
+                  .map(
+                    (action) => FilledButton.tonalIcon(
+                      onPressed: _submittingAction ? null : () => _handleQuickAction(action),
+                      icon: Icon(_resolveIcon(action.icon)),
+                      label: Text(action.label),
+                    ),
+                  )
+                  .toList(),
+            ),
+            if (_submittingAction) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: const [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 8),
+                  Text('Submitting action…'),
+                ],
+              ),
+            ],
+            if (_queuedActions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                pending > 0
+                    ? '$pending action(s) pending in queue'
+                    : 'Queue is ready • all actions synced',
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+              ),
+              if (failed > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('$failed action(s) require attention', style: theme.textTheme.bodySmall?.copyWith(color: Colors.red.shade600)),
+                ),
+              const SizedBox(height: 12),
+              ..._queuedActions.map((action) {
+                final color = () {
+                  switch (action.state) {
+                    case InstructorActionState.completed:
+                      return Colors.green.shade600;
+                    case InstructorActionState.failed:
+                      return Colors.red.shade600;
+                    case InstructorActionState.processing:
+                      return Colors.amber.shade700;
+                    case InstructorActionState.queued:
+                    default:
+                      return Colors.blueGrey.shade700;
+                  }
+                }();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.blueGrey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(action.type.name.toUpperCase(), style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700)),
+                          Text(action.state.name.toUpperCase(), style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                      if ((action.payload['session'] as String?)?.isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('Session: ${action.payload['session']}', style: theme.textTheme.bodySmall),
+                        ),
+                      if ((action.payload['assessment'] as String?)?.isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('Assessment: ${action.payload['assessment']}', style: theme.textTheme.bodySmall),
+                        ),
+                      if ((action.payload['title'] as String?)?.isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(action.payload['title'] as String, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                        ),
+                      if ((action.payload['notes'] as String?)?.isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(action.payload['notes'] as String, style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade700)),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text('Queued ${_formatRelativeTime(action.queuedAt)}', style: theme.textTheme.labelSmall?.copyWith(color: Colors.blueGrey.shade600)),
+                      ),
+                      if (action.errorMessage != null && action.errorMessage!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(action.errorMessage!, style: theme.textTheme.bodySmall?.copyWith(color: Colors.red.shade600)),
+                        ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _resolveIcon(String materialName) {
+    switch (materialName) {
+      case 'campaign':
+        return Icons.campaign_outlined;
+      case 'assignment_turned_in':
+        return Icons.assignment_turned_in_outlined;
+      case 'grading':
+        return Icons.grading_outlined;
+      case 'event_repeat':
+        return Icons.event_repeat_outlined;
+      case 'note_add':
+        return Icons.note_add_outlined;
+      default:
+        return Icons.flash_on_outlined;
+    }
   }
 
   Future<void> _load() async {
@@ -609,6 +998,8 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                             ),
                           _buildHeroCard(context),
                           const SizedBox(height: 20),
+                          _buildQuickActionsSection(context),
+                          const SizedBox(height: 20),
                           _buildServiceSuiteBanner(context),
                           const SizedBox(height: 20),
                           _buildMetricHighlights(context),
@@ -646,6 +1037,8 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                             ),
                           ),
                         _buildHeroCard(context),
+                        const SizedBox(height: 20),
+                        _buildQuickActionsSection(context),
                         const SizedBox(height: 20),
                         _buildServiceSuiteBanner(context),
                         const SizedBox(height: 20),

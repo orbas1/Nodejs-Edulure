@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { describeClusterLabel, normaliseClusterKey } from '../utils/learningClusters.js';
 
 const TABLE = 'search_documents';
 
@@ -13,6 +14,7 @@ const BASE_COLUMNS = [
   'description',
   'thumbnail_url as thumbnailUrl',
   'keywords',
+  'cluster_key as clusterKey',
   'metadata',
   'category',
   'level',
@@ -439,6 +441,18 @@ function deserialize(row) {
     return null;
   }
   const metadata = parseJson(row.metadata, {});
+  const clusterKey = normaliseClusterKey(
+    row.clusterKey ?? metadata.clusterKey ?? metadata.cluster?.key ?? metadata.cluster ?? null
+  );
+  const clusterLabel = describeClusterLabel(clusterKey);
+  metadata.clusterKey = clusterKey;
+  metadata.cluster =
+    metadata.cluster && typeof metadata.cluster === 'object'
+      ? {
+          key: metadata.cluster.key ?? clusterKey,
+          label: metadata.cluster.label ?? clusterLabel
+        }
+      : { key: clusterKey, label: clusterLabel };
   return {
     id: row.id,
     entityType: row.entityType,
@@ -451,6 +465,7 @@ function deserialize(row) {
     thumbnailUrl: row.thumbnailUrl ?? null,
     keywords: parseJsonArray(row.keywords, []),
     metadata,
+    clusterKey,
     category: row.category ?? null,
     level: row.level ?? null,
     country: row.country ?? null,

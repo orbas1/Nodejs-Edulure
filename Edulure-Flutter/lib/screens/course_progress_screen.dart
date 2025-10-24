@@ -245,22 +245,18 @@ class _ProgressLogFormSheetState extends ConsumerState<_ProgressLogFormSheet> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || _selectedCourse == null || _selectedModule == null) return;
-    final notifier = ref.read(progressStoreProvider.notifier);
-    final log = notifier.buildLogFromForm(
-      courseId: _selectedCourse!.id,
-      moduleId: _selectedModule!.id,
-      timestamp: _timestamp,
-      notes: _notesController.text.trim(),
-      completedLessons: int.tryParse(_lessonsController.text) ?? 0,
-    );
-    notifier.recordProgress(log);
-    ref.read(courseStoreProvider.notifier).updateModuleProgress(
+    final completed = int.tryParse(_lessonsController.text) ?? 0;
+    final note = _notesController.text.trim();
+    await ref.read(learningProgressControllerProvider).updateModuleProgress(
           courseId: _selectedCourse!.id,
           moduleId: _selectedModule!.id,
-          completedLessons: int.tryParse(_lessonsController.text) ?? 0,
+          completedLessons: completed,
+          note: note.isEmpty ? null : note,
+          timestamp: _timestamp,
         );
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Progress recorded for ${_selectedCourse!.title}')),

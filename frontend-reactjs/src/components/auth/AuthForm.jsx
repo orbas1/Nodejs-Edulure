@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
@@ -11,7 +12,11 @@ function PasswordChecklist({ requirements, description }) {
     return null;
   }
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-600">
+    <div
+      className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-600"
+      role="status"
+      aria-live="polite"
+    >
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Password requirements</p>
       <p className="mt-1 text-xs text-slate-500">{description}</p>
       <ul className="mt-3 space-y-2">
@@ -103,28 +108,60 @@ export default function AuthForm({
 }) {
   const progressValue = typeof progress?.progress === 'number' ? Math.min(Math.max(progress.progress, 0), 1) : null;
   const progressLabel = progress?.label ?? null;
+  const progressPercent = progressValue !== null ? Math.round(progressValue * 100) : null;
+  const formInstanceId = useId();
+  const errorId = error ? `${formInstanceId}-error` : undefined;
+  const successId = success ? `${formInstanceId}-success` : undefined;
+  const progressLabelId = progressValue !== null ? `${formInstanceId}-progress-label` : undefined;
+  const progressDescriptionId = progressLabel ? `${formInstanceId}-progress-description` : undefined;
 
   return (
     <AuthCard title={title} subtitle={subtitle} highlights={highlights} badge={badge} supportEmail={supportEmail} footnote={footnote}>
       <div className="space-y-6">
         {progressValue !== null ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="space-y-2" aria-live="polite">
+            <div className="flex items-center justify-between text-xs text-slate-500" id={progressLabelId}>
               <span className="font-semibold uppercase tracking-wide">Onboarding progress</span>
-              <span>{Math.round(progressValue * 100)}%</span>
+              <span aria-hidden="true">{progressPercent}%</span>
             </div>
-            <div className="h-2 w-full rounded-full bg-slate-200">
+            <div
+              className="h-2 w-full rounded-full bg-slate-200"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPercent ?? 0}
+              aria-labelledby={progressLabelId}
+              aria-describedby={progressDescriptionId}
+            >
               <div
                 className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${Math.max(4, progressValue * 100)}%` }}
+                style={{ width: `${Math.max(4, progressPercent ?? 0)}%` }}
               />
             </div>
-            {progressLabel ? <p className="text-xs text-slate-500">{progressLabel}</p> : null}
+            {progressLabel ? (
+              <p id={progressDescriptionId} className="text-xs text-slate-500">
+                {progressLabel}
+              </p>
+            ) : null}
           </div>
         ) : null}
-        <form className="space-y-6" onSubmit={onSubmit} data-analytics-id={analyticsId} noValidate>
-          {error ? <p className="form-banner form-banner--error">{error}</p> : null}
-          {success ? <p className="form-banner form-banner--success">{success}</p> : null}
+        <form
+          className="space-y-6"
+          onSubmit={onSubmit}
+          data-analytics-id={analyticsId}
+          noValidate
+          aria-describedby={[errorId, successId].filter(Boolean).join(' ') || undefined}
+        >
+          {error ? (
+            <p id={errorId} className="form-banner form-banner--error" role="alert" aria-live="assertive">
+              {error}
+            </p>
+          ) : null}
+          {success ? (
+            <p id={successId} className="form-banner form-banner--success" role="status" aria-live="polite">
+              {success}
+            </p>
+          ) : null}
           <div className="space-y-6">{children}</div>
           {passwordChecklist ? (
             <PasswordChecklist

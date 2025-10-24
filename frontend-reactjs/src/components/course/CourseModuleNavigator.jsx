@@ -54,6 +54,7 @@ function LessonPreview({ lesson, onSelect, isActive }) {
       onClick={() => onSelect?.(lesson)}
       className={baseClasses.join(' ')}
       aria-current={isActive ? 'true' : undefined}
+      data-lesson-id={lesson.id}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {thumbnailUrl ? (
@@ -104,8 +105,9 @@ function ModuleCard({ module, maxPreviewLessons, onLessonSelect, index, activeLe
       ? module.position
       : module.position + 1
     : index + 1;
+  const risks = Array.isArray(module.risks) ? module.risks.filter(Boolean) : [];
   return (
-    <div className="dashboard-card-muted space-y-4 p-5">
+    <div className="dashboard-card-muted space-y-4 p-5" data-module-id={module.id ?? moduleNumber}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="dashboard-kicker">Module {moduleNumber}</p>
@@ -132,6 +134,19 @@ function ModuleCard({ module, maxPreviewLessons, onLessonSelect, index, activeLe
           <p className="text-xs font-semibold text-emerald-600">Module complete</p>
         )}
       </div>
+      {risks.length ? (
+        <ul className="space-y-1 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+          {risks.slice(0, 3).map((risk) => (
+            <li key={`${module.id ?? moduleNumber}-risk-${risk}`} className="flex items-start gap-2">
+              <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-amber-500" />
+              <span>{risk}</span>
+            </li>
+          ))}
+          {risks.length > 3 ? (
+            <li className="text-amber-600/80">+{risks.length - 3} additional risks logged</li>
+          ) : null}
+        </ul>
+      ) : null}
       <div className="space-y-2">
         {previewLessons.map((lesson) => (
           <LessonPreview
@@ -164,7 +179,8 @@ ModuleCard.propTypes = {
       status: PropTypes.string,
       completed: PropTypes.bool
     }),
-    lessons: PropTypes.arrayOf(PropTypes.object)
+    lessons: PropTypes.arrayOf(PropTypes.object),
+    risks: PropTypes.arrayOf(PropTypes.string)
   }).isRequired,
   maxPreviewLessons: PropTypes.number,
   onLessonSelect: PropTypes.func,

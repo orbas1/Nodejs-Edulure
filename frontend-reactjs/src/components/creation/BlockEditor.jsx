@@ -379,6 +379,26 @@ function renderEditor({ block, onChange, readOnly }) {
 
 export default function BlockEditor({ value, onChange, readOnly }) {
   const blocks = useMemo(() => normaliseBlocks(value), [value]);
+  const statistics = useMemo(() => {
+    let wordCount = 0;
+    blocks.forEach((block) => {
+      if (block.type === 'list' && Array.isArray(block.data?.items)) {
+        block.data.items.forEach((item) => {
+          if (typeof item === 'string') {
+            wordCount += item.trim().split(/\s+/).filter(Boolean).length;
+          }
+        });
+      } else if (typeof block.data?.text === 'string') {
+        wordCount += block.data.text.trim().split(/\s+/).filter(Boolean).length;
+      } else if (typeof block.data === 'string') {
+        wordCount += block.data.trim().split(/\s+/).filter(Boolean).length;
+      }
+    });
+    return {
+      blockCount: blocks.length,
+      wordCount
+    };
+  }, [blocks]);
 
   const handleCommit = useCallback(
     (nextBlocks) => {
@@ -479,6 +499,13 @@ export default function BlockEditor({ value, onChange, readOnly }) {
       ) : (
         <ol className="space-y-4">{blocks.map((block, index) => renderBlock(block, index))}</ol>
       )}
+      <footer className="flex flex-wrap items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+        <span className="font-semibold text-slate-900">{statistics.blockCount} block{statistics.blockCount === 1 ? '' : 's'}</span>
+        <span className="text-slate-400">·</span>
+        <span>{statistics.wordCount} words</span>
+        <span className="text-slate-400">·</span>
+        <span>{readOnly ? 'Read-only mode' : 'Editing enabled'}</span>
+      </footer>
     </div>
   );
 }

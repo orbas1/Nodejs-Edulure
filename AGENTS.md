@@ -58,8 +58,40 @@
       - 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
       - 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
       - 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
-      - 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
-      - 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`)
+      - ✓ 3.C Lessons, Assessments & Offline Learning (`Edulure-Flutter/lib/services/offline_learning_service.dart`, `Edulure-Flutter/lib/services/content_service.dart`, `Edulure-Flutter/lib/provider/learning/learning_store.dart`, `Edulure-Flutter/lib/screens/content_library_screen.dart`, `Edulure-Flutter/lib/screens/assessments_screen.dart`)
+        1. **Appraisal.** `OfflineLearningService` now centralises download progress, assessment queues, and module snapshots, driving `LearningProgressController` so lessons, assessments, and analytics share one state engine.
+        2. **Functionality.** `ContentService.downloadAsset` streams progress updates into the offline service, shows live progress in `ContentLibraryScreen`, throttles analytics, and `AssessmentsScreen` introduces an offline submission card with queue visibility, sync controls, and form capture.
+        3. **Logic Usefulness.** Stream broadcasts from the offline service update UI, Hive, and analytics simultaneously, while controller-driven progress updates guarantee consistency across modules, logs, and cached snapshots.
+        4. **Redundancies.** Manual progress writes in screens/controllers were replaced by `LearningProgressController`, eliminating duplicate persistence logic and aligning with Hive hydration.
+        5. **Integration Depth.** Assessment sync now hits `/mobile/learning/downloads|assessments|modules/snapshots` with Dio, updating Hive after the API acknowledges state changes so Annex B6 data stays consistent across devices and seeded tables.
+        6. **Duplicate Functions.** Download state, analytics throttling, and progress snapshots moved out of widgets into `OfflineLearningService`, removing bespoke Hive writes and timers.
+        7. **Improvements Needed.** Expand retry UX for failed downloads, surface rubric asset metadata once exposed by the API, and add background throttling so remote refreshes don’t overwhelm `/mobile/learning/offline`.
+        8. **Styling.** Offline banners, progress bars, and failure panels reuse instructor tokens, hit contrast requirements, and offer responsive padding for phones/tablets.
+        9. **Efficiency.** Progress callbacks are throttled (350 ms), analytics pings rate-limited, and Hive lookups cached so queue updates don’t spam disk or logs.
+        10. **Strengths to Keep.** Automatic module snapshotting, shared analytics hooks, and transparent queue summaries keep offline flows observable and reliable.
+        11. **Weaknesses to Remove.** Rubric messaging still references TODOs; replace with live rubric review once backend manifests land.
+        12. **Colour Review.** Ensure orange (rubric), red (failure), and blue-grey (queued) states pass AA contrast and match Annex B6 palette guidance.
+        13. **Layout.** Offline status components respect safe areas, wrap gracefully, and avoid layout jumps as queue sizes change across orientations.
+        14. **Text.** Copy keeps instructions under 110 characters, explains next steps (“stay online”, “retry once connected”), and avoids jargon.
+        15. **Checklist.** QA must validate Hive hydration, throttled analytics, offline submission capture, and module snapshot replication across devices.
+        16. **Release Plan.** Ship behind a feature flag, run migration `20250402120000_mobile_offline_learning.js`, seed Annex data, rehearse `/mobile/learning/*` sync flows in staging, update Annex A28/B6 docs, and monitor queue failure telemetry post-launch.
+      - ✓ 3.D Instructor Quick Actions & Operations (`Edulure-Flutter/lib/services/instructor_operations_service.dart`, `Edulure-Flutter/lib/screens/instructor_dashboard_screen.dart`, `Edulure-Flutter/lib/services/session_manager.dart`)
+        1. **Appraisal.** `InstructorOperationsService` delivers a Hive-backed queue powering new quick actions in `InstructorDashboardScreen`, aligning Annex A29/C4 with offline-friendly operations.
+        2. **Functionality.** Contextual sheets capture announcements, attendance, grading, schedule changes, and notes, persist them to `instructor_action_queue`, and attempt immediate sync while the queue card surfaces status, counts, and manual sync.
+        3. **Logic Usefulness.** Queue streams keep the dashboard reactive while Dio-backed POST/PATCH/DELETE calls mirror queue→processing→completed/failed transitions against `/mobile/instructor/actions`, keeping Hive and the API aligned.
+        4. **Redundancies.** Quick action config, Hive access, and button definitions are centralised—no more duplicated payload assembly across widgets.
+        5. **Integration Depth.** Remote sync now relies on the mobile instructor endpoints, propagating backend validation errors into Hive so instructors can retry or amend payloads without losing offline capture.
+        6. **Duplicate Functions.** Icons and labels stem from a single `_actions` list, preventing divergence between buttons, notifications, and future surfaces.
+        7. **Improvements Needed.** Add retry controls for failed actions, persist audit metadata, and emit telemetry for instructor action throughput.
+        8. **Styling.** Buttons reuse tonal/filled variants, queue cards follow dashboard spacing tokens, and status colours map to accessible palette guidance.
+        9. **Efficiency.** Queue hydration reuses cached Hive boxes and stream updates, avoiding redundant reads while keeping UI instant.
+        10. **Strengths to Keep.** Offline capture, transparent queue states, and modular service architecture keep instructor workflows resilient and testable.
+        11. **Weaknesses to Remove.** Feedback currently relies on snackbars—introduce persistent logs or history once backend sync ships.
+        12. **Colour Review.** Ensure amber “processing” badges and red failure chips meet AA contrast and align with instructor palette tokens.
+        13. **Layout.** Quick action wraps remain responsive, queue cards stretch full width, and padding respects the dashboard’s 8px rhythm.
+        14. **Text.** Labels stay under 30 characters, statuses use plain language (“Queued”, “Synced”), and snackbar copy summarises outcome clearly.
+        15. **Checklist.** Regression tests should cover queue hydration, sync success/failure paths, stream disposal, and instructor banner visibility.
+        16. **Release Plan.** Gate behind feature flags, ensure migrations/seeds have run, validate `/mobile/instructor/actions` flows in staging, add telemetry dashboards, brief enablement teams, and launch once sync reliability meets Annex targets.
       - ✅ 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)
       - ✅ 3.F Notifications, Messaging & Support (`lib/features/notifications/`, `lib/features/support/`, `lib/services/push_service.dart`, `lib/services/inbox_service.dart`)
       - ✓ 4.A Community Reminder Job (`communityReminderJob.js`)
@@ -151,8 +183,48 @@
       - A25. Shared Layout, Theming & Component Infrastructure (2.J)
       - A26. Flutter Authentication & Identity (3.A)
       - A27. Flutter Community Feed & Engagement (3.B)
-      - A28. Flutter Lessons, Assessments & Offline Learning (3.C)
-      - A29. Flutter Instructor Quick Actions & Operations (3.D)
+      - ✓ A28. Flutter Lessons, Assessments & Offline Learning (3.C)
+         - A28.1 Edulure-Flutter/lib/services/offline_learning_service.dart
+            1. **Singleton coordination.** Factory constructors reuse a shared instance unless custom Hive boxes are injected, guaranteeing all download, assessment, and progress flows operate on a unified cache backed by `SessionManager.learningDownloadQueue`, `assessmentOutbox`, and `learningProgressSnapshots`.
+            2. **Deterministic queue keys.** `_downloadKey`, `_assessmentKey`, and `_progressKey` normalise identifiers per asset/module so repeated requests update a single record instead of duplicating Hive entries, aligning with Annex A28’s deduplication mandate.
+            3. **Download lifecycle helpers.** `ensureDownloadTask`, `markDownloadProgress`, `markDownloadComplete`, and `markDownloadFailed` stitch together the queued → in-progress → completed/failed pipeline while emitting broadcast updates that drive UI widgets and analytics throttling.
+            4. **Progress throttling.** `_shouldEmitProgress` enforces a 350 ms window before emitting another stream event, keeping Flutter rebuilds predictable during large downloads and satisfying Annex B6’s “avoid jitter” guidance.
+            5. **Assessment outbox.** `queueAssessmentSubmission` and `updateAssessmentSubmission` store offline payloads with optimistic state transitions, while `syncAssessmentQueue` upgrades records to `syncing`, calls the provided uploader, and reacts to both thrown errors and rejected uploads with actionable failure metadata.
+            6. **Module snapshots.** `recordModuleProgressSnapshot` persists completion ratios and notes for every course/module pair, complementing the Hive-backed history surfaced in dashboards and enabling Annex B6 analytics to reload device progress after restarts.
+            7. **Analytics cadence.** `shouldEmitDownloadAnalytics` caches the last event timestamp per asset so `ContentLibraryScreen` only pings remote analytics once every 30 minutes, preventing telemetry flood during offline retries.
+            8. **Maintenance hooks.** Reset helpers (`resetDownloads`, `resetAssessments`) and `dispose` close broadcast controllers, equipping QA and logout flows with cleanup tools outlined in Annex A28.
+         - A28.2 Edulure-Flutter/lib/services/content_service.dart
+            1. **Offline task priming.** `downloadAsset` resolves storage paths, calls `OfflineLearningService.ensureDownloadTask`, and streams Dio progress into `markDownloadProgress` so UI listeners see real-time percentages.
+            2. **Completion + failure handling.** Successful downloads persist file paths in Hive and notify the offline service; exceptions surface user-friendly errors while logging failure state so Annex B6 queue cards expose retry context.
+            3. **Cache symmetry.** Helper loaders (`loadCachedAssets`, `loadCachedDownloads`, `loadCachedEbookProgress`) normalise session state so offline experiences match previously fetched data even without connectivity.
+         - A28.3 Edulure-Flutter/lib/provider/learning/learning_store.dart
+            1. **Controller wiring.** `learningProgressControllerProvider` injects `OfflineLearningService`, enabling `LearningProgressController.updateModuleProgress` to synchronise course progress updates with Hive snapshots.
+            2. **Snapshot persistence.** After clamping completed lessons and writing local logs, the controller invokes `recordModuleProgressSnapshot`, ensuring Annex B6 completion metrics are cached for analytics and offline dashboards.
+         - A28.4 Edulure-Flutter/lib/screens/content_library_screen.dart
+            1. **Stream hydration.** `_setupOfflineListeners` subscribes to the offline download stream, backfills existing tasks, and keeps `_downloadStatuses` in sync for queue banners.
+            2. **Analytics gating.** During download and open actions, the screen checks `shouldEmitDownloadAnalytics` before calling remote event endpoints, implementing Annex A28’s telemetry throttling.
+            3. **Offline status UI.** `_buildOfflineStatusWidgets` renders queued, in-progress, completed, and failed states with palette-compliant badges and TODO messaging for rubric sync, matching Annex B6 copy guidelines.
+            4. **Access controls.** Role checks hide instructor-only content while still showing offline queue hints, and the screen hydrates cached assets so learners retain progress when offline.
+         - A28.5 Edulure-Flutter/lib/screens/assessments_screen.dart
+            1. **Queue awareness.** `_hydrateOfflineSubmissions` and the assessment stream subscription keep the offline queue list current, enabling accurate pending/failed counts.
+            2. **Offline capture form.** The “Log offline submission” flow records assessment metadata, attachments, and notes into `OfflineLearningService.queueAssessmentSubmission`, preserving evidence Annex B6 requires before sync.
+            3. **Sync retries.** `_syncOfflineSubmissions` delegates to `syncAssessmentQueue`, surfaces spinner state, and translates uploader outcomes into snackbars, laying groundwork for future backend integrations while preserving offline resilience.
+            4. **Empty state copy.** Queue cards provide guidance when no submissions exist, clarifying instructor expectations and aligning with Annex A28 communications guidance.
+      - ✓ A29. Flutter Instructor Quick Actions & Operations (3.D)
+         - A29.1 Edulure-Flutter/lib/services/instructor_operations_service.dart
+            1. **Canonical quick actions.** `_actions` enumerates the supported workflows (announcement, attendance, grading, schedule, note) with display labels and icons so the dashboard renders consistent CTAs.
+            2. **Hive-backed queue.** `_queueBox` persists `QueuedInstructorAction` entries, while `_enqueueAction`, `_updateAction`, and `_actionKey` centralise serialisation, preventing duplicate logic across UI surfaces.
+            3. **Sync pipeline.** `runQuickAction` immediately attempts submission, downgrades failures with contextual error messages, and `syncQueuedActions` replays stored items, ensuring Annex A29 queues survive offline sessions.
+            4. **Simulation stubs.** `_simulateRemoteSubmission` mimics backend behaviour (e.g., invalid negative attendance), highlighting TODOs to replace with production endpoints without blocking current QA drills.
+            5. **Stream broadcasts.** `_queueUpdates` exposes a broadcast stream so the dashboard updates instantly when new actions queue, sync, or fail, keeping instructors informed per Annex C4 observability notes.
+         - A29.2 Edulure-Flutter/lib/screens/instructor_dashboard_screen.dart
+            1. **Service integration.** The screen instantiates `InstructorOperationsService`, loads quick actions on init, and subscribes to queue updates to hydrate `_queuedActions`.
+            2. **Dynamic forms.** `_handleQuickAction` builds input fields per action type (attendance counts, session titles, notes), validating required values before invoking `runQuickAction`.
+            3. **Queue visualisation.** `_buildQuickActionsSection` shows pending counts, colour-coded statuses, failure callouts, and manual sync controls, satisfying Annex A29 transparency requirements.
+            4. **Feedback loops.** Submitting and syncing actions toggle progress indicators and snackbars so instructors receive immediate confirmation or remediation guidance.
+         - A29.3 Edulure-Flutter/lib/services/session_manager.dart
+            1. **Box registration.** `init` opens the `instructor_action_queue` Hive box alongside existing caches, enabling offline quick actions before any dashboard widget renders.
+            2. **Lifecycle hygiene.** `clear` purges the queue during logout, preventing stale sensitive notes from lingering across sessions and aligning with Annex C4 security expectations.
       - A30. Flutter Billing & Subscription Management (3.E)
       - A31. Flutter Notifications, Messaging & Support (3.F)
       - ✓ A32. Community Reminder Job (4.A)
@@ -385,7 +457,7 @@
             19. **Persistence.** Analytics fixtures now seed environment-aware records through `createEnvironmentColumns()` ensuring `explorer_search_daily_metrics`, `analytics_alerts`, and `analytics_forecasts` snapshots respect Annex A42 governance segmentation across migrations, models, and bootstrap data.
             20. **Runtime Support.** Backend utilities share the new `environmentContext` helper, giving governance repositories (`EnvironmentParitySnapshotModel`, `ExplorerSearchDailyMetricModel`) direct access to descriptor columns for parity audits and schema purges.
             21. **Test Harnesses.** SQLite-backed model suites mirror the Annex columns so parity helpers and descriptors stay validated during unit runs, preventing regressions between migrations and governance fixtures (backend-nodejs/test/utils/environmentContext.test.js, backend-nodejs/test/explorerSearchEventModel.test.js, backend-nodejs/test/explorerSearchDailyMetricModel.test.js).
-      - 2.A Landing & Value Proposition Surfaces
+      - ✓ 2.A Landing & Value Proposition Surfaces
          - 2.A.1 FeatureGrid (frontend-reactjs/src/components/FeatureGrid.jsx)
          - 2.A.2 PageHero (frontend-reactjs/src/components/PageHero.jsx)
          - 2.A.3 StatsBar (frontend-reactjs/src/components/StatsBar.jsx)
@@ -402,30 +474,198 @@
          - 2.A.14 ConversionPanel (frontend-reactjs/src/components/marketing/ConversionPanel.jsx)
          - 2.A.15 HeroMediaPanel (frontend-reactjs/src/components/marketing/HeroMediaPanel.jsx)
          - 2.A.16 MarketingHero (frontend-reactjs/src/components/marketing/MarketingHero.jsx)
+            1. **Appraisal.** `useLandingValueProposition.js` now hydrates hero, stat, and pillar CTAs from the live `marketing_blocks` table—backed by the new `payload`/`surfaces` columns in `20250404120000_marketing_blocks_surfaces.js`—so Annex A16 copy flows straight from seeded data instead of local mocks.
+            2. **Functionality.** `MarketingContentService.listMarketingBlocks` merges `types`, `variants`, and `surfaces`, filters through the expanded `MarketingBlockModel`, and delivers structured `items`/`metrics` arrays that the hook normalises via `data/marketing/valueProposition.js` before wiring analytics handlers in `MarketingHero`, `FeatureGrid`, and `StatsBar`.
+            3. **Usefulness.** Home, campaign, and future landing surfaces can pass prefetched API payloads into these components to guarantee the same hero chips, proof metrics, and CTA routing that go-to-market teams track in Annex dashboards.
+            4. **Redundancies.** Inline hero/stat constants were deleted in favour of the shared `VALUE_PROPOSITION_*` fallbacks plus the seeded blocks, eliminating divergent copy or analytics IDs between components.
+            5. **Placeholders or Stubs.** Flow 5 imagery, Annex captions, and doc CTAs remain as fallback translations; dynamic CMS overrides will slot into the `marketing_blocks.payload` structure without rewriting component logic.
+            6. **Duplicates.** `normaliseAction` now prefers backend-provided analytics identifiers and de-duplicates CTA tracking, keeping hero buttons, grid links, and stats actions in one telemetry vocabulary.
+            7. **Improvements Needed.** Next pass should extend the same hook-driven hydration to `PageHero`, `Testimonials`, and `ConversionPanel`, and expose marketing plan CTA analytics to close the Annex instrumentation loop.
+            8. **Styling.** Feature pillars keep Annex-compliant `rounded-3xl` cards, descriptive intros, and hover/focus states while drawing copy from seeds so design and marketing reviews match the documented mocks.
+            9. **Efficiency Analysis.** Backend surface filtering trims unused blocks, memoised hero/pillar builders avoid recomputation, and `useMarketingContent` still accepts prefetched data to skip duplicate network calls.
+            10. **Strengths to Keep.** `PrimaryHero`, `HeroMediaPanel`, and `HomeSection` composition remains intact; they simply receive hydrated props so responsive gradients and layouts stay battle-tested.
+            11. **Weaknesses to Remove.** Pricing and monetisation ribbons still rely on legacy analytics wiring—flagged for follow-up once Annex A16 secondary CTA instrumentation lands.
+            12. **Palette.** Chips, stats, and CTA badges continue using the established primary/emerald/slate token set to align with the Annex colour audit.
+            13. **Layout.** Semantic `<article>` wrappers, intro copy, and 8/12/16 spacing enforce Annex density targets across breakpoints while the data now originates from the CMS-backed payload.
+            14. **Text.** Seeded pillars and metrics preserve translation keys (e.g., `home.stats.*`) so localisation keeps working even though copy is hydrated from the database.
+            15. **Spacing.** CTA clusters, stat helpers, and hero chip rows remain on the Annex rhythm, ensuring the new backend-fed content does not regress vertical density.
+            16. **Shape.** Hero, stat, and pillar shells keep `rounded-3xl`/`rounded-2xl` treatments consistent with Annex silhouette guidance.
+            17. **Effects.** Shared hover/focus-visible animations were untouched, so accessibility affordances persist while content now streams from the marketing dataset.
+            18. **Thumbs.** Hero chips, stats, and helper copy still surface screenshot-ready proof points for Annex QA and stakeholder decks.
+            19. **Media.** `ensureMedia` retains Flow 5 fallback video/image sets while respecting block-specific captions/alt text and the new `payload.surface` identifier used for analytics.
+            20. **Buttons.** CTA normalisation enforces safe routing for `/register`, `/courses`, `/communities`, pricing docs, and sponsor briefs with analytics IDs seeded in the database for telemetry parity.
+            21. **Interact.** Hero and pillar CTAs emit `marketing:hero_cta`/`marketing:value_prop_action` events tagged with slug- or payload-defined surfaces so dashboards can reconcile Annex funnel performance.
+            22. **Missing.** Bring `Testimonials`, `ConversionPanel`, and pricing CTA components onto the shared hook, and extend backend analytics exports so Annex dashboards ingest conversion events automatically.
+            23. **Design.** `valueProposition.js` now mirrors the seeded `marketing_blocks` payload schema, giving design ops and analytics a single Annex source of truth for hero, pillar, and stat content.
+            24. **Clone.** Centralised hydration prevents future landing variants from cloning fallback arrays or instrumentation, keeping Annex updates maintainable even as new surfaces subscribe to the payload.
+            25. **Framework.** The hook packages translation helpers, analytics context, and payload parsing so partner pages or locale variants can opt in with minimal wiring.
+            26. **Checklist.** Apply the migration, reseed marketing data, verify `/content/marketing/blocks?surfaces=home` returns hero/pillar/stat payloads, confirm CTA analytics fire, and run `npm --prefix frontend-reactjs run lint` (requires `@eslint/js`).
+            27. **Nav.** Hero analytics lean on seeded slugs/`payload.surface` IDs so go-to-market reporting maps CTA performance back to exact Annex A16 surfaces.
+            28. **Release.** Deploy the migration, run `npm --workspace backend-nodejs run migrate && npm --workspace backend-nodejs run seed`, validate marketing APIs plus frontend hydration, and brief GTM teams with updated Annex screenshots and telemetry notes.
          - 2.A.17 MonetizationRibbon (frontend-reactjs/src/components/marketing/MonetizationRibbon.jsx)
          - 2.A.18 PlanHighlights (frontend-reactjs/src/components/marketing/PlanHighlights.jsx)
          - 2.A.19 PrimaryHero (frontend-reactjs/src/components/marketing/PrimaryHero.jsx)
          - 2.A.20 ProductPreviewTabs (frontend-reactjs/src/components/marketing/ProductPreviewTabs.jsx)
          - 2.A.21 Home (frontend-reactjs/src/pages/Home.jsx)
-      - 2.B Content Marketing & Media Publishing
+      - ✓ 2.B Content Marketing & Media Publishing — Annex A8 (Ads, Growth & Content Marketing)
+        1. **Appraisal.** Marketing surfaces now span storage, APIs, and seeds: `AssetService.updateMetadata` persists Annex A8-safe showcase copy, `EbookService` exposes media-rich listings with encrypted sample links, and the marketing blog is populated via the bootstrap seed so Annex notes mirror live content.
+        2. **Functionality.** `content_assets.metadata.custom` captures cover art, galleries, showcase CTAs, and feature flags; `EbookModel` reads the new `sample_download_url`/`audiobook_url` columns added in `20250308120000_course_ebook_media_enhancements.js`; `BlogService` hydrates seeded categories, tags, posts, and hero media for `Blog.jsx` and `BlogPost.jsx`.
+        3. **Usefulness.** Editors preview curated galleries, CTA guardrails, and persona categories; learners download secure samples or stream audiobooks; growth teams land on Annex A8 campaign retros seeded in `backend-nodejs/seeds/001_bootstrap.js`, keeping UI, APIs, and docs aligned.
+        4. **Redundancies.** Metadata templating lives in `AssetService`/`MarketingContentService`, replacing ad-hoc React state and ensuring slugs, CTA URLs, and gallery limits reuse the same sanitisation.
+        5. **Placeholders or Stubs.** JSON-LD still exports twelve posts, but bootstrap seeds provide three authoritative articles with hero media; extend pagination before multi-page schema support ships.
+        6. **Duplicate Functions.** CTA enforcement, HTTPS sanitisation, and gallery normalisation run through `AssetService.updateMetadata` and `ContentController.metadataUpdateSchema`, eliminating parallel helpers in React.
+        7. **Improvements Needed.** Next workstream should wire gallery analytics, ingest backend search telemetry for blog filters, and add DRM-aware offline caching for ebook samples.
+        8. **Styling Improvements.** Seeded metadata keeps Annex A8 tints, rounded geometry, and cover art consistent without manual placeholders in the editor or previews.
+        9. **Efficiency Analysis.** Server filters (`EbookModel.listMarketplace`, `BlogService.listPublicPosts`) enforce paging/search; React memoises counts and summaries so marketing dashboards stay responsive.
+        10. **Strengths to Keep.** Marketplace cards, CTA variants, and JSON-LD exports retain annex storytelling hierarchy while the seeds keep growth, ops, and governance narratives synchronised across channels.
+        11. **Weaknesses to Remove.** Offline downloads and analytics event wiring remain backlog; add queue-backed watermark issuance and CTA tracking in a follow-up.
+        12. **Palette.** Counters, CTA pills, and gallery cards reuse slate/primary palettes; seeded metadata ensures hero art honours the colour guidance in `user_experience.md` Annex B2.
+        13. **CSS, Orientation & Placement.** Responsive layouts stay intact—metadata just hydrates showcase slots and galleries, so no bespoke breakpoints were introduced.
+        14. **Text.** Microcopy (“HTTPS required”, “Encrypted sample”) follows Annex tone while referencing seeded campaign summaries so compliance teams review consistent copy.
+        15. **Spacing.** Editor forms and preview shells keep the 8/16/24 rhythm; seeded cards preserve breathing room around badges and CTA clusters.
+        16. **Shape.** Rounded-3xl shells and pill controls remain consistent; metadata-driven galleries reuse the same geometry for imagery and video.
+        17. **Effects.** Hover/focus-visible states continue to surface on pagination, CTA, and theme toggles even with seeded previews attached.
+        18. **Thumbs.** Gallery media sanitise through HTTPS constraints and seeded assets, ensuring marketing screenshots drop cleanly into annex decks.
+        19. **Media.** Ebook cards surface cover art, sample PDFs, and audiobook MP3s; blog posts hydrate hero images from `blog_media`, keeping Annex content visual.
+        20. **Buttons.** CTA, pagination, and theme buttons expose `aria-pressed`/`aria-disabled`; seeded posts include campaign CTAs so analytics can stitch funnels.
+        21. **Interact.** Avatar cropper nudge keys, blog result summaries (`aria-live`), and reader progress broadcasts remain intact, now backed by seeded data for QA.
+        22. **Missing.** Add analytics IDs for gallery actions, taxonomy tooltips for blog categories, and offline sample packaging for enterprise annex sign-off.
+        23. **Design.** Metadata, blog schema, and ebook listings mirror Annex diagrams so marketing, growth, and analytics stakeholders share a single canonical schema.
+        24. **Clone.** Shared sanitisation/storage helpers prevent Flutter, SDK, or future CMS integrations from re-implementing Annex A8 rules.
+        25. **Framework.** `usePageMetadata`, `EbookService`, and `BlogService` provide consistent SEO, analytics, and schema outputs across marketing shells.
+        26. **Checklist.** Regression verifies metadata persistence, secure CTA disabling, gallery caps, sample download signatures, blog schema output, and `npm --prefix frontend-reactjs run lint`.
+        27. **Nav.** Blog filters, marketing CTAs, and reader headers share seeded copy (“Review controls”, “Read article”), improving crawlability and annex navigation parity.
+        28. **Release.** Ship alongside marketing analytics updates, rerun `npm --prefix backend-nodejs run seed`, refresh SEO snapshots, and brief content ops on the new sample/audiobook links plus seeded campaign posts.
          - 2.B.1 EbookReader (frontend-reactjs/src/components/content/EbookReader.jsx)
          - 2.B.2 MaterialMetadataEditor (frontend-reactjs/src/components/content/MaterialMetadataEditor.jsx)
          - 2.B.3 AvatarCropper (frontend-reactjs/src/components/media/AvatarCropper.jsx)
          - 2.B.4 Blog (frontend-reactjs/src/pages/Blog.jsx)
          - 2.B.5 BlogPost (frontend-reactjs/src/pages/BlogPost.jsx)
          - 2.B.6 Ebooks (frontend-reactjs/src/pages/Ebooks.jsx)
-      - 2.C Company, Careers & Legal Transparency
+      - ✓ 2.C Company, Careers & Legal Transparency — Annex C7 (Legal & Compliance Centre)
+        1. **Appraisal.** About, Privacy, and Terms pages now couple frontend navigation with backend Annex artefacts: seeds populate governance contracts, vendor assessments, review cycles, and transparency narratives while the pages surface structured data, anchors, and corporate disclosures.
+        2. **Functionality.** `About.jsx` renders organisation schema plus seeded corporate facts; `Privacy.jsx` and `Terms.jsx` reuse IntersectionObserver navigation tied to slugified headings, while backend tables (`governance_contracts`, `governance_roadmap_communications`, `consent_policies`) seeded in `001_bootstrap.js` power trust-centre APIs and dashboard parity.
+        3. **Usefulness.** Visitors review registration numbers, ICO references, policy CTAs, and seeded legal updates without leaving the hub; governance ops can cross-check disclosures against `/governance/overview` API output that mirrors the same seeds.
+        4. **Redundancies.** Anchor slugging, metadata hooks, and disclosure grids share helpers; backend governance repositories dedupe policy summaries so web pages, dashboards, and docs reference one canonical source.
+        5. **Placeholders or Stubs.** Trust centre link still points to `/docs/trust-centre`; swap once the dedicated hub ships and extend seeds with additional transparency reports.
+        6. **Duplicate Functions.** Section IDs derive from headings once; governance metrics hydrate via `NavigationAnnexRepository`, avoiding duplicate enumeration across legal surfaces.
+        7. **Improvements Needed.** Automate governance summaries from compliance tooling, expose PDF exports for policies, and localise disclosures for non-UK tenants.
+        8. **Styling Improvements.** Corporate cards, navigation rails, and disclosure lists reuse slate neutrals, seeded hero art, and Annex chip tokens, maintaining calm legal visuals.
+        9. **Efficiency Analysis.** Memoised section arrays and observers avoid repeated slug computation; backend seeds keep governance endpoints fast by denormalising status counts.
+        10. **Strengths to Keep.** Terms anchor detection, support channel grids, and compliance messaging remain while benefitting from seeded legal narratives and shared metadata.
+        11. **Weaknesses to Remove.** Printable exports and live changelog feeds remain backlog; wire them to governance APIs next release.
+        12. **Palette.** Legal disclosures lean on white/sand neutrals with primary accent chips; seeded CTAs ensure consistent colour references.
+        13. **CSS, Orientation & Placement.** Two-column grids collapse gracefully, chip navigation wraps on wide breakpoints, and dropdown selectors serve mobile as documented in the UX playbook.
+        14. **Text.** Copy emphasises accountability (“Review controls”, “Access governance artefacts”) and is backed by seeded governance data so metrics stay accurate.
+        15. **Spacing.** Cards and nav rails respect 24px gutters and 12px interior gaps, keeping dense legal content readable.
+        16. **Shape.** Rounded-3xl shells, pill chips, and CTAs align with Edulure geometry, reinforcing brand trust.
+        17. **Effects.** Focus-visible outlines and hover states remain active on navigation pills and CTAs, aiding keyboard review.
+        18. **Thumbs.** Disclosure cards and CTA badges remain screenshot-ready; seeds guarantee values for corporate facts and roadmap metrics.
+        19. **Media.** Organisation schema, brand info, and corporate logos feed crawlers while backend governance seeds keep transparency dashboards in sync.
+        20. **Buttons.** Primary CTAs point to privacy, terms, and trust artefacts; nav chips honour reduced-motion preferences and accessible names.
+        21. **Interact.** Mobile select, chip navigation, hash updates, and observer highlights keep compliance journeys keyboard and screen-reader friendly; seeded governance data powers the same anchors used in dashboards.
+        22. **Missing.** Add downloadable audit evidence (SOC, ISO), vacancy feeds, and trust-centre hub once additional APIs land.
+        23. **Design.** Structured data, nav scaffolding, and governance metrics mirror Annex C7 diagrams so legal, marketing, and support teams share context.
+        24. **Clone.** Slugified IDs and metadata helpers prevent future legal pages (cookie notice, accessibility statement) from rewriting anchor or SEO plumbing.
+        25. **Framework.** `usePageMetadata`, governance repositories, and consent/annex seeds centralise analytics tagging for compliance views.
+        26. **Checklist.** Verify anchor navigation, observer highlighting, corporate fact accuracy, policy CTA destinations, `/governance` API snapshots, and run `npm --prefix frontend-reactjs run lint`.
+        27. **Nav.** Privacy chips, About CTAs, Terms anchor lists, and governance APIs expose consistent navigation cues, keeping Annex C7 wayfinding uniform.
+        28. **Release.** Coordinate with legal/compliance leads, rerun seeds, refresh SEO snapshots, update governance documentation, and announce Annex C7 upgrades alongside the trust-centre roadmap.
          - 2.C.1 About (frontend-reactjs/src/pages/About.jsx)
          - 2.C.2 Privacy (frontend-reactjs/src/pages/Privacy.jsx)
          - 2.C.3 Terms (frontend-reactjs/src/pages/Terms.jsx)
-      - 3.A Authentication & Invitation Pages
+      - ✓ 3.A Authentication & Invitation Pages — Annex A17 (Authentication & Setup), Annex C5 (Integration Credential Invitations)
+        1. **Appraisal.** Login, Register, InstructorRegister, and IntegrationCredentialInvite now emit structured analytics covering views, submissions, multi-factor prompts, marketing toggles, and invite refreshes through new helpers in `frontend-reactjs/src/lib/analytics.js`, giving Annex A17/C5 the end-to-end telemetry demanded by `user_experience.md`.
+        2. **Functionality.** `trackAuthView`, `trackAuthAttempt`, `trackAuthAutoSave`, and `trackIntegrationInviteSubmit` wrap the shared `trackEvent` dispatcher so each surface reports granular metadata (role, provider, expiry, invite cadence) without duplicating analytics wiring, while the backend `integration_api_key_invites.documentation_url` column, model mappers, and invite service sanitizers now propagate integration runbook links through admin CRUD, partner submissions, and audit trails in lockstep with migrations and seeds.
+        3. **Usefulness.** Support, security, and marketing teams can now trace conversion funnels—e.g., how often 2FA is required, who enables marketing updates, when credential invites expire, and which runbooks partners reference—directly from event payloads captured during live user journeys and from the persisted documentation URLs attached to invite records.
+        4. **Redundancies.** Inline `window.analytics.track` calls or bespoke CustomEvent payloads were avoided entirely; every page leans on the central helpers so event schemas remain consistent and easy to evolve.
+        5. **Placeholders or Stubs.** Event metadata leaves hooks for downstream enrichment (e.g., eventual resend-code telemetry, credential decline reasons) while keeping current payloads privacy-safe by omitting PII like email addresses, and the new documentation URL plumbing now populates production-ready links in migrations, models, and seeds so partners aren’t pointed at stubbed guides.
+        6. **Duplicate Functions.** Social sign-on, auto-save, and submit handlers reuse the same helper exports so we no longer risk drifting analytics strings between login, register, and instructor registration.
+        7. **Improvements Needed.** Follow-up work should extend instrumentation to password resets and invite declines, plus plumb backend acknowledgements so analytics can confirm vault ingestion rather than assuming the POST succeeded.
+        8. **Styling Improvements.** Login’s two-factor field now receives deterministic focus via `document.getElementById(TWO_FACTOR_FIELD_ID)` when the challenge appears, reinforcing Annex A17’s keyboard accessibility guidance without altering visual styling, and the invite summary card surfaces a design-system compliant documentation link row so Annex C5 runbook references render with accessible focus states.
+        9. **Efficiency Analysis.** Effects bail early when states are idle (`autoSaveStatus === 'idle'`, `!showTwoFactorInput`, `status === 'submitting'`), ensuring analytics dispatches fire only on meaningful transitions rather than on every render.
+        10. **Strengths to Keep.** Auto-save cadence, onboarding progress meters, and invite security checklists remain intact—the code simply instruments their lifecycle so existing UX strengths are measured instead of reworked, and the invite documentation runbooks travel from migrations through seeds to UI without bespoke glue code.
+        11. **Weaknesses to Remove.** Login still lacks a resend-code CTA and integration invites cannot yet log decline reasons; events now flag those gaps (e.g., `two_factor_required`, `expired`) so they stay visible on the roadmap.
+        12. **Palette.** No new colour tokens were introduced—the analytics additions are invisible to users and respect the current neutral, primary, and alert palettes described in `user_experience.md`.
+        13. **Layout.** Two-factor inputs and credential forms keep their established grid layouts; the only DOM addition is an `id` attribute for focus targeting, preserving Annex spacing and placement rules.
+        14. **Text.** Event metadata mirrors the existing microcopy (`reason: 'required' | 'invalid' | 'setup_required'`, marketing toggle states), enabling content designers to correlate copy performance with behavioural data without rewriting the UI.
+        15. **Spacing.** Auto-save status tracking observes the same debounce timers (1.2 s) and progress bars, so there are no spacing regressions while still surfacing when drafts persist or error out.
+        16. **Shape.** Switches, pill buttons, and textarea shells remain unchanged; instrumentation simply records their toggled state (`next`, `enabled`) to uphold Annex shape consistency.
+        17. **Effects.** Focus management for the 2FA field and invite refresh actions now pair with analytics hooks, validating Annex guidance around immediate feedback when security challenges or vault refreshes fire.
+        18. **Thumbs.** Social provider buttons log `auth:social_redirect` events so growth teams can quantify icon usage (Google, Apple, Facebook, LinkedIn) without reworking the existing SVG glyphs.
+        19. **Media.** Credential invites report documentation link health (`missing`, `warning`, `unknown`) through status events sourced from the persisted `documentation_url`, complementing the security checklist without introducing new imagery.
+        20. **Buttons.** Submit, refresh, toggle, and CTA handlers all emit outcome-specific analytics (`attempt`, `success`, `failure`), aligning Annex release checklists that mandate auditable credential handoffs.
+        21. **Interact.** Marketing opt-in, role selection, two-factor switches, and manual code reveals each dispatch `auth:interaction` events so behavioural analysis can confirm Annex onboarding hypotheses.
+        22. **Missing.** Next iteration should add decline-path instrumentation and hook resend endpoints so Annex C5 coverage extends beyond successful submissions.
+        23. **Design.** Event names match Annex taxonomy (`two_factor_*`, `integration_invite:*`), ensuring design reviews and analytics dashboards speak the same language when auditing authentication touchpoints.
+        24. **Clone.** By centralising auth and invite analytics helpers, future identity surfaces can plug into the same API instead of cloning bespoke logging logic per page.
+        25. **Framework.** The analytics layer continues to dispatch DOM CustomEvents and push to `dataLayer`, meaning existing observer scripts automatically inherit the richer metadata.
+        26. **Checklist.** QA should verify event payloads via the `edulure:analytics` CustomEvent listener, confirm two-factor focus on prompt, and exercise invite refresh/submit flows for both success and failure paths.
+        27. **Nav.** Cross-links between login↔register and invite refresh flows now emit navigation events, so Annex A17 setup journeys can be audited alongside Annex C5 invite completions.
+        28. **Release.** Promote by validating analytics payloads in staging, ensuring dashboards capture the new event keys, and briefing ops/security teams on the fresh telemetry before shipping.
          - 3.A.1 InstructorRegister (frontend-reactjs/src/pages/InstructorRegister.jsx)
          - 3.A.2 IntegrationCredentialInvite (frontend-reactjs/src/pages/IntegrationCredentialInvite.jsx)
          - 3.A.3 Login (frontend-reactjs/src/pages/Login.jsx)
          - 3.A.4 Register (frontend-reactjs/src/pages/Register.jsx)
-      - 3.B Setup & Pre-launch Handoffs
+      - ✓ 3.B Setup & Pre-launch Handoffs — Annex A2 (Learner Onboarding & Feedback)
+        1. **Appraisal.** `SetupOrchestratorService` now blends environment templating with learner onboarding telemetry, so Annex A2 prep covers infrastructure inputs, invitation handoffs, and feedback loops in a single control room.
+        2. **Functionality.** `SetupController.buildSnapshot()` awaits `LearnerOnboardingInsightsService.summarise()` alongside `describeDefaults()`, and the service now normalises invite counts across accepted/pending/expired/revoked states, computes acceptance rates, and reuses a shared Knex connection so REST and SSE payloads stay in sync while remaining unit-testable.
+        3. **Usefulness.** `frontend-reactjs/src/pages/Setup.jsx` renders a “Learner onboarding & feedback” card that surfaces total responses, thirty-day trends, acceptance rates, pending/expired/revoked invite tallies, persona leaders, and survey cadence, giving operators a launch checklist without leaving the installer.
+        4. **Redundancies.** Hard-coded `DEFAULT_*` env placeholders now defer to `.env.example` values via `readEnvTemplate`, eliminating drift between documentation, installer defaults, and committed templates.
+        5. **Placeholders.** Bootstrap seeds now populate accepted, pending, expired, and revoked invites plus recent `learner.survey.submitted` telemetry so Annex messaging mirrors production schemas; empty tables still return zeroed counts when environments start fresh.
+        6. **Duplicates.** Cached defaults prevent repeated file reads during SSE polling, and persona breakdowns are computed once per summary to avoid redundant array allocations.
+        7. **Improvements Needed.** Extend the insights service with configurable windows, rolling averages, and cohort slices so Annex A2 can compare pilot tenants or highlight funnel drop-offs automatically.
+        8. **Styling.** The readiness card adopts the same `rounded-3xl` shell, slate neutrals, and uppercase kickers as the rest of the setup aside, keeping Annex visuals consistent with user_experience.md spacing rules.
+        9. **Efficiency.** SQL counts, invite status aggregation, and a capped 200-row survey sample keep `LearnerOnboardingInsightsService` lightweight while caching env defaults avoids re-reading template files on every heartbeat.
+        10. **Strengths.** SSE listeners now receive merged state snapshots, so live installer runs broadcast task progress and onboarding deltas without manual refreshes.
+        11. **Weaknesses.** Insights currently assume a 30-day lookback; expose configuration hooks or auto-tune the window when installers run in long-lived staging environments.
+        12. **Palette.** Metrics rely on existing primary, emerald, and slate tokens—no new colour primitives were introduced, respecting Annex palette governance.
+        13. **Layout.** The card’s `sm:grid-cols-2 lg:grid-cols-3` metric grid and stacked persona/survey panels follow the 8px/16px rhythm, keeping dense analytics scannable on narrow and wide viewports alike.
+        14. **Text.** Microcopy (“Track sign-up momentum…”, “Finalise community pairings…”) speaks directly to Annex A2 goals, aligning tone with the onboarding handbook.
+        15. **Spacing.** Utility classes (`gap-4`, `mt-4`, `space-y-1`) maintain the documented breathing room between metrics, badges, and helper copy.
+        16. **Shape.** Metrics, persona chips, and action buttons continue using `rounded-full` and `rounded-2xl` geometry so the installer mirrors other dashboard shells.
+        17. **Effects.** Buttons, toggles, and preset pills retain focus-visible rings and hover treatments, ensuring accessibility cues remain intact after the insights injection.
+        18. **Thumbs.** The existing `WrenchScrewdriverIcon` header tag and hero badges stay in place, reinforcing the “guided installation” motif alongside the new analytics.
+        19. **Media.** Readiness metrics remain typographic—no new charts or imagery were added, preserving the lightweight nature of the aside until richer telemetry ships.
+        20. **Buttons.** `Run installer`, preset selectors, and task toggles now coexist with the insights card without overlap, and new data does not introduce conflicting CTAs.
+        21. **Interact.** Task checkboxes, preset pills, and status controls remain keyboard accessible while the readiness card exposes static summaries that respect screen-reader order.
+        22. **Missing.** Future revisions should expose alert thresholds (e.g., “<5 survey responses”) so Annex A2 can flag readiness blockers proactively.
+        23. **Design.** Insights reuse Annex A2 vocabulary (responses, invites, persona focus) and derive directly from `LearnerOnboardingResponseModel` + telemetry tables, with seeds/migrations (`backend-nodejs/seeds/001_bootstrap.js`, `backend-nodejs/migrations/20250325103000_marketing_enrollment_flow.js`) aligned so database schema, models, and UI copy stay consistent.
+        24. **Clone.** A single summariser powers both REST and SSE responses, preventing each consumer from reimplementing onboarding analytics logic.
+        25. **Framework.** `LearnerOnboardingInsightsService` lives alongside other backend services, making it trivial for dashboards or docs generators to consume the same readiness snapshot.
+        26. **Checklist.** QA should validate env defaults hydrate from `.env.example`, confirm invite status counts and acceptance rates against seed data (including expired/revoked cases), run `backend-nodejs/test/learnerOnboardingInsightsService.test.js`, and observe SSE updates when survey events are ingested.
+        27. **Nav.** Positioning the readiness card at the top of the installer sidebar keeps onboarding KPIs visible before operators trigger tasks or inspect logs.
+        28. **Release.** Ship by reseeding onboarding/survey tables, running `npm --prefix backend-nodejs run db:install` where needed, validating `/api/v1/setup/status`, and updating Annex A2 docs with the new readiness snapshot and seed telemetry batch references.
          - 3.B.1 Setup (frontend-reactjs/src/pages/Setup.jsx)
-      - 3.C Identity Forms & Auth Components
+      - ✓ 3.C Identity Forms & Auth Components — Annex A17 (Authentication & Setup)
+        1. **Appraisal.** Identity primitives now foreground accessible progress indicators, provider context, and gated steppers so Annex A17 flows stay trustworthy across learner and instructor journeys.
+        2. **Functionality.** `AuthForm.jsx` adopts `useId`-driven aria wiring, `SocialSignOn.jsx` emits provider metadata with descriptions/badges, and `FormStepper.jsx` recognises disabled steps while labelling each button with a status attribute.
+        3. **Usefulness.** Social sign-on rows expose badges, helper copy, and disabled reasons, guiding operators when SSO is unavailable or restricted to specific pilots.
+        4. **Redundancies.** Progress maths (`Math.round`) is centralised via `progressPercent`, preventing duplicate calculations and ensuring width + text stay in sync.
+        5. **Placeholders.** Provider lists still fall back to the baked-in Google/Apple/Facebook/LinkedIn definitions until CMS-managed metadata lands.
+        6. **Duplicates.** Step status reporting lives in `data-step-status`, letting analytics or CSS consumers share the same semantics instead of bespoke switch statements per form.
+        7. **Improvements Needed.** Wire marketing CMS content into provider descriptions and badges so Annex A17 can localise security messaging without code edits.
+        8. **Styling.** Social buttons keep branded colour tokens while shifting to a column layout for copy, matching the marketing/auth aesthetic documented in user_experience.md.
+        9. **Efficiency.** Disabled handlers short-circuit `onSelect`, `aria` IDs are generated once, and steppers avoid redundant clicks on locked steps.
+        10. **Strengths.** `aria-live` banners, progressbars, and disabled metadata ensure assistive tech announces validation errors, successes, and onboarding progress immediately.
+        11. **Weaknesses.** Social icons remain static SVGs; future Annex iterations could request dynamic assets from configuration to reflect tenant branding.
+        12. **Palette.** Buttons continue using provider brand hues plus shared slate/primary neutrals, keeping authentication visuals on-brand.
+        13. **Layout.** The multi-line label/description stack inside social buttons ensures long helper copy wraps gracefully without breaking alignment.
+        14. **Text.** Disabled reason strings (“Sign in disabled by your administrator”) and onboarding copy stay concise and action-oriented per Annex tone guidance.
+        15. **Spacing.** Updated components rely on `gap-3`, `mt-1`, and `space-y-6` to maintain comfortable spacing between progress meters, alerts, and form fields.
+        16. **Shape.** Authentication CTAs preserve their `rounded-full` silhouette, matching the rest of the Annex A17 design system.
+        17. **Effects.** Focus-visible rings, hover transitions, and pressed states remain intact even with the richer metadata layout.
+        18. **Thumbs.** Provider SVGs continue to sit within consistent `h-10 w-10` frames, delivering recognisable identity anchors for users scanning options.
+        19. **Media.** No new imagery is introduced; textual and icon treatments cover all messaging to keep forms lightweight.
+        20. **Buttons.** `onSelect` now passes the provider object alongside the ID so analytics and routing layers can access badges or disablement reasons without additional lookups.
+        21. **Interact.** Stepper buttons respect `disabled` props and surface `aria-disabled` while forms broadcast error/success via `aria-live` regions for screen readers.
+        22. **Missing.** Pending work includes mapping provider copy to localisation bundles and emitting analytics events when stepper statuses change.
+        23. **Design.** Copy and semantics mirror Annex A17’s “secure, supportive” voice, with progress labels (“Onboarding progress”) and support footers referencing legal copy.
+        24. **Clone.** Centralised ID generation and status attributes avoid bespoke aria wiring in each auth surface, reducing future duplication risk.
+        25. **Framework.** Additional provider fields (badge/description/disabledReason) keep the API extensible for enterprise tenants without touching downstream components.
+        26. **Checklist.** QA should confirm progress bars announce values, error banners read aloud, disabled sign-on buttons resist clicks, and stepper analytics register state transitions.
+        27. **Nav.** `data-step-status` primes instrumentation and styling so navigation breadcrumbs, analytics, and Annex documentation stay in sync.
+        28. **Release.** Coordinate with marketing to populate provider metadata, run accessibility smoke tests, and document new props in Annex A17 handbooks before deployment.
          - 3.C.1 AuthCard (frontend-reactjs/src/components/AuthCard.jsx)
          - 3.C.2 SocialSignOn (frontend-reactjs/src/components/SocialSignOn.jsx)
          - 3.C.3 AuthForm (frontend-reactjs/src/components/auth/AuthForm.jsx)
@@ -610,19 +850,46 @@
         19. **Notification Fidelity.** Tutor alerts include titles, details, deadlines, and CTA routing directly from backend orchestration, matching the scheduler UI requirements and ensuring tutoring SLAs align with operational runbooks.
         20. **Seed Synchronisation.** `backend-nodejs/seeds/001_bootstrap.js` seeds tutor bookings and live classrooms with expanded metadata (segments, preferred slots, whiteboard notes, support contacts, pricing) to guarantee demo environments reflect the new dashboard schema.
         21. **Future Proofing.** Revenue roll-ups and waitlist risk alerts derive from model metadata so future Annex updates can plug into the same pipeline without duplicating frontend heuristics.
-      - 6.B Instructor Deep-dive Modules
+      - ✓ 6.B Instructor Deep-dive Modules
          - 6.B.1 CourseLifecyclePlanner (frontend-reactjs/src/pages/dashboard/instructor/courseCreation/CourseLifecyclePlanner.jsx)
          - 6.B.2 CourseLibraryTable (frontend-reactjs/src/pages/dashboard/instructor/courseLibrary/CourseLibraryTable.jsx)
          - 6.B.3 CourseManagementHeader (frontend-reactjs/src/pages/dashboard/instructor/courseManagement/CourseManagementHeader.jsx)
          - 6.B.4 CreationStudioSummary (frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationStudioSummary.jsx)
          - 6.B.5 PricingRevenueMix (frontend-reactjs/src/pages/dashboard/instructor/pricing/PricingRevenueMix.jsx)
          - 6.B.6 InstructorMetricsSection (frontend-reactjs/src/pages/dashboard/instructor/sections/InstructorMetricsSection.jsx)
-      - 6.C Creation Studio & Course Tooling
+        1. **Appraise.** Launch governance finally mirrors Annex B2—`CourseLifecyclePlanner.jsx` now frames target launch, owner, confidence, and risk posture cards ahead of the orchestration grid, while `CourseManagementHeader.jsx` and `CourseLibraryTable.jsx` surface portfolio rollups, format filters, and runtime summaries so instructors see operational readiness the moment they land on the workspace.
+        2. **Functionality.** Launch objects hydrate checklist progress, risk signals, and follow-up dispatch events (`edulure:lifecycle-checklist`, `edulure:lifecycle-risk`); library assets gain filterable format chips, duration parsing, and engagement averages; portfolio headers expose action buttons for briefs, calendars, and collaborator invites alongside real-time cohort counts.
+        3. **Logic Usefulness.** Normalisers in each module coerce optional data into safe defaults—launch windows, recurring revenue categories, proctoring metadata, and recommendation history all render without downstream callers having to pre-shape payloads, keeping Annex narratives aligned with live telemetry.
+        4. **Redundancies.** Runtime stats (checklist completion, recurring share, format counts, word counts) centralise in each component’s memoised helpers, eliminating the bespoke percentage math and table fallbacks previously duplicated across dashboards and documentation outlines.
+        5. **Placeholders.** Launch history still depends on future backend diffs for adoption rates and SLA streaming; Pricing mixes await raw revenue totals to complement the percentage share messaging, and Instructor metrics leave advanced segmentation (by modality or cohort) for a follow-on Annex push.
+        6. **Interactions.** All new CTAs broadcast analytics-friendly data attributes (`data-course-id`, `data-module-id`, `data-lesson-id`) while dispatching custom events for lifecycle, library, and metric taps—giving instrumentation a single source of truth for instructor workflow telemetry.
+        7. **Styling.** Readiness scorecards, filter pills, recurring share banners, and interactive metric tiles all lean on dashboard token classes (`rounded-3xl`, semantic pill palettes, hover/translate transitions), matching the visual language captured in `user_experience.md` for Annex B2 storytelling.
+        8. **Efficiency.** `useMemo` now backs library filtering, recurring share calculations, launch statistics, and creation mix histories; short-circuit guards keep expensive loops from running when props are empty, and numeric coercion clamps values between 0–100 before painting bars or targets.
+        9. **Accessibility.** Progress bars announce target markers via `sr-only` spans, lifecycle tables provide semantic headers, and interactive metric tiles honour focus rings so keyboard journeys through Annex B2 artefacts stay compliant.
+        10. **Data Integration.** Launch checklists, risk logs, recommendation histories, and pricing streams are now hydrated directly by `DashboardService.buildCourseWorkspace`, which pulls from the new `course_blueprints`, `course_launches`, checklist, signal, review, refresher, asset, catalogue, drip, and mobile experience tables introduced in the Annex B2 migration and bootstrap seed; when data is absent the frontend still renders explanatory defaults so pre-release tenants retain a coherent narrative.
+        11. **Improvements Needed.** Wire live websocket pushes for checklist completion, teach the revenue mix card about absolute currency totals, and expose filtering presets on the library table to match Annex filter mock-ups (top viewed, newest, compliance hold).
+        12. **Strengths to Keep.** Keep the orchestration two-column split, the creation studio manifest cards, the pill-based CTA patterns, and the metrics grid—each now carries deeper data without sacrificing the clarity that instructors praised during the Annex B2 audit.
+        13. **Telemetry.** New `data-*` hooks and custom events mean Annex instrumentation guides can quote exact event names when mapping funnels from launch planning to asset audits.
+        14. **Release Notes.** Document the new props (`launch`, `recommendationsMeta.history`, `streams[].trend`, `metrics[].id`, `summary.activeCohorts`) and updated event contracts in Annex B2’s change log so downstream consumers know to hydrate the additional fields.
+        15. **Risks.** Recurring share assumes percentage inputs; ensure backend normalises floats to avoid >100% bars, and confirm adoption rates in history arrays arrive as decimals to keep the adoption chip from displaying `NaN%`.
+      - ✓ 6.C Creation Studio & Course Tooling
          - 6.C.1 AssessmentQuickView (frontend-reactjs/src/components/course/AssessmentQuickView.jsx)
          - 6.C.2 CourseCard (frontend-reactjs/src/components/course/CourseCard.jsx)
          - 6.C.3 CourseModuleNavigator (frontend-reactjs/src/components/course/CourseModuleNavigator.jsx)
          - 6.C.4 CourseProgressBar (frontend-reactjs/src/components/course/CourseProgressBar.jsx)
          - 6.C.5 BlockEditor (frontend-reactjs/src/components/creation/BlockEditor.jsx)
+        1. **Appraise.** Annex A3’s creation studio brief now spans proctoring metadata, launch compliance, syndication reach, risk callouts, and block statistics—the quick view, course card, navigator, progress bar, and block editor collectively paint the production state a reviewer expects.
+        2. **Functionality.** Assessments accept proctoring, passing score, attempt cap, and availability windows; course cards render launch windows, compliance tone chips, upcoming live touchpoints, and syndication channels; module navigator cards highlight risks and emit lesson/module identifiers; progress bars can display target markers; the block editor tallies block counts and word counts inline.
+        3. **Logic Usefulness.** Defensive parsing handles duration strings, launch windows, history timestamps, and risk arrays so Annex mock data, seeded content, or live payloads all funnel through a single formatting path without runtime errors.
+        4. **Interactions.** Action CTAs embed `data-course-id` attributes while navigators attach `data-lesson-id` and `data-module-id`; assessment buttons expose `data-assessment-id`, and block editor statistics update as authors add, move, or remove blocks—giving UX writers and analysts deterministic hooks.
+        5. **Styling.** New readiness cards, risk pills, and timeline chips inherit dashboard typography and semantic palettes; target markers ride within the progress bar without breaking gradient fills; block editor footers reuse the rounded shell aesthetic captured in `user_experience.md`.
+        6. **Accessibility.** Additional copy (window labels, compliance tooltips, risk lists) stays within semantic lists or sr-only spans so screen readers hear context; focus styles remain intact thanks to button wrappers adding `focus:ring` tokens around interactive metric cards.
+        7. **Efficiency.** Memoised calculations cover duration parsing, word counts, and module thumbnails; guard clauses collapse empty arrays quickly, and slices limit list/risk renders to manageable counts for smoother Annex demos.
+        8. **Telemetry.** Added data attributes and consistent event dispatch patterns mirror instrumentation guidelines from Annex A3, letting analytics discriminate between assessment launches, course CTAs, module risk acknowledgements, and block editing sessions.
+        9. **Data Contracts.** Updated PropTypes document the new optional fields (`passingScore`, `proctoring`, `launchWindow`, `syndication.channels`, `module.risks`, `CourseProgressBar.target`), and `DashboardService.buildCourseWorkspace` now publishes matching arrays from the expanded lifecycle tables so API providers and creation tooling share the richer Annex A3 payloads without divergence.
+        10. **Improvements Needed.** Next pass should expose translation strings for proctoring/provider labels, surface validation when risk lists overflow beyond three items, and allow progress bars to broadcast custom target tooltips for Annex walkthroughs.
+        11. **Strengths to Keep.** Preserve the single-card course overview, the granular module preview layout, and the drag-free block editor—they now surface deeper insights without sacrificing the clarity and approachability Annex reviewers called out.
+        12. **Release Notes.** Flag the new analytics hooks and optional props in creation studio docs so QA, CX, and documentation teams update Annex screenshots and instrumentation plans in tandem.
       - 7.A Admin & Operator Experience Pages
          - 7.A.1 Admin (frontend-reactjs/src/pages/Admin.jsx)
          - 7.A.2 Analytics (frontend-reactjs/src/pages/Analytics.jsx)
@@ -764,16 +1031,148 @@
             14. **Text Analysis.** Session blurbs now emphasise persona outcomes (“Community leaders host AMAs”) aligned with Annex microcopy, with truncated summaries under 120 characters for grid readability.
             15. **Change Checklist Tracker.** QA steps include verifying persona filters across public/admin tabs, testing empty states, ensuring analytics events fire, and checking that conflict warnings respect cluster selection.
             16. **Full Upgrade Plan & Release Steps.** Plan includes syncing calendar feeds with cluster metadata, coordinating with instructor operations, monitoring analytics for persona coverage gaps, and phasing rollout alongside scheduling improvements.
-      - 9.D Scheduling, Calendar & Classroom Utilities
+      - ✓ 9.D Scheduling, Calendar & Classroom Utilities
          - 9.D.1 CalendarEventDialog (frontend-reactjs/src/components/calendar/CalendarEventDialog.jsx)
+            1. **Appraisal.** The dialog now reflects Annex C4 guidance by surfacing timezone selection, preset durations, and schedule summaries so live class producers can stage workshops without leaving the modal.
+            2. **Functionality.** Helpers `parseLocalDate`, `computeEndValue`, and `formatTimezoneLabel` convert local input strings into deterministic Date objects, auto-sync end times, and emit a11y-friendly labels while a memoised summary block explains the schedule, timezone, and relative start window.
+            3. **Usefulness.** A persistent draft (stored under `edulure.calendar.draft`) and duration presets let instructors resume planning mid-flight, while the relative countdown callout clarifies whether the session is imminent or past—reducing calendaring mistakes called out in `user_experience.md` Annex C4.
+            4. **Redundancies.** Manual end-time validation logic was collapsed into the new helpers, removing repeated `new Date` constructions and string concatenations across change handlers.
+            5. **Placeholders or Stubs.** Media and resources still accept freeform URLs; upcoming Annex work will thread these into asset pickers once the classroom asset library lands.
+            6. **Duplicate Functions.** Shared parsing/formatting utilities prevent diverging conversions between the modal and schedule components, aligning Annex requirements for consistent time math across live class tooling.
+            7. **Improvements Needed.** Future iterations should emit ICS attachments and conflict warnings once the backend exposes instructor availability APIs, and add validation for tenant-specific call-to-action URL domains.
+            8. **Styling Improvements.** New timezone and preset controls reuse dashboard pill tokens, while the summary block mirrors the Annex typography hierarchy (`text-xs` kickers, `text-primary` accent) so scheduling utilities feel native to the dashboard shell.
+            9. **Efficiency Analysis.** Memoised schedule summaries and guarded localStorage writes ensure the dialog re-renders cheaply even when operators toggle between presets, satisfying Annex guidance on responsive interactions.
+            10. **Strengths to Keep.** Focus-trap behaviour, Escape handling, and screen-reader announcements remain intact, meaning accessibility affordances from earlier Annex passes continue to hold.
+            11. **Weaknesses to Remove.** Timezone formatting still relies on browser support; document a follow-up to ship a curated timezone list from the backend for environments lacking `Intl.supportedValuesOf`.
+            12. **Styling & Colour Review.** Duration chips honour primary palettes while the summary callout keeps neutral tones, reinforcing the calm scheduling motif laid out in Annex C4.
+            13. **CSS, Orientation & Placement.** Controls stay within the existing grid (`md:grid-cols-2`), ensuring mobile layouts cascade without overflow while the summary strip anchors to the modal footer per Annex orientation notes.
+            14. **Text Analysis.** Microcopy emphasises action clarity (“Auto-sync end time”, “Highlight media URL”), matching Annex tone that prioritises descriptive cues over marketing language.
+            15. **Change Checklist Tracker.** QA should confirm auto-sync toggles, draft persistence, timezone validation, and relative countdown accuracy before approving C4 releases.
+            16. **Full Upgrade Plan & Release Steps.** Roll out by piloting with instructor ops, verifying timezone offsets in staging, capturing feedback on preset coverage, then publishing Annex C4 screenshots/documentation alongside the code deploy.
          - 9.D.2 ScheduleGrid (frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx)
-      - 9.E Search & Discovery Components
+            1. **Appraisal.** The schedule grid now surfaces occupancy progress, location, persona tags, and primary/secondary actions so Annex C4 stakeholders can scan readiness at a glance.
+            2. **Functionality.** `formatRelative`, `formatDuration`, and `formatTimezone` compute readable labels, while progress bars and CTA buttons adapt based on provided metadata, enabling both interactive selection and deep links.
+            3. **Usefulness.** Hosts immediately see seat fill ratios, upcoming session relative timing, and quick links (join/request) without diving into detail pages, matching Annex expectations for rapid classroom triage.
+            4. **Redundancies.** The component dropped wrapper `button` duplication in favour of a single `<article>` with keyboard handlers, eliminating nested interactive elements and consolidating focus styling.
+            5. **Placeholders or Stubs.** Tags remain limited to four entries; a follow-up will paginate larger tag sets once programme metadata expands.
+            6. **Duplicate Functions.** Shared helper functions replace ad-hoc Date math from prior iterations, keeping live class schedule calculations consistent with the dialog’s utilities.
+            7. **Improvements Needed.** Consider streaming live attendance snapshots and resilience for missing timezone abbreviations, plus exposing instructor avatars referenced in Annex C4 roadmap.
+            8. **Styling Improvements.** Persona, momentum, and CTA badges reuse Annex colour tokens (`bg-primary/5`, `bg-emerald-50`), ensuring parity with schedule summaries documented in `user_experience.md`.
+            9. **Efficiency Analysis.** Formatting helpers short-circuit on invalid dates and reuse Intl formatters, reducing expensive allocations when rendering large grids.
+            10. **Strengths to Keep.** Responsive three-column layout, hover/focus cues, and attendance cards remain intact, now enriched with more metrics rather than replaced.
+            11. **Weaknesses to Remove.** CTA spacing now collapses when no buttons render; the remaining gap is the absence of skeletons for occupancy/attendance metrics, which briefly flash empty content while data hydrates.
+            12. **Styling & Colour Review.** Progress bars adopt subtle primary gradients while retaining high contrast for seat usage, aligning with Annex accessibility audits.
+            13. **CSS, Orientation & Placement.** The grid continues using Tailwind utilities (`md:grid-cols-2`, `xl:grid-cols-3`), ensuring density targets from Annex C4 remain satisfied across breakpoints.
+            14. **Text Analysis.** Relative timing strings (“Starts in 2.5 hr”) and occupancy labels follow Annex copy tone—actionable, concise, and free from jargon.
+            15. **Change Checklist Tracker.** QA should cover occupancy progress, persona tag rendering, CTA affordances, timezone fallbacks, and keyboard activation flows.
+            16. **Full Upgrade Plan & Release Steps.** Release alongside updated live-class analytics, obtain instructor feedback on persona chips, update Annex screenshots, and monitor engagement on the upgraded grid.
+            17. **Back-end Integration.** `DashboardService.buildLearnerDashboard` now emits backend-sourced timezone, location, tag, and CTA metadata—plus normalised call-to-action pairs—so ScheduleGrid renders production-aligned Annex C4 payloads instead of local fallbacks, and the supporting seeds/migrations keep classroom metadata synced across environments when `npm --workspace backend-nodejs run migrate && run seed` executes.
+      - ✓ 9.E Search & Discovery Components
          - 9.E.1 BlogSearchSection (frontend-reactjs/src/components/search/BlogSearchSection.jsx)
+            1. **Appraisal.** Annex A6’s newsroom brief now lives in the component: trending tags, saved view metrics, and recent history transform the static blog search into a discovery console.
+            2. **Functionality.** Local persistence covers saved views and recent posts, analytics summaries expose totals/latency, and trending tags derive counts from the tag feed, all memoised to avoid redundant fetch churn.
+            3. **Usefulness.** Editorial teams see catalogue totals, saved view counts, top tags, last refresh timestamp, and device-local history, aligning with Annex guidance for newsroom ops.
+            4. **Redundancies.** Replaced ad-hoc `console` warnings and manual stats with structured dashboards, eliminating duplicate filters previously scattered around the page.
+            5. **Placeholders.** Contact copy still references manual newsroom sharing; upcoming annex work can swap in collaboration hooks once backend endpoints land.
+            6. **Duplicate Functions.** Trending calculations and view persistence reuse shared helpers instead of repeating JSON.parse/JSON.stringify across the module.
+            7. **Improvements Needed.** Wire backend analytics (views per tag, conversions) once available, and consider multi-tenant saved-view syncing beyond localStorage.
+            8. **Styling Improvements.** Summary cards and recents adopt Annex token spacing (`rounded-3xl`, `text-xs uppercase`), ensuring parity with other discovery pages highlighted in `user_experience.md`.
+            9. **Efficiency Analysis.** Debounced fetches remain, while analytics computations filter/sort at most five tags to keep renders snappy.
+            10. **Strengths to Keep.** Knowledge of categories/tags, saved view rename/delete flows, and pagination remain untouched but now contextualised with new metrics.
+            11. **Weaknesses to Remove.** Device-local recents don’t sync across sessions; highlight this in the backlog for future Annex iterations.
+            12. **Styling & Colour Review.** Primary accents highlight metric cards, trending tags, and recents while saved-view warnings retain neutral palettes for contrast compliance.
+            13. **CSS, Orientation & Placement.** Grid layouts maintain responsiveness (cards stack on mobile) while the metrics row complements the existing two-column layout.
+            14. **Text Analysis.** Copy emphasises newsroom actions (“Capture your favourite filters”, “Clear history”), meeting Annex tone for operational clarity.
+            15. **Change Checklist Tracker.** QA should validate saved view CRUD, recents persistence, trending tag counts, pagination, and analytics cards after each release.
+            16. **Full Upgrade Plan & Release Steps.** Launch by seeding real analytics data, briefing editorial ops, updating Annex screenshots, and monitoring engagement with the new summary cards.
+            17. **Back-end Integration.** Search services now emit cluster, persona, and momentum metadata via `SearchDocumentModel`, so BlogSearchSection mirrors Explorer context when the backend toggles Annex A6 features across discovery surfaces.
          - 9.E.2 ExplorerPreviewDrawer (frontend-reactjs/src/components/search/ExplorerPreviewDrawer.jsx)
+            1. **Appraisal.** The preview drawer now showcases persona focus, upcoming sessions, related resources, and copy-to-clipboard share links per Annex A6 exploration requirements.
+            2. **Functionality.** Memoised metrics, persona detection, and upcoming session lists feed structured blocks, while clipboard handling and focus traps keep share actions accessible.
+            3. **Usefulness.** Operators can evaluate persona fit, next session timing, and supporting collateral without leaving the preview, speeding up evaluation as Annex specifies.
+            4. **Redundancies.** Duplicate share/related logic scattered in result cards was consolidated into the drawer, centralising formatting and copy.
+            5. **Placeholders.** Related resources rely on the `relatedResources` array; future search backend upgrades can enrich metadata (thumbnails, types) for richer previews.
+            6. **Duplicate Functions.** Upcoming session formatting reuses shared formatting helpers rather than custom string concatenation for each preview.
+            7. **Improvements Needed.** Add analytics instrumentation for copy-link usage and upcoming session list interactions once telemetry endpoints are defined.
+            8. **Styling Improvements.** Persona chips and share buttons reuse Annex palette tokens (`bg-slate-100`, `border-primary/30`), matching discovery surfaces documented in `user_experience.md`.
+            9. **Efficiency Analysis.** Memoisation ensures persona/metrics/extracted lists render only when hits change, keeping the drawer responsive even with rich data.
+            10. **Strengths to Keep.** Focus trap, Escape handling, and hero media fallback remain unchanged, retaining the accessible baseline from earlier Annex phases.
+            11. **Weaknesses to Remove.** Clipboard copy lacks a tooltip for unsupported browsers; log a follow-up to show inline guidance when copy fails.
+            12. **Styling & Colour Review.** Share success states adopt emerald accents to signal confirmation without introducing new colour tokens.
+            13. **CSS, Orientation & Placement.** Layout preserves existing spacing but adds new cards (`rounded-3xl`) to house sessions/resources, maintaining Annex rhythm.
+            14. **Text Analysis.** Labels emphasise purpose (“Upcoming sessions”, “Related resources”), consistent with Annex clarity guidelines.
+            15. **Change Checklist Tracker.** QA should verify persona chips, upcoming session formatting, share copy states, and related resource links before publishing Annex updates.
+            16. **Full Upgrade Plan & Release Steps.** Roll out alongside analytics updates, document persona/upcoming sections in Annex A6, and capture new screenshots for enablement decks.
+            17. **Back-end Integration.** Drawer content binds directly to Explorer search payloads enriched by `SearchDocumentService` (cluster keys, persona focus, momentum labels), ensuring Annex A6 previews stay in sync with the database-backed discovery taxonomy.
          - 9.E.3 ExplorerSearchSection (frontend-reactjs/src/components/search/ExplorerSearchSection.jsx)
+            1. **Appraisal.** Annex A6 explorers now launch with performance dashboards, latency snapshots, and analytics-driven facet callouts, giving operators actionable intelligence at the top of the page.
+            2. **Functionality.** Latency capture, result counts, and active filter totals feed the new summary row; facet analytics render in dedicated cards, and saved searches highlight pinned entries with skeleton placeholders while `FilterChips` expose a clear-all action.
+            3. **Usefulness.** Teams gain immediate awareness of search responsiveness, filter pressure, pinned configurations, and trending facets without leaving the explorer grid.
+            4. **Redundancies.** Existing facet teaser replaced by analytic cards, eliminating repeated loops for rendering counts throughout the component.
+            5. **Placeholders.** Pinned search info assumes `updatedAt`; document a follow-up for backends that lack timestamp data to avoid blank metadata.
+            6. **Duplicate Functions.** Clear-all chip handling reuses the hook’s `clearFilters`, preventing divergent behaviour between the header reset button and chip controls.
+            7. **Improvements Needed.** Capture latency percentiles and add CTA instrumentation for facet cards when analytics endpoints mature.
+            8. **Styling Improvements.** Summary and facet cards mirror Annex card tokens (`rounded-3xl`, `text-xs uppercase`), keeping the explorer consistent with other discovery surfaces.
+            9. **Efficiency Analysis.** Facet processing limits to top five entries per facet, memoising outputs so large analytics payloads don’t thrash renders.
+            10. **Strengths to Keep.** Infinite scroll, saved search CRUD, and preview drawers remain intact, now augmented with analytics context.
+            11. **Weaknesses to Remove.** Latency display surfaces raw milliseconds; queue an enhancement to render human-readable tiers once Annex approves thresholds.
+            12. **Styling & Colour Review.** Neutral backgrounds ensure metrics stand out without clashing with the existing white explorer shell.
+            13. **CSS, Orientation & Placement.** Summary row slots above the main grid while preserving breakpoints; facet cards collapse elegantly on mobile using the existing grid system.
+            14. **Text Analysis.** Microcopy emphasises action (“Clear history”, “Pinned”) echoing Annex tone for clarity.
+            15. **Change Checklist Tracker.** QA now verifies latency output, summary counts, facet cards, pinned badges, and clear-all chips alongside baseline explorer tests.
+            16. **Full Upgrade Plan & Release Steps.** Coordinate with analytics to validate facet feeds, refresh Annex docs, and brief enablement on the new telemetry row before shipping.
+            17. **Data Alignment.** `SearchDocumentService.normaliseDocument` stamps cluster keys, persona descriptors, and momentum scores; `SearchDocumentModel.deserialize` now rehydrates cluster metadata for legacy rows; migration `20250402101500_search_documents_cluster_alignment.js` plus seed `002_search_documents.js` keep the database aligned; and updated unit tests cover the enriched payloads so Explorer stays in lockstep with Annex A6 taxonomy.
          - 9.E.4 FilterChips (frontend-reactjs/src/components/search/FilterChips.jsx)
+            1. **Appraisal.** Filter chips gained a shared cap (`MAX_MULTI_CHIPS`) and a clear-all affordance, ensuring Annex A6 explorers manage filter overload gracefully.
+            2. **Functionality.** Multi-select chips limit rendering to 12 entries, and the new `onClearAll` prop enables bulk removal while keeping existing remove buttons accessible.
+            3. **Usefulness.** Operators can reset entire filter sets without hunting for the reset header, matching Annex guidance for efficient discovery workflows.
+            4. **Redundancies.** Duplicate slicing logic across consumers was eliminated; chips now centralise their limit and clear affordance in one place.
+            5. **Placeholders.** Bulk clear currently hides when the consumer omits `onClearAll`; document this optionality in Annex docs.
+            6. **Duplicate Functions.** Existing `buildFilterChips` now respects the shared cap, preventing diverging heuristics between explorer/filter contexts.
+            7. **Improvements Needed.** Add tooltip support for truncated chip labels in a future Annex iteration.
+            8. **Styling Improvements.** Clear-all button reuses neutral border tokens, maintaining Annex styling consistency with other chip controls.
+            9. **Efficiency Analysis.** Early exits prevent unnecessary chip creation when filters exceed the limit, keeping render loops cheap.
+            10. **Strengths to Keep.** Button semantics, sr-only labels, and keyboard-friendly removal remain unchanged.
+            11. **Weaknesses to Remove.** The component still lacks virtualization for extremely large filter sets; evaluate if Annex needs this once analytics pipelines expand.
+            12. **Styling & Colour Review.** No palette drift—the new button leans on slate neutrals with primary hover states.
+            13. **CSS, Orientation & Placement.** Layout continues to flex-wrap chips with consistent spacing, aligning with Annex orientation specs.
+            14. **Text Analysis.** “Clear all” copy matches Annex instruction style, concise and action-led.
+            15. **Change Checklist Tracker.** QA should confirm chip limits, clear-all rendering, and removal semantics across explorer views.
+            16. **Full Upgrade Plan & Release Steps.** Update explorer consumers to pass `onClearAll`, document chip caps, and capture Annex screenshots reflecting the new control.
          - 9.E.5 GlobalSearchBar (frontend-reactjs/src/components/search/GlobalSearchBar.jsx)
+            1. **Appraisal.** The global search bar now mirrors Annex A6 expectations: escape-to-dismiss, recent queries, and history clearing give users a guided entry point.
+            2. **Functionality.** LocalStorage-backed recents store the last five submissions, populate the dropdown when no suggestions exist, and expose a clear-history control, while the keydown handler closes on Escape.
+            3. **Usefulness.** Learners can re-run popular searches and manage history without typing, improving exploration speed per Annex UX notes.
+            4. **Redundancies.** Shared submission logic now centralises history updates—removing prior ad-hoc copy/paste across suggestion selection and manual submit paths.
+            5. **Placeholders.** History remains device-local; future Annex work may sync across accounts once backend endpoints exist.
+            6. **Duplicate Functions.** History persistence lives in dedicated helpers (`loadRecents`, `persistRecents`), replacing inline JSON parsing in multiple callbacks.
+            7. **Improvements Needed.** Add analytics events for history taps once telemetry pipelines are ready.
+            8. **Styling Improvements.** Recent entries use Annex pill styling, maintaining visual continuity with other discovery components.
+            9. **Efficiency Analysis.** History updates filter duplicates and trim to five entries, keeping storage and render loops lightweight.
+            10. **Strengths to Keep.** Debounced suggestion refresh, focus management, and pointer guardrails remain unaffected.
+            11. **Weaknesses to Remove.** Consider surfacing suggestions even when history displays to avoid empty-state confusion for novice users.
+            12. **Styling & Colour Review.** Neutral backgrounds and primary hover states keep dropdown aesthetics aligned with Annex tokens.
+            13. **CSS, Orientation & Placement.** Dropdown retains padding/gaps, now with nested lists that collapse cleanly on mobile due to flex column layout.
+            14. **Text Analysis.** Labels like “Clear history” and “Recent searches” adopt Annex voice—succinct and directive.
+            15. **Change Checklist Tracker.** QA should validate suggestion navigation, history persistence/clearing, and Escape behaviour.
+            16. **Full Upgrade Plan & Release Steps.** Stage with QA verifying multi-device behaviour, update Annex docs with new screenshots, and monitor search engagement post-release.
          - 9.E.6 SearchResultCard (frontend-reactjs/src/components/search/SearchResultCard.jsx)
+            1. **Appraisal.** Result cards now expose persona focus, momentum, and share links, aligning Annex A6’s cross-surface storytelling expectations.
+            2. **Functionality.** Persona/momentum chips render beside metadata, share links reference canonical URLs, and metrics reuse the existing grid to highlight price, rating, duration, and location.
+            3. **Usefulness.** Operators can quickly gauge whether a result fits the desired persona, share the listing, or inspect momentum without opening detail pages.
+            4. **Redundancies.** Rewrote the component to remove redundant markup duplication and centralise persona/momentum display logic.
+            5. **Placeholders.** Share CTA currently links out; a follow-up can integrate inline clipboard copy when the backend exposes shortlinks.
+            6. **Duplicate Functions.** Persona/momentum detection mirrors the preview drawer’s heuristics, keeping consistent semantics across the discovery stack.
+            7. **Improvements Needed.** Evaluate adding badges for analytics trends (CTR, conversion) once Annex extends the search payload.
+            8. **Styling Improvements.** Persona/momentum chips reuse neutral and emerald tokens, preserving Annex palette harmony.
+            9. **Efficiency Analysis.** Component still short-circuits when metrics missing; rewrites didn’t add heavy computations, ensuring large result lists stay performant.
+            10. **Strengths to Keep.** Card layout, highlight chips, and CTA rendering remain intact, now augmented with persona storytelling.
+            11. **Weaknesses to Remove.** Share CTA adds vertical spacing; plan to collapse the share block when no link exists to avoid empty padding.
+            12. **Styling & Colour Review.** Buttons retain neutral outlines and primary hover states, aligning with Annex design tokens.
+            13. **CSS, Orientation & Placement.** Persona row anchors beneath highlight lists without breaking existing grid flow across breakpoints.
+            14. **Text Analysis.** Copy emphasises clarity (“Share this result”, “Momentum”), following Annex guidelines for actionable microcopy.
+            15. **Change Checklist Tracker.** QA should verify persona/momentum chip rendering, share link presence, and existing CTA flows remain correct.
+            16. **Full Upgrade Plan & Release Steps.** Roll out with updated search payload documentation, refresh Annex screenshots, and monitor share link usage post-launch.
       - ✅ 10.A Commerce, Checkout & Pricing Components
          - 10.A.1 CampaignEditor (frontend-reactjs/src/components/ads/CampaignEditor.jsx)
          - 10.A.2 CampaignPreview (frontend-reactjs/src/components/ads/CampaignPreview.jsx)

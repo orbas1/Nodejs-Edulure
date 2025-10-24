@@ -110,7 +110,8 @@ describe('IntegrationApiKeyInviteService', () => {
       tokenHash: 'hash-token',
       rotationIntervalDays: 90,
       keyExpiresAt: new Date('2025-03-10T10:00:00.000Z'),
-      metadata: { notes: 'Marketing automations', reason: 'Initial onboarding' },
+      metadata: { notes: 'Marketing automations', reason: 'Initial onboarding', documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' },
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook',
       lastSentAt: now,
       sendCount: 1
     });
@@ -125,7 +126,8 @@ describe('IntegrationApiKeyInviteService', () => {
       notes: 'Marketing automations',
       reason: 'Initial onboarding',
       requestedBy: 'admin@example.com',
-      requestedByName: 'Ops Admin'
+      requestedByName: 'Ops Admin',
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
     });
 
     expect(inviteModelMock.create).toHaveBeenCalledWith(
@@ -134,7 +136,8 @@ describe('IntegrationApiKeyInviteService', () => {
         environment: 'production',
         alias: 'Content Studio Bot',
         rotationIntervalDays: 90,
-        ownerEmail: 'ops@example.com'
+        ownerEmail: 'ops@example.com',
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
       }),
       databaseMock
     );
@@ -154,7 +157,8 @@ describe('IntegrationApiKeyInviteService', () => {
         provider: 'openai',
         providerLabel: 'OpenAI',
         status: 'pending',
-        rotationIntervalDays: 90
+        rotationIntervalDays: 90,
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
       })
     );
     expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
@@ -167,7 +171,8 @@ describe('IntegrationApiKeyInviteService', () => {
           provider: 'openai',
           ownerEmail: 'ops@example.com',
           rotationIntervalDays: 90,
-          requestedByName: 'Ops Admin'
+          requestedByName: 'Ops Admin',
+          documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
         })
       })
     );
@@ -184,7 +189,8 @@ describe('IntegrationApiKeyInviteService', () => {
       status: 'pending',
       expiresAt: new Date('2025-02-27T10:00:00.000Z'),
       sendCount: 1,
-      metadata: { notes: null }
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook',
+      metadata: { notes: null, documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' }
     });
 
     inviteModelMock.updateById.mockResolvedValue({
@@ -197,7 +203,7 @@ describe('IntegrationApiKeyInviteService', () => {
       status: 'pending',
       expiresAt: new Date('2025-02-29T10:00:00.000Z'),
       sendCount: 2,
-      metadata: { notes: null, requestedByName: 'Ops Admin' },
+      metadata: { notes: null, requestedByName: 'Ops Admin', documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' },
       lastSentAt: now
     });
 
@@ -217,7 +223,7 @@ describe('IntegrationApiKeyInviteService', () => {
 
     expect(mailServiceMock.sendMail).toHaveBeenCalled();
     expect(result.invite).toEqual(
-      expect.objectContaining({ id: 'invite-uuid', status: 'pending', sendCount: 2 })
+      expect.objectContaining({ id: 'invite-uuid', status: 'pending', sendCount: 2, documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' })
     );
     expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
@@ -226,7 +232,8 @@ describe('IntegrationApiKeyInviteService', () => {
         entityId: 'invite-uuid',
         metadata: expect.objectContaining({
           sendCount: 2,
-          provider: 'openai'
+          provider: 'openai',
+          documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
         })
       })
     );
@@ -239,7 +246,8 @@ describe('IntegrationApiKeyInviteService', () => {
       environment: 'production',
       alias: 'Content Studio Bot',
       ownerEmail: 'ops@example.com',
-      status: 'pending'
+      status: 'pending',
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
     });
 
     inviteModelMock.updateById.mockResolvedValue({
@@ -250,7 +258,8 @@ describe('IntegrationApiKeyInviteService', () => {
       ownerEmail: 'ops@example.com',
       status: 'cancelled',
       cancelledAt: now,
-      cancelledBy: 'admin@example.com'
+      cancelledBy: 'admin@example.com',
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
     });
 
     const result = await service.cancelInvite('invite-uuid', { cancelledBy: 'admin@example.com' });
@@ -265,7 +274,7 @@ describe('IntegrationApiKeyInviteService', () => {
       expect.objectContaining({
         eventType: 'integrations.invite.cancelled',
         entityId: 'invite-uuid',
-        metadata: expect.objectContaining({ cancelledBy: 'admin@example.com' })
+        metadata: expect.objectContaining({ cancelledBy: 'admin@example.com', documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' })
       })
     );
   });
@@ -281,7 +290,8 @@ describe('IntegrationApiKeyInviteService', () => {
       status: 'pending',
       rotationIntervalDays: 90,
       keyExpiresAt: null,
-      metadata: { notes: null }
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook',
+      metadata: { notes: null, documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' }
     });
 
     inviteModelMock.findById.mockResolvedValue({
@@ -291,7 +301,8 @@ describe('IntegrationApiKeyInviteService', () => {
       alias: 'Content Studio Bot',
       apiKeyId: 5,
       ownerEmail: 'ops@example.com',
-      status: 'completed'
+      status: 'completed',
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
     });
 
     apiKeyServiceMock.createKey.mockResolvedValue({ id: 5, alias: 'Content Studio Bot', status: 'active' });
@@ -331,7 +342,9 @@ describe('IntegrationApiKeyInviteService', () => {
       trxMock
     );
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 5, sanitized: true }));
-    expect(result.invite).toEqual(expect.objectContaining({ id: 'invite-uuid', status: 'completed' }));
+    expect(result.invite).toEqual(
+      expect.objectContaining({ id: 'invite-uuid', status: 'completed', documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' })
+    );
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'integrations.invite.fulfilled',
@@ -339,7 +352,8 @@ describe('IntegrationApiKeyInviteService', () => {
         metadata: expect.objectContaining({
           apiKeyId: 5,
           tokenFingerprint: 'abcdef1234567890',
-          provider: 'openai'
+          provider: 'openai',
+          documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
         })
       })
     );
@@ -356,7 +370,8 @@ describe('IntegrationApiKeyInviteService', () => {
       status: 'pending',
       rotationIntervalDays: 45,
       keyExpiresAt: null,
-      metadata: { notes: 'existing' }
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook',
+      metadata: { notes: 'existing', documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' }
     });
 
     inviteModelMock.findById.mockResolvedValue({
@@ -366,7 +381,8 @@ describe('IntegrationApiKeyInviteService', () => {
       alias: 'Content Studio Bot',
       apiKeyId: 9,
       ownerEmail: 'ops@example.com',
-      status: 'completed'
+      status: 'completed',
+      documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
     });
 
     apiKeyServiceMock.rotateKey.mockResolvedValue({ id: 9, alias: 'Content Studio Bot', status: 'active' });
@@ -399,7 +415,7 @@ describe('IntegrationApiKeyInviteService', () => {
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'integrations.invite.fulfilled',
-        metadata: expect.objectContaining({ apiKeyId: 9, provider: 'openai' })
+        metadata: expect.objectContaining({ apiKeyId: 9, provider: 'openai', documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' })
       })
     );
   });

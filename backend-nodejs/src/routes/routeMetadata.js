@@ -1150,7 +1150,7 @@ const ROUTE_DEFINITIONS = [
   {
     name: 'mobile',
     capability: 'mobile-experience',
-    description: 'Mobile billing, messaging, and learner support endpoints.',
+    description: 'Mobile billing, messaging, offline learning sync, and instructor quick-action endpoints.',
     basePath: '/mobile',
     flagKey: 'platform.api.v1.mobile',
     defaultState: 'enabled',
@@ -1159,15 +1159,15 @@ const ROUTE_DEFINITIONS = [
     audience: 'user',
     owners: ['mobile-experience', 'learner-success'],
     serviceTier: 'core',
-    tags: ['api', 'v1', 'mobile', 'billing', 'messaging'],
+    tags: ['api', 'v1', 'mobile', 'billing', 'messaging', 'learning', 'instructor'],
     rbac: {
       strategy: 'role-based',
       defaultRole: 'user',
-      allowedRoles: ['user', 'staff', 'admin']
+      allowedRoles: ['user', 'instructor', 'staff', 'admin']
     },
     cors: {
       allowedOrigins: ['@env:app.corsOrigins'],
-      allowedMethods: ['GET', 'POST']
+      allowedMethods: ['GET', 'POST', 'PATCH', 'DELETE']
     },
     statusPageComponent: 'api-mobile'
   },

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/content_service.dart';
+import '../services/offline_learning_service.dart';
 import '../services/session_manager.dart';
 import '../widgets/material_metadata_sheet.dart';
 import 'ebook_reader_screen.dart';
@@ -18,9 +21,12 @@ class ContentLibraryScreen extends StatefulWidget {
 
 class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
   final ContentService _service = ContentService();
+  final OfflineLearningService _offlineService = OfflineLearningService();
   List<ContentAsset> _assets = [];
   Map<String, String> _downloads = {};
   Map<String, EbookProgress> _ebookProgress = {};
+  Map<String, OfflineLessonDownload> _downloadStatuses = {};
+  StreamSubscription<OfflineLessonDownload>? _downloadSubscription;
   bool _loading = true;
   List<EbookMarketplaceItem> _marketplace = [];
   bool _marketplaceLoading = true;
@@ -33,7 +39,31 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
   @override
   void initState() {
     super.initState();
+    _setupOfflineListeners();
     _initialise();
+  }
+
+  void _setupOfflineListeners() {
+    unawaited(_hydrateOfflineDownloads());
+    _downloadSubscription = _offlineService.downloadStream.listen((status) {
+      if (!mounted) return;
+      setState(() {
+        _downloadStatuses[status.assetId] = status;
+        if (status.isComplete && status.filePath != null) {
+          _downloads[status.assetId] = status.filePath!;
+        }
+      });
+    });
+  }
+
+  Future<void> _hydrateOfflineDownloads() async {
+    final statuses = await _offlineService.listDownloads();
+    if (!mounted) return;
+    setState(() {
+      _downloadStatuses = {
+        for (final status in statuses) status.assetId: status,
+      };
+    });
   }
 
   Future<void> _initialise() async {
@@ -54,6 +84,12 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
           : null;
     });
     await _refresh();
+  }
+
+  @override
+  void dispose() {
+    _downloadSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _refresh() async {
@@ -428,7 +464,9 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
     try {
       final token = await _service.viewerToken(asset.publicId);
       final path = await _service.downloadAsset(asset, token);
-      await _service.recordDownload(asset.publicId);
+      if (_offlineService.shouldEmitDownloadAnalytics(asset.publicId)) {
+        await _service.recordDownload(asset.publicId);
+      }
       setState(() {
         _downloads[asset.publicId] = path;
       });
@@ -451,7 +489,9 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
       if (path == null) {
         final token = await _service.viewerToken(asset.publicId);
         path = await _service.downloadAsset(asset, token);
-        await _service.recordDownload(asset.publicId);
+        if (_offlineService.shouldEmitDownloadAnalytics(asset.publicId)) {
+          await _service.recordDownload(asset.publicId);
+        }
         setState(() {
           _downloads[asset.publicId] = path!;
         });
@@ -515,6 +555,154 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
       await SessionManager.assetsCache
           .put('items', _assets.map((asset) => asset.toJson()).toList());
     }
+  }
+
+  List<Widget> _buildOfflineStatusWidgets(
+    BuildContext context,
+    ContentAsset asset,
+    OfflineLessonDownload? status,
+  ) {
+    final theme = Theme.of(context);
+    if (status == null) {
+      if (asset.type.toLowerCase() == 'rubric') {
+        return [
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.rule_folder_outlined, color: Colors.orange),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Offline rubric review is coming soon. Rubric annotations will sync once Annex B6 offline workflows go live.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ];
+      }
+      return const [];
+    }
+
+    switch (status.state) {
+      case OfflineDownloadState.queued:
+        return [
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.blueGrey.shade50,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.watch_later_outlined, color: Colors.blueGrey.shade600),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Queued for offline download • keep the app in the foreground to prioritise this bundle.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ];
+      case OfflineDownloadState.inProgress:
+        final percent = (status.progress * 100).clamp(0, 100).toStringAsFixed(0);
+        return [
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: status.progress.clamp(0, 1),
+              minHeight: 6,
+              backgroundColor: _brandPrimary.withOpacity(0.1),
+              valueColor: const AlwaysStoppedAnimation<Color>(_brandPrimary),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Downloading $percent% • stay online to finish the offline bundle.',
+            style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade700),
+          ),
+        ];
+      case OfflineDownloadState.completed:
+        final relative = _formatRelativeTime(status.updatedAt);
+        final path = status.filePath ?? _downloads[status.assetId];
+        return [
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: _brandPrimaryDark, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Offline copy ready • updated $relative',
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          if (path != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Stored at $path',
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+              ),
+            ),
+        ];
+      case OfflineDownloadState.failed:
+        return [
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Download failed. ${status.errorMessage ?? 'Check your connection and retry.'}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.red.shade700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ];
+    }
+  }
+
+  String _formatRelativeTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    if (difference.inMinutes < 1) {
+      return 'just now';
+    }
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} min ago';
+    }
+    if (difference.inHours < 24) {
+      return '${difference.inHours} h ago';
+    }
+    return '${difference.inDays} d ago';
   }
 
   @override
@@ -611,6 +799,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                   final asset = _assets[index];
                               final downloadedPath = _downloads[asset.publicId];
                               final ebookProgress = _ebookProgress[asset.publicId];
+                              final downloadStatus = _downloadStatuses[asset.publicId];
                               final description = asset.customMetadata['description'] as String?;
                               final showcase = asset.customMetadata['showcase'];
                               final badge = showcase is Map<String, dynamic> ? showcase['badge'] as String? : null;
@@ -758,6 +947,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                               .toList(),
                                         ),
                                       ],
+                                      ..._buildOfflineStatusWidgets(context, asset, downloadStatus),
                                       const SizedBox(height: 16),
                                       Wrap(
                                         spacing: 8,
@@ -830,7 +1020,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                           style: Theme.of(context).textTheme.bodySmall,
                                         ),
                                       ],
-                                      if (downloadedPath != null)
+                                      if (downloadedPath != null && (downloadStatus == null || !downloadStatus.isComplete))
                                         Padding(
                                           padding: const EdgeInsets.only(top: 8),
                                           child: Text(
