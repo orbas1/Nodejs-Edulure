@@ -16,6 +16,8 @@ import { BoltIcon, CheckCircleIcon, MegaphoneIcon } from '@heroicons/react/24/so
 import CalendarEventDialog from '../../components/calendar/CalendarEventDialog.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { loadPersistentState, savePersistentState, deletePersistentState } from '../../utils/persistentState.js';
+import { buildIcsCalendar } from '../../utils/calendar.js';
+import { downloadTextFile } from '../../utils/download.js';
 
 const STORAGE_KEY = 'edulure.dashboard.calendar.v1';
 const EVENT_TYPE_LABELS = {
@@ -139,20 +141,6 @@ function normaliseSeededEvents(events) {
             .filter(Boolean)
         : []
   }));
-}
-
-function toICSDate(date) {
-  const iso = toDate(date)?.toISOString();
-  if (!iso) return '';
-  return iso.replace(/[-:]/g, '').split('.')[0] + 'Z';
-}
-
-function escapeICS(text = '') {
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/,/g, '\\,')
-    .replace(/;/g, '\\;')
-    .replace(/\r?\n/g, '\\n');
 }
 
 function computeStatus(event) {
@@ -568,41 +556,48 @@ export default function DashboardCalendar() {
       setAnnouncement('Nothing to export yet. Add an event first.');
       return;
     }
-    const nowStamp = toICSDate(new Date());
-    const lines = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Edulure//CommunityCalendar//EN'
-    ];
-    events.forEach((event) => {
-      lines.push('BEGIN:VEVENT');
-      lines.push(`UID:${event.id}@edulure`);
-      lines.push(`DTSTAMP:${nowStamp}`);
-      lines.push(`DTSTART:${toICSDate(event.startAt)}`);
-      lines.push(`DTEND:${toICSDate(event.endAt)}`);
-      lines.push(`SUMMARY:${escapeICS(event.title)}`);
-      lines.push(`DESCRIPTION:${escapeICS(event.description ?? '')}`);
-      if (event.location) {
-        lines.push(`LOCATION:${escapeICS(event.location)}`);
-      }
-      if (event.ctaUrl) {
-        lines.push(`URL:${escapeICS(event.ctaUrl)}`);
-      }
-      if (Array.isArray(event.tags) && event.tags.length) {
-        lines.push(`CATEGORIES:${escapeICS(event.tags.join(','))}`);
-      }
-      lines.push('END:VEVENT');
+    const calendarEvents = events.map((event) => {
+      const descriptionParts = [
+        event.description,
+        Array.isArray(event.resources) && event.resources.length
+          ? `Resources: ${event.resources.join(', ')}`
+          : typeof event.resources === 'string' && event.resources.trim()
+            ? `Resources: ${event.resources.trim()}`
+            : null,
+        event.ctaLabel && event.ctaUrl ? `${event.ctaLabel}: ${event.ctaUrl}` : null
+      ].filter(Boolean);
+      return {
+        uid: `${event.id}@edulure`,
+        startAt: event.startAt,
+        endAt: event.endAt,
+        timezone: event.timezone ?? event.metadata?.timezone ?? null,
+        summary: event.title,
+        description: descriptionParts.join('\n'),
+        location: event.location ?? null,
+        url: event.joinUrl ?? event.ctaUrl ?? null,
+        categories: Array.isArray(event.tags) ? event.tags : [],
+        organizer: event.facilitator
+          ? {
+              name: event.facilitator,
+              email: event.organizerEmail ?? null
+            }
+          : null,
+        reminders: [{ minutesBefore: 30, description: 'Upcoming community session' }]
+      };
     });
-    lines.push('END:VCALENDAR');
 
-    const blob = new Blob([lines.join('\n')], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'edulure-community-calendar.ics';
-    link.click();
-    URL.revokeObjectURL(url);
-    setAnnouncement('Calendar export generated.');
+    const ics = buildIcsCalendar(calendarEvents, {
+      prodId: '-//Edulure//CommunityCalendar//EN',
+      name: 'Edulure Programming Calendar'
+    });
+
+    const saved = downloadTextFile({
+      content: ics,
+      fileName: 'edulure-community-calendar.ics',
+      mimeType: 'text/calendar;charset=utf-8'
+    });
+
+    setAnnouncement(saved ? 'Calendar export generated.' : 'Calendar export could not be generated in this browser.');
   }, [events]);
 
   const handlePromote = useCallback((event) => {

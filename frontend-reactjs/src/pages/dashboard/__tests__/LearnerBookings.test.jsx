@@ -10,6 +10,7 @@ const createTutorBookingRequestMock = vi.hoisted(() => vi.fn());
 const exportTutorScheduleMock = vi.hoisted(() => vi.fn());
 const updateTutorBookingMock = vi.hoisted(() => vi.fn());
 const cancelTutorBookingMock = vi.hoisted(() => vi.fn());
+const downloadTextFileMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../hooks/useLearnerDashboard.js', () => ({
   useLearnerDashboardSection: useLearnerDashboardSectionMock
@@ -24,6 +25,10 @@ vi.mock('../../../api/learnerDashboardApi.js', () => ({
   exportTutorSchedule: exportTutorScheduleMock,
   updateTutorBooking: updateTutorBookingMock,
   cancelTutorBooking: cancelTutorBookingMock
+}));
+
+vi.mock('../../../utils/download.js', () => ({
+  downloadTextFile: downloadTextFileMock
 }));
 
 describe('<LearnerBookings />', () => {
@@ -60,11 +65,18 @@ describe('<LearnerBookings />', () => {
       }
     });
     exportTutorScheduleMock.mockResolvedValue({
-      message: 'Export prepared',
-      data: { meta: { downloadUrl: '/exports/schedule.ics' } }
+      message: 'Agenda export ready – 2 upcoming sessions',
+      data: {
+        meta: {
+          ics: 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nSUMMARY:Test\r\nEND:VEVENT\r\nEND:VCALENDAR',
+          fileName: 'schedule.ics',
+          events: 2
+        }
+      }
     });
     updateTutorBookingMock.mockResolvedValue({ message: 'Mentor booking updated.' });
     cancelTutorBookingMock.mockResolvedValue({ message: 'Booking cancelled.' });
+    downloadTextFileMock.mockReturnValue(true);
   });
 
   it('submits a new tutor booking request via the booking form', async () => {
@@ -147,7 +159,12 @@ describe('<LearnerBookings />', () => {
 
     await waitFor(() => {
       expect(exportTutorScheduleMock).toHaveBeenCalledWith({ token: 'token-123' });
-      expect(screen.getByRole('status')).toHaveTextContent(/agenda export ready/i);
+      expect(downloadTextFileMock).toHaveBeenCalledWith({
+        content: expect.stringContaining('BEGIN:VCALENDAR'),
+        fileName: 'schedule.ics',
+        mimeType: 'text/calendar;charset=utf-8'
+      });
+      expect(screen.getByRole('status')).toHaveTextContent(/agenda export downloaded/i);
     });
   });
 });

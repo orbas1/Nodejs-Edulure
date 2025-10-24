@@ -10,6 +10,7 @@ import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboar
 import useLearnerProgress from '../../hooks/useLearnerProgress.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useMountedRef from '../../hooks/useMountedRef.js';
+import { downloadTextFile } from '../../utils/download.js';
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -400,11 +401,29 @@ export default function LearnerCourses() {
     setStatusMessage({ type: 'pending', message: 'Preparing calendar sync…' });
     try {
       const response = await exportTutorSchedule({ token });
-      const url = response?.data?.meta?.downloadUrl ?? null;
+      const acknowledgement = response?.data ?? {};
+      const meta = acknowledgement.meta ?? {};
+      const eventCount = typeof meta.events === 'number' ? meta.events : null;
+      const countLabel = eventCount === null ? '' : ` (${eventCount} session${eventCount === 1 ? '' : 's'})`;
+      let message = acknowledgement.message ?? response?.message ?? `Calendar sync prepared${countLabel}.`;
+
+      if (meta.ics) {
+        const saved = downloadTextFile({
+          content: meta.ics,
+          fileName: meta.fileName ?? 'edulure-tutor-schedule.ics',
+          mimeType: 'text/calendar;charset=utf-8'
+        });
+        message = saved
+          ? `Calendar export downloaded${countLabel}.`
+          : `Calendar export generated${countLabel}. Download the .ics file from your browser if it did not download automatically.`;
+      } else if (meta.downloadUrl) {
+        message = `Calendar export ready${countLabel}. Download from ${meta.downloadUrl}.`;
+      }
+
       if (mounted.current) {
         setStatusMessage({
           type: 'success',
-          message: url ? `Calendar export ready. Download from ${url}.` : 'Calendar sync prepared.'
+          message
         });
       }
     } catch (calendarError) {

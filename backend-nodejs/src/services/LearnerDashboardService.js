@@ -48,6 +48,168 @@ function buildAcknowledgement({
   };
 }
 
+function escapeIcsText(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+}
+
+function foldIcsLine(line) {
+  if (!line || line.length <= 75) {
+    return line;
+  }
+
+  const segments = [];
+  for (let index = 0; index < line.length; index += 75) {
+    const chunk = line.slice(index, index + 75);
+    segments.push(index === 0 ? chunk : ` ${chunk}`);
+  }
+  return segments.join('\r\n');
+}
+
+function toDate(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatIcsDate(value, timezone) {
+  const date = toDate(value);
+  if (!date) {
+    return null;
+  }
+
+  if (timezone) {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(date).reduce((acc, part) => {
+        acc[part.type] = part.value;
+        return acc;
+      }, {});
+      const stamp = `${parts.year}${parts.month}${parts.day}T${parts.hour}${parts.minute}${parts.second}`;
+      return { value: stamp, timezone };
+    } catch (_error) {
+      // Fall back to UTC formatting below
+    }
+  }
+
+  const iso = date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  return { value: iso, timezone: null };
+}
+
+function buildIcsEventLines(event, { stamp } = {}) {
+  const lines = ['BEGIN:VEVENT'];
+  const nowStamp = stamp ?? formatIcsDate(new Date()).value;
+  const uid = escapeIcsText(event.uid ?? `event-${Date.now()}`);
+  lines.push(`UID:${uid}`);
+  lines.push(`DTSTAMP:${nowStamp}`);
+
+  const start = formatIcsDate(event.startAt, event.timezone);
+  const end = formatIcsDate(
+    event.endAt ?? (start ? new Date(toDate(event.startAt).getTime() + 60 * 60 * 1000) : null),
+    event.timezone
+  );
+
+  if (start) {
+    if (start.timezone) {
+      lines.push(`DTSTART;TZID=${escapeIcsText(start.timezone)}:${start.value}`);
+    } else {
+      lines.push(`DTSTART:${start.value}`);
+    }
+  }
+
+  if (end) {
+    if (end.timezone) {
+      lines.push(`DTEND;TZID=${escapeIcsText(end.timezone)}:${end.value}`);
+    } else {
+      lines.push(`DTEND:${end.value}`);
+    }
+  }
+
+  if (event.summary) {
+    lines.push(`SUMMARY:${escapeIcsText(event.summary)}`);
+  }
+  if (event.description) {
+    lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+  }
+  if (event.location) {
+    lines.push(`LOCATION:${escapeIcsText(event.location)}`);
+  }
+  if (event.url) {
+    lines.push(`URL:${escapeIcsText(event.url)}`);
+  }
+  if (Array.isArray(event.categories) && event.categories.length) {
+    lines.push(`CATEGORIES:${escapeIcsText(event.categories.join(','))}`);
+  }
+  if (event.organizer) {
+    const name = escapeIcsText(event.organizer.name ?? 'Edulure Mentor');
+    const email = event.organizer.email ? `MAILTO:${escapeIcsText(event.organizer.email)}` : '';
+    const organiserLine = email ? `ORGANIZER;CN=${name}:${email}` : `ORGANIZER;CN=${name}`;
+    lines.push(organiserLine);
+  }
+  if (Array.isArray(event.attendees)) {
+    event.attendees
+      .filter(Boolean)
+      .forEach((attendee) => {
+        const name = escapeIcsText(attendee.name ?? attendee.email ?? 'Participant');
+        const email = attendee.email ? `MAILTO:${escapeIcsText(attendee.email)}` : '';
+        const role = attendee.role ? `;ROLE=${escapeIcsText(attendee.role)}` : '';
+        const status = attendee.status ? `;PARTSTAT=${escapeIcsText(attendee.status)}` : '';
+        lines.push(`ATTENDEE;CN=${name}${role}${status}:${email || name}`);
+      });
+  }
+
+  if (Array.isArray(event.reminders)) {
+    event.reminders
+      .filter((reminder) => Number.isFinite(Number(reminder?.minutesBefore)))
+      .forEach((reminder) => {
+        lines.push('BEGIN:VALARM');
+        lines.push('ACTION:DISPLAY');
+        lines.push(`DESCRIPTION:${escapeIcsText(reminder.description ?? 'Session reminder')}`);
+        lines.push(`TRIGGER:-PT${Math.max(1, Math.floor(reminder.minutesBefore))}M`);
+        lines.push('END:VALARM');
+      });
+  }
+
+  lines.push('END:VEVENT');
+  return lines.map(foldIcsLine);
+}
+
+function buildIcsCalendar(events, { prodId = '-//Edulure//LearnerAgenda//EN', name, timezone } = {}) {
+  const safeEvents = Array.isArray(events) ? events : [];
+  const nowStamp = formatIcsDate(new Date()).value;
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:${escapeIcsText(prodId)}`, 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  if (name) {
+    lines.push(`X-WR-CALNAME:${escapeIcsText(name)}`);
+  }
+  if (timezone) {
+    lines.push(`X-WR-TIMEZONE:${escapeIcsText(timezone)}`);
+  }
+  safeEvents.forEach((event) => {
+    buildIcsEventLines(event, { stamp: nowStamp }).forEach((line) => {
+      lines.push(line);
+    });
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
 function parseDate(value, fallback) {
   if (!value) {
     return fallback instanceof Date ? fallback : new Date(fallback ?? Date.now());
@@ -1654,13 +1816,159 @@ export default class LearnerDashboardService {
   }
 
   static async exportTutorSchedule(userId) {
+    if (!userId) {
+      const error = new Error('User identifier is required to export the tutor schedule');
+      error.status = 400;
+      throw error;
+    }
+
     const exportId = generateReference('schedule');
     log.info({ userId, exportId }, 'Learner requested tutor schedule export');
+
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - 30 * 60 * 1000);
+    const windowEnd = new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000);
+
+    const [bookings, classrooms] = await Promise.all([
+      TutorBookingModel.listByLearnerId(userId, { limit: 200 }, db),
+      LiveClassroomModel.listForLearner(userId, { from: windowStart, to: windowEnd, limit: 200 }, db)
+    ]);
+
+    const events = [];
+
+    bookings
+      .filter((booking) => {
+        const start = toDate(booking.scheduledStart);
+        return start && start >= windowStart && start <= windowEnd && booking.status !== 'cancelled';
+      })
+      .forEach((booking) => {
+        const timezone =
+          booking.metadata?.timezone ||
+          booking.metadata?.timeZone ||
+          booking.tutorProfile?.metadata?.timezone ||
+          null;
+        const durationMinutes = Number.isFinite(Number(booking.durationMinutes))
+          ? Math.max(15, Math.round(Number(booking.durationMinutes)))
+          : 60;
+        const endTime = booking.scheduledEnd
+          ? booking.scheduledEnd
+          : new Date(toDate(booking.scheduledStart).getTime() + durationMinutes * 60 * 1000);
+        const summaryBase = booking.metadata?.topic || booking.metadata?.title || 'Mentorship session';
+        const mentorName = booking.tutorProfile?.displayName || booking.tutorProfile?.user?.firstName || 'Edulure Mentor';
+        const descriptionParts = [
+          summaryBase,
+          booking.metadata?.message ? `Learner notes: ${booking.metadata.message}` : null,
+          booking.meetingUrl ? `Meeting link: ${booking.meetingUrl}` : null,
+          `Status: ${booking.status ?? 'scheduled'}`
+        ].filter(Boolean);
+
+        events.push({
+          uid: `${booking.publicId || `booking-${booking.id}`}@edulure`,
+          startAt: booking.scheduledStart,
+          endAt: endTime,
+          timezone,
+          summary: `${summaryBase} · ${mentorName}`,
+          description: descriptionParts.join('\n'),
+          location: booking.meetingUrl ?? undefined,
+          url: booking.meetingUrl ?? undefined,
+          categories: ['Mentorship'],
+          organizer: {
+            name: mentorName,
+            email: booking.tutorProfile?.user?.email ?? null
+          },
+          attendees: [
+            booking.learner
+              ? {
+                  name: `${booking.learner.firstName ?? ''} ${booking.learner.lastName ?? ''}`.trim() || booking.learner.email,
+                  email: booking.learner.email ?? null,
+                  role: 'REQ-PARTICIPANT',
+                  status: 'NEEDS-ACTION'
+                }
+              : null
+          ],
+          reminders: [
+            { minutesBefore: 60, description: 'Mentor session starting soon' },
+            { minutesBefore: 10, description: 'Mentor session begins in 10 minutes' }
+          ]
+        });
+      });
+
+    classrooms
+      .filter((classroom) => {
+        const start = toDate(classroom.startAt);
+        return start && start >= windowStart && start <= windowEnd;
+      })
+      .forEach((classroom) => {
+        const fallbackDuration = Number.isFinite(Number(classroom.metadata?.durationMinutes))
+          ? Number(classroom.metadata.durationMinutes)
+          : 75;
+        const endTime = classroom.endAt
+          ? classroom.endAt
+          : new Date(toDate(classroom.startAt).getTime() + fallbackDuration * 60 * 1000);
+        const descriptionParts = [
+          classroom.summary,
+          classroom.description,
+          Array.isArray(classroom.metadata?.prepMaterials)
+            ? `Prep: ${classroom.metadata.prepMaterials.join(', ')}`
+            : null,
+          classroom.metadata?.broadcastUrl ? `Broadcast: ${classroom.metadata.broadcastUrl}` : null
+        ].filter(Boolean);
+
+        events.push({
+          uid: `${classroom.publicId || `classroom-${classroom.id}`}@edulure`,
+          startAt: classroom.startAt,
+          endAt: endTime,
+          timezone: classroom.timezone || classroom.metadata?.timezone || null,
+          summary: classroom.title ?? 'Live classroom',
+          description: descriptionParts.join('\n'),
+          location: classroom.metadata?.venue ?? classroom.location ?? null,
+          url: classroom.metadata?.joinUrl ?? classroom.metadata?.broadcastUrl ?? classroom.metadata?.registrationUrl ?? null,
+          categories: ['Live classroom', classroom.type, ...(Array.isArray(classroom.topics) ? classroom.topics : [])].filter(
+            Boolean
+          ),
+          organizer: {
+            name: classroom.metadata?.host ?? classroom.facilitator ?? 'Edulure Team',
+            email: classroom.metadata?.hostEmail ?? null
+          },
+          reminders: [{ minutesBefore: 30, description: 'Live classroom starts in 30 minutes' }]
+        });
+      });
+
+    const sortedEvents = events.sort((a, b) => {
+      const timeA = toDate(a.startAt)?.getTime() ?? 0;
+      const timeB = toDate(b.startAt)?.getTime() ?? 0;
+      return timeA - timeB;
+    });
+
+    let defaultTimezone = 'Etc/UTC';
+    try {
+      const resolved = Intl.DateTimeFormat().resolvedOptions()?.timeZone;
+      if (resolved && typeof resolved === 'string') {
+        defaultTimezone = resolved;
+      }
+    } catch (_error) {
+      defaultTimezone = 'Etc/UTC';
+    }
+
+    const calendarName = 'Edulure · Live Sessions & Mentorship';
+    const icsPayload = buildIcsCalendar(sortedEvents, {
+      prodId: '-//Edulure//TutorAgenda//EN',
+      name: calendarName,
+      timezone: sortedEvents[0]?.timezone ?? defaultTimezone
+    });
+
+    const message = sortedEvents.length
+      ? `Tutor agenda export ready – ${sortedEvents.length} upcoming session${sortedEvents.length === 1 ? '' : 's'}`
+      : 'Agenda export generated. No upcoming sessions detected.';
+
     return buildAcknowledgement({
       reference: exportId,
-      message: 'Tutor agenda export ready',
+      message,
       meta: {
-        downloadUrl: `/exports/${exportId}.ics`
+        fileName: `edulure-tutor-schedule-${now.toISOString().slice(0, 10)}.ics`,
+        generatedAt: now.toISOString(),
+        events: sortedEvents.length,
+        ics: icsPayload
       }
     });
   }

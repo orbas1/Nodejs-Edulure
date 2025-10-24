@@ -10,6 +10,7 @@ import {
 } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useMountedRef from '../../hooks/useMountedRef.js';
+import { downloadTextFile } from '../../utils/download.js';
 
 const prepShareDefaultState = {
   open: false,
@@ -600,13 +601,28 @@ export default function LearnerBookings() {
         return;
       }
       const acknowledgement = response?.data ?? {};
-      const downloadUrl = acknowledgement.meta?.downloadUrl ?? null;
+      const meta = acknowledgement.meta ?? {};
+      const eventCount = typeof meta.events === 'number' ? meta.events : null;
+      const countLabel = eventCount === null ? '' : ` (${eventCount} session${eventCount === 1 ? '' : 's'})`;
+
+      let message = acknowledgement.message ?? response?.message ?? `Agenda export prepared${countLabel}.`;
+
+      if (meta.ics) {
+        const saved = downloadTextFile({
+          content: meta.ics,
+          fileName: meta.fileName ?? 'edulure-tutor-schedule.ics',
+          mimeType: 'text/calendar;charset=utf-8'
+        });
+        message = saved
+          ? `Agenda export downloaded${countLabel}.`
+          : `Agenda export generated${countLabel}. Download the .ics file from your browser if it did not start automatically.`;
+      } else if (meta.downloadUrl) {
+        message = `Agenda export ready${countLabel}. Download from ${meta.downloadUrl}.`;
+      }
+
       setStatusMessage({
         type: 'success',
-        message:
-          downloadUrl
-            ? `Agenda export ready. Download from ${downloadUrl}.`
-            : response?.message ?? 'Agenda export prepared.'
+        message
       });
     } catch (exportError) {
       if (mounted.current) {

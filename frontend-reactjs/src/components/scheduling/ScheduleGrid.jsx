@@ -3,7 +3,8 @@ import {
   CalendarDaysIcon,
   ClockIcon,
   UserGroupIcon,
-  WifiIcon
+  WifiIcon,
+  ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -80,6 +81,19 @@ function resolveAttendance(attendance = {}) {
   return `${total} checkpoint${total === 1 ? '' : 's'} • ${label}`;
 }
 
+function normaliseResourceList(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(/[,\n]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessions scheduled', showAttendance = true }) {
   if (!Array.isArray(events) || events.length === 0) {
     return (
@@ -97,6 +111,10 @@ export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessio
         const attendanceLabel = resolveAttendance(event.attendance);
         const status = event.status ? String(event.status).toLowerCase() : 'scheduled';
         const stage = event.stage ?? 'Live classroom';
+        const facilitator = event.facilitator ?? event.host ?? event.organizer?.name ?? null;
+        const joinUrl = event.joinUrl ?? event.ctaUrl ?? null;
+        const joinLabel = event.joinLabel ?? event.ctaLabel ?? 'Join session';
+        const resources = normaliseResourceList(event.resources);
         const Wrapper = onSelect ? 'button' : 'div';
         const wrapperProps = onSelect
           ? {
@@ -143,6 +161,12 @@ export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessio
                   <span>{event.timezone}</span>
                 </div>
               )}
+              {facilitator ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <UserGroupIcon className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                  <span>{facilitator}</span>
+                </div>
+              ) : null}
             </div>
             <div className="mt-4 space-y-2 text-xs text-slate-600">
               <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
@@ -155,6 +179,32 @@ export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessio
                   <span className="font-semibold text-slate-900">{attendanceLabel}</span>
                 </div>
               )}
+              {resources.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {resources.slice(0, 3).map((resource) => (
+                    <span key={resource} className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600">
+                      {resource}
+                    </span>
+                  ))}
+                  {resources.length > 3 ? (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-500">
+                      +{resources.length - 3} more
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {joinUrl ? (
+                <a
+                  href={joinUrl}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-primary/40 px-3 py-1 text-[11px] font-semibold text-primary transition hover:border-primary hover:bg-primary/10"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  {joinLabel}
+                  <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+              ) : null}
             </div>
           </Wrapper>
         );
@@ -180,6 +230,14 @@ ScheduleGrid.propTypes = {
       attendance: PropTypes.shape({
         total: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
         lastRecordedLabel: PropTypes.string
+      }),
+      joinUrl: PropTypes.string,
+      joinLabel: PropTypes.string,
+      resources: PropTypes.oneOfType([PropTypes.arrayOf(PropTypes.string), PropTypes.string]),
+      facilitator: PropTypes.string,
+      host: PropTypes.string,
+      organizer: PropTypes.shape({
+        name: PropTypes.string
       })
     })
   ),
