@@ -1,0 +1,103 @@
+{
+  "version": "2025.10",
+  "generatedAt": "2025-10-10T00:00:00.000Z",
+  "owner": "Strategy & Insights",
+  "pillars": [
+    {
+      "id": "retention",
+      "label": "Retention",
+      "stakeholders": ["Product", "Design", "Customer Success"],
+      "summary": "Reduce navigation friction so returning learners can reach fresh content faster.",
+      "communications": [
+        {
+          "channel": "Weekly exec stand-up",
+          "cadence": "weekly",
+          "owner": "VP Product",
+          "message": "Report feed click-depth delta and qualitative blockers from support transcripts."
+        },
+        {
+          "channel": "Board packet",
+          "cadence": "quarterly",
+          "owner": "CEO",
+          "message": "Highlight returning learner uplift driven by annex remediation."
+        }
+      ],
+      "metrics": {
+        "nav-click-depth": {
+          "weight": 0.35,
+          "targetDate": "2025-12-31",
+          "valuationNotes": "Each 0.1 reduction maps to a 0.6pt increase in weekly active ratio.",
+          "owner": "Navigation PM",
+          "reporting": "DashboardService.navigationSummary"
+        },
+        "return-visit-rate": {
+          "weight": 0.65,
+          "targetDate": "2026-01-31",
+          "valuationNotes": "Ties to cohort retention and upsell eligibility.",
+          "owner": "Lifecycle Marketing",
+          "reporting": "TelemetryWarehouseService.learnersReturning30d"
+        }
+      }
+    },
+    {
+      "id": "activation",
+      "label": "Activation",
+      "stakeholders": ["Growth", "Design", "Learning Operations"],
+      "summary": "Improve discovery metadata and filter adoption to shorten time-to-value for new learners.",
+      "communications": [
+        {
+          "channel": "Growth review",
+          "cadence": "bi-weekly",
+          "owner": "Director of Growth",
+          "message": "Share filter engagement trends and qualitative notes from learner interviews."
+        }
+      ],
+      "metrics": {
+        "course-discovery-time": {
+          "weight": 0.5,
+          "targetDate": "2025-11-15",
+          "valuationNotes": "Correlates with trial-to-paid conversion speed.",
+          "owner": "Growth Analytics",
+          "reporting": "ExplorerAnalyticsService.discoveryLatency"
+        },
+        "filter-engagement-rate": {
+          "weight": 0.5,
+          "targetDate": "2025-12-10",
+          "valuationNotes": "Filter usage demonstrates meaningful catalog exploration.",
+          "owner": "Learning Operations",
+          "reporting": "ExplorerAnalyticsService.filterEngagement"
+        }
+      }
+    },
+    {
+      "id": "efficiency",
+      "label": "Efficiency",
+      "stakeholders": ["Instructor Operations", "Revenue", "Design"],
+      "summary": "Reduce rework in instructor tooling by surfacing readiness gating and evidence capture inline.",
+      "communications": [
+        {
+          "channel": "Instructor operations review",
+          "cadence": "monthly",
+          "owner": "Director of Instructor Success",
+          "message": "Publish readiness pass rates and backlog of evidence capture tasks."
+        }
+      ],
+      "metrics": {
+        "upload-readiness-pass-rate": {
+          "weight": 0.6,
+          "targetDate": "2025-11-30",
+          "valuationNotes": "Directly influences course launch velocity and instructor NPS.",
+          "owner": "Instructor Success",
+          "reporting": "NavigationAnnexRepository.describe"
+        },
+        "evidence-capture-latency": {
+          "weight": 0.4,
+          "targetDate": "2026-01-15",
+          "valuationNotes": "Audit compliance requirement before scaling annex rollouts.",
+          "owner": "Quality Engineering",
+          "reporting": "OperationsChecklist.auditEvidenceLatency"
+        }
+      }
+    }
+  ]
+}

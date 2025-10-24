@@ -42,6 +42,7 @@ import 'screens/privacy_policy_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/user_profile_view_screen.dart';
 import 'services/language_service.dart';
+import 'theme/app_theme.dart';
 import 'widgets/capability_status_banner.dart';
 
 Future<void> main() async {
@@ -124,6 +125,11 @@ class EdulureApp extends ConsumerWidget {
           routes['/ads/governance'] = (_) => const MobileAdsGovernanceScreen();
         }
 
+        final lightTheme = AppTheme.light(textTheme: textTheme);
+        final darkTheme = AppTheme.dark(
+          textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+        );
+
         return MaterialApp(
           title: 'Edulure',
           debugShowCheckedModeBanner: false,
@@ -134,16 +140,8 @@ class EdulureApp extends ConsumerWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF2D62FF),
-              primary: const Color(0xFF2D62FF),
-              secondary: const Color(0xFFFF7A59),
-            ),
-            scaffoldBackgroundColor: Colors.white,
-            textTheme: textTheme,
-            useMaterial3: true,
-          ),
+          theme: lightTheme,
+          darkTheme: darkTheme,
           routes: routes,
           builder: (context, child) {
             if (child == null) {

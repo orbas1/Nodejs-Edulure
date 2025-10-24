@@ -8,6 +8,9 @@ import {
   formatDocumentationLabel,
   isInternalDocumentationLink
 } from '../../utils/navigationAnnex.js';
+import DesignTokenPlayground from '../../components/design/DesignTokenPlayground.jsx';
+import designTokenCatalog from '../../data/designTokens.generated.json';
+import uxResearchInsights from '../../data/uxResearchInsights.generated.json';
 
 function SectionCard({ section }) {
   const { id, label, initiative, originIds, quickAccess } = section;
@@ -266,6 +269,20 @@ export default function NavigationAnnex() {
     [refreshedAt]
   );
 
+  const designCatalog = useMemo(() => {
+    const researchByTag = (uxResearchInsights.insights ?? []).reduce((acc, insight) => {
+      (insight.tags ?? []).forEach((tag) => {
+        if (!acc[tag]) {
+          acc[tag] = [];
+        }
+        acc[tag].push(insight.id);
+      });
+      return acc;
+    }, {});
+
+    return { ...designTokenCatalog, researchByTag };
+  }, []);
+
   const renderDocumentationAnchor = (href) => {
     if (!href) {
       return null;
@@ -316,6 +333,7 @@ export default function NavigationAnnex() {
           </button>
         </div>
       ) : null}
+      <DesignTokenPlayground catalog={designCatalog} insights={uxResearchInsights} />
       <nav aria-label="Quick links" className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm backdrop-blur">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Anchors</h2>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2">

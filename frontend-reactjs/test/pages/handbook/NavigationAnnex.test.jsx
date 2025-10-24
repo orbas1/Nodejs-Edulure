@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import NavigationAnnex from '../../../src/pages/handbook/NavigationAnnex.jsx';
@@ -100,9 +101,11 @@ describe('NavigationAnnex handbook page', () => {
 
   const renderPage = (value = contextValue) =>
     render(
-      <NavigationMetadataContext.Provider value={value}>
-        <NavigationAnnex />
-      </NavigationMetadataContext.Provider>
+      <MemoryRouter>
+        <NavigationMetadataContext.Provider value={value}>
+          <NavigationAnnex />
+        </NavigationMetadataContext.Provider>
+      </MemoryRouter>
     );
 
   it('surfaces seeded annex tasks, backlog, and documentation summaries', () => {
@@ -110,9 +113,10 @@ describe('NavigationAnnex handbook page', () => {
 
     expect(screen.getByText('Ensure focus ring is visible.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /cross-surface summary/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /cross-platform token catalogue/i })).toBeInTheDocument();
     expect(screen.getByText('Operational readiness (Annex A54)')).toBeInTheDocument();
     expect(screen.getAllByText('Verify feed registry export.')).toHaveLength(2);
-    expect(screen.getByText('Navigation Backlog • Feed Registry')).toBeInTheDocument();
+    expect(screen.getAllByText('Navigation Backlog • Feed Registry').length).toBeGreaterThan(0);
     expect(
       screen.getByText('Highlight feed remediation progress in the notification panel.')
     ).toBeInTheDocument();

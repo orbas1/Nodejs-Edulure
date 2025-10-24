@@ -1269,6 +1269,30 @@ const ROUTE_DEFINITIONS = [
     statusPageComponent: 'api-quality-assurance'
   },
   {
+    name: 'design',
+    capability: 'design-system-assets',
+    description: 'Design tokens, UX research insights, and annex-aligned asset manifests.',
+    basePath: '/design',
+    flagKey: 'platform.api.v1.design',
+    defaultState: 'enabled',
+    fallbackStatus: 404,
+    disabledMessage: 'Design system APIs are not enabled for this deployment.',
+    audience: 'public',
+    owners: ['design-ops', 'ux-research'],
+    serviceTier: 'supporting',
+    tags: ['api', 'v1', 'design'],
+    rbac: {
+      strategy: 'public',
+      defaultRole: 'public',
+      allowedRoles: ['anonymous', 'user', 'admin']
+    },
+    cors: {
+      allowedOrigins: ['@env:app.corsOrigins'],
+      allowedMethods: ['GET']
+    },
+    statusPageComponent: 'api-design-system'
+  },
+  {
     name: 'provider-transition',
     capability: 'provider-transition-program',
     description: 'Provider transition announcements, acknowledgements, and migration status endpoints.',
