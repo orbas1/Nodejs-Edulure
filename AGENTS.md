@@ -343,7 +343,7 @@
          - 5.A.10 LearnerSupport (frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx)
       - 5.B Learner Deep-dive Modules
          - 5.B.1 LearnerUpcomingSection (frontend-reactjs/src/pages/dashboard/learner/sections/LearnerUpcomingSection.jsx)
-      - 6.A Instructor Dashboard Pages
+      - ✓ 6.A Instructor Dashboard Pages — Annex A19 (Courses & Library), Annex C4 (Live Classes & Tutoring Operations)
          - 6.A.1 InstructorCommunityChats (frontend-reactjs/src/pages/dashboard/InstructorCommunityChats.jsx)
          - 6.A.2 InstructorCommunityCreate (frontend-reactjs/src/pages/dashboard/InstructorCommunityCreate.jsx)
          - 6.A.3 InstructorCommunityManage (frontend-reactjs/src/pages/dashboard/InstructorCommunityManage.jsx)
@@ -359,6 +359,22 @@
          - 6.A.13 InstructorTutorBookings (frontend-reactjs/src/pages/dashboard/InstructorTutorBookings.jsx)
          - 6.A.14 InstructorTutorManagement (frontend-reactjs/src/pages/dashboard/InstructorTutorManagement.jsx)
          - 6.A.15 InstructorTutorSchedule (frontend-reactjs/src/pages/dashboard/InstructorTutorSchedule.jsx)
+        1. **Appraisal.** Instructor live operations now surface timezone-aware schedules, resource runbooks, and calendar exports (`pages/dashboard/InstructorLiveClasses.jsx`, `pages/dashboard/InstructorTutorBookings.jsx`) so Annex A19’s course orchestration narrative and Annex C4’s tutoring control room describe real workflows rather than placeholders.
+        2. **Functionality.** The live classroom console introduces a scheduling preference banner with timezone selector, session cards render dynamic prep/resource links, alerts, and readiness summaries, while tutor bookings add segment filters, CSV exports, and .ics calendar generation built from `utils/calendar.js` helpers.
+        3. **Logic Usefulness.** `resolveRelativeTime` and `formatDateTime` ensure countdowns, SLA deadlines, and mentor hand-offs reference the same clocks, giving instructors and coordinators reliable go-live windows and reducing manual reconciliation during high-volume cohorts.
+        4. **Redundancies.** Shared calendar utilities eliminate bespoke ICS builders inside dashboard pages and reuse a single filename normaliser for both tutoring and live class exports, cutting duplicated DOM download logic and aligning Annex documentation with the new helper.
+        5. **Placeholders.** Static “Schedule TBC” and generic escalation copy are replaced by real alerts (`data.escalations`) and enriched prep links sourced from session payloads, so Annex callouts can cite working join, recording, and material links instead of TODO notes.
+        6. **Duplicate Functions.** Pipeline segmentation, CSV quoting, and relative time formatting moved into memoised helpers, removing repeated map/filter logic throughout the bookings workspace and aligning with the reusable `downloadCalendarEvents` workflow.
+        7. **Improvements Needed.** Next iteration should stream export feedback through a toast service, hydrate booking analytics cards with backend SLA deltas, and thread timezone selection through `ScheduleGrid`’s event filters to keep grid/tooling parity.
+        8. **Styling Improvements.** New rounded-pill controls, amber escalation banners, and prep/resource stacks re-use dashboard typography/spacing tokens, matching the user_experience.md palette guidance for Annex A19 hero modules and Annex C4 risk panels.
+        9. **Efficiency Analysis.** `useMemo` caches for filtered pipeline/confirmed lists avoid recomputation across renders, while export handlers short-circuit when no records exist, keeping dashboard interactions smooth even as routing queues grow.
+        10. **Strengths to Keep.** Keep the action feedback pattern, shared scheduling grid, and modular session cards—they now support richer data without sacrificing readability, fulfilling Annex expectations for cross-surface consistency.
+        11. **Weaknesses to Remove.** Tutor routing still depends on manual refresh after CSV/ICS exports; wire server-triggered rehydration and consider batching notifications to curb duplicate SLA alerts across channels.
+        12. **Styling & Colour Review.** Accessibility-checked badge palettes (emerald/amber/rose) extend to alerts, support routing, and escalations, ensuring Annex references to readiness states stay in sync with live colour tokens.
+        13. **CSS, Orientation & Placement.** Responsive stacking for pipeline controls and live hand-off cards keeps key operations above the fold on tablet while preserving the two-column analytics grid on desktop.
+        14. **Text Analysis.** Inline copy now emphasises action-first phrasing (“Export pipeline CSV”, “Live classroom hand-off”) mirroring user_experience.md tone guidance, and prep tooltips stay under 140 characters for quick scanning.
+        15. **Change Checklist Tracker.** Add regression checks for timezone selector persistence, export success/failure messaging, CSV header integrity, and ICS start/end validation before shipping future instructor dashboard updates.
+        16. **Full Upgrade Plan & Release Steps.** Phase 1 rolls the shared calendar utility + timezone selector, Phase 2 expands pipeline analytics and tutoring telemetry, Phase 3 integrates backend-driven alerts/escalations, and Phase 4 publishes Annex A19/C4 documentation updates alongside release comms.
       - 6.B Instructor Deep-dive Modules
          - 6.B.1 CourseLifecyclePlanner (frontend-reactjs/src/pages/dashboard/instructor/courseCreation/CourseLifecyclePlanner.jsx)
          - 6.B.2 CourseLibraryTable (frontend-reactjs/src/pages/dashboard/instructor/courseLibrary/CourseLibraryTable.jsx)
