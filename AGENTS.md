@@ -336,14 +336,24 @@
          - 1.B.8 UserMenu (frontend-reactjs/src/components/navigation/UserMenu.jsx)
          - 1.B.9 routes (frontend-reactjs/src/navigation/routes.js)
          - 1.B.10 utils (frontend-reactjs/src/navigation/utils.js)
-      - 1.C Runtime Context Providers & Config
+      - ✓ 1.C Runtime Context Providers & Config — Annex A21 (Admin & Operations Dashboards)
          - 1.C.1 AuthContext (frontend-reactjs/src/context/AuthContext.jsx)
          - 1.C.2 DashboardContext (frontend-reactjs/src/context/DashboardContext.jsx)
          - 1.C.3 LanguageContext (frontend-reactjs/src/context/LanguageContext.jsx)
          - 1.C.4 RealtimeContext (frontend-reactjs/src/context/RealtimeContext.jsx)
          - 1.C.5 RuntimeConfigContext (frontend-reactjs/src/context/RuntimeConfigContext.jsx)
          - 1.C.6 ServiceHealthContext (frontend-reactjs/src/context/ServiceHealthContext.jsx)
-      - 1.D Hooks & Composable Logic
+        1. **Appraisal.** Front-end providers now bind to real multi-tenant operator data: the new `SupportOperationsService`, `OperatorSupportController`, and `/api/v1/operator/support/*` routes hydrate `DashboardContext`, `RuntimeConfigContext`, and downstream hooks with Annex A21 payloads backed by MySQL tables (`support_operations_*`, `support_notification_policies`, `support_automation_workflows`).
+        2. **AuthContext.** Session snapshots capture active tenant identifiers and feed them into `SupportTicketModel.buildCreatePayload`, ensuring tickets and operations queries persist `tenant_id` values that match the seeded workspaces introduced in `20250322120000_support_operations_console.js`.
+        3. **Tenant targeting.** DashboardContext still exposes `operationsSnapshot`, now populated by `SupportOperationsService.getOverview({ tenantId })`, so support/ops surfaces render queue metrics, backlog trends, and alerts aligned with the tenant list returned by `/operator/support/tenants`.
+        4. **Ops-ready runtime config.** RuntimeConfigContext gates realtime toggles (`support.realtime`, `trustSafety.realtime`) that `useSupportDashboard` and `useTrustSafetyDashboard` reference when orchestrating the freshly wired backend snapshots, preserving deterministic flag evaluation per tenant.
+        5. **Realtime fabric.** RealtimeContext’s subscription lifecycle complements the new support endpoints by streaming case updates (`operations.support.case.updated`) into the hook caches, keeping Annex panels in sync with database writes.
+        6. **Service health intelligence.** ServiceHealthContext continues to expose capability impact data which now pairs with the seeded `support_automation_workflows` health metadata to give admins a unified outage view across Annex dashboards.
+        7. **Lifecycle.** Context providers still invalidate cache tags (e.g., `operator:support:*`) and abort inflight requests; the operator routes piggyback on the same invalidation keys so tenant switches immediately re-fetch queue, automation, and onboarding snapshots.
+        8. **Diagnostics.** `lastLoadedAt`, `fetchedAt`, and `connectedAt` timestamps remain exposed and now align with backend telemetry: support overview responses surface `generatedAt` values used in ops checklists and recorded in `support_operations_communications`.
+        9. **Extensibility.** Selector APIs (`getDashboard`, `getSection`, `hasPermission`, `getFeatureVariant`, `getCapability`) stay stable while the backend provides canonical support data, letting future Annex work reuse the same contexts without reimplementing analytics joins.
+        10. **Resilience.** Context error objects map neatly to the new controller responses (`Support operations overview loaded`), yielding consistent `DashboardStateMessage` props even when backend validation (Joi) raises 422s.
+      - ✓ 1.D Hooks & Composable Logic — Annex C1 (Learner Support Workspace), Annex C2 (Admin Trust-Safety)
          - 1.D.1 useAuthorization (frontend-reactjs/src/hooks/useAuthorization.js)
          - 1.D.2 useAutoDismissMessage (frontend-reactjs/src/hooks/useAutoDismissMessage.js)
          - 1.D.3 useConsentRecords (frontend-reactjs/src/hooks/useConsentRecords.js)
@@ -365,6 +375,16 @@
          - 1.D.19 useSupportDashboard (frontend-reactjs/src/hooks/useSupportDashboard.js)
          - 1.D.20 useSystemPreferencesForm (frontend-reactjs/src/hooks/useSystemPreferencesForm.js)
          - 1.D.21 useTrustSafetyDashboard (frontend-reactjs/src/hooks/useTrustSafetyDashboard.js)
+        1. **Appraisal.** Learner support and trust-safety hooks now consume real Annex payloads: `useSupportDashboard` drives against `/api/v1/operator/support/overview`, while `useLearnerSupportCases` and realtime listeners hydrate queue data seeded in `support_operations_communications`, `support_notification_policies`, and `support_onboarding_checklists`.
+        2. **Authorization.** `useAuthorization` still merges tenants and permissions, and the backend enforces admin-only access to operator routes through `auth('admin')`, keeping C1/C2 tooling behind the correct roles.
+        3. **Message UX.** `useAutoDismissMessage` maintains pause/resume semantics so the new backend-sourced toasts (queue breaches, automation pauses) remain readable and accessible across Annex panels.
+        4. **Support cases.** `useLearnerSupportCases` reconciles socket updates with the tenant-aware `learner_support_cases.tenant_id` column; the repository and seeds ensure SLA metadata (`firstResponseMinutes`, `resolutionMinutes`, satisfaction) match the hook’s SLA badge logic.
+        5. **Support operations.** `useSupportDashboard` now fetches enriched summaries—queue stats, backlog trend, automation health, onboarding progress, and notification policies—directly from `SupportOperationsService`, caching by tenant and replaying realtime deltas.
+        6. **Trust & safety.** `useTrustSafetyDashboard` continues to orchestrate moderation data while sharing tenant state and service health context with the support dashboard so Annex C2 insights align with A21 telemetry.
+        7. **Observability.** Hooks expose `lastUpdated`, `realtime`, and feature variants; backend responses surface `generatedAt` and workflow statuses so analytics dashboards can verify SLA attainment, CSAT, and NPS for every tenant.
+        8. **Interoperability.** Shared caches (`support-overview`, `support-tenants`) and runtime selectors let support/trust-safety hooks reuse context data (`statusSummary`, `impactMatrix`) without duplicate fetches, ensuring admin and learner shells stay in sync.
+        9. **Resilience.** Offline guards, abort controllers, and cache fallbacks now pair with backend Joi validation—422 responses bubble through the hooks and render consistent `DashboardStateMessage` variants when filters are invalid.
+        10. **Extensibility.** Public hook APIs (`updateTicket`, `updateNotificationPolicy`, `refreshTenants`) map directly onto the seeded tables and controller endpoints, giving follow-on Annex tasks (automation toggles, new playbooks) a stable integration surface.
       - ✓ 1.E API Clients & Data Contracts — Annex A11 (Integrations & Environment Parity)
          - 1.E.1 adminAdsApi (frontend-reactjs/src/api/adminAdsApi.js)
          - 1.E.2 adminApi (frontend-reactjs/src/api/adminApi.js)

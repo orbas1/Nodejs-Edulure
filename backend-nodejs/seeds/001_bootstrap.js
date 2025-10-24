@@ -141,6 +141,13 @@ export async function seed(knex) {
     await trx('community_post_moderation_cases').del();
     await trx('scam_reports').del();
     await trx('moderation_analytics_events').del();
+    await trx('support_onboarding_playbooks').del();
+    await trx('support_onboarding_checklists').del();
+    await trx('support_notification_policies').del();
+    await trx('support_automation_workflows').del();
+    await trx('support_operations_playbooks').del();
+    await trx('support_operations_communications').del();
+    await trx('support_operations_tenants').del();
     await trx('learner_support_messages').del();
     await trx('learner_support_cases').del();
     await trx('support_articles').del();
@@ -6966,7 +6973,9 @@ export async function seed(knex) {
         keywords: JSON.stringify(['live classroom', 'troubleshooting', 'reset']),
         url: 'https://support.edulure.test/articles/live-classroom-reset',
         minutes: 5,
-        helpfulness_score: 9.6
+        helpfulness_score: 9.6,
+        pending_review: false,
+        is_draft: false
       },
       {
         slug: 'billing-reconcile-declines',
@@ -6976,7 +6985,9 @@ export async function seed(knex) {
         keywords: JSON.stringify(['billing', 'payments', 'declines']),
         url: 'https://support.edulure.test/articles/billing-reconcile-declines',
         minutes: 4,
-        helpfulness_score: 8.8
+        helpfulness_score: 8.8,
+        pending_review: true,
+        is_draft: false
       },
       {
         slug: 'course-content-refresh',
@@ -6986,7 +6997,164 @@ export async function seed(knex) {
         keywords: JSON.stringify(['course', 'cache', 'refresh']),
         url: 'https://support.edulure.test/articles/course-content-refresh',
         minutes: 6,
-        helpfulness_score: 8.1
+        helpfulness_score: 8.1,
+        pending_review: false,
+        is_draft: true
+      }
+    ]);
+
+    await trx('support_operations_tenants').insert([
+      {
+        tenant_id: 'global',
+        name: 'Global Workspace',
+        slug: 'global',
+        region: 'US',
+        timezone: 'UTC',
+        status: 'active',
+        is_primary: true,
+        display_order: 0
+      },
+      {
+        tenant_id: 'edulure-internal',
+        name: 'Edulure Internal',
+        slug: 'edulure-internal',
+        region: 'IE',
+        timezone: 'Europe/Dublin',
+        status: 'active',
+        is_primary: false,
+        display_order: 1
+      },
+      {
+        tenant_id: 'enterprise-north',
+        name: 'Enterprise North',
+        slug: 'enterprise-north',
+        region: 'CA',
+        timezone: 'America/Toronto',
+        status: 'active',
+        is_primary: false,
+        display_order: 2
+      }
+    ]);
+
+    await trx('support_operations_communications').insert([
+      {
+        tenant_id: 'global',
+        title: 'February success digest',
+        channel: 'email',
+        status: 'scheduled',
+        audience_size: 1240,
+        scheduled_at: new Date('2025-02-07T14:00:00Z'),
+        author: 'SLA Desk'
+      },
+      {
+        tenant_id: 'global',
+        title: 'Automation downtime advisory',
+        channel: 'in-app',
+        status: 'draft',
+        audience_size: 480,
+        scheduled_at: null,
+        author: 'Operations Duty Manager'
+      },
+      {
+        tenant_id: 'enterprise-north',
+        title: 'Learner billing remediation',
+        channel: 'sms',
+        status: 'scheduled',
+        audience_size: 64,
+        scheduled_at: new Date('2025-02-05T16:30:00Z'),
+        author: 'Enterprise Concierge'
+      }
+    ]);
+
+    await trx('support_operations_playbooks').insert([
+      {
+        tenant_id: 'global',
+        name: 'Live classroom recovery',
+        category: 'incident',
+        audience: 'support',
+        description: 'Checklist for restoring live classrooms stuck in connection loops.',
+        link: 'https://support.edulure.test/playbooks/live-classroom-recovery'
+      },
+      {
+        tenant_id: 'edulure-internal',
+        name: 'Fraud escalation',
+        category: 'trust-safety',
+        audience: 'operations',
+        description: 'Coordinate with risk and payments teams when marketplace fraud is detected.',
+        link: 'https://support.edulure.test/playbooks/fraud-escalation'
+      }
+    ]);
+
+    await trx('support_automation_workflows').insert([
+      {
+        tenant_id: 'global',
+        name: 'Auto-close low sentiment resolved cases',
+        status: 'active',
+        success_rate: 92.5,
+        last_run_at: new Date('2025-02-04T08:45:00Z'),
+        metadata: JSON.stringify({ trigger: 'resolution_webhook', owner: 'Automation Guild' })
+      },
+      {
+        tenant_id: 'edulure-internal',
+        name: 'Reassign idle queue tickets',
+        status: 'paused',
+        success_rate: 74.3,
+        last_run_at: new Date('2025-01-31T17:10:00Z'),
+        metadata: JSON.stringify({ trigger: 'scheduler', owner: 'Ops Duty Manager' })
+      }
+    ]);
+
+    await trx('support_notification_policies').insert([
+      {
+        tenant_id: 'global',
+        name: 'High priority SLA',
+        description: 'Alert channels for high urgency tickets breaching SLAs.',
+        sla_minutes: 60,
+        channels: JSON.stringify({ email: true, sms: true, push: false, inApp: true }),
+        escalation_targets: JSON.stringify([
+          { id: 'oncall', name: 'On-call engineer', type: 'user', contact: 'oncall@edulure.test' },
+          { id: 'lead', name: 'Support lead', type: 'user', contact: 'support.lead@edulure.test' }
+        ])
+      },
+      {
+        tenant_id: 'enterprise-north',
+        name: 'Enterprise concierge',
+        description: 'Concierge notification rules for enterprise accounts.',
+        sla_minutes: 30,
+        channels: JSON.stringify({ email: true, sms: true, push: true, inApp: true }),
+        escalation_targets: JSON.stringify([
+          { id: 'enterprise-desk', name: 'Enterprise desk', type: 'team', contact: 'enterprise@edulure.test' }
+        ])
+      }
+    ]);
+
+    await trx('support_onboarding_checklists').insert([
+      {
+        tenant_id: 'global',
+        name: 'Enable realtime escalations',
+        progress: 65.0,
+        owner: 'Mira Patel',
+        updated_at: new Date('2025-02-04T09:20:00Z')
+      },
+      {
+        tenant_id: 'edulure-internal',
+        name: 'Roll out updated macros',
+        progress: 42.0,
+        owner: 'Jordan Lee',
+        updated_at: new Date('2025-02-03T15:05:00Z')
+      }
+    ]);
+
+    await trx('support_onboarding_playbooks').insert([
+      {
+        tenant_id: 'global',
+        name: 'Trust & safety onboarding',
+        link: 'https://support.edulure.test/onboarding/trust-safety'
+      },
+      {
+        tenant_id: 'enterprise-north',
+        name: 'Enterprise go-live checklist',
+        link: 'https://support.edulure.test/onboarding/enterprise-go-live'
       }
     ]);
 
@@ -7001,6 +7169,7 @@ export async function seed(knex) {
         priority: 'high',
         status: 'waiting',
         channel: 'Portal',
+        satisfaction: 4,
         owner: 'Mira Patel',
         last_agent: 'Mira Patel',
         escalation_breadcrumbs: JSON.stringify([
@@ -7031,9 +7200,13 @@ export async function seed(knex) {
         ai_summary: 'Learner reported “Live classroom session frozen at 95%”. Priority: High.',
         follow_up_due_at: new Date('2025-02-01T12:30:00Z'),
         ai_summary_generated_at: new Date('2025-02-01T08:35:00Z'),
+        tenant_id: 'global',
         metadata: JSON.stringify({
           intake: { channel: 'portal', attachments: 1 },
-          firstResponseMinutes: 28
+          firstResponseMinutes: 28,
+          resolutionMinutes: 42,
+          sentiment: 'neutral',
+          tags: ['live-classroom', 'incident']
         }),
         created_at: supportCaseAlphaCreatedAt,
         updated_at: supportCaseAlphaUpdatedAt
@@ -7072,6 +7245,7 @@ export async function seed(knex) {
         priority: 'normal',
         status: 'open',
         channel: 'Portal',
+        satisfaction: null,
         owner: 'Mira Patel',
         last_agent: 'Jordan Lee',
         escalation_breadcrumbs: JSON.stringify([
@@ -7103,9 +7277,13 @@ export async function seed(knex) {
         ai_summary: 'Learner reported “Recurring billing decline on premium plan”. Priority: Normal.',
         follow_up_due_at: new Date('2025-02-05T14:10:00Z'),
         ai_summary_generated_at: new Date('2025-02-04T14:15:00Z'),
+        tenant_id: 'enterprise-north',
         metadata: JSON.stringify({
           intake: { channel: 'portal', attachments: 0 },
-          renewalAmountCents: 12900
+          renewalAmountCents: 12900,
+          firstResponseMinutes: 55,
+          resolutionMinutes: null,
+          sentiment: 'frustrated'
         }),
         created_at: supportCaseBetaCreatedAt,
         updated_at: supportCaseBetaCreatedAt

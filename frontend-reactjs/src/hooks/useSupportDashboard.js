@@ -5,6 +5,9 @@ import {
   fetchSupportTenants
 } from '../api/operatorDashboardApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useRealtime } from '../context/RealtimeContext.jsx';
+import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
+import { useServiceHealth } from '../context/ServiceHealthContext.jsx';
 import createPersistentCache from '../utils/persistentCache.js';
 import { useInterval } from './useInterval.js';
 
@@ -31,6 +34,9 @@ function resolveDefaultTenant(current, available = [], fallback) {
 export default function useSupportDashboard({ pollIntervalMs = 180_000 } = {}) {
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const { subscribe } = useRealtime();
+  const { isFeatureEnabled, getFeatureVariant } = useRuntimeConfig();
+  const { statusSummary, alerts: serviceAlerts } = useServiceHealth();
   const [tenantId, setTenantId] = useState(null);
   const [state, setState] = useState({
     loading: true,
@@ -38,7 +44,8 @@ export default function useSupportDashboard({ pollIntervalMs = 180_000 } = {}) {
     data: null,
     lastUpdated: null,
     stale: false,
-    offline: getIsOffline()
+    offline: getIsOffline(),
+    realtime: null
   });
   const [tenantState, setTenantState] = useState({
     loading: true,
@@ -95,7 +102,8 @@ export default function useSupportDashboard({ pollIntervalMs = 180_000 } = {}) {
           data: overview,
           lastUpdated: new Date().toISOString(),
           stale: false,
-          offline: getIsOffline()
+          offline: getIsOffline(),
+          realtime: null
         });
       } catch (error) {
         if (!mountedRef.current || controller.signal.aborted) {
@@ -109,7 +117,8 @@ export default function useSupportDashboard({ pollIntervalMs = 180_000 } = {}) {
           data: cached?.value ?? null,
           lastUpdated: cached?.storedAt ? new Date(cached.storedAt).toISOString() : null,
           stale: Boolean(cached?.value),
-          offline: getIsOffline()
+          offline: getIsOffline(),
+          realtime: null
         });
       } finally {
         if (abortController.current === controller) {
@@ -251,6 +260,55 @@ export default function useSupportDashboard({ pollIntervalMs = 180_000 } = {}) {
     [updateData]
   );
 
+  useEffect(() => {
+    if (typeof subscribe !== 'function') {
+      return undefined;
+    }
+
+    const unsubscribes = [];
+
+    unsubscribes.push(
+      subscribe('operations.support.overview.updated', (event) => {
+        const payload = event?.payload ?? event;
+        if (!payload) {
+          return;
+        }
+        const tenant = payload.tenantId ?? payload.tenant_id ?? payload.tenant;
+        if (tenant && tenant !== tenantId) {
+          return;
+        }
+        setState((prev) => ({
+          ...prev,
+          data: payload.overview ?? payload,
+          lastUpdated: payload.generatedAt ?? new Date().toISOString(),
+          realtime: payload,
+          stale: false
+        }));
+      })
+    );
+
+    unsubscribes.push(
+      subscribe('operations.support.case.updated', (event) => {
+        const payload = event?.payload ?? event;
+        const ticketId = payload?.ticketId ?? payload?.ticket?.id;
+        if (!ticketId) {
+          return;
+        }
+        updateTicket(ticketId, (current) => ({
+          ...(current ?? {}),
+          ...payload.ticket,
+          lastUpdated: new Date().toISOString()
+        }));
+      })
+    );
+
+    return () => {
+      unsubscribes
+        .filter((unsubscribe) => typeof unsubscribe === 'function')
+        .forEach((unsubscribe) => unsubscribe());
+    };
+  }, [subscribe, tenantId, updateTicket]);
+
   const value = useMemo(
     () => ({
       tenantId,
@@ -264,9 +322,26 @@ export default function useSupportDashboard({ pollIntervalMs = 180_000 } = {}) {
       refreshTenants,
       updateData,
       updateTicket,
-      updateNotificationPolicy
+      updateNotificationPolicy,
+      realtimeEnabled: isFeatureEnabled('support.realtime', true),
+      caseStreamVariant: getFeatureVariant('support.caseStream', 'default'),
+      serviceAlerts,
+      statusSummary
     }),
-    [refreshOverview, refreshTenants, state, tenantId, tenantState, updateData, updateNotificationPolicy, updateTicket]
+    [
+      getFeatureVariant,
+      isFeatureEnabled,
+      refreshOverview,
+      refreshTenants,
+      serviceAlerts,
+      state,
+      statusSummary,
+      tenantId,
+      tenantState,
+      updateData,
+      updateNotificationPolicy,
+      updateTicket
+    ]
   );
 
   return value;

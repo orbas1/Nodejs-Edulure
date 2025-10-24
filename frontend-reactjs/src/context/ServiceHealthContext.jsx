@@ -13,6 +13,7 @@ import { DefaultService } from '@edulure/api-sdk';
 
 import { prepareApiSdk } from '../api/sdkClient.js';
 import { useAuth } from './AuthContext.jsx';
+import { useRealtime } from './RealtimeContext.jsx';
 
 const ServiceHealthContext = createContext(null);
 const DEFAULT_POLL_INTERVAL = 60000;
@@ -91,8 +92,48 @@ function deriveAlerts(manifest) {
   return alerts;
 }
 
+function summariseStatus(manifest) {
+  const serviceCounts = { operational: 0, degraded: 0, outage: 0, disabled: 0, unknown: 0 };
+  const capabilityCounts = { operational: 0, degraded: 0, outage: 0, disabled: 0, unknown: 0 };
+
+  (manifest?.services ?? []).forEach((service) => {
+    if (!service?.status) {
+      serviceCounts.unknown += 1;
+      return;
+    }
+    serviceCounts[service.status] = (serviceCounts[service.status] ?? 0) + 1;
+  });
+
+  (manifest?.capabilities ?? []).forEach((capability) => {
+    if (!capability?.status) {
+      capabilityCounts.unknown += 1;
+      return;
+    }
+    capabilityCounts[capability.status] = (capabilityCounts[capability.status] ?? 0) + 1;
+  });
+
+  return { services: serviceCounts, capabilities: capabilityCounts };
+}
+
+function buildImpactMatrix(manifest) {
+  const matrix = new Map();
+  (manifest?.capabilities ?? []).forEach((capability) => {
+    if (!capability) {
+      return;
+    }
+    matrix.set(capability.capability, {
+      status: capability.status ?? 'unknown',
+      affectedServices: capability.dependencies ?? [],
+      evaluation: capability.evaluation ?? null,
+      lastChecked: capability.generatedAt ?? manifest?.generatedAt ?? null
+    });
+  });
+  return matrix;
+}
+
 export function ServiceHealthProvider({ children, pollIntervalMs = DEFAULT_POLL_INTERVAL }) {
   const { session, isAuthenticated } = useAuth();
+  const { subscribe } = useRealtime();
   const [state, setState] = useState({
     loading: true,
     error: null,
@@ -149,6 +190,8 @@ export function ServiceHealthProvider({ children, pollIntervalMs = DEFAULT_POLL_
   }, [fetchManifest, pollIntervalMs]);
 
   const alerts = useMemo(() => deriveAlerts(state.manifest), [state.manifest]);
+  const statusSummary = useMemo(() => summariseStatus(state.manifest), [state.manifest]);
+  const impactMatrix = useMemo(() => buildImpactMatrix(state.manifest), [state.manifest]);
 
   const servicesByKey = useMemo(() => {
     const map = new Map();
@@ -158,6 +201,45 @@ export function ServiceHealthProvider({ children, pollIntervalMs = DEFAULT_POLL_
     return map;
   }, [state.manifest]);
 
+  useEffect(() => {
+    if (typeof subscribe !== 'function') {
+      return undefined;
+    }
+    return subscribe('operations.service_health.updated', (message) => {
+      const payload = message?.payload ?? message;
+      if (!payload) {
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: null,
+        manifest: payload.manifest ?? payload,
+        lastUpdated: payload.generatedAt ?? payload.manifest?.generatedAt ?? new Date().toISOString()
+      }));
+    });
+  }, [subscribe]);
+
+  const getService = useCallback(
+    (serviceKey) => {
+      if (!serviceKey) {
+        return null;
+      }
+      return servicesByKey.get(serviceKey) ?? null;
+    },
+    [servicesByKey]
+  );
+
+  const getCapability = useCallback(
+    (capabilityKey) => {
+      if (!capabilityKey) {
+        return null;
+      }
+      return impactMatrix.get(capabilityKey) ?? null;
+    },
+    [impactMatrix]
+  );
+
   const value = useMemo(
     () => ({
       loading: state.loading,
@@ -166,9 +248,25 @@ export function ServiceHealthProvider({ children, pollIntervalMs = DEFAULT_POLL_
       lastUpdated: state.manifest?.generatedAt ?? state.lastUpdated,
       alerts,
       servicesByKey,
+      impactMatrix,
+      statusSummary,
+      getService,
+      getCapability,
       refresh: fetchManifest
     }),
-    [alerts, fetchManifest, servicesByKey, state.loading, state.error, state.manifest, state.lastUpdated]
+    [
+      alerts,
+      fetchManifest,
+      getCapability,
+      getService,
+      impactMatrix,
+      servicesByKey,
+      state.error,
+      state.lastUpdated,
+      state.loading,
+      state.manifest,
+      statusSummary
+    ]
   );
 
   return <ServiceHealthContext.Provider value={value}>{children}</ServiceHealthContext.Provider>;
