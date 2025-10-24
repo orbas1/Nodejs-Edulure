@@ -91,7 +91,7 @@ function ChipInput({ label, helper, placeholder, values, onChange, max = 12 }) {
   );
 }
 
-function GalleryEditor({ items, onChange, onRemove, onAdd }) {
+function GalleryEditor({ items, onChange, onRemove, onAdd, canAdd = true, limit = 8 }) {
   return (
     <div className="space-y-4">
       {items.map((item, index) => (
@@ -145,10 +145,14 @@ function GalleryEditor({ items, onChange, onRemove, onAdd }) {
       <button
         type="button"
         onClick={onAdd}
-        className="inline-flex items-center justify-center gap-2 rounded-full border border-dashed border-primary px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:border-primary-dark hover:text-primary-dark"
+        disabled={!canAdd}
+        className="inline-flex items-center justify-center gap-2 rounded-full border border-dashed border-primary px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:border-primary-dark hover:text-primary-dark disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
       >
         + Add gallery item
       </button>
+      {!canAdd ? (
+        <p className="text-xs font-semibold text-amber-600">Gallery limit reached ({limit} showcase assets).</p>
+      ) : null}
     </div>
   );
 }
@@ -178,7 +182,9 @@ GalleryEditor.propTypes = {
   ).isRequired,
   onChange: PropTypes.func.isRequired,
   onRemove: PropTypes.func.isRequired,
-  onAdd: PropTypes.func.isRequired
+  onAdd: PropTypes.func.isRequired,
+  canAdd: PropTypes.bool,
+  limit: PropTypes.number
 };
 
 export default function MaterialMetadataEditor({
@@ -197,6 +203,18 @@ export default function MaterialMetadataEditor({
   const previewCoverImage = useMemo(() => sanitiseHttpsUrl(draft.coverImageUrl), [draft.coverImageUrl]);
   const previewVideo = useMemo(() => sanitiseHttpsUrl(draft.showcaseVideoUrl), [draft.showcaseVideoUrl]);
   const previewPoster = useMemo(() => sanitiseHttpsUrl(draft.showcaseVideoPosterUrl), [draft.showcaseVideoPosterUrl]);
+  const secureCtaUrl = useMemo(() => sanitiseHttpsUrl(draft.callToActionUrl), [draft.callToActionUrl]);
+  const galleryLimitReached = draft.gallery.length >= 8;
+  const descriptionCharactersUsed = draft.description?.length ?? 0;
+  const headlineCharactersUsed = draft.showcaseHeadline?.length ?? 0;
+  const subheadlineCharactersUsed = draft.showcaseSubheadline?.length ?? 0;
+  const callToActionUrlIsValid = !draft.callToActionUrl || Boolean(secureCtaUrl);
+
+  const handleGalleryAdd = useCallback(() => {
+    if (!galleryLimitReached) {
+      onGalleryAdd();
+    }
+  }, [galleryLimitReached, onGalleryAdd]);
 
   if (!asset) {
     return (
@@ -271,7 +289,12 @@ export default function MaterialMetadataEditor({
                 placeholder="Summarise the learner outcomes, differentiators, and companion resources for this material."
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
-              <p className="text-xs text-slate-500">Maximum 1,500 characters. This powers search, share links, and storefront copy.</p>
+              <div className="flex items-center justify-between text-xs">
+                <p className="text-slate-500">Maximum 1,500 characters. This powers search, share links, and storefront copy.</p>
+                <span className={descriptionCharactersUsed > 1400 ? 'font-semibold text-amber-600' : 'text-slate-400'}>
+                  {descriptionCharactersUsed}/1500
+                </span>
+              </div>
             </div>
             <ChipInput
               label="Categories"
@@ -341,6 +364,11 @@ export default function MaterialMetadataEditor({
                 placeholder="Reimagine ESG storytelling"
                 className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
+              <div className="flex items-center justify-end text-[11px] text-slate-400">
+                <span className={headlineCharactersUsed > 110 ? 'font-semibold text-amber-600' : undefined}>
+                  {headlineCharactersUsed}/120
+                </span>
+              </div>
               <input
                 type="text"
                 value={draft.showcaseSubheadline}
@@ -349,6 +377,11 @@ export default function MaterialMetadataEditor({
                 placeholder="Trusted templates, video walkthroughs, and analytics instrumentation ready to deploy."
                 className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
+              <div className="flex items-center justify-end text-[11px] text-slate-400">
+                <span className={subheadlineCharactersUsed > 180 ? 'font-semibold text-amber-600' : undefined}>
+                  {subheadlineCharactersUsed}/200
+                </span>
+              </div>
               <input
                 type="text"
                 value={draft.showcaseBadge}
@@ -374,6 +407,11 @@ export default function MaterialMetadataEditor({
                   className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
+              <p className={`text-xs ${callToActionUrlIsValid ? 'text-slate-500' : 'font-semibold text-rose-600'}`}>
+                {callToActionUrlIsValid
+                  ? 'Link learners to secure calls-to-action. HTTPS is required for marketing placements.'
+                  : 'Provide a secure HTTPS URL so analytics and storefront placements remain compliant.'}
+              </p>
             </div>
           </div>
         </section>
@@ -400,7 +438,9 @@ export default function MaterialMetadataEditor({
             items={draft.gallery}
             onChange={onGalleryChange}
             onRemove={onGalleryRemove}
-            onAdd={onGalleryAdd}
+            onAdd={handleGalleryAdd}
+            canAdd={!galleryLimitReached}
+            limit={8}
           />
         </section>
 
@@ -451,8 +491,14 @@ export default function MaterialMetadataEditor({
             </div>
             {draft.callToActionLabel ? (
               <a
-                href={sanitiseHttpsUrl(draft.callToActionUrl) || '#'}
+                href={secureCtaUrl || '#'}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark"
+                aria-disabled={!secureCtaUrl}
+                onClick={(event) => {
+                  if (!secureCtaUrl) {
+                    event.preventDefault();
+                  }
+                }}
               >
                 {draft.callToActionLabel}
               </a>

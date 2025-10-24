@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 
@@ -12,6 +12,7 @@ function normalisePreview(preview) {
 
 export default function AvatarCropper({ label, helperText, value, onChange, onReset }) {
   const fileInputId = useId();
+  const instructionsId = useId();
   const [source, setSource] = useState(value ?? '');
   const [zoom, setZoom] = useState(1.1);
   const [offsetX, setOffsetX] = useState(0);
@@ -92,6 +93,44 @@ export default function AvatarCropper({ label, helperText, value, onChange, onRe
 
   const hasPreview = useMemo(() => Boolean(preview), [preview]);
 
+  const nudgeOffset = useCallback((direction) => {
+    const STEP = 0.04;
+    if (direction === 'up') {
+      setOffsetY((current) => Math.max(-1, Math.min(1, current - STEP)));
+    }
+    if (direction === 'down') {
+      setOffsetY((current) => Math.max(-1, Math.min(1, current + STEP)));
+    }
+    if (direction === 'left') {
+      setOffsetX((current) => Math.max(-1, Math.min(1, current - STEP)));
+    }
+    if (direction === 'right') {
+      setOffsetX((current) => Math.max(-1, Math.min(1, current + STEP)));
+    }
+  }, []);
+
+  const handleKeyboardNudge = useCallback(
+    (event) => {
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        nudgeOffset('up');
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        nudgeOffset('down');
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        nudgeOffset('left');
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        nudgeOffset('right');
+      }
+    },
+    [nudgeOffset]
+  );
+
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -136,6 +175,11 @@ export default function AvatarCropper({ label, helperText, value, onChange, onRe
               'flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-inner',
               hasPreview ? 'bg-white' : 'bg-slate-100'
             )}
+            role="img"
+            tabIndex={0}
+            aria-label="Avatar crop preview"
+            aria-describedby={instructionsId}
+            onKeyDown={handleKeyboardNudge}
           >
             {hasPreview ? (
               <img src={preview} alt="Avatar preview" className="h-full w-full object-cover" />
@@ -216,6 +260,9 @@ export default function AvatarCropper({ label, helperText, value, onChange, onRe
           </div>
           <p className="text-xs text-slate-500">
             Edulure stores the cropped square as your avatar. Larger images are scaled down automatically while keeping fine detail.
+          </p>
+          <p id={instructionsId} className="text-xs text-slate-400">
+            Use the arrow keys while the preview is focused to nudge the image within the crop.
           </p>
         </div>
       </div>
