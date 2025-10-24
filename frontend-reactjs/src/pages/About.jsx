@@ -32,6 +32,7 @@ const corporateFacts = [
 const governanceLinks = [
   { label: 'Terms & Conditions', href: '/terms' },
   { label: 'Privacy Notice', href: '/privacy' },
+  { label: 'Legal & Compliance Contacts', href: '/legal/contact' },
   { label: 'Trust & Security Centre', href: '/docs/trust-centre' }
 ];
 

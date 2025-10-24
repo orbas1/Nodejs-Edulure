@@ -42,6 +42,7 @@ function ensureJson(value) {
 }
 
 function mapDsrRow(row) {
+  const dueMetrics = calculateDueMetrics(row.due_at);
   return {
     id: row.id,
     requestUuid: row.request_uuid,
@@ -59,8 +60,34 @@ function mapDsrRow(row) {
     slaDays: Number(row.sla_days),
     metadata: ensureJson(row.metadata),
     reporter: normalizeUser(row.reporter),
-    assignee: normalizeUser(row.assignee)
+    assignee: normalizeUser(row.assignee),
+    dueInHours: dueMetrics.dueInHours,
+    deadlineState: dueMetrics.deadlineState
   };
+}
+
+function calculateDueMetrics(dueAt) {
+  if (!dueAt) {
+    return { dueInHours: null, deadlineState: 'unknown' };
+  }
+
+  const dueDate = new Date(dueAt);
+  if (Number.isNaN(dueDate.getTime())) {
+    return { dueInHours: null, deadlineState: 'unknown' };
+  }
+
+  const diffMs = dueDate.getTime() - Date.now();
+  const dueInHours = Number((diffMs / (60 * 60 * 1000)).toFixed(1));
+
+  if (diffMs < 0) {
+    return { dueInHours, deadlineState: 'overdue' };
+  }
+
+  if (diffMs <= 12 * 60 * 60 * 1000) {
+    return { dueInHours, deadlineState: 'due_soon' };
+  }
+
+  return { dueInHours, deadlineState: 'on_track' };
 }
 
 function mapConsentRow(row) {

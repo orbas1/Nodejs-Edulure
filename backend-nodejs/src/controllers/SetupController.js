@@ -22,7 +22,7 @@ const startSchema = Joi.object({
 });
 
 export default class SetupController {
-  static async buildSnapshot() {
+  static async buildSnapshot(historyLimit = 10) {
     const [defaults, learnerReadiness] = await Promise.all([
       setupOrchestratorService.describeDefaults(),
       LearnerOnboardingInsightsService.summarise()
@@ -38,13 +38,16 @@ export default class SetupController {
       tasks: setupOrchestratorService.describeTasks(),
       presets: setupOrchestratorService.describePresets(),
       defaults,
-      history: setupOrchestratorService.getRecentRuns()
+      history: setupOrchestratorService.getRecentRuns(historyLimit)
     };
   }
 
-  static async getStatus(_req, res, next) {
+  static async getStatus(req, res, next) {
     try {
-      const snapshot = await SetupController.buildSnapshot();
+      const rawLimit = req?.query?.history_limit;
+      const parsedLimit = rawLimit !== undefined ? Number.parseInt(rawLimit, 10) : undefined;
+      const historyLimit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : 10;
+      const snapshot = await SetupController.buildSnapshot(historyLimit);
       return success(res, {
         status: 200,
         message: 'Setup status retrieved',

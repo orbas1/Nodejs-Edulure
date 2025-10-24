@@ -6,6 +6,9 @@ const DEFAULT_CREDENTIAL_POLICY = {
   defaultRotationDays: 90
 };
 
+const GENERIC_POLICY_URL = 'https://trust.edulure.com/security/integration-credentials';
+const GENERIC_RUNBOOK_URL = 'https://trust.edulure.com/runbooks/integration-vaulting';
+
 const PROVIDERS = {
   hubspot: {
     id: 'hubspot',
@@ -13,6 +16,11 @@ const PROVIDERS = {
     category: 'crm',
     type: 'marketing_automation',
     credentialPolicy: { ...DEFAULT_CREDENTIAL_POLICY },
+    policy: {
+      security: GENERIC_POLICY_URL,
+      runbook: `${GENERIC_RUNBOOK_URL}#hubspot`
+    },
+    documentationUrl: 'https://docs.edulure.com/integrations/hubspot/credential-rotation',
     surfaces: { orchestrator: true, dashboard: true }
   },
   salesforce: {
@@ -21,6 +29,11 @@ const PROVIDERS = {
     category: 'crm',
     type: 'sales_automation',
     credentialPolicy: { ...DEFAULT_CREDENTIAL_POLICY },
+    policy: {
+      security: GENERIC_POLICY_URL,
+      runbook: `${GENERIC_RUNBOOK_URL}#salesforce`
+    },
+    documentationUrl: 'https://docs.edulure.com/integrations/salesforce/api-credential-runbook',
     surfaces: { orchestrator: true, dashboard: true }
   },
   openai: {
@@ -29,6 +42,11 @@ const PROVIDERS = {
     category: 'ai',
     type: 'text_generation',
     credentialPolicy: { ...DEFAULT_CREDENTIAL_POLICY, defaultRotationDays: 90 },
+    policy: {
+      security: `${GENERIC_POLICY_URL}#openai`,
+      runbook: 'https://docs.edulure.com/integrations/openai/vaulting'
+    },
+    documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook',
     surfaces: { invites: true }
   },
   anthropic: {
@@ -37,6 +55,11 @@ const PROVIDERS = {
     category: 'ai',
     type: 'text_generation',
     credentialPolicy: { ...DEFAULT_CREDENTIAL_POLICY, defaultRotationDays: 90 },
+    policy: {
+      security: `${GENERIC_POLICY_URL}#anthropic`,
+      runbook: 'https://docs.edulure.com/integrations/anthropic/credential-rotation'
+    },
+    documentationUrl: 'https://docs.edulure.com/integrations/anthropic/invite-handbook',
     surfaces: { invites: true }
   },
   grok: {
@@ -45,6 +68,11 @@ const PROVIDERS = {
     category: 'ai',
     type: 'text_generation',
     credentialPolicy: { ...DEFAULT_CREDENTIAL_POLICY, defaultRotationDays: 60 },
+    policy: {
+      security: `${GENERIC_POLICY_URL}#grok`,
+      runbook: 'https://docs.edulure.com/integrations/grok/credentials'
+    },
+    documentationUrl: 'https://docs.edulure.com/integrations/grok/security-checklist',
     surfaces: { invites: true }
   },
   'azure-openai': {
@@ -53,6 +81,11 @@ const PROVIDERS = {
     category: 'ai',
     type: 'text_generation',
     credentialPolicy: { ...DEFAULT_CREDENTIAL_POLICY, defaultRotationDays: 60 },
+    policy: {
+      security: `${GENERIC_POLICY_URL}#azure-openai`,
+      runbook: 'https://docs.edulure.com/integrations/azure-openai/runbook'
+    },
+    documentationUrl: 'https://docs.edulure.com/integrations/azure-openai/security',
     surfaces: { invites: true }
   },
   'google-vertex': {
@@ -61,6 +94,11 @@ const PROVIDERS = {
     category: 'ai',
     type: 'ml_platform',
     credentialPolicy: { ...DEFAULT_CREDENTIAL_POLICY, defaultRotationDays: 60 },
+    policy: {
+      security: `${GENERIC_POLICY_URL}#google-vertex`,
+      runbook: 'https://docs.edulure.com/integrations/google-vertex/runbook'
+    },
+    documentationUrl: 'https://docs.edulure.com/integrations/google-vertex/credential-handbook',
     surfaces: { invites: true }
   }
 };
@@ -120,7 +158,11 @@ function getIntegrationDescriptor(value) {
     label: provider.label,
     category: provider.category ?? 'integration',
     type: provider.type ?? 'general',
-    enabled: resolveProviderEnablement(provider.id)
+    enabled: resolveProviderEnablement(provider.id),
+    policy: provider.policy ?? {
+      security: GENERIC_POLICY_URL,
+      runbook: GENERIC_RUNBOOK_URL
+    }
   };
 }
 

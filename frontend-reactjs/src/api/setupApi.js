@@ -1,7 +1,8 @@
 import { httpClient } from './httpClient.js';
 
-export async function fetchSetupStatus() {
-  const response = await httpClient.get('/setup/status', { cache: false });
+export async function fetchSetupStatus({ historyLimit, signal } = {}) {
+  const search = typeof historyLimit === 'number' ? `?history_limit=${encodeURIComponent(historyLimit)}` : '';
+  const response = await httpClient.get(`/setup/status${search}`, { cache: false, signal });
   return response?.data ?? {};
 }
 

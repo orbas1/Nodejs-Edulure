@@ -55,6 +55,36 @@ describe('Compliance HTTP routes', () => {
     });
   });
 
+  it('exposes dueInHours and deadlineState for each DSR entry', async () => {
+    complianceServiceMock.listDsrRequests.mockResolvedValueOnce({
+      data: [
+        {
+          id: 99,
+          requestType: 'access',
+          status: 'in_review',
+          dueInHours: 6.5,
+          deadlineState: 'due_soon'
+        }
+      ],
+      total: 1,
+      overdue: 0
+    });
+
+    const response = await request(app).get('/api/v1/compliance/dsr/requests');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.data[0]).toEqual(
+      expect.objectContaining({
+        id: 99,
+        requestType: 'access',
+        status: 'in_review',
+        dueInHours: 6.5,
+        deadlineState: 'due_soon'
+      })
+    );
+  });
+
   it('validates assign payloads before delegating to the service', async () => {
     const response = await request(app).post('/api/v1/compliance/dsr/requests/44/assign').send({});
 

@@ -315,6 +315,45 @@ export default function Admin() {
     ].filter(Boolean);
   }, [revenueOverview]);
 
+  const handleApprovalDecision = useCallback(
+    async (item, decision) => {
+      if (!token || !item) {
+        return;
+      }
+
+      const verificationId = item.verificationId ?? item?.context?.verificationId ?? item?.metadata?.verificationId ?? null;
+      if (!verificationId) {
+        console.warn('No verification identifier available for approval item', item);
+        return;
+      }
+
+      try {
+        await reviewVerificationCase({
+          token,
+          verificationId,
+          body: {
+            decision,
+            notes: item.summary ?? undefined,
+            amount: item.amount ?? undefined
+          }
+        });
+        if (typeof refresh === 'function') {
+          await refresh();
+        }
+      } catch (error) {
+        console.error('Failed to process approval decision', error);
+      }
+    },
+    [refresh, token]
+  );
+
+  const handleApprovalEscalate = useCallback(
+    async (item) => {
+      await handleApprovalDecision(item, 'escalate');
+    },
+    [handleApprovalDecision]
+  );
+
   const paymentHealthBreakdown = useMemo(() => {
     if (!paymentHealth) {
       return EMPTY_ARRAY;
@@ -772,6 +811,8 @@ export default function Admin() {
         items={approvalItems}
         formatNumber={formatNumber}
         onRefresh={refresh}
+        onDecision={handleApprovalDecision}
+        onEscalate={handleApprovalEscalate}
       />
 
       <AdminRevenueSection

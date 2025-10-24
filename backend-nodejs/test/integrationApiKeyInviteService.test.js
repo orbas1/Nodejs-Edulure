@@ -158,7 +158,9 @@ describe('IntegrationApiKeyInviteService', () => {
         providerLabel: 'OpenAI',
         status: 'pending',
         rotationIntervalDays: 90,
-        documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook'
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook',
+        policyUrl: expect.stringContaining('trust.edulure.com/security/integration-credentials'),
+        runbookUrl: 'https://docs.edulure.com/integrations/openai/vaulting'
       })
     );
     expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
@@ -223,7 +225,14 @@ describe('IntegrationApiKeyInviteService', () => {
 
     expect(mailServiceMock.sendMail).toHaveBeenCalled();
     expect(result.invite).toEqual(
-      expect.objectContaining({ id: 'invite-uuid', status: 'pending', sendCount: 2, documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' })
+      expect.objectContaining({
+        id: 'invite-uuid',
+        status: 'pending',
+        sendCount: 2,
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook',
+        policyUrl: expect.stringContaining('trust.edulure.com/security/integration-credentials'),
+        runbookUrl: 'https://docs.edulure.com/integrations/openai/vaulting'
+      })
     );
     expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
@@ -269,7 +278,13 @@ describe('IntegrationApiKeyInviteService', () => {
       expect.objectContaining({ status: 'cancelled', cancelledBy: 'admin@example.com' }),
       databaseMock
     );
-    expect(result).toEqual(expect.objectContaining({ status: 'cancelled', cancelledBy: 'admin@example.com' }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        cancelledBy: 'admin@example.com',
+        policyUrl: expect.stringContaining('trust.edulure.com/security/integration-credentials')
+      })
+    );
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'integrations.invite.cancelled',
@@ -343,7 +358,13 @@ describe('IntegrationApiKeyInviteService', () => {
     );
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 5, sanitized: true }));
     expect(result.invite).toEqual(
-      expect.objectContaining({ id: 'invite-uuid', status: 'completed', documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' })
+      expect.objectContaining({
+        id: 'invite-uuid',
+        status: 'completed',
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook',
+        policyUrl: expect.stringContaining('trust.edulure.com/security/integration-credentials'),
+        runbookUrl: 'https://docs.edulure.com/integrations/openai/vaulting'
+      })
     );
     expect(auditLoggerMock.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -418,6 +439,31 @@ describe('IntegrationApiKeyInviteService', () => {
         metadata: expect.objectContaining({ apiKeyId: 9, provider: 'openai', documentationUrl: 'https://docs.edulure.com/integrations/openai/production-handbook' })
       })
     );
+  });
+
+  it('rejects weak credentials that fail entropy validation', async () => {
+    inviteModelMock.findActiveByTokenHash.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: null,
+      ownerEmail: 'ops@example.com',
+      status: 'pending',
+      rotationIntervalDays: 90,
+      keyExpiresAt: null,
+      metadata: {}
+    });
+
+    await expect(
+      service.submitInvitation('token-xyz', {
+        key: 'aaaaaaaaaaaaaaaaaaaa',
+        rotationIntervalDays: 60
+      })
+    ).rejects.toThrow('API key must contain a mix of characters for entropy');
+
+    expect(apiKeyServiceMock.createKey).not.toHaveBeenCalled();
+    expect(apiKeyServiceMock.rotateKey).not.toHaveBeenCalled();
   });
 
   it('persists fulfilment context metadata when provided', async () => {

@@ -114,6 +114,46 @@ export function requireString(value, field, { min = 1, max = 255 } = {}) {
   return trimmed;
 }
 
+const COMPROMISED_PATTERNS = [
+  'apikey',
+  'api_key',
+  'password',
+  'changeme',
+  'default',
+  'sample',
+  'test',
+  'token'
+];
+
+export function validateKeyStrength(value, { provider } = {}) {
+  const trimmed = requireString(value, 'API key', { min: MIN_KEY_LENGTH, max: 512 });
+  const uniqueCharacters = new Set(trimmed).size;
+
+  if (uniqueCharacters < 10) {
+    throw Object.assign(new Error('API key must contain a mix of characters for entropy'), { status: 422 });
+  }
+
+  if (/^[a-z]+$/i.test(trimmed) || /^\d+$/.test(trimmed)) {
+    throw Object.assign(new Error('API key must include letters and numbers or symbols'), { status: 422 });
+  }
+
+  if (/(.)\1{5,}/.test(trimmed)) {
+    throw Object.assign(new Error('API key cannot repeat the same character excessively'), { status: 422 });
+  }
+
+  const lower = trimmed.toLowerCase();
+  const bannedTerms = [...COMPROMISED_PATTERNS];
+  if (provider) {
+    bannedTerms.push(String(provider).toLowerCase());
+  }
+
+  if (bannedTerms.some((term) => term && lower.includes(term))) {
+    throw Object.assign(new Error('API key must not include placeholder or provider names'), { status: 422 });
+  }
+
+  return trimmed;
+}
+
 function addDays(date, days) {
   const ms = Number(days) * 24 * 60 * 60 * 1000;
   const value = date instanceof Date ? date.getTime() : new Date(date).getTime();
@@ -307,7 +347,7 @@ export default class IntegrationApiKeyService {
 
     const ownerEmailAddress = ensureOwnerEmailDomain(ownerEmail);
 
-    const trimmedKey = requireString(keyValue, 'API key', { min: MIN_KEY_LENGTH, max: 512 });
+    const trimmedKey = validateKeyStrength(keyValue, { provider: normalisedProvider });
 
     const rotationDays = clampRotationInterval(rotationIntervalDays, normalisedProvider);
     const now = this.nowProvider();
@@ -329,10 +369,6 @@ export default class IntegrationApiKeyService {
     const hashConflict = await this.model.findByHash(keyHash, connection);
     if (hashConflict && hashConflict.provider === normalisedProvider) {
       throw Object.assign(new Error('API key already registered for this provider'), { status: 409 });
-    }
-
-    if (trimmedKey.length < MIN_KEY_LENGTH) {
-      throw Object.assign(new Error('API key must be at least 20 characters'), { status: 422 });
     }
 
     const encrypted = this.encryptionService.encryptStructured(
@@ -410,7 +446,7 @@ export default class IntegrationApiKeyService {
       throw Object.assign(new Error('API key is disabled and cannot be rotated'), { status: 409 });
     }
 
-    const trimmedKey = requireString(keyValue, 'API key', { min: MIN_KEY_LENGTH, max: 512 });
+    const trimmedKey = validateKeyStrength(keyValue, { provider: record.provider });
     const rotationDays = clampRotationInterval(rotationIntervalDays ?? record.rotationIntervalDays, record.provider);
     const now = this.nowProvider();
     const expiresDate = expiresAt ? new Date(expiresAt) : record.expiresAt;

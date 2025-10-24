@@ -77,6 +77,36 @@ export default function InviteSummaryCard({ invite, countdown, onRefresh }) {
             )}
           </dd>
         </div>
+        {invite.policyUrl ? (
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Security policy</dt>
+            <dd className="text-sm font-medium text-slate-800">
+              <a
+                href={invite.policyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-emerald-700 hover:text-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+              >
+                Review credential handling standards
+              </a>
+            </dd>
+          </div>
+        ) : null}
+        {invite.runbookUrl && !invite.documentationUrl ? (
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Operations runbook</dt>
+            <dd className="text-sm font-medium text-slate-800">
+              <a
+                href={invite.runbookUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-primary hover:text-primary-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                View rotation workflow
+              </a>
+            </dd>
+          </div>
+        ) : null}
       </dl>
 
       <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-600">
@@ -96,7 +126,9 @@ InviteSummaryCard.propTypes = {
     expiresAt: PropTypes.string,
     keyExpiresAt: PropTypes.string,
     reason: PropTypes.string,
-    documentationUrl: PropTypes.string
+    documentationUrl: PropTypes.string,
+    policyUrl: PropTypes.string,
+    runbookUrl: PropTypes.string
   }),
   countdown: PropTypes.shape({
     expired: PropTypes.bool,
