@@ -54,8 +54,40 @@
       - 2.F Analytics, Admin & Operations Dashboards (`src/pages/Analytics.jsx`, `src/pages/admin/index.jsx`, `src/pages/admin/sections/*`, `src/components/admin/`, `src/hooks/useAdminAnalytics.js`)
       - 2.G Commerce, Billing & Profile Management (`src/pages/Profile.jsx`, `src/pages/TutorProfile.jsx`, `src/components/billing/`, `src/hooks/useBillingPortal.js`)
       - 2.H Integrations, Enablement & Invitations (`src/pages/IntegrationCredentialInvite.jsx`, `src/components/integrations/`, `src/hooks/useIntegrationInvite.js`)
-      - 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
-      - 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
+      - ✓ 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
+        1. **Appraisal.** `DashboardLayout.jsx` wires the contextual support workspace into the shell, passing session-aware metrics, seed articles, and case summaries so the `SupportLauncher` modal reflects the role-specific dashboard payloads without additional setup. 
+        2. **Functionality.** `useSupportLauncher.js` normalises knowledge-base results, recent case metadata, and SLA metrics while exposing `openLauncher`, `toggleHelpfulArticle`, and `submitFeedback` callbacks; the `SupportLauncher.jsx` overlay renders search, metrics, case history, and feedback forms tied to those hooks and Headless UI transitions. 
+        3. **Logic Usefulness.** Launcher context tracks the current route segments, resolved role, and latest feedback entry, letting the overlay stamp badges, pre-filter analytics, and feed deflection metrics directly from dashboard state. 
+        4. **Redundancies.** Article normalisation dedupes seed data and live search responses before rendering, preventing double-surfaced guides that previously diverged between inline support drawers and standalone support pages. 
+        5. **Placeholders or Stubs.** Launcher seeds still rely on dashboard-provided suggestion scaffolds and assume knowledge-base endpoints exist; integration TODOs and placeholder category labels remain until production APIs are validated. 
+        6. **Duplicate Functions.** Local-storage powered helpful toggles and feedback persistence now live solely inside `useSupportLauncher`, replacing duplicated helpful-mark logic that formerly lived in dashboard widgets. 
+        7. **Improvements Needed.** Follow-ups should replace the placeholder category dropdown, hydrate analytics events for search and deflection, and confirm support case hydration once backend payloads stabilise. 
+        8. **Styling Improvements.** The overlay applies token-driven colours via `var(--color-surface)`/`var(--color-text)` and consistent rounded radii so support surfaces inherit the shared theming system instead of bespoke palettes. 
+        9. **Efficiency Analysis.** Debounced search requests (220 ms) plus memoised article, case, and metric derivations minimise repeated API calls and recomputations when the modal opens or filters change. 
+        10. **Strengths to Keep.** Context-aware badges, accessible focusable controls from Headless UI, and persistent feedback history provide a cohesive, observable support experience for success teams. 
+        11. **Weaknesses to Remove.** The launcher still fails gracefully when unauthenticated but lacks inline messaging for missing search connectors; error copy and offline fallbacks need extending before GA. 
+        12. **Styling & Colour Review.** Metrics chips, helpful pills, and CTA buttons reuse primary/neutral tokens ensuring contrast, while modal copy references annex verbiage to stay brand-aligned. 
+        13. **CSS, Orientation & Placement.** Centered modal layout, responsive padding, and mobile-friendly tag stacks avoid obscuring dashboard CTAs when invoked on narrow viewports. 
+        14. **Text Analysis.** Introductory microcopy emphasises contextual guidance and deflection metrics, and feedback confirmations remain concise yet appreciative to encourage future submissions. 
+        15. **Change Checklist Tracker.** Regression passes should cover knowledge search debouncing, localStorage hydration, badge context accuracy, and error states from aborted fetches. 
+        16. **Full Upgrade Plan & Release Steps.** Validate production knowledge APIs, wire analytics events, expand category taxonomy, run accessibility sweeps, and ship alongside updated Annex A24 documentation. 
+      - ✓ 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
+        1. **Appraisal.** `main.jsx` wraps the React tree with the `ThemeProvider`, Dashboard, Auth, Runtime Config, and Realtime contexts so routing, theming, and shell state remain coherent across marketing and dashboard surfaces. 
+        2. **Functionality.** `ThemeContext.jsx` normalises persisted preferences, resolves system colour schemes, and writes `data-theme`, `data-contrast`, `data-density`, and `data-radius` attributes that downstream layouts and CSS tokens consume. 
+        3. **Logic Usefulness.** `DashboardLayout.jsx` reads dashboard theme preferences and calls `applyTheme`, letting server-provided appearance settings immediately re-skin the shell without manual CSS overrides. 
+        4. **Redundancies.** Centralised setter helpers (`setMode`, `setDensity`, `applyTheme`) eliminate formerly scattered theme toggles and ensure marketing pages and dashboard forms share a single source of truth. 
+        5. **Placeholders or Stubs.** Density preferences still map legacy “expanded” options to “comfortable,” and design notes flag the need to extend provider support once broader density variants are reintroduced. 
+        6. **Duplicate Functions.** Shared layout utilities (skip link, sticky top bar, responsive sidebar) are encapsulated inside `DashboardLayout` rather than re-implemented per page, keeping navigation treatments uniform. 
+        7. **Improvements Needed.** Remaining work includes re-enabling lint (missing `@eslint/js`), fleshing out integration tests for theme propagation, and wiring analytics around live theme changes. 
+        8. **Styling Improvements.** `tokens.css` encodes light/dark, high-contrast, density, and radius tokens so new components can inherit consistent spacing, typography, and corner radii without bespoke CSS. 
+        9. **Efficiency Analysis.** Memoised selectors in `DashboardLayout` plus `ThemeProvider`’s guarded listeners prevent redundant re-renders when role switches or media queries change. 
+        10. **Strengths to Keep.** The layered provider stack, sticky `AppTopBar`, and responsive sidebar deliver predictable navigation scaffolding and preserve accessibility affordances. 
+        11. **Weaknesses to Remove.** Some global CSS (`styles.css`) still carries legacy overrides; future cleanup should consolidate on token-driven variables to avoid leakage into modular components. 
+        12. **Styling & Colour Review.** Theme attributes feed modal backgrounds, notification surfaces, and buttons, enforcing palette cohesion across support overlays, settings, and shell chrome. 
+        13. **CSS, Orientation & Placement.** Layout components respect safe navigation order (skip link, focus ring) and collapse sidebar/search affordances for smaller screens while preserving action discoverability. 
+        14. **Text Analysis.** Dashboard settings copy (“Settings control centre,” “Refresh all”) keeps tone operational yet concise, reflecting brand voice across shared layout primitives. 
+        15. **Change Checklist Tracker.** Release checklist should confirm dataset attributes, token overrides, responsive sidebar states, and theme persistence across reloads. 
+        16. **Full Upgrade Plan & Release Steps.** Stage density/radius expansions, run cross-surface visual regression tests, ship updated design tokens, and coordinate with design ops before enabling for all tenants. 
       - 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
       - 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
       - 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
@@ -147,8 +179,63 @@
       - A21. Analytics, Admin & Operations Dashboards (2.F)
       - A22. Commerce, Billing & Profile Management (2.G) ✓
       - A23. Integrations, Enablement & Invitations (2.H) ✓
-      - A24. Support, Knowledge & Feedback (2.I)
-      - A25. Shared Layout, Theming & Component Infrastructure (2.J)
+      - ✓ A24. Support, Knowledge & Feedback (2.I)
+         - A24.1 frontend-reactjs/src/hooks/useSupportLauncher.js
+            1. **Context synthesis.** `useSupportLauncher.js` now captures route segments, role, metrics, and recent case summaries so the support overlay understands which workspace a learner is in when surfacing guidance.
+            2. **Search orchestration.** The hook debounces knowledge-base queries, guards against aborted fetches, and normalises API payloads (`articles`, `data.articles`) into a consistent article schema with id/title/excerpt/minutes metadata.
+            3. **Suggestion dedupe.** Knowledge suggestions from seeded payloads, case breadcrumbs, and live search responses are merged and deduplicated so `SupportLauncher` renders a single authoritative list without copy/paste drift across surfaces.
+            4. **Persistence.** Helpful marks and feedback history persist to localStorage under a user-specific namespace, letting annex analytics derive deflection rates per learner session even after refreshes.
+            5. **Feedback contract.** `submitFeedback` normalises ratings, trims comments, and records contextual metadata (path, query, category, role) before storing the entry so future integrations can publish telemetry without losing attribution.
+            6. **Metrics bridge.** Support metrics (open, awaiting learner, average response minutes, CSAT) are normalised regardless of backend naming (`openTickets`, `avgResponse`) to keep the overlay stats grid in sync with Annex C1 dashboards.
+            7. **Case digestion.** Recent cases map to lightweight summaries (subject, status, SLA flag, updated timestamp) so the overlay can highlight continuity cues for learners jumping between tickets.
+            8. **Guardrails.** The hook bails early when no token is available, prevents state updates after aborts, and resets error/loading state on close to avoid stale warnings when reopening the drawer.
+            9. **Extensibility.** Options allow new seeds (`seedArticles`, `seedSuggestions`, `metrics`, `recentCases`) without rethreading the hook, supporting future annex integrations (e.g., admin knowledge previews) from the same primitive.
+            10. **Testing hooks.** The hook is pure React logic using `useMemo`/`useCallback`, keeping it testable and aligning with prior annex instrumentation patterns.
+            11. **Checklist.** Lint coverage now targets `frontend-reactjs/src` including the hook; note the current lint task surfaces missing `@eslint/js`, which should be addressed before CI enforcement.
+         - A24.2 frontend-reactjs/src/components/support/SupportLauncher.jsx
+            1. **Overlay shell.** A Headless UI `Dialog` renders a responsive support workspace with context tags, knowledge search, and metrics, matching Annex C1’s single-pane-of-glass requirement.
+            2. **Navigation entry.** A top-right Lifebuoy button (wired via `onOpenSupport`) gives learners and instructors a consistent support entrypoint from the dashboard shell, instrumenting Annex A24’s quick-launch affordance.
+            3. **Knowledge search.** The overlay includes a debounced search field, category filter, and article cards with CTA/“Mark helpful” actions that reuse the hook’s normalised data.
+            4. **Analytics surfacing.** A metrics column highlights open cases, awaiting-learner count, SLA response minutes, and deflection rate using annex colour tokens for quick scanning.
+            5. **Recent cases.** Recent support tickets display subject/status/timestamps so learners can jump between contexts without leaving the overlay.
+            6. **Feedback loop.** A rating selector and comment box submit via the hook, persisting success/error messages and showing the most recent feedback to satisfy Annex A24 feedback telemetry goals.
+            7. **Styling alignment.** Tokens (`rounded-3xl`, semantic badges, var-based backgrounds) keep the overlay aligned with dashboard palettes, while focus-visible rings maintain accessibility.
+            8. **Interaction parity.** Buttons inherit the same transitions as notifications/support modules, ensuring keyboard users can navigate the overlay without focus traps.
+            9. **Empty states.** When no articles match, the component renders a dashed guidance card encouraging feedback, preventing dead-ends noted in the logic flows audit.
+            10. **Media semantics.** Article cards carry minute estimates and category pills so the knowledge base remains skimmable and Annex-ready for release notes.
+         - A24.3 frontend-reactjs/src/layouts/DashboardLayout.jsx & frontend-reactjs/src/components/navigation/AppTopBar.jsx
+            1. **Launcher wiring.** DashboardLayout instantiates `useSupportLauncher` with knowledge seeds, metrics, and case snapshots from the dashboard payload, guaranteeing the overlay opens with live annex data.
+            2. **Top bar integration.** `AppTopBar` accepts `onOpenSupport` and renders the new Lifebuoy button beside notifications, ensuring support is a first-class navigation affordance across roles.
+            3. **Support panel mounting.** The layout mounts `<SupportLauncher launcher={supportLauncher} />` alongside the notification panel so the overlay is available on every dashboard route once the hook is ready.
+            4. **Seed extraction.** Knowledge seed helpers inspect multiple dashboard shapes (`knowledgeBase.articles`, `knowledge.topArticles`, `support.suggestions`) to stay resilient while backend annex payloads evolve.
+            5. **Telemetry alignment.** Support metrics normalised in the hook appear in the overlay without extra transforms, aligning with Annex C1 telemetry dashboards.
+            6. **Future-facing.** Optional seeds gracefully degrade (empty arrays) so additional annex work can supply richer datasets without defensive patches across components.
+
+      - ✓ A25. Shared Layout, Theming & Component Infrastructure (2.J)
+         - A25.1 frontend-reactjs/src/context/ThemeContext.jsx
+            1. **Provider uplift.** A new `ThemeProvider` centralises theme mode, density, contrast, and radius preferences with safe normalisation, storage, and system dark-mode detection.
+            2. **Persistence.** Preferences persist per user via `localStorage` (`edulure.theme.preferences.v1`) with guarded parsing/logging to avoid corrupt state from invalid JSON.
+            3. **System parity.** `resolveSystemMode` listens to `prefers-color-scheme` changes so “Follow system” respects live OS toggles without reloads, satisfying Annex theming parity goals.
+            4. **Attribute sync.** `applyThemeAttributes` stamps `data-theme`, `data-density`, `data-radius`, and `data-contrast` on `documentElement`, giving CSS tokens a single source of truth across the app shell.
+            5. **API ergonomics.** Exposed setters (`setMode`, `setDensity`, `applyTheme`, `resetTheme`) make it easy for dashboard modules or settings forms to adopt shared theme primitives without reimplementing persistence.
+         - A25.2 frontend-reactjs/src/styles/tokens.css & frontend-reactjs/src/styles.css
+            1. **Color-scheme updates.** Tokens now map `color-scheme: light` by default and switch to `dark` when `data-theme='dark'`, aligning browser-rendered form controls and scrollbars with Annex accessibility requirements.
+            2. **Density tokens.** `[data-density='compact']` trims spacing tokens and form paddings, enabling compact/comfortable variants without ad-hoc utility overrides.
+            3. **Radius tokens.** `[data-radius='sharp'|'pill']` adjusts shared radii and media thumb corners so theme preferences propagate automatically to cards, dialogs, and overlays.
+         - A25.3 frontend-reactjs/src/main.jsx & frontend-reactjs/src/layouts/DashboardLayout.jsx
+            1. **Global wiring.** `main.jsx` now wraps the app with `ThemeProvider`, guaranteeing every route inherits shared theming without manual provider stacking.
+            2. **Dashboard adoption.** `DashboardLayout` reads runtime theme preferences, applies them via `useTheme`, and feeds support launcher seeds, ensuring layout infrastructure honours annex theming tokens alongside support upgrades.
+            3. **Support integration.** Layout updates also mount `SupportLauncher` and provide `onOpenSupport` to the top bar, reinforcing shared component infrastructure across dashboards.
+         - A25.4 frontend-reactjs/src/pages/dashboard/DashboardSettings.jsx
+            1. **Live previews.** Appearance settings now call `applyTheme` whenever administrators adjust mode, density, or border radius, mapping the legacy “expanded” density option to the closest supported value.
+            2. **Experience parity.** Theme adjustments instantly apply to the dashboard shell, letting Annex reviewers validate palette/density changes without reloading or manually toggling devtools.
+         - A25.5 frontend-reactjs/src/components/navigation/AppTopBar.jsx & frontend-reactjs/src/components/support/SupportLauncher.jsx
+            1. **Shared tokens.** The top bar support button and overlay reuse the same border/focus tokens as other navigation controls, reinforcing the shared component vocabulary.
+            2. **Button contract.** `AppTopBar` exposes `onOpenSupport` with PropTypes/defaults so other shells (marketing/admin) can opt in without rewriting structure, keeping component infrastructure modular.
+         - A25.6 frontend-reactjs/src/hooks/useSupportLauncher.js
+            1. **Hook reuse.** The support launcher hook exports reusable normalisers and persistence logic, demonstrating the shared-component ethos Annex A25 targets for cross-surface overlays.
+         - A25.7 frontend-reactjs/src/styles/tokens.css (Density/Radius)
+            1. **Infrastructure readiness.** New density/radius tokens allow design system consumers (cards, modals, overlays) to respond to theme context without bespoke Tailwind overrides, underpinning Annex A25’s component infrastructure narrative.
       - A26. Flutter Authentication & Identity (3.A)
       - A27. Flutter Community Feed & Engagement (3.B)
       - A28. Flutter Lessons, Assessments & Offline Learning (3.C)

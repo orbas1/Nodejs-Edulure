@@ -15,6 +15,7 @@ import SettingsLayout from '../../components/settings/SettingsLayout.jsx';
 import SettingsToggleField from '../../components/settings/SettingsToggleField.jsx';
 import SettingsAccordion from '../../components/settings/SettingsAccordion.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import { useOutletContext } from 'react-router-dom';
 import {
   fetchAppearanceSettings,
@@ -1572,6 +1573,7 @@ ThirdPartySection.propTypes = {
 
 export default function DashboardSettings() {
   const { session } = useAuth();
+  const { applyTheme } = useTheme();
   const outletContext = useOutletContext();
   const token = session?.tokens?.accessToken ?? outletContext?.token;
 
@@ -1610,6 +1612,20 @@ export default function DashboardSettings() {
     fallback: FALLBACK_THIRD_PARTY,
     sectionName: 'third-party credentials'
   });
+
+  useEffect(() => {
+    if (!appearance.data?.theme) {
+      return;
+    }
+    const density = appearance.data.theme.density === 'expanded'
+      ? 'comfortable'
+      : appearance.data.theme.density;
+    applyTheme({
+      mode: appearance.data.theme.mode,
+      radius: appearance.data.theme.borderRadius,
+      density
+    });
+  }, [appearance.data?.theme?.borderRadius, appearance.data?.theme?.density, appearance.data?.theme?.mode, applyTheme]);
 
   const sections = useMemo(
     () => [

@@ -6,6 +6,7 @@ import AppSidebar from '../components/navigation/AppSidebar.jsx';
 import AppNotificationPanel from '../components/navigation/AppNotificationPanel.jsx';
 import ServiceHealthBanner from '../components/status/ServiceHealthBanner.jsx';
 import DashboardStateMessage from '../components/dashboard/DashboardStateMessage.jsx';
+import SupportLauncher from '../components/support/SupportLauncher.jsx';
 import {
   PRIMARY_NAVIGATION,
   QUICK_CREATE_ACTIONS,
@@ -17,11 +18,13 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import { useRealtime } from '../context/RealtimeContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import {
   trackNavigationSelect,
   trackNotificationOpen,
   trackNotificationPreferenceChange
 } from '../lib/analytics.js';
+import useSupportLauncher from '../hooks/useSupportLauncher.js';
 
 function buildDashboardNotifications(session, dashboard) {
   const baseNotifications = buildShellNotifications(session);
@@ -66,6 +69,7 @@ export default function DashboardLayout() {
   const { roles, dashboards, activeRole, setActiveRole, loading, error, refresh } = useDashboard();
   const { getConfigValue } = useRuntimeConfig();
   const { connected: realtimeConnected } = useRealtime();
+  const { applyTheme } = useTheme();
 
   const availableRoles = useMemo(
     () => roles.map((role) => role.id.toLowerCase()),
@@ -90,6 +94,30 @@ export default function DashboardLayout() {
   );
 
   const dashboardData = dashboards?.[resolvedRole] ?? null;
+
+  const themePreferences = useMemo(() => {
+    const raw =
+      dashboardData?.preferences?.theme ??
+      dashboardData?.themePreferences ??
+      dashboardData?.theme ??
+      null;
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+    return {
+      mode: raw.mode ?? raw.themeMode ?? raw.appearanceMode,
+      contrast: raw.contrast ?? raw.contrastMode ?? raw.accessibilityContrast,
+      density: raw.density ?? raw.interfaceDensity ?? raw.layoutDensity,
+      radius: raw.borderRadius ?? raw.radius ?? raw.cornerStyle
+    };
+  }, [dashboardData]);
+
+  useEffect(() => {
+    if (!themePreferences) {
+      return;
+    }
+    applyTheme(themePreferences);
+  }, [applyTheme, themePreferences]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState({
@@ -202,6 +230,54 @@ export default function DashboardLayout() {
     trackNotificationPreferenceChange(groupId, enabled);
   }, []);
 
+  const supportSeedArticles = useMemo(() => {
+    const knowledge = dashboardData?.support?.knowledgeBase ?? dashboardData?.support?.knowledge ?? null;
+    if (!knowledge) {
+      return [];
+    }
+    if (Array.isArray(knowledge)) {
+      return knowledge;
+    }
+    if (Array.isArray(knowledge?.articles)) {
+      return knowledge.articles;
+    }
+    if (Array.isArray(knowledge?.topArticles)) {
+      return knowledge.topArticles;
+    }
+    return [];
+  }, [dashboardData]);
+
+  const supportSeedSuggestions = useMemo(() => {
+    const knowledge = dashboardData?.support?.knowledgeBase ?? dashboardData?.support ?? null;
+    if (!knowledge) {
+      return [];
+    }
+    if (Array.isArray(knowledge?.suggestions)) {
+      return knowledge.suggestions;
+    }
+    if (Array.isArray(knowledge?.recommended)) {
+      return knowledge.recommended;
+    }
+    return [];
+  }, [dashboardData]);
+
+  const supportMetrics = useMemo(
+    () => dashboardData?.support?.metrics ?? dashboardData?.supportMetrics ?? null,
+    [dashboardData]
+  );
+
+  const supportCases = useMemo(() => {
+    const cases = dashboardData?.support?.cases ?? dashboardData?.support?.tickets ?? [];
+    return Array.isArray(cases) ? cases : [];
+  }, [dashboardData]);
+
+  const supportLauncher = useSupportLauncher({
+    seedArticles: supportSeedArticles,
+    seedSuggestions: supportSeedSuggestions,
+    metrics: supportMetrics,
+    recentCases: supportCases
+  });
+
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
 
   const showEmptyState = !loading && !error && !dashboardData;
@@ -218,6 +294,7 @@ export default function DashboardLayout() {
         quickActions={quickActions}
         onNavigate={handleNavigate}
         onOpenNotifications={handleOpenNotifications}
+        onOpenSupport={supportLauncher.openLauncher}
         searchValue={searchTerm}
         onSearchChange={(value) => setSearchTerm(value)}
         onSearchSubmit={handleSearchSubmit}
@@ -295,6 +372,7 @@ export default function DashboardLayout() {
         onUpdatePreference={handleUpdateNotificationPreference}
         onNavigate={handleNavigate}
       />
+      <SupportLauncher launcher={supportLauncher} />
     </div>
   );
 }

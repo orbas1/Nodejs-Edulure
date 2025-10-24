@@ -6,6 +6,7 @@ import {
   Bars3Icon,
   BellIcon,
   BoltIcon,
+  LifebuoyIcon,
   PlusIcon,
   RectangleStackIcon
 } from '@heroicons/react/24/outline';
@@ -25,6 +26,7 @@ export default function AppTopBar({
   quickActions,
   onNavigate,
   onOpenNotifications,
+  onOpenSupport,
   onToggleSidebar,
   isSidebarCollapsed,
   searchValue,
@@ -197,6 +199,16 @@ export default function AppTopBar({
               </Transition>
             </Menu>
           ) : null}
+          {typeof onOpenSupport === 'function' ? (
+            <button
+              type="button"
+              onClick={onOpenSupport}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-primary/50 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              aria-label="Open support workspace"
+            >
+              <LifebuoyIcon className="h-5 w-5" />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onOpenNotifications}
@@ -275,6 +287,7 @@ AppTopBar.propTypes = {
   ),
   onNavigate: PropTypes.func,
   onOpenNotifications: PropTypes.func,
+  onOpenSupport: PropTypes.func,
   onToggleSidebar: PropTypes.func,
   isSidebarCollapsed: PropTypes.bool,
   searchValue: PropTypes.string,
@@ -302,6 +315,7 @@ AppTopBar.defaultProps = {
   quickActions: [],
   onNavigate: null,
   onOpenNotifications: null,
+  onOpenSupport: null,
   onToggleSidebar: null,
   isSidebarCollapsed: false,
   searchValue: undefined,
