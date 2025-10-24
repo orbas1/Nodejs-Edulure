@@ -8,7 +8,8 @@ import {
 } from '../utils/modelUtils.js';
 
 const TABLE = 'community_growth_experiments';
-const STATUS_OPTIONS = new Set(['ideation', 'active', 'paused', 'completed', 'cancelled']);
+const STATUS_OPTIONS = new Set(['ideation', 'design', 'building', 'live', 'completed', 'archived']);
+const ACTIVE_STATUSES = new Set(['design', 'building', 'live']);
 
 function normalisePrimaryId(value, fieldName) {
   if (value === undefined || value === null || value === '') {
@@ -315,7 +316,7 @@ export default class CommunityGrowthExperimentModel {
     const rows = await this.table(connection)
       .select(['id', 'community_id as communityId', 'title', 'status', 'metadata', 'updated_at as updatedAt'])
       .whereIn('community_id', ids)
-      .andWhere('status', 'active')
+      .andWhereIn('status', Array.from(ACTIVE_STATUSES))
       .orderBy('updated_at', 'desc');
 
     return rows.map((row) => ({

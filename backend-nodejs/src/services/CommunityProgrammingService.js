@@ -239,7 +239,7 @@ export default class CommunityProgrammingService {
         limit: 200
       }),
       CommunityWebinarModel.listForCommunity(community.id, {
-        status: ['announced', 'live', 'draft'],
+        status: ['announced', 'scheduled', 'live', 'draft'],
         order: 'asc',
         limit: 200
       })

@@ -3,7 +3,7 @@ import Joi from 'joi';
 import CommunityProgrammingService from '../services/CommunityProgrammingService.js';
 import { paginated, success } from '../utils/httpResponse.js';
 
-const webinarStatusEnum = ['draft', 'announced', 'live', 'complete', 'cancelled'];
+const webinarStatusEnum = ['draft', 'scheduled', 'announced', 'live', 'complete', 'cancelled'];
 const podcastStageEnum = ['planning', 'recording', 'editing', 'qa', 'scheduled', 'live', 'archived'];
 const growthStatusEnum = ['ideation', 'design', 'building', 'live', 'completed', 'archived'];
 
