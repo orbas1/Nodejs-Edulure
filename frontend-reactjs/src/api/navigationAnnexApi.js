@@ -57,9 +57,29 @@ function normaliseInitiativeBucket(items = []) {
       product: item.initiative?.product ?? null,
       operations: item.initiative?.operations ?? { tasks: [] },
       design: item.initiative?.design ?? { tokens: [], qa: [], references: [] },
-      strategy: item.initiative?.strategy ?? { pillar: null, narrative: null, metrics: [] }
+      strategy: normaliseInitiativeStrategy(item.initiative?.strategy)
     }
   }));
+}
+
+function normaliseInitiativeStrategy(raw = {}) {
+  const pillar = raw?.pillar ?? null;
+  const narrative = raw?.narrative ?? null;
+  const narratives = ensureArray(raw?.narratives).map((value) => String(value));
+  const metrics = ensureArray(raw?.metrics).map((metric) => ({
+    id: metric.id ?? metric.key ?? metric.label ?? 'metric',
+    label: metric.label ?? metric.name ?? '',
+    baseline: metric.baseline ?? null,
+    target: metric.target ?? null,
+    unit: metric.unit ?? ''
+  }));
+
+  return {
+    pillar,
+    narrative: narrative ?? narratives[0] ?? null,
+    narratives,
+    metrics
+  };
 }
 
 function normaliseStrategyNarratives(raw = []) {

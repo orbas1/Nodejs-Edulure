@@ -44,6 +44,10 @@ describe('NavigationAnnex handbook page', () => {
             },
             strategy: {
               narrative: 'Reduce clicks to reach the feed after sign-in.',
+              narratives: [
+                'Reduce clicks to reach the feed after sign-in.',
+                'Highlight feed remediation progress in the notification panel.'
+              ],
               metrics: [
                 {
                   id: 'nav-click-depth',
@@ -109,5 +113,8 @@ describe('NavigationAnnex handbook page', () => {
     expect(screen.getByText('Operational readiness (Annex A54)')).toBeInTheDocument();
     expect(screen.getAllByText('Verify feed registry export.')).toHaveLength(2);
     expect(screen.getByText('Navigation Backlog • Feed Registry')).toBeInTheDocument();
+    expect(
+      screen.getByText('Highlight feed remediation progress in the notification panel.')
+    ).toBeInTheDocument();
   });
 });

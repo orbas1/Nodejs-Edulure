@@ -13,8 +13,15 @@ function SectionCard({ section }) {
   const { id, label, initiative, originIds, quickAccess } = section;
   const operations = initiative.operations ?? { tasks: [] };
   const design = initiative.design ?? { tokens: [], qa: [], references: [] };
-  const strategy = initiative.strategy ?? { narratives: [], metrics: [] };
+  const strategy =
+    initiative.strategy ?? { pillar: null, narrative: null, narratives: [], metrics: [] };
   const product = initiative.product ?? { epicId: label, summary: '', impactedFiles: [] };
+  const strategyNarratives =
+    strategy.narratives && strategy.narratives.length
+      ? strategy.narratives
+      : strategy.narrative
+        ? [strategy.narrative]
+        : [];
 
   return (
     <section
@@ -148,7 +155,15 @@ function SectionCard({ section }) {
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Strategy narrative</h3>
-            <p className="text-sm text-slate-600">{strategy.narrative}</p>
+            {strategyNarratives.length ? (
+              <ul className="mt-2 space-y-2 text-sm text-slate-600">
+                {strategyNarratives.map((narrative) => (
+                  <li key={`${id}-strategy-${narrative}`}>{narrative}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">No strategy narrative recorded.</p>
+            )}
             {strategy.metrics?.length ? (
               <ul className="mt-3 space-y-2 text-xs text-slate-500">
                 {strategy.metrics.map((metric) => (
@@ -185,7 +200,20 @@ SectionCard.propTypes = {
         ),
         references: PropTypes.arrayOf(PropTypes.string)
       }),
-      strategy: PropTypes.object
+      strategy: PropTypes.shape({
+        pillar: PropTypes.string,
+        narrative: PropTypes.string,
+        narratives: PropTypes.arrayOf(PropTypes.string),
+        metrics: PropTypes.arrayOf(
+          PropTypes.shape({
+            id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+            label: PropTypes.string.isRequired,
+            baseline: PropTypes.string,
+            target: PropTypes.string,
+            unit: PropTypes.string
+          })
+        )
+      })
     }).isRequired,
     originIds: PropTypes.instanceOf(Set).isRequired,
     quickAccess: PropTypes.string

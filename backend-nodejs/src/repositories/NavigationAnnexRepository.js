@@ -106,6 +106,7 @@ function ensureNode(nodes, row) {
       strategy: {
         pillar: null,
         narrative: null,
+        narratives: new Map(),
         metrics: new Map(),
         sortOrder: row.displayOrder ?? 0
       }
@@ -121,7 +122,7 @@ function ensureStrategyPillar(pillars, pillarName, displayOrder = 0) {
   if (!pillars.has(pillarName)) {
     pillars.set(pillarName, {
       pillar: pillarName,
-      narratives: new Set(),
+      narratives: new Map(),
       metrics: new Map(),
       order: displayOrder
     });
@@ -130,6 +131,33 @@ function ensureStrategyPillar(pillars, pillarName, displayOrder = 0) {
     entry.order = Math.min(entry.order ?? displayOrder, displayOrder);
   }
   return pillars.get(pillarName);
+}
+
+function registerNarrative(map, text, order = 0) {
+  if (!text) {
+    return;
+  }
+  const resolvedOrder = order ?? 0;
+  const existing = map.get(text);
+  if (!existing) {
+    map.set(text, { text, order: resolvedOrder });
+    return;
+  }
+  const nextOrder = existing.order ?? resolvedOrder;
+  existing.order = Math.min(nextOrder, resolvedOrder);
+  map.set(text, existing);
+}
+
+function normaliseNarrativeList(map) {
+  return Array.from(map.values())
+    .sort((a, b) => {
+      const orderDiff = (a.order ?? 0) - (b.order ?? 0);
+      if (orderDiff !== 0) {
+        return orderDiff;
+      }
+      return a.text.localeCompare(b.text);
+    })
+    .map((entry) => entry.text);
 }
 
 function sortByPriority(a, b) {
@@ -327,6 +355,7 @@ export default class NavigationAnnexRepository {
       node.strategy.pillar = formattedPillar;
       node.strategy.narrative = row.narrative;
       node.strategy.sortOrder = Math.min(node.strategy.sortOrder ?? row.displayOrder ?? 0, row.displayOrder ?? 0);
+      registerNarrative(node.strategy.narratives, row.narrative, row.displayOrder ?? 0);
       narrativeIndex.set(row.id, {
         pillar: formattedPillar,
         navItemId: row.navItemId,
@@ -334,7 +363,7 @@ export default class NavigationAnnexRepository {
         displayOrder: row.displayOrder ?? 0
       });
       const pillarEntry = ensureStrategyPillar(strategyByPillar, formattedPillar, row.displayOrder ?? 0);
-      pillarEntry.narratives.add(row.narrative);
+      registerNarrative(pillarEntry.narratives, row.narrative, row.displayOrder ?? 0);
     }
 
     const metricsRows = await NavigationAnnexStrategyMetricModel.listAll(connection);
@@ -385,6 +414,9 @@ export default class NavigationAnnexRepository {
         .sort(sortByPriority)
         .map(({ id, label, baseline, target, unit }) => ({ id, label, baseline, target, unit }));
 
+      const nodeNarratives = normaliseNarrativeList(node.strategy.narratives);
+      const primaryNarrative = nodeNarratives.length ? nodeNarratives[0] : node.strategy.narrative;
+
       const initiative = {
         id: node.id,
         label: node.label,
@@ -400,7 +432,8 @@ export default class NavigationAnnexRepository {
           design,
           strategy: {
             pillar: node.strategy.pillar,
-            narrative: node.strategy.narrative,
+            narrative: primaryNarrative,
+            narratives: nodeNarratives,
             metrics: strategyMetrics
           }
         }
@@ -459,7 +492,7 @@ export default class NavigationAnnexRepository {
       })
       .map((entry) => ({
         pillar: entry.pillar,
-        narratives: Array.from(entry.narratives),
+        narratives: normaliseNarrativeList(entry.narratives),
         metrics: Array.from(entry.metrics.values())
           .sort(sortByPriority)
           .map(({ id, label, baseline, target, unit }) => ({ id, label, baseline, target, unit }))
@@ -470,9 +503,9 @@ export default class NavigationAnnexRepository {
       .map((entry) => ({
         href: entry.href,
         usageCount: entry.usageCount,
-        categories: Array.from(entry.categories),
-        navItems: Array.from(entry.navItemIds),
-        navItemLabels: Array.from(entry.navItemLabels)
+        categories: Array.from(entry.categories).sort((a, b) => a.localeCompare(b)),
+        navItems: Array.from(entry.navItemIds).sort((a, b) => a.localeCompare(b)),
+        navItemLabels: Array.from(entry.navItemLabels).sort((a, b) => a.localeCompare(b))
       }));
 
     return {

@@ -965,7 +965,7 @@ This compendium maps the execution paths, responsibilities, and release consider
 6. **Duplicate Functions:** Documentation label formatting is centralised in the repository and API normaliser, removing the duplicate string manipulation that previously lived in each UI surface.
 7. **Improvements need to make:** Add automated linting to validate seeded anchors resolve and expose changelog URLs so release notes link directly to annex updates.
 8. **Styling improvements:** Cross-surface summary cards share annex palette tokens (`bg-primary/10`, slate neutrals) and responsive spacing, reinforcing brand alignment across docs.
-9. **Efficiency analysis and improvement:** Backend sets dedupe anchors/nav items before serialising JSON; the UI limits cards to the top five entries and memoises context fetches to avoid re-render storms.
+9. **Efficiency analysis and improvement:** Backend sets dedupe anchors/nav items before serialising JSON, sorts narratives and reference chips for deterministic payloads, and the UI limits cards to the top five entries while memoising context fetches to avoid re-render storms.
 10. **Strengths to Keep:** Cached HTTP responses, abortable fetches, and snapshot tests keep annex documentation fast and deterministic across staging and production.
 11. **Weaknesses to remove:** Documentation entries remain English-only and lack ownership metadata—future iterations should integrate translation keys and maintainer tags.
 12. **Styling and Colour review changes:** Documentation chips reuse established primary/surface colours that already satisfy AA contrast and match the annex notification treatment.
