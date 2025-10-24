@@ -7044,7 +7044,9 @@ export async function seed(knex) {
         status: 'scheduled',
         audience_size: 1240,
         scheduled_at: new Date('2025-02-07T14:00:00Z'),
-        author: 'SLA Desk'
+        author: 'SLA Desk',
+        message:
+          'Celebrating February milestones, reminding learners about live classroom readiness, and linking to the latest knowledge base highlights.'
       },
       {
         tenant_id: 'global',
@@ -7053,7 +7055,9 @@ export async function seed(knex) {
         status: 'draft',
         audience_size: 480,
         scheduled_at: null,
-        author: 'Operations Duty Manager'
+        author: 'Operations Duty Manager',
+        message:
+          'Heads up! Automation workflows are undergoing maintenance. Expect slower assignment routing for the next 30 minutes.'
       },
       {
         tenant_id: 'enterprise-north',
@@ -7062,7 +7066,9 @@ export async function seed(knex) {
         status: 'scheduled',
         audience_size: 64,
         scheduled_at: new Date('2025-02-05T16:30:00Z'),
-        author: 'Enterprise Concierge'
+        author: 'Enterprise Concierge',
+        message:
+          'We identified a billing hiccup for Enterprise North learners. A remediation is in progress and should clear within two hours.'
       }
     ]);
 

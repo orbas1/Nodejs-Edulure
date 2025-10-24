@@ -317,7 +317,8 @@ export default class SupportOperationsService {
       audienceSize: row.audience_size ?? null,
       scheduledAt: toIso(row.scheduled_at),
       createdAt: toIso(row.created_at),
-      author: row.author ?? null
+      author: row.author ?? null,
+      message: row.message ?? null
     });
 
     const knowledgeBase = {
@@ -588,6 +589,8 @@ export default class SupportOperationsService {
     const channel = rawChannel === 'in_app' || rawChannel === 'inapp' ? 'in-app' : rawChannel;
     const audienceSize = Number.isFinite(Number(payload.audienceSize)) ? Number(payload.audienceSize) : null;
     const actorDescriptor = this.#buildActorDescriptor(actor);
+    const messageInput = typeof payload.message === 'string' ? payload.message.trim() : '';
+    const message = messageInput.length ? messageInput : null;
 
     const [inserted] = await this.db('support_operations_communications').insert(
       {
@@ -597,7 +600,8 @@ export default class SupportOperationsService {
         status: payload.status ?? 'scheduled',
         audience_size: audienceSize,
         scheduled_at: scheduledAt,
-        author: actorDescriptor.name ?? actorDescriptor.email ?? payload.author ?? null
+        author: actorDescriptor.name ?? actorDescriptor.email ?? payload.author ?? null,
+        message
       },
       ['id']
     );
@@ -615,7 +619,7 @@ export default class SupportOperationsService {
       scheduledAt: SupportTicketModel.toIso(stored.scheduled_at),
       createdAt: SupportTicketModel.toIso(stored.created_at),
       author: stored.author ?? null,
-      message: payload.message ?? null
+      message: stored.message ?? message
     };
 
     this.logger.info(

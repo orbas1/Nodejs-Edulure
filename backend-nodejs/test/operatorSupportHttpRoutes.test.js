@@ -123,7 +123,8 @@ beforeEach(() => {
     id: 11,
     title: 'Status update',
     channel: 'email',
-    status: 'scheduled'
+    status: 'scheduled',
+    message: 'Status update details'
   });
 
   serviceMock.updateNotificationPolicy.mockResolvedValue({
@@ -213,15 +214,16 @@ describe('Operator support HTTP routes', () => {
     const response = await request(app)
       .post('/api/v1/operator/support/tenants/global/communications/broadcasts')
       .set('Authorization', 'Bearer token')
-      .send({ title: 'Status update', channel: 'email' });
+      .send({ title: 'Status update', channel: 'email', message: 'Status update details' });
 
     expect(response.status).toBe(200);
     expect(serviceMock.scheduleBroadcast).toHaveBeenCalledWith({
       tenantId: 'global',
-      payload: { title: 'Status update', channel: 'email' },
+      payload: { title: 'Status update', channel: 'email', message: 'Status update details' },
       actor: { id: 7, name: null, email: null }
     });
     expect(response.body.data.broadcast.title).toBe('Status update');
+    expect(response.body.data.broadcast.message).toBe('Status update details');
   });
 
   it('updates a notification policy', async () => {
