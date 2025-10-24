@@ -3,7 +3,7 @@ import { gzipSync } from 'node:zlib';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 import TelemetryEventModel from '../models/TelemetryEventModel.js';
-import TelemetryEventBatchModel from '../models/TelemetryEventBatchModel.js';
+import TelemetryExportModel from '../models/TelemetryExportModel.js';
 import TelemetryFreshnessMonitorModel from '../models/TelemetryFreshnessMonitorModel.js';
 import TelemetryLineageRunModel from '../models/TelemetryLineageRunModel.js';
 import storageService from './StorageService.js';
@@ -11,6 +11,7 @@ import {
   recordTelemetryExport,
   recordTelemetryFreshness
 } from '../observability/metrics.js';
+import { serialiseTelemetryEvent } from '../utils/telemetrySerializers.js';
 
 function normalisePrefix(prefix, fallback) {
   const source = (prefix ?? fallback ?? '').trim();
@@ -20,34 +21,23 @@ function normalisePrefix(prefix, fallback) {
   return source.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
-function serialiseEvent(event) {
+function buildExportRecord(event, { batch, trigger }) {
+  const base = serialiseTelemetryEvent(event);
   return {
-    eventUuid: event.eventUuid,
-    eventName: event.eventName,
-    eventVersion: event.eventVersion,
-    eventSource: event.eventSource,
-    schemaVersion: event.schemaVersion,
-    occurredAt: event.occurredAt,
-    receivedAt: event.receivedAt,
-    tenantId: event.tenantId,
-    userId: event.userId,
-    sessionId: event.sessionId,
-    deviceId: event.deviceId,
-    correlationId: event.correlationId,
-    consentScope: event.consentScope,
-    consentStatus: event.consentStatus,
-    payload: event.payload,
-    context: event.context,
-    metadata: event.metadata,
-    tags: event.tags,
-    ingestionStatus: event.ingestionStatus
+    ...base,
+    exportContext: {
+      trigger,
+      batchUuid: batch?.batchUuid ?? null,
+      batchId: batch?.id ?? null,
+      destination: batch?.destination ?? null
+    }
   };
 }
 
 export class TelemetryWarehouseService {
   constructor({
     eventModel = TelemetryEventModel,
-    batchModel = TelemetryEventBatchModel,
+    batchModel = TelemetryExportModel,
     freshnessModel = TelemetryFreshnessMonitorModel,
     lineageModel = TelemetryLineageRunModel,
     storage = storageService,
@@ -131,7 +121,10 @@ export class TelemetryWarehouseService {
       });
     }
 
-    const serialised = events.map(serialiseEvent).map((payload) => JSON.stringify(payload)).join('\n');
+    const serialised = events
+      .map((event) => buildExportRecord(event, { batch, trigger }))
+      .map((payload) => JSON.stringify(payload))
+      .join('\n');
     let buffer = Buffer.from(serialised, 'utf8');
     let contentType = 'application/json';
     let extension = 'jsonl';
@@ -157,18 +150,24 @@ export class TelemetryWarehouseService {
         }
       });
 
-      await this.batchModel.markExported(batch.id, {
+      const completedBatch = await this.batchModel.markExported(batch.id, {
         eventsCount: events.length,
         fileKey: upload.key,
         checksum: upload.checksum,
-        metadata: { bucket: upload.bucket, byteLength: buffer.length }
+        metadata: { bucket: upload.bucket, byteLength: buffer.length, trigger }
       });
 
+      const exportedAt = new Date().toISOString();
       await this.eventModel.markExported(
         events.map((event) => event.id),
         {
           batchId: batch.id,
-          metadata: { destination: key, exportedAt: new Date().toISOString(), trigger }
+          metadata: {
+            destination: key,
+            exportedAt,
+            trigger,
+            batchUuid: completedBatch?.batchUuid ?? batch.batchUuid
+          }
         }
       );
 
@@ -188,7 +187,8 @@ export class TelemetryWarehouseService {
           trigger,
           durationSeconds,
           eventsCount: events.length,
-          destinationKey: key
+          destinationKey: key,
+          batchUuid: completedBatch?.batchUuid ?? batch.batchUuid
         }
       });
 
@@ -205,18 +205,33 @@ export class TelemetryWarehouseService {
           output: {
             batchId: batch.id,
             eventsCount: events.length,
-            destinationKey: key
+            destinationKey: key,
+            batchUuid: completedBatch?.batchUuid ?? batch.batchUuid
           },
-          metadata: { trigger }
+          metadata: { trigger, batchUuid: completedBatch?.batchUuid ?? batch.batchUuid }
         });
       }
 
-      return {
+      const summary = {
         status: 'exported',
         exported: events.length,
-        batchId: batch.id,
-        fileKey: key
+        batchId: completedBatch?.id ?? batch.id,
+        batchUuid: completedBatch?.batchUuid ?? batch.batchUuid,
+        destination: {
+          bucket: this.config.export.bucket,
+          key,
+          contentType,
+          compressed: this.config.export.compress
+        },
+        trigger,
+        durationSeconds,
+        lineageRunId: lineageRun?.id ?? null,
+        preview: events
+          .slice(0, 5)
+          .map((event) => buildExportRecord(event, { batch: completedBatch ?? batch, trigger }))
       };
+
+      return summary;
     } catch (error) {
       this.logger.error({ err: error, batchId: batch.id }, 'Telemetry export failed');
       await this.batchModel.markFailed(batch.id, error);
@@ -231,8 +246,8 @@ export class TelemetryWarehouseService {
         await this.lineageModel.completeRun(lineageRun.id, {
           status: 'failed',
           error,
-          output: { batchId: batch.id },
-          metadata: { trigger }
+          output: { batchId: batch.id, batchUuid: batch.batchUuid },
+          metadata: { trigger, batchUuid: batch.batchUuid }
         });
       }
 

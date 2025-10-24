@@ -16,6 +16,39 @@ function normalizeArrayParam(value) {
     .filter(Boolean);
 }
 
+function resolveTenantId(req) {
+  if (req.user?.tenantId) {
+    return req.user.tenantId;
+  }
+  const headerTenant = req.headers['x-tenant-id'];
+  if (typeof headerTenant === 'string' && headerTenant.trim()) {
+    return headerTenant.trim();
+  }
+  return 'global';
+}
+
+function resolveActor(req) {
+  if (!req.user) {
+    return { id: null, type: 'system', role: 'system' };
+  }
+  return {
+    id: req.user.id ?? req.user.email ?? null,
+    type: 'user',
+    role: req.user.role ?? 'admin'
+  };
+}
+
+function buildRequestContext(req) {
+  return {
+    requestId: req.traceId ?? null,
+    traceId: req.traceId ?? null,
+    ipAddress: req.ip ?? null,
+    userAgent: typeof req.get === 'function' ? req.get('user-agent') : req.headers['user-agent'],
+    method: req.method ?? null,
+    path: req.originalUrl ?? req.url ?? null
+  };
+}
+
 export default class GovernanceController {
   static async getOverview(_req, res, next) {
     try {
@@ -53,7 +86,11 @@ export default class GovernanceController {
     try {
       const { contractId } = req.params;
       const payload = req.body ?? {};
-      const updated = await governanceStakeholderService.updateContract(contractId, payload);
+      const updated = await governanceStakeholderService.updateContract(contractId, payload, {
+        actor: resolveActor(req),
+        tenantId: resolveTenantId(req),
+        requestContext: buildRequestContext(req)
+      });
       if (!updated) {
         return res.status(404).json({ success: false, message: `Contract ${contractId} not found` });
       }
@@ -88,7 +125,11 @@ export default class GovernanceController {
   static async recordVendorAssessmentDecision(req, res, next) {
     try {
       const { assessmentId } = req.params;
-      const updated = await governanceStakeholderService.recordVendorAssessmentDecision(assessmentId, req.body ?? {});
+      const updated = await governanceStakeholderService.recordVendorAssessmentDecision(assessmentId, req.body ?? {}, {
+        actor: resolveActor(req),
+        tenantId: resolveTenantId(req),
+        requestContext: buildRequestContext(req)
+      });
       if (!updated) {
         return res.status(404).json({ success: false, message: `Vendor assessment ${assessmentId} not found` });
       }
@@ -123,7 +164,11 @@ export default class GovernanceController {
   static async recordReviewAction(req, res, next) {
     try {
       const { reviewId } = req.params;
-      const updated = await governanceStakeholderService.recordReviewAction(reviewId, req.body ?? {});
+      const updated = await governanceStakeholderService.recordReviewAction(reviewId, req.body ?? {}, {
+        actor: resolveActor(req),
+        tenantId: resolveTenantId(req),
+        requestContext: buildRequestContext(req)
+      });
       if (!updated) {
         return res.status(404).json({ success: false, message: `Review cycle ${reviewId} not found` });
       }
@@ -156,7 +201,11 @@ export default class GovernanceController {
 
   static async scheduleCommunication(req, res, next) {
     try {
-      const created = await governanceStakeholderService.scheduleCommunication(req.body ?? {});
+      const created = await governanceStakeholderService.scheduleCommunication(req.body ?? {}, {
+        actor: resolveActor(req),
+        tenantId: resolveTenantId(req),
+        requestContext: buildRequestContext(req)
+      });
       return res.status(201).json({ success: true, data: created });
     } catch (error) {
       return next(error);
@@ -166,7 +215,11 @@ export default class GovernanceController {
   static async recordCommunicationMetrics(req, res, next) {
     try {
       const { communicationId } = req.params;
-      const updated = await governanceStakeholderService.recordCommunicationMetrics(communicationId, req.body ?? {});
+      const updated = await governanceStakeholderService.recordCommunicationMetrics(communicationId, req.body ?? {}, {
+        actor: resolveActor(req),
+        tenantId: resolveTenantId(req),
+        requestContext: buildRequestContext(req)
+      });
       if (!updated) {
         return res.status(404).json({ success: false, message: `Communication ${communicationId} not found` });
       }

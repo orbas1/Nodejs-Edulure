@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 import { generateConsentPolicyChecksum } from '../src/database/domains/compliance.js';
-import { TABLES as TELEMETRY_TABLES } from '../src/database/domains/telemetry.js';
+import { TABLES as TELEMETRY_TABLES, generateTelemetryDedupeHash } from '../src/database/domains/telemetry.js';
 import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
@@ -5521,6 +5521,126 @@ export async function seed(knex) {
         metadata: JSON.stringify({ cadence: 'biweekly' })
       }
     ]);
+
+    const telemetryConsentScope = 'product.analytics';
+    const telemetryConsentVersion = 'v1';
+    const telemetryCorrelationId = 'governance-dashboard-seed';
+    const telemetryBatchUuid = crypto.randomUUID();
+    const telemetryBatchKey = 'warehouse/telemetry/seed-governance-dashboard.jsonl.gz';
+    const telemetryOccurredAt = new Date('2025-04-05T10:15:00Z');
+    const telemetryReceivedAt = new Date('2025-04-05T10:15:02Z');
+    const telemetryPayload = {
+      view: 'governance_overview',
+      modulesLoaded: ['contracts', 'vendorAssessments', 'communications'],
+      widgetTelemetry: {
+        contractsRenewalCount: 3,
+        highRiskVendors: 2,
+        scheduledCommunications: 1
+      }
+    };
+    const telemetryIpHash = makeHash('203.0.113.42');
+
+    const [telemetryBatchId] = await trx(TELEMETRY_TABLES.EVENT_BATCHES).insert({
+      batch_uuid: telemetryBatchUuid,
+      status: 'exported',
+      destination: 's3',
+      events_count: 1,
+      started_at: new Date('2025-04-05T10:20:00Z'),
+      completed_at: new Date('2025-04-05T10:20:05Z'),
+      file_key: telemetryBatchKey,
+      checksum: makeHash('telemetry-seed-governance-dashboard'),
+      metadata: JSON.stringify({ bucket: 'edulure-data-seeds', trigger: 'seed', previewCount: 1, byteLength: 4096 })
+    });
+
+    await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert({
+      user_id: adminId,
+      tenant_id: 'global',
+      consent_scope: telemetryConsentScope,
+      consent_version: telemetryConsentVersion,
+      status: 'granted',
+      is_active: true,
+      recorded_at: telemetryReceivedAt,
+      effective_at: telemetryReceivedAt,
+      recorded_by: 'system',
+      evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryIpHash }),
+      metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap admin analytics consent' })
+    });
+
+    const telemetryDedupe = generateTelemetryDedupeHash({
+      eventName: 'governance.dashboard.loaded',
+      eventVersion: '2025.04',
+      occurredAt: telemetryOccurredAt,
+      userId: adminId,
+      sessionId: 'seed-admin-session',
+      correlationId: telemetryCorrelationId,
+      payload: telemetryPayload
+    });
+
+    const [telemetryEventId] = await trx(TELEMETRY_TABLES.EVENTS).insert({
+      tenant_id: 'global',
+      schema_version: 'v1',
+      event_name: 'governance.dashboard.loaded',
+      event_version: '2025.04',
+      event_source: 'web.admin',
+      occurred_at: telemetryOccurredAt,
+      received_at: telemetryReceivedAt,
+      user_id: adminId,
+      session_id: 'seed-admin-session',
+      device_id: 'seed-device-mac',
+      correlation_id: telemetryCorrelationId,
+      consent_scope: telemetryConsentScope,
+      consent_status: 'granted',
+      ingestion_status: 'exported',
+      ingestion_attempts: 1,
+      last_ingestion_attempt: telemetryReceivedAt,
+      export_batch_id: telemetryBatchId,
+      dedupe_hash: telemetryDedupe,
+      payload: JSON.stringify(telemetryPayload),
+      context: JSON.stringify({
+        actor: adminId,
+        network: { ipHash: telemetryIpHash, userAgent: 'edulure-admin/seed' },
+        location: { timezone: 'UTC' }
+      }),
+      metadata: JSON.stringify({
+        consentVersion: telemetryConsentVersion,
+        consentRecordedAt: telemetryReceivedAt,
+        batchUuid: telemetryBatchUuid,
+        seeded: true,
+        exportHint: 'governance-dashboard'
+      }),
+      tags: JSON.stringify(['governance', 'dashboard', 'seed'])
+    });
+
+    await trx(TELEMETRY_TABLES.FRESHNESS_MONITORS).insert([
+      {
+        pipeline_key: 'ingestion.raw',
+        last_event_at: telemetryOccurredAt,
+        status: 'healthy',
+        threshold_minutes: 15,
+        lag_seconds: 0,
+        metadata: JSON.stringify({ lastEventId: telemetryEventId, source: 'seed' })
+      },
+      {
+        pipeline_key: 'warehouse.export',
+        last_event_at: telemetryOccurredAt,
+        status: 'healthy',
+        threshold_minutes: 30,
+        lag_seconds: 45,
+        metadata: JSON.stringify({ batchUuid: telemetryBatchUuid, destinationKey: telemetryBatchKey })
+      }
+    ]);
+
+    await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
+      run_uuid: crypto.randomUUID(),
+      tool: 'dbt',
+      model_name: 'warehouse.telemetry_events',
+      status: 'success',
+      started_at: new Date('2025-04-05T10:20:00Z'),
+      completed_at: new Date('2025-04-05T10:20:05Z'),
+      input: JSON.stringify({ trigger: 'seed', eventIds: [telemetryEventId], batchUuid: telemetryBatchUuid }),
+      output: JSON.stringify({ batchUuid: telemetryBatchUuid, destinationKey: telemetryBatchKey, rowCount: 1 }),
+      metadata: JSON.stringify({ trigger: 'seed', batchId: telemetryBatchId, destination: 's3' })
+    });
 
     const releaseChecklistEntries = [
       {
