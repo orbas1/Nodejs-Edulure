@@ -1,0 +1,83 @@
+{
+  "metadata": {
+    "updatedAt": "2025-05-20T00:00:00Z",
+    "currency": "GBP"
+  },
+  "valuation": {
+    "midpoint": 900000,
+    "range": [650000, 1100000],
+    "methodology": "Blended cost-to-recreate, execution premium, and comparables."
+  },
+  "stakeholders": [
+    {
+      "id": "executive",
+      "title": "Executive leadership",
+      "summary": "Frame Annex A55/A56 progress as risk reduction for navigation and monetisation surfaces.",
+      "channels": ["Monthly board update", "Quarterly roadmap review"],
+      "evidence": ["Navigation annex screenshots", "Valuation memo excerpt"],
+      "callToAction": "Highlight improved click-depth and retention forecasts."
+    },
+    {
+      "id": "product-ops",
+      "title": "Product operations",
+      "summary": "Surface design dependency QA outcomes and readiness cadences for release managers.",
+      "channels": ["Weekly readiness stand-up", "Annex QA digest"],
+      "evidence": ["Design dependency checklist", "Ops cadence tracker"],
+      "callToAction": "Confirm upload readiness pass rate stays above target." 
+    },
+    {
+      "id": "investors",
+      "title": "Investor relations",
+      "summary": "Translate navigation remediation into valuation uplift and GTM preparedness.",
+      "channels": ["Quarterly investor brief", "Fundraising data room"],
+      "evidence": ["Valuation sensitivity bands", "Stakeholder narratives"],
+      "callToAction": "Share scenario planning for return-visit-rate improvements." 
+    }
+  ],
+  "cadences": [
+    {
+      "id": "retention-weekly",
+      "label": "Weekly active streakers",
+      "metricKey": "nav-click-depth",
+      "owner": "Product Ops",
+      "cadence": "Weekly"
+    },
+    {
+      "id": "activation-monthly",
+      "label": "Course discovery time",
+      "metricKey": "course-discovery-time",
+      "owner": "Experience Research",
+      "cadence": "Monthly"
+    },
+    {
+      "id": "readiness-biweekly",
+      "label": "Upload readiness pass rate",
+      "metricKey": "upload-readiness-pass-rate",
+      "owner": "Design Systems",
+      "cadence": "Bi-weekly"
+    }
+  ],
+  "messaging": [
+    {
+      "id": "retention-narrative",
+      "pillar": "Retention",
+      "summary": "Navigation shells now expose streak depth and recirculation metrics inline, keeping weekly active streakers above the 62% target.",
+      "evidence": ["nav-click-depth", "return-visit-rate"],
+      "nextSteps": "Ship the community header token audit and publish refreshed screenshots in the Annex A55 playbook."
+    },
+    {
+      "id": "activation-narrative",
+      "pillar": "Activation",
+      "summary": "Course discovery time has fallen under four minutes after aligning catalog facets with design tokens and explorer analytics.",
+      "evidence": ["course-discovery-time", "filter-engagement-rate"],
+      "nextSteps": "Instrument explorer CTA click-through and share adoption telemetry with growth leads."
+    },
+    {
+      "id": "efficiency-narrative",
+      "pillar": "Efficiency",
+      "summary": "Upload readiness pass rate stays above 92% as QA automation verifies tokens, runbook anchors, and asset evidence at each release gate.",
+      "evidence": ["upload-readiness-pass-rate", "evidence-capture-latency"],
+      "nextSteps": "Close the loop on automated annex updates once analytics ingestion ships."
+    }
+  ]
+}

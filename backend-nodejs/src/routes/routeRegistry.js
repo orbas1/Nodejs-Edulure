@@ -35,7 +35,9 @@ import mediaRoutes from './media.routes.js';
 import mobileRoutes from './mobile.routes.js';
 import setupRoutes from './setup.routes.js';
 import navigationRoutes from './navigation.routes.js';
+import designSystemRoutes from './designSystem.routes.js';
 import operatorRoutes from './operator.routes.js';
+import strategyRoutes from './strategy.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 import { buildRouteRegistry } from './registryValidator.js';
 
@@ -77,7 +79,9 @@ const routerMap = {
   media: mediaRoutes,
   setup: setupRoutes,
   navigation: navigationRoutes,
-  operator: operatorRoutes
+  'design-system': designSystemRoutes,
+  operator: operatorRoutes,
+  strategy: strategyRoutes
 };
 
 export const apiRouteRegistry = buildRouteRegistry({

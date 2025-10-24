@@ -995,40 +995,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Seed new tasks, reseed staging, validate annex API responses by role, rehearse the playbook via the notification panel and handbook, then publish drill notes with annex evidence.
 
 ### 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
-1. **Appraisal:** Design system tokens, component guidelines, UX research summaries, and cross-platform theming references.
-2. **Functionality:** Defines colour palettes, typography scales, spacing tokens, component anatomy, and UX heuristics consumed across apps.
-3. **Logic Usefulness:** Ensures consistent user experience, accessible interfaces, and efficient design-to-code workflows.
-4. **Redundancies:** Token definitions repeated across CSS and docs; centralise in single source exported to platforms.
-5. **Placeholders Or non-working functions or stubs:** Some research sections note pending synthesis; prioritise completion.
-6. **Duplicate Functions:** Component usage guidelines duplicated across docs; consolidate with deep links.
-7. **Improvements need to make:** Add interactive token playground, accessibility checklists, and usage analytics for components.
-8. **Styling improvements:** Ensure docs reflect most recent palette and component illustrations.
-9. **Efficiency analysis and improvement:** Automate token distribution to codebases via pipelines.
-10. **Strengths to Keep:** Comprehensive tokens, cross-platform coverage, and research-backed guidance.
-11. **Weaknesses to remove:** Outdated screenshots; refresh to avoid confusion.
-12. **Styling and Colour review changes:** Verify token contrast ratios and update as design evolves.
-13. **CSS, orientation, placement and arrangement changes:** Provide responsive layout guidelines for documentation and sample components.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Ensure copy remains concise, remove redundant descriptions, and maintain consistent voice.
-15. **Change Checklist Tracker:** Track design system updates, downstream dependency notifications, and research publication cadence.
-16. **Full Upgrade Plan & Release Steps:** Publish token updates, notify engineering teams, update component libraries, and monitor adoption.
+1. **Appraisal:** `docs/design-system/tokens.json` paired with `scripts/design-system/sync-design-tokens.mjs` now governs Annex A55 tokens, regenerating `frontend-reactjs/src/styles/tokens.css` and `Edulure-Flutter/lib/core/design/design_tokens.dart` so docs, web, and Flutter stay aligned.
+2. **Functionality:** The sync script digests token groups, media overrides, and data-attribute scopes, while `DesignSystemService.describeTokens` exposes `/api/v1/design-system/tokens` for `frontend-reactjs/src/pages/handbook/DesignSystemPlayground.jsx` to render previews, copy controls, and metadata badges; Flutter’s `buildAppTheme` consumes the Dart manifest to apply tokens to cards, inputs, chips, and typography.
+3. **Logic Usefulness:** Designers validate theme/density/contrast states directly in the handbook playground, engineers copy canonical token names/values, and Flutter widgets retrieve shared spacing/radius/colour via `DesignTokensManifest` helpers to mirror ThemeProvider data attributes.
+4. **Redundancies:** Hard-coded CSS variables, Flutter colour constants, and bespoke copy-to-clipboard helpers were replaced with manifest output, `_fallbackColor` utilities, and a centralised `designSystemApi.fetchTokens` call path.
+5. **Placeholders Or non-working functions or stubs:** UX research narrative updates remain TODO in `user experience.md`, the manifest lacks expanded typography ramps/semantic tokens referenced in Annex drafts, and Flutter theming still needs to extend to dialog/chart palettes listed in upcoming Annex work.
+6. **Duplicate Functions:** Manifest caching now lives solely in `DesignSystemService`, colour/dimension parsing in `DesignTokensManifest`, and the React API client removes repeated `fetch` boilerplate from prospective consumers.
+7. **Improvements need to make:** Ship CI verification that regenerated CSS/Dart stay in sync with the manifest, emit SDK typings for tokens, add Vitest coverage/screenshot baselines for the playground, and wire analytics that track copy-to-clipboard usage.
+8. **Styling improvements:** Preview cards showcase real gradients, CTA shadows, radius presets, and chip badges; Flutter theme applies Inter fonts, consistent rounded shells, and manifest-driven padding so Annex screenshots match product surfaces.
+9. **Efficiency analysis and improvement:** Token manifest reads memoise after first access, React fetches can be aborted when navigating away, memoised swatches prevent rerender churn during toggles, and Flutter fallback helpers avoid repeated parsing of the same token values.
+10. **Strengths to Keep:** ThemeProvider data attributes remain the central toggle contract, Material 3 defaults complement manifest styling on Flutter, and generated CSS preserves group comments to keep docs/tooling easy to scan.
+11. **Weaknesses to remove:** Playground currently lacks automated testing and explicit accessibility assertions, Flutter fallbacks silently default to constants when tokens are missing, and there’s no alerting when manifest metadata (version/source) drifts from design ops governance.
+12. **Styling and Colour review changes:** Dark and high-contrast overrides ship in both CSS and Dart artefacts, Flutter buttons enforce white `onPrimary`, and preview copy emphasises accessible combinations flagged in Annex audits.
+13. **CSS, orientation, placement and arrangement changes:** Handbook layout keeps responsive stacking (controls collapse on mobile, token catalogue stays scannable), and generated CSS groups categories logically, maintaining consistent placement across surfaces.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Handbook copy stresses actionable toggles (“Toggle themes”, “Copy value”), surfaces version/source metadata, and avoids duplicating the in-depth prose that lives in Annex research docs.
+15. **Change Checklist Tracker:** Run `npm run design-tokens:sync`, execute `npm --workspace backend-nodejs test -- test/designSystemService.test.js`, verify the React playground manually, and format Flutter sources before landing new tokens.
+16. **Full Upgrade Plan & Release Steps:** Update the manifest from design ops, rerun the sync script, restart backend services to clear cached manifests, confirm Flutter/React previews, refresh `user experience.md` captures, and brief stakeholders on Annex A55 palette updates.
 
 ### 9.D Strategy, Valuation & Stakeholder Communication (`valuation/`, `docs/operations/strategy.md`, `user experience.md`)
-1. **Appraisal:** Business strategy, valuation models, and stakeholder communications aligning product roadmap with financial goals.
-2. **Functionality:** Provides valuation assumptions, KPI definitions, roadmap priorities, and stakeholder messaging frameworks.
-3. **Logic Usefulness:** Aligns leadership, informs prioritisation, and supports fundraising or board updates.
-4. **Redundancies:** KPI descriptions repeated across documents; consolidate into single reference.
-5. **Placeholders Or non-working functions or stubs:** Some valuation cells flagged TBD; ensure updates follow finance cadence.
-6. **Duplicate Functions:** Messaging templates overlap; centralise to maintain consistent tone.
-7. **Improvements need to make:** Automate data refresh, embed dashboards, and create executive summaries tied to telemetry.
-8. **Styling improvements:** Align valuation decks with brand typography and palette for professionalism.
-9. **Efficiency analysis and improvement:** Link spreadsheets to live data sources to reduce manual updates.
-10. **Strengths to Keep:** Clear articulation of strategy, KPIs, and stakeholder communication guidelines.
-11. **Weaknesses to remove:** Manual reconciliation of metrics; automate through analytics exports.
-12. **Styling and Colour review changes:** Ensure reports use accessible colours and consistent visuals.
-13. **CSS, orientation, placement and arrangement changes:** Provide templates for executive dashboards and memos.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Streamline narrative, remove redundant jargon, and maintain clarity.
-15. **Change Checklist Tracker:** Track valuation updates, stakeholder briefings, and KPI revisions.
-16. **Full Upgrade Plan & Release Steps:** Refresh valuation inputs, review with leadership, update messaging, and distribute through official channels.
+1. **Appraisal:** `valuation/annex_a56.json` encodes Annex A56 valuation bands, stakeholder cadences, messaging narratives, and evidence tags which the backend now merges with navigation annex metrics for a single source of truth.
+2. **Functionality:** `StrategyBriefingService.getBriefing` loads the manifest, maps strategy metrics via `NavigationAnnexRepository.describe`, and serves `/api/v1/strategy/briefing`; `frontend-reactjs/src/pages/handbook/StrategyBriefing.jsx` consumes the payload to render stakeholder cards, pillar dashboards, cadence tables, and narrative summaries with filtering.
+3. **Logic Usefulness:** Metric enrichment ensures cadence rows display baseline/target/unit data, stakeholders see relevant evidence lists, and handbook filters help execs concentrate on specific pillars before briefings or board packs.
+4. **Redundancies:** Previously duplicated stakeholder copy and KPI descriptions across docs, decks, and scripts now originate from the manifest and annex metrics, reducing manual reconciliation and stale messaging.
+5. **Placeholders Or non-working functions or stubs:** Automated ingestion from analytics/finance systems is still pending, optional `?role` filtering returns the same payload today, and evidence attachments aren’t yet linked to artefact storage referenced in Annex A56.
+6. **Duplicate Functions:** Metric indexing centralised in the service removes the need for UI-level joins, and the React API client standardises fetch error handling instead of scattering bespoke logic across handbook routes.
+7. **Improvements need to make:** Add cache invalidation when annex reseeds run, capture risk/owner metadata within the manifest, surface freshness alerts for stale valuation data, and build Vitest coverage for loading/error/filter cases.
+8. **Styling improvements:** Cards, badges, and tables reuse design-system tokens (rounded-3xl shells, primary badges) so valuation narratives visually align with navigation annex and design system previews.
+9. **Efficiency analysis and improvement:** Service memoises manifest reads, cadences reuse a precomputed metric map for O(1) lookups, and the React page aborts inflight fetches when unmounted to avoid stale state updates.
+10. **Strengths to Keep:** Navigation annex remains authoritative for metric definitions, the API exposes metadata timestamps for readiness dashboards, and existing documentation can deep-link to the handbook for up-to-date narratives.
+11. **Weaknesses to remove:** No automated notification warns when valuation data ages, handbook lacks export/print tooling for board packets, and investor-facing messaging still requires manual packaging in `docs/operations/strategy.md`.
+12. **Styling and Colour review changes:** Primary accents highlight pillar labels while neutral tables preserve readability; high-contrast tokens ensure copy stays accessible across density modes.
+13. **CSS, orientation, placement and arrangement changes:** Handbook layout keeps responsive two-column grids for stakeholders/pillars, filter controls stay in section headers, and cadence tables use alternating backgrounds for scannability.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Copy foregrounds cadence, valuation ranges, and next steps with concise verbs, and date stamps emphasise recency, mirroring Annex communication tone.
+15. **Change Checklist Tracker:** Update the valuation manifest, run `npm --workspace backend-nodejs test -- test/strategyBriefingService.test.js`, validate `/api/v1/strategy/briefing` (including role parameter), and refresh handbook screenshots for stakeholder packets.
+16. **Full Upgrade Plan & Release Steps:** Sync finance inputs, reseed navigation annex metrics, redeploy the API, verify handbook rendering, distribute updated narratives via Annex A56 comms, and archive evidence in `docs/operations/strategy.md`.
 
 ---
 

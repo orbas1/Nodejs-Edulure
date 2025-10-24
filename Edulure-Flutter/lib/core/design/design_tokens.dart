@@ -1,0 +1,315 @@
+// GENERATED FILE. DO NOT EDIT DIRECTLY.
+// Run `npm run design-tokens:sync` from the repo root to regenerate.
+import 'dart:ui';
+
+class DesignTokensManifest {
+  static const Map<String, String> metadata = {
+    'version': '2025-05-20',
+    'description': 'Canonical design tokens backing Annex A55 surfaces across web and Flutter clients.',
+    'source': 'design-ops',
+  };
+  static const Map<String, String> base = {
+    '--screen-xs': '360px',
+    '--screen-sm': '480px',
+    '--screen-md': '768px',
+    '--screen-lg': '1024px',
+    '--screen-xl': '1280px',
+    '--screen-2xl': '1536px',
+    '--space-1': '0.25rem',
+    '--space-2': '0.5rem',
+    '--space-3': '0.75rem',
+    '--space-4': '1rem',
+    '--space-5': '1.25rem',
+    '--space-6': '1.5rem',
+    '--space-8': '2rem',
+    '--space-10': '2.5rem',
+    '--space-12': '3rem',
+    '--space-16': '4rem',
+    '--font-family-sans': '\'Inter\', ui-sans-serif, system-ui',
+    '--font-size-root': '16px',
+    '--line-height-base': '1.5',
+    '--color-surface': '#ffffff',
+    '--color-surface-muted': '#f8fafc',
+    '--color-surface-subtle': '#f1f5f9',
+    '--color-border': 'rgba(15, 23, 42, 0.12)',
+    '--color-text': '#0f172a',
+    '--color-text-muted': '#475569',
+    '--color-text-subtle': '#64748b',
+    '--color-primary': '#2d62ff',
+    '--color-primary-dark': '#1f3bb3',
+    '--color-primary-soft': '#dbe4ff',
+    '--color-emerald': '#10b981',
+    '--color-amber': '#f59e0b',
+    '--color-rose': '#f43f5e',
+    '--radius-lg': '1.25rem',
+    '--radius-xl': '2rem',
+    '--radius-xxl': '2.75rem',
+    '--radius-pill': '999px',
+    '--uploads-progress-radius': '0.75rem',
+    '--shadow-card': '0 24px 60px -30px rgba(15, 23, 42, 0.18)',
+    '--shadow-card-strong': '0 32px 84px -36px rgba(15, 23, 42, 0.32)',
+    '--shadow-media': '0 40px 120px -48px rgba(15, 23, 42, 0.42)',
+    '--shadow-cta': '0 22px 52px -26px rgba(79, 70, 229, 0.7)',
+    '--gradient-hero': 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 52%, #111827 100%)',
+    '--gradient-marketing': 'linear-gradient(160deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 64, 175, 0.92) 65%, rgba(15, 23, 42, 0.96) 100%)',
+    '--gradient-cta': 'linear-gradient(135deg, #4338ca 0%, #6366f1 55%, #7c3aed 100%)',
+    '--gradient-cta-hover': 'linear-gradient(135deg, #3730a3 0%, #4f46e5 55%, #6d28d9 100%)',
+    '--motion-duration-fast': '120ms',
+    '--motion-duration-medium': '220ms',
+    '--motion-easing-standard': 'cubic-bezier(0.16, 1, 0.3, 1)',
+    '--media-thumb-aspect': '16 / 10',
+    '--media-thumb-radius': '2.75rem',
+    '--skeleton-base': '#e2e8f0',
+    '--skeleton-highlight': '#f8fafc',
+    '--form-field-surface': '#ffffff',
+    '--form-field-surface-focus': '#f8fbff',
+    '--form-field-border': 'rgba(148, 163, 184, 0.45)',
+    '--form-field-border-strong': 'rgba(79, 70, 229, 0.45)',
+    '--form-field-shadow': '0 18px 45px -28px rgba(15, 23, 42, 0.35)',
+    '--form-field-padding-x': '1.25rem',
+    '--form-field-padding-y': '0.875rem',
+    '--form-label-letterspacing': '0.025em',
+    '--shadow-focus-ring': '0 0 0 3px rgba(45, 98, 255, 0.35)',
+    '--overlay-backdrop': 'rgba(15, 23, 42, 0.6)',
+    '--grid-min-column': '18rem',
+    '--grid-gap': 'var(--space-6)',
+  };
+  static const Map<String, Map<String, String>> mediaOverrides = {
+    'dark-media': {
+      '--color-surface': '#0f172a',
+      '--color-surface-muted': '#111c33',
+      '--color-surface-subtle': '#17284a',
+      '--color-border': 'rgba(226, 232, 240, 0.2)',
+      '--color-text': '#e2e8f0',
+      '--color-text-muted': '#cbd5f5',
+      '--color-text-subtle': '#a5b4fc',
+      '--color-primary-soft': 'rgba(45, 98, 255, 0.24)',
+      '--overlay-backdrop': 'rgba(15, 23, 42, 0.75)',
+      '--shadow-card': '0 24px 60px -30px rgba(15, 23, 42, 0.4)',
+      '--shadow-card-strong': '0 32px 84px -36px rgba(15, 23, 42, 0.6)',
+      '--shadow-media': '0 40px 120px -48px rgba(15, 23, 42, 0.6)',
+      '--shadow-cta': '0 22px 52px -26px rgba(99, 102, 241, 0.75)',
+      '--gradient-hero': 'linear-gradient(135deg, #0b1120 0%, #1e1b4b 60%, #111827 100%)',
+      '--gradient-marketing': 'linear-gradient(160deg, rgba(15, 23, 42, 1) 0%, rgba(30, 64, 175, 0.92) 55%, rgba(15, 23, 42, 0.96) 100%)',
+      '--gradient-cta': 'linear-gradient(135deg, #4338ca 0%, #4f46e5 55%, #7c3aed 100%)',
+      '--gradient-cta-hover': 'linear-gradient(135deg, #3730a3 0%, #4338ca 55%, #6d28d9 100%)',
+      '--form-field-surface': 'rgba(15, 23, 42, 0.8)',
+      '--form-field-surface-focus': 'rgba(30, 58, 138, 0.9)',
+      '--form-field-border': 'rgba(148, 163, 184, 0.35)',
+      '--form-field-border-strong': 'rgba(129, 140, 248, 0.55)',
+      '--form-field-shadow': '0 22px 60px -34px rgba(15, 23, 42, 0.8)',
+      '--skeleton-base': 'rgba(148, 163, 184, 0.35)',
+      '--skeleton-highlight': 'rgba(226, 232, 240, 0.35)',
+    },
+    'high-contrast-media': {
+      '--color-surface': '#ffffff',
+      '--color-surface-muted': '#ffffff',
+      '--color-surface-subtle': '#f8fafc',
+      '--color-border': 'rgba(15, 23, 42, 0.4)',
+      '--color-text': '#0b1120',
+      '--color-text-muted': '#111c33',
+      '--color-text-subtle': '#1e293b',
+      '--color-primary': '#1d4ed8',
+      '--color-primary-dark': '#1e3a8a',
+      '--color-primary-soft': '#c7d2fe',
+    },
+  };
+  static const Map<String, Map<String, String>> dataOverrides = {
+    'theme-dark': {
+      '--color-surface': '#0f172a',
+      '--color-surface-muted': '#111c33',
+      '--color-surface-subtle': '#17284a',
+      '--color-border': 'rgba(226, 232, 240, 0.2)',
+      '--color-text': '#e2e8f0',
+      '--color-text-muted': '#cbd5f5',
+      '--color-text-subtle': '#a5b4fc',
+      '--color-primary-soft': 'rgba(45, 98, 255, 0.24)',
+      '--overlay-backdrop': 'rgba(15, 23, 42, 0.75)',
+    },
+    'contrast-high': {
+      '--color-surface': '#ffffff',
+      '--color-surface-muted': '#ffffff',
+      '--color-surface-subtle': '#f8fafc',
+      '--color-border': 'rgba(15, 23, 42, 0.4)',
+      '--color-text': '#0b1120',
+      '--color-text-muted': '#111c33',
+      '--color-text-subtle': '#1e293b',
+      '--color-primary': '#1d4ed8',
+      '--color-primary-dark': '#1e3a8a',
+      '--color-primary-soft': '#c7d2fe',
+      '--shadow-card': '0 24px 60px -32px rgba(15, 23, 42, 0.4)',
+      '--shadow-card-strong': '0 32px 84px -36px rgba(15, 23, 42, 0.6)',
+      '--shadow-media': '0 40px 120px -46px rgba(15, 23, 42, 0.55)',
+      '--shadow-cta': '0 22px 52px -24px rgba(30, 64, 175, 0.78)',
+      '--gradient-hero': 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #1e293b 100%)',
+      '--gradient-marketing': 'linear-gradient(160deg, rgba(226, 232, 240, 1) 0%, rgba(191, 219, 254, 0.85) 45%, rgba(226, 232, 240, 1) 100%)',
+      '--gradient-cta': 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #4f46e5 100%)',
+      '--gradient-cta-hover': 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #4338ca 100%)',
+      '--form-field-border': 'rgba(30, 64, 175, 0.55)',
+      '--form-field-border-strong': 'rgba(17, 94, 89, 0.55)',
+    },
+    'density-compact': {
+      '--space-3': '0.6rem',
+      '--space-4': '0.85rem',
+      '--space-5': '1.1rem',
+      '--space-6': '1.3rem',
+      '--space-8': '1.8rem',
+      '--space-10': '2.2rem',
+      '--space-12': '2.6rem',
+    },
+    'radius-soft': {
+      '--radius-lg': '1.5rem',
+      '--radius-xl': '2.25rem',
+      '--radius-xxl': '3rem',
+    },
+    'radius-sharp': {
+      '--radius-lg': '0.75rem',
+      '--radius-xl': '1rem',
+      '--radius-xxl': '1.5rem',
+    },
+  };
+  static const Map<String, Map<String, String>> colorSchemes = {
+    ':root': {
+      'color-scheme': 'light',
+    },
+    '[data-theme=\'dark\']': {
+      'color-scheme': 'dark',
+    },
+  };
+
+  static Map<String, String> _tokensFor({
+    Brightness brightness = Brightness.light,
+    bool highContrast = false,
+    bool compactDensity = false,
+    String? radiusVariant,
+  }) {
+    final tokens = Map<String, String>.from(base);
+    if (brightness == Brightness.dark) {
+      tokens.addAll(dataOverrides['theme-dark'] ?? const {});
+    }
+    if (highContrast) {
+      tokens.addAll(dataOverrides['contrast-high'] ?? const {});
+    }
+    if (compactDensity) {
+      tokens.addAll(dataOverrides['density-compact'] ?? const {});
+    }
+    if (radiusVariant == "soft") {
+      tokens.addAll(dataOverrides['radius-soft'] ?? const {});
+    } else if (radiusVariant == "sharp") {
+      tokens.addAll(dataOverrides['radius-sharp'] ?? const {});
+    }
+    return tokens;
+  }
+
+  static String? raw(String token, {
+    Brightness brightness = Brightness.light,
+    bool highContrast = false,
+    bool compactDensity = false,
+    String? radiusVariant,
+  }) {
+    final tokens = _tokensFor(
+      brightness: brightness,
+      highContrast: highContrast,
+      compactDensity: compactDensity,
+      radiusVariant: radiusVariant,
+    );
+    return tokens[token];
+  }
+
+  static Color? color(String token, {
+    Brightness brightness = Brightness.light,
+    bool highContrast = false
+  }) {
+    final value = raw(token, brightness: brightness, highContrast: highContrast);
+    return value == null ? null : _parseColor(value);
+  }
+
+  static double? spacing(String token, { bool compact = false }) {
+    final value = raw(token, compactDensity: compact);
+    return value == null ? null : _parseDimension(value);
+  }
+
+  static double? radius(String token, { String? variant }) {
+    final value = raw(token, radiusVariant: variant);
+    return value == null ? null : _parseDimension(value);
+  }
+
+  static double? letterSpacing(String token) {
+    final value = raw(token);
+    return value == null ? null : _parseDimension(value);
+  }
+
+  static double? _parseDimension(String value) {
+    final trimmed = value.trim();
+    if (trimmed.endsWith('rem')) {
+      final number = double.tryParse(trimmed.replaceAll('rem', '').trim());
+      return number == null ? null : number * 16;
+    }
+    if (trimmed.endsWith('em')) {
+      final number = double.tryParse(trimmed.replaceAll('em', '').trim());
+      return number == null ? null : number * 16;
+    }
+    if (trimmed.endsWith('px')) {
+      return double.tryParse(trimmed.replaceAll('px', '').trim());
+    }
+    if (trimmed.contains('/')) {
+      final parts = trimmed.split('/').map((p) => p.trim()).toList();
+      if (parts.length == 2) {
+        final numerator = double.tryParse(parts[0]);
+        final denominator = double.tryParse(parts[1]);
+        if (numerator != null && denominator != null && denominator != 0) {
+          return numerator / denominator;
+        }
+      }
+    }
+    return double.tryParse(trimmed);
+  }
+
+  static Color? _parseColor(String value) {
+    final trimmed = value.trim();
+    if (trimmed.startsWith('#')) {
+      final hex = trimmed.substring(1);
+      final buffer = StringBuffer();
+      if (hex.length == 6) {
+        buffer.write('ff');
+        buffer.write(hex);
+      } else if (hex.length == 8) {
+        buffer.write(hex);
+      } else {
+        return null;
+      }
+      final intValue = int.tryParse(buffer.toString(), radix: 16);
+      return intValue == null ? null : Color(intValue);
+    }
+    if (trimmed.startsWith('rgba')) {
+      final inside = trimmed.substring(trimmed.indexOf('(') + 1, trimmed.lastIndexOf(')'));
+      final parts = inside.split(',').map((part) => part.trim()).toList();
+      if (parts.length != 4) {
+        return null;
+      }
+      final r = double.tryParse(parts[0]);
+      final g = double.tryParse(parts[1]);
+      final b = double.tryParse(parts[2]);
+      final a = double.tryParse(parts[3]);
+      if (r == null || g == null || b == null || a == null) {
+        return null;
+      }
+      return Color.fromARGB((a.clamp(0, 1) * 255).round(), r.round(), g.round(), b.round());
+    }
+    if (trimmed.startsWith('rgb')) {
+      final inside = trimmed.substring(trimmed.indexOf('(') + 1, trimmed.lastIndexOf(')'));
+      final parts = inside.split(',').map((part) => part.trim()).toList();
+      if (parts.length != 3) {
+        return null;
+      }
+      final r = int.tryParse(parts[0]);
+      final g = int.tryParse(parts[1]);
+      final b = int.tryParse(parts[2]);
+      if (r == null || g == null || b == null) {
+        return null;
+      }
+      return Color.fromARGB(255, r, g, b);
+    }
+    return null;
+  }
+}

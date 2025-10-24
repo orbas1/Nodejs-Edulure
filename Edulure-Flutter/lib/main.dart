@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'bootstrap/app_theme.dart';
 
 import 'bootstrap/app_bootstrap.dart';
 import 'core/feature_flags/feature_flag_notifier.dart';
@@ -55,7 +55,6 @@ class EdulureApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = GoogleFonts.interTextTheme(ThemeData.light().textTheme);
     final flagsAsync = ref.watch(featureFlagControllerProvider);
 
     return ValueListenableBuilder<String>(
@@ -124,6 +123,9 @@ class EdulureApp extends ConsumerWidget {
           routes['/ads/governance'] = (_) => const MobileAdsGovernanceScreen();
         }
 
+        final lightTheme = buildAppTheme();
+        final darkTheme = buildAppTheme(brightness: Brightness.dark);
+
         return MaterialApp(
           title: 'Edulure',
           debugShowCheckedModeBanner: false,
@@ -134,16 +136,9 @@ class EdulureApp extends ConsumerWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF2D62FF),
-              primary: const Color(0xFF2D62FF),
-              secondary: const Color(0xFFFF7A59),
-            ),
-            scaffoldBackgroundColor: Colors.white,
-            textTheme: textTheme,
-            useMaterial3: true,
-          ),
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: ThemeMode.system,
           routes: routes,
           builder: (context, child) {
             if (child == null) {

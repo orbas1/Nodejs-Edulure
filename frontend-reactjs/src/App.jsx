@@ -64,6 +64,8 @@ import CommunityCommunications from './pages/dashboard/community/CommunityCommun
 import LearnerSocial from './pages/dashboard/LearnerSocial.jsx';
 import LearnerCommunityChats from './pages/dashboard/LearnerCommunityChats.jsx';
 import NavigationAnnex from './pages/handbook/NavigationAnnex.jsx';
+import DesignSystemPlayground from './pages/handbook/DesignSystemPlayground.jsx';
+import StrategyBriefing from './pages/handbook/StrategyBriefing.jsx';
 import ThemeProvider from './providers/ThemeProvider.jsx';
 const DashboardLayout = lazy(() => import('./layouts/DashboardLayout.jsx'));
 const DashboardHome = lazy(() => import('./pages/dashboard/DashboardHome.jsx'));
@@ -162,6 +164,8 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/handbook/navigation-annex" element={<NavigationAnnex />} />
+        <Route path="/handbook/design-system" element={<DesignSystemPlayground />} />
+        <Route path="/handbook/strategy-briefing" element={<StrategyBriefing />} />
         <Route path="/integrations/credential-invite/:token" element={<IntegrationCredentialInvite />} />
         <Route path="/setup" element={<Setup />} />
       </Route>

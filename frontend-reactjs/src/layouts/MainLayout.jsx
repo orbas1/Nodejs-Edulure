@@ -192,6 +192,12 @@ export function MainLayoutContent({
             <a className="transition hover:text-primary" href="/terms">
               Terms
             </a>
+            <a className="transition hover:text-primary" href="/handbook/design-system">
+              Design system
+            </a>
+            <a className="transition hover:text-primary" href="/handbook/strategy-briefing">
+              Strategy briefing
+            </a>
             <a className="transition hover:text-primary" href={`mailto:${supportEmail}`}>
               Support
             </a>

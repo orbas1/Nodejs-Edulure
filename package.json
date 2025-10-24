@@ -19,6 +19,7 @@
     "dev:stack": "node ./scripts/dev-stack.mjs",
     "dev:observability": "node ./scripts/observability-stack.mjs",
     "onboard": "node ./scripts/onboard.mjs",
+    "design-tokens:sync": "node ./scripts/design-system/sync-design-tokens.mjs",
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

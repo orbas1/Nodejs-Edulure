@@ -736,6 +736,40 @@ const ROUTE_DEFINITIONS = [
     }
   },
   {
+    name: 'design-system',
+    capability: 'design-tokens',
+    description: 'Design token manifest and asset metadata for Annex A55 surfaces.',
+    basePath: '/design-system',
+    flagKey: 'platform.api.v1.design-system',
+    defaultState: 'enabled',
+    fallbackStatus: 404,
+    disabledMessage: 'Design system APIs are not exposed in this environment.',
+    audience: 'user',
+    owners: ['experience-foundations'],
+    serviceTier: 'supporting',
+    tags: ['api', 'v1', 'design-system'],
+    cors: {
+      allowedMethods: ['GET']
+    }
+  },
+  {
+    name: 'strategy',
+    capability: 'valuation-briefing',
+    description: 'Strategy, valuation, and stakeholder briefing payloads for Annex A56.',
+    basePath: '/strategy',
+    flagKey: 'platform.api.v1.strategy',
+    defaultState: 'enabled',
+    fallbackStatus: 404,
+    disabledMessage: 'Strategy briefing APIs are not available in this deployment.',
+    audience: 'user',
+    owners: ['experience-foundations'],
+    serviceTier: 'supporting',
+    tags: ['api', 'v1', 'strategy'],
+    cors: {
+      allowedMethods: ['GET']
+    }
+  },
+  {
     name: 'social',
     capability: 'social-graph',
     description: 'Follows, recommendations, and user engagement APIs.',
