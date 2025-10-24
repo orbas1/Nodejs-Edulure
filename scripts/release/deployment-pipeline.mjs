@@ -50,6 +50,58 @@ async function loadEnvironmentManifest(repoRoot) {
   return JSON.parse(contents);
 }
 
+function resolveBlueprintDescriptor(manifest, environmentKey) {
+  const blueprintEntry = manifest.blueprints?.backendService;
+  if (!blueprintEntry) {
+    return null;
+  }
+
+  const registryRecord = blueprintEntry.registry?.[environmentKey] ?? null;
+  const fallbackParameter = typeof blueprintEntry.ssmParameter === 'string'
+    ? blueprintEntry.ssmParameter.replace('${environment}', environmentKey)
+    : null;
+  const runtimeEndpoint = registryRecord?.runtimeEndpoint
+    ?? (environmentKey === 'prod'
+      ? 'https://edulure.com/ops/runtime-blueprint.json'
+      : `https://${environmentKey}.edulure.com/ops/runtime-blueprint.json`);
+
+  return {
+    key: 'backendService',
+    version: registryRecord?.version ?? blueprintEntry.version ?? null,
+    serviceName: registryRecord?.serviceName ?? blueprintEntry.service ?? 'backend-service',
+    modulePath: blueprintEntry.modulePath ?? blueprintEntry.module?.path ?? null,
+    moduleHash: registryRecord?.moduleHash ?? blueprintEntry.moduleHash ?? blueprintEntry.module?.hash ?? null,
+    blueprintPath: blueprintEntry.path ?? null,
+    blueprintHash: registryRecord?.blueprintHash ?? blueprintEntry.hash ?? null,
+    ssmParameter: registryRecord?.ssmParameter ?? fallbackParameter,
+    runtimeEndpoint,
+    observabilityDashboardPath:
+      registryRecord?.observabilityDashboardPath
+      ?? blueprintEntry.observability?.grafana?.path
+      ?? blueprintEntry.dashboard
+      ?? null,
+    observabilityDashboardHash:
+      registryRecord?.observabilityDashboardHash
+      ?? blueprintEntry.observability?.grafana?.hash
+      ?? null,
+    alarmOutputs: registryRecord?.alarmOutputs ?? blueprintEntry.alarmOutputs ?? [],
+    registryTable:
+      manifest.pipelines?.deployment?.blueprintRegistry
+      ?? blueprintEntry.metadata?.registryTable
+      ?? null,
+    metadata: {
+      ...((blueprintEntry.metadata && typeof blueprintEntry.metadata === 'object' && !Array.isArray(blueprintEntry.metadata))
+        ? blueprintEntry.metadata
+        : {}),
+      ...((registryRecord?.metadata
+        && typeof registryRecord.metadata === 'object'
+        && !Array.isArray(registryRecord.metadata))
+        ? registryRecord.metadata
+        : {})
+    }
+  };
+}
+
 function buildPipelinePlan(manifest, environmentKey) {
   const environment = manifest.environments?.[environmentKey];
   if (!environment) {
@@ -62,7 +114,11 @@ function buildPipelinePlan(manifest, environmentKey) {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const terraformPath = environment.path;
-  const blueprintEndpoint = `https://${environmentKey}.edulure.com/ops/runtime-blueprint.json`;
+  const blueprint = resolveBlueprintDescriptor(manifest, environmentKey);
+  const blueprintEndpoint = blueprint?.runtimeEndpoint
+    ?? (environmentKey === 'prod'
+      ? 'https://edulure.com/ops/runtime-blueprint.json'
+      : `https://${environmentKey}.edulure.com/ops/runtime-blueprint.json`);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -72,9 +128,13 @@ function buildPipelinePlan(manifest, environmentKey) {
     artifacts: {
       licenseSummary: 'reports/licenses/summary.json',
       licensePipelineManifest: 'reports/licenses/pipeline-manifest.json',
-      observabilityDashboard: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
-      blueprintEndpoint
+      observabilityDashboard: blueprint?.observabilityDashboardPath
+        ?? 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+      blueprintEndpoint,
+      blueprintParameter: blueprint?.ssmParameter ?? null,
+      blueprintVersion: blueprint?.version ?? null
     },
+    blueprint,
     phases: [
       {
         name: 'Build',
@@ -157,7 +217,7 @@ function buildPipelinePlan(manifest, environmentKey) {
           {
             id: 'blueprint-fetch',
             title: 'Verify environment blueprint endpoint',
-            command: `curl --fail ${blueprintEndpoint}`
+            command: `curl --fail --header 'Accept: application/json' ${blueprintEndpoint}`
           }
         ]
       }
@@ -179,6 +239,12 @@ function renderMarkdown(plan) {
   lines.push(`| License pipeline manifest | ${plan.artifacts.licensePipelineManifest} |`);
   lines.push(`| Observability dashboard | ${plan.artifacts.observabilityDashboard} |`);
   lines.push(`| Blueprint endpoint | ${plan.artifacts.blueprintEndpoint} |`);
+  if (plan.artifacts.blueprintParameter) {
+    lines.push(`| Blueprint SSM parameter | ${plan.artifacts.blueprintParameter} |`);
+  }
+  if (plan.artifacts.blueprintVersion) {
+    lines.push(`| Blueprint version | ${plan.artifacts.blueprintVersion} |`);
+  }
   lines.push('');
 
   lines.push('## Terraform Modules');
@@ -200,6 +266,49 @@ function renderMarkdown(plan) {
     for (const step of phase.steps) {
       const escapedCommand = step.command.replace(/`/g, '\\`');
       lines.push(`| ${step.title} | \`${escapedCommand}\` |`);
+    }
+    lines.push('');
+  }
+
+  if (plan.blueprint) {
+    lines.push('## Blueprint');
+    lines.push('');
+    lines.push(`- Key: ${plan.blueprint.key}`);
+    lines.push(`- Service: ${plan.blueprint.serviceName}`);
+    lines.push(`- Version: ${plan.blueprint.version ?? 'n/a'}`);
+    if (plan.blueprint.registryTable) {
+      lines.push(`- Registry table: ${plan.blueprint.registryTable}`);
+    }
+    if (plan.blueprint.modulePath) {
+      lines.push(`- Module path: ${plan.blueprint.modulePath}`);
+    }
+    if (plan.blueprint.moduleHash) {
+      lines.push(`- Module hash: ${plan.blueprint.moduleHash}`);
+    }
+    if (plan.blueprint.blueprintPath) {
+      lines.push(`- Blueprint path: ${plan.blueprint.blueprintPath}`);
+    }
+    if (plan.blueprint.blueprintHash) {
+      lines.push(`- Blueprint hash: ${plan.blueprint.blueprintHash}`);
+    }
+    if (plan.blueprint.observabilityDashboardPath) {
+      lines.push(`- Observability dashboard: ${plan.blueprint.observabilityDashboardPath}`);
+    }
+    if (plan.blueprint.observabilityDashboardHash) {
+      lines.push(`- Dashboard hash: ${plan.blueprint.observabilityDashboardHash}`);
+    }
+    const alarms = Array.isArray(plan.blueprint.alarmOutputs) && plan.blueprint.alarmOutputs.length
+      ? plan.blueprint.alarmOutputs.join(', ')
+      : 'None';
+    lines.push(`- Alarm outputs: ${alarms}`);
+    if (plan.blueprint.metadata && Object.keys(plan.blueprint.metadata).length > 0) {
+      lines.push('- Metadata:');
+      for (const [key, value] of Object.entries(plan.blueprint.metadata)) {
+        if (value === null || value === undefined || value === '') {
+          continue;
+        }
+        lines.push(`  - ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+      }
     }
     lines.push('');
   }

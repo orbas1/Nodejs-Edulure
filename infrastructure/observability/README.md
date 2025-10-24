@@ -35,3 +35,17 @@ automatically link the following constructs:
 Use the new Terraform outputs (`cpu_alarm_name`, `memory_alarm_name`, `observability_dashboard_name`,
 and `environment_blueprint_parameter_arn`) to export runtime references into downstream tooling
 or pipeline notifications.
+
+### Blueprint Registry Synchronisation
+
+Environment blueprints are now catalogued in the backend database via the
+`environment_blueprints` table (see migration `20250330140000_environment_blueprints_registry.js`).
+The registry is hydrated by the `backend-nodejs/seeds/003_environment_blueprints.js` seed which
+reads `infrastructure/environment-manifest.json`, computes the expected hashes for Terraform
+modules, and upserts records for each environment. The registry retains the SSM parameter name,
+runtime endpoint, observability dashboard hash, and alarm bindings used by Annex A46/A48 controls.
+
+`EnvironmentParityService` ingests this registry when producing the `/api/v1/environment/health`
+report. Any drift between the manifest and persisted registry (e.g. mismatched hashes, missing SSM
+parameters, or unexpected environments) is surfaced as a parity mismatch so on-call responders can
+spot configuration skew alongside infrastructure drift.

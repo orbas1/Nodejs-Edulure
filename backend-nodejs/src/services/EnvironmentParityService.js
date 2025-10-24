@@ -8,6 +8,7 @@ import { env } from '../config/env.js';
 import { healthcheck as databaseHealthcheck } from '../config/database.js';
 import logger from '../config/logger.js';
 import { getRedisClient } from '../config/redisClient.js';
+import EnvironmentBlueprintModel from '../models/EnvironmentBlueprintModel.js';
 import EnvironmentParitySnapshotModel from '../models/EnvironmentParitySnapshotModel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -139,8 +140,24 @@ export class EnvironmentParityService {
   async describeRuntimeState({ manifest }) {
     const sections = {};
     const relativeBase = path.join(projectRoot, '..');
+    const logger = this.logger;
 
     const manifestSections = manifest ?? (await this.manifestResolver());
+
+    async function safeHashPath(targetPath) {
+      if (!targetPath) {
+        return null;
+      }
+
+      try {
+        return await hashPath(targetPath, { relativeTo: relativeBase });
+      } catch (error) {
+        if (logger && typeof logger.warn === 'function') {
+          logger.warn({ err: error, target: targetPath }, 'Failed to hash manifest artefact');
+        }
+        return null;
+      }
+    }
 
     async function computeSection(entries) {
       const hashes = {};
@@ -168,6 +185,87 @@ export class EnvironmentParityService {
         })
       }
     };
+
+    const blueprintRecords = await EnvironmentBlueprintModel.listAll();
+    const recordsByBlueprint = blueprintRecords.reduce((acc, record) => {
+      if (!acc.has(record.blueprintKey)) {
+        acc.set(record.blueprintKey, new Map());
+      }
+      acc.get(record.blueprintKey).set(record.environmentName, record);
+      return acc;
+    }, new Map());
+
+    async function computeBlueprintSections(entries) {
+      const result = {};
+
+      for (const [blueprintKey, descriptor] of Object.entries(entries ?? {})) {
+        const runtimeEntry = {
+          path: descriptor.path ?? null,
+          hash: null,
+          modulePath: descriptor.modulePath ?? descriptor.module?.path ?? null,
+          moduleHash: null,
+          observability: {},
+          registry: {}
+        };
+
+        if (descriptor.path) {
+          const absoluteBlueprintPath = path.resolve(relativeBase, descriptor.path);
+          runtimeEntry.path = path.relative(relativeBase, absoluteBlueprintPath);
+          runtimeEntry.hash = await safeHashPath(absoluteBlueprintPath);
+        }
+
+        if (runtimeEntry.modulePath) {
+          const absoluteModulePath = path.resolve(relativeBase, runtimeEntry.modulePath);
+          runtimeEntry.modulePath = path.relative(relativeBase, absoluteModulePath);
+          runtimeEntry.moduleHash = await safeHashPath(absoluteModulePath);
+        }
+
+        const observabilityPath = descriptor.observability?.grafana?.path
+          ?? descriptor.dashboard
+          ?? null;
+        if (observabilityPath) {
+          const absoluteObservabilityPath = path.resolve(relativeBase, observabilityPath);
+          runtimeEntry.observability.grafana = {
+            path: path.relative(relativeBase, absoluteObservabilityPath),
+            hash: await safeHashPath(absoluteObservabilityPath)
+          };
+        }
+
+        const expectedRegistry = descriptor.registry ?? {};
+        const recordMap = recordsByBlueprint.get(blueprintKey) ?? new Map();
+
+        const toSanitisedRecord = (record) => ({
+          environment: record.environmentName,
+          provider: record.environmentProvider,
+          serviceName: record.serviceName,
+          blueprintVersion: record.blueprintVersion,
+          blueprintHash: record.blueprintHash,
+          moduleHash: record.moduleHash,
+          ssmParameterName: record.ssmParameterName,
+          runtimeEndpoint: record.runtimeEndpoint,
+          observabilityDashboardHash: record.observabilityDashboardHash,
+          alarmOutputs: Array.isArray(record.alarmOutputs) ? [...record.alarmOutputs] : [],
+          metadata: record.metadata
+        });
+
+        for (const envKey of Object.keys(expectedRegistry)) {
+          const record = recordMap.get(envKey);
+          runtimeEntry.registry[envKey] = record ? toSanitisedRecord(record) : null;
+        }
+
+        for (const [envKey, record] of recordMap.entries()) {
+          if (!Object.prototype.hasOwnProperty.call(expectedRegistry, envKey)) {
+            runtimeEntry.registry[envKey] = toSanitisedRecord(record);
+          }
+        }
+
+        result[blueprintKey] = runtimeEntry;
+      }
+
+      return result;
+    }
+
+    sections.blueprints = await computeBlueprintSections(manifestSections.blueprints);
 
     return sections;
   }
@@ -219,11 +317,109 @@ export class EnvironmentParityService {
       }
     }
 
+    function normaliseAlarmList(list = []) {
+      if (!Array.isArray(list)) {
+        return [];
+      }
+      return Array.from(new Set(list.map((value) => String(value).trim()).filter(Boolean))).sort();
+    }
+
+    function sanitizeBlueprintRecord(record) {
+      if (!record) {
+        return null;
+      }
+      return {
+        environment: record.environment ?? record.environmentName ?? null,
+        provider: record.provider ?? record.environmentProvider ?? null,
+        serviceName: record.serviceName ?? null,
+        blueprintVersion: record.blueprintVersion ?? record.version ?? null,
+        blueprintHash: record.blueprintHash ?? null,
+        moduleHash: record.moduleHash ?? null,
+        ssmParameter: record.ssmParameter ?? record.ssmParameterName ?? null,
+        runtimeEndpoint: record.runtimeEndpoint ?? null,
+        observabilityDashboardHash: record.observabilityDashboardHash ?? null,
+        alarmOutputs: normaliseAlarmList(record.alarmOutputs),
+        metadata: record.metadata ?? null
+      };
+    }
+
+    function compareBlueprintRegistry(blueprintKey, expectedDescriptor, actualDescriptor) {
+      const expectedRegistry = expectedDescriptor?.registry ?? {};
+      const actualRegistry = actualDescriptor?.registry ?? {};
+
+      for (const [environmentKey, expectedRecord] of Object.entries(expectedRegistry)) {
+        const actualRecord = actualRegistry[environmentKey];
+        if (!actualRecord) {
+          mismatches.push({
+            component: `blueprints.${blueprintKey}.registry.${environmentKey}`,
+            status: 'missing',
+            expected: expectedRecord,
+            observed: null
+          });
+          continue;
+        }
+
+        const expectedAlarms = normaliseAlarmList(expectedRecord?.alarmOutputs);
+        const actualAlarms = normaliseAlarmList(actualRecord?.alarmOutputs);
+
+        const issues = [];
+        if (expectedRecord?.blueprintHash && expectedRecord.blueprintHash !== actualRecord.blueprintHash) {
+          issues.push('blueprintHash');
+        }
+        if (expectedRecord?.moduleHash && expectedRecord.moduleHash !== actualRecord.moduleHash) {
+          issues.push('moduleHash');
+        }
+        if (expectedRecord?.ssmParameter && expectedRecord.ssmParameter !== actualRecord.ssmParameterName) {
+          issues.push('ssmParameter');
+        }
+        if (expectedRecord?.runtimeEndpoint && expectedRecord.runtimeEndpoint !== actualRecord.runtimeEndpoint) {
+          issues.push('runtimeEndpoint');
+        }
+        if (
+          expectedRecord?.observabilityDashboardHash
+          && expectedRecord.observabilityDashboardHash !== actualRecord.observabilityDashboardHash
+        ) {
+          issues.push('observabilityDashboardHash');
+        }
+        if (expectedRecord?.serviceName && expectedRecord.serviceName !== actualRecord.serviceName) {
+          issues.push('serviceName');
+        }
+        if (expectedRecord?.version && expectedRecord.version !== actualRecord.blueprintVersion) {
+          issues.push('version');
+        }
+        if (expectedAlarms.length && expectedAlarms.join('|') !== actualAlarms.join('|')) {
+          issues.push('alarmOutputs');
+        }
+
+        if (issues.length > 0) {
+          mismatches.push({
+            component: `blueprints.${blueprintKey}.registry.${environmentKey}`,
+            status: 'mismatch',
+            expected: { ...expectedRecord, alarmOutputs: expectedAlarms },
+            observed: { ...sanitizeBlueprintRecord(actualRecord), alarmOutputs: actualAlarms },
+            details: { fields: issues }
+          });
+        }
+      }
+
+      for (const environmentKey of Object.keys(actualRegistry)) {
+        if (!Object.prototype.hasOwnProperty.call(expectedRegistry, environmentKey)) {
+          mismatches.push({
+            component: `blueprints.${blueprintKey}.registry.${environmentKey}`,
+            status: 'unexpected',
+            expected: null,
+            observed: sanitizeBlueprintRecord(actualRegistry[environmentKey])
+          });
+        }
+      }
+    }
+
     evaluate('modules', manifest.modules, runtime.modules);
     evaluate('environments', manifest.environments, runtime.environments);
     evaluate('docker', manifest.docker, runtime.docker);
     evaluate('scripts', manifest.scripts, runtime.scripts);
     evaluate('root', manifest.root, runtime.root);
+    evaluate('blueprints', manifest.blueprints, runtime.blueprints);
 
     return mismatches;
   }
