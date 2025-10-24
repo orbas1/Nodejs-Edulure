@@ -43,7 +43,7 @@ Combining these elements yields an indicative midpoint valuation of **£0.90M**,
 4. **Establish post-launch KPI cadence** (DAU, streak recovery rate, churn) aligning investor updates with the telemetry available across web and mobile clients.
 
 ## KPI scoreboard linkage (Q3 FY25)
-`npm run generate:strategy-brief` exports the live KPI table into `valuation/generated-scorecard.md`, keeping valuation inputs aligned with stakeholder reporting. Key links:
+`npm run generate:strategy-brief` exports the live KPI table into `valuation/generated-scorecard.md`, keeping valuation inputs aligned with stakeholder reporting. The same metrics are seeded into `navigation_annex_strategy_narratives`/`navigation_annex_strategy_metrics`, ensuring `/api/v1/navigation/annex` surfaces identical baselines and targets for ops and design stakeholders. Key links:
 
 - **Activation** — Conversion uplift targets (20% trial → paid, 75% onboarding completion) validate the growth premium baked into the midpoint valuation.
 - **Retention** — Streak health, live attendance, and NPS goals protect recurring revenue assumptions and justify the execution premium.

@@ -4,6 +4,8 @@ import NavigationAnnexDesignDependencyModel from '../models/NavigationAnnexDesig
 import NavigationAnnexOperationTaskModel from '../models/NavigationAnnexOperationTaskModel.js';
 import NavigationAnnexStrategyMetricModel from '../models/NavigationAnnexStrategyMetricModel.js';
 import NavigationAnnexStrategyNarrativeModel from '../models/NavigationAnnexStrategyNarrativeModel.js';
+import DesignSystemTokenModel from '../models/DesignSystemTokenModel.js';
+import UxResearchInsightModel from '../models/UxResearchInsightModel.js';
 import { safeJsonParse } from '../utils/modelUtils.js';
 
 const ROLE_SYNONYMS = {
@@ -207,6 +209,30 @@ function registerDocumentationReference(map, href, { navItemId, navItemLabel, ca
   map.set(normalised, entry);
 }
 
+function formatTokenContexts(contexts) {
+  return contexts
+    .slice()
+    .sort((a, b) => {
+      const orderDiff = (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+      if (orderDiff !== 0) {
+        return orderDiff;
+      }
+      const sourceDiff = String(a.source).localeCompare(String(b.source));
+      if (sourceDiff !== 0) {
+        return sourceDiff;
+      }
+      return String(a.selector).localeCompare(String(b.selector));
+    })
+    .map(({ source, context, selector, value, displayOrder, metadata }) => ({
+      source,
+      context,
+      selector,
+      value,
+      displayOrder: displayOrder ?? 0,
+      metadata: metadata ?? {}
+    }));
+}
+
 export default class NavigationAnnexRepository {
   static async describe({ role } = {}, connection = db) {
     const nodes = new Map();
@@ -222,7 +248,95 @@ export default class NavigationAnnexRepository {
     const documentationIndex = new Map();
     const resolvedRole = normaliseRole(role);
 
-    const backlogRows = await NavigationAnnexBacklogItemModel.listAll(connection);
+    const [
+      backlogRows,
+      operationsRows,
+      designRows,
+      narrativeRows,
+      metricsRows,
+      tokenRows,
+      researchRows
+    ] = await Promise.all([
+      NavigationAnnexBacklogItemModel.listAll(connection),
+      NavigationAnnexOperationTaskModel.listAll(connection),
+      NavigationAnnexDesignDependencyModel.listAll(connection),
+      NavigationAnnexStrategyNarrativeModel.listAll(connection),
+      NavigationAnnexStrategyMetricModel.listAll(connection),
+      DesignSystemTokenModel.listAll(connection),
+      UxResearchInsightModel.listAll(connection)
+    ]);
+
+    const tokenIndex = new Map();
+    const tokenCategoryIndex = new Map();
+    const categoryDisplayOrder = new Map();
+    const tokenDisplayOrder = new Map();
+
+    const designSystemTokens = tokenRows.map((row) => ({
+      key: row.tokenKey,
+      value: row.tokenValue,
+      source: row.source,
+      context: row.context ?? null,
+      selector: row.selector,
+      category: row.tokenCategory,
+      displayOrder: row.displayOrder,
+      metadata: row.metadata ?? {}
+    }));
+
+    for (const token of designSystemTokens) {
+      if (!tokenIndex.has(token.key)) {
+        tokenIndex.set(token.key, []);
+      }
+      tokenIndex.get(token.key).push(token);
+
+      const category = token.category ?? 'general';
+      if (!tokenCategoryIndex.has(category)) {
+        tokenCategoryIndex.set(category, new Map());
+        categoryDisplayOrder.set(category, token.displayOrder ?? 0);
+      } else {
+        const currentCategoryOrder = categoryDisplayOrder.get(category) ?? token.displayOrder ?? 0;
+        categoryDisplayOrder.set(category, Math.min(currentCategoryOrder, token.displayOrder ?? 0));
+      }
+
+      const categoryMap = tokenCategoryIndex.get(category);
+      if (!categoryMap.has(token.key)) {
+        categoryMap.set(token.key, []);
+        tokenDisplayOrder.set(`${category}:${token.key}`, token.displayOrder ?? 0);
+      } else {
+        const currentTokenOrder = tokenDisplayOrder.get(`${category}:${token.key}`) ?? token.displayOrder ?? 0;
+        tokenDisplayOrder.set(
+          `${category}:${token.key}`,
+          Math.min(currentTokenOrder, token.displayOrder ?? 0)
+        );
+      }
+      categoryMap.get(token.key).push(token);
+    }
+
+    const designSystemCatalogue = Array.from(tokenCategoryIndex.entries())
+      .sort((a, b) => {
+        const orderDiff =
+          (categoryDisplayOrder.get(a[0]) ?? 0) - (categoryDisplayOrder.get(b[0]) ?? 0);
+        if (orderDiff !== 0) {
+          return orderDiff;
+        }
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([category, tokenMap]) => ({
+        category,
+        tokens: Array.from(tokenMap.entries())
+          .sort((a, b) => {
+            const aOrder = tokenDisplayOrder.get(`${category}:${a[0]}`) ?? 0;
+            const bOrder = tokenDisplayOrder.get(`${category}:${b[0]}`) ?? 0;
+            const orderDiff = aOrder - bOrder;
+            if (orderDiff !== 0) {
+              return orderDiff;
+            }
+            return a[0].localeCompare(b[0]);
+          })
+          .map(([key, contexts]) => ({
+            key,
+            contexts: formatTokenContexts(contexts)
+          }))
+      }));
 
     for (const row of backlogRows) {
       const scope = parseRoleScope(row.roleScope);
@@ -252,8 +366,6 @@ export default class NavigationAnnexRepository {
         });
       }
     }
-
-    const operationsRows = await NavigationAnnexOperationTaskModel.listAll(connection);
 
     for (const row of operationsRows) {
       const scope = parseRoleScope(row.roleScope);
@@ -291,8 +403,6 @@ export default class NavigationAnnexRepository {
         });
       }
     }
-
-    const designRows = await NavigationAnnexDesignDependencyModel.listAll(connection);
 
     for (const row of designRows) {
       const scope = parseRoleScope(row.roleScope);
@@ -343,8 +453,6 @@ export default class NavigationAnnexRepository {
       }
     }
 
-    const narrativeRows = await NavigationAnnexStrategyNarrativeModel.listAll(connection);
-
     for (const row of narrativeRows) {
       const scope = parseRoleScope(row.roleScope);
       if (!matchesRole(scope, resolvedRole)) {
@@ -365,8 +473,6 @@ export default class NavigationAnnexRepository {
       const pillarEntry = ensureStrategyPillar(strategyByPillar, formattedPillar, row.displayOrder ?? 0);
       registerNarrative(pillarEntry.narratives, row.narrative, row.displayOrder ?? 0);
     }
-
-    const metricsRows = await NavigationAnnexStrategyMetricModel.listAll(connection);
 
     for (const row of metricsRows) {
       const info = narrativeIndex.get(row.narrativeId);
@@ -466,12 +572,23 @@ export default class NavigationAnnexRepository {
       .sort(sortByPriority)
       .map(({ priority, displayOrder, ...rest }) => rest);
 
+    const aggregatedTokenList = Array.from(aggregatedDesign.tokens).sort();
+    const designDependencyTokenDetails = aggregatedTokenList.map((tokenKey) => {
+      const contexts = formatTokenContexts(tokenIndex.get(tokenKey) ?? []);
+      return {
+        key: tokenKey,
+        category: (tokenIndex.get(tokenKey)?.[0]?.category) ?? 'general',
+        contexts
+      };
+    });
+
     const designDependencies = {
-      tokens: Array.from(aggregatedDesign.tokens).sort(),
+      tokens: aggregatedTokenList,
       qa: Array.from(aggregatedDesign.qa.values())
         .sort(sortByPriority)
         .map(({ id, label }) => ({ id, label })),
-      references: Array.from(aggregatedDesign.references).sort()
+      references: Array.from(aggregatedDesign.references).sort(),
+      tokenDetails: designDependencyTokenDetails
     };
 
     const productBacklog = Array.from(productBacklogIndex.values())
@@ -508,6 +625,54 @@ export default class NavigationAnnexRepository {
         navItemLabels: Array.from(entry.navItemLabels).sort((a, b) => a.localeCompare(b))
       }));
 
+    const sortedDesignSystemTokens = designSystemTokens
+      .slice()
+      .sort((a, b) => {
+        const orderDiff = (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+        if (orderDiff !== 0) {
+          return orderDiff;
+        }
+        const keyDiff = String(a.key).localeCompare(String(b.key));
+        if (keyDiff !== 0) {
+          return keyDiff;
+        }
+        return String(a.source).localeCompare(String(b.source));
+      });
+
+    const designSystemVersion = sortedDesignSystemTokens.find((entry) => entry.metadata?.version)?.metadata.version ?? null;
+
+    const researchEntries = researchRows.map((row) => ({
+      slug: row.slug,
+      title: row.title,
+      status: row.status,
+      recordedAt: row.recordedAt,
+      owner: row.owner,
+      summary: row.summary,
+      tokensImpacted: row.tokensImpacted,
+      documents: row.documents,
+      participants: row.participants,
+      evidenceUrl: row.evidenceUrl ?? null,
+      metadata: row.metadata ?? {}
+    }));
+
+    const researchVersion = researchEntries.find((entry) => entry.metadata?.version)?.metadata.version ?? null;
+    const researchTotals = researchEntries.reduce((acc, entry) => {
+      const key = entry.status ?? 'unknown';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const designSystem = {
+      version: designSystemVersion,
+      tokens: sortedDesignSystemTokens,
+      research: {
+        version: researchVersion,
+        totals: researchTotals,
+        entries: researchEntries
+      },
+      catalogue: designSystemCatalogue
+    };
+
     return {
       initiatives,
       operationsChecklist,
@@ -515,6 +680,7 @@ export default class NavigationAnnexRepository {
       strategyNarratives,
       productBacklog,
       documentationIndex: documentationReferences,
+      designSystem,
       refreshedAt: new Date().toISOString()
     };
   }

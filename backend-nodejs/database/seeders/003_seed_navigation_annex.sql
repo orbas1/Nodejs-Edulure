@@ -454,7 +454,7 @@ VALUES
     JSON_ARRAY('user', 'instructor'),
     'retention-feed-depth',
     'retention',
-    'Reduce steps after sign-in by aligning navigation registry, breadcrumbs, and notification entry points.',
+    'Stabilise streak health and session attendance by surfacing proactive reminders, better content recommendations, and Annex-backed readiness states.',
     1
   ),
   (
@@ -465,7 +465,7 @@ VALUES
     JSON_ARRAY('user', 'instructor'),
     'activation-courses-discovery',
     'activation',
-    'Improve time-to-value for new learners with consistent metadata hydration and skeleton loaders.',
+    'Reduce drop-off between sign-up and first value moment by pairing cross-surface onboarding flows with personalised streak nudges.',
     1
   ),
   (
@@ -476,7 +476,7 @@ VALUES
     JSON_ARRAY('instructor'),
     'efficiency-upload-readiness',
     'efficiency',
-    'Accelerate instructor onboarding by surfacing readiness checks and evidence capture directly in the builder.',
+    'Increase margin by automating governance, reducing manual support load, and accelerating conversion of high-intent cohorts.',
     1
   )
 ON DUPLICATE KEY UPDATE
@@ -497,57 +497,84 @@ INSERT INTO navigation_annex_strategy_metrics (
 VALUES
   (
     (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'retention-feed-depth' LIMIT 1),
-    'nav-click-depth',
-    'Average click depth to reach feed updates',
-    '3.2',
-    '2.1',
-    'clicks',
+    'streak-health',
+    'Weekly streak health index',
+    '0.64',
+    '0.78',
+    'index',
     1
   ),
   (
     (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'retention-feed-depth' LIMIT 1),
-    'return-visit-rate',
-    '30-day returning learner rate',
-    '41%',
-    '48%',
-    'percentage',
+    'live-class-attendance',
+    'Live class attendance rate',
+    '0.46',
+    '0.62',
+    'ratio',
     2
   ),
   (
+    (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'retention-feed-depth' LIMIT 1),
+    'nps-core-learners',
+    'NPS – core learner cohort',
+    '34',
+    '48',
+    'score',
+    3
+  ),
+  (
     (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'activation-courses-discovery' LIMIT 1),
-    'course-discovery-time',
-    'Median time to locate a course after sign-in',
-    '4m 20s',
-    '2m 30s',
-    'duration',
+    'trial-to-paid-conversion',
+    'Trial → paid conversion',
+    '0.12',
+    '0.20',
+    'ratio',
     1
   ),
   (
     (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'activation-courses-discovery' LIMIT 1),
-    'filter-engagement-rate',
-    'Learners applying filters during first session',
-    '18%',
-    '32%',
-    'percentage',
+    'multi-surface-onboarding',
+    'Multi-surface onboarding completion',
+    '0.58',
+    '0.75',
+    'ratio',
     2
   ),
   (
+    (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'activation-courses-discovery' LIMIT 1),
+    'first-class-time',
+    'Median time to first live class',
+    '3.4',
+    '2.1',
+    'days',
+    3
+  ),
+  (
     (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'efficiency-upload-readiness' LIMIT 1),
-    'upload-readiness-pass-rate',
-    'Course uploads passing readiness checks on first attempt',
-    '61%',
-    '85%',
-    'percentage',
+    'support-minutes-per-ticket',
+    'Support minutes per ticket',
+    '11.2',
+    '6.5',
+    'minutes',
     1
   ),
   (
     (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'efficiency-upload-readiness' LIMIT 1),
-    'evidence-capture-latency',
-    'Time to archive readiness evidence after release',
-    '3d',
-    '1d',
-    'duration',
+    'upload-readiness-pass',
+    'Upload readiness checklist pass rate',
+    '0.44',
+    '0.68',
+    'ratio',
     2
+  ),
+  (
+    (SELECT id FROM navigation_annex_strategy_narratives WHERE narrative_key = 'efficiency-upload-readiness' LIMIT 1),
+    'arpu-premium',
+    'Premium ARPU',
+    '18.4',
+    '26.0',
+    'gbp',
+    3
   )
 ON DUPLICATE KEY UPDATE
   label = VALUES(label),

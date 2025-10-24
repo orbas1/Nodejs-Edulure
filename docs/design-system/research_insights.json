@@ -1,0 +1,53 @@
+{
+  "version": "2025-05-26",
+  "insights": [
+    {
+      "slug": "design-system-parity-may-2025",
+      "title": "Design system parity verification (May 2025)",
+      "status": "completed",
+      "recordedAt": "2025-05-20",
+      "summary": "Verified generated web and Flutter tokens across light, dark, and high-contrast modes with evidence captured for Annex A55.",
+      "owner": "Design Systems",
+      "tokensImpacted": ["--color-surface", "--shadow-focus-ring", "--form-field-border", "--form-field-padding-x"],
+      "documents": ["docs/design-system/design_tokens.json", "user experience.md"],
+      "participants": ["12 remote learners (diary study)", "Design Systems triad"],
+      "evidenceUrl": "vault://research/design-system-parity-may-2025"
+    },
+    {
+      "slug": "accessibility-audit-dark-high-contrast",
+      "title": "Accessibility audit – dark & high-contrast",
+      "status": "in_progress",
+      "recordedAt": "2025-05-24",
+      "summary": "Validating regenerated Flutter themes and React surfaces against WCAG AA targets for dark mode and high-contrast annex flows.",
+      "owner": "Accessibility Guild",
+      "tokensImpacted": ["--color-text", "--color-primary-soft", "--skeleton-highlight"],
+      "documents": ["docs/design-system/design_tokens.json", "docs/design-system/navigation-annex.md"],
+      "participants": ["6 accessibility specialists", "QA automation harness"],
+      "evidenceUrl": "zeplin://a11y/dark-mode-audit"
+    },
+    {
+      "slug": "multi-surface-onboarding-intercepts",
+      "title": "Multi-surface onboarding intercepts",
+      "status": "scheduled",
+      "recordedAt": "2025-06-05",
+      "summary": "Diary-guided intercepts following learners from marketing site to native app to confirm spacing and CTA tokens carry over.",
+      "owner": "Product Research",
+      "tokensImpacted": ["--grid-gap", "--space-6", "--form-field-surface"],
+      "documents": ["user experience.md", "docs/operations/strategy.md"],
+      "participants": ["Ops research partner panel"],
+      "evidenceUrl": "notion://research/activation/2025-06-intercepts"
+    },
+    {
+      "slug": "stakeholder-comms-tone-testing",
+      "title": "Stakeholder communications tone testing",
+      "status": "planned",
+      "recordedAt": "2025-06-20",
+      "summary": "Co-create investor and board templates ensuring Annex A56 narratives match UX-led tone guidance before the Q3 brief.",
+      "owner": "Design Ops",
+      "tokensImpacted": ["--color-primary", "--gradient-cta", "--font-family-sans"],
+      "documents": ["docs/operations/templates/investor-update-outline.md", "docs/operations/templates/board-brief-outline.md"],
+      "participants": ["Investor advisory group", "Founder"],
+      "evidenceUrl": "drive://comms/voice-and-tone/a56"
+    }
+  ]
+}

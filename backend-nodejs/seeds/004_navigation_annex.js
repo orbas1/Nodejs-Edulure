@@ -450,7 +450,7 @@ const strategyNarratives = [
     narrative_key: 'retention-feed-depth',
     pillar: 'retention',
     narrative:
-      'Reduce steps after sign-in by aligning navigation registry, breadcrumbs, and notification entry points.',
+      'Stabilise streak health and session attendance by surfacing proactive reminders, better content recommendations, and Annex-backed readiness states.',
     display_order: 1
   },
   {
@@ -461,7 +461,8 @@ const strategyNarratives = [
     role_scope: ['user', 'instructor'],
     narrative_key: 'activation-courses-discovery',
     pillar: 'activation',
-    narrative: 'Improve time-to-value for new learners with consistent metadata hydration and skeleton loaders.',
+    narrative:
+      'Reduce drop-off between sign-up and first value moment by pairing cross-surface onboarding flows with personalised streak nudges.',
     display_order: 1
   },
   {
@@ -472,7 +473,8 @@ const strategyNarratives = [
     role_scope: ['instructor'],
     narrative_key: 'efficiency-upload-readiness',
     pillar: 'efficiency',
-    narrative: 'Accelerate instructor onboarding by surfacing readiness checks and evidence capture directly in the builder.',
+    narrative:
+      'Increase margin by automating governance, reducing manual support load, and accelerating conversion of high-intent cohorts.',
     display_order: 1
   }
 ];
@@ -480,57 +482,84 @@ const strategyNarratives = [
 const strategyMetrics = [
   {
     narrative_key: 'retention-feed-depth',
-    metric_key: 'nav-click-depth',
-    label: 'Average click depth to reach feed updates',
-    baseline: '3.2',
-    target: '2.1',
-    unit: 'clicks',
+    metric_key: 'streak-health',
+    label: 'Weekly streak health index',
+    baseline: '0.64',
+    target: '0.78',
+    unit: 'index',
     display_order: 1
   },
   {
     narrative_key: 'retention-feed-depth',
-    metric_key: 'return-visit-rate',
-    label: '30-day returning learner rate',
-    baseline: '41%',
-    target: '48%',
-    unit: 'percentage',
+    metric_key: 'live-class-attendance',
+    label: 'Live class attendance rate',
+    baseline: '0.46',
+    target: '0.62',
+    unit: 'ratio',
     display_order: 2
   },
   {
+    narrative_key: 'retention-feed-depth',
+    metric_key: 'nps-core-learners',
+    label: 'NPS – core learner cohort',
+    baseline: '34',
+    target: '48',
+    unit: 'score',
+    display_order: 3
+  },
+  {
     narrative_key: 'activation-courses-discovery',
-    metric_key: 'course-discovery-time',
-    label: 'Median time to locate a course after sign-in',
-    baseline: '4m 20s',
-    target: '2m 30s',
-    unit: 'duration',
+    metric_key: 'trial-to-paid-conversion',
+    label: 'Trial → paid conversion',
+    baseline: '0.12',
+    target: '0.20',
+    unit: 'ratio',
     display_order: 1
   },
   {
     narrative_key: 'activation-courses-discovery',
-    metric_key: 'filter-engagement-rate',
-    label: 'Learners applying filters during first session',
-    baseline: '18%',
-    target: '32%',
-    unit: 'percentage',
+    metric_key: 'multi-surface-onboarding',
+    label: 'Multi-surface onboarding completion',
+    baseline: '0.58',
+    target: '0.75',
+    unit: 'ratio',
     display_order: 2
   },
   {
+    narrative_key: 'activation-courses-discovery',
+    metric_key: 'first-class-time',
+    label: 'Median time to first live class',
+    baseline: '3.4',
+    target: '2.1',
+    unit: 'days',
+    display_order: 3
+  },
+  {
     narrative_key: 'efficiency-upload-readiness',
-    metric_key: 'upload-readiness-pass-rate',
-    label: 'Course uploads passing readiness checks on first attempt',
-    baseline: '61%',
-    target: '85%',
-    unit: 'percentage',
+    metric_key: 'support-minutes-per-ticket',
+    label: 'Support minutes per ticket',
+    baseline: '11.2',
+    target: '6.5',
+    unit: 'minutes',
     display_order: 1
   },
   {
     narrative_key: 'efficiency-upload-readiness',
-    metric_key: 'evidence-capture-latency',
-    label: 'Time to archive readiness evidence after release',
-    baseline: '3d',
-    target: '1d',
-    unit: 'duration',
+    metric_key: 'upload-readiness-pass',
+    label: 'Upload readiness checklist pass rate',
+    baseline: '0.44',
+    target: '0.68',
+    unit: 'ratio',
     display_order: 2
+  },
+  {
+    narrative_key: 'efficiency-upload-readiness',
+    metric_key: 'arpu-premium',
+    label: 'Premium ARPU',
+    baseline: '18.4',
+    target: '26.0',
+    unit: 'gbp',
+    display_order: 3
   }
 ];
 

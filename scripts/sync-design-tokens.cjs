@@ -5,10 +5,19 @@ const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..');
 const tokensPath = path.join(repoRoot, 'docs', 'design-system', 'design_tokens.json');
+const researchInsightsPath = path.join(repoRoot, 'docs', 'design-system', 'research_insights.json');
 const cssOutputPath = path.join(repoRoot, 'frontend-reactjs', 'src', 'styles', 'tokens.css');
 const dartOutputPath = path.join(repoRoot, 'Edulure-Flutter', 'lib', 'core', 'design_tokens.dart');
+const sqlSeedOutputPath = path.join(
+  repoRoot,
+  'backend-nodejs',
+  'database',
+  'seeders',
+  '004_seed_design_system_assets.sql'
+);
 
 const tokens = JSON.parse(fs.readFileSync(tokensPath, 'utf8'));
+const researchInsights = JSON.parse(fs.readFileSync(researchInsightsPath, 'utf8'));
 
 const headerComment = `/*
  * -----------------------------------------------------------------------------
@@ -294,8 +303,213 @@ function buildDart(json) {
   return lines.join('\n') + '\n';
 }
 
+function categoriseToken(key) {
+  if (!key || typeof key !== 'string') {
+    return 'general';
+  }
+  const trimmed = key.replace(/^--/, '');
+  const [segment] = trimmed.split('-');
+  const known = new Set([
+    'color',
+    'gradient',
+    'shadow',
+    'font',
+    'space',
+    'radius',
+    'screen',
+    'form',
+    'motion',
+    'media',
+    'skeleton',
+    'overlay',
+    'grid'
+  ]);
+  return known.has(segment) ? segment : 'general';
+}
+
+function flattenTokenRecords(json) {
+  const records = [];
+  let order = 1;
+
+  const pushRecord = ({ key, value, source, context = null, selector }) => {
+    if (!key || value === undefined || value === null) {
+      return;
+    }
+    records.push({
+      token_key: key,
+      token_value: String(value),
+      source,
+      context,
+      selector,
+      token_category: categoriseToken(key),
+      display_order: order++,
+      metadata: {
+        version: json.version ?? null,
+        source,
+        context,
+        selector
+      }
+    });
+  };
+
+  const base = json.base ?? {};
+  for (const [key, value] of Object.entries(base)) {
+    pushRecord({ key, value, source: 'base', context: null, selector: ':root' });
+  }
+
+  const overrides = json.overrides ?? {};
+  for (const [atRule, selectorMap] of Object.entries(overrides)) {
+    for (const [selector, declarations] of Object.entries(selectorMap ?? {})) {
+      for (const [key, value] of Object.entries(declarations ?? {})) {
+        pushRecord({ key, value, source: 'media', context: atRule, selector });
+      }
+    }
+  }
+
+  const dataOverrides = json.dataOverrides ?? {};
+  for (const [selector, declarations] of Object.entries(dataOverrides)) {
+    for (const [key, value] of Object.entries(declarations ?? {})) {
+      pushRecord({ key, value, source: 'data', context: null, selector });
+    }
+  }
+
+  return records;
+}
+
+function buildResearchRecords(json) {
+  const version = json.version ?? null;
+  return (json.insights ?? []).map((insight, index) => ({
+    slug: insight.slug,
+    title: insight.title,
+    status: insight.status,
+    recorded_at: insight.recordedAt,
+    owner: insight.owner,
+    summary: insight.summary,
+    tokens_impacted: insight.tokensImpacted ?? [],
+    documents: insight.documents ?? [],
+    participants: insight.participants ?? [],
+    evidence_url: insight.evidenceUrl ?? null,
+    metadata: { version, index }
+  }));
+}
+
+function sqlString(value) {
+  if (value === null || value === undefined) {
+    return 'NULL';
+  }
+  const escaped = String(value).replace(/\\/g, '\\\\').replace(/'/g, "''");
+  return `'${escaped}'`;
+}
+
+function sqlJson(value) {
+  const payload = typeof value === 'string' ? value : JSON.stringify(value ?? {});
+  const escaped = payload.replace(/\\/g, '\\\\').replace(/'/g, "''");
+  return `CAST('${escaped}' AS JSON)`;
+}
+
+function buildInsertStatement(table, columns, rows, updateColumns) {
+  if (!rows.length) {
+    return `-- No rows for ${table}\n`;
+  }
+  const values = rows
+    .map((row) => `  (${columns.map((column) => row[column]).join(', ')})`)
+    .join(',\n');
+  const updates = updateColumns
+    .map((column) => `  ${column} = VALUES(${column})`)
+    .concat(['  updated_at = CURRENT_TIMESTAMP'])
+    .join(',\n');
+  return `INSERT INTO ${table} (${columns.join(', ')})\nVALUES\n${values}\nON DUPLICATE KEY UPDATE\n${updates};\n`;
+}
+
+function buildSqlSeed(tokensJson, researchJson) {
+  const tokenRecords = flattenTokenRecords(tokensJson).map((record) => ({
+    token_key: sqlString(record.token_key),
+    token_value: sqlString(record.token_value),
+    source: sqlString(record.source),
+    context: sqlString(record.context),
+    selector: sqlString(record.selector),
+    token_category: sqlString(record.token_category),
+    display_order: String(record.display_order ?? 0),
+    metadata: sqlJson(record.metadata)
+  }));
+
+  const researchRecords = buildResearchRecords(researchJson).map((record) => ({
+    slug: sqlString(record.slug),
+    title: sqlString(record.title),
+    status: sqlString(record.status),
+    recorded_at: sqlString(record.recorded_at),
+    owner: sqlString(record.owner),
+    summary: sqlString(record.summary),
+    tokens_impacted: sqlJson(record.tokens_impacted),
+    documents: sqlJson(record.documents),
+    participants: sqlJson(record.participants),
+    evidence_url: sqlString(record.evidence_url),
+    metadata: sqlJson(record.metadata)
+  }));
+
+  const tokenInsert = buildInsertStatement(
+    'design_system_tokens',
+    [
+      'token_key',
+      'token_value',
+      'source',
+      'context',
+      'selector',
+      'token_category',
+      'display_order',
+      'metadata'
+    ],
+    tokenRecords,
+    ['token_value', 'source', 'context', 'selector', 'token_category', 'display_order', 'metadata']
+  );
+
+  const researchInsert = buildInsertStatement(
+    'ux_research_insights',
+    [
+      'slug',
+      'title',
+      'status',
+      'recorded_at',
+      'owner',
+      'summary',
+      'tokens_impacted',
+      'documents',
+      'participants',
+      'evidence_url',
+      'metadata'
+    ],
+    researchRecords,
+    [
+      'title',
+      'status',
+      'recorded_at',
+      'owner',
+      'summary',
+      'tokens_impacted',
+      'documents',
+      'participants',
+      'evidence_url',
+      'metadata'
+    ]
+  );
+
+  return [
+    '-- AUTO-GENERATED FILE. Update docs/design-system/design_tokens.json or research_insights.json and rerun sync-design-tokens.',
+    'DELETE FROM design_system_tokens;',
+    tokenInsert,
+    '',
+    'DELETE FROM ux_research_insights;',
+    researchInsert,
+    ''
+  ]
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
 fs.writeFileSync(cssOutputPath, buildCss(tokens));
 fs.mkdirSync(path.dirname(dartOutputPath), { recursive: true });
 fs.writeFileSync(dartOutputPath, buildDart(tokens));
+fs.mkdirSync(path.dirname(sqlSeedOutputPath), { recursive: true });
+fs.writeFileSync(sqlSeedOutputPath, buildSqlSeed(tokens, researchInsights));
 
-console.log('Design tokens synced to CSS and Flutter outputs.');
+console.log('Design tokens synced to CSS, Flutter outputs, and SQL seed.');

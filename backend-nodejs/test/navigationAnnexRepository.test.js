@@ -6,6 +6,8 @@ import NavigationAnnexDesignDependencyModel from '../src/models/NavigationAnnexD
 import NavigationAnnexOperationTaskModel from '../src/models/NavigationAnnexOperationTaskModel.js';
 import NavigationAnnexStrategyMetricModel from '../src/models/NavigationAnnexStrategyMetricModel.js';
 import NavigationAnnexStrategyNarrativeModel from '../src/models/NavigationAnnexStrategyNarrativeModel.js';
+import DesignSystemTokenModel from '../src/models/DesignSystemTokenModel.js';
+import UxResearchInsightModel from '../src/models/UxResearchInsightModel.js';
 
 const now = new Date().toISOString();
 
@@ -266,6 +268,73 @@ const strategyMetrics = [
   }
 ];
 
+const designSystemTokens = [
+  {
+    id: 101,
+    tokenKey: '--space-4',
+    tokenValue: '1rem',
+    source: 'base',
+    context: null,
+    selector: ':root',
+    tokenCategory: 'space',
+    displayOrder: 10,
+    metadata: { version: '2025-05-26', source: 'base' }
+  },
+  {
+    id: 102,
+    tokenKey: '--space-4',
+    tokenValue: '1.1rem',
+    source: 'data',
+    context: null,
+    selector: "[data-theme='dark']",
+    tokenCategory: 'space',
+    displayOrder: 110,
+    metadata: { version: '2025-05-26', source: 'data' }
+  },
+  {
+    id: 103,
+    tokenKey: '--grid-gap',
+    tokenValue: 'var(--space-6)',
+    source: 'base',
+    context: null,
+    selector: ':root',
+    tokenCategory: 'grid',
+    displayOrder: 64,
+    metadata: { version: '2025-05-26', source: 'base' }
+  }
+];
+
+const researchInsights = [
+  {
+    id: 201,
+    slug: 'design-system-parity',
+    title: 'Design system parity verification',
+    status: 'completed',
+    recordedAt: '2025-05-20',
+    owner: 'Design Systems',
+    summary: 'Verified generated tokens across platforms.',
+    tokensImpacted: ['--space-4', '--grid-gap'],
+    documents: ['docs/design-system/design_tokens.json'],
+    participants: ['Design Systems triad'],
+    evidenceUrl: 'vault://design-system-parity',
+    metadata: { version: '2025-05-26' }
+  },
+  {
+    id: 202,
+    slug: 'multi-surface-onboarding-intercepts',
+    title: 'Multi-surface onboarding intercepts',
+    status: 'scheduled',
+    recordedAt: '2025-06-05',
+    owner: 'Product Research',
+    summary: 'Diary-guided intercepts for activation flows.',
+    tokensImpacted: ['--space-4'],
+    documents: ['user experience.md'],
+    participants: ['Ops research partner panel'],
+    evidenceUrl: 'notion://research/activation',
+    metadata: { version: '2025-05-26' }
+  }
+];
+
 describe('NavigationAnnexRepository', () => {
   beforeEach(() => {
     vi.spyOn(NavigationAnnexBacklogItemModel, 'listAll').mockResolvedValue(backlogRows);
@@ -273,6 +342,8 @@ describe('NavigationAnnexRepository', () => {
     vi.spyOn(NavigationAnnexDesignDependencyModel, 'listAll').mockResolvedValue(designDependencies);
     vi.spyOn(NavigationAnnexStrategyNarrativeModel, 'listAll').mockResolvedValue(strategyNarratives);
     vi.spyOn(NavigationAnnexStrategyMetricModel, 'listAll').mockResolvedValue(strategyMetrics);
+    vi.spyOn(DesignSystemTokenModel, 'listAll').mockResolvedValue(designSystemTokens);
+    vi.spyOn(UxResearchInsightModel, 'listAll').mockResolvedValue(researchInsights);
   });
 
   afterEach(() => {
@@ -315,6 +386,30 @@ describe('NavigationAnnexRepository', () => {
     expect(annex.designDependencies.tokens).toEqual(['--space-4']);
     expect(annex.designDependencies.qa).toEqual([
       { id: 'feed-qa', label: 'Ensure focus ring is visible.' }
+    ]);
+    expect(annex.designDependencies.tokenDetails).toEqual([
+      {
+        key: '--space-4',
+        category: 'space',
+        contexts: [
+          {
+            source: 'base',
+            context: null,
+            selector: ':root',
+            value: '1rem',
+            displayOrder: 10,
+            metadata: { version: '2025-05-26', source: 'base' }
+          },
+          {
+            source: 'data',
+            context: null,
+            selector: "[data-theme='dark']",
+            value: '1.1rem',
+            displayOrder: 110,
+            metadata: { version: '2025-05-26', source: 'data' }
+          }
+        ]
+      }
     ]);
 
     expect(annex.strategyNarratives).toEqual([
@@ -373,6 +468,75 @@ describe('NavigationAnnexRepository', () => {
         navItemLabels: ['Feed']
       }
     ]);
+
+    expect(annex.designSystem).toMatchObject({
+      version: '2025-05-26',
+      research: {
+        version: '2025-05-26',
+        totals: { completed: 1, scheduled: 1 }
+      }
+    });
+
+    expect(annex.designSystem.tokens).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: '--space-4', value: '1rem', source: 'base' }),
+        expect.objectContaining({ key: '--grid-gap', value: 'var(--space-6)' })
+      ])
+    );
+
+    expect(annex.designSystem.catalogue).toEqual([
+      {
+        category: 'space',
+        tokens: [
+          {
+            key: '--space-4',
+            contexts: [
+              {
+                source: 'base',
+                context: null,
+                selector: ':root',
+                value: '1rem',
+                displayOrder: 10,
+                metadata: { version: '2025-05-26', source: 'base' }
+              },
+              {
+                source: 'data',
+                context: null,
+                selector: "[data-theme='dark']",
+                value: '1.1rem',
+                displayOrder: 110,
+                metadata: { version: '2025-05-26', source: 'data' }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        category: 'grid',
+        tokens: [
+          {
+            key: '--grid-gap',
+            contexts: [
+              {
+                source: 'base',
+                context: null,
+                selector: ':root',
+                value: 'var(--space-6)',
+                displayOrder: 64,
+                metadata: { version: '2025-05-26', source: 'base' }
+              }
+            ]
+          }
+        ]
+      }
+    ]);
+
+    expect(annex.designSystem.research.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ slug: 'design-system-parity', status: 'completed' }),
+        expect.objectContaining({ slug: 'multi-surface-onboarding-intercepts', status: 'scheduled' })
+      ])
+    );
 
     expect(annex.refreshedAt).toMatch(/Z$/);
   });
