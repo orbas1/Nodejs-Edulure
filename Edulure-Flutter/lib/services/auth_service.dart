@@ -102,6 +102,51 @@ class AuthService {
     }
   }
 
+  Future<void> requestMagicLink(String email) async {
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty) {
+      throw AuthException(
+        requestOptions: RequestOptions(path: '/auth/magic-link'),
+        message: 'Email is required to request a magic link',
+        type: DioExceptionType.unknown,
+      );
+    }
+    try {
+      await _dio.post(
+        '/auth/magic-link',
+        data: {'email': normalizedEmail},
+        options: ApiConfig.unauthenticatedOptions(),
+      );
+    } on DioException catch (error) {
+      throw AuthException.fromDio(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> authenticateWithMagicLink(String token) async {
+    final trimmedToken = token.trim();
+    if (trimmedToken.isEmpty) {
+      throw AuthException(
+        requestOptions: RequestOptions(path: '/auth/magic-link/consume'),
+        message: 'Magic link token is missing',
+        type: DioExceptionType.unknown,
+      );
+    }
+    try {
+      final response = await _dio.post(
+        '/auth/magic-link/consume',
+        data: {'token': trimmedToken},
+        options: ApiConfig.unauthenticatedOptions(),
+      );
+      final session = _extractSession(response.data);
+      if (session.isNotEmpty) {
+        await _sessionPersistence.saveSession(session);
+      }
+      return session;
+    } on DioException catch (error) {
+      throw AuthException.fromDio(error);
+    }
+  }
+
   Future<Map<String, dynamic>> register({
     required String firstName,
     required String lastName,

@@ -17,6 +17,7 @@ class SessionManager {
   static const _adsActionBox = 'ads_governance_actions';
   static const _notificationPreferencesBox = 'notification_preferences';
   static const _notificationOutboxBox = 'notification_outbox';
+  static const _feedSnapshotsBox = 'feed_snapshots';
   static const _providerTransitionBox = 'provider_transition_announcements';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
@@ -42,6 +43,7 @@ class SessionManager {
     await _openBox(_adsActionBox, optional: true);
     await _openBox(_notificationPreferencesBox, optional: true);
     await _openBox(_notificationOutboxBox, optional: true);
+    await _openBox(_feedSnapshotsBox, optional: true);
     await _openBox(_providerTransitionBox, optional: true);
     _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
     _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
@@ -63,6 +65,8 @@ class SessionManager {
   static Box get notificationOutbox => Hive.box(_notificationOutboxBox);
   static Box? get providerTransitionCache =>
       Hive.isBoxOpen(_providerTransitionBox) ? Hive.box(_providerTransitionBox) : null;
+  static Box? get _feedSnapshotCache =>
+      Hive.isBoxOpen(_feedSnapshotsBox) ? Hive.box(_feedSnapshotsBox) : null;
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     final sanitized = Map<String, dynamic>.from(session);
@@ -153,6 +157,7 @@ class SessionManager {
     await _clearIfAvailable(_adsActionBox);
     await _clearIfAvailable(_notificationPreferencesBox);
     await _clearIfAvailable(_notificationOutboxBox);
+    await _clearIfAvailable(_feedSnapshotsBox);
     await _clearIfAvailable(_providerTransitionBox);
     await SecureStorageService.instance.deleteAll(
       keys: const {
@@ -174,6 +179,52 @@ class SessionManager {
       return Map<String, dynamic>.from(data as Map);
     }
     return null;
+  }
+
+  static Future<void> cacheFeedSnapshot(String key, Map<String, dynamic> payload) async {
+    final box = _feedSnapshotCache;
+    if (box == null) {
+      return;
+    }
+    final snapshot = Map<String, dynamic>.from(payload);
+    snapshot['cachedAt'] = snapshot['cachedAt'] ?? DateTime.now().toIso8601String();
+    await box.put(key, snapshot);
+    await _pruneFeedCache(box);
+  }
+
+  static Map<String, dynamic>? loadCachedFeedSnapshot(String key) {
+    final box = _feedSnapshotCache;
+    if (box == null) {
+      return null;
+    }
+    final data = box.get(key);
+    if (data is Map) {
+      return Map<String, dynamic>.from(data as Map);
+    }
+    return null;
+  }
+
+  static Future<void> _pruneFeedCache(Box box, {int maxEntries = 6}) async {
+    if (box.length <= maxEntries) {
+      return;
+    }
+    final entries = <MapEntry<dynamic, DateTime>>[];
+    for (final key in box.keys) {
+      final value = box.get(key);
+      DateTime timestamp = DateTime.fromMillisecondsSinceEpoch(0);
+      if (value is Map && value['cachedAt'] != null) {
+        final parsed = DateTime.tryParse(value['cachedAt'].toString());
+        if (parsed != null) {
+          timestamp = parsed;
+        }
+      }
+      entries.add(MapEntry<dynamic, DateTime>(key, timestamp));
+    }
+    entries.sort((a, b) => a.value.compareTo(b.value));
+    final overflow = entries.length - maxEntries;
+    for (var i = 0; i < overflow; i++) {
+      await box.delete(entries[i].key);
+    }
   }
 
   static Future<Box?> ensureProviderTransitionCache() async {

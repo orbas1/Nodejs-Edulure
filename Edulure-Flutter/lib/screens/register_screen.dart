@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
 import '../services/auth_service.dart';
+import '../services/auth_validators.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -31,8 +32,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _countryController = TextEditingController();
   final _postcodeController = TextEditingController();
 
-  final _passwordPattern =
-      RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$');
+  AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   String _role = 'instructor';
   bool _termsAccepted = false;
@@ -194,6 +194,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final form = _formKey.currentState;
     if (form == null) return;
     if (!form.validate()) {
+      setState(() {
+        _autovalidateMode = AutovalidateMode.onUserInteraction;
+        _error = null;
+      });
       return;
     }
     if (!_termsAccepted) {
@@ -204,16 +208,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     final ageInput = _ageController.text.trim();
-    int? age;
-    if (ageInput.isNotEmpty) {
-      age = int.tryParse(ageInput);
-      if (age == null) {
-        setState(() {
-          _error = 'Age must be a number.';
-        });
-        return;
-      }
-    }
+    final age = ageInput.isEmpty ? null : int.tryParse(ageInput);
 
     setState(() {
       _loading = true;
@@ -306,6 +301,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             constraints: const BoxConstraints(maxWidth: 560),
             child: Form(
               key: _formKey,
+              autovalidateMode: _autovalidateMode,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -346,15 +342,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           controller: _firstNameController,
                           decoration: const InputDecoration(labelText: 'First name'),
                           textInputAction: TextInputAction.next,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'First name is required';
-                            }
-                            if (value.trim().length < 2) {
-                              return 'Enter at least 2 characters';
-                            }
-                            return null;
-                          },
+                          validator: (value) =>
+                              AuthValidators.name(value, fieldLabel: 'First name'),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -363,12 +352,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           controller: _lastNameController,
                           decoration: const InputDecoration(labelText: 'Last name'),
                           textInputAction: TextInputAction.next,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Last name is required';
-                            }
-                            return null;
-                          },
+                          validator: (value) =>
+                              AuthValidators.name(value, fieldLabel: 'Last name'),
                         ),
                       ),
                     ],
@@ -379,16 +364,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Email address'),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Email is required';
-                      }
-                      final emailPattern = RegExp(r'^.+@.+\..+$');
-                      if (!emailPattern.hasMatch(value.trim())) {
-                        return 'Enter a valid email address';
-                      }
-                      return null;
-                    },
+                    validator: AuthValidators.email,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
@@ -424,19 +400,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Age (optional)'),
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return null;
-                      }
-                      final age = int.tryParse(value.trim());
-                      if (age == null) {
-                        return 'Age must be a number';
-                      }
-                      if (age < 16) {
-                        return 'Minimum age is 16';
-                      }
-                      return null;
-                    },
+                    validator: (value) => AuthValidators.optionalAge(value),
                   ),
                   const SizedBox(height: 16),
                   const SizedBox(height: 16),
@@ -526,30 +490,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Password'),
                     obscureText: true,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Password is required';
-                      }
-                      if (!_passwordPattern.hasMatch(value)) {
-                        return 'Use 12+ chars with upper, lower, number, and symbol';
-                      }
-                      return null;
-                    },
+                    validator: AuthValidators.password,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _confirmPasswordController,
                     decoration: const InputDecoration(labelText: 'Confirm password'),
                     obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Confirm your password';
-                      }
-                      if (value != _passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
+                    validator: (value) =>
+                        AuthValidators.confirmPassword(value, _passwordController.text),
                   ),
                   const SizedBox(height: 16),
                   SwitchListTile.adaptive(

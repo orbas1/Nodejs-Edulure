@@ -206,6 +206,20 @@ class FeedSnapshot {
     );
   }
 
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'context': describeEnum(context),
+      if (community != null) 'community': community!.toJson(),
+      'pagination': pagination.toJson(),
+      'generatedAt': generatedAt.toIso8601String(),
+      'items': items.map((entry) => entry.toJson()).toList(),
+      if (analytics != null) 'analytics': analytics!.toJson(),
+      if (highlights.isNotEmpty) 'highlights': highlights.map((highlight) => highlight.toJson()).toList(),
+      if (adsSummary != null) 'ads': adsSummary!.toJson(),
+      if (range != null) 'range': range!.toJson(),
+    };
+  }
+
   static JsonMap _extractPagination(JsonMap json) {
     if (json['pagination'] is Map<String, dynamic>) {
       return json['pagination'] as Map<String, dynamic>;
@@ -254,6 +268,14 @@ class FeedRangeWindow {
       key: json['key']?.toString() ?? '30d',
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'start': start.toIso8601String(),
+      'end': end.toIso8601String(),
+      'key': key,
+    };
+  }
 }
 
 class FeedPagination {
@@ -278,6 +300,15 @@ class FeedPagination {
       total: _parseInt(json['total']) ?? 0,
       totalPages: _parseInt(json['totalPages']) ?? 1,
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'page': page,
+      'perPage': perPage,
+      'total': total,
+      'totalPages': totalPages,
+    };
   }
 }
 
@@ -305,6 +336,14 @@ class FeedEntry {
       post: post ?? this.post,
       ad: ad,
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'kind': describeEnum(kind),
+      if (post != null) 'post': post!.toJson(),
+      if (ad != null) 'ad': ad!.toJson(),
+    };
   }
 }
 
@@ -355,6 +394,14 @@ class CommunityReference {
       slug: json['slug']?.toString() ?? '',
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'name': name,
+      'slug': slug,
+    };
+  }
 }
 
 class FeedAd {
@@ -394,6 +441,19 @@ class FeedAd {
       position: _parseInt(json['position']),
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'placementId': placementId,
+      'campaignId': campaignId,
+      'slot': slot,
+      'headline': headline,
+      if (description != null) 'description': description,
+      if (ctaUrl != null) 'ctaUrl': ctaUrl,
+      if (tracking.isNotEmpty) 'tracking': tracking,
+      if (position != null) 'position': position,
+    };
+  }
 }
 
 class FeedPlacement {
@@ -423,6 +483,17 @@ class FeedPlacement {
       ctaUrl: json['ctaUrl']?.toString(),
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'placementId': placementId,
+      'campaignId': campaignId,
+      'slot': slot,
+      'headline': headline,
+      if (description != null) 'description': description,
+      if (ctaUrl != null) 'ctaUrl': ctaUrl,
+    };
+  }
 }
 
 class FeedAdsSummary {
@@ -446,6 +517,13 @@ class FeedAdsSummary {
       placements: placements,
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'count': count,
+      if (placements.isNotEmpty) 'placements': placements.map((summary) => summary.toJson()).toList(),
+    };
+  }
 }
 
 class FeedPlacementSummary {
@@ -468,6 +546,15 @@ class FeedPlacementSummary {
       slot: json['slot']?.toString() ?? 'feed-inline',
       position: _parseInt(json['position']) ?? 0,
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'placementId': placementId,
+      'campaignId': campaignId,
+      'slot': slot,
+      'position': position,
+    };
   }
 }
 
@@ -521,6 +608,22 @@ class FeedHighlight {
       objective: json['objective']?.toString(),
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'type': type,
+      'id': id,
+      'timestamp': timestamp.toIso8601String(),
+      if (title != null) 'title': title,
+      if (summary != null) 'summary': summary,
+      if (metadata.isNotEmpty) 'metadata': metadata,
+      if (metrics.isNotEmpty) 'metrics': metrics,
+      if (name != null) 'name': name,
+      if (status != null) 'status': status,
+      if (projectType != null) 'projectType': projectType,
+      if (objective != null) 'objective': objective,
+    };
+  }
 }
 
 class FeedAnalytics {
@@ -536,6 +639,14 @@ class FeedAnalytics {
       engagement: FeedEngagement.fromJson(_extractNested(json, 'engagement')),
       ads: FeedAdsAnalytics.fromJson(_extractNested(json, 'ads')),
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'generatedAt': generatedAt.toIso8601String(),
+      'engagement': engagement.toJson(),
+      'ads': ads.toJson(),
+    };
   }
 }
 
@@ -578,6 +689,18 @@ class FeedEngagement {
       latestActivityAt: DateTime.tryParse(json['latestActivityAt']?.toString() ?? ''),
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'postsSampled': postsSampled,
+      'postsTotal': postsTotal,
+      'comments': comments,
+      'reactions': reactions,
+      'uniqueCommunities': uniqueCommunities,
+      if (trendingTags.isNotEmpty) 'trendingTags': trendingTags.map((tag) => tag.toJson()).toList(),
+      if (latestActivityAt != null) 'latestActivityAt': latestActivityAt!.toIso8601String(),
+    };
+  }
 }
 
 class FeedTrendingTag {
@@ -591,6 +714,13 @@ class FeedTrendingTag {
       tag: json['tag']?.toString() ?? '',
       count: _parseInt(json['count']) ?? 0,
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'tag': tag,
+      'count': count,
+    };
   }
 }
 
@@ -618,6 +748,16 @@ class FeedAdsAnalytics {
       totals: FeedAdsTotals.fromJson(_extractNested(json, 'totals')),
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'placementsServed': placementsServed,
+      'campaignsServed': campaignsServed,
+      'activeCampaigns': activeCampaigns,
+      'scheduledCampaigns': scheduledCampaigns,
+      'totals': totals.toJson(),
+    };
+  }
 }
 
 class FeedAdsTotals {
@@ -643,6 +783,16 @@ class FeedAdsTotals {
       spendCents: _parseInt(json['spendCents']) ?? 0,
       revenueCents: _parseInt(json['revenueCents']) ?? 0,
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'impressions': impressions,
+      'clicks': clicks,
+      'conversions': conversions,
+      'spendCents': spendCents,
+      'revenueCents': revenueCents,
+    };
   }
 }
 
@@ -752,6 +902,26 @@ class CommunityPost {
       moderation: CommunityPostModeration.fromJson(_extractNested(json, 'moderation')),
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'type': type,
+      'body': body,
+      'publishedAt': publishedAt?.toIso8601String(),
+      if (scheduledAt != null) 'scheduledAt': scheduledAt!.toIso8601String(),
+      'status': status,
+      'visibility': visibility,
+      if (title != null) 'title': title,
+      if (tags.isNotEmpty) 'tags': tags,
+      if (channel != null) 'channel': channel!.toJson(),
+      if (community != null) 'community': community!.toJson(),
+      'author': author.toJson(),
+      if (metadata.isNotEmpty) 'metadata': metadata,
+      'stats': stats.toJson(),
+      'moderation': moderation.toJson(),
+    };
+  }
 }
 
 class CommunityChannelReference {
@@ -775,6 +945,15 @@ class CommunityChannelReference {
       type: json['type']?.toString() ?? 'discussion',
     );
   }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'name': name,
+      'slug': slug,
+      'type': type,
+    };
+  }
 }
 
 class CommunityMemberSummary {
@@ -792,6 +971,15 @@ class CommunityMemberSummary {
       role: json['role']?.toString() ?? 'member',
       avatarUrl: json['avatarUrl']?.toString() ?? '',
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'name': name,
+      'role': role,
+      'avatarUrl': avatarUrl,
+    };
   }
 }
 
@@ -816,6 +1004,14 @@ class CommunityPostStats {
               : const <String, dynamic>{},
       comments: _parseInt(json['comments']) ?? 0,
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'reactions': reactions,
+      if (reactionBreakdown.isNotEmpty) 'reactionBreakdown': reactionBreakdown,
+      'comments': comments,
+    };
   }
 }
 
@@ -853,6 +1049,16 @@ class CommunityPostModeration {
       riskHistory: json['riskHistory'] is List ? List<dynamic>.from(json['riskHistory'] as List) : const <dynamic>[],
       notes: json['notes'] is List ? List<dynamic>.from(json['notes'] as List) : const <dynamic>[],
     );
+  }
+
+  JsonMap toJson() {
+    return <String, dynamic>{
+      'state': state,
+      if (lastReviewedAt != null) 'lastReviewedAt': lastReviewedAt!.toIso8601String(),
+      if (flags.isNotEmpty) 'flags': flags,
+      if (riskHistory.isNotEmpty) 'riskHistory': riskHistory,
+      if (notes.isNotEmpty) 'notes': notes,
+    };
   }
 }
 
