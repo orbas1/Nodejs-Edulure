@@ -60,6 +60,23 @@ export default function InviteSummaryCard({ invite, countdown, onRefresh }) {
             {invite.keyExpiresAt ? formatDisplayDate(invite.keyExpiresAt) : 'Set if the provider enforces expiry'}
           </dd>
         </div>
+        <div className="sm:col-span-2">
+          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Documentation</dt>
+          <dd className="text-sm font-medium text-slate-800">
+            {invite.documentationUrl ? (
+              <a
+                href={invite.documentationUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-primary hover:text-primary-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                View integration runbook
+              </a>
+            ) : (
+              'Refer to the security checklist for required controls'
+            )}
+          </dd>
+        </div>
       </dl>
 
       <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-600">
@@ -78,7 +95,8 @@ InviteSummaryCard.propTypes = {
     rotationIntervalDays: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     expiresAt: PropTypes.string,
     keyExpiresAt: PropTypes.string,
-    reason: PropTypes.string
+    reason: PropTypes.string,
+    documentationUrl: PropTypes.string
   }),
   countdown: PropTypes.shape({
     expired: PropTypes.bool,

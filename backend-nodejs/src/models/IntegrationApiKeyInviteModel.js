@@ -37,6 +37,12 @@ function mapRow(row) {
     return null;
   }
 
+  const metadata = safeParseJson(row.metadata, {});
+  const documentationUrlFromMetadata =
+    typeof metadata.documentationUrl === 'string' && metadata.documentationUrl.trim()
+      ? metadata.documentationUrl.trim()
+      : null;
+
   return {
     id: row.id,
     provider: row.provider,
@@ -60,7 +66,8 @@ function mapRow(row) {
     cancelledBy: row.cancelled_by ?? null,
     lastSentAt: row.last_sent_at ? new Date(row.last_sent_at) : null,
     sendCount: row.send_count !== undefined && row.send_count !== null ? Number(row.send_count) : 0,
-    metadata: safeParseJson(row.metadata, {}),
+    documentationUrl: row.documentation_url ?? documentationUrlFromMetadata,
+    metadata,
     createdAt: row.created_at ? new Date(row.created_at) : null,
     updatedAt: row.updated_at ? new Date(row.updated_at) : null
   };
@@ -95,7 +102,8 @@ export default class IntegrationApiKeyInviteModel {
       key_expires_at: payload.keyExpiresAt ?? null,
       metadata: serialiseMetadata(payload.metadata),
       last_sent_at: payload.lastSentAt ?? connection.fn.now(),
-      send_count: payload.sendCount ?? 1
+      send_count: payload.sendCount ?? 1,
+      documentation_url: payload.documentationUrl ?? null
     };
 
     if (payload.id !== undefined && payload.id !== null) {
@@ -206,6 +214,9 @@ export default class IntegrationApiKeyInviteModel {
     }
     if (updates.metadata !== undefined) {
       payload.metadata = serialiseMetadata(updates.metadata);
+    }
+    if (updates.documentationUrl !== undefined) {
+      payload.documentation_url = updates.documentationUrl ?? null;
     }
 
     await query(connection).where({ id }).update(payload);
