@@ -1,0 +1,1 @@
+{"version":3,"file":"FeedPostStats.d.ts","sourceRoot":"","sources":["../../../src/generated/models/FeedPostStats.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,aAAa,GAAG;IACxB,QAAQ,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IACzB,SAAS,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IAC1B,iBAAiB,CAAC,EAAE,MAAM,CAAC,MAAM,EAAE,GAAG,CAAC,GAAG,IAAI,CAAC;CAClD,CAAC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"CreationRecommendationResponse.d.ts","sourceRoot":"","sources":["../../../src/generated/models/CreationRecommendationResponse.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,8BAA8B,EAAE,MAAM,kCAAkC,CAAC;AACvF,OAAO,KAAK,EAAE,gBAAgB,EAAE,MAAM,oBAAoB,CAAC;AAC3D,MAAM,MAAM,8BAA8B,GAAG,CAAC,gBAAgB,GAAG;IAC7D,IAAI,EAAE,8BAA8B,CAAC;CACxC,CAAC,CAAC"}

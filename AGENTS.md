@@ -477,9 +477,65 @@
          - 13.A.3 nginx (infrastructure/docker/nginx.conf)
       - 13.B Security & Automation Scripts
          - 13.B.1 generate-license-report (scripts/security/generate-license-report.mjs)
-      - 14.A TypeScript SDK & Tooling
+      - ✅ 14.A TypeScript SDK & Tooling (`sdk-typescript/scripts/generate-sdk.mjs`, `sdk-typescript/src/runtime/configure.ts`, `sdk-typescript/src/runtime/client.ts`, `sdk-typescript/src/runtime/manifest.ts`, `sdk-typescript/src/generated/.manifest.json`, `sdk-typescript/src/index.ts`)
          - 14.A.1 sdk-typescript/scripts (found at sdk-typescript/scripts)
-      - 14.B Update Templates & Release Guides
+            1. **Appraise.** Within `sdk-typescript/scripts/generate-sdk.mjs` and runtime modules under `sdk-typescript/src/runtime/*`, the SDK toolchain now exposes manifest-driven metadata, client bootstrapping helpers, and documented CLI ergonomics so API consumers align with backend releases.
+            2. **Function.** The generator accepts `--spec`, `--out`, `--force`, `--dry-run`, and `--summary` flags, parses `backend-nodejs/src/docs/openapi.json`, and emits `.openapi-hash` plus `.manifest.json` artefacts alongside regenerated TypeScript bindings.
+            3. **Usefulness.** `createSdkClient` freezes a service registry (`AdsService`, `AnalyticsService`, `CommunitiesService`, `ExplorerService`, `DefaultService`) while `configureSdk` auto-infers the OpenAPI version from the manifest to keep runtime consumers and documentation consistent.
+            4. **Redundant.** Prior ad-hoc scripts and manual version bumps are replaced by a hash-aware generator and manifest helpers (`getSdkManifest`, `describeSdk`, `isManifestFresh`) centralising drift detection.
+            5. **Placeholders.** Watch-mode regeneration and multi-spec orchestration remain future work; CLI currently processes a single OpenAPI document per invocation.
+            6. **Duplicates.** Service discovery logic is consolidated within `runtime/client.ts`, avoiding repeated imports across downstream packages.
+            7. **Improvements Needed.** Next iteration should surface retry configuration and spec diffing directly within the generator summary to pre-empt contract regressions.
+            8. **Styling Improvements.** Console output now uses `[api-sdk]` prefixes and tabular summaries, standardising release logs across CI and local runs.
+            9. **Efficiency Analysis.** SHA-256 caching skips regeneration when the spec hash is unchanged while still refreshing manifests, eliminating redundant codegen passes in CI.
+            10. **Strengths to Keep.** Hash-based idempotence, manifest emission, and service registry freezing deliver predictable SDK builds with runtime safety nets.
+            11. **Weaknesses to Remove.** Generator still depends on Node `process.env` for proxies (see npm warning); plan migration to explicit CLI options for proxy handling.
+            12. **Palette.** Logging adopts concise severity-neutral phrasing, ensuring automation transcripts remain accessible without colour-coded dependencies.
+            13. **Layout.** Runtime modules (`configure.ts`, `client.ts`, `manifest.ts`) now sit under `sdk-typescript/src/runtime`, mirroring generated core/service folders for intuitive discovery.
+            14. **Text.** CLI help strings and manifest descriptors emphasise spec paths (`backend-nodejs/src/docs/openapi.json`) so documentation accurately cites source contracts.
+            15. **Spacing.** Script refactor aligns with Prettier conventions (two-space indentation) and uses destructuring to keep option parsing compact.
+            16. **Shape.** `ConfigureSdkOptions` now extends to `userAgent` and `onConfig`, enabling ergonomic injection of headers and observers without leaking OpenAPI internals.
+            17. **Effects.** Summary tables highlight spec hash prefixes and operation counts (e.g., 172 operations in v1.51.0), providing instant visibility into surface area changes.
+            18. **Thumbs.** `describeSdk()` returns a human-readable label for release notes, supporting copy-paste into change logs and customer comms.
+            19. **Media.** The `.manifest.json` file persists generator provenance and timestamp, ready for embedding into docs or dashboards tracking SDK freshness.
+            20. **Buttons.** CLI execution examples (`npm --prefix sdk-typescript run generate -- --summary`) give release engineers a single command pathway for regen plus auditing.
+            21. **Interact.** `listAvailableServices()` and `getService()` expose discoverable integration points for dynamic client construction within apps or tooling.
+            22. **Missing.** Automated publication to NPM remains manual; integrate with release pipeline once audit trails and signing are finalised.
+            23. **Design.** Manifest helpers freeze configuration objects to prevent runtime mutation, aligning with the platform's immutability-first SDK guidelines.
+            24. **Clone.** Centralised manifest utilities eliminate repeated JSON parsing across consuming modules, reducing drift between service usage patterns.
+            25. **Framework.** Script now reads `package.json` to log the `openapi-typescript-codegen` version, supporting governance requirements for dependency traceability.
+            26. **Checklist.** Release steps include running `npm --prefix sdk-typescript run build`, committing `.manifest.json`, and capturing CLI summaries in release notes.
+            27. **Nav.** Service registry keys (`ads`, `analytics`, `communities`, `explorer`, `core`) provide quick reference anchors for documentation and typed imports.
+            28. **Release.** Shipping workflow: regenerate SDK, review manifest hash, bump package version, publish runtime helpers, and circulate summary tables to downstream teams.
+      - ✅ 14.B Update Templates & Release Guides (`update_template/backend_updates/backend_change_log.md`, `update_template/backend_updates/api_changes.md`, `update_template/backend_updates/backend_new_files.md`, `update_template/backend_updates/other_backend_updates.md`)
          - 14.B.1 update_template/backend_updates (found at update_template/backend_updates)
+            1. **Appraise.** Backend release templates now incorporate SDK regeneration notes so Annex A47 covers both infrastructure and client distribution narratives.
+            2. **Function.** `backend_change_log.md` enumerates the new manifest-aware generator, ensuring infra/automation callouts mention SDK tooling enhancements.
+            3. **Usefulness.** `api_changes.md` summary explicitly calls out `.manifest.json` publication, guiding auditors on where to find spec hashes for contract sign-off.
+            4. **Redundant.** Prior blanket statement of “no new backend files” is narrowed to list the manifest, preventing duplicate explanations across templates.
+            5. **Placeholders.** Additional annexes for mobile SDKs remain TODO; current update focuses on TypeScript tooling until parity templates exist.
+            6. **Duplicates.** `other_backend_updates.md` centralises developer experience guidance, avoiding repeated CLI references across the pack.
+            7. **Improvements Needed.** Future revisions should embed checklist tables capturing command output snippets directly within the templates.
+            8. **Styling.** Template bullets now include inline code fences (e.g., `npm --prefix sdk-typescript run generate -- --summary`) to align with release style guides.
+            9. **Efficiency Analysis.** Highlighting manifest regeneration reduces time wasted cross-referencing backend commits and client packages during CAB reviews.
+            10. **Strengths to Keep.** Templates maintain structured headings (Summary, Validation, Developer Experience) while weaving in SDK-specific steps.
+            11. **Weaknesses to Remove.** Need to add automation for capturing CLI output snapshots; currently manual copy-paste is required each release.
+            12. **Palette.** Plain text emphasis ensures Markdown renders consistently across Confluence, GitHub, and internal portals without colour reliance.
+            13. **Layout.** Manifest mention appears under “Backend New Files,” aligning inventory sections with actual artefact outputs.
+            14. **Text.** Language emphasises release accountability (“publish the `.manifest.json` fingerprint”) clarifying action-oriented tasks.
+            15. **Spacing.** Section spacing preserved for readability across exported PDFs; bullet indentation unchanged.
+            16. **Shape.** Template sections continue to use level-two headings, maintaining compatibility with automated doc stitching scripts.
+            17. **Effects.** Callouts instruct capturing CLI summaries, making release notes more actionable for stakeholders scanning for risk cues.
+            18. **Thumbs.** CLI examples double as quick-start notes for incident responders verifying SDK freshness mid-cycle.
+            19. **Media.** Manifest references pave the way for embedding spec hashes into dashboards without altering template structure.
+            20. **Buttons.** Template instructions highlight a single canonical command, reducing release-time branching decisions.
+            21. **Interact.** Guidance encourages cross-team collaboration by pointing data consumers to hashed manifests during go/no-go calls.
+            22. **Missing.** Need a future appendix for verifying built artefacts in `dist/`; current templates stop at manifest commit confirmation.
+            23. **Design.** Release guide copy mirrors the SDK logging prefix `[api-sdk]`, reinforcing consistent nomenclature across artefacts.
+            24. **Clone.** Consolidated manifest messaging prevents each functional template from restating context in conflicting ways.
+            25. **Framework.** Templates now align with governance requirements to document codegen outputs as part of release evidence packages.
+            26. **Checklist.** Action items now include regenerating SDK, capturing CLI summary, and listing manifest in new-files inventory.
+            27. **Nav.** Clear headings point reviewers to manifest updates without scanning unrelated infrastructure notes.
+            28. **Release.** Updated guides instruct teams to run the generator, publish hashes, and attach summaries to the backend change log before CAB submission.
       - 15.A Docs & unresolved mappings
          - 15.A.1 Documentation Coverage Gap (unresolved path)

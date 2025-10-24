@@ -9,7 +9,9 @@ export type ConfigureSdkOptions = {
     defaultHeaders?: HeaderResolver;
     withCredentials?: boolean;
     credentials?: OpenAPIConfig['CREDENTIALS'];
+    userAgent?: string;
+    onConfig?: (config: OpenAPIConfig) => void;
 };
-export declare function configureSdk({ baseUrl, version, getAccessToken, defaultHeaders, withCredentials, credentials }: ConfigureSdkOptions): OpenAPIConfig;
+export declare function configureSdk({ baseUrl, version, getAccessToken, defaultHeaders, withCredentials, credentials, userAgent, onConfig }: ConfigureSdkOptions): OpenAPIConfig;
 export {};
 //# sourceMappingURL=configure.d.ts.map

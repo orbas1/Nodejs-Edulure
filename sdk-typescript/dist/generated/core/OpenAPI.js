@@ -1,6 +1,6 @@
 export const OpenAPI = {
     BASE: 'https://api.edulure.com/api/v1',
-    VERSION: '1.50.0',
+    VERSION: '1.51.0',
     WITH_CREDENTIALS: false,
     CREDENTIALS: 'include',
     TOKEN: undefined,

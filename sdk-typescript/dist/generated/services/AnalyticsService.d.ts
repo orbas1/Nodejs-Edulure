@@ -1,3 +1,4 @@
+import type { BiExecutiveOverview } from '../models/BiExecutiveOverview';
 import type { ExplorerAnalyticsAlert } from '../models/ExplorerAnalyticsAlert';
 import type { ExplorerAnalyticsSummary } from '../models/ExplorerAnalyticsSummary';
 import type { ExplorerInteractionRecord } from '../models/ExplorerInteractionRecord';
@@ -31,6 +32,16 @@ export declare class AnalyticsService {
      */
     static postAnalyticsExplorerInteractions(requestBody: ExplorerInteractionRequest): CancelablePromise<(StandardResponse & {
         data?: ExplorerInteractionRecord;
+    })>;
+    /**
+     * Executive analytics overview
+     * Returns aggregated KPIs, trends, and telemetry health indicators for the executive dashboard.
+     * @param range Time window used when calculating KPI deltas and trend lines.
+     * @returns any Executive overview generated
+     * @throws ApiError
+     */
+    static getAnalyticsBiExecutiveOverview(range?: '7d' | '14d' | '30d' | '90d'): CancelablePromise<(StandardResponse & {
+        data?: BiExecutiveOverview;
     })>;
 }
 //# sourceMappingURL=AnalyticsService.d.ts.map

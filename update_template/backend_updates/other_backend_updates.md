@@ -14,6 +14,7 @@
 - Introduced `make run-local` target to boot dependencies via Docker Compose and start the backend with proper environment variables.
 - Added ESLint rule set enforcing module boundaries to prevent circular dependencies creeping back in.
 - Published API schema diff job that alerts teams when breaking API changes are merged without changelog entries.
+- Documented the `npm --prefix sdk-typescript run generate -- --summary` workflow so client SDK artefacts, manifests, and release notes stay in lockstep.
 
 ## Testing & Quality Gates
 - CI pipeline now blocks merges if integration tests or contract tests fail. Matrix includes Node 18 LTS and 20 LTS.
