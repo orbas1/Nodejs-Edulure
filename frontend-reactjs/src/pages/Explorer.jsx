@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   AcademicCapIcon,
   ArrowTrendingUpIcon,
@@ -13,6 +13,8 @@ import { Link } from 'react-router-dom';
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
 import BlogSearchSection from '../components/search/BlogSearchSection.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import LearningClusterSummary from '../components/learning/LearningClusterSummary.jsx';
+import { getSearchSectionCluster, summariseLearningClusters } from '../utils/learningClusters.js';
 
 const CATEGORY_OPTIONS = [
   { label: 'Automation', value: 'automation' },
@@ -450,6 +452,29 @@ export default function Explorer() {
     return Array.from(result);
   }, []);
 
+  const [clusterFilter, setClusterFilter] = useState('all');
+
+  const clusterSummary = useMemo(
+    () => summariseLearningClusters({ searchSections: SECTION_CONFIG }),
+    []
+  );
+
+  const filteredSections = useMemo(() => {
+    if (clusterFilter === 'all') {
+      return SECTION_CONFIG;
+    }
+    return SECTION_CONFIG.filter((section) => getSearchSectionCluster(section).key === clusterFilter);
+  }, [clusterFilter]);
+
+  const handleClusterSelect = useCallback((key) => {
+    setClusterFilter((current) => {
+      if (key === 'all') {
+        return 'all';
+      }
+      return current === key ? 'all' : key;
+    });
+  }, []);
+
   usePageMetadata({
     title: 'Explorer · Unified search across Edulure',
     description:
@@ -458,7 +483,8 @@ export default function Explorer() {
     keywords,
     analytics: {
       page_type: 'explorer',
-      section_count: SECTION_CONFIG.length
+      section_count: filteredSections.length,
+      cluster_filter: clusterFilter
     }
   });
 
@@ -473,10 +499,30 @@ export default function Explorer() {
 
         <CommunityAccessPanel />
 
+        <section className="space-y-4">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Learning clusters</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Filter discovery by cluster focus</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Focus search tooling on the most relevant operational, growth, enablement or community surfaces.
+            </p>
+          </div>
+          <LearningClusterSummary
+            clusters={clusterSummary.clusters}
+            activeKey={clusterFilter}
+            onSelect={handleClusterSelect}
+          />
+        </section>
+
         <div className="space-y-12">
-          {SECTION_CONFIG.map((section) => (
+          {filteredSections.map((section) => (
             <ExplorerSearchSection key={section.entityType} {...section} />
           ))}
+          {filteredSections.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No discovery surfaces match this learning cluster yet. Adjust the filter to browse the full explorer catalog.
+            </p>
+          ) : null}
         </div>
 
         <section className="rounded-4xl border border-slate-200 bg-white/80 p-10 shadow-xl">

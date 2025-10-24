@@ -6,7 +6,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import PowerpointViewer from '../components/content/PowerpointViewer.jsx';
 import EbookReader from '../components/content/EbookReader.jsx';
 import MaterialMetadataEditor from '../components/content/MaterialMetadataEditor.jsx';
+import LearningClusterSummary from '../components/learning/LearningClusterSummary.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import { getAssetCluster, summariseLearningClusters } from '../utils/learningClusters.js';
 
 const CACHE_KEY = 'edulure.content.assets';
 
@@ -194,6 +196,16 @@ export default function ContentLibrary() {
   const [metadataSaving, setMetadataSaving] = useState(false);
   const [metadataFeedback, setMetadataFeedback] = useState(null);
   const [metadataError, setMetadataError] = useState(null);
+  const [clusterFilter, setClusterFilter] = useState('all');
+
+  const clusterSummary = useMemo(() => summariseLearningClusters({ assets }), [assets]);
+
+  const visibleAssets = useMemo(() => {
+    if (clusterFilter === 'all') {
+      return assets;
+    }
+    return assets.filter((asset) => getAssetCluster(asset).key === clusterFilter);
+  }, [assets, clusterFilter]);
 
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.publicId === selectedAssetId) ?? null,
@@ -221,7 +233,8 @@ export default function ContentLibrary() {
       asset_count: assets.length,
       viewer_mode: viewer ?? 'summary',
       is_instructor: isInstructor,
-      has_token: Boolean(token)
+      has_token: Boolean(token),
+      cluster_filter: clusterFilter
     }
   });
 
@@ -286,6 +299,18 @@ export default function ContentLibrary() {
   }, [assets, selectedAssetId]);
 
   useEffect(() => {
+    if (!visibleAssets.length) {
+      if (clusterFilter !== 'all') {
+        setSelectedAssetId(null);
+      }
+      return;
+    }
+    if (!visibleAssets.some((asset) => asset.publicId === selectedAssetId)) {
+      setSelectedAssetId(visibleAssets[0].publicId);
+    }
+  }, [clusterFilter, visibleAssets, selectedAssetId]);
+
+  useEffect(() => {
     if (selectedAsset) {
       setMetadataDraft(buildDraftFromAsset(selectedAsset));
       setMetadataFeedback(null);
@@ -304,6 +329,15 @@ export default function ContentLibrary() {
 
   const handleSelectAsset = useCallback((asset) => {
     setSelectedAssetId(asset.publicId);
+  }, []);
+
+  const handleClusterSelect = useCallback((key) => {
+    setClusterFilter((current) => {
+      if (key === 'all') {
+        return 'all';
+      }
+      return current === key ? 'all' : key;
+    });
   }, []);
 
   const handleMetadataFieldChange = useCallback((field, value) => {
@@ -530,12 +564,27 @@ export default function ContentLibrary() {
             ) : null}
           </header>
           {error ? <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
+          <div className="mt-6 space-y-4">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Learning clusters</p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-900">Pivot the library by audience focus</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Filter decks, ebooks and showcases by the operational, growth, enablement or community clusters they reinforce.
+              </p>
+            </div>
+            <LearningClusterSummary
+              clusters={clusterSummary.clusters}
+              activeKey={clusterFilter}
+              onSelect={handleClusterSelect}
+            />
+          </div>
           <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200 shadow-sm">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Cluster</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Metadata</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Updated</th>
@@ -545,12 +594,12 @@ export default function ContentLibrary() {
               <tbody className="divide-y divide-slate-200 bg-white text-sm text-slate-700">
                 {isLoading ? (
                   <tr>
-                    <td colSpan="6" className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
                       Loading assets…
                     </td>
                   </tr>
-                ) : assets.length ? (
-                  assets.map((asset) => {
+                ) : visibleAssets.length ? (
+                  visibleAssets.map((asset) => {
                     const custom =
                       typeof asset.metadata?.custom === 'object' && asset.metadata?.custom
                         ? asset.metadata.custom
@@ -559,6 +608,7 @@ export default function ContentLibrary() {
                     const tags = Array.isArray(custom.tags) ? custom.tags : [];
                     const visibility = asset.visibility ?? 'workspace';
                     const isSelected = selectedAssetId === asset.publicId;
+                    const cluster = getAssetCluster(asset);
                     return (
                       <tr
                         key={asset.publicId}
@@ -579,14 +629,31 @@ export default function ContentLibrary() {
                         <td className="px-4 py-3 capitalize">{asset.type}</td>
                         <td className="px-4 py-3">
                           <span
+                            className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold ${
+                              cluster.key === 'operations'
+                                ? 'border-sky-200 text-sky-600'
+                                : cluster.key === 'growth'
+                                  ? 'border-emerald-200 text-emerald-600'
+                                  : cluster.key === 'enablement'
+                                    ? 'border-indigo-200 text-indigo-600'
+                                    : cluster.key === 'community'
+                                      ? 'border-rose-200 text-rose-600'
+                                      : 'border-slate-200 text-slate-600'
+                            }`}
+                          >
+                            {cluster.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
                             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
                               asset.status === 'ready'
                                 ? 'bg-green-50 text-green-700'
                                 : asset.status === 'processing'
-                                ? 'bg-amber-50 text-amber-700'
-                                : asset.status === 'failed'
-                                ? 'bg-red-50 text-red-700'
-                                : 'bg-slate-100 text-slate-600'
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : asset.status === 'failed'
+                                    ? 'bg-red-50 text-red-700'
+                                    : 'bg-slate-100 text-slate-600'
                             }`}
                           >
                             {asset.status}
@@ -665,8 +732,10 @@ export default function ContentLibrary() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="6" className="px-4 py-10 text-center text-slate-500">
-                      No assets uploaded yet.
+                    <td colSpan="7" className="px-4 py-10 text-center text-slate-500">
+                      {clusterFilter === 'all'
+                        ? 'No assets uploaded yet.'
+                        : 'No assets match this learning cluster filter.'}
                     </td>
                   </tr>
                 )}

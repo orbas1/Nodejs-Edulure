@@ -415,11 +415,75 @@
          - 8.C.12 FeedItemCard (frontend-reactjs/src/components/feed/FeedItemCard.jsx)
          - 8.C.13 FeedList (frontend-reactjs/src/components/feed/FeedList.jsx)
          - 8.C.14 SponsoredCard (frontend-reactjs/src/components/feed/SponsoredCard.jsx)
-      - 9.A Course, Library & Discovery Pages
+      - ✓ 9.A Course, Library & Discovery Pages
          - 9.A.1 ContentLibrary (frontend-reactjs/src/pages/ContentLibrary.jsx)
+            1. **Appraisal.** Library discovery now leans on `learningClusters.js` so Annex A19 audiences (Operations, Growth, Enablement, Community, General) surface contextual summaries instead of a static asset grid, while maintaining the multi-tab layout documented in `user_experience.md`.
+            2. **Functionality.** `ContentLibrary.jsx` wires `useLearningClusters` to hydrate filter chips, card metadata, and analytics payloads; the shared `LearningClusterSummary` component renders hero cards that count assets per cluster and supplies top exemplars pulled from the memoized heuristics.
+            3. **Usefulness.** Persona-led filtering collapses marketing, course, and resource tiles into annex-ready groupings so success teams, operators, and community managers all see inventory aligned to their workflows with direct deep links.
+            4. **Redundancies.** Cluster detection centralises logic previously duplicated between library highlights and admin catalogue views, eliminating bespoke keyword checks inside each table section.
+            5. **Placeholders or Stubs.** Legacy mock CMS payloads remain for some tiles; each mock now maps to a cluster key so production APIs can swap in real taxonomies without breaking filter affordances.
+            6. **Duplicate Functions.** Removed ad-hoc summary builders in the page by delegating to `buildClusterSummary` and `getClusterExamples`, ensuring the same copy appears across discovery surfaces.
+            7. **Improvements Needed.** Follow-up work should ingest backend-provided cluster labels and add telemetry for multi-select filter states plus empty-state variant tests noted in `user_experience.md`.
+            8. **Styling Improvements.** Harmonised summary cards and filter pills use the new component's accent tokens so Annex B2 visuals stay consistent across Library, Explorer, Courses, and LiveClassrooms hero sections.
+            9. **Efficiency Analysis.** Memoized keyword maps and precomputed lowercase caches prevent repeated regex scans when learners toggle filters, keeping the catalogue responsive even with hundreds of entries.
+            10. **Strengths to Keep.** Clustered storytelling, analytics hook integration, and shared empty-result messaging (“No Enablement resources yet”) reinforce Annex guidance without fragmenting copy.
+            11. **Weaknesses to Remove.** CMS sync still lacks tenant-aware weighting; production rollout should prioritise remote configuration and localized cluster descriptions highlighted in the UX audit.
+            12. **Styling & Colour Review.** Summary ribbons borrow discovery palette tokens verified in `user_experience.md`, retaining contrast targets while adopting neutral backgrounds for accessibility.
+            13. **CSS, Orientation & Placement.** Filters align within the hero rail on desktop and collapse into the mobile drawer using the shared layout mixins introduced for Explorer, preventing overflow in narrow breakpoints.
+            14. **Text Analysis.** Cluster headings now reuse Annex copy such as “Operations Excellence” and “Growth Experiments” with brevity guidelines under 45 characters for tile-friendly truncation.
+            15. **Change Checklist Tracker.** Regression checklist updated to cover cluster heuristics snapshots, analytics `cluster_filter` emission, filter state persistence, and fallback messaging per cluster.
+            16. **Full Upgrade Plan & Release Steps.** Stage by enabling cluster summaries behind a flag, sync CMS keywords, run analytics QA on staging, brief marketing/content teams, and roll out once telemetry confirms engagement uplift.
          - 9.A.2 Courses (frontend-reactjs/src/pages/Courses.jsx)
+            1. **Appraisal.** The course catalogue now mirrors Annex A19 personas by grouping featured programmes, admin catalogue rows, and learner highlights under the shared learning-cluster engine with empty-state guardrails.
+            2. **Functionality.** `Courses.jsx` invokes `filterCoursesByCluster` for highlight, full catalogue, and admin inventory lists while emitting analytics that include the selected cluster so Annex dashboards can slice enrolment interest.
+            3. **Usefulness.** Learners immediately see which courses align with Operations, Growth, Enablement, Community, or General competencies, and administrators can pivot catalogue tables with the same persona filter to plan inventory fills.
+            4. **Redundancies.** Removed bespoke tag-based filters from hero sliders and admin tables in favour of cluster selection, consolidating query params and state reducers that previously diverged per section.
+            5. **Placeholders or Stubs.** Some demo courses still rely on hard-coded tags; all are mapped through the heuristic keywords with TODOs flagged to replace them with backend-provided taxonomy once available.
+            6. **Duplicate Functions.** `buildClusteredCourseHighlights` wraps the shared summary utility instead of replicating highlight slicing, ensuring card copy and counts stay synchronised with library and explorer outputs.
+            7. **Improvements Needed.** Add persisted learner preferences, certificate pathways surfaced per cluster, and analytics for conversions post-filter as called out in `user_experience.md` recommendations.
+            8. **Styling Improvements.** Cluster badges and filter chips reuse `LearningClusterSummary` tokens so course cards, admin tables, and empty states communicate persona context with consistent colouring.
+            9. **Efficiency Analysis.** Memoised selectors and a single derived `clusterKey` prevent re-render storms when toggling between highlight, catalog, and admin tabs, maintaining responsiveness even with long course lists.
+            10. **Strengths to Keep.** Course preview narratives, assessment snippets, and cluster-specific recommendations align with Annex B2’s learning pathways guidance while retaining previous progress tooling.
+            11. **Weaknesses to Remove.** Offline download toggles and transcript states still ignore cluster filters; integrate these contexts to avoid learners losing state when switching personas.
+            12. **Styling & Colour Review.** Progress bars and persona badges meet contrast requirements while adopting the same accent colours used in ContentLibrary and LiveClassrooms cluster cards.
+            13. **CSS, Orientation & Placement.** Cluster filter bar pins beneath the hero on desktop and collapses into accordion drawers on mobile, mirroring behaviour validated in the UX audit for consistent orientation cues.
+            14. **Text Analysis.** Updated hero copy highlights cluster benefits (“Grow revenue with experimentation sprints”) drawn from Annex microcopy guidelines, ensuring clarity across marketing and admin contexts.
+            15. **Change Checklist Tracker.** QA scenarios now cover admin cluster switching, highlight empties, analytics event payloads, and regression tests for default persona fallback.
+            16. **Full Upgrade Plan & Release Steps.** Sequence includes content tagging sync, analytics validation, stakeholder enablement (education, marketing, success), and go-live once enrolment funnels confirm uplift.
          - 9.A.3 Explorer (frontend-reactjs/src/pages/Explorer.jsx)
+            1. **Appraisal.** Explorer’s cross-entity discovery now leans on the shared cluster heuristics to balance courses, library assets, and live programming into Annex B2 learning clusters with persona-driven messaging.
+            2. **Functionality.** `Explorer.jsx` renders `LearningClusterSummary` at the top of the page, adds cluster filters to each discovery section, and feeds the analytics pipeline with `cluster_filter` context for search refinements.
+            3. **Usefulness.** Learners can start from a persona cluster and immediately pivot into recommended courses, articles, and events without leaving Explorer, aligning discovery with the Annex storyline.
+            4. **Redundancies.** Deprecated bespoke “featured topics” arrays and replaced them with cluster-driven lists, removing manual curation steps and aligning component props across search subsections.
+            5. **Placeholders or Stubs.** Mock search data persists but is annotated with cluster assignments so real search APIs can override without breaking layout; TODO comments remain to swap to backend results.
+            6. **Duplicate Functions.** Unified cluster card rendering via `LearningClusterSummary` eliminates repeated markup previously embedded in Explorer hero and section headers.
+            7. **Improvements Needed.** Implement backend-backed suggestions, recent searches scoped by cluster, and deeper analytics for preview drawer engagement as referenced in the UX audit.
+            8. **Styling Improvements.** Cluster chips and summary cards respect the same layout, typography, and icon treatments as ContentLibrary, ensuring Explorer inherits Annex-compliant visuals.
+            9. **Efficiency Analysis.** Derived data uses memoized lookups so toggling between clusters no longer retriggers heavy map/filter chains for each section, improving initial load and re-render times.
+            10. **Strengths to Keep.** Rich preview drawer, cross-entity linking, and analytics instrumentation now gain persona context without sacrificing existing search affordances.
+            11. **Weaknesses to Remove.** Keyboard navigation and saved search persistence still lag; follow-up should carry cluster state into those features to avoid disjointed experiences.
+            12. **Styling & Colour Review.** Explorer adopts the shared neutral background and accent colours validated for Annex B2, keeping card states and filter chips aligned with the discovery palette.
+            13. **CSS, Orientation & Placement.** Cluster summary adapts responsively, collapsing into a two-column stack on tablet and single-column list on mobile per `user_experience.md` orientation guidance.
+            14. **Text Analysis.** Section intros highlight persona value (“Operations teams streamline onboarding”) consistent with Annex copy deck, trimmed for SEO-friendly snippet length.
+            15. **Change Checklist Tracker.** Release checklist includes search analytics verification, empty-state copy review, QA for admin/public toggles, and snapshot tests for persona-specific layouts.
+            16. **Full Upgrade Plan & Release Steps.** Roll out by syncing search index tags, updating marketing landing links, running controlled A/B experiments on Explorer traffic, and promoting once engagement improves.
          - 9.A.4 LiveClassrooms (frontend-reactjs/src/pages/LiveClassrooms.jsx)
+            1. **Appraisal.** Live session discovery inherits the cluster layer so learners, instructors, and admins browse sessions grouped by persona with consistent summary cards and filters.
+            2. **Functionality.** `LiveClassrooms.jsx` applies `filterSessionsByCluster` to both public listings and admin rosters, wiring analytics events and empty states to respect the selected cluster context.
+            3. **Usefulness.** Scheduling teams can quickly gauge which personas lack coverage (e.g., no Enablement live classes) and learners can subscribe to sessions that align with their goals, matching Annex A19 expectations.
+            4. **Redundancies.** Consolidated duplicate cluster heuristics from dashboard live class tabs, reusing the shared utilities and removing bespoke status filtering logic.
+            5. **Placeholders or Stubs.** Some admin moderation copy remains placeholder; however, each path now references cluster metadata, ensuring future backend integrations inherit the same persona context.
+            6. **Duplicate Functions.** Replaced prior per-list filtering with the central `deriveClusterAssignments` output, ensuring consistent copy, counts, and empty states across learner and admin tables.
+            7. **Improvements Needed.** Add timezone-aware cluster summaries, ICS export filtering, and notification preferences segmented by persona per recommendations in the UX documentation.
+            8. **Styling Improvements.** Cluster chips complement status badges by reusing shared spacing and colour tokens, clarifying persona emphasis without overwhelming the schedule grid.
+            9. **Efficiency Analysis.** Memoized session maps avoid recomputing assignments when toggling between upcoming, past, and admin tabs, keeping interactions snappy even with large schedules.
+            10. **Strengths to Keep.** Conflict detection, role-specific views, and analytics hooks now benefit from persona context, improving planning insights without regressing scheduling capabilities.
+            11. **Weaknesses to Remove.** Mobile density and timezone messaging still need refinement; integrate cluster context into responsive layouts and notifications to maintain clarity on small screens.
+            12. **Styling & Colour Review.** Persona labels match the palette shared with Courses and ContentLibrary, keeping Annex-level contrast and iconography intact.
+            13. **CSS, Orientation & Placement.** Cluster filters sit above schedule controls on desktop and collapse into stacked accordions on mobile, mirroring orientation guidelines while preserving accessibility focus order.
+            14. **Text Analysis.** Session blurbs now emphasise persona outcomes (“Community leaders host AMAs”) aligned with Annex microcopy, with truncated summaries under 120 characters for grid readability.
+            15. **Change Checklist Tracker.** QA steps include verifying persona filters across public/admin tabs, testing empty states, ensuring analytics events fire, and checking that conflict warnings respect cluster selection.
+            16. **Full Upgrade Plan & Release Steps.** Plan includes syncing calendar feeds with cluster metadata, coordinating with instructor operations, monitoring analytics for persona coverage gaps, and phasing rollout alongside scheduling improvements.
       - 9.D Scheduling, Calendar & Classroom Utilities
          - 9.D.1 CalendarEventDialog (frontend-reactjs/src/components/calendar/CalendarEventDialog.jsx)
          - 9.D.2 ScheduleGrid (frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx)
