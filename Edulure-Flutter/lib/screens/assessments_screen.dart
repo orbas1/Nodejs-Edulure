@@ -202,19 +202,33 @@ class _AssessmentsScreenState extends State<AssessmentsScreen> {
     setState(() {
       _syncingOffline = true;
     });
-    await _offlineService.syncAssessmentQueue((submission) async {
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      return true;
-    });
-    await _hydrateOfflineQueue();
-    if (!mounted) return;
-    setState(() {
-      _syncingOffline = false;
-      _lastOfflineSync = DateTime.now();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Offline submissions synced.')), 
-    );
+    try {
+      await _offlineService.syncAssessmentQueue();
+    } finally {
+      await _hydrateOfflineQueue();
+      if (!mounted) {
+        return;
+      }
+      final pending = _offlineSubmissions
+          .where((submission) => submission.state == OfflineAssessmentState.queued ||
+              submission.state == OfflineAssessmentState.syncing)
+          .length;
+      final failed = _offlineSubmissions
+          .where((submission) => submission.state == OfflineAssessmentState.failed)
+          .length;
+      setState(() {
+        _syncingOffline = false;
+        _lastOfflineSync = DateTime.now();
+      });
+      final message = failed > 0
+          ? 'Offline sync finished with $failed failed and $pending pending.'
+          : pending > 0
+              ? 'Offline sync completed. $pending submissions still pending.'
+              : 'Offline submissions synced.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   String _formatRelativeTime(DateTime timestamp) {
