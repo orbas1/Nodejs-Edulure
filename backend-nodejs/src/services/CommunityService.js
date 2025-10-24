@@ -998,8 +998,8 @@ export default class CommunityService {
         trx
       );
 
-      const summary = await CommunityPostReactionModel.summarise(post.id, trx);
-      const updated = await CommunityPostModel.updateReactionSummary(post.id, summary, trx);
+      const summary = toggled.summary ?? (await CommunityPostReactionModel.refreshSummary(post.id, trx));
+      const updated = await CommunityPostModel.findById(post.id, trx);
       const viewerReactions = await CommunityPostReactionModel.listForPosts([post.id], userId, trx);
       const community = post.communityId
         ? { id: post.communityId, name: post.communityName, slug: post.communitySlug }

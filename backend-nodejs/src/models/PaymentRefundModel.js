@@ -91,7 +91,7 @@ function toDbPayload(refund) {
   return {
     public_id: refund.publicId ?? randomUUID(),
     payment_intent_id: refund.paymentIntentId,
-    status: refund.status ?? 'pending',
+    status: normaliseRefundStatus(refund.status),
     amount: refund.amount,
     currency: refund.currency,
     reason: refund.reason ?? null,
@@ -158,7 +158,7 @@ export default class PaymentRefundModel {
       publicId: record.publicId,
       paymentIntentId: record.paymentIntentId,
       providerRefundId: sensitive.providerRefundId,
-      status: record.status,
+      status: normaliseRefundStatus(record.status, { defaultValue: 'pending' }),
       amount: coerceAmount(record.amount),
       currency: record.currency,
       reason: record.reason ?? null,
@@ -192,7 +192,7 @@ export default class PaymentRefundModel {
       encryption_key_version: encrypted.keyId
     };
 
-    if (updates.status) payload.status = updates.status;
+    if (updates.status) payload.status = normaliseRefundStatus(updates.status);
     if (updates.processedAt !== undefined) payload.processed_at = updates.processedAt;
     if (updates.amount !== undefined) payload.amount = updates.amount;
     if (updates.reason !== undefined) payload.reason = updates.reason ?? null;

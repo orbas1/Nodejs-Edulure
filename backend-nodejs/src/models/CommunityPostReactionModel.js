@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import CommunityPostModel from './CommunityPostModel.js';
 
 const TABLE = 'community_post_reactions';
 
@@ -32,7 +33,8 @@ export default class CommunityPostReactionModel {
       await this.table(connection)
         .where({ id: existing.id })
         .del();
-      return { active: false, reaction: reactionKey };
+      const summary = await this.refreshSummary(postId, connection);
+      return { active: false, reaction: reactionKey, summary };
     }
 
     const payload = {
@@ -44,7 +46,8 @@ export default class CommunityPostReactionModel {
       updated_at: connection.fn.now()
     };
     await this.table(connection).insert(payload).onConflict(['post_id', 'user_id', 'reaction']).ignore();
-    return { active: true, reaction: reactionKey };
+    const summary = await this.refreshSummary(postId, connection);
+    return { active: true, reaction: reactionKey, summary };
   }
 
   static async summarise(postId, connection = db) {
@@ -93,5 +96,11 @@ export default class CommunityPostReactionModel {
       set.add(normaliseReaction(row.reaction));
     }
     return result;
+  }
+
+  static async refreshSummary(postId, connection = db) {
+    const summary = await this.summarise(postId, connection);
+    await CommunityPostModel.updateReactionSummary(postId, summary, connection);
+    return summary;
   }
 }

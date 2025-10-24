@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
 import DataEncryptionService from '../services/DataEncryptionService.js';
+import { PAYMENT_INTENT_STATUSES, normaliseEnum } from './shared/statusRegistry.js';
+import PaymentIntentStatusTransitionModel from './PaymentIntentStatusTransitionModel.js';
 
 const TABLE = 'payment_intents';
 
@@ -38,6 +40,10 @@ const BASE_COLUMNS = [
   'created_at as createdAt',
   'updated_at as updatedAt'
 ];
+
+function normaliseStatus(status, { defaultValue = 'requires_payment_method', fieldName = 'status' } = {}) {
+  return normaliseEnum(status, PAYMENT_INTENT_STATUSES, { defaultValue, fieldName });
+}
 
 function coerceAmount(value) {
   if (value === null || value === undefined) {
@@ -137,7 +143,7 @@ function toDbPayload(intent) {
     public_id: intent.publicId ?? randomUUID(),
     user_id: intent.userId ?? null,
     provider: intent.provider,
-    status: intent.status ?? 'requires_payment_method',
+    status: normaliseStatus(intent.status),
     currency: intent.currency,
     amount_subtotal: intent.amountSubtotal,
     amount_discount: intent.amountDiscount ?? 0,
@@ -162,6 +168,7 @@ function toDbPayload(intent) {
 
 function deserialize(record) {
   const sensitive = deserializeSensitive(record);
+  const status = normaliseStatus(record.status, { defaultValue: 'requires_payment_method' });
   return {
     id: record.id,
     publicId: record.publicId,
@@ -170,7 +177,7 @@ function deserialize(record) {
     providerIntentId: sensitive.providerIntentId,
     providerCaptureId: sensitive.providerCaptureId,
     providerLatestChargeId: sensitive.providerLatestChargeId,
-    status: record.status,
+    status,
     currency: record.currency,
     amountSubtotal: coerceAmount(record.amountSubtotal),
     amountDiscount: coerceAmount(record.amountDiscount),
@@ -265,7 +272,10 @@ export default class PaymentIntentModel {
       return null;
     }
 
-    const sensitiveUpdates = pickSensitiveUpdates(updates);
+    const inputUpdates = updates ?? {};
+    const { statusReason, statusMetadata, statusChangedBy, ...persistableUpdates } = inputUpdates;
+
+    const sensitiveUpdates = pickSensitiveUpdates(persistableUpdates);
     const mergedSensitive = {
       ...deserializeSensitive(currentRecord),
       ...sensitiveUpdates
@@ -281,25 +291,45 @@ export default class PaymentIntentModel {
       encryption_key_version: encrypted.keyId
     };
 
-    if (updates.status) payload.status = updates.status;
-    if (updates.currency) payload.currency = updates.currency;
-    if (updates.amountSubtotal !== undefined) payload.amount_subtotal = updates.amountSubtotal;
-    if (updates.amountDiscount !== undefined) payload.amount_discount = updates.amountDiscount;
-    if (updates.amountTax !== undefined) payload.amount_tax = updates.amountTax;
-    if (updates.amountTotal !== undefined) payload.amount_total = updates.amountTotal;
-    if (updates.amountRefunded !== undefined) payload.amount_refunded = updates.amountRefunded;
-    if (updates.taxBreakdown) payload.tax_breakdown = JSON.stringify(updates.taxBreakdown);
-    if (updates.metadata) payload.metadata = JSON.stringify(updates.metadata);
-    if (updates.couponId !== undefined) payload.coupon_id = updates.couponId;
-    if (updates.entityType) payload.entity_type = updates.entityType;
-    if (updates.entityId) payload.entity_id = updates.entityId;
-    if (updates.capturedAt !== undefined) payload.captured_at = updates.capturedAt;
-    if (updates.canceledAt !== undefined) payload.canceled_at = updates.canceledAt;
-    if (updates.expiresAt !== undefined) payload.expires_at = updates.expiresAt;
+    const nextStatus =
+      persistableUpdates.status !== undefined
+        ? normaliseStatus(persistableUpdates.status, { fieldName: 'status' })
+        : null;
+
+    if (nextStatus) payload.status = nextStatus;
+    if (persistableUpdates.currency) payload.currency = persistableUpdates.currency;
+    if (persistableUpdates.amountSubtotal !== undefined) payload.amount_subtotal = persistableUpdates.amountSubtotal;
+    if (persistableUpdates.amountDiscount !== undefined) payload.amount_discount = persistableUpdates.amountDiscount;
+    if (persistableUpdates.amountTax !== undefined) payload.amount_tax = persistableUpdates.amountTax;
+    if (persistableUpdates.amountTotal !== undefined) payload.amount_total = persistableUpdates.amountTotal;
+    if (persistableUpdates.amountRefunded !== undefined) payload.amount_refunded = persistableUpdates.amountRefunded;
+    if (persistableUpdates.taxBreakdown)
+      payload.tax_breakdown = JSON.stringify(persistableUpdates.taxBreakdown);
+    if (persistableUpdates.metadata) payload.metadata = JSON.stringify(persistableUpdates.metadata);
+    if (persistableUpdates.couponId !== undefined) payload.coupon_id = persistableUpdates.couponId;
+    if (persistableUpdates.entityType) payload.entity_type = persistableUpdates.entityType;
+    if (persistableUpdates.entityId) payload.entity_id = persistableUpdates.entityId;
+    if (persistableUpdates.capturedAt !== undefined) payload.captured_at = persistableUpdates.capturedAt;
+    if (persistableUpdates.canceledAt !== undefined) payload.canceled_at = persistableUpdates.canceledAt;
+    if (persistableUpdates.expiresAt !== undefined) payload.expires_at = persistableUpdates.expiresAt;
 
     await connection(TABLE)
       .where({ id })
       .update({ ...payload, updated_at: connection.fn.now() });
+
+    if (nextStatus && nextStatus !== currentRecord.status) {
+      await PaymentIntentStatusTransitionModel.recordTransition(
+        {
+          paymentIntentId: id,
+          fromStatus: currentRecord.status,
+          toStatus: nextStatus,
+          changedBy: statusChangedBy ?? null,
+          reason: statusReason ?? null,
+          metadata: statusMetadata ?? {}
+        },
+        connection
+      );
+    }
 
     return this.findById(id, connection);
   }
