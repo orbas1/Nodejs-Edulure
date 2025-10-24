@@ -9,15 +9,28 @@ import changeDataCaptureService from '../src/services/ChangeDataCaptureService.j
 
 const ENTITY = 'unit_records';
 
-function createBuilder({ sampleIds = [101, 102], affectedRows = 2 } = {}) {
-  return {
-    count: vi.fn().mockResolvedValue([{ total: sampleIds.length }]),
+function createBuilder({ sampleIds = [101, 102], affectedRows = sampleIds.length, remainingAfter = 0 } = {}, state) {
+  const sharedState = state ?? { deleted: false };
+
+  const builder = {
+    count: vi.fn().mockImplementation(() => {
+      const total = sharedState.deleted ? remainingAfter : sampleIds.length;
+      return Promise.resolve([{ total }]);
+    }),
     clone: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     pluck: vi.fn().mockResolvedValue(sampleIds),
-    del: vi.fn().mockResolvedValue(affectedRows),
-    update: vi.fn().mockResolvedValue(affectedRows)
+    del: vi.fn().mockImplementation(async () => {
+      sharedState.deleted = true;
+      return affectedRows;
+    }),
+    update: vi.fn().mockImplementation(async () => {
+      sharedState.deleted = true;
+      return affectedRows;
+    })
   };
+
+  return builder;
 }
 
 describe('dataRetentionService', () => {
@@ -49,10 +62,11 @@ describe('dataRetentionService', () => {
     vi.restoreAllMocks();
   });
 
-  function registerTestStrategy({ sampleIds = [201, 202], affectedRows = 2 } = {}) {
+  function registerTestStrategy({ sampleIds = [201, 202], affectedRows = 2, remainingAfter = 0 } = {}) {
     const builders = [];
+    const state = { deleted: false };
     const factory = vi.fn(() => {
-      const builder = createBuilder({ sampleIds, affectedRows });
+      const builder = createBuilder({ sampleIds, affectedRows, remainingAfter }, state);
       builders.push(builder);
       return builder;
     });
@@ -86,9 +100,10 @@ describe('dataRetentionService', () => {
       policyId: 99,
       status: 'executed',
       affectedRows: 2,
-      sampleIds: [11, 12]
+      sampleIds: [11, 12],
+      verification: { status: 'cleared', remainingRows: 0 }
     });
-    expect(builders.at(-1).del).toHaveBeenCalledTimes(1);
+    expect(builders.some((builder) => builder.del.mock.calls.length === 1)).toBe(true);
     expect(auditInsert).toHaveBeenCalledTimes(1);
     expect(auditInsert.mock.calls[0][0]).toMatchObject({
       policy_id: 99,
@@ -96,6 +111,7 @@ describe('dataRetentionService', () => {
     });
     const details = JSON.parse(auditInsert.mock.calls[0][0].details);
     expect(details.runId).toBeDefined();
+    expect(details.verification).toMatchObject({ status: 'cleared', remainingRows: 0 });
     expect(summary.runId).toBeDefined();
     expect(changeDataCaptureService.recordEvent).toHaveBeenCalled();
   });
@@ -115,10 +131,32 @@ describe('dataRetentionService', () => {
     const summary = await enforceRetentionPolicies({ mode: 'simulate', policies: [policy], dbClient: fakeDb });
 
     expect(summary.dryRun).toBe(true);
-    expect(summary.results[0]).toMatchObject({ status: 'executed', affectedRows: 1 });
+    expect(summary.results[0]).toMatchObject({
+      status: 'executed',
+      affectedRows: 1,
+      verification: { status: 'simulated', remainingRows: 1 }
+    });
     expect(builders.at(-1).count).toHaveBeenCalledTimes(1);
     expect(builders.at(-1).del).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it('reports residual rows when verification detects remaining records', async () => {
+    const { builders } = registerTestStrategy({ sampleIds: [7, 8], affectedRows: 1, remainingAfter: 1 });
+
+    const policy = {
+      id: 33,
+      entityName: ENTITY,
+      action: 'hard-delete',
+      retentionPeriodDays: 14,
+      active: true,
+      description: 'Residual verification test'
+    };
+
+    const summary = await enforceRetentionPolicies({ policies: [policy], dbClient: fakeDb });
+
+    expect(summary.results[0].verification).toMatchObject({ status: 'residual', remainingRows: 1 });
+    expect(builders.some((builder) => builder.del.mock.calls.length === 1)).toBe(true);
   });
 
   it('skips policies without registered strategies', async () => {

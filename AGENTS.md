@@ -123,8 +123,44 @@
       - A31. Flutter Notifications, Messaging & Support (3.F)
       - A32. Community Reminder Job (4.A)
       - A33. Data Partition Job (4.B)
-      - A34. Data Retention Job (4.C)
-      - A35. Moderation Follow-Up Job (4.D)
+      - A34. Data Retention Job (4.C) ✓
+         - A34.1 backend-nodejs/src/jobs/dataRetentionJob.js & config/env integration
+            1. **Operational depth.** The scheduler now orchestrates retention enforcement, verification, and reporting in a single run loop, mirroring Annex A34’s mandate to purge PII, issue audit trails, and brief compliance stakeholders.
+            2. **Configuration surface.** New environment toggles (`DATA_RETENTION_VERIFY`, `DATA_RETENTION_VERIFICATION_SAMPLE_SIZE`, `DATA_RETENTION_REPORT_ENABLED`, `DATA_RETENTION_REPORT_CHANNEL`, `DATA_RETENTION_REPORT_AUDIENCE`) expose governance levers so runtime behaviour aligns with policy sign-off windows.
+            3. **Execution guardrails.** `dispatchSummary` fans out post-run responsibilities—audit logging, domain events, and stakeholder communications—without blocking the main retention cycle, keeping resiliency in low-traffic maintenance windows.
+            4. **Verification workflow.** Jobs pass a normalised verification contract to the service, ensuring every policy captures pre-run counts, post-run counts, and residual signals that surface soft-delete drift highlighted under “Gaps & Risks.”
+            5. **Residual signalling.** Residual matches raise structured warnings, bubble into audit payloads, and switch audit severity from “notice” to “warning,” delivering the verification assurances promised under “Resilience & Efficiency.”
+            6. **Audit trail.** Each run records `governance.data_retention.*` events via `AuditEventService`, packaging policy outcomes, residuals, and totals so compliance reviews have an immutable ledger.
+            7. **Stakeholder communication.** When not in dry-run mode, the job schedules Governance Roadmap communications with summarised bodies, tagged audiences, and metrics, answering the “UX & Communications” requirement to brief compliance partners.
+            8. **Domain events.** Both simulated and committed cycles broadcast `governance.data_retention.(simulated|completed)` domain events with dispatch metadata, creating hooks for telemetry dashboards and alerting pipelines.
+            9. **Observability.** Run metadata (trigger, totals, residual counts) is logged and persisted into `lastSummary`, improving runbook triage while keeping failure backoff semantics intact.
+            10. **Extensibility.** Verification/reporting configs are normalised helpers, easing future annex work (e.g., batching communications or toggling manifest attachments) without re-threading scheduler wiring.
+         - A34.2 backend-nodejs/src/services/dataRetentionService.js
+            1. **Strategy normalisation.** Verification options are first-class citizens—sample sizes, residual handling, and metadata propagate through every enforcement branch.
+            2. **Pre/Post counts.** Each policy now captures `preRunCount`, residual tallies, and status markers (`cleared`, `residual`, `simulated`), giving auditors quantitative proof of policy execution.
+            3. **Audit payload enrichment.** `data_retention_audit_logs` entries carry verification summaries alongside reasons, sample IDs, and contexts, satisfying Annex A34’s requirement for reproducible evidence.
+            4. **Sample controls.** Policy sampling honours configurable limits rather than hard-coded values, aligning with the resilience guidance to throttle IO and provide deterministic previews.
+            5. **Residual warnings.** Policies that fail to clear matched rows emit targeted logger warnings and still push CDC events, ensuring monitoring catches misaligned soft-delete columns.
+            6. **Empty-strategy handling.** Strategies with no matches return structured results (including verification state), so reporting layers still generate zero-impact evidence packets.
+         - A34.3 backend-nodejs/test/dataRetentionService.test.js
+            1. **Coverage.** New Vitest cases lock in residual detection, dry-run simulation semantics, and audit payload structure, preventing regressions while Annex A34 iterates.
+            2. **Builder fidelity.** Shared builder state simulates pre/post deletion counts, guaranteeing verification math mirrors production SQL behaviour.
+            3. **Runtime compatibility.** Tests run with stubbed R2 credentials and reuse the same logging cadence seen in worker executions, validating observability parity.
+      - A35. Moderation Follow-Up Job (4.D) ✓
+         - A35.1 backend-nodejs/src/jobs/moderationFollowUpJob.js & config/env integration
+            1. **Operational depth.** The follow-up scheduler now hydrates cases, computes overdue windows, and escalates unresolved actions—directly answering Annex A35’s charge to audit moderation follow-ups end-to-end.
+            2. **Configuration knobs.** New env inputs (`MODERATION_FOLLOW_UP_ESCALATE_AFTER_MINUTES`, `MODERATION_FOLLOW_UP_ESCALATION_ROLES`, `MODERATION_FOLLOW_UP_AUDIT_SEVERITY`, `MODERATION_FOLLOW_UP_ANALYTICS_ENABLED`) externalise thresholds and audiences that were previously hard-coded risks.
+            3. **Overdue intelligence.** Each follow-up calculates `overdueMinutes`, stamps metadata, and distinguishes escalated versus routine reminders, tightening accountability for aged cases.
+            4. **Dual domain events.** The job emits `community.moderation.follow_up.due` plus `...escalated` events with dispatch tags and role audiences so realtime infra and alerting channels can route reminders and escalations separately.
+            5. **Audit assurance.** Escalations record `moderation.follow_up.escalated` audit entries with assignee, overdue window, and escalation roles, satisfying Annex A35’s escalation evidence expectations.
+            6. **Analytics insight.** Optional analytics events (dispatch versus escalated) push severity-weighted risk scores into `moderation_analytics_events`, feeding dashboards that monitor alert fatigue.
+            7. **Metadata hygiene.** `ModerationFollowUpModel.markCompleted` now persists dispatch timestamps, triggers, overdue minutes, and escalation context for retrospective QA.
+            8. **Run summaries.** Aggregated logging (processed count, escalations, overdue backlog) keeps operations visibility high without additional queries.
+            9. **Graceful cancellation.** Failures capture error context, retain overdue metadata, and avoid silent drops, aligning with resilience guidelines to implement retries and cancellation audit trails.
+            10. **Extensibility.** Analytics, audit, and domain event dependencies are injected, simplifying future Annex enhancements (e.g., queue retries or multi-channel notifications).
+         - A35.2 backend-nodejs/src/config/env.js
+            1. **Schema updates.** Zod parsing now validates follow-up thresholds, escalation roles, and analytics toggles, giving deployment pipelines deterministic config validation.
+            2. **Workspace defaults.** Sensible defaults (120-minute escalation, moderator/compliance roles, “notice” audit severity) map directly to tabletop exercises outlined under “Change Management.”
       - A36. Monetization Reconciliation Job (4.E)
       - A37. Telemetry Warehouse Job (4.F)
       - A38. Identity & Access Schema (5.A)
