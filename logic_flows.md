@@ -313,40 +313,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Roll enhancements behind feature flags, run usability sessions, validate analytics funnels, coordinate support documentation, and monitor conversion plus drop-off metrics before broad release.
 
 ### 2.C Learner Dashboard & Insights (`src/pages/dashboard/index.jsx`, `src/pages/dashboard/widgets/*`, `src/components/dashboard/`, `src/hooks/useLearnerDashboard.js`)
-1. **Appraisal:** Personalised learner hub aggregating progress, recommendations, streaks, certificates, billing alerts, and community prompts.
-2. **Functionality:** Components fetch widgets via SDK, use Suspense for loading states, and compose chart components to visualise engagement trends.
-3. **Logic Usefulness:** Dashboard context merges analytics, recommendation prompts, and CTA logic, ensuring consistent experiences with backend widget metadata.
-4. **Redundancies:** Progress card components duplicated between dashboard and profile; refactor to shared component library.
-5. **Placeholders Or non-working functions or stubs:** Upcoming events widget uses placeholder skeleton data until calendar API is wired; guard for clarity.
-6. **Duplicate Functions:** Date/time formatting scattered across widgets; centralise to avoid inconsistent localisation.
-7. **Improvements need to make:** Add widget personalisation toggles, drill-down analytics, and cohort comparison views.
-8. **Styling improvements:** Align card padding, border radii, and chart theming with design tokens for visual consistency.
-9. **Efficiency analysis and improvement:** Batch API calls via query caching, prefetch next dataset slices, and window heavy widgets.
-10. **Strengths to Keep:** Modular widget system, responsive grid, and integration with analytics events.
-11. **Weaknesses to remove:** Notification duplication between dashboard and feed; deduplicate.
-12. **Styling and Colour review changes:** Adjust heatmap colour scales for accessibility and theme compatibility.
-13. **CSS, orientation, placement and arrangement changes:** Optimise grid for small screens with column stacking and reorder critical widgets for mobile priorities.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Polish progress summaries to emphasise next actions and remove redundant metrics.
-15. **Change Checklist Tracker:** Update regression tests, analytics validations, and widget contract snapshots before release.
-16. **Full Upgrade Plan & Release Steps:** Roll updates via feature flags, run A/B tests, monitor telemetry, and expand after positive engagement impact.
+1. **Appraisal:** Annex A18’s learner insight charter is now reflected in code: `frontend-reactjs/src/utils/dashboardFormatting.js` supplies a shared language for progress, commitment, and support timestamps so the B5.A dashboard and C1 support workspace render coherent status narratives across widgets and case timelines.
+2. **Functionality:** `LearnerOverview.jsx` consumes the new formatting helpers to enrich quick actions, progress cards, and recommendation metadata, while `LearnerSupport.jsx` replaces bespoke `Intl` instances with the shared utility to timestamp threads, case summaries, and escalation metrics in line with Annex B5.A expectations for consistent telemetry copy.
+3. **Logic Usefulness:** `normaliseUpcoming` now classifies every event with urgency, relative timing, and sanitised links, powering `LearnerUpcomingSection.jsx` badges that guide learners toward imminent commitments; the same urgency vocabulary feeds Learner Support notifications to highlight aging tickets per Annex C1 escalation guidance.
+4. **Redundancies:** Legacy components such as `VerificationStatusCard.jsx` still wrap `toLocaleString`; migrating the remaining dashboard primitives to `dashboardFormatting.js` will eliminate the last date-handling forks identified in Annex A18.
+5. **Placeholders Or non-working functions or stubs:** Upcoming sessions now surface an explicit empty-state with calendar/tutor CTAs, but the widget still depends on upstream schedule hydration—until Annex C4’s live calendar feed lands, ensure mock data in Storybook mirrors the new urgency schema.
+6. **Duplicate Functions:** Consolidation reduced bespoke helpers in `LearnerOverview.jsx` and `LearnerSupport.jsx`, yet pace analytics and finance banners maintain standalone number formatters; track follow-up tickets to port them to the shared dashboard utility bundle.
+7. **Improvements need to make:** Implement learner-controlled widget visibility and cross-device snapshot caching so Annex A18’s personalisation targets extend beyond date normalisation; `LearnerQuickActionsSection.jsx` already exposes the hook points for storing layout preferences.
+8. **Styling improvements:** Upcoming commitments adopt urgency-aware chips and responsive stacked layouts that honour design tokens from Annex B5.A, and Learner Support timelines reuse the dashboard badge palette to avoid contrast regressions flagged in Annex C1.
+9. **Efficiency analysis and improvement:** The formatting helpers are memo-friendly, but we should complement them with React Query caching around Learner Support fetches and prefetch upcoming sessions once Annex C1’s repository exposes pagination metadata.
+10. **Strengths to Keep:** The modular widget grid and context providers still orchestrate analytics, community prompts, and billing nudges without regression, and the new utilities lower the cost of adding future insights modules referenced in Annex A18.
+11. **Weaknesses to remove:** Notification aggregation still occurs both in the learner dashboard and community feed; next iteration should deduplicate sources via a shared alert gateway so badges in Learner Support mirror the single source of truth.
+12. **Styling and Colour review changes:** Heatmap scales remain pending, but urgency badges, empty states, and support alerts now align with the primary/amber/emerald semantic palette, meeting Annex B5.A accessibility thresholds.
+13. **CSS, orientation, placement and arrangement changes:** `LearnerUpcomingSection.jsx` introduces mobile-first column stacking and live CTA rows, yet broader grid re-ordering for tablets should follow once analytics validates the new hierarchy.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Progress copy now emphasises next actions (“resume course”, “calendar export ready”) while the chat preview banner in Annex C1 surfaces limitations plainly; continue pruning redundant adjectives in Learner Goals and Financial widgets.
+15. **Change Checklist Tracker:** Record follow-up tasks to migrate remaining widgets to the formatting util, extend Storybook coverage, add regression snapshots for the urgency badges, and refresh Learner Support QA scripts with the new timeline copy before the next release.
+16. **Full Upgrade Plan & Release Steps:** Phase 1 rolled out shared formatting and empty states behind existing routes; Phase 2 should AB-test personalisation toggles, Phase 3 aligns remaining widgets with the formatting utility, and Phase 4 coordinates analytics validation and support-runbook updates before wide rollout per Annex A18/B5.A/C1.
 
 ### 2.D Courses, Library & Live Sessions (`src/pages/Courses.jsx`, `src/pages/ContentLibrary.jsx`, `src/pages/LiveClassrooms.jsx`, `src/components/learning/`, `src/components/video/`, `src/hooks/useCoursePlayer.js`)
-1. **Appraisal:** Course catalogue and learning player orchestrating video, documents, quizzes, notes, and live session access.
-2. **Functionality:** Components load course hierarchies, orchestrate progress, surface resource downloads, and coordinate live session join states with backend events.
-3. **Logic Usefulness:** Player manages note-taking, transcript toggles, offline hints, and completion events to keep progress and analytics aligned with backend records.
-4. **Redundancies:** Lesson navigation duplicated across on-demand and live classroom components; unify navigation components with mode-aware props.
-5. **Placeholders Or non-working functions or stubs:** Live chat panels contain TODO placeholders until realtime integration complete; ensure UI clarifies limited functionality.
-6. **Duplicate Functions:** Download handlers repeated across player and library; refactor to shared hook.
-7. **Improvements need to make:** Introduce adaptive recommendations, offline indicator improvements, and accessibility enhancements for keyboard navigation.
-8. **Styling improvements:** Align typography, spacing, and progress indicator styling with design-system guidelines.
-9. **Efficiency analysis and improvement:** Lazy-load heavy components, prefetch next lessons, and reuse cached manifests for offline bundles.
-10. **Strengths to Keep:** Feature-rich player, strong integration with backend telemetry, and accessible controls.
-11. **Weaknesses to remove:** Deep nested menus hinder navigation; simplify structure with breadcrumbs.
-12. **Styling and Colour review changes:** Update status badges and progress bars to match new palette while preserving contrast.
-13. **CSS, orientation, placement and arrangement changes:** Provide responsive layout rules for video player, transcript panels, and resource lists.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Review lesson summaries for clarity, limit excerpt length, and ensure notes remain scannable.
-15. **Change Checklist Tracker:** Update learning QA scripts, accessibility validations, and transcript checks.
-16. **Full Upgrade Plan & Release Steps:** Deploy to staging, run cohort beta, gather telemetry, update docs, and release with support readiness.
+1. **Appraisal:** Annex A19’s emphasis on cohesive course journeys now spans Annex B5.B’s player and C4’s live operations—`CourseViewer.jsx` and `LearnerLiveClasses.jsx` share the new dashboard formatting layer so on-demand lessons, live sessions, and scheduling surfaces narrate progress with the same lexicon.
+2. **Functionality:** The player normalises release dates, progress snapshots, and chat timestamps through `dashboardFormatting.js`, while live classrooms hydrate session cards, readiness metrics, and donation workflows with the same helper, satisfying Annex C4’s requirement for aligned learner/instructor timing cues.
+3. **Logic Usefulness:** Session normalisation introduces urgency-aware labels and relative timers that surface in ScheduleGrid events, donation dialogs, and attendance summaries, giving learners immediate insight into readiness and lagging checkpoints across Annex C4 surfaces.
+4. **Redundancies:** We still expose duplicated download logic in `Courses.jsx` and the Content Library; consolidating into a shared hook remains on the backlog to fully resolve Annex A19’s duplication call-out.
+5. **Placeholders Or non-working functions or stubs:** Live chat now displays a prominent preview notice explaining the temporary polling behaviour, mitigating confusion while Annex B5.B’s realtime integration is completed.
+6. **Duplicate Functions:** Date localisation has been centralised, but metrics components inside `Courses.jsx` continue to roll their own compact number utilities—track cleanup to `dashboardFormatting.js` or an adjacent numeric helper module.
+7. **Improvements need to make:** Next iterations should expose adaptive lesson recommendations and offline indicators that lean on the shared formatting primitives so player and live views remain consistent when we add Annex A19’s adaptive roadmap.
+8. **Styling improvements:** Chat preview banners, session urgency badges, and whiteboard cards adopt the dashboard palette and rounded geometry, aligning the player and live operations with Annex B5.B/C4 design guidance.
+9. **Efficiency analysis and improvement:** The new normalisation steps run in pure functions, but we still need to layer in data caching (React Query or SWR) to avoid repeated fetches when learners hop between Course Viewer tabs and live classroom views during a session.
+10. **Strengths to Keep:** Rich telemetry hooks, structured lesson navigation, and cross-surface session insights remain intact, and the new relative timing overlays strengthen Annex A19’s promise of trustworthy progress narratives.
+11. **Weaknesses to remove:** Deep nested menus and context switching between tabs persist; plan breadcrumbs and keyboard shortcuts once the course navigation refactor begins.
+12. **Styling and Colour review changes:** Status chips, readiness banners, and timeline callouts now honour the accessible brand palette; extend this work to module accordions and transcript toggles to finish Annex B5.B parity.
+13. **CSS, orientation, placement and arrangement changes:** Live classroom cards received responsive stacking and CTA clustering, but the player’s lesson/notes dual column still needs tablet breakpoints—schedule follow-up as part of Annex C4 usability testing.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Updated copy clarifies when live chat is in preview mode and when sessions are overdue; continue auditing lesson summaries to remove redundant phrases surfaced during Annex A19 QA.
+15. **Change Checklist Tracker:** Track remaining tasks to migrate download handlers, refresh automated tests for the formatting helpers, update Storybook stories, and add regression checks for the chat preview banner before the next cohort release.
+16. **Full Upgrade Plan & Release Steps:** Phase 1 delivered shared formatting and communication guardrails, Phase 2 should ship the download hook refactor, Phase 3 introduces adaptive recommendations and responsive layout updates, and Phase 4 coordinates telemetry review, documentation updates, and live classroom enablement per Annex A19/B5.B/C4.
 
 ### 2.E Community, Events & Messaging (`src/pages/Communities.jsx`, `src/pages/Feed.jsx`, `src/components/community/`, `src/components/chat/`, `src/hooks/useCommunityRealtime.js`)
 1. **Appraisal:** Real-time community experience covering feeds, leaderboards, events, moderation tooling, direct messaging, and donation prompts.
@@ -1187,18 +1187,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Include regression suites for auth forms, update localisation files, and run usability tests before release.
 
 ### A18. Learner Dashboard & Insights (2.C)
-- **Operational Depth:** Dashboard widgets fetch analytics via hooks, manage state with context providers, and display progress, streaks, and recommendations.
-- **Gaps & Risks:** Widget-specific CSS modules occasionally override global tokens; audit for consistency. Some charts lack empty-state copy, leaving blank cards for new learners.
-- **Resilience & Efficiency:** Use Suspense boundaries with skeleton loaders, memoise expensive selectors, and batch API requests to limit network chatter.
-- **UX & Communications:** Provide consistent card spacing, accessible colour palettes for charts, and concise copy within tooltips.
-- **Change Management:** Update dashboard stories in Storybook, refresh visual regression baselines, and coordinate analytics validation post-deploy.
+- **Operational Depth:** `backend-nodejs/src/services/DashboardService.js` now emits normalised upcoming commitments with structured `actionLabel`, `actionHref`, and urgency metadata so the React dashboard can present booking, billing, and community CTAs without bespoke serializers. On the client, `frontend-reactjs/src/pages/dashboard/learner/LearnerOverview.jsx` funnels those payloads through `resolveUpcomingAction`, `dashboardFormatting.js`, and shared quick-action builders, while `LearnerUpcomingSection.jsx` renders consistent urgency badges and CTA buttons that mirror Annex B5.A copy.
+- **Gaps & Risks:** A handful of secondary widgets (pace, finance banners) still rely on legacy number formatters and lack `actionType` hints, so analytics cannot yet segment click-throughs by CTA intent. Storybook coverage for the urgency ladder and disabled states should be expanded before a/b testing personalisation toggles.
+- **Resilience & Efficiency:** Sanitised CTA links prevent malformed URLs from breaking hydration, and reusable memo-friendly helpers reduce recalculation in `LearnerOverview`. Next, layer React Query caching around support/tutor data to keep Annex C1 telemetry responsive when multiple panels rehydrate simultaneously.
+- **UX & Communications:** Learner insight cards now share palette tokens, accessible empty states, and descriptive CTA labels (“Join mentor session”, “Pay invoice”) sourced from the backend, aligning the dashboard with Annex A18/B5.A language while maintaining clear affordances for disabled buttons.
+- **Change Management:** Seeds, migrations, and formatting utilities stay in lockstep—new metadata scaffolding ships alongside updated logic flows. Regression tests should snapshot the upcoming commitment schema, refresh Storybook docs, and brief support teams on the new escalation copy before release.
 
 ### A19. Courses, Library & Live Sessions (2.D)
-- **Operational Depth:** Course pages combine curriculum navigation, video playback, and live session scheduling. Hooks handle player state, track progress, and sync with backend.
-- **Gaps & Risks:** Live classroom components still use placeholder availability data; integrate with scheduling APIs. Redundant video controls appear in multiple components; consolidate.
-- **Resilience & Efficiency:** Prefetch upcoming lesson assets, implement adaptive bitrate streaming, and cache syllabus data client-side.
-- **UX & Communications:** Ensure responsive layout for modules, provide clear action buttons, and harmonise copy for live session reminders.
-- **Change Management:** Test cross-browser playback, run QA on live session flows, and update documentation for instructors.
+- **Operational Depth:** Live classroom metadata seeded in `backend-nodejs/seeds/001_bootstrap.js` now mirrors Annex C4—security posture, whiteboard snapshots, breakout rooms, donation readiness, and attendance checkpoints feed straight into `LiveClassroomModel` and the learner dashboard. `DashboardService.js` enriches upcoming sessions with contextual CTAs, and `frontend-reactjs/src/pages/dashboard/LearnerLiveClasses.jsx` consumes those objects to deliver readiness badges, queue/offline handling, and donation workflows that stay in sync with backend analytics.
+- **Gaps & Risks:** Download/export handlers in `Courses.jsx` and `ContentLibrary.jsx` still duplicate I/O logic and bypass the shared formatting helpers. Transcript toggles and module accordions have yet to adopt the refreshed badge palette, leaving a small styling gap against Annex B5.B.
+- **Resilience & Efficiency:** Call-to-action hrefs are sanitised server-side and replayed client-side, preventing malformed meeting links while enabling offline queueing via `liveSessionQueue.js`. Next steps should introduce SWR/React Query caching around live session fetches and integrate adaptive recommendation APIs referenced in Annex A19.
+- **UX & Communications:** Learners now see consistent “Join live session”/“Check in” language, fill-rate callouts, and schedule windows drawn from the same formatting stack as on-demand lessons. Seeded data ensures lobby, donation, and whiteboard hints surface identically in staging and production, harmonising messaging across Annex B5.B and C4 surfaces.
+- **Change Management:** Keep migrations, seeds, and model serializers aligned when expanding live session schema; add regression coverage for CTA types and donation payloads, and brief instructors/support on the updated lobby + attendance flows before enabling new cohorts.
 
 ### A20. Community, Events & Messaging (2.E)
 - **Operational Depth:** Community pages integrate feed, chat, and event calendars using websocket hooks and query caches. Membership management surfaces gating states and moderation tools.

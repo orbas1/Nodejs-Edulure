@@ -3476,12 +3476,35 @@ export async function seed(knex) {
       hourly_rate_currency: 'USD',
       meeting_url: 'https://meet.edulure.test/ops-masterclass-sync',
       status: 'confirmed',
-      metadata: JSON.stringify({ availabilitySlotId: bookedAvailabilityId, communityId: opsCommunityId })
+      metadata: JSON.stringify({
+        availabilitySlotId: bookedAvailabilityId,
+        communityId: opsCommunityId,
+        topic: 'Automation rehearsal coaching',
+        summary: 'Pre-flight run-through for the automation command simulation.',
+        meetingUrl: 'https://meet.edulure.test/ops-masterclass-sync',
+        joinUrl: 'https://meet.edulure.test/ops-masterclass-sync',
+        ctaLabel: 'Join mentor room',
+        location: 'Virtual ops lounge',
+        timezone: 'Etc/UTC',
+        notes: 'Review escalation runbooks and donation messaging before the live stream.',
+        resources: [
+          {
+            title: 'Automation rehearsal checklist',
+            url: 'https://docs.edulure.test/ops/automation-checklist'
+          }
+        ]
+      })
     });
 
     const liveClassroomStart = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
     liveClassroomStart.setUTCHours(17, 0, 0, 0);
     const liveClassroomEnd = new Date(liveClassroomStart.getTime() + 90 * 60 * 1000);
+    const liveWhiteboardUpdated = new Date(liveClassroomStart.getTime() - 45 * 60 * 1000);
+    const liveSnapshotOne = new Date(liveClassroomStart.getTime() - 30 * 60 * 1000);
+    const liveSnapshotTwo = new Date(liveClassroomStart.getTime() - 10 * 60 * 1000);
+    const livePrepCheckpoint = new Date(liveClassroomStart.getTime() - 2 * 60 * 60 * 1000);
+    const liveLobbyCheckpoint = new Date(liveClassroomStart.getTime() - 20 * 60 * 1000);
+    const liveJoinCheckpoint = new Date(liveClassroomStart.getTime() - 5 * 60 * 1000);
 
     const [opsLiveClassroomId] = await trx('live_classrooms').insert({
       public_id: crypto.randomUUID(),
@@ -3503,7 +3526,82 @@ export async function seed(knex) {
       start_at: liveClassroomStart,
       end_at: liveClassroomEnd,
       topics: JSON.stringify(['Automation', 'Live Operations']),
-      metadata: JSON.stringify({ agoraChannel: 'OPS-LAUNCH-001', featureFlag: 'live-simulations' })
+      metadata: JSON.stringify({
+        agoraChannel: 'OPS-LAUNCH-001',
+        featureFlag: 'live-simulations',
+        stage: 'Automation rehearsal',
+        summary: 'Hands-on automation drill with live telemetry checks and donation workflows.',
+        communityName: 'Ops Control Guild',
+        currency: 'USD',
+        joinUrl: 'https://live.edulure.test/ops/automation-command-simulation',
+        checkInUrl: 'https://live.edulure.test/ops/automation-command-simulation/check-in',
+        lobbyUrl: 'https://live.edulure.test/ops/automation-command-simulation/lobby',
+        meetingUrl: 'https://live.edulure.test/ops/automation-command-simulation',
+        timezone: 'Etc/UTC',
+        facilitators: ['Kai Watanabe', 'Ops Control Desk'],
+        security: { waitingRoom: true, passcodeRequired: true, owner: 'Ops Control Desk' },
+        whiteboard: {
+          template: 'Automation ops board',
+          summary: 'Live runbook for escalation commands and readiness checks.',
+          updatedAt: liveWhiteboardUpdated.toISOString(),
+          ready: true,
+          url: 'https://whiteboard.edulure.test/ops/automation-command',
+          snapshots: [
+            {
+              template: 'Automation ops board',
+              summary: 'Checklist finalised with automation leads.',
+              updatedAt: liveSnapshotOne.toISOString()
+            },
+            {
+              template: 'Escalation matrix',
+              summary: 'Escalation routes rehearsed with facilitators.',
+              updatedAt: liveSnapshotTwo.toISOString()
+            }
+          ]
+        },
+        attendanceCheckpoints: [
+          {
+            id: crypto.randomUUID(),
+            type: 'prep',
+            source: 'instructor',
+            recordedAt: livePrepCheckpoint.toISOString(),
+            metadata: { note: 'Ops prep sync' }
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'lobby',
+            source: 'learner',
+            userId: learnerId,
+            recordedAt: liveLobbyCheckpoint.toISOString(),
+            metadata: { channel: 'dashboard' }
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'join',
+            source: 'learner',
+            userId: learnerId,
+            recordedAt: liveJoinCheckpoint.toISOString(),
+            metadata: { acknowledgement: 'seed-checkpoint' }
+          }
+        ],
+        attendanceAnalytics: {
+          total: 3,
+          lastRecordedAt: liveJoinCheckpoint.toISOString(),
+          lastRecordedBy: learnerId
+        },
+        breakoutRooms: [
+          { name: 'Automation pod A', capacity: 24 },
+          { name: 'Escalation drills', capacity: 18 }
+        ],
+        resources: [
+          {
+            title: 'Automation command deck',
+            url: 'https://cdn.edulure.test/slides/automation-command.pdf'
+          }
+        ],
+        donations: { enabled: true, suggestedAmountCents: 2500 },
+        eventId: 'OPS-LIVE-001'
+      })
     });
 
     await trx('live_classroom_registrations').insert({

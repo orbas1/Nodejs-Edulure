@@ -17,6 +17,13 @@ import { checkInToLiveSession, joinLiveSession } from '../../api/learnerDashboar
 import { useAuth } from '../../context/AuthContext.jsx';
 import ScheduleGrid from '../../components/scheduling/ScheduleGrid.jsx';
 import { enqueueLiveSessionAction, flushLiveSessionQueue } from '../../utils/liveSessionQueue.js';
+import {
+  formatDashboardDate,
+  formatDashboardDateTime,
+  formatDashboardRelative,
+  formatDashboardWindow,
+  getDashboardUrgency
+} from '../../utils/dashboardFormatting.js';
 
 function ReadinessBadge({ status }) {
   const base = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide';
@@ -41,6 +48,7 @@ function SessionCard({ session, onAction, pending, onDonate }) {
   const facilitators = Array.isArray(session.facilitators) ? session.facilitators : [];
   const attendance = session.attendance ?? {};
   const attendanceSummary = Number.isFinite(Number(attendance.total)) ? Number(attendance.total) : null;
+  const relativeStart = session.startAt ? formatDashboardRelative(session.startAt) : null;
 
   return (
     <article className="dashboard-card space-y-5 p-5">
@@ -52,6 +60,7 @@ function SessionCard({ session, onAction, pending, onDonate }) {
             {session.startLabel}
             {session.timezone ? ` • ${session.timezone}` : ''}
             {session.community ? ` • ${session.community}` : ''}
+            {relativeStart ? ` • ${relativeStart}` : ''}
           </p>
           {session.summary && <p className="mt-3 text-sm text-slate-500">{session.summary}</p>}
         </div>
@@ -345,6 +354,71 @@ function DonationDialog({ open, session, onClose, onSubmit, submitting, status }
   );
 }
 
+function describeSessionStage(session) {
+  if (session.stage) {
+    return session.stage;
+  }
+  const start = session.startAt ?? session.startTime ?? null;
+  const urgency = getDashboardUrgency(start);
+  if (urgency === 'overdue') {
+    return 'Completed';
+  }
+  if (urgency === 'soon') {
+    return 'Upcoming';
+  }
+  return 'Scheduled';
+}
+
+function normaliseLiveSession(session) {
+  if (!session) return null;
+  const start = session.startAt ?? session.startTime ?? session.beginAt ?? null;
+  const end = session.endAt ?? session.endTime ?? session.finishAt ?? null;
+  const timezone = session.timezone ?? session.tz ?? session.timeZone ?? null;
+  const startLabel =
+    session.startLabel ?? formatDashboardWindow(start, end, { timezone, fallback: 'Schedule pending' });
+  const attendance = session.attendance ?? {};
+  const attendanceLabel = attendance.lastRecordedLabel
+    ? attendance.lastRecordedLabel
+    : attendance.lastRecordedAt
+      ? formatDashboardRelative(attendance.lastRecordedAt)
+      : null;
+  const whiteboard = session.whiteboard
+    ? {
+        ...session.whiteboard,
+        lastUpdatedLabel:
+          session.whiteboard.lastUpdatedLabel ??
+          (session.whiteboard.updatedAt
+            ? formatDashboardRelative(session.whiteboard.updatedAt)
+            : null)
+      }
+    : null;
+
+  return {
+    ...session,
+    startAt: start,
+    endAt: end,
+    timezone,
+    startLabel,
+    stage: describeSessionStage(session),
+    attendance: {
+      ...attendance,
+      lastRecordedLabel: attendanceLabel
+    },
+    whiteboard
+  };
+}
+
+function normaliseSnapshot(snapshot) {
+  if (!snapshot) return null;
+  return {
+    ...snapshot,
+    updatedAt: snapshot.updatedAt
+      ? formatDashboardDateTime(snapshot.updatedAt, { fallback: 'Recently' })
+      : snapshot.updatedAt,
+    displayDate: snapshot.updatedAt ? formatDashboardDate(snapshot.updatedAt) : null
+  };
+}
+
 export default function LearnerLiveClasses() {
   const { dashboard, refresh } = useOutletContext();
   const { session } = useAuth();
@@ -559,11 +633,17 @@ export default function LearnerLiveClasses() {
   }
 
   const metrics = Array.isArray(data.metrics) ? data.metrics : [];
-  const active = Array.isArray(data.active) ? data.active : [];
-  const upcoming = Array.isArray(data.upcoming) ? data.upcoming : [];
-  const completed = Array.isArray(data.completed) ? data.completed : [];
+  const active = (Array.isArray(data.active) ? data.active : []).map(normaliseLiveSession).filter(Boolean);
+  const upcoming = (Array.isArray(data.upcoming) ? data.upcoming : [])
+    .map(normaliseLiveSession)
+    .filter(Boolean);
+  const completed = (Array.isArray(data.completed) ? data.completed : [])
+    .map(normaliseLiveSession)
+    .filter(Boolean);
   const groups = Array.isArray(data.groups) ? data.groups : [];
-  const whiteboardSnapshots = Array.isArray(data.whiteboard?.snapshots) ? data.whiteboard.snapshots : [];
+  const whiteboardSnapshots = (Array.isArray(data.whiteboard?.snapshots) ? data.whiteboard.snapshots : [])
+    .map(normaliseSnapshot)
+    .filter(Boolean);
   const readiness = Array.isArray(data.whiteboard?.readiness) ? data.whiteboard.readiness : [];
   const scheduleEvents = [...active, ...upcoming].map((sessionItem) => ({
     id: sessionItem.id,
@@ -763,7 +843,9 @@ export default function LearnerLiveClasses() {
             <div key={snapshot.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="dashboard-kicker">{snapshot.template}</p>
               <p className="mt-2 text-sm text-slate-600">{snapshot.summary}</p>
-              <p className="mt-3 text-xs text-slate-500">Updated {snapshot.updatedAt}</p>
+              <p className="mt-3 text-xs text-slate-500">
+                Updated {snapshot.displayDate ?? snapshot.updatedAt ?? 'Recently'}
+              </p>
             </div>
           ))}
           {whiteboardSnapshots.length === 0 && (

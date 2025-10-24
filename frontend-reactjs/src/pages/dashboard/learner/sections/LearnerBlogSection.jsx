@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 
+import { formatDashboardDate } from '../../../../utils/dashboardFormatting.js';
+
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
@@ -76,7 +78,9 @@ export default function LearnerBlogSection({ posts, featured, className }) {
           <p className="text-sm text-slate-600">{spotlight.excerpt ?? 'Tap through to read the full insight.'}</p>
           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-wide text-slate-500">
             <span>
-              {spotlight.publishedAt ? new Date(spotlight.publishedAt).toLocaleDateString() : 'Drafted'}
+              {spotlight.publishedAt
+                ? formatDashboardDate(spotlight.publishedAt, { fallback: 'Drafted' })
+                : 'Drafted'}
             </span>
             <Link
               to={spotlightLink}

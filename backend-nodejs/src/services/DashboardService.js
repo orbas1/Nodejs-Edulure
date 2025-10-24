@@ -1015,6 +1015,18 @@ export function buildLearnerDashboard({
       : booking.scheduledStart
         ? new Date(booking.scheduledStart.getTime() + booking.durationMinutes * 60 * 1000).toISOString()
         : null;
+    const meetingHref = sanitiseDashboardHref(
+      booking.meetingUrl ??
+        booking.metadata?.meetingUrl ??
+        booking.metadata?.joinUrl ??
+        booking.metadata?.ctaUrl ??
+        booking.metadata?.lobbyUrl ??
+        null
+    );
+    const bookingActionLabel = meetingHref ? 'Join mentor session' : 'View booking';
+    const bookingAction = meetingHref
+      ? { action: 'join', label: bookingActionLabel, href: meetingHref }
+      : { action: 'view', label: bookingActionLabel, href: null };
     learningUpcoming.push({
       id: booking.publicId ?? `tutor-booking-${booking.id}`,
       title: booking.metadata?.topic ?? 'Mentorship session',
@@ -1029,7 +1041,9 @@ export function buildLearnerDashboard({
       location: booking.metadata?.location ?? 'Mentor lounge',
       description: booking.metadata?.summary ?? booking.metadata?.notes ?? null,
       resources: booking.metadata?.resources ?? null,
-      action: booking.meetingUrl ?? booking.metadata?.meetingUrl ?? null,
+      action: bookingAction,
+      actionLabel: bookingActionLabel,
+      actionHref: meetingHref,
       dateLabel: formatRelativeDay(booking.scheduledStart, now)
     });
   });
@@ -1046,6 +1060,32 @@ export function buildLearnerDashboard({
         : metadata.host
           ? [metadata.host]
           : [];
+    const joinHref = sanitiseDashboardHref(
+      metadata.joinUrl ??
+        metadata.meetingUrl ??
+        metadata.streamUrl ??
+        metadata.ctaUrl ??
+        null
+    );
+    const checkInHref = sanitiseDashboardHref(metadata.checkInUrl ?? metadata.lobbyUrl ?? joinHref);
+    const lobbyHref = sanitiseDashboardHref(
+      metadata.lobbyUrl ?? metadata.detailsUrl ?? metadata.pageUrl ?? metadata.url ?? null
+    );
+    let sessionAction = null;
+    if (joinHref || checkInHref) {
+      const hoursUntil = startAtIso ? (new Date(startAtIso).getTime() - now.getTime()) / (60 * 60 * 1000) : null;
+      const actionableSoon = hoursUntil !== null && hoursUntil <= 1;
+      if (actionableSoon || !checkInHref) {
+        sessionAction = { action: 'join', label: 'Join live session', href: joinHref ?? checkInHref };
+      } else {
+        sessionAction = { action: 'check-in', label: 'Check in', href: checkInHref };
+      }
+    }
+    const sessionActionLabel = sessionAction?.label ?? 'View session';
+    const sessionActionHref = sessionAction?.href ?? lobbyHref ?? joinHref ?? checkInHref ?? null;
+    if (!sessionAction) {
+      sessionAction = { action: 'view', label: sessionActionLabel, href: sessionActionHref };
+    }
     learningUpcoming.push({
       id: session.publicId ?? `live-session-${session.id ?? crypto.randomUUID()}`,
       title: session.title ?? 'Live classroom',
@@ -1064,7 +1104,9 @@ export function buildLearnerDashboard({
       capacity: session.capacity ?? metadata.capacity ?? null,
       timezone: metadata.timezone ?? null,
       stage: metadata.stage ?? 'Live classroom',
-      action: metadata.meetingUrl ?? metadata.joinUrl ?? null,
+      action: sessionAction,
+      actionLabel: sessionActionLabel,
+      actionHref: sessionActionHref,
       dateLabel: formatRelativeDay(session.startAt, now)
     });
   });
@@ -1074,6 +1116,17 @@ export function buildLearnerDashboard({
     .filter((event) => event.startAt && event.startAt >= now)
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
     .forEach((event) => {
+      const eventHref = sanitiseDashboardHref(
+        event.meetingUrl ??
+          event.joinUrl ??
+          event.registrationUrl ??
+          event.url ??
+          event.actionUrl ??
+          null
+      );
+      const eventAction = eventHref
+        ? { action: 'join', label: 'View event page', href: eventHref }
+        : { action: 'view', label: 'View event details', href: null };
       learningUpcoming.push({
         id: event.id ? `community-event-${event.id}` : `community-event-${event.communityId}`,
         title: event.title ?? 'Community event',
@@ -1087,7 +1140,9 @@ export function buildLearnerDashboard({
         location: event.location ?? 'Community hub',
         description: event.description ?? null,
         resources: event.resources ?? null,
-        action: event.meetingUrl ?? null,
+        action: eventAction,
+        actionLabel: eventAction.label,
+        actionHref: eventHref,
         dateLabel: formatRelativeDay(event.startAt, now)
       });
     });
@@ -1097,6 +1152,16 @@ export function buildLearnerDashboard({
     .forEach((invoice) => {
       const invoiceDate = normaliseDate(invoice.date);
       const endAt = invoiceDate ? new Date(invoiceDate.getTime() + 30 * 60 * 1000) : null;
+      const invoiceHref = sanitiseDashboardHref(
+        invoice.paymentUrl ??
+          invoice.actionUrl ??
+          invoice.ctaUrl ??
+          invoice.href ??
+          '/dashboard/learner/financial'
+      );
+      const invoiceAction = invoiceHref
+        ? { action: 'pay', label: 'Pay invoice', href: invoiceHref }
+        : { action: 'view', label: 'View invoice', href: '/dashboard/learner/financial' };
       learningUpcoming.push({
         id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
         title: invoice.label ?? 'Invoice payment',
@@ -1108,7 +1173,9 @@ export function buildLearnerDashboard({
         host: invoice.currency ?? 'USD',
         location: 'Billing desk',
         description: invoice.reference ? `Reference ${invoice.reference}` : null,
-        action: null,
+        action: invoiceAction,
+        actionLabel: invoiceAction.label,
+        actionHref: invoiceAction.href,
         dateLabel: invoiceDate ? formatRelativeDay(invoiceDate, now) : null
       });
     });
@@ -2014,6 +2081,17 @@ export function buildLearnerDashboard({
     const stage = metadata.stage ?? (session.type ? String(session.type).replace(/_/g, ' ') : 'Live classroom');
     const communityId = session.communityId ?? metadata.communityId ?? null;
     const communityName = communityId ? communityNameMap.get(communityId) ?? `Community ${communityId}` : metadata.communityName;
+    const joinHref = sanitiseDashboardHref(
+      metadata.joinUrl ??
+        metadata.meetingUrl ??
+        metadata.streamUrl ??
+        metadata.ctaUrl ??
+        null
+    );
+    const checkInHref = sanitiseDashboardHref(metadata.checkInUrl ?? metadata.lobbyUrl ?? joinHref);
+    const lobbyHref = sanitiseDashboardHref(
+      metadata.lobbyUrl ?? metadata.detailsUrl ?? metadata.pageUrl ?? metadata.url ?? null
+    );
 
     const nowTime = now.getTime();
     const startTime = startAt ? startAt.getTime() : null;
@@ -2031,14 +2109,16 @@ export function buildLearnerDashboard({
 
     let callToAction = null;
     if (phase === 'live') {
-      callToAction = { action: 'join', label: 'Join session', enabled: true };
+      callToAction = { action: 'join', label: 'Join session', enabled: true, href: joinHref ?? checkInHref ?? lobbyHref };
     } else if (phase === 'scheduled') {
       const hoursUntil = startTime ? (startTime - nowTime) / (60 * 60 * 1000) : null;
       const isSoon = hoursUntil !== null && hoursUntil <= 1;
+      const scheduledHref = isSoon ? joinHref ?? checkInHref ?? lobbyHref : checkInHref ?? joinHref ?? lobbyHref;
       callToAction = {
         action: isSoon ? 'join' : 'check-in',
         label: isSoon ? 'Join session' : 'Check in',
-        enabled: true
+        enabled: true,
+        href: scheduledHref ?? null
       };
     }
 

@@ -17,6 +17,14 @@ import LearnerGoalsSection from './sections/LearnerGoalsSection.jsx';
 import LearnerSurveySection from './sections/LearnerSurveySection.jsx';
 import LearnerRevenueBanner from './sections/LearnerRevenueBanner.jsx';
 import LearnerQuickActionsSection from './sections/LearnerQuickActionsSection.jsx';
+import {
+  formatDashboardDate,
+  formatDashboardDateTime,
+  formatDashboardRelative,
+  formatDashboardWindow,
+  getDashboardUrgency,
+  describeDashboardUrgency
+} from '../../../utils/dashboardFormatting.js';
 
 function normaliseSectionKey(name) {
   return name?.toString().trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -147,19 +155,79 @@ function normaliseLearningPace(entries) {
   }));
 }
 
+function resolveUpcomingAction(event) {
+  if (!event || typeof event !== 'object') {
+    return { label: 'View details', href: null, type: null };
+  }
+
+  const actionCandidate = event.callToAction ?? event.action ?? null;
+  const labelCandidates = [event.actionLabel, event.ctaLabel, event.buttonLabel];
+  const hrefCandidates = [
+    event.actionHref,
+    event.ctaHref,
+    event.href,
+    event.url,
+    event.actionUrl,
+    event.ctaUrl
+  ];
+
+  if (actionCandidate && typeof actionCandidate === 'object') {
+    if (actionCandidate.label) labelCandidates.push(actionCandidate.label);
+    if (actionCandidate.title) labelCandidates.push(actionCandidate.title);
+    hrefCandidates.push(actionCandidate.href, actionCandidate.url, actionCandidate.link);
+  } else if (typeof actionCandidate === 'string') {
+    const directHref = sanitiseActionLink(actionCandidate);
+    if (directHref) {
+      hrefCandidates.unshift(directHref);
+    } else {
+      labelCandidates.push(actionCandidate);
+    }
+  }
+
+  let href = null;
+  for (const candidate of hrefCandidates) {
+    const sanitised = sanitiseActionLink(candidate);
+    if (sanitised) {
+      href = sanitised;
+      break;
+    }
+  }
+
+  const label = labelCandidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+  const resolvedLabel = label ?? (href ? 'Open details' : 'View details');
+  const type =
+    (typeof actionCandidate === 'object' && actionCandidate?.action) || event.actionType || event.actionKind || null;
+
+  return { label: resolvedLabel, href, type };
+}
+
 function normaliseUpcoming(upcoming) {
   if (!Array.isArray(upcoming)) return [];
+  const baseDate = new Date();
   return upcoming
     .filter((event) => event?.id)
-    .map((event) => ({
-      id: event.id,
-      type: event.type ?? 'Session',
-      date: event.date ?? event.time ?? 'TBC',
-      title: event.title ?? 'Upcoming session',
-      host: event.host ?? 'Edulure team',
-      action: event.action ?? 'View details',
-      href: sanitiseActionLink(event.href ?? event.url ?? event.actionUrl ?? event.ctaUrl)
-    }));
+    .map((event) => {
+      const start = event.startAt ?? event.start ?? event.date ?? event.time ?? null;
+      const end = event.endAt ?? event.end ?? event.finishAt ?? null;
+      const timezone = event.timezone ?? event.tz ?? event.timeZone ?? null;
+      const scheduledFor = start ?? end;
+      const { label: actionLabel, href: actionHref, type: actionType } = resolveUpcomingAction(event);
+      const urgency = getDashboardUrgency(scheduledFor, { baseDate });
+      return {
+        id: event.id,
+        type: event.type ?? 'Session',
+        date: formatDashboardWindow(start, end, { timezone, fallback: 'Schedule pending' }),
+        relative: formatDashboardRelative(scheduledFor, { baseDate, numeric: 'auto' }),
+        urgency,
+        urgencyLabel: describeDashboardUrgency(scheduledFor, { baseDate }),
+        title: event.title ?? 'Upcoming session',
+        host: event.host ?? 'Edulure team',
+        action: actionLabel,
+        actionLabel,
+        actionType,
+        href: actionHref
+      };
+    });
 }
 
 function normaliseQuickActions({ progressCards, upcoming, dashboard }) {
@@ -268,15 +336,9 @@ function normaliseQuickActions({ progressCards, upcoming, dashboard }) {
       const nextAssignment = assignmentSummary.upcoming[0];
       const courseTitle = nextAssignment.course ?? nextAssignment.courseTitle ?? null;
       const dueLabelRaw = nextAssignment.dueLabel ?? nextAssignment.dueDate ?? null;
-      let dueLabel = null;
-      if (typeof dueLabelRaw === 'string' && dueLabelRaw.trim()) {
-        const parsedDate = new Date(dueLabelRaw);
-        if (!Number.isNaN(parsedDate.getTime())) {
-          dueLabel = parsedDate.toLocaleDateString();
-        } else {
-          dueLabel = dueLabelRaw;
-        }
-      }
+      const dueLabel = dueLabelRaw
+        ? formatDashboardDate(dueLabelRaw, { fallback: dueLabelRaw })
+        : null;
       assignmentDescription = [
         courseTitle ? `Submit ${courseTitle}` : null,
         dueLabel ? `due ${dueLabel}` : null
@@ -335,12 +397,13 @@ function normaliseNotifications(notifications) {
         typeof notification.title === 'string' && notification.title.trim().length > 0
           ? notification.title
           : String(notification.title ?? 'Dashboard update'),
-      timestamp:
-        typeof notification.timestamp === 'string' && notification.timestamp.trim().length > 0
-          ? notification.timestamp
-          : notification.timestamp instanceof Date
-            ? notification.timestamp.toLocaleString()
-            : String(notification.timestamp ?? 'Just now'),
+      timestamp: (() => {
+        const timestampValue =
+          notification.timestamp ?? notification.createdAt ?? notification.created_at ?? null;
+        const absolute = formatDashboardDateTime(timestampValue, { fallback: 'Just now' });
+        const relative = formatDashboardRelative(timestampValue);
+        return `${absolute} • ${relative}`;
+      })(),
       type: notification.type ?? 'update'
     }));
 }
@@ -407,7 +470,7 @@ function normaliseProgressCards(courses, goals, promotions) {
     const dueLabel = goal?.dueLabel
       ? goal.dueLabel
       : goal?.dueDate
-        ? new Date(goal.dueDate).toLocaleDateString()
+        ? formatDashboardDate(goal.dueDate, { fallback: goal.dueDate })
         : goal?.metadata?.dueLabel ?? null;
     const nextStep = goal?.nextStep ?? goal?.upNext ?? course?.nextLesson ?? null;
     const goalPriority = Number.isFinite(Number(goal?.priority)) ? Number(goal.priority) : null;
@@ -437,7 +500,7 @@ function normaliseProgressCards(courses, goals, promotions) {
     const meta = course.lastTouchedLabel
       ? { lastUpdatedLabel: course.lastTouchedLabel }
       : course.lastTouchedAt
-        ? { lastUpdatedLabel: new Date(course.lastTouchedAt).toLocaleDateString() }
+        ? { lastUpdatedLabel: formatDashboardDate(course.lastTouchedAt, { fallback: 'Recently' }) }
         : goal?.metadata?.updatedLabel
           ? { lastUpdatedLabel: goal.metadata.updatedLabel }
           : null;
@@ -491,10 +554,10 @@ function normaliseGoals(goals) {
     const progressPercent = Number.isFinite(Number(goal?.progressPercent))
       ? Number(goal.progressPercent)
       : 0;
-    const dueLabel = goal?.dueLabel
-      ? goal.dueLabel
-      : goal?.dueDate
-        ? new Date(goal.dueDate).toLocaleDateString()
+  const dueLabel = goal?.dueLabel
+    ? goal.dueLabel
+    : goal?.dueDate
+        ? formatDashboardDate(goal.dueDate, { fallback: goal.dueDate })
         : null;
 
     return {
