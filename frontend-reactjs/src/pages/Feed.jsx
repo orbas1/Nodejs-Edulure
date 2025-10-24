@@ -28,6 +28,13 @@ import { useAuthorization } from '../hooks/useAuthorization.js';
 import useFeedInteractions from '../hooks/useFeedInteractions.js';
 import { preloadImage } from '../utils/mediaCache.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import {
+  computeCommunityEngagementScore,
+  extractCommunityPersonas,
+  getPersonaLabel,
+  resolveLastActivity,
+  summarisePersonaCounts
+} from '../utils/communityPersona.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -561,6 +568,48 @@ export default function Feed() {
     }
     return selectedCommunity?.id;
   }, [selectedCommunity, composerCommunities]);
+
+  const personaSummary = useMemo(() => summarisePersonaCounts(communities), [communities]);
+
+  const topMomentumCommunities = useMemo(() => {
+    const eligible = communities.filter(
+      (community) => community && String(community.id) !== String(ALL_COMMUNITIES_NODE.id)
+    );
+    return eligible
+      .map((community) => {
+        const score = Number(
+          community?.stats?.momentumScore ?? computeCommunityEngagementScore(community)
+        );
+        const personas = extractCommunityPersonas(community);
+        return {
+          id: community.id,
+          name: community.name,
+          score,
+          members: Number(community?.stats?.members ?? 0),
+          lastActivityAt:
+            community?.personaSummary?.lastActivityAt ?? resolveLastActivity(community),
+          personaLabels: personas.map(getPersonaLabel),
+          node: community
+        };
+      })
+      .sort((a, b) => {
+        if (b.score === a.score) {
+          return b.members - a.members;
+        }
+        return b.score - a.score;
+      })
+      .slice(0, 3);
+  }, [communities]);
+
+  const selectCommunityFromMomentum = useCallback(
+    (communityId) => {
+      const match = communities.find((community) => String(community.id) === String(communityId));
+      if (match) {
+        setSelectedCommunity(match);
+      }
+    },
+    [communities]
+  );
 
   useEffect(() => {
     setJoinError(null);
@@ -1298,6 +1347,61 @@ export default function Feed() {
             </div>
           </div>
           <div className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Community health</h2>
+              <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                {personaSummary.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-500">
+                    Directory insights will appear once communities finish loading.
+                  </div>
+                ) : (
+                  personaSummary.slice(0, 4).map((entry) => (
+                    <div key={entry.id} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{entry.label}</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-900">{formatCount(entry.count)}</p>
+                      <p className="mt-1 text-xs text-slate-500">Communities instrumented for this audience</p>
+                    </div>
+                  ))
+                )}
+              </div>
+              {topMomentumCommunities.length > 0 && (
+                <div className="mt-6 space-y-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Momentum leaderboard
+                  </p>
+                  {topMomentumCommunities.map((community) => (
+                    <button
+                      key={community.id}
+                      type="button"
+                      onClick={() => selectCommunityFromMomentum(community.id)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white/70 p-4 text-left text-sm text-slate-700 transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold text-slate-900">{community.name}</p>
+                        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                          Score {formatCount(community.score)}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
+                        {community.personaLabels.map((label) => (
+                          <span key={label} className="rounded-full bg-slate-100 px-3 py-1">
+                            {label}
+                          </span>
+                        ))}
+                        <span className="rounded-full bg-slate-100 px-3 py-1">
+                          {formatCount(community.members)} members
+                        </span>
+                        {community.lastActivityAt && (
+                          <span className="rounded-full bg-slate-100 px-3 py-1">
+                            {formatRelativeTimestamp(community.lastActivityAt)}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-slate-900">Trending now</h2>
               {isLoadingInsights ? (

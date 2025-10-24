@@ -17,15 +17,53 @@ export default function SettingsLayout({
   actions,
   status,
   afterHeader,
-  children
+  children,
+  breadcrumbs,
+  lastSavedAt
 }) {
   const statusClassName = useMemo(() => {
     if (!status) return null;
     return STATUS_STYLES[status.type] ?? STATUS_STYLES.info;
   }, [status]);
 
+  const formattedLastSaved = useMemo(() => {
+    if (!lastSavedAt) return null;
+    const date = lastSavedAt instanceof Date ? lastSavedAt : new Date(lastSavedAt);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    return new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      minute: '2-digit',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  }, [lastSavedAt]);
+
   return (
     <div className="flex flex-col gap-6">
+      {breadcrumbs?.length ? (
+        <nav aria-label="Settings breadcrumbs">
+          <ol className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {breadcrumbs.map((crumb, index) => {
+              const isLast = index === breadcrumbs.length - 1;
+              return (
+                <li key={crumb.href ?? crumb.label} className="flex items-center gap-2">
+                  {crumb.href && !isLast ? (
+                    <a href={crumb.href} className="text-primary hover:underline">
+                      {crumb.label}
+                    </a>
+                  ) : (
+                    <span className={isLast ? 'text-slate-500' : undefined}>{crumb.label}</span>
+                  )}
+                  {!isLast ? <span aria-hidden="true">/</span> : null}
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+      ) : null}
+
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           {eyebrow ? <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{eyebrow}</p> : null}
@@ -34,7 +72,12 @@ export default function SettingsLayout({
             {description ? <p className="mt-1 text-sm text-slate-600">{description}</p> : null}
           </div>
         </div>
-        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+        <div className="flex flex-col gap-2 text-right lg:items-end">
+          {formattedLastSaved ? (
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Last saved {formattedLastSaved}</p>
+          ) : null}
+          {actions ? <div className="flex flex-wrap gap-2 lg:justify-end">{actions}</div> : null}
+        </div>
       </header>
 
       {status ? (
@@ -66,7 +109,14 @@ SettingsLayout.propTypes = {
     liveRegion: PropTypes.oneOf(['polite', 'assertive'])
   }),
   afterHeader: PropTypes.node,
-  children: PropTypes.node.isRequired
+  children: PropTypes.node.isRequired,
+  breadcrumbs: PropTypes.arrayOf(
+    PropTypes.shape({
+      label: PropTypes.string.isRequired,
+      href: PropTypes.string
+    })
+  ),
+  lastSavedAt: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)])
 };
 
 SettingsLayout.defaultProps = {
@@ -74,5 +124,7 @@ SettingsLayout.defaultProps = {
   description: undefined,
   actions: undefined,
   status: undefined,
-  afterHeader: undefined
+  afterHeader: undefined,
+  breadcrumbs: undefined,
+  lastSavedAt: undefined
 };

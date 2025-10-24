@@ -404,6 +404,190 @@ BEGIN
       ALTER TABLE support_articles ADD INDEX idx_support_articles_score (helpfulness_score);
     END IF;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_system_preferences'
+  ) THEN
+    CREATE TABLE learner_system_preferences (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNSIGNED NOT NULL,
+      language VARCHAR(8) NOT NULL DEFAULT 'en',
+      region VARCHAR(32) NOT NULL DEFAULT 'US',
+      timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+      notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
+      digest_enabled TINYINT(1) NOT NULL DEFAULT 1,
+      auto_play_media TINYINT(1) NOT NULL DEFAULT 0,
+      high_contrast TINYINT(1) NOT NULL DEFAULT 0,
+      reduced_motion TINYINT(1) NOT NULL DEFAULT 0,
+      preferences JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY learner_system_preferences_user_unique (user_id),
+      CONSTRAINT fk_learner_system_preferences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_financial_profiles'
+  ) THEN
+    CREATE TABLE learner_financial_profiles (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNSIGNED NOT NULL,
+      auto_pay_enabled TINYINT(1) NOT NULL DEFAULT 0,
+      reserve_target_cents INT UNSIGNED NOT NULL DEFAULT 0,
+      preferences JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY learner_financial_profiles_user_unique (user_id),
+      CONSTRAINT fk_learner_financial_profiles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT learner_financial_profiles_reserve_chk CHECK (reserve_target_cents >= 0)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_financial_profiles'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_financial_profiles'
+         AND index_name = 'learner_financial_profiles_user_unique'
+    ) THEN
+      ALTER TABLE learner_financial_profiles
+        ADD UNIQUE KEY learner_financial_profiles_user_unique (user_id);
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_payment_methods'
+  ) THEN
+    CREATE TABLE learner_payment_methods (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNSIGNED NOT NULL,
+      label VARCHAR(120) NOT NULL,
+      brand VARCHAR(60) NOT NULL,
+      last4 VARCHAR(4) NOT NULL,
+      expiry VARCHAR(10) NOT NULL,
+      is_primary TINYINT(1) NOT NULL DEFAULT 0,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY learner_payment_methods_user_label_unique (user_id, label),
+      KEY learner_payment_methods_user_primary_idx (user_id, is_primary),
+      CONSTRAINT fk_learner_payment_methods_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_payment_methods'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_payment_methods'
+         AND index_name = 'learner_payment_methods_user_primary_idx'
+    ) THEN
+      ALTER TABLE learner_payment_methods
+        ADD INDEX learner_payment_methods_user_primary_idx (user_id, is_primary);
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_billing_contacts'
+  ) THEN
+    CREATE TABLE learner_billing_contacts (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNSIGNED NOT NULL,
+      name VARCHAR(150) NOT NULL,
+      email VARCHAR(180) NOT NULL,
+      phone VARCHAR(60) NULL,
+      company VARCHAR(150) NULL,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY learner_billing_contacts_user_email_unique (user_id, email),
+      KEY learner_billing_contacts_user_idx (user_id),
+      CONSTRAINT fk_learner_billing_contacts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_billing_contacts'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_billing_contacts'
+         AND index_name = 'learner_billing_contacts_user_idx'
+    ) THEN
+      ALTER TABLE learner_billing_contacts
+        ADD INDEX learner_billing_contacts_user_idx (user_id);
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_finance_purchases'
+  ) THEN
+    CREATE TABLE learner_finance_purchases (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNSIGNED NOT NULL,
+      reference VARCHAR(64) NOT NULL,
+      description VARCHAR(255) NOT NULL,
+      amount_cents INT UNSIGNED NOT NULL DEFAULT 0,
+      currency CHAR(3) NOT NULL DEFAULT 'USD',
+      status VARCHAR(32) NOT NULL DEFAULT 'paid',
+      purchased_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      KEY learner_finance_purchases_user_date_idx (user_id, purchased_at),
+      KEY learner_finance_purchases_user_status_idx (user_id, status),
+      CONSTRAINT fk_learner_finance_purchases_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT learner_finance_purchases_amount_chk CHECK (amount_cents >= 0)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_finance_purchases'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_finance_purchases'
+         AND index_name = 'learner_finance_purchases_user_date_idx'
+    ) THEN
+      ALTER TABLE learner_finance_purchases
+        ADD INDEX learner_finance_purchases_user_date_idx (user_id, purchased_at);
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.statistics
+       WHERE table_schema = DATABASE()
+         AND table_name = 'learner_finance_purchases'
+         AND index_name = 'learner_finance_purchases_user_status_idx'
+    ) THEN
+      ALTER TABLE learner_finance_purchases
+        ADD INDEX learner_finance_purchases_user_status_idx (user_id, status);
+    END IF;
+  END IF;
 END $$
 
 CALL ensure_edulure_extensions() $$
