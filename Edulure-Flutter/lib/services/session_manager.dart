@@ -28,6 +28,7 @@ class SessionManager {
   static const _instructorActionQueueBox = 'instructor_action_queue';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
+  static const _sessionMetadataKey = 'metadata';
   static const _secureAccessTokenKey = 'session.accessToken';
   static const _secureRefreshTokenKey = 'session.refreshToken';
 
@@ -96,6 +97,12 @@ class SessionManager {
     if (userRole is String && userRole.isNotEmpty) {
       await _session.put(_activeRoleKey, userRole);
     }
+    final metadata = _buildSessionMetadata(session, tokens);
+    if (metadata.isNotEmpty) {
+      await _session.put(_sessionMetadataKey, metadata);
+    } else {
+      await _session.delete(_sessionMetadataKey);
+    }
     if (tokens is Map) {
       final accessToken = tokens['accessToken'];
       final refreshToken = tokens['refreshToken'];
@@ -122,6 +129,70 @@ class SessionManager {
       return Map<String, dynamic>.from(data);
     }
     return null;
+  }
+
+  static Map<String, dynamic>? getSessionMetadata() {
+    final data = _session.get(_sessionMetadataKey);
+    if (data is Map) {
+      return Map<String, dynamic>.from(data as Map);
+    }
+    if (data is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(data);
+    }
+    return null;
+  }
+
+  static Map<String, dynamic> _buildSessionMetadata(
+    Map<String, dynamic> session,
+    dynamic tokens,
+  ) {
+    final metadata = <String, dynamic>{
+      'lastAuthenticatedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+    final user = session['user'];
+    if (user is Map) {
+      if (user['id'] != null) {
+        metadata['userId'] = user['id'].toString();
+      }
+      if (user['role'] != null) {
+        metadata['role'] = user['role'].toString();
+      }
+      if (user['email'] != null) {
+        metadata['email'] = user['email'].toString();
+      }
+    }
+    if (session['sessionId'] != null) {
+      metadata['sessionId'] = session['sessionId'].toString();
+    }
+    if (session['version'] != null) {
+      metadata['sessionVersion'] = session['version'].toString();
+    }
+    final twoFactor = session['twoFactor'];
+    if (twoFactor is Map && twoFactor['enabled'] != null) {
+      metadata['twoFactorEnabled'] = twoFactor['enabled'] == true;
+    }
+    final issuedAt = session['issuedAt'] ?? session['issued_at'];
+    if (issuedAt != null) {
+      metadata['issuedAt'] = issuedAt.toString();
+    }
+    if (tokens is Map) {
+      final accessExpiry = tokens['expiresAt'] ?? tokens['accessTokenExpiresAt'];
+      if (accessExpiry != null) {
+        metadata['accessTokenExpiresAt'] = accessExpiry.toString();
+      }
+      final refreshExpiry = tokens['refreshTokenExpiresAt'] ?? tokens['refreshExpiresAt'];
+      if (refreshExpiry != null) {
+        metadata['refreshTokenExpiresAt'] = refreshExpiry.toString();
+      }
+      if (tokens['sessionId'] != null) {
+        metadata['sessionTokenId'] = tokens['sessionId'].toString();
+      }
+    }
+    metadata.removeWhere(
+      (key, value) =>
+          value == null || (value is String && value.trim().isEmpty),
+    );
+    return metadata;
   }
 
   static ValueListenable<Box<dynamic>> sessionListenable() {
@@ -165,6 +236,7 @@ class SessionManager {
   static Future<void> clear() async {
     await _session.delete(_sessionKey);
     await _session.delete(_activeRoleKey);
+    await _session.delete(_sessionMetadataKey);
     await dashboardCache.clear();
     await _clearIfAvailable(_assetsBox);
     await _clearIfAvailable(_downloadsBox);

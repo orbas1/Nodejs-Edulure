@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
 import '../services/auth_service.dart';
+import '../services/auth_validators.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -30,9 +31,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _cityController = TextEditingController();
   final _countryController = TextEditingController();
   final _postcodeController = TextEditingController();
-
-  final _passwordPattern =
-      RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$');
 
   String _role = 'instructor';
   bool _termsAccepted = false;
@@ -196,9 +194,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!form.validate()) {
       return;
     }
-    if (!_termsAccepted) {
+    final consentError = AuthValidators.consentAccepted(
+      _termsAccepted,
+      fieldLabel: 'Terms of Service and Privacy Policy',
+    );
+    if (consentError != null) {
       setState(() {
-        _error = 'You must accept the terms to continue.';
+        _error = consentError;
       });
       return;
     }
@@ -346,15 +348,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           controller: _firstNameController,
                           decoration: const InputDecoration(labelText: 'First name'),
                           textInputAction: TextInputAction.next,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'First name is required';
-                            }
-                            if (value.trim().length < 2) {
-                              return 'Enter at least 2 characters';
-                            }
-                            return null;
-                          },
+                          validator: (value) =>
+                              AuthValidators.name(value, fieldLabel: 'First name'),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -363,12 +358,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           controller: _lastNameController,
                           decoration: const InputDecoration(labelText: 'Last name'),
                           textInputAction: TextInputAction.next,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Last name is required';
-                            }
-                            return null;
-                          },
+                          validator: (value) =>
+                              AuthValidators.name(value, fieldLabel: 'Last name'),
                         ),
                       ),
                     ],
@@ -379,16 +370,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Email address'),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Email is required';
-                      }
-                      final emailPattern = RegExp(r'^.+@.+\..+$');
-                      if (!emailPattern.hasMatch(value.trim())) {
-                        return 'Enter a valid email address';
-                      }
-                      return null;
-                    },
+                    validator: (value) =>
+                        AuthValidators.email(value, fieldLabel: 'Email address'),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
@@ -526,30 +509,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Password'),
                     obscureText: true,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Password is required';
-                      }
-                      if (!_passwordPattern.hasMatch(value)) {
-                        return 'Use 12+ chars with upper, lower, number, and symbol';
-                      }
-                      return null;
-                    },
+                    validator: (value) => AuthValidators.password(
+                      value,
+                      fieldLabel: 'Password',
+                      minLength: 12,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _confirmPasswordController,
                     decoration: const InputDecoration(labelText: 'Confirm password'),
                     obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Confirm your password';
-                      }
-                      if (value != _passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
+                    validator: (value) => AuthValidators.confirmPassword(
+                      value,
+                      _passwordController.text,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   SwitchListTile.adaptive(

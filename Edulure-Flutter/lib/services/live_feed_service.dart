@@ -1,27 +1,32 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
+import '../core/telemetry/telemetry_service.dart';
 import 'api_config.dart';
-import 'session_manager.dart';
+import 'feed_cache_repository.dart';
 
 class LiveFeedService {
-  LiveFeedService()
-      : _dio = Dio(
-          BaseOptions(
-            baseUrl: apiBaseUrl,
-            connectTimeout: const Duration(seconds: 12),
-            receiveTimeout: const Duration(seconds: 20),
-          ),
-        );
+  LiveFeedService({
+    Dio? httpClient,
+    FeedCacheRepository? cache,
+    TelemetryService? telemetry,
+    Duration cacheTtl = const Duration(minutes: 5),
+  })  : _dio = httpClient ?? ApiConfig.createHttpClient(requiresAuth: true),
+        _cache = cache,
+        _telemetry = telemetry,
+        _cacheTtl = cacheTtl;
 
   final Dio _dio;
+  final FeedCacheRepository? _cache;
+  final TelemetryService? _telemetry;
+  final Duration _cacheTtl;
 
-  Options _authOptions() {
-    final token = SessionManager.getAccessToken();
-    if (token == null || token.isEmpty) {
-      throw Exception('Authentication required');
-    }
-    return Options(headers: {'Authorization': 'Bearer $token'});
+  Options _requestOptions() {
+    return Options(
+      headers: Map<String, String>.from(ApiConfig.defaultHeaders),
+      extra: const {'requiresAuth': true},
+    );
   }
 
   Future<FeedSnapshot> fetchFeed({
@@ -34,31 +39,124 @@ class LiveFeedService {
     String range = '30d',
     String? search,
     String? postType,
+    bool preferCache = true,
+    bool forceRefresh = false,
   }) async {
-    final response = await _dio.get(
-      '/feed',
-      queryParameters: <String, dynamic>{
-        'context': describeEnum(context),
-        if (community != null) 'community': community,
-        'page': page,
-        'perPage': perPage,
-        'includeAnalytics': includeAnalytics,
-        'includeHighlights': includeHighlights,
-        'range': range,
-        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
-        if (postType != null && postType.trim().isNotEmpty) 'postType': postType.trim(),
-      },
-      options: _authOptions(),
+    await _cache?.pruneExpired();
+    final cacheKey = _cacheKey(
+      context: context,
+      community: community,
+      page: page,
+      perPage: perPage,
+      includeAnalytics: includeAnalytics,
+      includeHighlights: includeHighlights,
+      range: range,
+      search: search,
+      postType: postType,
     );
 
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return FeedSnapshot.fromJson(payload);
+    FeedCacheEntry? cached;
+    final canUseCache = _cache != null && page == 1 && preferCache && !forceRefresh;
+    if (canUseCache) {
+      cached = await _cache!.read(cacheKey);
+      if (cached != null) {
+        _recordFeedEvent(
+          action: 'fetch',
+          success: true,
+          metadata: {
+            'context': describeEnum(context),
+            if (community != null) 'community': community,
+            'fromCache': true,
+          },
+        );
+        return _dedupeSnapshot(FeedSnapshot.fromJson(cached.payload));
+      }
     }
-    if (payload is Map) {
-      return FeedSnapshot.fromJson(Map<String, dynamic>.from(payload as Map));
+
+    final stopwatch = Stopwatch()..start();
+    try {
+      final response = await _dio.get(
+        '/feed',
+        queryParameters: <String, dynamic>{
+          'context': describeEnum(context),
+          if (community != null) 'community': community,
+          'page': page,
+          'perPage': perPage,
+          'includeAnalytics': includeAnalytics,
+          'includeHighlights': includeHighlights,
+          'range': range,
+          if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+          if (postType != null && postType.trim().isNotEmpty) 'postType': postType.trim(),
+        },
+        options: _requestOptions(),
+      );
+
+      final rawPayload = _extractFeedPayload(response.data);
+      if (rawPayload.isEmpty) {
+        throw Exception('Unexpected feed response payload');
+      }
+      final snapshot = _dedupeSnapshot(FeedSnapshot.fromJson(rawPayload));
+      stopwatch.stop();
+      await _cache?.write(
+        cacheKey,
+        rawPayload,
+        fetchedAt: snapshot.generatedAt,
+        metadata: {
+          'context': describeEnum(context),
+          if (community != null) 'community': community,
+          'itemCount': snapshot.items.length,
+          'highlightCount': snapshot.highlights.length,
+          'range': snapshot.range?.key ?? range,
+        },
+      );
+      _recordFeedEvent(
+        action: 'fetch',
+        success: true,
+        duration: stopwatch.elapsed,
+        metadata: {
+          'context': describeEnum(context),
+          if (community != null) 'community': community,
+          'fromCache': false,
+          'itemCount': snapshot.items.length,
+          'page': page,
+        },
+      );
+      return snapshot;
+    } on DioException catch (error) {
+      stopwatch.stop();
+      _recordFeedEvent(
+        action: 'fetch',
+        success: false,
+        duration: stopwatch.elapsed,
+        metadata: {
+          'context': describeEnum(context),
+          if (community != null) 'community': community,
+          'page': page,
+          'statusCode': error.response?.statusCode,
+        },
+      );
+      if (cached != null) {
+        return _dedupeSnapshot(FeedSnapshot.fromJson(cached.payload));
+      }
+      throw error;
+    } catch (error) {
+      stopwatch.stop();
+      _recordFeedEvent(
+        action: 'fetch',
+        success: false,
+        duration: stopwatch.elapsed,
+        metadata: {
+          'context': describeEnum(context),
+          if (community != null) 'community': community,
+          'page': page,
+          'error': error.toString(),
+        },
+      );
+      if (cached != null) {
+        return _dedupeSnapshot(FeedSnapshot.fromJson(cached.payload));
+      }
+      rethrow;
     }
-    throw Exception('Unexpected feed response payload');
   }
 
   Future<FeedAnalytics> fetchAnalytics({
@@ -68,26 +166,81 @@ class LiveFeedService {
     String? search,
     String? postType,
   }) async {
-    final response = await _dio.get(
-      '/feed/analytics',
-      queryParameters: <String, dynamic>{
-        'context': describeEnum(context),
-        if (community != null) 'community': community,
-        'range': range,
-        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
-        if (postType != null && postType.trim().isNotEmpty) 'postType': postType.trim(),
-      },
-      options: _authOptions(),
-    );
+    final stopwatch = Stopwatch()..start();
+    try {
+      final response = await _dio.get(
+        '/feed/analytics',
+        queryParameters: <String, dynamic>{
+          'context': describeEnum(context),
+          if (community != null) 'community': community,
+          'range': range,
+          if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+          if (postType != null && postType.trim().isNotEmpty) 'postType': postType.trim(),
+        },
+        options: _requestOptions(),
+      );
 
-    final payload = response.data['data'];
-    if (payload is Map<String, dynamic>) {
-      return FeedAnalytics.fromJson(payload);
+      final payload = response.data['data'];
+      if (payload is Map<String, dynamic>) {
+        final analytics = FeedAnalytics.fromJson(payload);
+        stopwatch.stop();
+        _recordFeedEvent(
+          action: 'analytics',
+          success: true,
+          duration: stopwatch.elapsed,
+          metadata: {
+            'context': describeEnum(context),
+            if (community != null) 'community': community,
+            'range': range,
+          },
+        );
+        return analytics;
+      }
+      if (payload is Map) {
+        final analytics = FeedAnalytics.fromJson(Map<String, dynamic>.from(payload as Map));
+        stopwatch.stop();
+        _recordFeedEvent(
+          action: 'analytics',
+          success: true,
+          duration: stopwatch.elapsed,
+          metadata: {
+            'context': describeEnum(context),
+            if (community != null) 'community': community,
+            'range': range,
+          },
+        );
+        return analytics;
+      }
+      throw Exception('Unexpected analytics payload');
+    } on DioException catch (error) {
+      stopwatch.stop();
+      _recordFeedEvent(
+        action: 'analytics',
+        success: false,
+        duration: stopwatch.elapsed,
+        metadata: {
+          'context': describeEnum(context),
+          if (community != null) 'community': community,
+          'range': range,
+          'statusCode': error.response?.statusCode,
+        },
+      );
+      throw error;
+    } catch (error) {
+      stopwatch.stop();
+      _recordFeedEvent(
+        action: 'analytics',
+        success: false,
+        duration: stopwatch.elapsed,
+        metadata: {
+          'context': describeEnum(context),
+          if (community != null) 'community': community,
+          'range': range,
+          'error': error.toString(),
+        },
+      );
+      rethrow;
     }
-    if (payload is Map) {
-      return FeedAnalytics.fromJson(Map<String, dynamic>.from(payload as Map));
-    }
-    throw Exception('Unexpected analytics payload');
   }
 
   Future<List<FeedPlacement>> fetchPlacements({
@@ -95,24 +248,188 @@ class LiveFeedService {
     int limit = 3,
     List<String>? keywords,
   }) async {
-    final response = await _dio.get(
-      '/feed/placements',
-      queryParameters: <String, dynamic>{
-        'context': describeEnum(context),
-        'limit': limit,
-        if (keywords != null && keywords.isNotEmpty) 'keywords': keywords.join(','),
-      },
-      options: _authOptions(),
-    );
+    final stopwatch = Stopwatch()..start();
+    try {
+      final response = await _dio.get(
+        '/feed/placements',
+        queryParameters: <String, dynamic>{
+          'context': describeEnum(context),
+          'limit': limit,
+          if (keywords != null && keywords.isNotEmpty) 'keywords': keywords.join(','),
+        },
+        options: _requestOptions(),
+      );
 
-    final data = response.data['data'];
-    if (data is List) {
-      return data
-          .whereType<Map>()
-          .map((entry) => FeedPlacement.fromJson(Map<String, dynamic>.from(entry as Map)))
-          .toList();
+      final data = response.data['data'];
+      if (data is List) {
+        final placements = data
+            .whereType<Map>()
+            .map((entry) => FeedPlacement.fromJson(Map<String, dynamic>.from(entry as Map)))
+            .toList();
+        stopwatch.stop();
+        _recordFeedEvent(
+          action: 'placements',
+          success: true,
+          duration: stopwatch.elapsed,
+          metadata: {
+            'context': describeEnum(context),
+            'limit': limit,
+            'resultCount': placements.length,
+          },
+        );
+        return placements;
+      }
+      stopwatch.stop();
+      _recordFeedEvent(
+        action: 'placements',
+        success: true,
+        duration: stopwatch.elapsed,
+        metadata: {
+          'context': describeEnum(context),
+          'limit': limit,
+          'resultCount': 0,
+        },
+      );
+      return const <FeedPlacement>[];
+    } on DioException catch (error) {
+      stopwatch.stop();
+      _recordFeedEvent(
+        action: 'placements',
+        success: false,
+        duration: stopwatch.elapsed,
+        metadata: {
+          'context': describeEnum(context),
+          'limit': limit,
+          'statusCode': error.response?.statusCode,
+        },
+      );
+      throw error;
+    } catch (error) {
+      stopwatch.stop();
+      _recordFeedEvent(
+        action: 'placements',
+        success: false,
+        duration: stopwatch.elapsed,
+        metadata: {
+          'context': describeEnum(context),
+          'limit': limit,
+          'error': error.toString(),
+        },
+      );
+      rethrow;
     }
-    return const <FeedPlacement>[];
+  }
+
+  String _cacheKey({
+    required FeedContext context,
+    String? community,
+    required int page,
+    required int perPage,
+    required bool includeAnalytics,
+    required bool includeHighlights,
+    required String range,
+    String? search,
+    String? postType,
+  }) {
+    final buffer = StringBuffer(describeEnum(context));
+    if (community != null && community.isNotEmpty) {
+      buffer.write('#$community');
+    }
+    buffer
+      ..write('?page=$page')
+      ..write('&perPage=$perPage')
+      ..write('&analytics=$includeAnalytics')
+      ..write('&highlights=$includeHighlights')
+      ..write('&range=${range.trim()}');
+    if (search != null && search.trim().isNotEmpty) {
+      buffer.write('&search=${search.trim().toLowerCase()}');
+    }
+    if (postType != null && postType.trim().isNotEmpty) {
+      buffer.write('&postType=${postType.trim()}');
+    }
+    return buffer.toString();
+  }
+
+  Map<String, dynamic> _extractFeedPayload(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        return Map<String, dynamic>.from(data);
+      }
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+    }
+    if (response is Map) {
+      final map = Map<String, dynamic>.from(response as Map);
+      final data = map['data'];
+      if (data is Map<String, dynamic>) {
+        return Map<String, dynamic>.from(data);
+      }
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+      return map;
+    }
+    return <String, dynamic>{};
+  }
+
+  FeedSnapshot _dedupeSnapshot(FeedSnapshot snapshot) {
+    final seenPosts = <String>{};
+    final seenAds = <String>{};
+    final dedupedItems = <FeedEntry>[];
+    for (final entry in snapshot.items) {
+      switch (entry.kind) {
+        case FeedEntryKind.post:
+          final id = entry.post?.id;
+          if (id == null || id.isEmpty || seenPosts.add(id)) {
+            dedupedItems.add(entry);
+          }
+          break;
+        case FeedEntryKind.ad:
+          final ad = entry.ad;
+          final key = ad == null
+              ? null
+              : '${ad.placementId}:${ad.slot}:${ad.campaignId}';
+          if (key == null || seenAds.add(key)) {
+            dedupedItems.add(entry);
+          }
+          break;
+      }
+    }
+    final dedupedHighlights = <FeedHighlight>[];
+    final seenHighlightIds = <String>{};
+    for (final highlight in snapshot.highlights) {
+      final key = '${highlight.type}:${highlight.id}';
+      if (seenHighlightIds.add(key)) {
+        dedupedHighlights.add(highlight);
+      }
+    }
+    dedupedHighlights.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return snapshot.copyWith(
+      items: dedupedItems,
+      highlights: dedupedHighlights,
+    );
+  }
+
+  void _recordFeedEvent({
+    required String action,
+    required bool success,
+    Duration? duration,
+    Map<String, Object?> metadata = const <String, Object?>{},
+  }) {
+    final data = <String, Object?>{
+      'action': action,
+      'success': success,
+      if (duration != null) 'durationMs': duration.inMilliseconds,
+      ...metadata,
+    };
+    _telemetry?.recordBreadcrumb(
+      category: 'feed',
+      message: 'feed.$action.${success ? 'success' : 'failure'}',
+      data: data,
+      level: success ? SentryLevel.info : SentryLevel.error,
+    );
   }
 }
 

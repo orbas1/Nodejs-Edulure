@@ -170,6 +170,27 @@ class TelemetryService {
     }
   }
 
+  void recordBreadcrumb({
+    required String category,
+    required String message,
+    Map<String, dynamic>? data,
+    SentryLevel level = SentryLevel.info,
+  }) {
+    final breadcrumb = Breadcrumb(
+      message: message,
+      category: category,
+      data: data,
+      level: level,
+    );
+    if (_sentryEnabled) {
+      _client.addBreadcrumb(breadcrumb);
+    }
+    if (kDebugMode) {
+      final meta = data == null || data.isEmpty ? '' : ' ${data.toString()}';
+      _debugLogger('[telemetry][$category] $message$meta');
+    }
+  }
+
   void recordNetworkEvent({
     required RequestOptions request,
     Response? response,
