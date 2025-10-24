@@ -446,6 +446,86 @@ describe('ReportingPaymentsRevenueDailyView', () => {
       succeededIntents: 0
     });
   });
+
+  it('fills missing days when requested', async () => {
+    const expectations = [
+      {
+        table: 'reporting_payments_revenue_daily',
+        rows: [
+          {
+            date: '2024-06-01',
+            currency: 'usd',
+            total_intents: '2',
+            succeeded_intents: '1',
+            gross_volume_cents: '5000',
+            discount_cents: '0',
+            tax_cents: '200',
+            refunded_cents: '0',
+            recognised_volume_cents: '3000'
+          },
+          {
+            date: '2024-06-03',
+            currency: 'USD',
+            total_intents: '3',
+            succeeded_intents: '3',
+            gross_volume_cents: '7500',
+            discount_cents: '100',
+            tax_cents: '250',
+            refunded_cents: '50',
+            recognised_volume_cents: '5000'
+          }
+        ],
+        onWhereIn: ([column, values]) => {
+          expect(column).toBe('currency');
+          expect(values).toEqual(['USD']);
+        }
+      }
+    ];
+
+    const connection = createConnectionStub(expectations);
+
+    const summaries = await ReportingPaymentsRevenueDailyView.fetchDailySummaries(
+      { start: '2024-06-01', end: '2024-06-03', currencies: ['usd'] },
+      connection,
+      { fillGaps: true }
+    );
+
+    expect(summaries).toEqual([
+      {
+        date: '2024-06-01',
+        currency: 'USD',
+        totalIntents: 2,
+        succeededIntents: 1,
+        grossVolumeCents: 5000,
+        discountCents: 0,
+        taxCents: 200,
+        refundedCents: 0,
+        recognisedVolumeCents: 3000
+      },
+      {
+        date: '2024-06-02',
+        currency: 'USD',
+        totalIntents: 0,
+        succeededIntents: 0,
+        grossVolumeCents: 0,
+        discountCents: 0,
+        taxCents: 0,
+        refundedCents: 0,
+        recognisedVolumeCents: 0
+      },
+      {
+        date: '2024-06-03',
+        currency: 'USD',
+        totalIntents: 3,
+        succeededIntents: 3,
+        grossVolumeCents: 7500,
+        discountCents: 100,
+        taxCents: 250,
+        refundedCents: 50,
+        recognisedVolumeCents: 5000
+      }
+    ]);
+  });
 });
 
 describe('RevenueAdjustmentModel', () => {

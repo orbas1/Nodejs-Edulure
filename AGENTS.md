@@ -481,11 +481,52 @@
         15. **Change Checklist Tracker.** Expand QA sign-off to include domain-event smoke tests, permission-matrix validation for JWT claims, and route metadata assertions before releasing entry-point changes.
         16. **Full Upgrade Plan & Release Steps.** Deploy middleware updates to staging, verify domain event emission via telemetry, audit permission-driven routes for regressions, and coordinate documentation updates before promoting to production.
       - 12.C Controllers & GraphQL Gateways
+      - 12.A Bootstrap & Runtime Wiring
+         - 12.A.1 bootstrap (backend-nodejs/src/bootstrap/bootstrap.js)
+         - 12.A.2 database (backend-nodejs/src/config/database.js)
+         - 12.A.3 workerService (backend-nodejs/src/servers/workerService.js)
+      - 12.B Routing, Middleware & Entry Points
+         - 12.B.1 auth (backend-nodejs/src/middleware/auth.js)
+         - 12.B.2 runtimeConfig (backend-nodejs/src/middleware/runtimeConfig.js)
+         - 12.B.3 creation.routes (backend-nodejs/src/routes/creation.routes.js)
+      - ✅ 12.C Controllers & GraphQL Gateways
          - 12.C.1 EbookController (backend-nodejs/src/controllers/EbookController.js)
          - 12.C.2 schema (backend-nodejs/src/graphql/schema.js)
-      - 12.D Domain Models & Persistence
+        1. **Appraisal.** `EbookController.js` now deduplicates and sanitises author, tag, category, and language collections while the GraphQL schema clamps pagination and trims search parameters, aligning back-office payload hygiene with the curated catalogue expectations captured in `user_experience.md`.
+        2. **Functionality.** Normalisers convert mixed string/array payloads into trimmed sets, metadata is deep-cloned before persistence, and GraphQL exposes a `prefetch` JSON field so dashboard surfaces can hydrate hero modules alongside feed entries without ad-hoc REST calls. The sanitised collections now match the JSON columns enforced by `EbookModel.js`, keeping catalogue seeds and future content imports schema-valid.
+        3. **Logic Usefulness.** Languages are uppercased to keep locale badges consistent across marketing and learner storefronts, while keyword filtering on placements guarantees ad targeting terms mirror the UX taxonomy shared across web, React Native, and Flutter.
+        4. **Redundancies.** Centralising pagination parsing removes bespoke limit handling from downstream services and lets React and Flutter clients rely on a single rule-set rather than duplicating array dedupe logic per platform.
+        5. **Placeholders or Stubs.** GraphQL still delegates feature-flag awareness to `LiveFeedService`; wiring the new sanitised metadata through gateway-level analytics toggles remains on the backlog before exposing experimental feed variants.
+        6. **Duplicate Functions.** Shared helpers (`trimText`, `normalisePaginationInput`, `normaliseArray`) replace one-off string munging that previously lived in controllers, GraphQL resolvers, and client utilities.
+        7. **Improvements Needed.** Next iteration should surface currency validation errors from `EbookService` with localized copy so the UX writing guidelines in `user_experience.md` are enforced server-side.
+        8. **Styling Improvements.** Sanitised `metadata` payloads give design systems reliable hooks for cover gradients and content warnings, preventing mismatched accent colours across the ebook shelf, dashboard cards, and marketing pages.
+        9. **Efficiency Analysis.** Pagination and keyword clamps cap list sizes, guarding the GraphQL gateway and marketplace endpoints against oversized queries while keeping response payloads within telemetry budgets.
+        10. **Strengths to Keep.** Consistent Joi validation, shared normalisers, and the new GraphQL `prefetch` surface maintain observability and keep timeline hydration deterministic across channels.
+        11. **Weaknesses to Remove.** Ebooks still accept arbitrary metadata structures; a typed contract should eventually govern marketing highlights versus purchase funnels so analytics dashboards remain comparable.
+        12. **Styling & Colour Review.** With metadata sanitised, align ebook accent tokens with the brand palette documented in `user_experience.md` to avoid divergent gradients between marketing pages and instructor consoles.
+        13. **CSS, Orientation & Placement.** GraphQL prefetch data should feed layout engines so featured posts and placements reserve space before hydration, matching responsive breakpoints encoded in the UX specification.
+        14. **Text Analysis.** Normalised pricing errors and Joi feedback should inherit the concise tone-of-voice guidelines (≤120 characters, action-first) referenced in the support copy tables.
+        15. **Change Checklist Tracker.** Extend backend QA to cover pagination clamps, keyword trimming, and metadata sanitisation before promoting new feed or marketplace filters to production.
+        16. **Full Upgrade Plan & Release Steps.** Roll out the sanitisation helpers, observe API analytics for pagination shifts, stage GraphQL schema changes behind gateway versioning, update client SDKs, and publish the new payload contract to the platform changelog.
+      - ✅ 12.D Domain Models & Persistence
          - 12.D.1 ReportingPaymentsRevenueDailyView (backend-nodejs/src/models/ReportingPaymentsRevenueDailyView.js)
          - 12.D.2 LearnerSupportRepository (backend-nodejs/src/repositories/LearnerSupportRepository.js)
+        1. **Appraisal.** Daily revenue summaries now support currency scoping and hole-filling for timeline charts, while learner support persistence emits domain events for ticket creation, updates, messaging, and closure.
+        2. **Functionality.** Currency filters flow through SQL builders, date windows are generated server-side, repository list views respect status/limit options, and close/add operations refresh breadcrumbs and return mapped artefacts. The base `006_create_learner_support_tables.sql` migration now provisions breadcrumbs, AI summary, follow-up, and knowledge suggestion columns up-front so seeds and runtime models stay aligned without relying on ad-hoc alter statements.
+        3. **Logic Usefulness.** Domain events encode ticket state transitions so support analytics, CRM syncs, and notification workers can respond without scraping tables, fulfilling Annex A15 expectations.
+        4. **Redundancies.** Centralised limit/currency normalisers prevent controllers and services from reimplementing filter parsing for every dashboard or export routine.
+        5. **Placeholders or Stubs.** Event dispatchers still await downstream subscribers for satisfaction surveys and escalation routing; wire those handlers before exposing support telemetry to leadership dashboards.
+        6. **Duplicate Functions.** The new helpers replace bespoke pagination parsing scattered across repositories and services, keeping learner support and reporting consistent with the shared toolkit in Annex C1.
+        7. **Improvements Needed.** Add currency conversion hooks so finance summaries can express both native and platform base currencies without duplicating reporting SQL.
+        8. **Styling Improvements.** Filled date gaps give UX designers stable line charts and card gradients that match the reporting layouts catalogued in `user_experience.md`.
+        9. **Efficiency Analysis.** `whereIn` filters and capped case listings reduce redundant message hydration, cutting latency for learners scrolling large support histories.
+        10. **Strengths to Keep.** Breadcrumb updates, automatic follow-up recalculation, and serialised attachments maintain the thorough audit trail expected in support experiences.
+        11. **Weaknesses to Remove.** Satisfaction updates still rely on caller-provided scores; consider enforcing allowed ranges and storing the rater identity for governance checks.
+        12. **Styling & Colour Review.** Domain events should drive consistent badge states (open, pending, closed) so the support timeline palette mirrors the gradients specified in the UX audit.
+        13. **CSS, Orientation & Placement.** Filled reporting series align with dashboard spacing assumptions, preventing the empty-day collapse observed in previous user testing.
+        14. **Text Analysis.** Event payloads use verb-first labels (“case_created”, “case_closed”) that map cleanly to support copywriting guidelines and notification templates.
+        15. **Change Checklist Tracker.** Add coverage for `fillGaps` timelines and list option normalisation to regression suites before each release.
+        16. **Full Upgrade Plan & Release Steps.** Deploy reporting changes alongside analytics schema docs, broadcast the new domain events to downstream consumers, backfill historic gaps for SLA dashboards, and validate support timelines with CX before GA.
       - 12.E Services & Integrations
          - 12.E.1 HubSpotClient (backend-nodejs/src/integrations/HubSpotClient.js)
          - 12.E.2 CourseLiveService (backend-nodejs/src/services/CourseLiveService.js)
@@ -493,10 +534,26 @@
          - 12.F.1 communityReminderJob (backend-nodejs/src/jobs/communityReminderJob.js)
          - 12.F.2 probes (backend-nodejs/src/observability/probes.js)
          - 12.F.3 backend-nodejs/src/jobs (found at backend-nodejs/src/jobs)
-      - 12.G Database Seeds & Migrations
+      - ✅ 12.G Database Seeds & Migrations
          - 12.G.1 20250213143000_creation_studio (backend-nodejs/migrations/20250213143000_creation_studio.js)
          - 12.G.2 002_search_documents (backend-nodejs/seeds/002_search_documents.js)
          - 12.G.3 backend-nodejs/database/migrations (found at backend-nodejs/database/migrations)
+        1. **Appraisal.** Creation Studio schemas now share enumerations through `src/constants/creationStudio.js`, letting migrations, services, and models consume one source of truth while Annex A38–A43 is mirrored by `008_creation_studio_tables.sql` so MySQL blueprints stay in lockstep with Knex DSL defaults.
+        2. **Functionality.** `creation_projects`, `creation_templates`, collaboration tables, and version history all validate type/status/role inputs, normalise JSON payloads, and dedupe permissions before writes, while the search seed continues to rebuild documents inside the transaction to keep bootstrap atomic.
+        3. **Logic Usefulness.** Shared normalisers and governance-tag handling keep models aligned with database defaults; enumerations now flow into `CreationStudioService` to reject unsupported transitions ahead of persistence, preventing Annex drift between docs and runtime rules.
+        4. **Redundancies.** Centralised constants and helpers replaced ad-hoc enum arrays and JSON sanitisation previously scattered across services, models, and migrations, reducing duplicate validation paths.
+        5. **Placeholders or Stubs.** Seeds still short-circuit when `search_documents` or its refresh queue are absent; plan representative creation-project fixtures once catalogue samples are approved so rebuild metrics remain meaningful during QA.
+        6. **Duplicate Functions.** Inline UUID/status definitions and collaborator permission parsing have been consolidated into shared utilities—ensure future migrations import the same constants to avoid divergence.
+        7. **Improvements Needed.** Add CI coverage for MySQL/Postgres migrate+rollback cycles, backfill regression tests around the new validation guards, and extend ERD exports sourced from `008_creation_studio_tables.sql` for governance reviews.
+        8. **Styling Improvements.** Column naming now mirrors camelCase accessors (e.g. `publicId`, `contentOutline`) with JSON defaults enforced at the database; keep Annex A42 naming guidance in play for upcoming schema additions.
+        9. **Efficiency Analysis.** Indexed ownership/status fields and deduped collaborator permissions preserve fast analytics queries, while transaction-scoped search rebuilds avoid queue fragmentation during bootstrap.
+        10. **Strengths to Keep.** Enum-driven workflow states, cascade rules, and version history remain a strength—now backed by mirrored SQL blueprints and runtime validators that guarantee lineage without extra app logic.
+        11. **Weaknesses to Remove.** Annex SQL still needs automated ERD generation and dialect-specific acceptance tests—schedule documentation automation and schema checks to close the feedback loop.
+        12. **Styling & Colour Review.** Not applicable to the data layer; continue investing in descriptive constraint aliases and comment fields so BI tooling surfaces friendly labels during governance audits.
+        13. **CSS, Orientation & Placement.** Maintain migration ordering that applies creation studio artefacts before downstream enrolment tables to keep FK relationships stable throughout bootstrap sequences.
+        14. **Text Analysis.** Normalised summaries, compliance notes, and governance tags now default to localisation-ready JSON; extend Annex A43 copy guidance for new template schemas to avoid truncation.
+        15. **Change Checklist Tracker.** Run `npm --prefix backend-nodejs run migrate:latest`, `seed`, and `db:schema:check` after each change; capture diffs for `008_creation_studio_tables.sql` alongside ERD snapshots for QA sign-off.
+        16. **Full Upgrade Plan & Release Steps.** Dry-run migrations across staging clusters, validate the new guard rails with regression suites, package rollback scripts, and broadcast schema change notes to curriculum, analytics, and platform squads before release.
       - 13.A Infrastructure Blueprints
          - 13.A.1 infrastructure/observability (found at infrastructure/observability)
          - 13.A.2 infrastructure/terraform/modules (found at infrastructure/terraform/modules)

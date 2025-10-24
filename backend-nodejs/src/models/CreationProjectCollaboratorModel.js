@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { CREATION_COLLABORATOR_ROLES } from '../constants/creationStudio.js';
 
 const TABLE = 'creation_project_collaborators';
 
@@ -12,6 +13,8 @@ const BASE_COLUMNS = [
   'removed_at as removedAt'
 ];
 
+const ROLE_SET = new Set(CREATION_COLLABORATOR_ROLES);
+
 function parsePermissions(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -23,19 +26,41 @@ function parsePermissions(value) {
   }
 }
 
+function normalisePermissions(permissions) {
+  if (permissions === undefined || permissions === null) {
+    return [];
+  }
+  const list = Array.isArray(permissions) ? permissions : [permissions];
+  return Array.from(
+    new Set(
+      list
+        .map((permission) => (typeof permission === 'string' ? permission.trim() : ''))
+        .filter((permission) => permission.length > 0)
+    )
+  );
+}
+
+function ensureValidRole(role) {
+  if (!ROLE_SET.has(role)) {
+    throw new Error('Invalid collaborator role');
+  }
+}
+
 export default class CreationProjectCollaboratorModel {
   static async add({ projectId, userId, role = 'editor', permissions = [] }, connection = db) {
+    ensureValidRole(role);
+    const normalisedPermissions = normalisePermissions(permissions);
     await connection(TABLE)
       .insert({
         project_id: projectId,
         user_id: userId,
         role,
-        permissions: JSON.stringify(permissions)
+        permissions: JSON.stringify(normalisedPermissions)
       })
       .onConflict(['project_id', 'user_id'])
       .merge({
         role,
-        permissions: JSON.stringify(permissions),
+        permissions: JSON.stringify(normalisedPermissions),
         removed_at: null,
         added_at: connection.fn.now()
       });
@@ -85,7 +110,7 @@ export default class CreationProjectCollaboratorModel {
   static deserialize(record) {
     return {
       ...record,
-      permissions: parsePermissions(record.permissions)
+      permissions: normalisePermissions(parsePermissions(record.permissions))
     };
   }
 }
