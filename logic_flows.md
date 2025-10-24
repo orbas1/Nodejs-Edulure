@@ -225,11 +225,11 @@ This compendium maps the execution paths, responsibilities, and release consider
 2. **Functionality:** `release.routes.js`, `providerTransition.routes.js`, and admin settings routes expose change calendars, provider migration workflows, and configuration management surfaces for operators.
 3. **Logic Usefulness:** Orchestration service ties checklists, runtime flags, and communications into a structured release pipeline, while provider transition service ensures partner migrations progress with audit trails.
 4. **Redundancies:** Settings normalization occurs in both admin settings controller and platform settings service; centralise to avoid mismatched defaults.
-5. **Placeholders Or non-working functions or stubs:** Some provider transition states still reference placeholder messaging; fill with actionable guidance to reduce support burden.
+5. **Placeholders Or non-working functions or stubs:** Provider transition announcements now ship with seeded runbooks, resources, and acknowledgements; keep copy aligned with migration reality so support teams are never left with placeholder messaging.
 6. **Duplicate Functions:** Release readiness scoring repeated between controller and service; unify to keep scoring consistent across surfaces.
 7. **Improvements need to make:** Integrate release gating with CI, automate provider migration alerts, and expand settings audit history.
 8. **Styling improvements:** Provide release checklist layout metadata and provider migration status colour tokens consumed by admin frontends.
-9. **Efficiency analysis and improvement:** Cache release timeline snapshots and reuse provider migration state transitions to minimise repeated DB hits.
+9. **Efficiency analysis and improvement:** Cache release timeline snapshots and reuse provider migration state transitions to minimise repeated DB hits; trimmed provider summaries already reduce payload size, so layer on response caching for the remaining hotspots.
 10. **Strengths to Keep:** Holistic release orchestration, auditable provider migration flows, and flexible platform setting storage.
 11. **Weaknesses to remove:** Manual export of release notes; integrate with `update_template/` automation.
 12. **Styling and Colour review changes:** Align release status colours with operations design guidelines for clarity during incidents.
@@ -260,7 +260,7 @@ This compendium maps the execution paths, responsibilities, and release consider
 1. **Appraisal:** Repository layer encapsulating data persistence, domain event capture, CDC workflows, and idempotent job tracking for consistent state transitions across modules.
 2. **Functionality:** Repository files provide CRUD helpers per model, domain event dispatcher normalises and routes events to downstream systems, and CDC service prepares change payloads for analytics or integrations.
 3. **Logic Usefulness:** Centralising event emission ensures auditing, search, and analytics consumers receive consistent payloads irrespective of initiating controller.
-4. **Redundancies:** Pagination helpers appear across repositories; extract to shared utility to avoid mismatched limit defaults.
+4. **Redundancies:** Pagination helpers appear across repositories; extract to shared utility to avoid mismatched limit defaults, and keep dispatch queue helpers co-located now that the model and migration share the same attempts/delivery channel schema.
 5. **Placeholders Or non-working functions or stubs:** CDC connectors mention TODO exports for data warehouse providers; annotate with backlog references.
 6. **Duplicate Functions:** Soft-delete handling repeated in multiple repositories; unify into mixins or base repository to maintain identical semantics.
 7. **Improvements need to make:** Add optimistic concurrency controls, wrap writes in transactions more broadly, and surface repository metrics for observability.
@@ -1119,25 +1119,58 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Expand release plan to include CDN cache warming, legal review of content retention policies, and monitoring dashboards for conversion throughput.
 
 ### A13. Release, Provider Transition & Platform Settings (1.M)
-- **Operational Depth:** Release orchestration coordinates phased rollouts, migration scripts, and provider transitions tracked in `models/ProviderTransitionModel.js`. Settings controllers expose tenant-level configuration toggles with audit trails.
-- **Gaps & Risks:** Some release checklists live in Google Docs instead of repository, risking drift. Consolidate into `qa/` to ensure version control. Provider transition scripts need idempotency to handle partial failures gracefully.
-- **Resilience & Efficiency:** Automate dependency audits, integrate dry-run migrations into CI, and simulate failovers during staging rehearsals. Use feature flag kill switches for rapid rollback.
-- **UX & Communications:** Admin UI should surface release phases with descriptive copy and highlight outstanding checklist items. Platform settings pages need consistent layout and colour coding for risk levels.
-- **Change Management:** Formalise go/no-go meetings, ensure rollback scripts tested, update documentation, and communicate timelines to stakeholders with clear acceptance criteria.
+1. **Appraisal.** Release orchestration (`ReleaseOrchestrationService.js`) now feeds an operational governance overview that blends readiness metrics with provider transition signals and platform setting health, ensuring admins see blockers and maintenance toggles together.
+2. **Functionality.** `AdminSettingsController.getOperationalGovernanceOverview` exposes `/api/v1/admin/settings/operational-overview`, aggregating release breakdowns, upcoming runs, and platform maintenance states, while provider transition endpoints track acknowledgements and status shifts.
+3. **Logic Usefulness.** The overview composes `summariseReadiness`, `getDashboard`, and provider announcement listings so rollout gates, ack counts, and maintenance plans appear in one payload for admin dashboards and runbooks.
+4. **Redundancies.** Snapshot helpers and overview endpoints share maintenance and security normalisation; refactor to reuse serialization helpers to avoid divergent defaults.
+5. **Placeholders or non-working functions or stubs.** Provider transition acknowledgements are now backed by seeded announcements, timelines, resources, and acknowledgements—keep the fixtures fresh so automated tests reflect real migration copy.
+6. **Duplicate Functions.** Operational snapshot and governance overview both merge admin profile data; centralise into a shared mapper that emits consistent structures for analytics and UI.
+7. **Improvements need to make.** Expand overview to include release gate evidence summaries and add SLA countdowns for provider migrations so teams prioritise pending actions.
+8. **Styling improvements.** Publish JSON schema describing overview cards (status colours, icon keys) so React admin sections render consistent risk badges without manual mapping.
+9. **Efficiency analysis and improvement.** Cache provider transition metrics when multiple tenants query the same slug, paginate release history, and extend the new summary-only provider payload with HTTP caching to keep responses lean under burst load.
+10. **Strengths to Keep.** Strong validation with Joi, consistent tenant scoping resolution, and release readiness metrics that already include weighted gate scores bolster trust in the new overview.
+11. **Weaknesses to remove.** Overview now emits trimmed announcement summaries when details are suppressed; maintain the summary schema contract so frontends can depend on lightweight payloads without extra filtering.
+12. **Styling and Colour review changes.** Align admin UI risk indicators with governance palette tokens and expose severity levels in overview metadata for consistent theming.
+13. **CSS, orientation, placement and arrangement changes.** Provide design guidance on arranging release and provider cards side by side with responsive stacking for tablet layouts.
+14. **Text analysis, placement & quality.** Clarify overview copy to surface actionable verbs (“Review gate evidence”) and avoid repeating “pending” across sections; include timezone info for change windows.
+15. **Change Checklist Tracker.** Update `qa/release-readiness-checklist.md` to cover the new endpoint, verifying release statistics, provider acknowledgements, and maintenance toggles before ship.
+16. **Full Upgrade Plan & Release Steps.** Phase 1 delivered the aggregated endpoint; Phase 2 should add caching & schema docs, Phase 3 integrates UI visualisations, and Phase 4 runs canary rollouts with communication plans for operations teams.
 
 ### A14. GraphQL Gateway & HTTP Bootstrapping (1.N)
-- **Operational Depth:** GraphQL schema composes backend resolvers with authentication guards, bridging REST services and clients requiring flexible queries. HTTP bootstrapping in `server.js` wires middleware, rate limiting, and websocket servers for real-time features.
-- **Gaps & Risks:** Schema documentation lags behind resolver changes, leading to developer confusion. Introduce CI to validate SDL descriptions and publish schema diffs. Bootstrapping logic mixes environment detection with transport configuration; refactor into dedicated modules.
-- **Resilience & Efficiency:** Enable persisted queries and automatic persisted query caching to reduce GraphQL payload sizes. Implement graceful shutdown hooks so websocket clients drain before deployments.
-- **UX & Communications:** Provide a schema registry with change logs and code examples, ensuring SDK users stay aligned. Document environment-specific boot behaviours for support teams.
-- **Change Management:** Add GraphQL schema review gates, run smoke tests for websocket connectivity, and coordinate release notes with SDK updates.
+1. **Appraisal.** The GraphQL router enforces depth/operation caps and now supports automatic persisted queries via `persistedQueryStore.js`, while HTTP bootstrapping in `webServer.js` tracks active sockets for graceful shutdown.
+2. **Functionality.** Incoming requests with `extensions.persistedQuery` are validated, hashed (`computeSha256`), cached, and replayed when clients send hash-only payloads; the web server drains connections for five seconds before destroying stragglers during shutdown.
+3. **Logic Usefulness.** Persisted query caching slashes payload size for mobile clients and removes repeated AST parsing, while connection tracking prevents abrupt disconnects during deploys by closing sockets cleanly.
+4. **Redundancies.** Persisted query validation currently lives inline in the router; extract to middleware utilities to reuse for future GraphQL routers or test harnesses.
+5. **Placeholders or non-working functions or stubs.** Persisted query store lacks metrics export; wire gauge/counter metrics in `observability/metrics.js` to monitor hit/miss ratios.
+6. **Duplicate Functions.** SHA-256 helpers exist both in the store and various auth utilities; consolidate hashing helpers to avoid divergent implementations.
+7. **Improvements need to make.** Add LRU eviction telemetry, support batched persisted queries in instrumentation, and expose persisted query registration endpoints for CI to prewarm caches.
+8. **Styling improvements.** Document persisted query error shapes so API explorers display consistent messaging and link to troubleshooting docs.
+9. **Efficiency analysis and improvement.** Tune store TTL/size via config, add async persistence (Redis) for multi-instance deployments, and surface cache size in health endpoints.
+10. **Strengths to Keep.** Strong validation, role-aware context injection, and now hash verification ensure GraphQL remains secure and efficient.
+11. **Weaknesses to remove.** Lack of schema diff automation still risks drift; integrate SDL snapshot checks into CI to keep docs current.
+12. **Styling and Colour review changes.** Update API docs to highlight persisted query workflow diagrams with consistent colour tokens for cache states.
+13. **CSS, orientation, placement and arrangement changes.** Ensure admin consoles embedding GraphQL docs allocate space for persisted query instructions without crowding code samples.
+14. **Text analysis, placement & quality.** Improve error copy (“Persisted query hash mismatch”) to include guidance on recalculating hashes and link to CLI helpers.
+15. **Change Checklist Tracker.** Extend release checklist to cover persisted query cache warmups, shutdown drain verification, and GraphQL regression tests.
+16. **Full Upgrade Plan & Release Steps.** Roll persisted queries out behind feature flags, monitor cache metrics, document client integration, then enforce persisted queries for public clients post validation.
 
 ### A15. Repositories, Data Access & Domain Events (1.O)
-- **Operational Depth:** Repository layer encapsulates SQL with tenant scoping, while domain events capture mutations for downstream processing (`DomainEventDispatcherService.js`). Change data capture bridges transactional updates into analytics pipelines.
-- **Gaps & Risks:** Some repositories bypass shared tenant filters; enforce base repository classes. Event payload schemas lack versioning, complicating consumer upgrades.
-- **Resilience & Efficiency:** Batch writes, reuse prepared statements, and stream domain events via durable queues to avoid loss during spikes. Provide replay tooling for failed consumers.
-- **UX & Communications:** Document repository patterns, ensure domain events carry descriptive metadata, and publish consumer onboarding guides.
-- **Change Management:** Include repository linting in CI, run CDC replay drills, and ensure schema migrations maintain backward compatibility for event consumers.
+1. **Appraisal.** Domain events now capture schema metadata when recorded, with dispatch queue metadata providing version and recorded timestamps, while CDC outbox entries embed `_schema` descriptors for downstream processors.
+2. **Functionality.** `DomainEventModel.record` enriches dispatch metadata, `DomainEventDispatcherService` forwards schema/version info to webhook subscribers, and `ChangeDataCaptureService.recordEvent` annotates payloads with versioned schema hints.
+3. **Logic Usefulness.** Consumers can inspect `dispatch.metadata.schemaVersion` and `_schema` payload blocks to select deserialisers, enabling backward-compatible evolution of event contracts without guessing payload shape.
+4. **Redundancies.** Schema version defaults (`'1.0'`) appear across services; centralise constants in a versioning helper to avoid typos.
+5. **Placeholders or non-working functions or stubs.** Repositories still lack base tenant guards; introduce a shared repository utility to prevent accidental cross-tenant reads.
+6. **Duplicate Functions.** JSON normalisers live in multiple models; consolidate to shared serializers so CDC and domain events reuse identical parsing behaviour.
+7. **Improvements need to make.** Surface schema version history in developer docs, add migration scripts for bumping versions, and expose replay tooling that honours `_schema.version` when reprocessing events.
+8. **Styling improvements.** Provide JSON schema definitions for domain events and CDC payloads so data teams can visualise structures in governance dashboards with consistent styling.
+9. **Efficiency analysis and improvement.** Batch dispatch acknowledgement writes and expose queue depth for failed vs pending states separately to guide scaling decisions.
+10. **Strengths to Keep.** Robust retry/backoff strategies, metrics instrumentation (`attemptCounter`, `queueGauge`), and structured logging ensure reliability even as payload metadata grows.
+11. **Weaknesses to remove.** Lack of tenant filtering in learner support repositories remains; future work should introduce scoped queries before multi-tenant GA.
+12. **Styling and Colour review changes.** Document event diagrams using consistent palette tokens distinguishing domain entities, CDC outbox, and dispatch consumers.
+13. **CSS, orientation, placement and arrangement changes.** For docs, organise event timeline diagrams with left-to-right flow showing creation, CDC capture, dispatch retries, and webhook publish metadata.
+14. **Text analysis, placement & quality.** Update consumer onboarding guides to emphasise `_schema` fields, provide sample JSON, and remove ambiguous phrases like “version TBD”.
+15. **Change Checklist Tracker.** Extend `qa/domain-events-checklist.md` to assert schemaVersion presence, CDC enrichment, and webhook metadata propagation before release.
+16. **Full Upgrade Plan & Release Steps.** Phase upcoming releases to introduce schema version increments, publish migration docs, add automated replay verification, and coordinate with analytics consumers before enforcing new versions.
 
 ### A16. Marketing, Storytelling & Acquisition (2.A)
 - **Operational Depth:** React pages under `src/pages` compose marketing narratives with data modules that surface testimonials, curriculum teasers, and CTA funnels. Hooks manage scroll-triggered animations and integrate analytics events for attribution.

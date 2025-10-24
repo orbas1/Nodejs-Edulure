@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import db from '../config/database.js';
 import DomainEventDispatchModel from './DomainEventDispatchModel.js';
 
@@ -39,6 +41,26 @@ function mapRow(row) {
   };
 }
 
+function computeDispatchPayloadChecksum(event, metadata = {}) {
+  const hash = crypto.createHash('sha256');
+  hash.update(String(event?.eventType ?? ''));
+  hash.update(':');
+  hash.update(String(event?.entityType ?? ''));
+  hash.update(':');
+  hash.update(String(event?.entityId ?? ''));
+  hash.update(':');
+  hash.update(
+    event?.createdAt instanceof Date
+      ? event.createdAt.toISOString()
+      : String(event?.createdAt ?? '')
+  );
+  hash.update(':');
+  hash.update(JSON.stringify(event?.payload ?? {}));
+  hash.update(':');
+  hash.update(JSON.stringify(metadata ?? {}));
+  return hash.digest('hex');
+}
+
 function resolveConnectionAndOptions(connectionOrOptions, maybeOptions) {
   let connection = db;
   let options = maybeOptions ?? {};
@@ -67,6 +89,7 @@ export default class DomainEventModel {
     }
 
     const { connection, options } = resolveConnectionAndOptions(connectionOrOptions, maybeOptions);
+    const schemaVersion = event?.schemaVersion ?? options?.schemaVersion ?? '1.0';
 
     const payload = {
       entity_type: String(event.entityType),
@@ -80,20 +103,35 @@ export default class DomainEventModel {
     const row = await this.table(connection).where({ id }).first();
     const mapped = mapRow(row);
 
+    const recordedAtIso = mapped?.createdAt instanceof Date ? mapped.createdAt.toISOString() : new Date().toISOString();
+
     if (options.enqueueDispatch !== false) {
+      const dispatchMetadata = {
+        schemaVersion,
+        recordedAt: recordedAtIso,
+        ...(options.dispatchMetadata ?? {})
+      };
+
+      const payloadChecksum = computeDispatchPayloadChecksum(mapped, dispatchMetadata);
+
       await DomainEventDispatchModel.enqueue(
-        mapped,
+        { ...mapped, schemaVersion },
         {
-          priority: options.priority,
           availableAt: options.availableAt,
-          metadata: options.dispatchMetadata,
-          status: options.dispatchStatus
+          metadata: dispatchMetadata,
+          status: options.dispatchStatus,
+          deliveryChannel: options.deliveryChannel,
+          maxAttempts: options.maxAttempts,
+          payloadChecksum,
+          traceId: options.traceId,
+          correlationId: options.correlationId,
+          dryRun: options.dryRun === true
         },
         connection
       );
     }
 
-    return mapped;
+    return { ...mapped, schemaVersion };
   }
 
   static async findById(id, connection = db) {
