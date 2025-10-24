@@ -1,17 +1,15 @@
 import { createHash } from 'crypto';
 import Joi from 'joi';
 
-import IntegrationApiKeyInviteService from '../services/IntegrationApiKeyInviteService.js';
+import IntegrationApiKeyInviteService, {
+  sanitizeInviteToken
+} from '../services/IntegrationApiKeyInviteService.js';
 import {
   MAX_ROTATION_DAYS,
   MIN_ROTATION_DAYS,
   MIN_KEY_LENGTH,
   isValidEmail
 } from '../services/IntegrationApiKeyService.js';
-
-const tokenParamSchema = Joi.object({
-  token: Joi.string().trim().min(10).max(200).required()
-});
 
 const KEY_EXPIRY_PAST_GRACE_MS = 1000 * 60 * 60 * 24 * 365; // one year
 
@@ -207,26 +205,21 @@ function logInviteEvent(req, level, message, metadata = {}) {
 
 export async function getInvitation(req, res, next) {
   try {
-    const { token } = await tokenParamSchema.validateAsync(req.params ?? {}, {
-      abortEarly: false,
-      stripUnknown: true
-    });
-
+    const token = sanitizeInviteToken(req?.params?.token);
     const details = await inviteService.getInvitationDetails(token);
     ensureSensitiveResponseHeaders(res);
     res.json({ success: true, data: details });
   } catch (error) {
     ensureSensitiveResponseHeaders(res);
     const tokenFingerprint = createTokenFingerprint(req?.params?.token);
-    if (error.isJoi) {
+    if (error.code === 'INVITE_TOKEN_INVALID') {
       logInviteEvent(req, 'warn', 'Invalid integration invite token received', {
         tokenFingerprint,
-        validationErrors: error.details?.map((detail) => detail.message) ?? []
+        message: error.message
       });
       res.status(400).json({
         success: false,
-        message: 'Invalid invitation token',
-        errors: error.details?.map((detail) => detail.message) ?? []
+        message: 'Invalid invitation token'
       });
       return;
     }
@@ -250,11 +243,7 @@ export async function getInvitation(req, res, next) {
 
 export async function submitInvitation(req, res, next) {
   try {
-    const { token } = await tokenParamSchema.validateAsync(req.params ?? {}, {
-      abortEarly: false,
-      stripUnknown: true
-    });
-
+    const token = sanitizeInviteToken(req?.params?.token);
     const payload = await submitInvitationSchema.validateAsync(req.body ?? {}, {
       abortEarly: false,
       stripUnknown: true
@@ -304,6 +293,13 @@ export async function submitInvitation(req, res, next) {
   } catch (error) {
     ensureSensitiveResponseHeaders(res);
     const tokenFingerprint = createTokenFingerprint(req?.params?.token);
+    if (error.code === 'INVITE_TOKEN_INVALID') {
+      logInviteEvent(req, 'warn', 'Integration invite submission rejected due to invalid token', {
+        tokenFingerprint
+      });
+      res.status(400).json({ success: false, message: 'Invalid invitation token' });
+      return;
+    }
     if (error.isJoi) {
       logInviteEvent(req, 'warn', 'Integration invite submission validation failed', {
         tokenFingerprint,

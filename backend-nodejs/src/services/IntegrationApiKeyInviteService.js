@@ -9,13 +9,16 @@ import AuditEventService from './AuditEventService.js';
 import IntegrationApiKeyModel from '../models/IntegrationApiKeyModel.js';
 import IntegrationApiKeyInviteModel from '../models/IntegrationApiKeyInviteModel.js';
 import IntegrationApiKeyService, {
-  PROVIDER_CATALOGUE,
   clampRotationInterval,
   isValidEmail,
   normaliseEnvironment,
   normaliseProvider,
   requireString
 } from './IntegrationApiKeyService.js';
+import {
+  getProviderDefinition,
+  normaliseProviderId
+} from './IntegrationProviderRegistry.js';
 
 const INVITE_STATUS = {
   PENDING: 'pending',
@@ -26,6 +29,8 @@ const INVITE_STATUS = {
 
 const AUDIT_ENTITY_TYPE = 'integration_api_key_invite';
 const DEFAULT_AUDIT_TENANT = 'integrations';
+const MIN_TOKEN_LENGTH = 10;
+const MAX_TOKEN_LENGTH = 200;
 
 function normaliseAuditRoles(roles) {
   if (!roles) {
@@ -158,7 +163,39 @@ function buildAuditMetadata(metadata = {}) {
 }
 
 function resolveProviderMeta(provider) {
-  return PROVIDER_CATALOGUE[provider] ?? { id: provider, label: provider };
+  const definition = getProviderDefinition(provider);
+  if (definition) {
+    return { id: definition.id, label: definition.label };
+  }
+
+  const normalised = normaliseProviderId(provider);
+  if (normalised) {
+    const fallback = getProviderDefinition(normalised);
+    if (fallback) {
+      return { id: fallback.id, label: fallback.label };
+    }
+  }
+
+  return { id: provider, label: provider };
+}
+
+export function sanitizeInviteToken(token) {
+  const trimmed = typeof token === 'string' ? token.trim() : '';
+  if (!trimmed) {
+    throw Object.assign(new Error('Invitation token is required'), {
+      status: 400,
+      code: 'INVITE_TOKEN_INVALID'
+    });
+  }
+
+  if (trimmed.length < MIN_TOKEN_LENGTH || trimmed.length > MAX_TOKEN_LENGTH) {
+    throw Object.assign(new Error('Invitation token is invalid'), {
+      status: 400,
+      code: 'INVITE_TOKEN_INVALID'
+    });
+  }
+
+  return trimmed;
 }
 
 function buildClaimUrl(token) {
@@ -582,12 +619,9 @@ export default class IntegrationApiKeyInviteService {
   }
 
   async loadInviteByToken(token) {
-    const trimmed = typeof token === 'string' ? token.trim() : '';
-    if (!trimmed) {
-      throw Object.assign(new Error('Token is required'), { status: 400 });
-    }
+    const sanitisedToken = sanitizeInviteToken(token);
 
-    const tokenHash = this.inviteModel.hashToken(trimmed);
+    const tokenHash = this.inviteModel.hashToken(sanitisedToken);
     const invite = await this.inviteModel.findActiveByTokenHash(tokenHash);
     if (!invite) {
       throw Object.assign(new Error('Invitation is invalid or expired'), { status: 404 });
@@ -653,7 +687,7 @@ export default class IntegrationApiKeyInviteService {
             reason: reason ?? 'delegated-rotation',
             notes: invite.metadata?.notes ?? null
           },
-          { connection: trx }
+          { connection: trx, skipInviteId: invite.id }
         );
       } else {
         result = await this.apiKeyService.createKey(
@@ -668,7 +702,7 @@ export default class IntegrationApiKeyInviteService {
             createdBy: actor,
             notes: invite.metadata?.notes ?? null
           },
-          { connection: trx }
+          { connection: trx, skipInviteId: invite.id }
         );
       }
 

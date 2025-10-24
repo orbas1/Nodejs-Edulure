@@ -1,4 +1,4 @@
-import { randomUUID, createHmac } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
 import { env } from '../config/env.js';
@@ -10,6 +10,7 @@ import ContentAuditLogModel from '../models/ContentAuditLogModel.js';
 import EbookProgressModel from '../models/EbookProgressModel.js';
 import antivirusService from './AntivirusService.js';
 import storageService from './StorageService.js';
+import { assertMediaTypeCompliance } from './MediaTypePolicy.js';
 
 const DRM_SIGNATURE_SECRET = env.security.drmSignatureSecret;
 
@@ -44,6 +45,16 @@ function sanitiseHttpsUrl(value) {
   }
 }
 
+async function computeObjectChecksum({ bucket, key }) {
+  const { stream } = await storageService.getObjectStream({ bucket, key });
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.once('error', (error) => reject(error));
+    stream.once('end', () => resolve(hash.digest('hex')));
+  });
+}
+
 function normaliseStringCollection(values, { maxItems, maxLength }) {
   const seen = new Set();
   const result = [];
@@ -74,8 +85,27 @@ function normaliseGalleryEntries(entries) {
   return items;
 }
 
+function resolveMediaKindFromAssetType(type) {
+  switch (type) {
+    case 'powerpoint':
+    case 'document':
+    case 'pdf':
+      return 'document';
+    case 'video':
+      return 'video';
+    case 'audio':
+      return 'audio';
+    case 'ebook':
+      return 'ebook';
+    default:
+      return 'image';
+  }
+}
+
 export default class AssetService {
   static async createUploadSession({ type, filename, mimeType, size, checksum, userId, visibility = 'workspace' }) {
+    const mediaKind = resolveMediaKindFromAssetType(type);
+    assertMediaTypeCompliance({ kind: mediaKind, mimeType, size });
     const prefix = `uploads/${type}/${userId}`;
     const storageKey = storageService.generateStorageKey(prefix, filename);
 
@@ -255,6 +285,81 @@ export default class AssetService {
         throw violation;
       }
 
+      const expectedChecksum = typeof checksum === 'string' ? checksum.trim().toLowerCase() : null;
+      let verifiedChecksum = asset.checksum ?? null;
+
+      if (expectedChecksum) {
+        const actualChecksum = await computeObjectChecksum({
+          bucket: asset.storageBucket,
+          key: asset.storageKey
+        });
+
+        if (actualChecksum !== expectedChecksum) {
+          const mismatchAt = new Date().toISOString();
+          await ContentAssetModel.patchById(
+            asset.id,
+            {
+              status: 'failed',
+              checksum: actualChecksum,
+              metadata: {
+                ...(asset.metadata ?? {}),
+                ingestion: {
+                  stage: 'checksum-mismatch',
+                  mismatchDetectedAt: mismatchAt
+                },
+                antivirus: antivirusMetadata,
+                checksum: {
+                  expected: expectedChecksum,
+                  actual: actualChecksum,
+                  status: 'mismatch',
+                  verifiedAt: mismatchAt
+                }
+              }
+            },
+            trx
+          );
+
+          await ContentAssetEventModel.record(
+            {
+              assetId: asset.id,
+              userId: actor.id,
+              eventType: 'checksum_mismatch',
+              metadata: {
+                expected: expectedChecksum,
+                actual: actualChecksum
+              }
+            },
+            trx
+          );
+
+          await ContentAuditLogModel.record(
+            {
+              assetId: asset.id,
+              event: 'asset.upload.checksum_mismatch',
+              performedBy: actor.id,
+              payload: {
+                expectedChecksum,
+                actualChecksum
+              }
+            },
+            trx
+          );
+
+          const mismatchError = new Error('Uploaded file checksum does not match expected value.');
+          mismatchError.status = 422;
+          mismatchError.code = 'CHECKSUM_MISMATCH';
+          mismatchError.details = [`expected ${expectedChecksum}, received ${actualChecksum}`];
+          throw mismatchError;
+        }
+
+        verifiedChecksum = actualChecksum;
+      } else if (!asset.checksum) {
+        verifiedChecksum = await computeObjectChecksum({
+          bucket: asset.storageBucket,
+          key: asset.storageKey
+        });
+      }
+
       const targetKey = `${buildStoragePrefix(asset)}/source-${randomUUID()}`;
       const { bucket: destinationBucket, key: destinationKey } = await storageService.copyObject({
         sourceBucket: asset.storageBucket,
@@ -266,25 +371,30 @@ export default class AssetService {
       await storageService.deleteObject({ bucket: asset.storageBucket, key: asset.storageKey });
 
       const updatedAsset = await ContentAssetModel.patchById(
-        asset.id,
-        {
-          status: 'uploaded',
-          storageBucket: destinationBucket,
-          storageKey: destinationKey,
-          checksum: checksum ?? asset.checksum,
-          metadata: {
-            ...(asset.metadata ?? {}),
-            uploadConfirmedAt: new Date().toISOString(),
-            ingestion: {
-              stage: 'queued',
-              queuedAt: new Date().toISOString()
-            },
-            antivirus: antivirusMetadata,
-            custom: metadata ?? {}
-          }
-        },
-        trx
-      );
+          asset.id,
+          {
+            status: 'uploaded',
+            storageBucket: destinationBucket,
+            storageKey: destinationKey,
+            checksum: verifiedChecksum ?? asset.checksum,
+            metadata: {
+              ...(asset.metadata ?? {}),
+              uploadConfirmedAt: new Date().toISOString(),
+              ingestion: {
+                stage: 'queued',
+                queuedAt: new Date().toISOString()
+              },
+              antivirus: antivirusMetadata,
+              checksum: {
+                value: verifiedChecksum ?? asset.checksum,
+                verifiedAt: new Date().toISOString(),
+                source: expectedChecksum ? 'client' : 'computed'
+              },
+              custom: metadata ?? {}
+            }
+          },
+          trx
+        );
 
       await ContentAssetEventModel.record(
         {
@@ -306,7 +416,8 @@ export default class AssetService {
           event: 'asset.upload.confirmed',
           performedBy: actor.id,
           payload: {
-            checksum: checksum ?? asset.checksum,
+            checksum: verifiedChecksum ?? asset.checksum,
+            checksumSource: expectedChecksum ? 'client' : 'computed',
             antivirus: antivirusMetadata
           }
         },

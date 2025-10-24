@@ -42,10 +42,46 @@ export default class AssetIngestionJobModel {
       .from(TABLE)
       .where({ status: 'pending' })
       .orderBy('created_at', 'asc')
-      .limit(limit)
+      .limit(limit * 3)
       .forUpdate()
       .skipLocked();
-    return rows.map((row) => this.deserialize(row));
+
+    const now = Date.now();
+    const ready = [];
+
+    for (const row of rows) {
+      if (ready.length >= limit) {
+        break;
+      }
+
+      const job = this.deserialize(row);
+      const retryAtRaw = job.resultMetadata?.retryAt;
+      const retryAt = retryAtRaw ? new Date(retryAtRaw).getTime() : null;
+      if (retryAt && retryAt > now) {
+        continue;
+      }
+
+      ready.push(job);
+    }
+
+    const prepared = [];
+    for (const job of ready) {
+      const metadata = { ...(job.resultMetadata ?? {}) };
+      if (metadata.retryAt) {
+        delete metadata.retryAt;
+      }
+      await connection(TABLE)
+        .where({ id: job.id })
+        .update({
+          status: 'processing',
+          started_at: connection.fn.now(),
+          updated_at: connection.fn.now(),
+          result_metadata: safeJsonStringify(metadata)
+        });
+      prepared.push({ ...job, status: 'processing', resultMetadata: metadata });
+    }
+
+    return prepared;
   }
 
   static async markProcessing(id, connection = db) {
@@ -72,8 +108,34 @@ export default class AssetIngestionJobModel {
         status: 'failed',
         last_error: lastError?.toString()?.slice(0, 2000) ?? null,
         attempts: connection.raw('attempts + 1'),
+        completed_at: connection.fn.now(),
         updated_at: connection.fn.now()
       });
+  }
+
+  static async scheduleRetry(id, { lastError, retryAt, attempts }, connection = db) {
+    const job = await this.findById(id, connection);
+    const metadata = { ...(job?.resultMetadata ?? {}) };
+    if (retryAt) {
+      const retryDate = retryAt instanceof Date ? retryAt : new Date(retryAt);
+      if (Number.isFinite(retryDate.getTime())) {
+        metadata.retryAt = retryDate.toISOString();
+      }
+    }
+
+    await connection(TABLE)
+      .where({ id })
+      .update({
+        status: 'pending',
+        attempts,
+        last_error: lastError?.toString()?.slice(0, 2000) ?? null,
+        result_metadata: safeJsonStringify(metadata),
+        started_at: null,
+        completed_at: null,
+        updated_at: connection.fn.now()
+      });
+
+    return this.findById(id, connection);
   }
 
   static deserialize(row) {

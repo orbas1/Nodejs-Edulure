@@ -4,6 +4,10 @@ import storageService from '../services/StorageService.js';
 import { env } from '../config/env.js';
 import { success } from '../utils/httpResponse.js';
 import { storageDescriptor, storageBuckets } from '../config/storage.js';
+import {
+  assertMediaTypeCompliance,
+  listAllowedMimeTypes
+} from '../services/MediaTypePolicy.js';
 
 const KIND_CONFIG = {
   image: { prefix: 'media/images', visibility: 'public' },
@@ -69,6 +73,14 @@ export default class MediaUploadController {
   static async requestUpload(req, res, next) {
     try {
       const payload = await uploadSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
+      try {
+        assertMediaTypeCompliance({ kind: payload.kind, mimeType: payload.mimeType, size: payload.size });
+      } catch (validationError) {
+        const error = new Error(validationError.message);
+        error.status = validationError.status ?? 422;
+        error.details = [validationError.message];
+        throw error;
+      }
       const prefix = resolvePrefix(payload.kind);
       const visibility = resolveVisibility(payload.kind, payload.visibility);
       const bucket = visibility === 'public' ? env.storage.publicBucket : env.storage.privateBucket;
@@ -120,6 +132,7 @@ export default class MediaUploadController {
             mimeType: payload.mimeType,
             size: payload.size,
             checksum: payload.checksum ?? null,
+            allowedMimeTypes: listAllowedMimeTypes(payload.kind),
             publicUrl:
               visibility === 'public'
                 ? storageService.buildPublicUrl({ bucket: upload.bucket, key: upload.key })
