@@ -11,7 +11,7 @@
     },
     "backendService": {
       "path": "infrastructure/terraform/modules/backend_service",
-      "hash": "34aa9f29f26ae9b78f50916aaa1111daaf1416ce28c03e7be88cd4eff392b593"
+      "hash": "1406f5b116fc61d93bcbc90a6630063d0209ee4ebea737866c1d8db273379de1"
     }
   },
   "environments": {
@@ -56,6 +56,23 @@
     "docker-compose.yml": {
       "path": "docker-compose.yml",
       "hash": "edba92c386a5ced24c16c61d0373a5c0a4d28c78f573cd2808810742ba33f8cc"
+    }
+  },
+  "blueprints": {
+    "backendService": {
+      "ssmParameter": "/edulure/${environment}/api/environment-blueprint",
+      "dashboard": "infrastructure/observability/grafana/dashboards/environment-runtime.json",
+      "alarmOutputs": [
+        "cpu_alarm_name",
+        "memory_alarm_name"
+      ]
+    }
+  },
+  "pipelines": {
+    "deployment": {
+      "script": "scripts/release/deployment-pipeline.mjs",
+      "licenseManifest": "reports/licenses/pipeline-manifest.json",
+      "readyCheck": "scripts/release/run-readiness.mjs"
     }
   }
 }

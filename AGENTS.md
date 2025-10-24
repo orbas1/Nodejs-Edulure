@@ -471,12 +471,32 @@
          - 12.G.1 20250213143000_creation_studio (backend-nodejs/migrations/20250213143000_creation_studio.js)
          - 12.G.2 002_search_documents (backend-nodejs/seeds/002_search_documents.js)
          - 12.G.3 backend-nodejs/database/migrations (found at backend-nodejs/database/migrations)
-      - 13.A Infrastructure Blueprints
-         - 13.A.1 infrastructure/observability (found at infrastructure/observability)
-         - 13.A.2 infrastructure/terraform/modules (found at infrastructure/terraform/modules)
-         - 13.A.3 nginx (infrastructure/docker/nginx.conf)
-      - 13.B Security & Automation Scripts
-         - 13.B.1 generate-license-report (scripts/security/generate-license-report.mjs)
+      - ✅ 13.A Infrastructure Blueprints (`infrastructure/terraform/modules/backend_service`, `infrastructure/observability`, `infrastructure/docker/nginx.conf`)
+        1. **Environment Topology.** `infrastructure/terraform/modules/backend_service` now emits CloudWatch alarms, dashboards, and SSM blueprints so Annex A46 spans compute, networking, and observability metadata in one module.
+        2. **Provisioning Controls.** CPU and memory alarms (`aws_cloudwatch_metric_alarm.cpu_high`, `.memory_high`) subscribe to configurable SNS topics, providing automated rollback hooks for deployment orchestration.
+        3. **Scaling Context.** Blueprint payload serialises desired/max task counts, target utilisation, and health-check paths, giving pipelines deterministic cues before scaling events.
+        4. **Credential Hygiene.** The SSM blueprint parameter (toggled via `blueprint_parameter_name`) stores JSON with subnet IDs, security group, and Secrets Manager references while inheriting environment tags.
+        5. **Observability Stack.** `observability.tf` publishes a CloudWatch dashboard that correlates ECS utilisation, ALB throughput, and response time so Annex A48 surfaces align with the Grafana blueprint.
+        6. **Dashboards.** `infrastructure/observability/grafana/dashboards/environment-runtime.json` mirrors the Terraform metrics and exposes a templated stat for the SSM parameter reference.
+        7. **Operational Docs.** `infrastructure/observability/README.md` documents data sources, alarm wiring, and how to lift dashboard outputs into release gates.
+        8. **Runtime Exposure.** `infrastructure/docker/nginx.conf` adds an `/ops/runtime-blueprint.json` endpoint plus the `X-Env-Blueprint` header so on-call tooling can fetch the active environment manifest without backend hops.
+        9. **Caching & Security.** Blueprint endpoint responses disable caching, inherit strict headers, and default the blueprint path to `/edulure/$host/api/environment-blueprint` for deterministic lookup.
+        10. **Manifest Cohesion.** `infrastructure/environment-manifest.json` links Terraform outputs, Grafana dashboards, and blueprint parameter patterns so CI can map environments to observability artefacts.
+        11. **Strengths to Keep.** Terraform module remains idempotent, centralises logging, and keeps deployment circuit breaker defaults intact.
+        12. **Weaknesses to Remove.** Future iterations should expose additional alarms (e.g., throttled requests) and wire blueprint hash validation into pipelines.
+        13. **Change Checklist.** Ensure SNS topics exist, provision the Grafana dashboard via IaC, and publish the SSM parameter before toggling the Nginx header in production.
+        14. **Release Steps.** Roll out to staging, verify `/ops/runtime-blueprint.json`, confirm alarms fire via synthetic load, and promote to production alongside updated pipeline manifests.
+      - ✅ 13.B Security & Automation Scripts (`scripts/security/generate-license-report.mjs`, `scripts/release/deployment-pipeline.mjs`)
+        1. **CI Integration.** License script now supports `--ci`, `--summary-path`, and `--pipeline-manifest` flags so Annex A47 outputs Markdown summaries and JSON manifests for GitHub runners.
+        2. **Policy Orchestration.** Violations render into `policy-violations.json`, Markdown digests, and aggregated severity data for downstream alerts.
+        3. **Failure Semantics.** `--no-fail-on-violation` allows gated stages to continue while still surfacing findings, aligning with approval workflows.
+        4. **Pipeline Manifest.** Generated manifest enumerates inventory, policy-review, and artifact publication steps so Annex B8 has machine-readable checkpoints.
+        5. **Deployment Blueprint.** New `scripts/release/deployment-pipeline.mjs` consumes the environment manifest to emit Markdown/JSON plans tied to Terraform directories and observability artefacts.
+        6. **Phase Coverage.** Pipeline plan covers build, security, infrastructure, deployment, and verification phases including blueprint endpoint validation.
+        7. **Command Hygiene.** Markdown renderer escapes backticks and surfaces explicit commands, enabling copy-paste friendly runbooks.
+        8. **Manifest Hooks.** Environment manifest references the pipeline script and license manifest so CI/CD tooling can locate automation outputs deterministically.
+        9. **Gaps.** Future work should ingest readiness results automatically and attach severity scoring to npm audit output for richer dashboards.
+        10. **Release Steps.** Validate license summary generation locally, commit pipeline manifest outputs in CI artifacts, and announce new commands to release engineers.
       - 14.A TypeScript SDK & Tooling
          - 14.A.1 sdk-typescript/scripts (found at sdk-typescript/scripts)
       - 14.B Update Templates & Release Guides
