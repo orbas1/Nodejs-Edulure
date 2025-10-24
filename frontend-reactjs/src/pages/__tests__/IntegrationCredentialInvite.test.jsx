@@ -54,9 +54,9 @@ describe('<IntegrationCredentialInvite />', () => {
       expect(fetchIntegrationInviteMock).toHaveBeenCalledWith({ token: 'token-xyz', signal: expect.any(AbortSignal) });
     });
 
-    expect(await screen.findByText('Provide secure credential')).toBeInTheDocument();
+    expect(await screen.findByText(/Provide credential for OpenAI/)).toBeInTheDocument();
     expect(screen.getByText(/Content Studio Bot/)).toBeInTheDocument();
-    expect(screen.getByText('How this works')).toBeInTheDocument();
+    expect(screen.getByText('Credential handling workflow')).toBeInTheDocument();
     expect(screen.getByDisplayValue('ops@example.com')).toBeInTheDocument();
     expect(screen.getByDisplayValue('90')).toBeInTheDocument();
     expect(document.title).toContain('Provide OpenAI credential');
@@ -71,7 +71,7 @@ describe('<IntegrationCredentialInvite />', () => {
 
   it('validates API key length before submitting', async () => {
     await renderWithRouter();
-    await screen.findByText('Provide secure credential');
+    await screen.findByText(/Provide credential for OpenAI/);
 
     await act(async () => {
       await userEvent.type(screen.getByLabelText('API key'), 'short');
@@ -84,7 +84,7 @@ describe('<IntegrationCredentialInvite />', () => {
 
   it('submits the credential and surfaces success messaging', async () => {
     await renderWithRouter();
-    await screen.findByText('Provide secure credential');
+    await screen.findByText(/Provide credential for OpenAI/);
 
     const key = 'sk-live-example-credential-123456';
     await act(async () => {
@@ -111,7 +111,9 @@ describe('<IntegrationCredentialInvite />', () => {
       });
     });
 
-    expect(await screen.findByText('Credential received. Our operations team will verify encryption and confirm rotation.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Credential received. Operations will verify connectivity and rotation.')
+    ).toBeInTheDocument();
     expect(screen.getByText('Next steps')).toBeInTheDocument();
   });
 });

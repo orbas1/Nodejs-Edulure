@@ -7606,7 +7606,24 @@ export async function seed(knex) {
         sla_days: 30,
         request_ciphertext: sealSensitive('Learner requested export of historical progress and direct messages.'),
         response_ciphertext: sealSensitive('Operations compiling export and awaiting legal approval.'),
-        metadata: JSON.stringify({ channel: 'support-portal', priority: 'standard' })
+        metadata: JSON.stringify({
+          channel: 'support-portal',
+          priority: 'standard',
+          assignmentHistory: [
+            {
+              assignedTo: adminId,
+              assignedAt: '2025-01-20T09:02:00Z',
+              notes: 'Initial review assigned to admin during bootstrap'
+            }
+          ],
+          resolutionHistory: [
+            {
+              status: 'in_review',
+              updatedAt: '2025-01-20T09:10:00Z',
+              notes: 'Awaiting export from analytics warehouse'
+            }
+          ]
+        })
       },
       {
         request_uuid: crypto.randomUUID(),
@@ -7624,7 +7641,30 @@ export async function seed(knex) {
         sla_days: 30,
         request_ciphertext: sealSensitive('Instructor requested erasure of deprecated sandbox account data.'),
         response_ciphertext: sealSensitive('Account anonymised and retention exceptions logged for compliance.'),
-        metadata: JSON.stringify({ channel: 'support-portal', priority: 'high' })
+        metadata: JSON.stringify({
+          channel: 'support-portal',
+          priority: 'high',
+          assignmentHistory: [
+            {
+              assignedTo: adminId,
+              assignedAt: '2024-12-10T15:05:00Z',
+              notes: 'Escalated to compliance admin via seed data'
+            }
+          ],
+          resolutionHistory: [
+            {
+              status: 'escalated',
+              updatedAt: '2024-12-15T09:10:00Z',
+              notes: 'Legal requested anonymisation evidence before completion'
+            },
+            {
+              status: 'completed',
+              updatedAt: '2024-12-22T11:30:00Z',
+              notes: 'Account anonymised per Annex C7 runbook'
+            }
+          ],
+          resolutionNotes: 'Erasure completed and evidence uploaded to audit vault'
+        })
       }
     ]);
 

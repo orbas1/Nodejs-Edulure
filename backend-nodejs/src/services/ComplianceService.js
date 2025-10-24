@@ -3,6 +3,7 @@ import logger from '../config/logger.js';
 import { TABLES as COMPLIANCE_TABLES } from '../database/domains/compliance.js';
 import changeDataCaptureService from './ChangeDataCaptureService.js';
 import AuditEventService from './AuditEventService.js';
+import DataSubjectRequestModel from '../models/DataSubjectRequestModel.js';
 
 const defaultAuditLogger = new AuditEventService();
 
@@ -42,6 +43,7 @@ function ensureJson(value) {
 }
 
 function mapDsrRow(row) {
+  const dueMetrics = calculateDueMetrics(row.due_at);
   return {
     id: row.id,
     requestUuid: row.request_uuid,
@@ -59,8 +61,34 @@ function mapDsrRow(row) {
     slaDays: Number(row.sla_days),
     metadata: ensureJson(row.metadata),
     reporter: normalizeUser(row.reporter),
-    assignee: normalizeUser(row.assignee)
+    assignee: normalizeUser(row.assignee),
+    dueInHours: dueMetrics.dueInHours,
+    deadlineState: dueMetrics.deadlineState
   };
+}
+
+function calculateDueMetrics(dueAt) {
+  if (!dueAt) {
+    return { dueInHours: null, deadlineState: 'unknown' };
+  }
+
+  const dueDate = new Date(dueAt);
+  if (Number.isNaN(dueDate.getTime())) {
+    return { dueInHours: null, deadlineState: 'unknown' };
+  }
+
+  const diffMs = dueDate.getTime() - Date.now();
+  const dueInHours = Number((diffMs / (60 * 60 * 1000)).toFixed(1));
+
+  if (diffMs < 0) {
+    return { dueInHours, deadlineState: 'overdue' };
+  }
+
+  if (diffMs <= 12 * 60 * 60 * 1000) {
+    return { dueInHours, deadlineState: 'due_soon' };
+  }
+
+  return { dueInHours, deadlineState: 'on_track' };
 }
 
 function mapConsentRow(row) {
@@ -304,79 +332,29 @@ export default class ComplianceService {
   }
 
   async listDsrRequests({ status, dueBefore, limit = 25, offset = 0 } = {}) {
-    const query = this.connection({ dr: COMPLIANCE_TABLES.DSR_REQUESTS })
-      .select(
-        'dr.*',
-        'users.id as reporter_id',
-        'users.email as reporter_email',
-        'users.first_name as reporter_first_name',
-        'users.last_name as reporter_last_name',
-        'assignees.id as assignee_id',
-        'assignees.email as assignee_email',
-        'assignees.first_name as assignee_first_name',
-        'assignees.last_name as assignee_last_name'
-      )
-      .leftJoin('users', 'dr.user_id', 'users.id')
-      .leftJoin({ assignees: 'users' }, 'dr.handled_by', 'assignees.id')
-      .orderBy('dr.due_at', 'asc')
-      .limit(limit)
-      .offset(offset);
-
-    if (status) {
-      query.where('dr.status', status);
-    }
-
-    if (dueBefore) {
-      query.andWhere('dr.due_at', '<=', dueBefore);
-    }
-
-    const rows = await query;
-    const mapped = rows.map((row) =>
-      mapDsrRow({
-        ...row,
-        reporter: {
-          id: row.reporter_id,
-          email: row.reporter_email,
-          first_name: row.reporter_first_name,
-          last_name: row.reporter_last_name
-        },
-        assignee: {
-          id: row.assignee_id,
-          email: row.assignee_email,
-          first_name: row.assignee_first_name,
-          last_name: row.assignee_last_name
-        }
-      })
+    const rows = await DataSubjectRequestModel.list(
+      { status, dueBefore, limit, offset },
+      this.connection
     );
-
-    const [{ total }] = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS)
-      .modify((builder) => {
-        if (status) {
-          builder.where('status', status);
-        }
-      })
-      .count({ total: '*' });
-
-    const [{ overdue }] = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS)
-      .where('status', '!=', 'completed')
-      .andWhere('due_at', '<', this.connection.fn.now())
-      .count({ overdue: '*' });
+    const mapped = rows.map((row) => mapDsrRow(row));
+    const total = await DataSubjectRequestModel.count({ status, dueBefore }, this.connection);
+    const overdue = await DataSubjectRequestModel.countOverdue(this.connection);
 
     return {
       data: mapped,
-      total: Number(total ?? 0),
-      overdue: Number(overdue ?? 0)
+      total,
+      overdue
     };
   }
 
   async assignDsrRequest({ requestId, assigneeId, actor, requestContext }) {
-    const updated = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS)
-      .where({ id: requestId })
-      .update({ handled_by: assigneeId, updated_at: this.connection.fn.now() });
+    const record = await DataSubjectRequestModel.assign(requestId, assigneeId, this.connection);
 
-    if (!updated) {
+    if (!record) {
       throw new Error(`DSR request ${requestId} not found`);
     }
+
+    const sanitized = mapDsrRow(record);
 
     await this.#recordAuditEvent({
       eventType: 'dsr.assigned',
@@ -394,37 +372,22 @@ export default class ComplianceService {
       payload: { assigneeId }
     });
 
-    return this.getDsrRequestById(requestId);
+    return sanitized;
   }
 
   async getDsrRequestById(requestId) {
-    const row = await this.connection({ dr: COMPLIANCE_TABLES.DSR_REQUESTS })
-      .select('dr.*')
-      .where('dr.id', requestId)
-      .first();
-
-    if (!row) {
-      return null;
-    }
-
-    return mapDsrRow(row);
+    const row = await DataSubjectRequestModel.findById(requestId, this.connection);
+    return row ? mapDsrRow(row) : null;
   }
 
   async updateDsrStatus({ requestId, status, resolutionNotes, actor, requestContext }) {
-    const now = this.connection.fn.now();
-    const updates = { status, updated_at: now };
+    const record = await DataSubjectRequestModel.updateStatus(
+      requestId,
+      { status, resolutionNotes },
+      this.connection
+    );
 
-    if (status === 'completed') {
-      updates.closed_at = now;
-    }
-
-    if (status === 'escalated') {
-      updates.escalated = true;
-      updates.escalated_at = now;
-    }
-
-    const updated = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS).where({ id: requestId }).update(updates);
-    if (!updated) {
+    if (!record) {
       throw new Error(`DSR request ${requestId} not found`);
     }
 
@@ -444,7 +407,7 @@ export default class ComplianceService {
       payload: { status, resolutionNotes }
     });
 
-    return this.getDsrRequestById(requestId);
+    return mapDsrRow(record);
   }
 
   async listConsentRecords(userId) {

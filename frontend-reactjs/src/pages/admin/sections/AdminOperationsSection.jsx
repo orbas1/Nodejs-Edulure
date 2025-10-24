@@ -72,7 +72,7 @@ function resolveConnectionBadge(state) {
   }
 }
 
-function SetupStatusCard({ state, connectionState, error, history }) {
+function SetupStatusCard({ state, connectionState, error, history, onLoadHistory }) {
   const badge = resolveConnectionBadge(connectionState);
   const status = state?.status ?? 'idle';
   const activePreset = state?.activePreset ?? state?.lastPreset ?? '—';
@@ -80,6 +80,7 @@ function SetupStatusCard({ state, connectionState, error, history }) {
     () => (Array.isArray(history) ? history.find((run) => run.status === 'succeeded') : null),
     [history]
   );
+  const historyPreview = useMemo(() => (Array.isArray(history) ? history.slice(0, 3) : []), [history]);
 
   return (
     <div className="dashboard-section">
@@ -120,6 +121,28 @@ function SetupStatusCard({ state, connectionState, error, history }) {
           <p className="mt-1">Completed at: {formatTimestamp(lastCompletedRun.completedAt)}</p>
         </div>
       ) : null}
+      {historyPreview.length > 0 ? (
+        <div className="mt-4 space-y-2 text-xs text-slate-600">
+          <p className="font-semibold text-slate-700">Recent runs</p>
+          <ul className="space-y-1">
+            {historyPreview.map((run) => (
+              <li key={run.id ?? run.startedAt} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+                <span className="font-medium text-slate-700">{run.presetId ?? 'Preset'}</span>
+                <span className="text-xs uppercase tracking-wide text-slate-500">{run.status ?? 'pending'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {typeof onLoadHistory === 'function' ? (
+        <button
+          type="button"
+          className="mt-4 inline-flex items-center justify-center rounded-full border border-primary/30 px-3 py-1 text-xs font-semibold text-primary hover:border-primary/50"
+          onClick={() => onLoadHistory()}
+        >
+          Load full run log
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -128,14 +151,16 @@ SetupStatusCard.propTypes = {
   state: PropTypes.object,
   connectionState: PropTypes.string,
   error: PropTypes.string,
-  history: PropTypes.arrayOf(PropTypes.object)
+  history: PropTypes.arrayOf(PropTypes.object),
+  onLoadHistory: PropTypes.func
 };
 
 SetupStatusCard.defaultProps = {
   state: null,
   connectionState: 'idle',
   error: null,
-  history: undefined
+  history: undefined,
+  onLoadHistory: undefined
 };
 
 export default function AdminOperationsSection({ sectionId, supportStats, riskStats, platformStats }) {
@@ -143,7 +168,8 @@ export default function AdminOperationsSection({ sectionId, supportStats, riskSt
     state: setupState,
     connectionState: setupConnectionState,
     error: setupError,
-    history: setupHistory
+    history: setupHistory,
+    loadHistory
   } = useSetupProgress();
 
   return (
@@ -156,6 +182,7 @@ export default function AdminOperationsSection({ sectionId, supportStats, riskSt
         connectionState={setupConnectionState}
         error={setupError}
         history={setupHistory}
+        onLoadHistory={loadHistory}
       />
     </section>
   );

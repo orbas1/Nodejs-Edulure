@@ -13,7 +13,8 @@ import IntegrationApiKeyService, {
   isValidEmail,
   normaliseEnvironment,
   normaliseProvider,
-  requireString
+  requireString,
+  validateKeyStrength
 } from './IntegrationApiKeyService.js';
 import {
   getProviderDefinition,
@@ -165,18 +166,30 @@ function buildAuditMetadata(metadata = {}) {
 function resolveProviderMeta(provider) {
   const definition = getProviderDefinition(provider);
   if (definition) {
-    return { id: definition.id, label: definition.label };
+    return {
+      id: definition.id,
+      label: definition.label,
+      policyUrl: definition.policy?.security ?? null,
+      runbookUrl: definition.policy?.runbook ?? null,
+      documentationUrl: definition.documentationUrl ?? null
+    };
   }
 
   const normalised = normaliseProviderId(provider);
   if (normalised) {
     const fallback = getProviderDefinition(normalised);
     if (fallback) {
-      return { id: fallback.id, label: fallback.label };
+      return {
+        id: fallback.id,
+        label: fallback.label,
+        policyUrl: fallback.policy?.security ?? null,
+        runbookUrl: fallback.policy?.runbook ?? null,
+        documentationUrl: fallback.documentationUrl ?? null
+      };
     }
   }
 
-  return { id: provider, label: provider };
+  return { id: provider, label: provider, policyUrl: null, runbookUrl: null, documentationUrl: null };
 }
 
 function normaliseDocumentationUrl(url) {
@@ -264,6 +277,8 @@ function sanitizeInvite(invite) {
     id: invite.id,
     provider: provider.id,
     providerLabel: provider.label,
+    policyUrl: provider.policyUrl ?? null,
+    runbookUrl: provider.runbookUrl ?? null,
     environment: invite.environment,
     alias: invite.alias,
     ownerEmail: invite.ownerEmail,
@@ -281,6 +296,7 @@ function sanitizeInvite(invite) {
     cancelledBy: invite.cancelledBy,
     documentationUrl:
       invite.documentationUrl
+        ?? provider.documentationUrl
         ?? (typeof invite.metadata?.documentationUrl === 'string' && invite.metadata.documentationUrl.trim()
           ? invite.metadata.documentationUrl.trim()
           : null),
@@ -479,7 +495,8 @@ export default class IntegrationApiKeyInviteService {
     const tokenHash = this.inviteModel.hashToken(rawToken);
     const expiresAt = calculateInviteExpiry(now);
 
-    const documentationLink = normaliseDocumentationUrl(documentationUrl);
+    const providerMeta = resolveProviderMeta(normalisedProvider ?? provider);
+    const documentationLink = normaliseDocumentationUrl(documentationUrl ?? providerMeta.documentationUrl);
 
     const metadata = createInviteMetadata({
       notes,
@@ -694,6 +711,8 @@ export default class IntegrationApiKeyInviteService {
       id: invite.id,
       provider: provider.id,
       providerLabel: provider.label,
+      policyUrl: provider.policyUrl ?? null,
+      runbookUrl: provider.runbookUrl ?? null,
       environment: invite.environment,
       alias: invite.alias,
       rotationIntervalDays: invite.rotationIntervalDays,
@@ -718,6 +737,7 @@ export default class IntegrationApiKeyInviteService {
 
   async submitInvitation(token, { key, rotationIntervalDays, keyExpiresAt, actorEmail, actorName, reason }, context = {}) {
     const invite = await this.loadInviteByToken(token);
+    const sanitizedKey = validateKeyStrength(key, { provider: invite.provider });
     const rotationDays = clampRotationInterval(rotationIntervalDays ?? invite.rotationIntervalDays, invite.provider);
     const expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : invite.keyExpiresAt;
     if (expiresAt && Number.isNaN(expiresAt.getTime())) {
@@ -747,7 +767,7 @@ export default class IntegrationApiKeyInviteService {
         result = await this.apiKeyService.rotateKey(
           invite.apiKeyId,
           {
-            keyValue: key,
+            keyValue: sanitizedKey,
             rotationIntervalDays: rotationDays,
             expiresAt: expiresAt ? expiresAt.toISOString() : null,
             rotatedBy: actor,
@@ -763,7 +783,7 @@ export default class IntegrationApiKeyInviteService {
             environment: invite.environment,
             alias: invite.alias,
             ownerEmail: invite.ownerEmail,
-            keyValue: key,
+            keyValue: sanitizedKey,
             rotationIntervalDays: rotationDays,
             expiresAt: expiresAt ? expiresAt.toISOString() : null,
             createdBy: actor,

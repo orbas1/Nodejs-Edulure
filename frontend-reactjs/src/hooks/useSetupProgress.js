@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../api/httpClient.js';
 const STREAM_ENDPOINT = `${API_BASE_URL}/setup/events`;
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
 const STREAM_RETRY_DELAY_MS = 15_000;
+const DEFAULT_HISTORY_LIMIT = 5;
 
 function parseEventData(event) {
   try {
@@ -19,7 +20,11 @@ function parseEventData(event) {
 const hasWindow = typeof window !== 'undefined';
 const hasEventSource = hasWindow && typeof window.EventSource !== 'undefined';
 
-export default function useSetupProgress({ autoStart = true, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS } = {}) {
+export default function useSetupProgress({
+  autoStart = true,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  historyLimit = DEFAULT_HISTORY_LIMIT
+} = {}) {
   const [snapshot, setSnapshot] = useState({ state: null, tasks: [], presets: [], defaults: {}, history: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,6 +35,7 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
   const reconnectTimeoutRef = useRef(null);
   const startStreamRef = useRef(null);
   const mountedRef = useRef(false);
+  const historyLimitRef = useRef(historyLimit);
 
   const applySnapshot = useCallback((data) => {
     if (!mountedRef.current) {
@@ -46,21 +52,25 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
     setError(null);
   }, []);
 
-  const fetchSnapshot = useCallback(async () => {
-    try {
-      const data = await fetchSetupStatus();
-      applySnapshot(data);
-      return data;
-    } catch (err) {
-      if (!mountedRef.current) {
+  const fetchSnapshot = useCallback(
+    async (limit = historyLimitRef.current) => {
+      try {
+        const data = await fetchSetupStatus({ historyLimit: limit });
+        applySnapshot(data);
+        historyLimitRef.current = limit;
+        return data;
+      } catch (err) {
+        if (!mountedRef.current) {
+          return null;
+        }
+        console.error('Failed to fetch setup status', err);
+        setError(err.message ?? 'Failed to load setup status');
+        setLoading(false);
         return null;
       }
-      console.error('Failed to fetch setup status', err);
-      setError(err.message ?? 'Failed to load setup status');
-      setLoading(false);
-      return null;
-    }
-  }, [applySnapshot]);
+    },
+    [applySnapshot]
+  );
 
   const closeEventSource = useCallback(() => {
     if (eventSourceRef.current) {
@@ -80,7 +90,7 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
     stopPolling();
     setConnectionState('polling');
     fetchSnapshot();
-    pollIntervalRef.current = setInterval(fetchSnapshot, pollIntervalMs);
+    pollIntervalRef.current = setInterval(() => fetchSnapshot(), pollIntervalMs);
   }, [fetchSnapshot, pollIntervalMs, stopPolling]);
 
   const scheduleReconnect = useCallback(() => {
@@ -179,6 +189,7 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
     error,
     connectionState,
     refresh: fetchSnapshot,
-    reconnect: startStream
+    reconnect: startStream,
+    loadHistory: (limit = 25) => fetchSnapshot(limit)
   };
 }

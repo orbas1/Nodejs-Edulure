@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import InviteSecurityChecklist from '../components/integrations/InviteSecurityChecklist.jsx';
 import InviteStatusBanner from '../components/integrations/InviteStatusBanner.jsx';
 import InviteSummaryCard from '../components/integrations/InviteSummaryCard.jsx';
+import InvitePolicySummary from '../components/integrations/InvitePolicySummary.jsx';
 import useIntegrationInvite from '../hooks/useIntegrationInvite.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import {
@@ -217,28 +218,49 @@ export default function IntegrationCredentialInvite() {
   const disableForm = status === 'submitting' || isExpired;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-16">
-      <InviteSummaryCard invite={invite} countdown={countdown} onRefresh={handleRefresh} />
-      {documentationBanner ? <InviteStatusBanner tone={documentationBanner.tone} message={documentationBanner.message} /> : null}
+    <div className="mx-auto max-w-5xl space-y-8 px-4 py-16">
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <InviteSummaryCard invite={invite} countdown={countdown} onRefresh={handleRefresh} />
+        <InvitePolicySummary
+          policyUrl={invite?.policyUrl ?? null}
+          runbookUrl={invite?.runbookUrl ?? invite?.documentationUrl ?? null}
+          providerLabel={invite?.providerLabel ?? invite?.provider ?? 'the integration'}
+        />
+      </div>
+      {documentationBanner ? (
+        <InviteStatusBanner tone={documentationBanner.tone} message={documentationBanner.message} />
+      ) : null}
       {message ? <InviteStatusBanner tone={statusTone} message={message} /> : null}
       {isExpired ? (
-        <InviteStatusBanner tone="danger" message="This invitation has expired. Request a fresh link from your Edulure contact." />
+        <InviteStatusBanner
+          tone="danger"
+          message="This invitation has expired. Request a fresh link from your Edulure contact."
+        />
       ) : null}
       <InviteSecurityChecklist
         rotationIntervalDays={invite?.rotationIntervalDays}
         documentationUrl={invite?.documentationUrl ?? documentationStatus?.url ?? null}
       />
 
-      <section className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-xs text-emerald-700">
-        <p className="font-semibold">How this works</p>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Paste the live API key directly into the secure field—avoid sharing secrets in chat or email.</li>
-          <li>Keys are encrypted on receipt and surfaced only to automation workloads governed by vault policies.</li>
-          <li>You’ll receive a confirmation email once connectivity checks complete or if additional steps are required.</li>
+      <section className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-5 text-xs text-emerald-800">
+        <p className="font-semibold uppercase tracking-wide">Credential handling workflow</p>
+        <ul className="mt-2 list-disc space-y-2 pl-5">
+          <li>
+            Submit the live credential using this form. Secrets are encrypted client-side, transferred via TLS, and vaulted with
+            hardware-backed keys.
+          </li>
+          <li>
+            Rotation cadences and expiry overrides are logged to governance dashboards so on-call responders receive PagerDuty
+            alerts ahead of SLA breaches.
+          </li>
+          <li>
+            A confirmation email and audit entry will be issued once connectivity checks succeed or if additional remediation is
+            required.
+          </li>
         </ul>
       </section>
 
-      <form className="space-y-4 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm" onSubmit={handleSubmit} noValidate>
+      <form className="space-y-5 rounded-3xl border border-slate-200 bg-white p-8 shadow-card" onSubmit={handleSubmit} noValidate>
         <div>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="invite-key">
             API key
@@ -253,6 +275,10 @@ export default function IntegrationCredentialInvite() {
             spellCheck="false"
             disabled={disableForm}
           />
+          <p className="mt-2 text-xs text-slate-500">
+            Ensure the credential is unique, high-entropy, and free from placeholders. The vault will reject secrets containing
+            provider names, repeated characters, or demo strings.
+          </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -328,10 +354,11 @@ export default function IntegrationCredentialInvite() {
           />
         </div>
         {status === 'success' ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
             <p className="font-semibold text-slate-700">Next steps</p>
             <p className="mt-1">
-              Operations will validate connectivity using this credential. Rotation reminders trigger calendar holds where requested.
+              Operations will validate connectivity and log an audit trail within 24 hours. You will receive confirmation once
+              automation checks succeed or if rotation adjustments are required.
             </p>
           </div>
         ) : null}
