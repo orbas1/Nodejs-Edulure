@@ -2,13 +2,37 @@ import type { ApiRequestOptions } from '../generated/core/ApiRequestOptions';
 import type { OpenAPIConfig } from '../generated/core/OpenAPI';
 import { OpenAPI } from '../generated/core/OpenAPI';
 
+import { createSessionManager, formatAuthorizationHeader } from './auth';
+import type { SessionManager, SessionManagerEvents, SessionManagerOptions, TokenRefreshHandler } from './auth';
+import { mergeHeaderProducers, normaliseHeaders } from './base';
+import type { HeaderDictionary, HeaderProducer } from './base';
 import { sdkManifest } from './manifest';
+import type { TokenStore } from './tokenStore';
 
 type TokenResolver = () => Promise<string | null | undefined> | string | null | undefined;
 
-export type HeaderResolver =
-  | Record<string, string | number | boolean | null | undefined>
-  | ((options: ApiRequestOptions) => Promise<Record<string, string>> | Record<string, string>);
+type AsyncTokenResolver = (options: ApiRequestOptions) => Promise<string | undefined>;
+
+type HeaderResolverFunction = (options: ApiRequestOptions) => Promise<HeaderDictionary> | HeaderDictionary;
+
+export type HeaderResolver = HeaderDictionary | HeaderResolverFunction;
+
+export type ConfigureAuthOptions = {
+  sessionManager?: SessionManager;
+  tokenStore?: TokenStore;
+  refresh?: TokenRefreshHandler;
+  refreshMarginMs?: number;
+  autoRefresh?: boolean;
+  allowAnonymous?: boolean;
+  scheme?: string;
+  headerName?: string;
+  getAccessToken?: TokenResolver;
+  onSession?: (session: SessionManager) => void;
+  onRefreshStart?: SessionManagerEvents['onRefreshStart'];
+  onRefreshSuccess?: SessionManagerEvents['onRefreshSuccess'];
+  onRefreshError?: SessionManagerEvents['onRefreshError'];
+  clock?: SessionManagerOptions['clock'];
+};
 
 export type ConfigureSdkOptions = {
   baseUrl: string;
@@ -19,6 +43,7 @@ export type ConfigureSdkOptions = {
   credentials?: OpenAPIConfig['CREDENTIALS'];
   userAgent?: string;
   onConfig?: (config: OpenAPIConfig) => void;
+  auth?: ConfigureAuthOptions;
 };
 
 function normaliseBaseUrl(baseUrl: string): string {
@@ -28,25 +53,75 @@ function normaliseBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 }
 
-async function resolveHeaders(
-  headers: HeaderResolver | undefined,
-  options: ApiRequestOptions
-): Promise<Record<string, string> | undefined> {
-  if (!headers) {
+function toHeaderProducer(resolver?: HeaderResolver): HeaderProducer | undefined {
+  if (!resolver) {
     return undefined;
   }
-  const raw = typeof headers === 'function' ? await headers(options) : headers;
-  if (!raw) {
+  if (typeof resolver === 'function') {
+    return async (options: ApiRequestOptions) => {
+      const output = await (resolver as HeaderResolverFunction)(options);
+      return normaliseHeaders(output);
+    };
+  }
+  return async () => normaliseHeaders(resolver);
+}
+
+function normaliseTokenResolver(resolver?: TokenResolver): AsyncTokenResolver | undefined {
+  if (resolver === undefined || resolver === null) {
     return undefined;
   }
-  const resolved: Record<string, string> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (value === undefined || value === null) {
-      continue;
+  if (typeof resolver === 'function') {
+    return async () => {
+      const value = await (resolver as () => Promise<string | null | undefined> | string | null | undefined)();
+      return value ?? undefined;
+    };
+  }
+  if (typeof resolver === 'string') {
+    if (resolver) {
+      return async () => resolver;
     }
-    resolved[key] = String(value);
+    return undefined;
   }
-  return resolved;
+  return undefined;
+}
+
+function buildSessionManager(auth?: ConfigureAuthOptions): SessionManager | undefined {
+  if (!auth) {
+    return undefined;
+  }
+  if (auth.sessionManager) {
+    return auth.sessionManager;
+  }
+  const { tokenStore, refresh, refreshMarginMs, onRefreshError, onRefreshStart, onRefreshSuccess, clock } = auth;
+  const sessionOptions: SessionManagerOptions = {
+    store: tokenStore,
+    refresh,
+    refreshMarginMs,
+    onRefreshError,
+    onRefreshStart,
+    onRefreshSuccess,
+    clock,
+  };
+  return createSessionManager(sessionOptions);
+}
+
+function createTokenHeaderProducer(
+  resolver: AsyncTokenResolver,
+  scheme: string,
+  headerName: string,
+  allowAnonymous: boolean
+): HeaderProducer {
+  return async (options) => {
+    const token = await resolver(options);
+    if (!token) {
+      if (allowAnonymous) {
+        return {};
+      }
+      throw new Error('Access token is required but none was resolved.');
+    }
+    const value = scheme ? formatAuthorizationHeader(token, scheme) : token;
+    return { [headerName]: value };
+  };
 }
 
 export function configureSdk({
@@ -57,36 +132,56 @@ export function configureSdk({
   withCredentials,
   credentials,
   userAgent,
-  onConfig
+  onConfig,
+  auth,
 }: ConfigureSdkOptions): OpenAPIConfig {
   const normalisedBase = normaliseBaseUrl(baseUrl);
   OpenAPI.BASE = normalisedBase;
   OpenAPI.VERSION = version ?? sdkManifest.specVersion;
 
-  if (typeof getAccessToken === 'function') {
-    OpenAPI.TOKEN = async () => {
-      const value = await getAccessToken();
-      return value ?? undefined;
-    };
-  } else if (typeof getAccessToken === 'string') {
-    OpenAPI.TOKEN = getAccessToken;
+  const session = buildSessionManager(auth);
+  if (session && auth?.onSession) {
+    auth.onSession(session);
+  }
+
+  const autoRefresh = auth?.autoRefresh !== false;
+  const allowAnonymous = auth?.allowAnonymous ?? true;
+  const scheme = auth?.scheme ?? 'Bearer';
+  const headerName = auth?.headerName ?? 'Authorization';
+
+  const providedTokenResolver = normaliseTokenResolver(auth?.getAccessToken ?? getAccessToken);
+  const sessionTokenResolver: AsyncTokenResolver | undefined = session
+    ? async () => {
+        const token = autoRefresh ? await session.ensureFreshToken() : await session.getAccessToken();
+        return token ?? undefined;
+      }
+    : undefined;
+
+  const tokenResolver = providedTokenResolver ?? sessionTokenResolver;
+
+  const headerProducers: HeaderProducer[] = [];
+  const defaultHeaderProducer = toHeaderProducer(defaultHeaders);
+  if (defaultHeaderProducer) {
+    headerProducers.push(defaultHeaderProducer);
+  }
+
+  if (tokenResolver) {
+    if (scheme === 'Bearer' && headerName === 'Authorization') {
+      OpenAPI.TOKEN = async (options) => {
+        const value = await tokenResolver(options);
+        return value ?? undefined;
+      };
+    } else {
+      OpenAPI.TOKEN = undefined;
+      headerProducers.push(createTokenHeaderProducer(tokenResolver, scheme, headerName, allowAnonymous));
+    }
   } else {
     OpenAPI.TOKEN = undefined;
   }
 
   const staticUserAgent = userAgent ?? undefined;
-  if (defaultHeaders || staticUserAgent) {
-    OpenAPI.HEADERS = async (options) => {
-      const resolved = await resolveHeaders(defaultHeaders, options);
-      const headers: Record<string, string> = resolved ? { ...resolved } : {};
-      if (staticUserAgent && !headers['User-Agent'] && !headers['user-agent']) {
-        headers['User-Agent'] = staticUserAgent;
-      }
-      return headers;
-    };
-  } else {
-    OpenAPI.HEADERS = undefined;
-  }
+  const combinedHeaders = mergeHeaderProducers(headerProducers, staticUserAgent);
+  OpenAPI.HEADERS = combinedHeaders;
 
   if (typeof withCredentials === 'boolean') {
     OpenAPI.WITH_CREDENTIALS = withCredentials;
