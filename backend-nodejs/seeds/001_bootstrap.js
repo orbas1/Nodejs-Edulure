@@ -1459,6 +1459,28 @@ export async function seed(knex) {
       emoji: '✅'
     });
 
+    const [opsSecurityHoldMessageId] = await trx('community_messages').insert({
+      community_id: opsCommunityId,
+      channel_id: opsGeneralChannelId,
+      author_id: instructorId,
+      message_type: 'text',
+      body: 'Security follow-up: rotate S3 credentials for the ingestion worker nodes.',
+      attachments: JSON.stringify([]),
+      metadata: JSON.stringify({ tags: ['security'], flagged: true }),
+      status: 'hidden',
+      thread_root_id: opsStandupMessageId,
+      reply_to_message_id: opsStandupMessageId,
+      delivered_at: trx.fn.now()
+    });
+
+    await trx('community_message_moderation_actions').insert({
+      message_id: opsSecurityHoldMessageId,
+      actor_id: adminId,
+      action_type: 'hide',
+      reason: 'Pending security approval before broadcast',
+      metadata: JSON.stringify({ reviewer: 'ops-admin', severity: 'medium' })
+    });
+
     await trx('community_channel_members')
       .where({ channel_id: opsGeneralChannelId, user_id: adminId })
       .update({ last_read_message_id: opsReplyMessageId, last_read_at: trx.fn.now() });
@@ -6358,6 +6380,34 @@ export async function seed(knex) {
         error: JSON.stringify({}),
         started_at: new Date('2025-04-18T08:51:10Z'),
         completed_at: new Date('2025-04-18T08:53:45Z')
+      }
+    ]);
+
+    const telemetryNow = new Date();
+    await trx(TELEMETRY_TABLES.FRESHNESS_MONITORS).insert([
+      {
+        pipeline_key: 'analytics.explorer.events',
+        last_event_at: new Date(telemetryNow.getTime() - 5 * 60 * 1000),
+        status: 'healthy',
+        threshold_minutes: 15,
+        lag_seconds: 5 * 60,
+        metadata: JSON.stringify({ dataset: 'explorer_search', region: 'us-west-2' })
+      },
+      {
+        pipeline_key: 'analytics.community.engagement',
+        last_event_at: new Date(telemetryNow.getTime() - 32 * 60 * 1000),
+        status: 'warning',
+        threshold_minutes: 20,
+        lag_seconds: 32 * 60,
+        metadata: JSON.stringify({ dataset: 'community_posts', region: 'us-east-1' })
+      },
+      {
+        pipeline_key: 'analytics.payments.revenue',
+        last_event_at: new Date(telemetryNow.getTime() - 3 * 60 * 60 * 1000),
+        status: 'critical',
+        threshold_minutes: 30,
+        lag_seconds: 3 * 60 * 60,
+        metadata: JSON.stringify({ dataset: 'payment_intents', region: 'eu-central-1' })
       }
     ]);
 
