@@ -97,6 +97,16 @@ const R2_STORAGE_FIELDS = [
   { key: 'R2_CDN_URL', label: 'CDN URL (optional)', placeholder: 'https://cdn.example.com' }
 ];
 
+const BACKEND_ENV_KEYS = new Set(
+  BACKEND_FIELD_GROUPS.flatMap((group) => group.fields.map((field) => field.key))
+);
+const STORAGE_FIELD_KEYS = new Set([
+  ...LOCAL_STORAGE_FIELDS.map((field) => field.key),
+  ...R2_STORAGE_FIELDS.map((field) => field.key)
+]);
+const STORAGE_CONTROL_KEYS = ['CONTENT_MAX_UPLOAD_MB', 'ASSET_PRESIGN_TTL_MINUTES', 'ASSET_DOWNLOAD_TTL_MINUTES'];
+const FRONTEND_ENV_KEYS = new Set(FRONTEND_FIELDS.map((field) => field.key));
+
 const TASK_STATUS_CLASS = {
   pending: 'border-slate-200 text-slate-600 bg-slate-50/70',
   running: 'border-indigo-400 text-indigo-600 bg-indigo-50/70',
@@ -130,6 +140,31 @@ function formatFullDate(value) {
     return '—';
   }
   return date.toLocaleString();
+}
+
+function formatNumber(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '0';
+  }
+  return value.toLocaleString();
+}
+
+function formatPercent(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 0;
+  }
+  return Math.round(value * 100);
+}
+
+function formatDayLabel(value) {
+  if (!value) {
+    return '—';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function formatDuration(start, end) {
@@ -193,6 +228,8 @@ export default function Setup() {
   const recentRuns = useMemo(() => (Array.isArray(history) ? history.slice(0, 5) : []), [history]);
 
   const presetInitialisedRef = useRef(false);
+  const backendDefaultsAppliedRef = useRef(false);
+  const frontendDefaultsAppliedRef = useRef(false);
 
   const applyPreset = useCallback(
     (presetId) => {
@@ -228,6 +265,76 @@ export default function Setup() {
     }
     applyPreset(setupState.activePreset);
   }, [applyPreset, setupState?.activePreset]);
+
+  useEffect(() => {
+    if (backendDefaultsAppliedRef.current) {
+      return;
+    }
+    const backendDefaults = defaults?.env?.backend;
+    if (!backendDefaults || Object.keys(backendDefaults).length === 0) {
+      return;
+    }
+
+    setBackendEnv((prev) => {
+      const next = { ...prev };
+      BACKEND_ENV_KEYS.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(backendDefaults, key)) {
+          const rawValue = backendDefaults[key];
+          next[key] = rawValue === undefined || rawValue === null ? '' : String(rawValue);
+        }
+      });
+      return next;
+    });
+
+    setAdvancedStorageValues((prev) => {
+      const next = { ...prev };
+      STORAGE_FIELD_KEYS.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(backendDefaults, key)) {
+          const rawValue = backendDefaults[key];
+          next[key] = rawValue === undefined || rawValue === null ? '' : String(rawValue);
+        }
+      });
+      STORAGE_CONTROL_KEYS.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(backendDefaults, key)) {
+          const rawValue = backendDefaults[key];
+          next[key] = rawValue === undefined || rawValue === null ? '' : String(rawValue);
+        }
+      });
+      return next;
+    });
+
+    if (Object.prototype.hasOwnProperty.call(backendDefaults, 'ASSET_STORAGE_DRIVER')) {
+      const driverValue = backendDefaults.ASSET_STORAGE_DRIVER;
+      if (driverValue) {
+        setStorageDriver(String(driverValue));
+      }
+    }
+
+    backendDefaultsAppliedRef.current = true;
+  }, [defaults?.env?.backend]);
+
+  useEffect(() => {
+    if (frontendDefaultsAppliedRef.current) {
+      return;
+    }
+    const frontendDefaults = defaults?.env?.frontend;
+    if (!frontendDefaults || Object.keys(frontendDefaults).length === 0) {
+      return;
+    }
+
+    setFrontendEnv((prev) => {
+      const next = { ...prev };
+      FRONTEND_ENV_KEYS.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(frontendDefaults, key)) {
+          const rawValue = frontendDefaults[key];
+          next[key] = rawValue === undefined || rawValue === null ? '' : String(rawValue);
+        }
+      });
+      return next;
+    });
+
+    frontendDefaultsAppliedRef.current = true;
+  }, [defaults?.env?.frontend]);
 
   const handleBackendChange = useCallback((key, value) => {
     setBackendEnv((prev) => ({ ...prev, [key]: value }));
@@ -329,6 +436,40 @@ export default function Setup() {
     return 'border-slate-200 bg-slate-50 text-slate-600';
   }, [connectionState]);
 
+  const learnerReadiness = setupState?.learnerReadiness ?? null;
+  const readinessWindowLabel = learnerReadiness?.windowLabel ??
+    (typeof learnerReadiness?.windowDays === 'number' ? `Last ${learnerReadiness.windowDays} days` : null);
+  const windowLabelLower = readinessWindowLabel ? readinessWindowLabel.toLowerCase() : 'the recent window';
+  const onboardingSummary = learnerReadiness?.onboarding ?? {};
+  const feedbackSummary = learnerReadiness?.feedback ?? {};
+  const totalOnboardingResponses = Number(onboardingSummary.totalResponses ?? 0);
+  const recentOnboardingResponses = Number(onboardingSummary.recentResponses ?? 0);
+  const acceptedInviteCount = Number(onboardingSummary.acceptedInvites ?? 0);
+  const recentAcceptedInviteCount = Number(onboardingSummary.recentAcceptedInvites ?? 0);
+  const pendingInviteCount = Number(onboardingSummary.pendingInvites ?? 0);
+  const recentPendingInviteCount = Number(onboardingSummary.recentPendingInvites ?? 0);
+  const expiredInviteCount = Number(onboardingSummary.expiredInvites ?? 0);
+  const recentExpiredInviteCount = Number(onboardingSummary.recentExpiredInvites ?? 0);
+  const revokedInviteCount = Number(onboardingSummary.revokedInvites ?? 0);
+  const recentRevokedInviteCount = Number(onboardingSummary.recentRevokedInvites ?? 0);
+  const acceptanceRatePercent = formatPercent(onboardingSummary.acceptanceRate ?? 0);
+  const recentAcceptanceRatePercent = formatPercent(onboardingSummary.recentAcceptanceRate ?? 0);
+  const personaBreakdown = Array.isArray(onboardingSummary.personaBreakdown)
+    ? onboardingSummary.personaBreakdown
+    : [];
+  const personaHighlights = personaBreakdown.slice(0, 3);
+  const topPersonaLabel = onboardingSummary.topPersona?.persona ?? null;
+  const topPersonaShare = typeof onboardingSummary.topPersona?.share === 'number'
+    ? onboardingSummary.topPersona.share
+    : null;
+  const lastOnboardingSubmission = onboardingSummary.lastSubmittedAt ?? null;
+  const totalFeedbackResponses = Number(feedbackSummary.totalResponses ?? 0);
+  const recentFeedbackResponses = Number(feedbackSummary.recentResponses ?? 0);
+  const lastFeedbackSubmission = feedbackSummary.lastSubmittedAt ?? null;
+  const surveyMomentum = Array.isArray(feedbackSummary.dailyBreakdown)
+    ? feedbackSummary.dailyBreakdown
+    : [];
+
   const handleSubmit = useCallback(
     async (event) => {
       event.preventDefault();
@@ -395,17 +536,22 @@ export default function Setup() {
         <div className="grid gap-8 lg:grid-cols-[2fr,1fr]">
           <form onSubmit={handleSubmit} className="flex flex-col gap-8">
             <section className="rounded-3xl bg-white p-8 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Environment configuration</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Provide the key settings for your backend and frontend apps. You can customise values before generating
-                    <code>.env.local</code> files.
-                  </p>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Storage driver
-                  <select
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">Environment configuration</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Provide the key settings for your backend and frontend apps. You can customise values before generating
+                      <code>.env.local</code> files.
+                    </p>
+                    {defaults?.sources?.backendEnv ? (
+                      <p className="mt-2 text-xs text-slate-400">
+                        Starting values loaded from <code>{defaults.sources.backendEnv}</code>.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Storage driver
+                    <select
                     className="rounded-full border-none bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none"
                     value={storageDriver}
                     onChange={(event) => setStorageDriver(event.target.value)}
@@ -504,6 +650,11 @@ export default function Setup() {
                 <div className="rounded-2xl border border-slate-100 p-6">
                   <h3 className="text-lg font-semibold text-slate-800">Frontend overrides</h3>
                   <p className="mt-1 text-sm text-slate-500">Values are written to <code>frontend-reactjs/.env.local</code>.</p>
+                  {defaults?.sources?.frontendEnv ? (
+                    <p className="mt-2 text-xs text-slate-400">
+                      Reference values sourced from <code>{defaults.sources.frontendEnv}</code>.
+                    </p>
+                  ) : null}
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     {FRONTEND_FIELDS.map((field) => (
                       <label key={field.key} className="flex flex-col text-sm font-medium text-slate-700">
@@ -601,6 +752,136 @@ export default function Setup() {
           </form>
 
           <aside className="flex flex-col gap-6">
+            <section className="rounded-3xl bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Learner onboarding &amp; feedback</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Track sign-up momentum and survey loops before inviting your first cohort.
+                  </p>
+                </div>
+                {readinessWindowLabel ? (
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {readinessWindowLabel}
+                  </span>
+                ) : null}
+              </div>
+
+              <dl className="mt-4 grid gap-4 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Onboarding responses</dt>
+                  <dd className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(totalOnboardingResponses)}
+                  </dd>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatNumber(recentOnboardingResponses)} in {windowLabelLower}.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Survey submissions</dt>
+                  <dd className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(recentFeedbackResponses)}
+                  </dd>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatNumber(totalFeedbackResponses)} captured all time.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Invites accepted</dt>
+                  <dd className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(acceptedInviteCount)}
+                  </dd>
+                  <p className="mt-1 text-xs text-slate-500">
+                    +{formatNumber(recentAcceptedInviteCount)} accepted in {windowLabelLower}. Acceptance rate {acceptanceRatePercent}%
+                    {recentAcceptedInviteCount ? ` (${recentAcceptanceRatePercent}% recent)` : ''}.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Invites pending</dt>
+                  <dd className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(pendingInviteCount)}
+                  </dd>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {recentPendingInviteCount
+                      ? `${formatNumber(recentPendingInviteCount)} surfaced in ${windowLabelLower}.`
+                      : 'Finalise community pairings before launch day.'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Invites expired</dt>
+                  <dd className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(expiredInviteCount)}
+                  </dd>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {recentExpiredInviteCount
+                      ? `${formatNumber(recentExpiredInviteCount)} lapsed in ${windowLabelLower}.`
+                      : 'Monitor expiry patterns to adjust outreach cadences.'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">Invites revoked</dt>
+                  <dd className="mt-1 text-lg font-semibold text-slate-900">
+                    {formatNumber(revokedInviteCount)}
+                  </dd>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {recentRevokedInviteCount
+                      ? `${formatNumber(recentRevokedInviteCount)} rescinded in ${windowLabelLower}.`
+                      : 'Review revocations with program owners before launch.'}
+                  </p>
+                </div>
+              </dl>
+
+              <div className="mt-4 rounded-2xl border border-slate-100 bg-white px-4 py-4 text-xs text-slate-600 shadow-inner">
+                <p className="font-semibold text-slate-700">
+                  {topPersonaLabel
+                    ? `Top persona interest: ${topPersonaLabel} • ${formatPercent(topPersonaShare ?? 0)}%`
+                    : 'Persona insights will appear after your first registrations.'}
+                </p>
+                {personaHighlights.length ? (
+                  <ul className="mt-2 space-y-1">
+                    {personaHighlights.map((entry) => (
+                      <li key={entry.persona} className="flex items-center justify-between">
+                        <span>{entry.persona}</span>
+                        <span className="font-semibold text-slate-700">{formatPercent(entry.share ?? 0)}%</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <div className="mt-3 grid gap-3 text-slate-500 sm:grid-cols-2">
+                  <div>
+                    <p className="font-semibold text-slate-600">Latest onboarding submission</p>
+                    <p className="mt-1">
+                      {lastOnboardingSubmission ? formatFullDate(lastOnboardingSubmission) : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-600">Latest survey response</p>
+                    <p className="mt-1">{lastFeedbackSubmission ? formatFullDate(lastFeedbackSubmission) : '—'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Survey momentum</p>
+                {surveyMomentum.length ? (
+                  <ul className="mt-2 space-y-1 text-xs text-slate-500">
+                    {surveyMomentum.map((entry) => (
+                      <li key={entry.date} className="flex items-center justify-between">
+                        <span>{formatDayLabel(entry.date)}</span>
+                        <span className="font-semibold text-slate-700">
+                          {formatNumber(Number(entry.count ?? 0))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-500">
+                    No survey responses recorded in {windowLabelLower}. Encourage beta learners to share feedback to tune
+                    dashboards before launch.
+                  </p>
+                )}
+              </div>
+            </section>
             <section className="rounded-3xl bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
