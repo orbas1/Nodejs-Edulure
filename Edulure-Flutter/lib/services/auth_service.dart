@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/network/dio_provider.dart';
 import 'api_config.dart';
 import 'session_manager.dart';
+import 'device_context_service.dart';
 
 class AuthException extends DioException {
   AuthException({
@@ -65,10 +67,13 @@ class AuthService {
   AuthService(
     this._dio, {
     SessionPersistence? sessionPersistence,
-  }) : _sessionPersistence = sessionPersistence ?? _SessionManagerPersistence();
+    DeviceContextService? deviceContextService,
+  })  : _sessionPersistence = sessionPersistence ?? _SessionManagerPersistence(),
+        _deviceContextService = deviceContextService ?? DeviceContextService();
 
   final Dio _dio;
   final SessionPersistence _sessionPersistence;
+  final DeviceContextService _deviceContextService;
 
   Future<Map<String, dynamic>> login(
     String email,
@@ -81,6 +86,10 @@ class AuthService {
       if (twoFactorCode != null && twoFactorCode.trim().isNotEmpty)
         'twoFactorCode': twoFactorCode.trim(),
     };
+    final context = await _buildActivityContext('login');
+    if (context.isNotEmpty) {
+      payload['context'] = context;
+    }
     try {
       final response = await _dio.post(
         '/auth/login',
@@ -124,6 +133,10 @@ class AuthService {
       'twoFactor': {'enabled': enableTwoFactor},
       if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
     };
+    final context = await _buildActivityContext('register');
+    if (context.isNotEmpty) {
+      payload['context'] = context;
+    }
     try {
       final response = await _dio.post(
         '/auth/register',
@@ -157,9 +170,13 @@ class AuthService {
       );
     }
     try {
+      final context = await _buildActivityContext('refresh', includeRiskSignals: false);
       final response = await _dio.post(
         '/auth/refresh',
-        data: {'refreshToken': token},
+        data: {
+          'refreshToken': token,
+          if (context.isNotEmpty) 'context': context,
+        },
         options: ApiConfig.unauthenticatedOptions(),
       );
       final session = _extractSession(response.data);
@@ -225,9 +242,30 @@ class AuthService {
     }
     return <String, dynamic>{};
   }
+
+  Future<Map<String, dynamic>> _buildActivityContext(
+    String activity, {
+    bool includeRiskSignals = true,
+  }) async {
+    try {
+      final context = await _deviceContextService.buildContext(
+        activity: activity,
+        includeRiskSignals: includeRiskSignals,
+      );
+      return context;
+    } catch (error, stackTrace) {
+      debugPrint('Failed to build auth context for $activity: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return <String, dynamic>{'activity': activity};
+    }
+  }
 }
 
 final authServiceProvider = Provider<AuthService>((ref) {
   final dio = ref.watch(dioProvider);
-  return AuthService(dio);
+  final deviceContext = ref.watch(deviceContextServiceProvider);
+  return AuthService(
+    dio,
+    deviceContextService: deviceContext,
+  );
 });

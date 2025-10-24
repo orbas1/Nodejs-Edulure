@@ -56,8 +56,8 @@
       - 2.H Integrations, Enablement & Invitations (`src/pages/IntegrationCredentialInvite.jsx`, `src/components/integrations/`, `src/hooks/useIntegrationInvite.js`)
       - 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
       - 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
-      - 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
-      - 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
+      - ✓ 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
+      - ✓ 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
       - ✓ 3.C Lessons, Assessments & Offline Learning (`Edulure-Flutter/lib/services/offline_learning_service.dart`, `Edulure-Flutter/lib/services/content_service.dart`, `Edulure-Flutter/lib/provider/learning/learning_store.dart`, `Edulure-Flutter/lib/screens/content_library_screen.dart`, `Edulure-Flutter/lib/screens/assessments_screen.dart`)
         1. **Appraisal.** `OfflineLearningService` now centralises download progress, assessment queues, and module snapshots, driving `LearningProgressController` so lessons, assessments, and analytics share one state engine.
         2. **Functionality.** `ContentService.downloadAsset` streams progress updates into the offline service, shows live progress in `ContentLibraryScreen`, throttles analytics, and `AssessmentsScreen` introduces an offline submission card with queue visibility, sync controls, and form capture.

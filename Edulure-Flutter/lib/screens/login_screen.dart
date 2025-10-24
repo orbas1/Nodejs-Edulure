@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
+import '../core/validators/auth_validators.dart';
 import '../services/auth_service.dart';
 import '../services/session_manager.dart';
 
@@ -17,6 +18,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _twoFactorController = TextEditingController();
@@ -49,6 +51,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    final form = _formKey.currentState;
+    if (form != null && !form.validate()) {
+      setState(() {
+        _error = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -135,135 +144,148 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (session != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFD6E4FF)),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (session != null)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFD6E4FF)),
+                        ),
+                        child: Text(
+                          'Signed in as ${_safeEmail(session)}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       ),
-                      child: Text(
-                        'Signed in as ${_safeEmail(session)}',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.username, AutofillHints.email],
+                      autocorrect: false,
+                      decoration: const InputDecoration(labelText: 'Email'),
+                      textInputAction: TextInputAction.next,
+                      validator: AuthValidators.email,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _passwordController,
+                      decoration: const InputDecoration(labelText: 'Password'),
+                      obscureText: true,
+                      autofillHints: const [AutofillHints.password],
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _loading ? null : _login(),
+                      validator: (value) => AuthValidators.password(
+                        value,
+                        requireComplexity: false,
                       ),
                     ),
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.username, AutofillHints.email],
-                    autocorrect: false,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _passwordController,
-                    decoration: const InputDecoration(labelText: 'Password'),
-                    obscureText: true,
-                    autofillHints: const [AutofillHints.password],
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _loading ? null : _login(),
-                  ),
-                  const SizedBox(height: 12),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: _showTwoFactorField
-                        ? Column(
-                            key: const ValueKey('twoFactor'),
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    const SizedBox(height: 12),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: _showTwoFactorField
+                          ? Column(
+                              key: const ValueKey('twoFactor'),
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Multi-factor verification',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelLarge
+                                            ?.copyWith(color: Theme.of(context).colorScheme.primary),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        verificationHint,
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Multi-factor verification',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelLarge
-                                          ?.copyWith(color: Theme.of(context).colorScheme.primary),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      verificationHint,
-                                      style: Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                  ],
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _twoFactorController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: 'Email security code',
+                                    helperText: _twoFactorRequired
+                                        ? 'Required to complete login'
+                                        : '6-digit code from your email inbox',
+                                  ),
+                                  inputFormatters: const [FilteringTextInputFormatter.digitsOnly],
+                                  maxLength: 6,
+                                  buildCounter: (_, {required int currentLength, required bool isFocused, int? maxLength}) => null,
+                                  validator: (value) => AuthValidators.otp(
+                                    value,
+                                    required: _twoFactorRequired,
+                                  ),
                                 ),
+                              ],
+                            )
+                          : Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _showTwoFactorField = true;
+                                  });
+                                },
+                                child: const Text('Have an email code?'),
                               ),
-                              const SizedBox(height: 12),
-                              TextField(
-                                controller: _twoFactorController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'Email security code',
-                                  helperText: _twoFactorRequired
-                                      ? 'Required to complete login'
-                                      : '6-digit code from your email inbox',
-                                ),
-                                inputFormatters: const [FilteringTextInputFormatter.digitsOnly],
-                                maxLength: 6,
-                                buildCounter: (_, {required int currentLength, required bool isFocused, int? maxLength}) => null,
-                              ),
-                            ],
-                          )
-                        : Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showTwoFactorField = true;
-                                });
-                              },
-                            child: const Text('Have an email code?'),
-                          ),
-                          ),
-                  ),
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8, top: 4),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-                      ),
+                            ),
                     ),
-                  FilledButton(
-                    onPressed: _loading ? null : _login,
-                    child: Text(_loading ? 'Authenticating…' : 'Login securely'),
-                  ),
-                  TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () async {
-                            try {
-                              await Navigator.pushNamed(context, '/forgot-password');
-                            } catch (_) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Reset links are available from the Edulure dashboard.'),
-                                ),
-                              );
-                            }
-                          },
-                    child: const Text('Forgot password?'),
-                  )
-                ],
-            ),
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8, top: 4),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    FilledButton(
+                      onPressed: _loading ? null : _login,
+                      child: Text(_loading ? 'Authenticating…' : 'Login securely'),
+                    ),
+                    TextButton(
+                      onPressed: _loading
+                          ? null
+                          : () async {
+                              try {
+                                await Navigator.pushNamed(context, '/forgot-password');
+                              } catch (_) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Reset links are available from the Edulure dashboard.'),
+                                  ),
+                                );
+                              }
+                            },
+                      child: const Text('Forgot password?'),
+                    )
+                  ],
+                ),
+              ),
           ),
         ),
       ),
