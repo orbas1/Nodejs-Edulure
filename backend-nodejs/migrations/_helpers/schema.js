@@ -34,6 +34,22 @@ export function jsonDefault(knex, fallback = '{}') {
   return knex.raw('?', [fallback]);
 }
 
+export async function ensureUuidExtension(knex) {
+  if (!isPostgres(knex)) {
+    return;
+  }
+
+  await knex.raw('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
+}
+
+export function defaultUuid(knex) {
+  if (isPostgres(knex)) {
+    return knex.raw('gen_random_uuid()');
+  }
+
+  return knex.raw('(UUID())');
+}
+
 export async function ensureUpdatedAtTrigger(knex, tableName) {
   if (isMysql(knex)) {
     await knex.raw(

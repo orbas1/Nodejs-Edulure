@@ -1,13 +1,22 @@
-import { jsonDefault } from './_helpers/utils.js';
-const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
-const JSON_EMPTY_ARRAY = (knex) => jsonDefault(knex, []);
+import {
+  addTimestamps,
+  defaultUuid,
+  ensureUpdatedAtTrigger,
+  ensureUuidExtension,
+  jsonDefault
+} from './_helpers/schema.js';
+
+const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, '{}');
+const JSON_EMPTY_ARRAY = (knex) => jsonDefault(knex, '[]');
 
 export async function up(knex) {
+  await ensureUuidExtension(knex);
+
   const hasProjects = await knex.schema.hasTable('creation_projects');
   if (!hasProjects) {
     await knex.schema.createTable('creation_projects', (table) => {
       table.increments('id').primary();
-      table.uuid('public_id').notNullable().unique().defaultTo(knex.raw('(UUID())'));
+      table.uuid('public_id').notNullable().unique().defaultTo(defaultUuid(knex));
       table
         .integer('owner_id')
         .unsigned()
@@ -33,15 +42,14 @@ export async function up(knex) {
       table.timestamp('approved_at');
       table.timestamp('published_at');
       table.timestamp('archived_at');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      addTimestamps(table, knex);
       table.index(['owner_id']);
       table.index(['type']);
       table.index(['status']);
       table.index(['created_at']);
     });
+
+    await ensureUpdatedAtTrigger(knex, 'creation_projects');
   }
 
   const hasCollaborators = await knex.schema.hasTable('creation_project_collaborators');
@@ -66,7 +74,7 @@ export async function up(knex) {
         .enum('role', ['owner', 'editor', 'commenter', 'viewer'])
         .notNullable()
         .defaultTo('editor');
-      table.json('permissions').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('permissions').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
       table.timestamp('added_at').defaultTo(knex.fn.now());
       table.timestamp('removed_at');
       table.unique(['project_id', 'user_id']);
@@ -78,7 +86,7 @@ export async function up(knex) {
   if (!hasTemplates) {
     await knex.schema.createTable('creation_templates', (table) => {
       table.increments('id').primary();
-      table.uuid('public_id').notNullable().unique().defaultTo(knex.raw('(UUID())'));
+      table.uuid('public_id').notNullable().unique().defaultTo(defaultUuid(knex));
       table
         .enum('type', ['course', 'ebook', 'community', 'ads_asset'])
         .notNullable();
@@ -97,21 +105,20 @@ export async function up(knex) {
       table.json('governance_tags').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
       table.timestamp('published_at');
       table.timestamp('retired_at');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      addTimestamps(table, knex);
       table.index(['type']);
       table.index(['is_default']);
       table.unique(['type', 'title', 'version']);
     });
+
+    await ensureUpdatedAtTrigger(knex, 'creation_templates');
   }
 
   const hasSessions = await knex.schema.hasTable('creation_collaboration_sessions');
   if (!hasSessions) {
     await knex.schema.createTable('creation_collaboration_sessions', (table) => {
       table.increments('id').primary();
-      table.uuid('public_id').notNullable().unique().defaultTo(knex.raw('(UUID())'));
+      table.uuid('public_id').notNullable().unique().defaultTo(defaultUuid(knex));
       table
         .integer('project_id')
         .unsigned()
@@ -163,9 +170,11 @@ export async function up(knex) {
         .onDelete('CASCADE');
       table.json('snapshot').notNullable();
       table.json('change_summary').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      addTimestamps(table, knex);
       table.unique(['project_id', 'version_number']);
     });
+
+    await ensureUpdatedAtTrigger(knex, 'creation_project_versions');
   }
 }
 

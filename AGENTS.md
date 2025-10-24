@@ -467,10 +467,26 @@
          - 12.F.1 communityReminderJob (backend-nodejs/src/jobs/communityReminderJob.js)
          - 12.F.2 probes (backend-nodejs/src/observability/probes.js)
          - 12.F.3 backend-nodejs/src/jobs (found at backend-nodejs/src/jobs)
-      - 12.G Database Seeds & Migrations
+      - ✅ 12.G Database Seeds & Migrations
          - 12.G.1 20250213143000_creation_studio (backend-nodejs/migrations/20250213143000_creation_studio.js)
          - 12.G.2 002_search_documents (backend-nodejs/seeds/002_search_documents.js)
          - 12.G.3 backend-nodejs/database/migrations (found at backend-nodejs/database/migrations)
+        1. **Appraisal.** Creation Studio schemas now standardise timestamp helpers and UUID defaults (`defaultUuid`, `ensureUuidExtension`) so Annex A38–A43 tables remain portable between MySQL and Postgres without manual rewrites.
+        2. **Functionality.** `creation_projects`, `creation_templates`, and `creation_project_versions` reuse `addTimestamps` plus `ensureUpdatedAtTrigger`, and the search seed drives `SearchDocumentService` with the ambient transaction to keep rebuilds atomic.
+        3. **Logic Usefulness.** Database defaults guarantee empty JSON payloads and consistent governance tags while `backend-nodejs/database/migrations/*.sql` stays aligned with the JS migration contracts for enrolment, onboarding, and analytics dependencies.
+        4. **Redundancies.** Shared JSON helpers remove ad-hoc `jsonDefault` wrappers so Annex schemas no longer duplicate array/object serialisation across seeds and DDL scripts.
+        5. **Placeholders or Stubs.** Seeds bail out gracefully when `search_documents` or its queue are absent, but still document the need for representative fixtures tied to learner/course catalogues before production cutover.
+        6. **Duplicate Functions.** The UUID helpers consolidate dialect-specific defaults; avoid reintroducing inline `(UUID())` expressions in future migrations so schema drift tooling stays deterministic.
+        7. **Improvements Needed.** Extend SQL Annex scripts with referential checks mirroring the Knex enums, and add migration smoke tests that exercise both `migrate:latest` and rollback paths in CI.
+        8. **Styling Improvements.** Naming now matches camelCase model accessors (`publicId`, `contentOutline`), but ensure future columns follow the same `snake_case` storage convention documented in Annex A42.
+        9. **Efficiency Analysis.** Fresh indexes on owners, status, and timestamps combine with transaction-scoped rebuilds to keep creation analytics queries fast while truncating refresh queues without table locks.
+        10. **Strengths to Keep.** Rich enum domains, cascade rules, and version history tables give the studio and catalogue teams complete lineage with minimal application code.
+        11. **Weaknesses to Remove.** SQL Annex files still lack generated ERD references—add comments or documentation hooks to keep analytics and governance teams in sync during audits.
+        12. **Styling & Colour Review.** Not applicable to data layers; prioritise schema naming, constraint aliases, and comment fields so BI dashboards read cleanly when surfaced in admin tooling.
+        13. **CSS, Orientation & Placement.** N/A for seeds, but migration ordering should continue grouping creation studio artefacts before downstream enrolment tables to prevent FK violations.
+        14. **Text Analysis.** Ensure description fields (template summaries, compliance notes) ship with localisation-ready defaults or length guidance in Annex A43 to avoid truncation.
+        15. **Change Checklist Tracker.** Run `npm --prefix backend-nodejs run migrate:latest`, `seed`, and `db:schema:check` after modifications; snapshot SQL Annex diffs alongside ERD updates for QA sign-off.
+        16. **Full Upgrade Plan & Release Steps.** Dry-run migrations against staging MySQL and Postgres clusters, confirm search rebuild parity, capture rollback scripts, and broadcast schema change notes to curriculum, analytics, and platform squads.
       - 13.A Infrastructure Blueprints
          - 13.A.1 infrastructure/observability (found at infrastructure/observability)
          - 13.A.2 infrastructure/terraform/modules (found at infrastructure/terraform/modules)

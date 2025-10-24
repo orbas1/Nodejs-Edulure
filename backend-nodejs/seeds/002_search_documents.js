@@ -23,7 +23,7 @@ export async function seed(knex) {
     await trx('search_documents').del();
 
     const service = new SearchDocumentService({
-      dbClient: knex,
+      dbClient: trx,
       loggerInstance: silentLogger
     });
 
