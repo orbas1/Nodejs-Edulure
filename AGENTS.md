@@ -420,16 +420,37 @@
          - 9.A.2 Courses (frontend-reactjs/src/pages/Courses.jsx)
          - 9.A.3 Explorer (frontend-reactjs/src/pages/Explorer.jsx)
          - 9.A.4 LiveClassrooms (frontend-reactjs/src/pages/LiveClassrooms.jsx)
-      - 9.D Scheduling, Calendar & Classroom Utilities
-         - 9.D.1 CalendarEventDialog (frontend-reactjs/src/components/calendar/CalendarEventDialog.jsx)
-         - 9.D.2 ScheduleGrid (frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx)
-      - 9.E Search & Discovery Components
-         - 9.E.1 BlogSearchSection (frontend-reactjs/src/components/search/BlogSearchSection.jsx)
-         - 9.E.2 ExplorerPreviewDrawer (frontend-reactjs/src/components/search/ExplorerPreviewDrawer.jsx)
-         - 9.E.3 ExplorerSearchSection (frontend-reactjs/src/components/search/ExplorerSearchSection.jsx)
-         - 9.E.4 FilterChips (frontend-reactjs/src/components/search/FilterChips.jsx)
-         - 9.E.5 GlobalSearchBar (frontend-reactjs/src/components/search/GlobalSearchBar.jsx)
-         - 9.E.6 SearchResultCard (frontend-reactjs/src/components/search/SearchResultCard.jsx)
+      - ✓ 9.D Scheduling, Calendar & Classroom Utilities — Annex C4 (Live Classes & Tutoring)
+         1. **Context.** `CalendarEventDialog.jsx` (369 LOC, hooks: `useEffect`, `useFocusTrap`, `useMemo`, `useRef`, `useState`) and `ScheduleGrid.jsx` (189 LOC) power the Live Classrooms and tutoring planners surfaced in Annex C4, sharing the same conflict-resolution patterns described in *user_experience.md* section 9.D.1–9.D.2.
+         2. **Scheduling Backbone.** Both components expose deterministic conflict detection yet rely on duplicated date-formatting; Annex C4 requires consolidating those helpers into a shared utility so dashboards, calendars, and checkout modals consume the exact same logic.
+         3. **Timezone Preparedness.** Neither file presently hydrates timezone context; the annex notes the need for instructor- and learner-selectable timezones, ICS exports, and multi-calendar sync so cross-tenant scheduling honours locale differences without manual adjustments.
+         4. **Session Enrichment.** `CalendarEventDialog` surfaces core metadata but omits prep materials, join URLs, and waitlist state. Live tutoring workflows must inject these from backend joins so learners receive action-ready cards directly in the modal.
+         5. **UI Density.** The dialog renders 48 classNames with minimal padding while the grid stays compact for desktop. Annex guidance calls for responsive stacking on mobile, expanded spacing between events, and focus-visible affordances to satisfy accessibility audits.
+         6. **Persona Differentiation.** Instructor utilities (drag-and-drop rescheduling, multi-session editing) are missing; Annex C4 emphasises gating those affordances behind role checks while keeping learner dialogs trimmed to RSVP and reminder controls.
+         7. **Analytics Hooks.** Neither component emits telemetry—add event instrumentation for open rates, join clicks, reschedule attempts, and conflict frequency so Annex C4 dashboards can chart utilisation.
+         8. **Resource Previews.** Media previews for slide decks, recordings, or breakout assignments are flagged as absent in the UX audit; embed thumbnail slots tied to material IDs and cache them for offline readiness.
+         9. **Accessibility.** Announce-politeness and focus traps already exist in the dialog, but grid navigation still lacks keyboard semantics; implement ARIA roles, roving tab index, and screen-reader friendly summaries of conflict states.
+         10. **State Management.** Consolidate conflict state, reminders, and RSVP statuses into a shared context or state machine to remove duplicated placeholder strings (10 in the dialog) and guarantee consistent messaging across scheduling entry points.
+         11. **Offline & Notifications.** Surface explicit reminder toggles, SMS/email preference syncing, and offline caches so learners can confirm attendance even when momentarily disconnected, matching Annex C4’s resilience expectations.
+         12. **Testing.** Both files lack unit stories/tests; add visual regression stories, timezone snapshot tests, and integration suites covering conflict resolution, join link rendering, and drag-drop operations.
+         13. **Documentation.** Update Annex C4 references to point to the shared scheduling design doc, enumerating hooks (`useFocusTrap`, `useMemo`, etc.), exported props, and expected analytics payloads so new contributors onboard quickly.
+         14. **Release Plan.** Stage rollout in three phases: (a) backend + shared utility consolidation, (b) responsive redesign with timezone/ICS integrations, (c) telemetry activation and instructor affordances behind feature flags with QA coverage across LiveClassrooms and dashboard tutors.
+      - ✓ 9.E Search & Discovery Components — Annex A6 (Explorer & Discovery)
+         1. **Surface Inventory.** Annex A6 spans six React surfaces—`BlogSearchSection.jsx` (431 LOC), `ExplorerPreviewDrawer.jsx` (228 LOC), `ExplorerSearchSection.jsx` (710 LOC), `FilterChips.jsx` (167 LOC), `GlobalSearchBar.jsx` (266 LOC), and `SearchResultCard.jsx` (260 LOC)—that collectively power Explorer, blog discovery, and global search.
+         2. **Data Fidelity.** All components currently depend on mocked datasets (`fetchBlogCategories`, `fetchBlogPosts`, placeholder Explorer responses); wiring them to production search indices and caching layers is priority-zero so Explorer analytics represent real engagement.
+         3. **Shared Taxonomy.** Filter chip generation, preview card styling, and metadata rendering are duplicated across modules; centralise taxonomy + chip builders so blog, course, community, and tutor facets reuse the same descriptors and color tokens.
+         4. **Personalisation Layer.** Explorer files lack trending queries, saved searches, or personalised feeds. Annex A6 mandates backend-ranked suggestions, recency weighting, and opt-in preference storage surfaced through `useGlobalSearchSuggestions` and new hooks for Explorer contexts.
+         5. **Performance.** Implement debounced queries, incremental loading, and caching for both blog and explorer surfaces—especially because `ExplorerSearchSection` orchestrates 27 event handlers and 105 classNames, making unnecessary rerenders costly.
+         6. **Editorial UX.** Blog search requires richer typography, author bios, reading times, and share/subscribe actions; align `BlogSearchSection` and `SearchResultCard` with marketing tokens, accessible link colors, and consistent CTAs highlighted in the UX audit.
+         7. **Preview Drawer Enhancements.** `ExplorerPreviewDrawer` should host contextual media, syllabus snippets, and instructor avatars while persisting filter selections; add keyboard navigation, sticky filter panes, and ARIA labelling so discovery remains inclusive.
+         8. **Global Search Alignment.** `GlobalSearchBar` straddles feed, community, and course contexts—ensure moderation flags, sponsored disclosures, and rate limiting propagate from backend policies instead of placeholder strings.
+         9. **Interaction Patterns.** Introduce quick-save, follow, and compare actions across cards; unify button styling (numerous occurrences across files) and connect to backend analytics for clickthrough attribution.
+         10. **Media Handling.** Add responsive hero imagery, inline galleries, and video previews referenced in Annex A6; share media loaders between blog and explorer to avoid code duplication and guarantee alt-text coverage.
+         11. **Accessibility & SEO.** Provide breadcrumbs, semantic headings, focus-visible states, and metadata injection (OpenGraph, schema.org) so search listings and previews earn SEO parity with marketing pages.
+         12. **Instrumentation.** Layer telemetry for search queries, filter toggles, preview expansions, and outbound clicks; aggregate metrics feed Annex dashboards tracking discovery funnels and drop-off points.
+         13. **Testing & Tooling.** None of the six files ship with tests/stories; add Storybook coverage for chips, cards, and drawers plus integration tests for search flows, caching behaviour, and suggestion rendering.
+         14. **Documentation.** Extend Annex A6 narrative with diagrams mapping hooks (`useExplorerEntitySearch`, `useGlobalSearchSuggestions`, `useFocusTrap`) to UI zones, enumerating expected props and analytics payload schemas for each component.
+         15. **Rollout Strategy.** Phase delivery: (a) backend integration + shared utilities, (b) UI/UX refinement with accessibility + media updates, (c) personalisation experiments gated via feature flags with analytics benchmarks and SEO audits prior to full release.
       - ✅ 10.A Commerce, Checkout & Pricing Components
          - 10.A.1 CampaignEditor (frontend-reactjs/src/components/ads/CampaignEditor.jsx)
          - 10.A.2 CampaignPreview (frontend-reactjs/src/components/ads/CampaignPreview.jsx)
