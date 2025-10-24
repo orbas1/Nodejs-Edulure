@@ -604,41 +604,41 @@ This compendium maps the execution paths, responsibilities, and release consider
 15. **Change Checklist Tracker:** Before releases, validate Prometheus scrapes, inspect `background_job_states` entries (`last_summary`, `pause_window`), rehearse failure backoff reset, and notify governance stakeholders of config changes (including seeded partition summaries).
 16. **Full Upgrade Plan & Release Steps:** Stage rotations with anonymised data, confirm metrics ingestion, refresh Annex A33/docs, secure DBA approval, configure alerts for pause scenarios, ensure bootstrap summaries remain representative, and deploy with monitoring of duration and outcome trends.
 
-### 4.C Data Retention Job (`dataRetentionJob.js`)
-1. **Appraisal:** Automates policy-driven retention, archiving, and purging with audit evidence capture.
-2. **Functionality:** Evaluates retention windows, archives or deletes records, logs evidence, and respects exemptions defined in platform settings.
-3. **Logic Usefulness:** Ensures compliance with data regulations while controlling storage costs and maintaining audit trails.
-4. **Redundancies:** Policy definitions repeated in settings and job; centralise to avoid discrepancies.
-5. **Placeholders Or non-working functions or stubs:** Exemption workflow flagged TODO; ensure placeholders respond with clear status.
-6. **Duplicate Functions:** Evidence logging replicates `AuditEventService.js`; unify for consistency.
-7. **Improvements need to make:** Add dry-run reporting, anomaly detection, and notifications for large deletions.
-8. **Styling improvements:** Provide retention summary payload for UI with severity colouring.
-9. **Efficiency analysis and improvement:** Batch operations, respect rate limits, and prioritise off-peak execution.
-10. **Strengths to Keep:** Detailed logging, configurable policies, and integration with governance.
-11. **Weaknesses to remove:** Manual overrides lack workflow; integrate approval UI.
-12. **Styling and Colour review changes:** Align retention report palette with compliance guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout metadata for retention dashboards showing status by domain.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refine retention summaries to highlight key metrics and avoid verbose wording.
-15. **Change Checklist Tracker:** Update compliance checklist, legal approvals, and dry-run evidence before release.
-16. **Full Upgrade Plan & Release Steps:** Stage job with scrubbed data, review outputs, secure sign-offs, update docs, and deploy with monitoring.
+### 4.C Data Retention Job (`backend-nodejs/src/jobs/dataRetentionJob.js`, `backend-nodejs/src/services/dataRetentionService.js`)
+1. **Appraisal:** The scheduler now orchestrates Annex A34 end-to-end—hydrating `data_retention_policies`, enforcing transactional strategies through `enforceRetentionPolicies`, persisting `data_retention_audit_logs`, and surfacing governance artefacts without manual intervention.
+2. **Functionality:** Each cycle normalises env toggles (`DATA_RETENTION_*`), executes policy-specific queries, captures verification samples, fans out change-data-capture events, emits `AuditEventService` run summaries, broadcasts `DomainEventModel` payloads, and books stakeholder comms via `GovernanceStakeholderService.scheduleCommunication` with structured metrics.
+3. **Logic Usefulness:** Verification metadata (pre/post counts, residual tallies) plus the `failOnResidual` guard guarantee auditors see the same evidence recorded in audit logs, domain events, and stakeholder briefs—backed by CDC payloads for downstream monitoring.
+4. **Redundancies:** Policy metadata now lives exclusively in `data_retention_policies` (migration `20241105153000_data_hygiene.js`) and optional overrides thread in through env-driven verification/reporting settings, eliminating the split definitions that previously lived in jobs and seeds.
+5. **Placeholders Or non-working functions or stubs:** The `anonymize` action path remains unimplemented—policies seeded as `hard-delete`/`soft-delete` explicitly avoid it until Annex follow-ups land; integrations should continue to surface TODO notices for anonymisation stakeholders.
+6. **Duplicate Functions:** Post-run aggregation funnels through `computeTotals` and domain/audit dispatch helpers so reporting, audit, and comms consume a single canonical summary instead of bespoke copies in governance controllers.
+7. **Improvements need to make:** Extend `onAlert` hooks to escalate residual failures into Ops runbooks, wire policy-level feature flags into `PlatformSettingModel`, and thread cold-storage export triggers alongside purge events.
+8. **Styling improvements:** `notifyStakeholders` now produces copy-ready paragraphs plus residual annotations; layer severity badges and CTA placement instructions so `governance_roadmap_communications` entries render consistently in executive briefs.
+9. **Efficiency analysis and improvement:** Policy executions are isolated per-transaction, reuse configurable sample sizes, respect `maxConsecutiveFailures` backoff, and leverage indexed audit tables—next optimisation is parallel entity batching gated by database load telemetry.
+10. **Strengths to Keep:** Strong evidence capture (audit rows, CDC events, domain events), governance comms automation, resilient env validation, seeded policy baselines, and regression coverage in `backend-nodejs/test/dataRetentionService.test.js` anchor compliance confidence.
+11. **Weaknesses to remove:** Manual override/exception workflows still sit outside the job; integrate approval state into `governance` models and expose UI toggles before relaxing `failOnResidual` defaults for specific tenants.
+12. **Styling and Colour review changes:** Align generated stakeholder briefs with compliance palette tokens so dashboards and outbound comms share consistent severity colours and typography pulled from governance design specs.
+13. **CSS, orientation, placement and arrangement changes:** Provide layout metadata (totals cards, residual callouts, failure lists) that dashboards can reuse when rendering retention runs inside admin or compliance consoles.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** `formatPolicyLine`/`formatFailureLine` now annotate residual counts; continue trimming prose to highlight run identifiers, totals, and required actions without duplicating policy descriptions.
+15. **Change Checklist Tracker:** Verify migration `20241105153000_data_hygiene.js`, confirm audit/event tables stay in sync, validate env contract additions, and run `npx vitest run backend-nodejs/test/dataRetentionService.test.js` before enabling new policies.
+16. **Full Upgrade Plan & Release Steps:** Promote retention updates by backfilling policy rows, toggling verification/reporting env flags, executing staging dry-runs, reviewing stakeholder briefs, validating CDC/audit outputs, and then enabling production schedules with monitoring and alert hooks.
 
-### 4.D Moderation Follow-Up Job (`moderationFollowUpJob.js`)
-1. **Appraisal:** Background worker revisiting moderation actions, ensuring follow-ups, escalations, and communication loops close correctly.
-2. **Functionality:** Processes moderation queues, checks pending reviews, sends follow-up notifications, and updates status fields on community records.
-3. **Logic Usefulness:** Keeps moderation responsive, reduces backlog, and ensures policy compliance through automated reminders.
-4. **Redundancies:** Notification formatting duplicates feed moderation copy; centralise to avoid diverging language.
-5. **Placeholders Or non-working functions or stubs:** Escalation path for legal review flagged TODO; guard to avoid false expectations.
-6. **Duplicate Functions:** Status updates overlap with moderation service; unify to single helper.
-7. **Improvements need to make:** Add SLA tracking, integrate analytics for backlog trends, and expose metrics to admin dashboards.
-8. **Styling improvements:** Provide severity colour metadata for moderation follow-up UI surfaces.
-9. **Efficiency analysis and improvement:** Batch updates, reuse cached membership data, and limit concurrency to protect database load.
-10. **Strengths to Keep:** Clear logging, focus on policy compliance, and integration with community services.
-11. **Weaknesses to remove:** Manual requeue flow; automate with configurable policies.
-12. **Styling and Colour review changes:** Harmonise moderation severity colours with community palette.
-13. **CSS, orientation, placement and arrangement changes:** Offer layout hints for follow-up dashboards and inbox views.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Ensure messages remain action-oriented and avoid redundant warnings.
-15. **Change Checklist Tracker:** Include moderation backlog review, SLA threshold validation, and notification QA in release tracker.
-16. **Full Upgrade Plan & Release Steps:** Stage job, validate against sandbox data, update runbooks, coordinate with moderators, and deploy gradually.
+### 4.D Moderation Follow-Up Job (`backend-nodejs/src/jobs/moderationFollowUpJob.js`)
+1. **Appraisal:** The job operationalises Annex A35—hydrating `moderation_follow_ups`, resolving linked `CommunityPostModerationCaseModel`/`CommunityPostModerationActionModel` records, and enforcing escalation SLAs with audit-ready telemetry.
+2. **Functionality:** Each run lists due follow-ups, calculates overdue windows, emits paired domain events (`community.moderation.follow_up.due|escalated`), records analytics snapshots via `ModerationAnalyticsEventModel`, persists completion metadata, and optionally raises audits with configurable severity.
+3. **Logic Usefulness:** Structured metadata (overdue minutes, escalation roles, triggers) captured in follow-up JSON plus analytics risk scores give moderation leads actionable backlog insights and power seeded dashboards in `001_bootstrap.js`.
+4. **Redundancies:** Status transitions, actor hydration, and notification metadata centralise within the job—eliminating prior duplication between moderation services and ad-hoc reminder utilities.
+5. **Placeholders Or non-working functions or stubs:** Legal/compliance escalation bridges to cross-org channels remain future work; guard rails keep escalation roles configurable until integrations with stakeholder comms are shipped.
+6. **Duplicate Functions:** Overdue computation and mark-completed logic now live solely in the job/`ModerationFollowUpModel`, replacing bespoke calculations previously scattered across moderation controllers.
+7. **Improvements need to make:** Add tenant-aware batching, introduce queue locking to avoid parallel runner conflicts, and surface SLA breach analytics directly into governance notification streams.
+8. **Styling improvements:** Domain-event payloads include tags and role audiences so realtime dashboards can colour-code severity; extend to UI schemas specifying chip palettes for escalated vs routine reminders.
+9. **Efficiency analysis and improvement:** Batched retrieval, configurable `batchSize`, threshold-driven escalation, and indexed migrations (`20250301120000_moderation_follow_up.js` + `20250215120000_community_moderation_pipeline.js`) keep read/write paths efficient; future tuning should add actor-level throttling.
+10. **Strengths to Keep:** Rich logging, dual domain events, analytics instrumentation, audit escalation hooks, and regression tests (`backend-nodejs/test/moderationFollowUpJob.test.js`) deliver visibility with minimal manual oversight.
+11. **Weaknesses to remove:** Follow-up creation still relies on upstream workflows; add proactive scheduling in moderation actions and integrate with messaging services for multi-channel outreach.
+12. **Styling and Colour review changes:** Map moderation severity to accessible palette tokens when rendering backlog dashboards and notification feeds, ensuring escalations stand out without sacrificing legibility.
+13. **CSS, orientation, placement and arrangement changes:** Surface layout guidance for moderation inboxes—grouping follow-ups by overdue bucket, rendering escalation badges, and pinning context metadata for quick triage.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Review reminder copy and audit payload strings to keep them action-focused, highlighting overdue minutes, assignees, and next steps without duplicating moderation case notes.
+15. **Change Checklist Tracker:** Confirm migrations for follow-ups/actions/cases are applied, validate seed fixtures, review env knobs (`MODERATION_FOLLOW_UP_*`), and execute `npx vitest run backend-nodejs/test/moderationFollowUpJob.test.js` before release.
+16. **Full Upgrade Plan & Release Steps:** Stage job with seeded cases, verify analytics/audit outputs, coordinate escalation roles with moderation/compliance leads, update runbooks, then enable production scheduling while monitoring domain-event streams and backlog burn-down metrics.
 
 ### 4.E Monetization Reconciliation Job (`monetizationReconciliationJob.js`)
 1. **Appraisal:** Reconciles billing provider data with internal ledger, flagging discrepancies and updating invoice states.
