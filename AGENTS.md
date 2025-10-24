@@ -330,7 +330,7 @@
          - 4.B.8 VerificationStatusCard (frontend-reactjs/src/components/dashboard/VerificationStatusCard.jsx)
          - 4.B.9 SkeletonPanel (frontend-reactjs/src/components/loaders/SkeletonPanel.jsx)
          - 4.B.10 ServiceHealthBanner (frontend-reactjs/src/components/status/ServiceHealthBanner.jsx)
-      - 5.A Learner Dashboard Pages
+      - ✓ 5.A Learner Dashboard Pages — Annex A18 (Learner Dashboard), Annex C1 (Learner Support Workspace)
          - 5.A.1 LearnerBookings (frontend-reactjs/src/pages/dashboard/LearnerBookings.jsx)
          - 5.A.2 LearnerCommunities (frontend-reactjs/src/pages/dashboard/LearnerCommunities.jsx)
          - 5.A.3 LearnerCommunityChats (frontend-reactjs/src/pages/dashboard/LearnerCommunityChats.jsx)
@@ -341,8 +341,64 @@
          - 5.A.8 LearnerSettings (frontend-reactjs/src/pages/dashboard/LearnerSettings.jsx)
          - 5.A.9 LearnerSocial (frontend-reactjs/src/pages/dashboard/LearnerSocial.jsx)
          - 5.A.10 LearnerSupport (frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx)
-      - 5.B Learner Deep-dive Modules
+            1. **Appraise.** `LearnerSupport.jsx` now elevates SLA visibility with semantic badges while `useLearnerSupportCases.js` deduplicates conversation messages and attachments, aligning Annex C1’s learner workspace with the Annex A18 dashboard expectations.
+            2. **Function.** `getSlaBadgeDescriptor`, `formatSlaDeadline`, and the enriched hook fields (`slaStatus`, `assignmentLabel`) power the new case list chips, stats grid, and SLA checkpoint summaries so learners instantly understand ownership and timing.
+            3. **Usefulness.** Knowledge suggestions render inline cards sourced from `knowledgeSuggestions`, the escalation breadcrumbs surface chronological status shifts, and badge tooltips contextualise countdowns, reducing time-to-resolution without leaving the workspace.
+            4. **Redundant.** Message normalisation now merges duplicate IDs and attachments, eliminating the prior UI jitter when optimistic updates appended the same payload twice.
+            5. **Placeholders.** Contact fallbacks still reference placeholder `href="#"` channels when the API omits live links, and voice-call scheduling remains disabled until telephony integrations land.
+            6. **Duplicates.** SLA formatting logic lives solely in `LearnerSupport.jsx`; future work should move the badge descriptor into the shared dashboard formatting utilities to avoid duplicating countdown text across widgets.
+            7. **Improvements Needed.** Wire SLA status to live websocket push events, expose agent avatars beside `assignmentLabel`, and allow learners to acknowledge knowledge suggestions so analytics can log deflection rates.
+            8. **Styling Improvements.** Case cards, SLA chips, and the escalation timeline now reuse dashboard pill tokens (`rounded-3xl`, semantic badge palettes) so the workspace matches the broader learner shell.
+            9. **Efficiency Analysis.** Message deduplication, attachment merging, and memoised case enrichments reduce render thrash when large transcripts stream in, keeping the timeline performant even for legacy tickets.
+            10. **Strengths to Keep.** Dual-column layout with sticky metadata, inline composer, and knowledge guidance retains the single-pane-of-glass experience Annex C1 champions.
+            11. **Weaknesses to Remove.** Offline replies still queue locally without surfacing retry state per message; exposing retry chips in `MessageTimeline` would prevent silent failures.
+            12. **Palette.** SLA and priority badges now adopt the same semantic colours (`bg-emerald-100`, `bg-rose-100`) used across the dashboard, ensuring brand and accessibility parity.
+            13. **Layout.** The detail grid adds a sixth cell for SLA checkpoints and the escalation panel stacks beneath the timeline, balancing information density without forcing horizontal scroll.
+            14. **Text.** Badge tooltips (“SLA on track”, “Breached …”), timeline copy, and knowledge card excerpts sharpen copywriting so learners see action-first phrasing.
+            15. **Spacing.** `space-y` utilities and the refreshed 3-column knowledge list maintain comfortable rhythm between panels while keeping the reply composer within reach.
+            16. **Shape.** Rounded-3xl shells, dashed borders on empty states, and subtle timeline markers keep the support hub visually consistent with other learner modules.
+            17. **Effects.** Badge hover/focus states inherit dashboard focus outlines, and the escalation feed avoids animations, respecting reduced-motion preferences baked into the layout.
+            18. **Thumbs.** Suggested playbooks now highlight read-time chips so learners can quickly judge effort before opening a guide.
+            19. **Media.** Attachment metadata merges duplicates and retains names/sizes, preserving context when learners upload logs or transcripts.
+            20. **Buttons.** Pill buttons (`dashboard-primary-pill`, focus-visible outlines) now complement SLA chips, while archive/reopen controls remain accessible and keyboard friendly.
+            21. **Interact.** `data-sla-status` attributes on list badges and detail chips open the door for automated filtering, and tooltip strings keep screen readers informed without extra markup.
+            22. **Missing.** Auto-refresh on SLA countdowns still relies on manual refresh; consider `setInterval` or React Query subscriptions to avoid stale timers.
+            23. **Design.** `getSlaBadgeDescriptor` centralises badge labelling, keeping copy cohesive as new SLA states emerge.
+            24. **Clone.** Merge logic prevents duplicate message rendering, replacing the previous per-component dedupe implementations with a single hook-level source of truth.
+            25. **Framework.** Enhancements lean on existing persistent storage (`usePersistentCollection`) and context boundaries, so no new architectural primitives were required.
+            26. **Checklist.** Regression suite should cover badge rendering, knowledge suggestion linking, escalation timeline ordering, and message dedupe, alongside running `npm --prefix frontend-reactjs run lint`.
+            27. **Nav.** SLA chips, escalation breadcrumbs, and knowledge cards extend Annex A18 navigation cues by labelling contexts (“Case detail”, “Suggested playbooks”) for quick scanning.
+            28. **Release.** Roll out behind the support workspace feature flag, capture telemetry on SLA badge engagement, and document the changes in Annex C1 plus the learner dashboard release notes.
+      - ✓ 5.B Learner Deep-dive Modules — Annex C1 (Learner Support)
          - 5.B.1 LearnerUpcomingSection (frontend-reactjs/src/pages/dashboard/learner/sections/LearnerUpcomingSection.jsx)
+            1. **Appraise.** `LearnerUpcomingSection.jsx` now adds urgency descriptors, semantic badges, and action-aware styling so the Annex C1 commitments rail mirrors Annex A18 priorities.
+            2. **Function.** `resolveActionVariant`, `resolveLinkTarget`, and urgency data attributes drive tailored CTA treatments, external link handling, and analytics-friendly tagging.
+            3. **Usefulness.** Learners see contextual copy (“Upcoming soon”, “Scheduled and on track”) alongside host, date, and relative labels, clarifying next steps without opening the event.
+            4. **Redundant.** Button rendering no longer duplicates target/rel logic—the helper centralises external link decisions while preserving mailto/self navigation.
+            5. **Placeholders.** Disabled CTAs still render greyed buttons when no actionable `href` exists; future revisions could hide them entirely or surface alternative prompts.
+            6. **Duplicates.** Urgency text aligns with the shared dashboard urgency vocabulary; remaining duplication inside `LearnerOverview.normaliseUpcoming` can move to a reusable formatter later.
+            7. **Improvements Needed.** Pipe through locations or delivery modes, extend badge variants for assessment deadlines, and offer iCal exports when schedules include calendar links.
+            8. **Styling Improvements.** Focus-visible outlines, variant-specific colours, and consistent rounded-full buttons bring the module in step with the dashboard shell.
+            9. **Efficiency Analysis.** External link resolution pre-parses URLs once per render, preventing runtime errors from malformed links while keeping the component lightweight.
+            10. **Strengths to Keep.** Compact cards with urgency chips and relative timestamps maintain scannability while layering richer context.
+            11. **Weaknesses to Remove.** The component still lacks inline actions for rescheduling or joining waitlists—hooks to bookings/live-class APIs would complete the experience.
+            12. **Palette.** Action variants use emerald/indigo/primary shades consistent with learner CTAs, and urgency badges keep rose/amber/emerald semantics for accessibility.
+            13. **Layout.** Card spacing remains vertical for clarity, and the new descriptor line avoids crowding by using subdued slate tones.
+            14. **Text.** CTA aria-labels mention the event title, supporting assistive tech, while urgency descriptors avoid jargon and stay action-focused.
+            15. **Spacing.** Extra `mt-1` spacing between host and urgency copy keeps the hierarchy readable even on small screens.
+            16. **Shape.** Rounded-2xl shells and pill badges continue the learner dashboard motif, reinforcing familiarity across modules.
+            17. **Effects.** Hover elevation (`hover:-translate-y-0.5`, `hover:shadow-md`) and focus outlines echo the rest of the dashboard without introducing new motion patterns.
+            18. **Thumbs.** Cards remain thumb-friendly on touch devices thanks to generous padding and full-width button targets.
+            19. **Media.** While still text-first, structured descriptors ensure upcoming live sessions can later embed icons without layout shifts.
+            20. **Buttons.** Variant-aware CTAs adjust colour and outline tokens to match action types, and disabled states now render with neutral greys to signal inactivity.
+            21. **Interact.** `data-urgency` attributes and descriptive aria labels give analytics and accessibility layers hooks for filtering and narration.
+            22. **Missing.** Countdown timers remain static per render; consider injecting live countdown hooks for high-priority sessions.
+            23. **Design.** Helper functions encapsulate variant logic, letting designers extend CTA palettes without touching JSX internals.
+            24. **Clone.** Shared functions avoid repeating external-link guards across other learner widgets, reducing drift when rules evolve.
+            25. **Framework.** Enhancements stay within the existing component boundary—no new dependencies beyond `clsx` were required.
+            26. **Checklist.** Regression checks: verify urgency badges render across statuses, ensure external links respect targets, and confirm disabled CTAs show grey styling.
+            27. **Nav.** Urgency descriptors plus aria-labelled buttons tie into Annex A18 navigation heuristics, making commitments easy to skim by keyboard or screen reader.
+            28. **Release.** Bundle with learner dashboard refresh, announce urgency badge upgrades in Annex C1 notes, and monitor click-through on join/review CTA variants post-launch.
       - 6.A Instructor Dashboard Pages
          - 6.A.1 InstructorCommunityChats (frontend-reactjs/src/pages/dashboard/InstructorCommunityChats.jsx)
          - 6.A.2 InstructorCommunityCreate (frontend-reactjs/src/pages/dashboard/InstructorCommunityCreate.jsx)
