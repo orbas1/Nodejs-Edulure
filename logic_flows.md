@@ -863,40 +863,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Implement pipeline updates in staging, run dry run, roll out to production, and monitor for regressions.
 
 ### 7.C Observability Stack & Runtime Telemetry (`infrastructure/observability/`, `backend-nodejs/src/observability/`, `docs/operations/observability.md`)
-1. **Appraisal:** Comprehensive observability stack configuring metrics, logs, tracing, dashboards, and alerting policies.
-2. **Functionality:** Sets up exporters, dashboards, alert routing, and instrumentation hooks integrated into backend bootstrapping.
-3. **Logic Usefulness:** Provides visibility into system health, supports SLO tracking, and enables proactive incident response.
-4. **Redundancies:** Dashboard JSON definitions duplicated; centralise to avoid inconsistent views.
-5. **Placeholders Or non-working functions or stubs:** Some alert rules flagged TODO; document expected triggers.
-6. **Duplicate Functions:** Metric definitions repeated between instrumentation and documentation; consolidate.
-7. **Improvements need to make:** Add SLO dashboards, automated incident response hooks, and noise reduction tuning.
-8. **Styling improvements:** Standardise dashboard theming, typography, and colour scales to match design tokens.
-9. **Efficiency analysis and improvement:** Optimise sampling rates, prune unused metrics, and configure retention policies.
-10. **Strengths to Keep:** Deep instrumentation coverage and alignment with runtime configuration.
-11. **Weaknesses to remove:** Manual alert routing; integrate with incident management automation.
-12. **Styling and Colour review changes:** Ensure dashboards use accessible palettes and consistent severity colours.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout templates for operations dashboards.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify alert descriptions, remove redundant jargon, and ensure actionable language.
-15. **Change Checklist Tracker:** Update observability checklist with alert tests, dashboard review, and metric coverage validation.
-16. **Full Upgrade Plan & Release Steps:** Deploy config to staging, validate alerts, roll out to production, and monitor noise levels.
+1. **Appraisal:** Prometheus metrics in `backend-nodejs/src/observability/metrics.js`, AsyncLocal request traces in `requestContext.js`, SLO evaluation in `sloRegistry.js`, and the packaged Grafana dashboards in `infrastructure/observability/grafana/` together provide a governed telemetry surface documented in `infrastructure/observability/README.md`.
+2. **Functionality:** `httpMetricsMiddleware` times every Express request, `recordStorageOperation`, `recordIntegrationRequestAttempt`, and `recordSearchIngestionRun` wrap storage, integration, and search flows, while `createProbeApp`/`createReadinessTracker` expose `/live` and `/ready` JSON probes and `withTelemetrySpan` binds nested AsyncLocal spans for downstream handlers.
+3. **Logic Usefulness:** Recorded metrics feed release governance (`releaseRunStatusGauge`, `releaseGateEvaluationsTotal`), consent quality dashboards (`consentMutationErrorRate`), and telemetry lag monitors that the environment blueprint registry surfaces through `/api/v1/environment/health`, keeping parity tooling and dashboards aligned.
+4. **Redundancies:** Runtime health is defined twice—CloudWatch widgets inside `infrastructure/terraform/modules/backend_service/observability.tf` and Grafana JSON in `infrastructure/observability/grafana/dashboards/environment-runtime.json`—so chart edits must be duplicated until a single source is introduced.
+5. **Placeholders Or non-working functions or stubs:** `docs/operations/observability.md` is referenced in guidance but absent from the repository, and alert routing beyond SNS outputs in Terraform has not yet been codified in runbooks.
+6. **Duplicate Functions:** Consent outcome aggregation still keeps a local `Map` in `metrics.js` to combine success/error ratios even though consent dashboards query Prometheus; extracting that reducer would avoid repeating bucketing logic once additional services emit the same labels.
+7. **Improvements need to make:** Extend SLO definitions (currently defaulted in `env.js`) to cover background jobs and ingestion exports, ship Alertmanager/incident webhooks aligned with `recordHttpSloObservation`, and document how blueprint hashes feed Grafana provisioning.
+8. **Styling improvements:** Both Grafana dashboards already encode accessible threshold palettes (`fieldConfig.thresholds`)—carry those gradients into CloudWatch widget JSON and update README screenshots so severity colours match Annex palettes.
+9. **Efficiency analysis and improvement:** Metrics collection is gated by `env.observability.metrics.enabled`, histograms use bounded buckets, and `storageOperationsInFlight` avoids negative gauges; further gains come from trimming rarely-read counters (e.g. both consent gauges) and enabling scrape IP allowlists by default.
+10. **Strengths to Keep:** Comprehensive instrumentation spans HTTP, storage, background jobs, search, monetisation, governance, and telemetry with consistent labelling, and readiness helpers provide structured responses with security headers for probes.
+11. **Weaknesses to remove:** `/metrics` authentication currently relies on Basic/Bearer checks only; integrate with API key rotation or IAM roles, and ensure probe responses include component remediation hints instead of generic failures.
+12. **Styling and Colour review changes:** Align dashboard typography and severity badges with the design tokens referenced in `backend-nodejs/README.md` (Prometheus alert copy) and keep Grafana stat panels labelled in sentence case for readability.
+13. **CSS, orientation, placement and arrangement changes:** Document recommended grid positions for the Grafana dashboards and mirror them in the CloudWatch widget matrix so on-call screens present ECS/ALB metrics in the same quadrants across tools.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** `createProbeApp` responses already return structured JSON; extend descriptions in Terraform alarm messages and Grafana panel summaries to emphasise actions (“Scale ECS service”, “Investigate consent ledger retries”) and trim legacy jargon.
+15. **Change Checklist Tracker:** Before shipping telemetry changes, rehearse probe endpoints, scrape `/metrics` behind IP whitelists, validate SLO evaluation via `backend-nodejs/test/observabilitySloRegistry.test.js`, and refresh blueprint registry hashes so parity checks continue to match deployed dashboards.
+16. **Full Upgrade Plan & Release Steps:** Roll updates through staging by toggling `METRICS_ENABLED` and new SLO configs, redeploy Terraform to publish revised alarms/dashboards, reseed `environment_blueprints`, export refreshed Grafana JSON, and monitor burn-rate alerts for 24 hours before production rollout.
 
 ### 7.D Local Tooling & Developer Enablement (`file_list.md`, `EDULURE_GUIDE.md`, `backend-nodejs/README.md`, `frontend-reactjs/README.md`, `valuation/`, `scripts/setup-*`)
-1. **Appraisal:** Documentation and tooling aiding onboarding, environment setup, valuation analysis, and knowledge transfer.
-2. **Functionality:** Guides describe architecture, setup steps, valuation context, and developer workflows while scripts automate bootstrapping.
-3. **Logic Usefulness:** Ensures new contributors ramp quickly and align with platform strategy.
-4. **Redundancies:** Setup instructions duplicated across READMEs; consolidate into central guide with per-repo appendices.
-5. **Placeholders Or non-working functions or stubs:** Some valuation documents note TBD metrics; mark with roadmap context.
-6. **Duplicate Functions:** Bootstrap scripts repeated between backend and frontend; refactor into shared CLI.
-7. **Improvements need to make:** Add interactive onboarding CLI, embed video walkthroughs, and keep valuations refreshed quarterly.
-8. **Styling improvements:** Align documentation typography, headings, and colour usage with design system.
-9. **Efficiency analysis and improvement:** Automate environment verification, cache dependencies, and add linting to docs pipeline.
-10. **Strengths to Keep:** Comprehensive guides, checklists, and cross-functional context.
-11. **Weaknesses to remove:** Outdated screenshots and stale instructions; schedule regular reviews.
-12. **Styling and Colour review changes:** Ensure documentation uses accessible colours and consistent formatting.
-13. **CSS, orientation, placement and arrangement changes:** Provide responsive layout for docs when rendered in portals.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Edit for concision, remove duplicate sections, and maintain consistent tone.
-15. **Change Checklist Tracker:** Track documentation updates alongside releases, including valuation adjustments and onboarding script changes.
-16. **Full Upgrade Plan & Release Steps:** Consolidate docs, automate linting, review with stakeholders, publish updates, and communicate via release notes.
+1. **Appraisal:** The onboarding toolchain pairs exhaustive guidance (`EDULURE_GUIDE.md`, `backend-nodejs/README.md`, `frontend-reactjs/README.md`, valuation briefs) with automation scripts (`scripts/dev-stack.mjs`, `scripts/bootstrap-environment.sh`, `scripts/verify-node-version.mjs`) so contributors can move from local setup to financial context quickly.
+2. **Functionality:** `EDULURE_GUIDE.md` walks through environment prerequisites, service responsibilities, and job schedules; `backend-nodejs/README.md` enumerates environment variables, telemetry options, and governance automation; `frontend-reactjs/README.md` lists supported routes; valuation notes articulate commercial framing; and CLI helpers supervise dev stacks, enforce runtime versions, and bootstrap Docker or Terraform targets.
+3. **Logic Usefulness:** Process supervisors (`scripts/lib/processSupervisor.mjs`) orchestrate backend/frontend processes with readiness probes, guides map UI flows to backend modules, and valuation analyses translate shipped capabilities into investor-ready narratives, aligning engineering execution with go-to-market planning.
+4. **Redundancies:** Environment setup steps are repeated verbatim across `README.md`, `EDULURE_GUIDE.md`, and `backend-nodejs/README.md`; consolidating prerequisites (Node, npm, database bootstrap) into a single canonical section would reduce maintenance churn.
+5. **Placeholders Or non-working functions or stubs:** Valuation data is static (last updated May 2025) and references future diligence actions; establishing an update cadence or linking to live metrics is still pending.
+6. **Duplicate Functions:** Both `scripts/dev-stack.mjs` and `scripts/bootstrap-environment.sh` perform database installation and seeding (`npm --workspace backend-nodejs run db:install`/`migrate`/`seed`), suggesting those routines could live in a shared helper invoked by each entry point.
+7. **Improvements need to make:** Add a guided onboarding CLI that wraps `dev-stack` presets, surface workspace health checks (lint/test) after boot, embed architecture diagrams referenced in `EDULURE_GUIDE.md`, and automate valuation refreshes alongside telemetry exports.
+8. **Styling improvements:** Harmonise Markdown headings and tables—`EDULURE_GUIDE.md` already structures sections cleanly, but `frontend-reactjs/README.md` could adopt the same table-driven route summary and include brand-consistent typography guidance.
+9. **Efficiency analysis and improvement:** `verify-node-version.mjs` blocks incompatible runtimes and `dev-stack` presets prevent redundant service launches; further efficiency comes from caching Docker layers in `bootstrap-environment.sh` and exposing `--skip-db-install`/`--skip-frontend` defaults via `.env` to avoid repeated heavy steps.
+10. **Strengths to Keep:** Strong cross-functional context (operational jobs, telemetry, monetisation, valuation rationale) with automation that enforces toolchain parity and multi-service orchestration, lowering onboarding friction.
+11. **Weaknesses to remove:** Local scripts stop short of verifying auxiliary dependencies (e.g. Terraform for infra contributors, Flutter for mobile work) unless readers consult the guide manually; extend CLI checks to surface missing binaries and stale configuration files.
+12. **Styling and Colour review changes:** Align imagery and charts referenced in valuation briefs with the Annex palette and ensure Markdown callouts (quotes, tables) use accessible colour schemes when rendered in portals like Notion or Confluence.
+13. **CSS, orientation, placement and arrangement changes:** When exporting docs, maintain responsive layouts by following the table + bullet structure already used in `EDULURE_GUIDE.md`; consider adding navigation front-matter for portal embeds so long sections remain scannable.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Tighten repeated copy across READMEs (e.g. Node version requirements), keep recommendation sections in valuation docs actionable, and add inline cross-links between guide sections to reduce scrolling.
+15. **Change Checklist Tracker:** Track updates by pairing documentation changes with CLI adjustments—run `scripts/verify-node-version.mjs`, execute `npm --workspace backend-nodejs run lint`, and spot-check valuation figures whenever onboarding tooling or market narratives change.
+16. **Full Upgrade Plan & Release Steps:** Sequence improvements by refactoring shared bootstrap utilities, updating docs with the new workflow, previewing exports in documentation portals, circulating updates to engineering + GTM leads, and versioning valuation snapshots alongside release notes.
 
 ## 8. QA, Testing & Governance (`qa/`, `backend-nodejs/test/`, `frontend-reactjs/src/pages/__tests__/`, `backend-test-results.json`)
 
