@@ -253,6 +253,17 @@ experiences per tenant:
 - `SOCIAL_MUTE_DEFAULT_DURATION_DAYS` – default length applied when clients mute a user without specifying a duration. Controllers
   accept explicit overrides but never exceed the configured ceiling.
 
+### GraphQL gateway runtime
+
+GraphQL is now first-class within the bootstrap sequence. Configure manifests, depth controls, and readiness expectations with the following levers:
+
+- `GRAPHQL_PERSISTED_QUERIES_PATH` – optional JSON or `.graphql` manifest hydrated during startup. When omitted the gateway marks readiness as degraded so operations can stage manifests separately.
+- `GRAPHQL_PERSISTED_QUERIES_REFRESH_SECONDS` – refresh cadence for persisted query manifests. Set to `0` to disable background reloads when using immutable artefacts.
+- `GRAPHQL_WARM_INTROSPECTION` – toggle schema introspection during bootstrap. Leave enabled in lower environments to catch resolver regressions early and disable in production if introspection must remain off outside of deploy windows.
+- `GRAPHQL_MAX_OPERATION_DEPTH` / `GRAPHQL_MAX_OPERATIONS_PER_REQUEST` – enforce guard rails against deeply nested documents and batched operations directly inside the Express router.
+
+`src/graphql/gatewayBootstrap.js` hydrates manifests into the shared in-memory store, verifies hashes, and logs readiness snapshots, while `src/graphql/router.js` applies depth/operation rules and rehydrates persisted queries on demand. Database artefacts stay in lock-step: migration `migrations/20250301100000_domain_event_dispatch_queue.js` provisions queue metadata required by `DomainEventModel.record`, the governance baseline (`database/schema/mysql-governance-baseline.json`) mirrors those columns, and seed `seeds/001_bootstrap.js` populates sample dispatch rows used by smoke tests. This alignment ensures runtime helpers like `req.recordDomainEvent` persist events consistently across bootstraps, migrations, and staging datasets.
+
 Common API workflows:
 
 ```bash

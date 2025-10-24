@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { getIntrospectionQuery, graphqlSync } from 'graphql';
+import { getIntrospectionQuery, graphqlSync, Kind, parse, print, visit } from 'graphql';
 
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
@@ -82,6 +82,80 @@ function dedupeEntries(entries = []) {
   return Array.from(unique.values());
 }
 
+function collectFragmentDependencies(definition, fragmentMap, collected = new Set()) {
+  const fragments = [];
+
+  visit(definition, {
+    FragmentSpread(node) {
+      const fragmentName = node.name?.value;
+      if (!fragmentName || collected.has(fragmentName)) {
+        return;
+      }
+
+      const fragmentDefinition = fragmentMap[fragmentName];
+      if (!fragmentDefinition) {
+        return;
+      }
+
+      collected.add(fragmentName);
+      fragments.push(fragmentDefinition);
+      const nested = collectFragmentDependencies(fragmentDefinition, fragmentMap, collected);
+      fragments.push(...nested);
+    }
+  });
+
+  return fragments;
+}
+
+function parseGraphQLDocumentManifest(source, { manifestPath, loggerInstance } = {}) {
+  try {
+    const document = parse(source, { noLocation: true });
+    const fragmentMap = Object.create(null);
+    const operations = [];
+
+    for (const definition of document.definitions ?? []) {
+      if (definition.kind === Kind.FRAGMENT_DEFINITION && definition.name?.value) {
+        fragmentMap[definition.name.value] = definition;
+        continue;
+      }
+
+      if (definition.kind === Kind.OPERATION_DEFINITION) {
+        operations.push(definition);
+      }
+    }
+
+    if (!operations.length) {
+      return [];
+    }
+
+    const entries = operations.map((operation, index) => {
+      const fragments = collectFragmentDependencies(operation, fragmentMap);
+      const operationDocument = {
+        kind: Kind.DOCUMENT,
+        definitions: [operation, ...fragments]
+      };
+      const rendered = print(operationDocument).trim();
+
+      const operationName = operation.name?.value
+        ?? `${operation.operation ?? 'operation'}-${index + 1}`;
+
+      return {
+        id: operationName,
+        query: rendered,
+        hash: computeSha256(rendered)
+      };
+    });
+
+    return dedupeEntries(entries.filter(Boolean));
+  } catch (error) {
+    loggerInstance?.warn(
+      { err: error, manifestPath },
+      'Failed to parse GraphQL manifest as document; falling back to raw payload'
+    );
+    return null;
+  }
+}
+
 function parseManifestPayload(payload) {
   if (payload === undefined || payload === null) {
     return [];
@@ -111,12 +185,16 @@ function parseManifestPayload(payload) {
   return [];
 }
 
-async function loadManifestEntries(manifestPath) {
+async function loadManifestEntries(manifestPath, loggerInstance) {
   const resolved = path.resolve(manifestPath);
   const extension = path.extname(resolved).toLowerCase();
   const contents = await fs.readFile(resolved, 'utf8');
 
   if (extension === '.graphql' || extension === '.gql') {
+    const parsed = parseGraphQLDocumentManifest(contents, { manifestPath: resolved, loggerInstance });
+    if (parsed) {
+      return parsed;
+    }
     return parseManifestPayload(contents);
   }
 
@@ -139,7 +217,7 @@ async function hydratePersistedQueries({ manifestPath, store, loggerInstance }) 
   }
 
   try {
-    const entries = await loadManifestEntries(manifestPath);
+    const entries = await loadManifestEntries(manifestPath, loggerInstance);
     store.replaceAll(entries);
     loggerInstance?.info(
       { manifestPath, loaded: entries.length },
