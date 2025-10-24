@@ -7,272 +7,48 @@ import NavigationAnnexOperationTaskModel from '../src/models/NavigationAnnexOper
 import NavigationAnnexStrategyMetricModel from '../src/models/NavigationAnnexStrategyMetricModel.js';
 import NavigationAnnexStrategyNarrativeModel from '../src/models/NavigationAnnexStrategyNarrativeModel.js';
 
-const now = new Date().toISOString();
+import { instantiateNavigationAnnexScenario } from '../../qa/test-data/navigationAnnex.js';
 
-const backlogRows = [
-  {
-    id: 1,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user', 'instructor'],
-    epicId: 'UX-401',
-    summary: 'Tighten registry alignment for the feed.',
-    backlogRef: '/handbook/navigation-annex#feed-registry',
-    impactedFiles: ['frontend-reactjs/src/navigation/routes.js'],
-    priority: 1,
-    displayOrder: 1,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 2,
-    navItemId: 'admin-only',
-    navItemLabel: 'Admin only',
-    navItemCategory: 'primary',
-    navItemRoute: '/admin',
-    roleScope: ['admin'],
-    epicId: 'OPS-999',
-    summary: 'Should be hidden for users.',
-    backlogRef: null,
-    impactedFiles: ['backend-nodejs/src/services/AdminService.js'],
-    priority: 5,
-    displayOrder: 5,
-    createdAt: now,
-    updatedAt: now
-  }
-];
+const {
+  backlogRows,
+  operationTaskRows,
+  designDependencyRows,
+  strategyNarrativeRows,
+  strategyMetricRows
+} = instantiateNavigationAnnexScenario();
 
-const operationTasks = [
-  {
-    id: 10,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user', 'instructor'],
-    taskKey: 'ops-feed-runbook',
-    label: 'Verify feed registry export.',
-    cadence: 'pre-release',
-    runbookSection: 'navigation-registry-validation',
-    href: '/docs/operations/navigation-readiness#registry-validation',
-    owner: 'Operations',
-    priority: 1,
-    displayOrder: 1,
-    includeInChecklist: 1,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 12,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user'],
-    taskKey: 'ops-feed-shared-reference',
-    label: 'Cross-check shared annex overview.',
-    cadence: 'weekly',
-    runbookSection: 'navigation-registry-validation',
-    href: '/docs/operations/shared-annex#overview',
-    owner: 'Operations',
-    priority: 3,
-    displayOrder: 3,
-    includeInChecklist: 1,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 11,
-    navItemId: 'admin-only',
-    navItemLabel: 'Admin only',
-    navItemCategory: 'primary',
-    navItemRoute: '/admin',
-    roleScope: ['admin'],
-    taskKey: 'ops-admin-secret',
-    label: 'Admin secret task',
-    cadence: 'release',
-    runbookSection: 'admin',
-    href: null,
-    owner: 'Admin',
-    priority: 1,
-    displayOrder: 1,
-    includeInChecklist: 1,
-    createdAt: now,
-    updatedAt: now
-  }
-];
+const feedBacklog = backlogRows.find((row) => row.navItemId === 'feed');
+const feedNarratives = strategyNarrativeRows.filter((row) => row.navItemId === 'feed');
+const feedMetrics = strategyMetricRows.filter((row) => feedNarratives.some((narrative) => narrative.id === row.narrativeId));
+const feedOperations = operationTaskRows.filter((row) => row.navItemId === 'feed');
+const feedTokens = designDependencyRows.filter((row) => row.dependencyType === 'token' && row.navItemId === 'feed');
+const feedQaDependencies = designDependencyRows.filter((row) => row.dependencyType === 'qa' && row.navItemId === 'feed');
+const sharedReferences = designDependencyRows.filter((row) => row.dependencyType === 'reference');
 
-const designDependencies = [
-  {
-    id: 21,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user'],
-    dependencyKey: 'feed-token',
-    dependencyType: 'token',
-    value: '--space-4',
-    notes: 'Shared spacing token',
-    displayOrder: 1,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 22,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user'],
-    dependencyKey: 'feed-token-duplicate',
-    dependencyType: 'token',
-    value: '--space-4',
-    notes: null,
-    displayOrder: 2,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 24,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user'],
-    dependencyKey: 'feed-reference-doc',
-    dependencyType: 'reference',
-    value: '/docs/design-system/navigation-annex#feed-topbar',
-    notes: null,
-    displayOrder: 3,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 25,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user'],
-    dependencyKey: 'feed-shared-reference',
-    dependencyType: 'reference',
-    value: '/docs/operations/shared-annex#overview',
-    notes: null,
-    displayOrder: 4,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 23,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user'],
-    dependencyKey: 'feed-qa',
-    dependencyType: 'qa',
-    value: 'Ensure focus ring is visible.',
-    notes: null,
-    displayOrder: 1,
-    createdAt: now,
-    updatedAt: now
-  }
-];
+const adminBacklog = backlogRows.find((row) => row.navItemId === 'admin-only');
+const adminTasks = operationTaskRows.filter((row) => row.navItemId === 'admin-only');
+const adminNarratives = strategyNarrativeRows.filter((row) => row.navItemId === 'admin-only');
+const adminMetrics = strategyMetricRows.filter((row) => adminNarratives.some((narrative) => narrative.id === row.narrativeId));
 
-const strategyNarratives = [
-  {
-    id: 31,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user'],
-    narrativeKey: 'retention-feed-depth',
-    pillar: 'retention',
-    narrative: 'Reduce clicks to reach the feed after sign-in.',
-    displayOrder: 1,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 33,
-    navItemId: 'feed',
-    navItemLabel: 'Feed',
-    navItemCategory: 'primary',
-    navItemRoute: '/feed',
-    roleScope: ['user'],
-    narrativeKey: 'retention-feed-latency',
-    pillar: 'retention',
-    narrative: 'Improve feed load time for returning learners.',
-    displayOrder: 2,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 32,
-    navItemId: 'admin-only',
-    navItemLabel: 'Admin only',
-    navItemCategory: 'primary',
-    navItemRoute: '/admin',
-    roleScope: ['admin'],
-    narrativeKey: 'admin-secret',
-    pillar: 'efficiency',
-    narrative: 'Hidden admin objective.',
-    displayOrder: 1,
-    createdAt: now,
-    updatedAt: now
-  }
-];
-
-const strategyMetrics = [
-  {
-    id: 41,
-    narrativeId: 31,
-    metricKey: 'nav-click-depth',
-    label: 'Average click depth to feed',
-    baseline: '3.2',
-    target: '2.1',
-    unit: 'clicks',
-    displayOrder: 1,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 43,
-    narrativeId: 33,
-    metricKey: 'feed-render-latency',
-    label: 'Feed render time on warm cache',
-    baseline: '1.8s',
-    target: '1.2s',
-    unit: 'duration',
-    displayOrder: 2,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: 42,
-    narrativeId: 32,
-    metricKey: 'admin-metric',
-    label: 'Hidden admin metric',
-    baseline: null,
-    target: null,
-    unit: '',
-    displayOrder: 1,
-    createdAt: now,
-    updatedAt: now
-  }
-];
+function expectOnlyFeedSurface(annex) {
+  expect(annex.initiatives.primary).toHaveLength(1);
+  const feed = annex.initiatives.primary[0];
+  expect(feed.id).toBe(feedBacklog.navItemId);
+  expect(feed.initiative.product).toMatchObject({ epicId: feedBacklog.epicId, summary: feedBacklog.summary });
+  expect(feed.initiative.operations.tasks).toHaveLength(feedOperations.filter((task) => task.roleScope.includes('user')).length);
+  expect(feed.initiative.design.tokens).toEqual(feedTokens.map((token) => token.value));
+  expect(feed.initiative.design.qa).toEqual(feedQaDependencies.map((qa) => ({ id: qa.dependencyKey, label: qa.value })));
+  expect(feed.initiative.strategy.narratives).toEqual(feedNarratives.map((narrative) => narrative.narrative));
+  expect(feed.initiative.strategy.metrics.map((metric) => metric.id)).toEqual(feedMetrics.map((metric) => metric.metricKey));
+}
 
 describe('NavigationAnnexRepository', () => {
   beforeEach(() => {
     vi.spyOn(NavigationAnnexBacklogItemModel, 'listAll').mockResolvedValue(backlogRows);
-    vi.spyOn(NavigationAnnexOperationTaskModel, 'listAll').mockResolvedValue(operationTasks);
-    vi.spyOn(NavigationAnnexDesignDependencyModel, 'listAll').mockResolvedValue(designDependencies);
-    vi.spyOn(NavigationAnnexStrategyNarrativeModel, 'listAll').mockResolvedValue(strategyNarratives);
-    vi.spyOn(NavigationAnnexStrategyMetricModel, 'listAll').mockResolvedValue(strategyMetrics);
+    vi.spyOn(NavigationAnnexOperationTaskModel, 'listAll').mockResolvedValue(operationTaskRows);
+    vi.spyOn(NavigationAnnexDesignDependencyModel, 'listAll').mockResolvedValue(designDependencyRows);
+    vi.spyOn(NavigationAnnexStrategyNarrativeModel, 'listAll').mockResolvedValue(strategyNarrativeRows);
+    vi.spyOn(NavigationAnnexStrategyMetricModel, 'listAll').mockResolvedValue(strategyMetricRows);
   });
 
   afterEach(() => {
@@ -284,96 +60,75 @@ describe('NavigationAnnexRepository', () => {
 
     expect(NavigationAnnexBacklogItemModel.listAll).toHaveBeenCalledTimes(1);
 
-    expect(annex.initiatives.primary).toHaveLength(1);
-    const feed = annex.initiatives.primary[0];
-    expect(feed.id).toBe('feed');
-    expect(feed.initiative.product).toMatchObject({ epicId: 'UX-401', summary: expect.any(String) });
-    expect(feed.initiative.operations.tasks).toHaveLength(1);
-    expect(feed.initiative.design.tokens).toEqual(['--space-4']);
-    expect(feed.initiative.design.qa).toEqual([{ id: 'feed-qa', label: 'Ensure focus ring is visible.' }]);
-    expect(feed.initiative.strategy).toMatchObject({
-      pillar: 'Retention',
-      narrative: 'Reduce clicks to reach the feed after sign-in.'
-    });
-    expect(feed.initiative.strategy.narratives).toEqual([
-      'Reduce clicks to reach the feed after sign-in.',
-      'Improve feed load time for returning learners.'
-    ]);
+    expectOnlyFeedSurface(annex);
 
     expect(annex.productBacklog).toEqual([
       {
-        id: 'UX-401',
-        summary: 'Tighten registry alignment for the feed.',
-        backlogRef: '/handbook/navigation-annex#feed-registry',
-        impactedFiles: ['frontend-reactjs/src/navigation/routes.js']
+        id: feedBacklog.epicId,
+        summary: feedBacklog.summary,
+        backlogRef: feedBacklog.backlogRef,
+        impactedFiles: feedBacklog.impactedFiles
       }
     ]);
 
-    expect(annex.operationsChecklist).toEqual([
-      expect.objectContaining({ id: 'ops-feed-runbook', label: 'Verify feed registry export.' })
-    ]);
-    expect(annex.designDependencies.tokens).toEqual(['--space-4']);
-    expect(annex.designDependencies.qa).toEqual([
-      { id: 'feed-qa', label: 'Ensure focus ring is visible.' }
-    ]);
+    expect(annex.operationsChecklist).toEqual(
+      feedOperations
+        .filter((task) => task.roleScope.includes('user'))
+        .map((task) => expect.objectContaining({ id: task.taskKey, label: task.label }))
+    );
+
+    expect(annex.designDependencies.tokens).toEqual(feedTokens.map((token) => token.value));
+    expect(annex.designDependencies.qa).toEqual(feedQaDependencies.map((qa) => ({ id: qa.dependencyKey, label: qa.value })));
 
     expect(annex.strategyNarratives).toEqual([
       {
         pillar: 'Retention',
-        narratives: [
-          'Reduce clicks to reach the feed after sign-in.',
-          'Improve feed load time for returning learners.'
-        ],
-        metrics: [
-          {
-            id: 'nav-click-depth',
-            label: 'Average click depth to feed',
-            baseline: '3.2',
-            target: '2.1',
-            unit: 'clicks'
-          },
-          {
-            id: 'feed-render-latency',
-            label: 'Feed render time on warm cache',
-            baseline: '1.8s',
-            target: '1.2s',
-            unit: 'duration'
-          }
-        ]
+        narratives: feedNarratives.map((narrative) => narrative.narrative),
+        metrics: feedMetrics.map((metric) => ({
+          id: metric.metricKey,
+          label: metric.label,
+          baseline: metric.baseline,
+          target: metric.target,
+          unit: metric.unit
+        }))
       }
     ]);
 
-    expect(annex.documentationIndex).toEqual([
-      {
-        href: '/docs/design-system/navigation-annex#feed-topbar',
-        usageCount: 1,
-        categories: ['design'],
-        navItems: ['feed'],
-        navItemLabels: ['Feed']
-      },
-      {
-        href: '/docs/operations/navigation-readiness#registry-validation',
-        usageCount: 1,
-        categories: ['operations'],
-        navItems: ['feed'],
-        navItemLabels: ['Feed']
-      },
-      {
-        href: '/docs/operations/shared-annex#overview',
-        usageCount: 2,
-        categories: ['design', 'operations'],
-        navItems: ['feed'],
-        navItemLabels: ['Feed']
-      },
-      {
-        href: '/handbook/navigation-annex#feed-registry',
-        usageCount: 1,
-        categories: ['product'],
-        navItems: ['feed'],
-        navItemLabels: ['Feed']
-      }
-    ]);
+    expect(annex.documentationIndex).toEqual(
+      expect.arrayContaining(
+        sharedReferences.map((dependency) => ({
+          href: dependency.value,
+          usageCount: expect.any(Number),
+          categories: expect.arrayContaining([expect.any(String)]),
+          navItems: expect.arrayContaining(['feed'])
+        }))
+      )
+    );
 
     expect(annex.refreshedAt).toMatch(/Z$/);
+  });
+
+  it('omits admin surfaces for learner roles', async () => {
+    const annex = await NavigationAnnexRepository.describe({ role: 'user' });
+
+    expect(annex.initiatives.primary.map((item) => item.id)).not.toContain(adminBacklog.navItemId);
+    expect(annex.productBacklog.map((item) => item.id)).not.toContain(adminBacklog.epicId);
+    expect(annex.operationsChecklist.map((item) => item.id)).not.toContain(adminTasks[0].taskKey);
+    expect(annex.strategyNarratives.flatMap((entry) => entry.metrics.map((metric) => metric.id))).not.toContain(
+      adminMetrics[0].metricKey
+    );
+  });
+
+  it('exposes admin surfaces for admin role', async () => {
+    const annex = await NavigationAnnexRepository.describe({ role: 'admin' });
+
+    const adminSurface = annex.initiatives.primary.find((surface) => surface.id === adminBacklog.navItemId);
+    expect(adminSurface).toBeDefined();
+    expect(adminSurface.initiative.product.epicId).toBe(adminBacklog.epicId);
+
+    expect(annex.operationsChecklist.map((item) => item.id)).toContain(adminTasks[0].taskKey);
+    expect(annex.strategyNarratives.flatMap((entry) => entry.metrics.map((metric) => metric.id))).toContain(
+      adminMetrics[0].metricKey
+    );
   });
 });

@@ -308,6 +308,51 @@ try {
   allPassed = false;
 }
 
+try {
+  const manualCommand = [
+    'node',
+    './scripts/qa/generate-manual-readiness.mjs',
+    '--checklist',
+    path.relative(repoRoot, checklistPath),
+    '--output-json',
+    'qa/reports/manual-qa-readiness.json',
+    '--output-markdown',
+    'qa/reports/manual-qa-readiness.md'
+  ];
+  const manualResult = spawnSync(manualCommand[0], manualCommand.slice(1), {
+    cwd: repoRoot,
+    env: { ...process.env, FORCE_COLOR: '1' },
+    stdio: 'inherit'
+  });
+  const manualExitCode = typeof manualResult.status === 'number' ? manualResult.status : manualResult.error ? 1 : 0;
+  results.push({
+    id: 'manual-qa-artifacts',
+    title: 'Manual QA readiness artefacts',
+    category: 'governance',
+    command: manualCommand.join(' '),
+    exitCode: manualExitCode,
+    status: manualExitCode === 0 ? 'passed' : 'failed',
+    durationMs: 0,
+    metadata: manualResult.error ? { error: manualResult.error.message } : undefined
+  });
+  if (manualExitCode !== 0) {
+    allPassed = false;
+  }
+} catch (error) {
+  console.error('\n❌  Failed to generate manual QA readiness artefacts:', error.message);
+  results.push({
+    id: 'manual-qa-artifacts',
+    title: 'Manual QA readiness artefacts',
+    category: 'governance',
+    command: 'node ./scripts/qa/generate-manual-readiness.mjs',
+    exitCode: 1,
+    status: 'failed',
+    durationMs: 0,
+    metadata: { error: error.message }
+  });
+  allPassed = false;
+}
+
 const summary = {
   executedAt: new Date().toISOString(),
   filters: {

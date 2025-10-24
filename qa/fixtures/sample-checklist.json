@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "title": "Sample QA checklist",
+  "items": [
+    {
+      "id": "qa-screenshots",
+      "description": "Upload manual QA screenshots",
+      "owner": "design",
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "qa-release-signoff",
+      "description": "Confirm release sign-off recorded",
+      "owner": "operations",
+      "status": "complete",
+      "evidence": ["doc://release-signoff"]
+    }
+  ]
+}
