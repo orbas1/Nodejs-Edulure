@@ -36,6 +36,7 @@ export async function up(knex) {
       table.json('keywords').nullable();
       table.string('url', 512).notNullable();
       table.integer('minutes').unsigned().notNullable().defaultTo(3);
+      table.integer('review_interval_days').unsigned().notNullable().defaultTo(90);
       table.decimal('helpfulness_score', 6, 2).notNullable().defaultTo(0);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
@@ -44,6 +45,16 @@ export async function up(knex) {
       table.index(['category'], 'idx_support_articles_category');
       table.index(['helpfulness_score'], 'idx_support_articles_score');
     });
+  } else {
+    const hasReviewInterval = await knex.schema.hasColumn(
+      'support_articles',
+      'review_interval_days'
+    );
+    if (!hasReviewInterval) {
+      await knex.schema.alterTable('support_articles', (table) => {
+        table.integer('review_interval_days').unsigned().notNullable().defaultTo(90);
+      });
+    }
   }
 }
 
@@ -72,5 +83,17 @@ export async function down(knex) {
     }
   });
 
-  await knex.schema.dropTableIfExists('support_articles');
+  const hasSupportArticles = await knex.schema.hasTable('support_articles');
+  if (hasSupportArticles) {
+    const hasReviewInterval = await knex.schema.hasColumn(
+      'support_articles',
+      'review_interval_days'
+    );
+    if (hasReviewInterval) {
+      await knex.schema.alterTable('support_articles', (table) => {
+        table.dropColumn('review_interval_days');
+      });
+    }
+    await knex.schema.dropTableIfExists('support_articles');
+  }
 }

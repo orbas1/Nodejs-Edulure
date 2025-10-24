@@ -82,6 +82,7 @@ export default class SupportKnowledgeBaseService {
       'url',
       'minutes',
       'keywords',
+      'review_interval_days',
       'helpfulness_score',
       'updated_at'
     );

@@ -11,6 +11,7 @@ import {
   COMMUNITY_EVENT_REMINDER_CHANNELS,
   COMMUNITY_EVENT_REMINDER_STATUSES
 } from '../src/models/communityEventConstants.js';
+import SupportTicketModel from '../src/models/SupportTicketModel.js';
 import { ensureSeedImage } from './_helpers/seedAssets.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -66,6 +67,64 @@ const buildEncryptedKycDocument = (
     classification_tag: encrypted.classificationTag,
     encryption_key_version: encrypted.keyId
   };
+};
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const buildDefaultNotificationPreferences = () =>
+  SupportTicketModel.normaliseNotificationPreferences();
+
+const computeReviewDueAt = (updatedAt, reviewIntervalDays) => {
+  const updated = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+  if (Number.isNaN(updated.getTime())) {
+    return null;
+  }
+  const interval = Number.isFinite(Number(reviewIntervalDays)) ? Number(reviewIntervalDays) : 90;
+  const due = new Date(updated.getTime() + interval * MILLISECONDS_PER_DAY);
+  return Number.isNaN(due.getTime()) ? null : due.toISOString();
+};
+
+const buildKnowledgeSuggestion = (article, referenceDate) => {
+  if (!article) {
+    return null;
+  }
+  const updatedAt = article.updated_at ?? article.updatedAt ?? new Date();
+  const reviewIntervalDays = Number.isFinite(Number(article.review_interval_days))
+    ? Number(article.review_interval_days)
+    : 90;
+  const updatedAtIso = SupportTicketModel.toIso(updatedAt) ?? SupportTicketModel.toIso(new Date());
+  const reviewDueAtIso = computeReviewDueAt(updatedAtIso, reviewIntervalDays);
+  const reference = referenceDate instanceof Date ? referenceDate : new Date(referenceDate ?? Date.now());
+  const referenceTime = Number.isNaN(reference.getTime()) ? Date.now() : reference.getTime();
+  const stale = reviewDueAtIso ? referenceTime > new Date(reviewDueAtIso).getTime() : false;
+
+  return {
+    id: article.slug,
+    title: article.title,
+    excerpt: article.summary,
+    url: article.url,
+    category: article.category,
+    minutes: article.minutes,
+    stale,
+    updatedAt: updatedAtIso,
+    reviewDueAt: reviewDueAtIso,
+    reviewIntervalDays
+  };
+};
+
+const buildKnowledgeSummaryMetadata = ({ suggestions, query, source, generatedAt, fromCache = false }) => {
+  const safeSuggestions = Array.isArray(suggestions) ? suggestions.filter(Boolean) : [];
+  return SupportTicketModel.buildKnowledgeSummary(safeSuggestions, {
+    query: query ?? null,
+    source: source ?? 'support.seed.bootstrap',
+    fromCache,
+    generatedAt: generatedAt ?? new Date(),
+    lastUpdatedAt:
+      safeSuggestions
+        .map((entry) => entry?.updatedAt)
+        .filter(Boolean)
+        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? generatedAt ?? new Date()
+  });
 };
 
 export async function seed(knex) {
@@ -6552,7 +6611,7 @@ export async function seed(knex) {
 
     await trx('security_incidents').insert(securityIncidents);
 
-    await trx('support_articles').insert([
+    const supportArticles = [
       {
         slug: 'live-classroom-reset',
         title: 'Stabilise a live classroom session',
@@ -6561,7 +6620,10 @@ export async function seed(knex) {
         keywords: JSON.stringify(['live classroom', 'troubleshooting', 'reset']),
         url: 'https://support.edulure.test/articles/live-classroom-reset',
         minutes: 5,
-        helpfulness_score: 9.6
+        review_interval_days: 60,
+        helpfulness_score: 9.6,
+        created_at: new Date('2024-11-15T08:00:00Z'),
+        updated_at: new Date('2025-01-22T08:15:00Z')
       },
       {
         slug: 'billing-reconcile-declines',
@@ -6571,7 +6633,10 @@ export async function seed(knex) {
         keywords: JSON.stringify(['billing', 'payments', 'declines']),
         url: 'https://support.edulure.test/articles/billing-reconcile-declines',
         minutes: 4,
-        helpfulness_score: 8.8
+        review_interval_days: 90,
+        helpfulness_score: 8.8,
+        created_at: new Date('2024-11-28T11:30:00Z'),
+        updated_at: new Date('2025-01-29T10:45:00Z')
       },
       {
         slug: 'course-content-refresh',
@@ -6581,12 +6646,36 @@ export async function seed(knex) {
         keywords: JSON.stringify(['course', 'cache', 'refresh']),
         url: 'https://support.edulure.test/articles/course-content-refresh',
         minutes: 6,
-        helpfulness_score: 8.1
+        review_interval_days: 120,
+        helpfulness_score: 8.1,
+        created_at: new Date('2024-10-02T15:20:00Z'),
+        updated_at: new Date('2025-01-18T11:30:00Z')
       }
-    ]);
+    ];
+
+    await trx('support_articles').insert(supportArticles);
+
+    const articleBySlug = Object.fromEntries(
+      supportArticles.map((article) => [article.slug, article])
+    );
 
     const supportCaseAlphaCreatedAt = new Date('2025-02-01T08:30:00Z');
     const supportCaseAlphaUpdatedAt = new Date('2025-02-01T09:10:00Z');
+    const alphaSuggestions = [
+      buildKnowledgeSuggestion(articleBySlug['live-classroom-reset'], supportCaseAlphaCreatedAt)
+    ].filter(Boolean);
+    const alphaMetadata = {
+      intake: { channel: 'portal', attachments: 1 },
+      firstResponseMinutes: 28,
+      notificationPreferences: buildDefaultNotificationPreferences(),
+      knowledgeBase: buildKnowledgeSummaryMetadata({
+        suggestions: alphaSuggestions,
+        query: 'Live classroom session frozen at 95%',
+        source: 'support.seed.bootstrap',
+        generatedAt: supportCaseAlphaUpdatedAt
+      })
+    };
+
     const [supportCaseAlphaInsert] = await trx('learner_support_cases').insert(
       {
         user_id: learnerId,
@@ -6613,23 +6702,11 @@ export async function seed(knex) {
             at: '2025-02-01T08:42:00Z'
           }
         ]),
-        knowledge_suggestions: JSON.stringify([
-          {
-            id: 'live-classroom-reset',
-            title: 'Stabilise a live classroom session',
-            excerpt: 'Reset real-time channels and reissue instructor invites to unstick sessions at 95%.',
-            url: 'https://support.edulure.test/articles/live-classroom-reset',
-            category: 'Live classroom',
-            minutes: 5
-          }
-        ]),
+        knowledge_suggestions: JSON.stringify(alphaSuggestions),
         ai_summary: 'Learner reported “Live classroom session frozen at 95%”. Priority: High.',
         follow_up_due_at: new Date('2025-02-01T12:30:00Z'),
         ai_summary_generated_at: new Date('2025-02-01T08:35:00Z'),
-        metadata: JSON.stringify({
-          intake: { channel: 'portal', attachments: 1 },
-          firstResponseMinutes: 28
-        }),
+        metadata: JSON.stringify(alphaMetadata),
         created_at: supportCaseAlphaCreatedAt,
         updated_at: supportCaseAlphaUpdatedAt
       },
@@ -6658,6 +6735,22 @@ export async function seed(knex) {
     ]);
 
     const supportCaseBetaCreatedAt = new Date('2025-02-04T14:10:00Z');
+    const betaSuggestions = [
+      buildKnowledgeSuggestion(articleBySlug['billing-reconcile-declines'], supportCaseBetaCreatedAt),
+      buildKnowledgeSuggestion(articleBySlug['course-content-refresh'], supportCaseBetaCreatedAt)
+    ].filter(Boolean);
+    const betaMetadata = {
+      intake: { channel: 'portal', attachments: 0 },
+      renewalAmountCents: 12900,
+      notificationPreferences: buildDefaultNotificationPreferences(),
+      knowledgeBase: buildKnowledgeSummaryMetadata({
+        suggestions: betaSuggestions,
+        query: 'Recurring billing decline on premium plan',
+        source: 'support.seed.bootstrap',
+        generatedAt: supportCaseBetaCreatedAt
+      })
+    };
+
     const [supportCaseBetaInsert] = await trx('learner_support_cases').insert(
       {
         user_id: learnerId,
@@ -6677,31 +6770,11 @@ export async function seed(knex) {
             at: supportCaseBetaCreatedAt.toISOString()
           }
         ]),
-        knowledge_suggestions: JSON.stringify([
-          {
-            id: 'billing-reconcile-declines',
-            title: 'Resolve recurring billing declines',
-            excerpt: 'Run the retry playbook and notify learners when payment profiles need an update.',
-            url: 'https://support.edulure.test/articles/billing-reconcile-declines',
-            category: 'Billing & payments',
-            minutes: 4
-          },
-          {
-            id: 'course-content-refresh',
-            title: 'Refresh stale course content for learners',
-            excerpt: 'Rebuild cached modules after billing reinstatement to avoid access mismatch.',
-            url: 'https://support.edulure.test/articles/course-content-refresh',
-            category: 'Course access',
-            minutes: 6
-          }
-        ]),
+        knowledge_suggestions: JSON.stringify(betaSuggestions),
         ai_summary: 'Learner reported “Recurring billing decline on premium plan”. Priority: Normal.',
         follow_up_due_at: new Date('2025-02-05T14:10:00Z'),
         ai_summary_generated_at: new Date('2025-02-04T14:15:00Z'),
-        metadata: JSON.stringify({
-          intake: { channel: 'portal', attachments: 0 },
-          renewalAmountCents: 12900
-        }),
+        metadata: JSON.stringify(betaMetadata),
         created_at: supportCaseBetaCreatedAt,
         updated_at: supportCaseBetaCreatedAt
       },
