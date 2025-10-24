@@ -14,6 +14,9 @@ abstract class CommunicationPersistence {
 
   Future<List<SupportTicket>?> loadSupportTickets();
   Future<void> saveSupportTickets(List<SupportTicket> tickets);
+
+  Future<List<QueuedInboxMessage>> loadPendingMessages();
+  Future<void> savePendingMessages(List<QueuedInboxMessage> messages);
 }
 
 class CommunicationPersistenceService implements CommunicationPersistence {
@@ -26,6 +29,7 @@ class CommunicationPersistenceService implements CommunicationPersistence {
   static const _defaultBox = 'communications.cache';
   static const _threadsKey = 'threads';
   static const _ticketsKey = 'tickets';
+  static const _pendingMessagesKey = 'pending.messages';
 
   final String _boxName;
   final HiveInterface _hive;
@@ -72,6 +76,24 @@ class CommunicationPersistenceService implements CommunicationPersistence {
       _ticketsKey,
       tickets,
       (ticket) => ticket.toJson(),
+    );
+  }
+
+  @override
+  Future<List<QueuedInboxMessage>> loadPendingMessages() async {
+    final pending = await _readList(
+      _pendingMessagesKey,
+      (json) => QueuedInboxMessage.fromJson(json),
+    );
+    return pending ?? const <QueuedInboxMessage>[];
+  }
+
+  @override
+  Future<void> savePendingMessages(List<QueuedInboxMessage> messages) {
+    return _writeList(
+      _pendingMessagesKey,
+      messages,
+      (message) => message.toJson(),
     );
   }
 

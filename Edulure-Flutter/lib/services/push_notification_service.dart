@@ -19,6 +19,9 @@ class PushNotificationService {
 
   bool _foregroundListenersRegistered = false;
   bool _localNotificationsInitialised = false;
+  StreamSubscription<String>? _tokenRefreshSubscription;
+  Future<void>? _tokenRegistration;
+  String? _lastRegisteredToken;
 
   /// Initialises Firebase, notification permissions, and listeners.
   Future<void> initialize() async {
@@ -28,6 +31,8 @@ class PushNotificationService {
     await _attachListeners();
     await NotificationPreferenceService.instance.loadPreferences();
     await _logFcmToken();
+    _tokenRefreshSubscription ??=
+        _messaging.onTokenRefresh.listen(_handleTokenRefresh);
   }
 
   Future<void> _initialiseFirebase() async {
@@ -88,15 +93,59 @@ class PushNotificationService {
   Future<void> _logFcmToken() async {
     try {
       final token = await _messaging.getToken();
-      if (kDebugMode) {
-        debugPrint('FCM registration token: $token');
-      }
       if (token != null) {
+        await _registerToken(token);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Unable to fetch FCM token: $error');
+      debugPrint('$stackTrace');
+    }
+  }
+
+  Future<void> _registerToken(String token) {
+    if (token.isEmpty) {
+      return Future.value();
+    }
+    if (_lastRegisteredToken == token && _tokenRegistration == null) {
+      return Future.value();
+    }
+
+    if (_tokenRegistration != null) {
+      return _tokenRegistration!;
+    }
+
+    final completer = Completer<void>();
+    _tokenRegistration = completer.future;
+
+    () async {
+      try {
+        if (kDebugMode) {
+          debugPrint('Registering FCM token: $token');
+        }
         await NotificationPreferenceService.instance
             .registerDeviceToken(token, platform: defaultTargetPlatform.name);
+        _lastRegisteredToken = token;
+        completer.complete();
+      } catch (error, stackTrace) {
+        debugPrint('Failed to register device token: $error');
+        debugPrint('$stackTrace');
+        completer.completeError(error, stackTrace);
+      } finally {
+        _tokenRegistration = null;
       }
-    } catch (error) {
-      debugPrint('Unable to fetch FCM token: $error');
+    }();
+
+    return _tokenRegistration!;
+  }
+
+  Future<void> _handleTokenRefresh(String token) async {
+    await _registerToken(token);
+  }
+
+  Future<void> refreshFcmToken() async {
+    final token = await _messaging.getToken();
+    if (token != null) {
+      await _registerToken(token);
     }
   }
 
@@ -159,6 +208,11 @@ class PushNotificationService {
   Future<void> handleBackgroundMessage(RemoteMessage message) async {
     await _configureLocalNotifications();
     await _showNotification(message);
+  }
+
+  Future<void> dispose() async {
+    await _tokenRefreshSubscription?.cancel();
+    _tokenRefreshSubscription = null;
   }
 }
 

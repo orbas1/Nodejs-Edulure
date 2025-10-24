@@ -1156,6 +1156,276 @@ class CommunitySubscriptionSnapshot {
   }
 }
 
+class BillingProduct {
+  BillingProduct({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.price,
+    required this.currency,
+    required this.billingCycle,
+    required this.active,
+    this.planType,
+    this.trialDays,
+    this.metadata = const <String, dynamic>{},
+  });
+
+  factory BillingProduct.fromJson(Map<String, dynamic> json) {
+    return BillingProduct(
+      id: json['id']?.toString() ?? generateCommerceId('product'),
+      name: json['name']?.toString() ?? 'Subscription plan',
+      description: json['description']?.toString() ?? '',
+      price: json['price'] is num
+          ? (json['price'] as num).toDouble()
+          : double.tryParse('${json['price']}') ??
+              0,
+      currency: json['currency']?.toString() ?? 'USD',
+      billingCycle: BillingCycleX.fromName(
+        json['billingCycle']?.toString() ?? 'monthly',
+      ),
+      active: json['active'] != false,
+      planType: json['planType']?.toString(),
+      trialDays: json['trialDays'] is int
+          ? json['trialDays'] as int
+          : int.tryParse('${json['trialDays']}'),
+      metadata: json['metadata'] is Map
+          ? Map<String, dynamic>.from(
+              json['metadata'] as Map,
+            )
+          : const <String, dynamic>{},
+    );
+  }
+
+  final String id;
+  final String name;
+  final String description;
+  final double price;
+  final String currency;
+  final BillingCycle billingCycle;
+  final bool active;
+  final String? planType;
+  final int? trialDays;
+  final Map<String, dynamic> metadata;
+
+  BillingProduct copyWith({
+    String? name,
+    String? description,
+    double? price,
+    String? currency,
+    BillingCycle? billingCycle,
+    bool? active,
+    String? planType,
+    int? trialDays,
+    Map<String, dynamic>? metadata,
+  }) {
+    return BillingProduct(
+      id: id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      currency: currency ?? this.currency,
+      billingCycle: billingCycle ?? this.billingCycle,
+      active: active ?? this.active,
+      planType: planType ?? this.planType,
+      trialDays: trialDays ?? this.trialDays,
+      metadata: metadata ?? Map<String, dynamic>.from(this.metadata),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'price': price,
+      'currency': currency,
+      'billingCycle': describeEnum(billingCycle),
+      'active': active,
+      if (planType != null) 'planType': planType,
+      if (trialDays != null) 'trialDays': trialDays,
+      if (metadata.isNotEmpty) 'metadata': metadata,
+    };
+  }
+}
+
+class BillingCatalogSnapshot {
+  BillingCatalogSnapshot({
+    required this.products,
+    required this.fetchedAt,
+    this.expiresAt,
+    this.source,
+  });
+
+  factory BillingCatalogSnapshot.fromJson(Map<String, dynamic> json) {
+    return BillingCatalogSnapshot(
+      products: (json['products'] as List?)
+              ?.map(
+                (item) => BillingProduct.fromJson(
+                  Map<String, dynamic>.from(item as Map),
+                ),
+              )
+              .toList(growable: false) ??
+          const <BillingProduct>[],
+      fetchedAt: json['fetchedAt'] is String
+          ? DateTime.tryParse(json['fetchedAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      expiresAt: json['expiresAt'] is String
+          ? DateTime.tryParse(json['expiresAt'] as String)
+          : null,
+      source: json['source']?.toString(),
+    );
+  }
+
+  factory BillingCatalogSnapshot.fromApi(
+    Map<String, dynamic> json, {
+    DateTime? fetchedAt,
+    Duration? ttl,
+  }) {
+    final products = (json['products'] as List?)
+            ?.map((item) => BillingProduct.fromJson(
+                  Map<String, dynamic>.from(item as Map),
+                ))
+            .toList(growable: false) ??
+        const <BillingProduct>[];
+    final resolvedFetchedAt = fetchedAt ?? DateTime.now();
+    final expiresAt = ttl == null ? null : resolvedFetchedAt.add(ttl);
+    return BillingCatalogSnapshot(
+      products: products,
+      fetchedAt: resolvedFetchedAt,
+      expiresAt: expiresAt,
+      source: 'network',
+    );
+  }
+
+  final List<BillingProduct> products;
+  final DateTime fetchedAt;
+  final DateTime? expiresAt;
+  final String? source;
+
+  bool get isExpired {
+    final expiry = expiresAt;
+    if (expiry == null) {
+      return false;
+    }
+    return DateTime.now().isAfter(expiry);
+  }
+
+  BillingCatalogSnapshot copyWith({
+    List<BillingProduct>? products,
+    DateTime? fetchedAt,
+    DateTime? expiresAt,
+    String? source,
+  }) {
+    return BillingCatalogSnapshot(
+      products: products ?? List<BillingProduct>.from(this.products),
+      fetchedAt: fetchedAt ?? this.fetchedAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+      source: source ?? this.source,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'products': products.map((product) => product.toJson()).toList(growable: false),
+      'fetchedAt': fetchedAt.toIso8601String(),
+      if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
+      if (source != null) 'source': source,
+    };
+  }
+}
+
+class PendingReceipt {
+  PendingReceipt({
+    required this.id,
+    required this.transactionId,
+    required this.productId,
+    required this.purchaseToken,
+    required this.createdAt,
+    this.platform,
+    this.retryCount = 0,
+    this.lastAttemptAt,
+    this.metadata = const <String, dynamic>{},
+  });
+
+  factory PendingReceipt.fromJson(Map<String, dynamic> json) {
+    return PendingReceipt(
+      id: json['id']?.toString() ?? generateCommerceId('receipt'),
+      transactionId: json['transactionId']?.toString() ?? '',
+      productId: json['productId']?.toString() ?? '',
+      purchaseToken: json['purchaseToken']?.toString() ?? '',
+      platform: json['platform']?.toString(),
+      createdAt: json['createdAt'] is String
+          ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      retryCount: json['retryCount'] is int
+          ? json['retryCount'] as int
+          : int.tryParse('${json['retryCount']}') ?? 0,
+      lastAttemptAt: json['lastAttemptAt'] is String
+          ? DateTime.tryParse(json['lastAttemptAt'] as String)
+          : null,
+      metadata: json['metadata'] is Map
+          ? Map<String, dynamic>.from(json['metadata'] as Map)
+          : const <String, dynamic>{},
+    );
+  }
+
+  final String id;
+  final String transactionId;
+  final String productId;
+  final String purchaseToken;
+  final DateTime createdAt;
+  final String? platform;
+  final int retryCount;
+  final DateTime? lastAttemptAt;
+  final Map<String, dynamic> metadata;
+
+  PendingReceipt copyWith({
+    int? retryCount,
+    DateTime? lastAttemptAt,
+    Map<String, dynamic>? metadata,
+  }) {
+    return PendingReceipt(
+      id: id,
+      transactionId: transactionId,
+      productId: productId,
+      purchaseToken: purchaseToken,
+      platform: platform,
+      createdAt: createdAt,
+      retryCount: retryCount ?? this.retryCount,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      metadata: metadata ?? Map<String, dynamic>.from(this.metadata),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'transactionId': transactionId,
+      'productId': productId,
+      'purchaseToken': purchaseToken,
+      'createdAt': createdAt.toIso8601String(),
+      if (platform != null) 'platform': platform,
+      'retryCount': retryCount,
+      if (lastAttemptAt != null) 'lastAttemptAt': lastAttemptAt!.toIso8601String(),
+      if (metadata.isNotEmpty) 'metadata': metadata,
+    };
+  }
+
+  Map<String, dynamic> toApiPayload() {
+    return {
+      'receiptId': id,
+      'transactionId': transactionId,
+      'productId': productId,
+      'purchaseToken': purchaseToken,
+      'platform': platform,
+      'createdAt': createdAt.toIso8601String(),
+      'retryCount': retryCount,
+      if (lastAttemptAt != null) 'lastAttemptAt': lastAttemptAt!.toIso8601String(),
+      if (metadata.isNotEmpty) 'metadata': metadata,
+    };
+  }
+}
+
 class CommerceJsonEncoder {
   const CommerceJsonEncoder();
 
@@ -1195,5 +1465,27 @@ class CommerceJsonEncoder {
           .toList(growable: false);
     }
     return const <CommercePaymentMethod>[];
+  }
+
+  String encodeBillingCatalog(BillingCatalogSnapshot snapshot) {
+    return jsonEncode(snapshot.toJson());
+  }
+
+  BillingCatalogSnapshot decodeBillingCatalog(String payload) {
+    return BillingCatalogSnapshot.fromJson(jsonDecode(payload) as Map<String, dynamic>);
+  }
+
+  String encodePendingReceipts(List<PendingReceipt> receipts) {
+    return jsonEncode(receipts.map((receipt) => receipt.toJson()).toList(growable: false));
+  }
+
+  List<PendingReceipt> decodePendingReceipts(String payload) {
+    final data = jsonDecode(payload);
+    if (data is List) {
+      return data
+          .map((item) => PendingReceipt.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList(growable: false);
+    }
+    return const <PendingReceipt>[];
   }
 }
