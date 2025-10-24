@@ -183,6 +183,9 @@ export async function seed(knex) {
     await trx('kyc_audit_logs').del();
     await trx('kyc_documents').del();
     await trx('kyc_verifications').del();
+    await trx('user_passkey_challenges').del();
+    await trx('user_magic_links').del();
+    await trx('user_passkeys').del();
     await trx('user_sessions').del();
     await trx('user_email_verification_tokens').del();
     await trx('user_profiles').del();

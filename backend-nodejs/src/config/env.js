@@ -648,6 +648,10 @@ const envSchema = z
       .max(300)
       .default(60),
     TWO_FACTOR_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(5),
+    PASSKEY_RP_ID: z.string().optional(),
+    PASSKEY_RP_NAME: z.string().optional(),
+    PASSKEY_ALLOWED_ORIGINS: z.string().optional(),
+    PASSKEY_CHALLENGE_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(300),
     DATA_ENCRYPTION_PRIMARY_KEY: z.string().min(32).optional(),
     DATA_ENCRYPTION_ACTIVE_KEY_ID: z.string().min(2).optional(),
     DATA_ENCRYPTION_FALLBACK_KEYS: z.string().optional(),
@@ -941,6 +945,8 @@ const envSchema = z
       .min(1)
       .max(24 * 60)
       .default(15),
+    MAGIC_LINK_BASE_URL: z.string().url().optional(),
+    MAGIC_LINK_TOKEN_TTL_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
     ACCOUNT_LOCKOUT_THRESHOLD: z.coerce.number().int().min(3).max(20).default(5),
     ACCOUNT_LOCKOUT_WINDOW_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(15),
     ACCOUNT_LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
@@ -1272,11 +1278,30 @@ const taxTable = normalizeTaxTable(tryParseJson(raw.PAYMENTS_TAX_TABLE));
 const statementDescriptor =
   normalizeStatementDescriptor(raw.STRIPE_STATEMENT_DESCRIPTOR) ?? 'EDULURE LEARNING';
 
+const appOrigins = parseOriginList(raw.APP_URL);
+const configuredPasskeyOrigins = parseOriginList(raw.PASSKEY_ALLOWED_ORIGINS ?? '');
+const passkeyAllowedOrigins = configuredPasskeyOrigins.length
+  ? configuredPasskeyOrigins
+  : appOrigins.length
+    ? appOrigins
+    : ['https://localhost'];
+
+let passkeyRpId = raw.PASSKEY_RP_ID ?? null;
+if (!passkeyRpId) {
+  try {
+    passkeyRpId = new URL(passkeyAllowedOrigins[0]).hostname;
+  } catch (_error) {
+    passkeyRpId = 'localhost';
+  }
+}
+
+const passkeyRpName = raw.PASSKEY_RP_NAME ?? raw.APP_NAME ?? 'Edulure';
+const magicLinkBaseUrl = raw.MAGIC_LINK_BASE_URL ?? raw.EMAIL_VERIFICATION_URL;
+
 const jwtKeyset = normalizeJwtKeyset(raw.JWT_KEYSET, raw.JWT_SECRET, raw.JWT_ACTIVE_KEY_ID);
 const activeJwtKey = jwtKeyset.keys.find((key) => key.kid === jwtKeyset.activeKeyId);
 
 const corsOrigins = parseOriginList(raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL);
-const appOrigins = parseOriginList(raw.APP_URL);
 const primaryAppUrl = appOrigins[0] ?? null;
 const billingPortalAllowedOrigins = parseOriginList(
   raw.BILLING_PORTAL_ALLOWED_RETURN_ORIGINS ?? raw.APP_URL
@@ -1502,6 +1527,15 @@ export const env = {
       challengeTtlSeconds: twoFactorChallengeTtlSeconds,
       resendCooldownSeconds: twoFactorResendCooldownSeconds,
       maxAttemptsPerChallenge: twoFactorMaxAttempts
+    },
+    passkeys: {
+      rpId: passkeyRpId,
+      rpName: passkeyRpName,
+      origins: passkeyAllowedOrigins,
+      challengeTtlSeconds: raw.PASSKEY_CHALLENGE_TTL_SECONDS
+    },
+    magicLinks: {
+      tokenTtlMinutes: raw.MAGIC_LINK_TOKEN_TTL_MINUTES
     },
     auditLog: {
       tenantId: auditLogTenantId,
@@ -1759,7 +1793,9 @@ export const env = {
     fromName: raw.SMTP_FROM_NAME,
     verificationBaseUrl: raw.EMAIL_VERIFICATION_URL,
     verificationTokenTtlMinutes: raw.EMAIL_VERIFICATION_TOKEN_TTL_MINUTES,
-    verificationResendCooldownMinutes: raw.EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES
+    verificationResendCooldownMinutes: raw.EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES,
+    magicLinkBaseUrl,
+    magicLinkTokenTtlMinutes: raw.MAGIC_LINK_TOKEN_TTL_MINUTES
   },
   messaging: {
     twilio: {

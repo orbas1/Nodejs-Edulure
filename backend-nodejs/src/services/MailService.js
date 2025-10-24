@@ -121,6 +121,44 @@ function buildTwoFactorText({ code, expiresAt }) {
   ].join('\n');
 }
 
+function buildMagicLinkHtml({ name, magicLinkUrl, expiresAt }) {
+  return `<!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <title>Continue signing in to Edulure</title>
+      <style>
+        body { font-family: 'Inter', Arial, sans-serif; background: #0f172a0d; padding: 32px; color: #0f172a; }
+        .card { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 18px; padding: 32px; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12); }
+        .cta { display: inline-block; margin-top: 24px; padding: 14px 28px; border-radius: 9999px; background: #0ea5e9; color: #ffffff; text-decoration: none; font-weight: 600; }
+        p { line-height: 1.6; margin: 16px 0; }
+        .meta { color: #475569; font-size: 13px; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>Here's your secure link${name ? `, ${name}` : ''}</h1>
+        <p>Use the button below to finish signing in to Edulure without typing your password. This link can only be used once.</p>
+        <p><a href="${magicLinkUrl}" class="cta">Open my secure link</a></p>
+        <p>If the button does not work, paste this link into your browser:</p>
+        <p class="meta">${magicLinkUrl}</p>
+        <p class="meta">This link expires on ${expiresAt.toUTCString()}. If you did not request it you can safely ignore this email.</p>
+      </div>
+    </body>
+  </html>`;
+}
+
+function buildMagicLinkText({ magicLinkUrl, expiresAt }) {
+  return [
+    'Finish signing in to Edulure',
+    '',
+    'Use the link below to continue:',
+    magicLinkUrl,
+    '',
+    `The link expires on ${expiresAt.toUTCString()}. If you did not request it you can ignore this message.`
+  ].join('\n');
+}
+
 export class MailService {
   constructor(transporter = null) {
     this.transporter = transporter ?? getTransporter();
@@ -196,6 +234,16 @@ export class MailService {
       html: buildTwoFactorHtml({ name, code, expiresAt }),
       text: buildTwoFactorText({ code, expiresAt }),
       headers: sanitizeHeaders({ 'X-Edulure-Template': 'two-factor-email-otp' })
+    });
+  }
+
+  async sendMagicLink({ to, name, magicLinkUrl, expiresAt }) {
+    return this.sendMail({
+      to,
+      subject: 'Finish signing in to Edulure',
+      html: buildMagicLinkHtml({ name, magicLinkUrl, expiresAt }),
+      text: buildMagicLinkText({ magicLinkUrl, expiresAt }),
+      headers: sanitizeHeaders({ 'X-Edulure-Template': 'magic-link-sign-in' })
     });
   }
 }

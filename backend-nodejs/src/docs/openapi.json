@@ -1881,6 +1881,74 @@
           "id"
         ]
       },
+      "MagicLinkIssueResult": {
+        "type": "object",
+        "properties": {
+          "delivered": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "delivered",
+          "expiresAt"
+        ]
+      },
+      "PasskeyOptionsPayload": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "requestId",
+          "options"
+        ]
+      },
+      "PasskeyCredentialSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "credentialId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "credentialId",
+          "createdAt"
+        ]
+      },
+      "PasskeyRegistrationResult": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "passkey": {
+            "$ref": "#/components/schemas/PasskeyCredentialSummary"
+          }
+        },
+        "required": [
+          "user",
+          "passkey"
+        ]
+      },
       "User": {
         "type": "object",
         "properties": {
@@ -13116,6 +13184,425 @@
           },
           "422": {
             "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/auth/magic-link": {
+      "post": {
+        "summary": "Send passwordless sign-in link",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "redirectTo": {
+                    "type": "string",
+                    "format": "uri",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Magic link processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/MagicLinkIssueResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "500": {
+            "description": "Magic link configuration missing"
+          }
+        }
+      }
+    },
+    "/auth/magic-link/consume": {
+      "post": {
+        "summary": "Redeem passwordless sign-in link",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in with magic link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification",
+                            "tokens",
+                            "session"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            },
+                            "tokens": {
+                              "$ref": "#/components/schemas/AuthTokens"
+                            },
+                            "session": {
+                              "$ref": "#/components/schemas/SessionEnvelope"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Magic link invalid or expired"
+          },
+          "410": {
+            "description": "Account is no longer available"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/auth/passkeys/register/options": {
+      "post": {
+        "summary": "Begin passkey registration",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Passkey registration options issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PasskeyOptionsPayload"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "503": {
+            "description": "Passkey support disabled"
+          }
+        }
+      }
+    },
+    "/auth/passkeys/register/complete": {
+      "post": {
+        "summary": "Complete passkey registration",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestId",
+                  "response"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "minLength": 10
+                  },
+                  "response": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Passkey registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PasskeyRegistrationResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Registration could not be verified"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "410": {
+            "description": "Passkey registration session expired"
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "503": {
+            "description": "Passkey support disabled"
+          }
+        }
+      }
+    },
+    "/auth/passkeys/login/options": {
+      "post": {
+        "summary": "Begin passkey authentication",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Passkey authentication options issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PasskeyOptionsPayload"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found"
+          },
+          "412": {
+            "description": "Passkey enrollment required"
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "503": {
+            "description": "Passkey support disabled"
+          }
+        }
+      }
+    },
+    "/auth/passkeys/login/complete": {
+      "post": {
+        "summary": "Complete passkey authentication",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestId",
+                  "response"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "minLength": 10
+                  },
+                  "response": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in with passkey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification",
+                            "tokens",
+                            "session"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            },
+                            "tokens": {
+                              "$ref": "#/components/schemas/AuthTokens"
+                            },
+                            "session": {
+                              "$ref": "#/components/schemas/SessionEnvelope"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Passkey verification failed"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "410": {
+            "description": "Passkey authentication session expired"
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "503": {
+            "description": "Passkey support disabled"
           }
         }
       }

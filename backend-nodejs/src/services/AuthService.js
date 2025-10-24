@@ -12,6 +12,8 @@ import LearnerOnboardingResponseModel from '../models/LearnerOnboardingResponseM
 import { emailVerificationService } from './EmailVerificationService.js';
 import { sessionRegistry } from './SessionRegistry.js';
 import TwoFactorService from './TwoFactorService.js';
+import MagicLinkService from './MagicLinkService.js';
+import PasskeyService from './PasskeyService.js';
 import { serializeUser } from './serializers/userSerializer.js';
 
 function hashRefreshToken(token) {
@@ -492,6 +494,95 @@ export default class AuthService {
         }
       };
     });
+  }
+
+  static async requestMagicLink(email, context = {}, options = {}) {
+    const result = await MagicLinkService.issue(email, context, options);
+    return {
+      data: {
+        delivered: result.delivered,
+        expiresAt: result.expiresAt ? result.expiresAt.toISOString() : null
+      }
+    };
+  }
+
+  static async consumeMagicLink(token, context = {}) {
+    const { user } = await MagicLinkService.consume(token, context);
+    const refreshedUser = await UserModel.findById(user.id);
+    const session = await this.createSession(
+      { id: refreshedUser.id, email: refreshedUser.email, role: refreshedUser.role },
+      context
+    );
+
+    await DomainEventModel.record({
+      entityType: 'user',
+      entityId: refreshedUser.id,
+      eventType: 'user.login_succeeded',
+      payload: {
+        sessionId: session.sessionId,
+        sessionExpiresAt: session.expiresAt.toISOString(),
+        method: 'magic_link',
+        ipAddress: context.ipAddress ?? null,
+        userAgent: context.userAgent ?? null
+      },
+      performedBy: refreshedUser.id
+    });
+
+    return this.buildAuthResponse(serializeUser(refreshedUser), session);
+  }
+
+  static async startPasskeyRegistration(userId, metadata = null, context = {}) {
+    return PasskeyService.issueRegistrationOptions(userId, metadata, context);
+  }
+
+  static async completePasskeyRegistration(requestId, response, context = {}) {
+    const { user, passkey } = await PasskeyService.completeRegistration(requestId, response, context);
+    return {
+      data: {
+        user: serializeUser(user),
+        passkey: {
+          id: passkey.id,
+          credentialId: passkey.credentialId,
+          createdAt: passkey.createdAt
+        }
+      }
+    };
+  }
+
+  static async startPasskeyLogin(payload, context = {}) {
+    const { requestId, options } = await PasskeyService.issueAuthenticationOptions(payload, context);
+    return {
+      data: {
+        requestId,
+        options
+      }
+    };
+  }
+
+  static async completePasskeyLogin(requestId, response, context = {}) {
+    const { user } = await PasskeyService.verifyAuthentication(requestId, response, context);
+    await UserModel.clearLoginFailures(user.id);
+    const refreshedUser = await UserModel.findById(user.id);
+    const session = await this.createSession(
+      { id: refreshedUser.id, email: refreshedUser.email, role: refreshedUser.role },
+      context
+    );
+
+    await DomainEventModel.record({
+      entityType: 'user',
+      entityId: refreshedUser.id,
+      eventType: 'user.login_succeeded',
+      payload: {
+        sessionId: session.sessionId,
+        sessionExpiresAt: session.expiresAt.toISOString(),
+        method: 'passkey',
+        ipAddress: context.ipAddress ?? null,
+        userAgent: context.userAgent ?? null
+      },
+      performedBy: refreshedUser.id
+    });
+
+    return this.buildAuthResponse(serializeUser(refreshedUser), session);
   }
 
   static async createSession(user, context = {}, connection = db) {

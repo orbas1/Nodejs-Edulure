@@ -88,6 +88,33 @@ const logoutAllSchema = Joi.object({
   includeCurrent: Joi.boolean().default(false)
 });
 
+const magicLinkRequestSchema = Joi.object({
+  email: Joi.string().email().required(),
+  redirectTo: Joi.string().uri().allow('', null)
+});
+
+const magicLinkConsumeSchema = Joi.object({
+  token: Joi.string().trim().min(10).required()
+});
+
+const passkeyRegistrationOptionsSchema = Joi.object({
+  metadata: Joi.object().unknown(true).optional()
+});
+
+const passkeyRegistrationCompleteSchema = Joi.object({
+  requestId: Joi.string().trim().min(10).required(),
+  response: Joi.object().required()
+}).unknown(false);
+
+const passkeyLoginOptionsSchema = Joi.object({
+  email: Joi.string().email().required()
+});
+
+const passkeyLoginCompleteSchema = Joi.object({
+  requestId: Joi.string().trim().min(10).required(),
+  response: Joi.object().required()
+}).unknown(false);
+
 function buildContext(req) {
   return {
     ipAddress: req.headers['x-forwarded-for']?.split(',').shift()?.trim() ?? req.ip,
@@ -253,6 +280,132 @@ export default class AuthController {
       return success(res, {
         data: result.data,
         message
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async requestMagicLink(req, res, next) {
+    try {
+      const payload = await magicLinkRequestSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await AuthService.requestMagicLink(payload.email, buildContext(req), {
+        redirectTo: payload.redirectTo ?? null
+      });
+      return success(res, {
+        data: result.data,
+        message: 'If the email exists we sent a secure sign-in link.'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async consumeMagicLink(req, res, next) {
+    try {
+      const payload = await magicLinkConsumeSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await AuthService.consumeMagicLink(payload.token, buildContext(req));
+      return success(res, {
+        data: result.data,
+        message: 'Signed in using magic link'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async passkeyRegistrationOptions(req, res, next) {
+    try {
+      const payload = await passkeyRegistrationOptionsSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await AuthService.startPasskeyRegistration(req.user.id, payload.metadata ?? null, buildContext(req));
+      return success(res, {
+        data: result,
+        message: 'Passkey registration initiated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async passkeyRegistrationComplete(req, res, next) {
+    try {
+      const payload = await passkeyRegistrationCompleteSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await AuthService.completePasskeyRegistration(
+        payload.requestId,
+        payload.response,
+        buildContext(req)
+      );
+      return success(res, {
+        data: result.data,
+        message: 'Passkey registered successfully'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async passkeyLoginOptions(req, res, next) {
+    try {
+      const payload = await passkeyLoginOptionsSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await AuthService.startPasskeyLogin({ email: payload.email }, buildContext(req));
+      return success(res, {
+        data: result.data,
+        message: 'Passkey authentication initiated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async passkeyLoginComplete(req, res, next) {
+    try {
+      const payload = await passkeyLoginCompleteSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await AuthService.completePasskeyLogin(payload.requestId, payload.response, buildContext(req));
+      return success(res, {
+        data: result.data,
+        message: 'Signed in with passkey'
       });
     } catch (error) {
       if (error.isJoi) {
