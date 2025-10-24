@@ -147,16 +147,103 @@ function normaliseKnowledgeSuggestions(value) {
       const id = suggestion.id ?? suggestion.slug ?? `kb-${index}`;
       const minutesRaw = suggestion.minutes ?? suggestion.readTime ?? suggestion.duration ?? null;
       const minutes = Number.isFinite(Number(minutesRaw)) ? Number(minutesRaw) : 3;
+      const updatedAt = toIso(suggestion.updatedAt ?? suggestion.updated_at);
+      const reviewDueAt = toIso(suggestion.reviewDueAt ?? suggestion.review_due_at);
       return {
         id,
         title: suggestion.title ?? 'Knowledge base article',
         excerpt: suggestion.excerpt ?? suggestion.summary ?? suggestion.description ?? '',
         url: suggestion.url ?? suggestion.link ?? '#',
         category: suggestion.category ?? suggestion.topic ?? 'General',
-        minutes
+        minutes,
+        stale: Boolean(suggestion.stale ?? suggestion.isStale),
+        updatedAt,
+        reviewDueAt,
+        reviewIntervalDays: Number.isFinite(Number(suggestion.reviewIntervalDays))
+          ? Number(suggestion.reviewIntervalDays)
+          : null
       };
     })
     .filter(Boolean);
+}
+
+const BASE_NOTIFICATION_PREFERENCES = {
+  digest: 'daily',
+  channels: { email: true, sms: false, inApp: true },
+  categories: { incidents: true, productUpdates: true, billing: true }
+};
+
+function normaliseNotificationPreferences(preferences) {
+  if (!preferences || typeof preferences !== 'object') {
+    return { ...BASE_NOTIFICATION_PREFERENCES };
+  }
+  const digest = typeof preferences.digest === 'string' ? preferences.digest : BASE_NOTIFICATION_PREFERENCES.digest;
+  const channelsInput = preferences.channels ?? {};
+  const categoriesInput = preferences.categories ?? {};
+
+  const normaliseBooleanMap = (baseMap, overrides) => {
+    return Object.keys(baseMap).reduce((acc, key) => {
+      const value = overrides[key];
+      return {
+        ...acc,
+        [key]: typeof value === 'boolean' ? value : baseMap[key]
+      };
+    }, {});
+  };
+
+  return {
+    digest,
+    channels: normaliseBooleanMap(BASE_NOTIFICATION_PREFERENCES.channels, channelsInput),
+    categories: normaliseBooleanMap(BASE_NOTIFICATION_PREFERENCES.categories, categoriesInput)
+  };
+}
+
+function normaliseRequester(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const requester = {
+    id: value.id ?? value.userId ?? null,
+    name: value.name ?? value.fullName ?? value.displayName ?? null,
+    email: value.email ?? null,
+    role: value.role ?? value.type ?? null,
+    locale: value.locale ?? value.language ?? null,
+    timezone: value.timezone ?? value.timeZone ?? null
+  };
+
+  const hasDetails = Object.values(requester).some((entry) => entry !== null && entry !== undefined && entry !== '');
+  return hasDetails ? requester : null;
+}
+
+function buildKnowledgeSummary(suggestions = [], metadata = {}) {
+  const entries = Array.isArray(suggestions) ? suggestions : normaliseKnowledgeSuggestions(suggestions);
+  const staleCount = entries.filter((entry) => entry?.stale).length;
+  const categories = Array.from(
+    new Set(
+      entries
+        .map((entry) => entry?.category)
+        .filter((category) => typeof category === 'string' && category.trim().length)
+        .map((category) => category.trim())
+    )
+  ).slice(0, 8);
+
+  const latestUpdateCandidate = entries
+    .map((entry) => entry?.updatedAt ?? entry?.updated_at ?? null)
+    .filter(Boolean)
+    .map((value) => toIso(value))
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null;
+
+  return {
+    query: typeof metadata.query === 'string' ? metadata.query : metadata.originalQuery ?? null,
+    articleCount: entries.length,
+    staleCount,
+    categories,
+    generatedAt: toIso(metadata.generatedAt ?? metadata.generated_at ?? new Date()),
+    source: metadata.source ?? 'support.knowledge-base',
+    fromCache: Boolean(metadata.fromCache ?? metadata.from_cache),
+    lastUpdatedAt: toIso(metadata.lastUpdatedAt ?? metadata.last_updated_at ?? latestUpdateCandidate)
+  };
 }
 
 function normaliseBreadcrumbs(value) {
@@ -203,6 +290,22 @@ function mapCase(row, messages = []) {
   if (!row) {
     return null;
   }
+
+  const knowledgeSuggestions = normaliseKnowledgeSuggestions(row.knowledge_suggestions);
+  const rawMetadata = parseJson(row.metadata, {});
+  const metadata = rawMetadata && typeof rawMetadata === 'object' ? { ...rawMetadata } : {};
+  const knowledgeBaseSummary = buildKnowledgeSummary(
+    knowledgeSuggestions,
+    metadata.knowledgeBase ?? metadata.knowledge_base ?? {}
+  );
+
+  if (knowledgeBaseSummary) {
+    metadata.knowledgeBase = knowledgeBaseSummary;
+    if (Object.prototype.hasOwnProperty.call(metadata, 'knowledge_base')) {
+      delete metadata.knowledge_base;
+    }
+  }
+
   return {
     id: row.id,
     reference: row.reference,
@@ -214,8 +317,9 @@ function mapCase(row, messages = []) {
     satisfaction: row.satisfaction,
     owner: row.owner,
     lastAgent: row.last_agent,
-    metadata: parseJson(row.metadata, {}),
-    knowledgeSuggestions: normaliseKnowledgeSuggestions(row.knowledge_suggestions),
+    metadata,
+    knowledgeSuggestions,
+    knowledgeBaseSummary,
     escalationBreadcrumbs: normaliseBreadcrumbs(row.escalation_breadcrumbs),
     aiSummary: row.ai_summary ?? null,
     followUpDueAt: toIso(row.follow_up_due_at),
@@ -381,6 +485,9 @@ export default class SupportTicketModel {
   static normaliseAttachmentInput = normaliseAttachmentInput;
   static serialiseAttachments = serialiseAttachments;
   static normaliseKnowledgeSuggestions = normaliseKnowledgeSuggestions;
+  static normaliseNotificationPreferences = normaliseNotificationPreferences;
+  static normaliseRequester = normaliseRequester;
+  static buildKnowledgeSummary = buildKnowledgeSummary;
   static normaliseBreadcrumbs = normaliseBreadcrumbs;
   static mapMessage = mapMessage;
   static mapCase = mapCase;
@@ -399,6 +506,9 @@ export const __testables = {
   normaliseAttachmentInput,
   serialiseAttachments,
   normaliseKnowledgeSuggestions,
+  normaliseNotificationPreferences,
+  normaliseRequester,
+  buildKnowledgeSummary,
   normaliseBreadcrumbs,
   mapMessage,
   mapCase,

@@ -1,6 +1,46 @@
 import db from '../config/database.js';
 import SupportTicketModel from '../models/SupportTicketModel.js';
 
+const REVIEW_INTERVAL_DAYS = 90;
+
+function toIso(value) {
+  return SupportTicketModel.toIso?.(value) ?? null;
+}
+
+function resolveReviewIntervalDays(value) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return Math.round(numeric);
+  }
+  return REVIEW_INTERVAL_DAYS;
+}
+
+function buildFreshnessDescriptor(updatedAt, reviewIntervalDays) {
+  const updatedAtIso = toIso(updatedAt);
+  if (!updatedAtIso) {
+    return {
+      updatedAt: null,
+      reviewDueAt: null,
+      stale: true,
+      daysSinceUpdate: null
+    };
+  }
+
+  const updatedAtDate = new Date(updatedAtIso);
+  const now = new Date();
+  const msDiff = now.getTime() - updatedAtDate.getTime();
+  const daysSinceUpdate = Math.floor(msDiff / (24 * 60 * 60 * 1000));
+  const reviewDueAtDate = new Date(updatedAtDate.getTime() + reviewIntervalDays * 24 * 60 * 60 * 1000);
+  const stale = Number.isFinite(daysSinceUpdate) ? daysSinceUpdate > reviewIntervalDays : true;
+
+  return {
+    updatedAt: updatedAtIso,
+    reviewDueAt: toIso(reviewDueAtDate),
+    stale,
+    daysSinceUpdate: Number.isFinite(daysSinceUpdate) ? daysSinceUpdate : null
+  };
+}
+
 function normaliseQuery(value) {
   if (!value) {
     return '';
@@ -21,7 +61,9 @@ function mapArticle(row) {
     category: row.category,
     minutes: row.minutes ?? 3,
     keywords: SupportTicketModel.parseJson(row.keywords, []),
-    helpfulnessScore: Number(row.helpfulness_score ?? 0)
+    helpfulnessScore: Number(row.helpfulness_score ?? 0),
+    reviewIntervalDays: resolveReviewIntervalDays(row.review_interval_days),
+    ...buildFreshnessDescriptor(row.updated_at ?? row.updatedAt, resolveReviewIntervalDays(row.review_interval_days))
   };
 }
 
@@ -40,7 +82,8 @@ export default class SupportKnowledgeBaseService {
       'url',
       'minutes',
       'keywords',
-      'helpfulness_score'
+      'helpfulness_score',
+      'updated_at'
     );
 
     if (category) {
@@ -60,7 +103,14 @@ export default class SupportKnowledgeBaseService {
     const articles = rows.map((row) => mapArticle(row)).filter(Boolean);
 
     if (!trimmedQuery) {
-      return articles.slice(0, limit);
+      return articles
+        .sort((a, b) => {
+          if (a.stale === b.stale) {
+            return 0;
+          }
+          return a.stale ? 1 : -1;
+        })
+        .slice(0, limit);
     }
 
     const lowered = trimmedQuery.toLowerCase();
@@ -76,7 +126,14 @@ export default class SupportKnowledgeBaseService {
         : false;
     });
 
-    return (filtered.length ? filtered : articles).slice(0, limit);
+    return (filtered.length ? filtered : articles)
+      .sort((a, b) => {
+        if (a.stale === b.stale) {
+          return 0;
+        }
+        return a.stale ? 1 : -1;
+      })
+      .slice(0, limit);
   }
 
   static async buildSuggestionsForTicket({ subject, description, category }) {

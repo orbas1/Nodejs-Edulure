@@ -9,6 +9,7 @@ import { RuntimeConfigProvider } from './context/RuntimeConfigContext.jsx';
 import { DashboardProvider } from './context/DashboardContext.jsx';
 import { RealtimeProvider } from './context/RealtimeContext.jsx';
 import { ServiceHealthProvider } from './context/ServiceHealthContext.jsx';
+import { ThemeProvider } from './providers/ThemeProvider.jsx';
 
 function resolveRouterBasename(baseUrl = '/') {
   if (!baseUrl || baseUrl === '/' || baseUrl === './') {
@@ -37,19 +38,21 @@ const routerBasename = resolveRouterBasename(import.meta.env.BASE_URL);
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter basename={routerBasename === '/' ? undefined : routerBasename}>
-      <LanguageProvider>
-        <AuthProvider>
-          <RuntimeConfigProvider>
-            <ServiceHealthProvider>
-              <RealtimeProvider>
-                <DashboardProvider>
-                  <App />
-                </DashboardProvider>
-              </RealtimeProvider>
-            </ServiceHealthProvider>
-          </RuntimeConfigProvider>
-        </AuthProvider>
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <RuntimeConfigProvider>
+              <ServiceHealthProvider>
+                <RealtimeProvider>
+                  <DashboardProvider>
+                    <App />
+                  </DashboardProvider>
+                </RealtimeProvider>
+              </ServiceHealthProvider>
+            </RuntimeConfigProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

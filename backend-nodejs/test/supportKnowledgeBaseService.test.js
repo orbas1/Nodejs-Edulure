@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SupportKnowledgeBaseService from '../src/services/SupportKnowledgeBaseService.js';
 import { createMockConnection } from './support/mockDb.js';
@@ -18,6 +18,8 @@ vi.mock('../src/config/database.js', () => ({
 
 describe('SupportKnowledgeBaseService', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-03-15T12:00:00Z'));
     connectionRef.current = createMockConnection({
       support_articles: [
         {
@@ -62,6 +64,10 @@ describe('SupportKnowledgeBaseService', () => {
     dbMock.transaction = connectionRef.current.transaction;
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('searches articles by query, category, and limit with ranking fallbacks', async () => {
     const articles = await SupportKnowledgeBaseService.searchArticles({
       query: 'billing declines',
@@ -74,8 +80,12 @@ describe('SupportKnowledgeBaseService', () => {
       id: 2,
       slug: 'billing-decline-remedy',
       title: 'Resolve recurring billing declines',
-      helpfulnessScore: 8.4
+      helpfulnessScore: 8.4,
+      stale: false,
+      reviewIntervalDays: 90
     });
+    expect(articles[0].updatedAt).toBe('2025-02-27T09:30:00.000Z');
+    expect(articles[0].reviewDueAt).toBe('2025-05-28T09:30:00.000Z');
   });
 
   it('builds ticket suggestions by normalising search results', async () => {
@@ -90,7 +100,8 @@ describe('SupportKnowledgeBaseService', () => {
       id: 'live-classroom-reset',
       title: 'Stabilise a live classroom session',
       url: 'https://support.edulure.test/articles/live-classroom-reset',
-      minutes: 5
+      minutes: 5,
+      stale: false
     });
   });
 });

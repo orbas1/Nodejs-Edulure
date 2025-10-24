@@ -645,6 +645,32 @@ button:focus-visible {
   }
 }
 
+@layer utilities {
+  .bg-surface {
+    background-color: var(--color-surface);
+  }
+
+  .bg-surface-muted {
+    background-color: var(--color-surface-muted);
+  }
+
+  .bg-surface-subtle {
+    background-color: var(--color-surface-subtle);
+  }
+
+  .border-surface {
+    border-color: var(--color-border);
+  }
+
+  .text-body {
+    color: var(--color-text);
+  }
+
+  .text-muted {
+    color: var(--color-text-muted);
+  }
+}
+
 @keyframes dashboard-shimmer {
   0% {
     transform: translateX(-100%);

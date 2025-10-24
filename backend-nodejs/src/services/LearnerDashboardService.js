@@ -29,6 +29,7 @@ import CommunityModel from '../models/CommunityModel.js';
 import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import LiveClassroomModel from '../models/LiveClassroomModel.js';
 import SupportKnowledgeBaseService from './SupportKnowledgeBaseService.js';
+import SupportTicketModel from '../models/SupportTicketModel.js';
 
 const log = logger.child({ service: 'LearnerDashboardService' });
 
@@ -2622,8 +2623,30 @@ export default class LearnerDashboardService {
         if (!suggestions.length) {
           return ticket;
         }
-        await LearnerSupportRepository.updateCase(userId, ticket.id, { knowledgeSuggestions: suggestions });
-        return { ...ticket, knowledgeSuggestions: suggestions };
+
+        const existingMetadata =
+          ticket.metadata && typeof ticket.metadata === 'object' ? { ...ticket.metadata } : {};
+        const knowledgeBaseMetadata = SupportTicketModel.buildKnowledgeSummary(suggestions, {
+          ...(existingMetadata.knowledgeBase ?? existingMetadata.knowledge_base ?? {}),
+          query: [ticket.subject, learnerNotes].filter(Boolean).join(' ').trim() || null,
+          source: 'support.portal.background-refresh',
+          fromCache: false,
+          generatedAt: new Date(),
+          lastUpdatedAt: new Date()
+        });
+        const mergedMetadata = { ...existingMetadata, knowledgeBase: knowledgeBaseMetadata };
+        const updatedTicket = await LearnerSupportRepository.updateCase(userId, ticket.id, {
+          knowledgeSuggestions: suggestions,
+          metadata: mergedMetadata
+        });
+        return (
+          updatedTicket ?? {
+            ...ticket,
+            knowledgeSuggestions: suggestions,
+            metadata: mergedMetadata,
+            knowledgeBaseSummary: knowledgeBaseMetadata
+          }
+        );
       })
     );
 
@@ -2648,6 +2671,35 @@ export default class LearnerDashboardService {
       category: payload.category ?? 'General'
     });
 
+    const notificationPreferences = SupportTicketModel.normaliseNotificationPreferences(
+      payload.notificationPreferences ?? payload.notification_preferences
+    );
+    const knowledgeBaseMetadata = SupportTicketModel.buildKnowledgeSummary(knowledgeSuggestions, {
+      ...((payload.knowledgeBaseMetadata ?? payload.knowledge_base_metadata) || {}),
+      query:
+        (payload.knowledgeBaseMetadata ?? payload.knowledge_base_metadata)?.query ??
+        [payload.subject, description].filter(Boolean).join(' '),
+      source:
+        (payload.knowledgeBaseMetadata ?? payload.knowledge_base_metadata)?.source ??
+        'support.portal.ticket-form',
+      fromCache: Boolean((payload.knowledgeBaseMetadata ?? payload.knowledge_base_metadata)?.fromCache),
+      generatedAt:
+        (payload.knowledgeBaseMetadata ?? payload.knowledge_base_metadata)?.generatedAt ?? new Date(),
+      lastUpdatedAt:
+        (payload.knowledgeBaseMetadata ?? payload.knowledge_base_metadata)?.lastUpdatedAt ?? new Date()
+    });
+    const requester = SupportTicketModel.normaliseRequester(
+      payload.requester ?? payload.requestContext ?? null
+    );
+
+    const baseMetadata = typeof payload.metadata === 'object' && payload.metadata !== null ? payload.metadata : {};
+    const intakeMetadata = {
+      ...(typeof baseMetadata.intake === 'object' && baseMetadata.intake !== null ? baseMetadata.intake : {}),
+      channel: (baseMetadata.intake?.channel ?? 'portal'),
+      attachments: attachments.length,
+      ...(requester ? { requester } : {})
+    };
+
     const ticket = await LearnerSupportRepository.createCase(userId, {
       subject: payload.subject,
       category: payload.category ?? 'General',
@@ -2667,11 +2719,10 @@ export default class LearnerDashboardService {
           ]
         : [],
       metadata: {
-        ...(payload.metadata ?? {}),
-        intake: {
-          channel: 'portal',
-          attachments: attachments.length
-        }
+        ...baseMetadata,
+        intake: intakeMetadata,
+        notificationPreferences,
+        knowledgeBase: knowledgeBaseMetadata
       }
     });
     log.info({ userId, ticketId: ticket?.id }, 'Learner created support ticket');
@@ -2713,7 +2764,20 @@ export default class LearnerDashboardService {
           category: ticket.category
         });
         if (suggestions.length) {
-          await LearnerSupportRepository.updateCase(userId, ticketId, { knowledgeSuggestions: suggestions });
+          const existingMetadata =
+            ticket.metadata && typeof ticket.metadata === 'object' ? { ...ticket.metadata } : {};
+          const knowledgeBaseMetadata = SupportTicketModel.buildKnowledgeSummary(suggestions, {
+            ...(existingMetadata.knowledgeBase ?? existingMetadata.knowledge_base ?? {}),
+            query: [ticket.subject, learnerNotes].filter(Boolean).join(' ').trim() || null,
+            source: 'support.portal.background-refresh',
+            fromCache: false,
+            generatedAt: new Date(),
+            lastUpdatedAt: new Date()
+          });
+          await LearnerSupportRepository.updateCase(userId, ticketId, {
+            knowledgeSuggestions: suggestions,
+            metadata: { ...existingMetadata, knowledgeBase: knowledgeBaseMetadata }
+          });
         }
       }
     }

@@ -447,7 +447,7 @@ export default function DashboardLayout() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-surface-muted text-body">
       <a className="skip-link" href="#dashboard-main">
         Skip to dashboard content
       </a>
@@ -483,7 +483,7 @@ export default function DashboardLayout() {
         <main
           id="dashboard-main"
           tabIndex={-1}
-          className="flex-1 overflow-y-auto bg-slate-25 px-4 pb-16 pt-6 sm:px-6 lg:px-8"
+          className="flex-1 overflow-y-auto bg-surface-subtle px-4 pb-16 pt-6 sm:px-6 lg:px-8"
         >
           {loading ? (
             <DashboardStateMessage
@@ -510,7 +510,7 @@ export default function DashboardLayout() {
           )}
         </main>
       </div>
-      <footer className="border-t border-slate-200 bg-white/90 px-4 py-6 text-sm text-slate-500 sm:px-6 lg:px-8">
+      <footer className="border-t border-surface bg-surface px-4 py-6 text-sm text-muted sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>&copy; {new Date().getFullYear()} Edulure. Operated workspaces.</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

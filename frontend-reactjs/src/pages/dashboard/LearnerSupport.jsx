@@ -354,7 +354,17 @@ export default function LearnerSupport() {
   const selectedCaseSlaBadge = selectedCase ? getSlaBadgeDescriptor(selectedCase) : null;
 
   const handleTicketSubmit = useCallback(
-    async ({ subject, category, priority, description, attachments = [], knowledgeSuggestions = [] }) => {
+    async ({
+      subject,
+      category,
+      priority,
+      description,
+      attachments = [],
+      knowledgeSuggestions = [],
+      notificationPreferences: ticketPreferences,
+      knowledgeBaseMetadata,
+      requester
+    }) => {
       const trimmedSubject = subject?.trim();
       const trimmedDescription = description?.trim();
       if (!trimmedSubject || !trimmedDescription) {
@@ -377,7 +387,10 @@ export default function LearnerSupport() {
             priority,
             description: trimmedDescription,
             attachments,
-            knowledgeSuggestions
+            knowledgeSuggestions,
+            notificationPreferences: ticketPreferences,
+            knowledgeBaseMetadata,
+            requester
           }
         });
         setStatusMessage({
@@ -397,6 +410,28 @@ export default function LearnerSupport() {
       }
 
       const remoteTicket = response?.data?.ticket ?? response?.data ?? {};
+      const metadata = (() => {
+        const base = (remoteTicket.metadata ?? remoteTicket.meta ?? {}) || {};
+        const intake = {
+          ...(typeof base.intake === 'object' && base.intake !== null ? base.intake : {}),
+          channel: base.intake?.channel ?? 'portal',
+          attachments: attachments.length,
+          ...(requester ? { requester } : {})
+        };
+        const merged = {
+          ...base,
+          intake,
+          notificationPreferences: ticketPreferences ?? base.notificationPreferences,
+          knowledgeBase: knowledgeBaseMetadata ?? base.knowledgeBase ?? base.knowledge_base
+        };
+        if (!merged.notificationPreferences) {
+          delete merged.notificationPreferences;
+        }
+        if (!merged.knowledgeBase) {
+          delete merged.knowledgeBase;
+        }
+        return merged;
+      })();
       const created = createCase({
         id: remoteTicket.id ?? remoteTicket.ticketId ?? `support-${Date.now()}`,
         reference: remoteTicket.reference ?? remoteTicket.ref ?? null,
@@ -406,6 +441,7 @@ export default function LearnerSupport() {
         status: remoteTicket.status ?? 'open',
         knowledgeSuggestions:
           remoteTicket.knowledgeSuggestions ?? remoteTicket.knowledge_suggestions ?? knowledgeSuggestions,
+        metadata,
         followUpDueAt: remoteTicket.followUpDueAt ?? remoteTicket.follow_up_due_at ?? null,
         aiSummary: remoteTicket.aiSummary ?? remoteTicket.ai_summary ?? null,
         escalationBreadcrumbs:

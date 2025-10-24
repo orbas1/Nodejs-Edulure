@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpTrayIcon, SparklesIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
-import { searchSupportKnowledgeBase } from '../../api/learnerDashboardApi.js';
+import useSupportKnowledgeSuggestions from '../../hooks/useSupportKnowledgeSuggestions.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 function createAttachmentMeta(file, index) {
@@ -42,27 +42,11 @@ function normaliseCategoryOptions(categoryOptions) {
   return categoryOptions;
 }
 
-function mapKnowledgeSuggestions(articles = []) {
-  if (!Array.isArray(articles)) {
-    return [];
-  }
-  return articles
-    .map((article, index) => {
-      if (!article) {
-        return null;
-      }
-      const id = article.id ?? article.slug ?? `kb-${index}`;
-      return {
-        id,
-        title: article.title ?? 'Support guide',
-        excerpt: article.excerpt ?? article.summary ?? article.description ?? '',
-        url: article.url ?? '#',
-        category: article.category ?? 'General',
-        minutes: Number.isFinite(Number(article.minutes)) ? Number(article.minutes) : 3
-      };
-    })
-    .filter(Boolean);
-}
+const REVIEW_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric'
+});
 
 const SUPPORT_PREFERENCE_STORAGE_PREFIX = 'edulure:support-preferences:';
 const VALIDATION_ERROR_MESSAGE = 'Add a subject and description to submit your request.';
@@ -199,8 +183,6 @@ export default function TicketForm({
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [suggestions, setSuggestions] = useState([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState(() =>
     createDefaultNotificationPreferences()
   );
@@ -214,13 +196,72 @@ export default function TicketForm({
     attachments: []
   });
 
+  const {
+    suggestions,
+    loading: loadingSuggestions,
+    error: suggestionError,
+    metadata: suggestionMetadata,
+    refresh: refreshSuggestions
+  } = useSupportKnowledgeSuggestions({
+    token,
+    subject: form.subject,
+    description: form.description,
+    category: form.category,
+    limit: 5,
+    enabled: open
+  });
+
+  const suggestionLastUpdatedLabel = useMemo(() => {
+    if (!suggestionMetadata?.lastUpdatedAt) {
+      return null;
+    }
+    const parsed = new Date(suggestionMetadata.lastUpdatedAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+    return REVIEW_DATE_FORMATTER.format(parsed);
+  }, [suggestionMetadata?.lastUpdatedAt]);
+
+  const knowledgeBaseMetadata = useMemo(() => {
+    if (!suggestionMetadata) {
+      const fallbackQuery = `${form.subject} ${form.description}`.trim();
+      return fallbackQuery
+        ? {
+            query: fallbackQuery,
+            category: form.category,
+            limit: 5,
+            generatedAt: new Date().toISOString(),
+            lastUpdatedAt: null,
+            staleCount: 0,
+            source: 'support.portal.prefill',
+            fromCache: false,
+            offline: false
+          }
+        : null;
+    }
+    return {
+      query: suggestionMetadata.query ?? `${form.subject} ${form.description}`.trim(),
+      category: suggestionMetadata.category ?? form.category,
+      limit: suggestionMetadata.limit ?? 5,
+      generatedAt: suggestionMetadata.generatedAt ?? new Date().toISOString(),
+      lastUpdatedAt: suggestionMetadata.lastUpdatedAt ?? null,
+      staleCount: suggestionMetadata.staleCount ?? 0,
+      source: `support.portal.${suggestionMetadata.source ?? 'network'}`,
+      fromCache: Boolean(suggestionMetadata.fromCache),
+      offline: Boolean(suggestionMetadata.offline)
+    };
+  }, [form.category, form.description, form.subject, suggestionMetadata]);
+
+  const staleSuggestionCount = suggestionMetadata?.staleCount ?? 0;
+  const suggestionsFromCache = Boolean(suggestionMetadata?.fromCache);
+  const suggestionsOffline = Boolean(suggestionMetadata?.offline);
+
   useEffect(() => {
     if (!open) {
       return;
     }
     setStep(0);
     setError(null);
-    setSuggestions([]);
     setForm({
       subject: '',
       category: defaultCategoryValue,
@@ -233,44 +274,6 @@ export default function TicketForm({
     setPreferencesDirty(false);
     setPreferenceBanner(null);
   }, [open, defaultCategoryValue, defaultPriorityValue, preferenceStorageKey]);
-
-  useEffect(() => {
-    if (!open || !token) {
-      return undefined;
-    }
-    const query = `${form.subject} ${form.description}`.trim();
-    if (!query) {
-      setSuggestions([]);
-      return undefined;
-    }
-    const controller = new AbortController();
-    setLoadingSuggestions(true);
-    searchSupportKnowledgeBase({
-      token,
-      query,
-      category: form.category,
-      limit: 5,
-      signal: controller.signal
-    })
-      .then((response) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        const articles = response?.data?.articles ?? response?.articles ?? [];
-        setSuggestions(mapKnowledgeSuggestions(articles));
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setSuggestions([]);
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoadingSuggestions(false);
-        }
-      });
-    return () => controller.abort();
-  }, [open, token, form.subject, form.description, form.category]);
 
   useEffect(() => {
     if (open && subjectInputRef.current) {
@@ -434,6 +437,24 @@ export default function TicketForm({
       size: attachment.size,
       type: attachment.type
     }));
+    const requesterPayload = (() => {
+      const user = auth?.session?.user ?? {};
+      const payload = {
+        id: user.id ?? null,
+        name: user.name ?? user.fullName ?? user.displayName ?? null,
+        email: user.email ?? null,
+        role: user.role ?? null,
+        locale: typeof navigator !== 'undefined' ? navigator.language : null,
+        timezone:
+          typeof Intl !== 'undefined' && Intl.DateTimeFormat
+            ? Intl.DateTimeFormat().resolvedOptions().timeZone
+            : null
+      };
+      return Object.fromEntries(
+        Object.entries(payload).filter(([, value]) => value !== null && value !== undefined && value !== '')
+      );
+    })();
+    const hasRequesterDetails = Object.keys(requesterPayload).length > 0;
     try {
       await onSubmit?.({
         subject: form.subject.trim(),
@@ -442,7 +463,9 @@ export default function TicketForm({
         description: form.description.trim(),
         attachments: attachmentsPayload,
         knowledgeSuggestions: suggestions,
-        notificationPreferences
+        notificationPreferences,
+        knowledgeBaseMetadata,
+        requester: hasRequesterDetails ? requesterPayload : undefined
       });
       onClose?.();
     } catch (submitError) {
@@ -696,21 +719,72 @@ export default function TicketForm({
               <p className="mt-2 text-xs text-primary/80">
                 We surface knowledge base guidance while you draft so you and the support desk share the same playbooks.
               </p>
+              <div className="mt-3 space-y-2 text-xs">
+                {suggestionError ? (
+                  <p className="text-rose-500">
+                    We could not refresh the knowledge base. Keep drafting—we will retry automatically.
+                  </p>
+                ) : null}
+                {suggestionsFromCache || suggestionLastUpdatedLabel ? (
+                  <p className="flex flex-wrap items-center gap-2 text-slate-500">
+                    {suggestionsFromCache ? (
+                      <>
+                        Using cached guidance
+                        {suggestionsOffline ? ' while offline.' : '.'}
+                      </>
+                    ) : suggestionLastUpdatedLabel ? (
+                      <>Synced {suggestionLastUpdatedLabel}.</>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="font-semibold text-primary transition hover:text-primary/80 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={refreshSuggestions}
+                      disabled={loadingSuggestions}
+                    >
+                      Refresh
+                    </button>
+                  </p>
+                ) : null}
+                {staleSuggestionCount > 0 ? (
+                  <p className="text-amber-600">
+                    {staleSuggestionCount === 1
+                      ? 'One article needs a content review. We will flag it for the support desk.'
+                      : `${staleSuggestionCount} articles need reviews. We will flag them for the support desk.`}
+                  </p>
+                ) : null}
+              </div>
               <div className="mt-4 space-y-3">
                 {loadingSuggestions ? (
                   <p className="text-xs text-slate-500">Searching the knowledge base…</p>
                 ) : suggestions.length ? (
-                  suggestions.map((suggestion) => (
-                    <div key={suggestion.id} className="rounded-xl bg-white p-4 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-slate-800">{suggestion.title}</p>
-                        <span className="text-xs font-medium text-slate-400">{suggestion.minutes} min</span>
+                  suggestions.map((suggestion) => {
+                    const reviewedAtLabel = suggestion.updatedAt
+                      ? REVIEW_DATE_FORMATTER.format(new Date(suggestion.updatedAt))
+                      : null;
+                    const reviewNote = suggestion.stale
+                      ? `Review overdue — last updated ${reviewedAtLabel ?? 'earlier'}`
+                      : reviewedAtLabel
+                        ? `Last updated ${reviewedAtLabel}`
+                        : null;
+                    return (
+                      <div key={suggestion.id} className="rounded-xl bg-white p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">{suggestion.title}</p>
+                            {suggestion.excerpt ? (
+                              <p className="mt-1 text-xs text-slate-500">{suggestion.excerpt}</p>
+                            ) : null}
+                          </div>
+                          <span className="text-xs font-medium text-slate-400">{suggestion.minutes} min</span>
+                        </div>
+                        {reviewNote ? (
+                          <p className={`mt-2 text-xs ${suggestion.stale ? 'text-amber-600' : 'text-slate-400'}`}>
+                            {reviewNote}
+                          </p>
+                        ) : null}
                       </div>
-                      {suggestion.excerpt ? (
-                        <p className="mt-1 text-xs text-slate-500">{suggestion.excerpt}</p>
-                      ) : null}
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="text-xs text-slate-400">
                     No instant matches yet. Add more detail and we will fetch tailored runbooks.

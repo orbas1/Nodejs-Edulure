@@ -14,6 +14,7 @@ import GlobalSearchBar from '../search/GlobalSearchBar.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
 import UserMenu from './UserMenu.jsx';
 import { buildFocusOrder } from '../../navigation/routes.js';
+import ThemeSwitcher from './ThemeSwitcher.jsx';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -82,10 +83,12 @@ export default function AppTopBar({
 
   return (
     <header
-      className={classNames(
-        'sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-        className
-      )}
+      className={classNames('sticky top-0 z-40 w-full border-b backdrop-blur', className)}
+      style={{
+        backgroundColor: 'var(--color-surface)',
+        borderColor: 'var(--color-border)',
+        backdropFilter: 'blur(16px)'
+      }}
     >
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
@@ -140,6 +143,7 @@ export default function AppTopBar({
           </div>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
+          <ThemeSwitcher className="hidden md:inline-block" />
           {resolvedCallToAction ? (
             <button
               type="button"
@@ -210,6 +214,7 @@ export default function AppTopBar({
               </span>
             ) : null}
           </button>
+          <ThemeSwitcher className="md:hidden" />
           <LanguageSelector size="compact" variant="light" align="end" showLabel={false} />
           {session?.user ? (
             <UserMenu session={session} onNavigate={handleNavigate} onLogout={onLogout} />
@@ -231,7 +236,7 @@ export default function AppTopBar({
           )}
         </div>
       </div>
-      <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-xs text-slate-500 sm:px-6 lg:hidden" aria-live="polite">
+      <div className="border-t border-surface bg-surface-subtle px-4 py-2 text-xs text-muted sm:px-6 lg:hidden" aria-live="polite">
         {primaryNavigation.map((item) => (
           <p key={item.id} id={`${item.id}-description`} className="sr-only">
             {item.description}
@@ -239,7 +244,7 @@ export default function AppTopBar({
         ))}
       </div>
       {showSearch ? (
-        <div className="border-t border-slate-100 px-4 py-3 lg:hidden">
+        <div className="border-t border-surface px-4 py-3 lg:hidden">
           <GlobalSearchBar
             value={searchValue}
             onChange={onSearchChange}

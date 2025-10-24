@@ -54,8 +54,40 @@
       - 2.F Analytics, Admin & Operations Dashboards (`src/pages/Analytics.jsx`, `src/pages/admin/index.jsx`, `src/pages/admin/sections/*`, `src/components/admin/`, `src/hooks/useAdminAnalytics.js`)
       - 2.G Commerce, Billing & Profile Management (`src/pages/Profile.jsx`, `src/pages/TutorProfile.jsx`, `src/components/billing/`, `src/hooks/useBillingPortal.js`)
       - 2.H Integrations, Enablement & Invitations (`src/pages/IntegrationCredentialInvite.jsx`, `src/components/integrations/`, `src/hooks/useIntegrationInvite.js`)
-      - 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
-      - 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
+      - ✓ 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
+        1. **Appraisal.** The learner support workspace now threads backend freshness metadata through `SupportKnowledgeBaseService.js`, `SupportTicketModel.js`, and `LearnerDashboardService.js`, while React surfaces (`LearnerSupport.jsx`, `TicketForm.jsx`, `useLearnerSupportCases.js`, `useSupportKnowledgeSuggestions.js`) expose SLA cues, cached knowledge cards, and offline-aware submission flows in one pane.
+        2. **Functionality.** `buildSuggestionsForTicket` queries `support_articles`, attaches review intervals, and `LearnerDashboardService.listSupportTickets`/`addSupportTicketMessage` persist both the suggestions and `buildKnowledgeSummary` metadata so tickets carry `metadata.knowledgeBase` summaries alongside escalation breadcrumbs and follow-up timers.
+        3. **Logic Usefulness.** `mapCase` now normalises ticket metadata and returns `knowledgeBaseSummary`, letting dashboards and mobile channels present deflection context without recomputing counts, and the hook cache uses localStorage to surface guides when the API is offline.
+        4. **Redundancies.** Knowledge-base serialisation funnels through `SupportTicketModel.normaliseKnowledgeSuggestions` and `buildKnowledgeSummary`, eliminating the ad-hoc metadata glue that previously lived in dashboard services and React reducers.
+        5. **Placeholders or Stubs.** Live chat toggles in `PlatformSettingsService` remain disabled and voice escalation links in `LearnerSupport.jsx` still point at placeholder anchors until telephony integrations and SLA webhooks land.
+        6. **Duplicate Functions.** Notification preference, requester, and breadcrumb helpers consolidate inside `SupportTicketModel`, so mobile, dashboard, and portal controllers rely on the same normalisers when creating or updating tickets.
+        7. **Improvements Needed.** Follow-on work should push SLA countdown updates over websockets, persist learner acknowledgement of suggestions for deflection analytics, and expose case history exports through the repository for compliance.
+        8. **Styling Improvements.** Support list chips and knowledge cards reuse dashboard pill tokens (`dashboard-pill`, `rounded-3xl`) and theme variables, matching `styles.css` typography and ensuring accessible contrast in both light/dark themes.
+        9. **Efficiency Analysis.** Suggestion hooks debounce API calls, `createPersistentCache` caches knowledge hits for 12 hours (dropping to 15 minutes when stale articles appear), and repository updates merge metadata atomically to prevent redundant writes.
+        10. **Strengths to Keep.** Offline ticket drafts via `usePersistentCollection`, SLA enrichment, and intake metadata capture (attachments, requester context) remain core so support teams inherit full context without manual follow-up.
+        11. **Weaknesses to Remove.** Message-level retry indicators are still absent for queued replies and ticket stats lack websocket hydration; schedule those enhancements once realtime infrastructure covers learner support.
+        12. **Styling & Colour Review.** Knowledge freshness banners, SLA badges, and escalation alerts stick to semantic slate/emerald/rose palettes referenced in `user_experience.md`, preventing rogue hues when theming toggles.
+        13. **CSS, Orientation & Placement.** The workspace keeps dual-column detail/layout grids, while support launcher drawers respect safe-area insets so mobile triggers avoid masking primary CTAs.
+        14. **Text Analysis.** Microcopy across `TicketForm.jsx` (“Add a subject…”, “We saved the ticket locally…”) stays under 140 characters and emphasises next steps; knowledge card excerpts trim to actionable summaries.
+        15. **Change Checklist Tracker.** Before shipping: sync `support_articles` seeds, run `vitest` suites (`SupportTicketModel` once tooling installs), validate `/learner/support/tickets` metadata responses, and exercise offline cache + SLA badge states in manual QA.
+        16. **Full Upgrade Plan & Release Steps.** Stage by backfilling article review intervals, rehearse learner ticket submission (create/reply/close), verify metadata persistence via database snapshots, update Annex A24 docs, and roll out alongside support ops enablement comms.
+      - ✓ 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
+        1. **Appraisal.** `ThemeProvider.jsx`, `ThemeSwitcher.jsx`, and shared layouts (`MainLayout.jsx`, `DashboardLayout.jsx`, `AppTopBar.jsx`) coordinate routing shells, breakpoints, theming preferences, and navigation contexts so learner, admin, and marketing surfaces share a consistent frame.
+        2. **Functionality.** The theme provider persists user preferences, reacts to system colour/contrast media queries, and publishes breakpoint tokens; layouts consume those contexts to render responsive nav, drawers, and top bars while `styles.css` exposes CSS variables for tokens.
+        3. **Logic Usefulness.** `useTheme` gives components instant access to resolved theme/contrast and `refreshBreakpoints`, enabling dashboards to adapt grid density and marketing surfaces to respect high-contrast overrides without duplicate logic.
+        4. **Redundancies.** Breakpoint definitions now live in one place (CSS custom properties surfaced through `ThemeProvider`), and theme toggles run through a single context instead of scattered `useState` hooks inside navigation components.
+        5. **Placeholders or Stubs.** Internationalisation toggles in `AppTopBar.jsx` still wrap stub locale providers; translation bundle loading remains future work guarded by feature flags.
+        6. **Duplicate Functions.** Dark-mode switches across `AppTopBar` and mobile menus delegate to `ThemeSwitcher`, eliminating bespoke button states and ensuring keyboard/focus handling is uniform.
+        7. **Improvements Needed.** Extend provider telemetry so layout mounts emit analytics on theme changes, wire Storybook tokens for design QA, and surface tenant-level theme presets once backend exposes them.
+        8. **Styling Improvements.** `styles.css` defines semantic colour, spacing, and elevation tokens applied across shared components (`dashboard-pill`, `dashboard-primary-pill`, `surface-card`), tightening alignment with design-system guidance.
+        9. **Efficiency Analysis.** Providers memoise context payloads, attach media-query listeners once, and update CSS dataset attributes without forcing reflows, keeping layout transitions lightweight.
+        10. **Strengths to Keep.** Declarative layout composition, accessible navigation (skip links, aria labelling), and consistent header/footer scaffolding stay intact while theming hooks simply enrich the shared shell.
+        11. **Weaknesses to Remove.** Some legacy CSS overrides still leak into module-specific styles; schedule refactors to migrate them onto the shared token classes now that the provider exposes canonical values.
+        12. **Styling & Colour Review.** Theme tokens honour WCAG contrast, updating `color-scheme` on the root element and toggling high-contrast data attributes so downstream components inherit compliant palettes.
+        13. **CSS, Orientation & Placement.** Layouts respect safe-area padding, maintain 8/16/24px spacing rhythm across breakpoints, and collapse sidebars into drawers via the provider’s breakpoint map for tablets/mobiles.
+        14. **Text Analysis.** Shared copy in nav footers and profile menus was trimmed to essential guidance (“Switch workspace”, “Toggle theme”) and localised-ready string keys.
+        15. **Change Checklist Tracker.** Release runs should include `npm --prefix frontend-reactjs run lint`, visual regression or Percy snapshots for light/dark modes, and manual accessibility sweeps on focus order and contrast.
+        16. **Full Upgrade Plan & Release Steps.** Enable theming in staging, validate persisted preferences across reloads, update Annex A25 documentation, capture screenshots for design sign-off, and roll out with changelog + support messaging for theme availability.
       - 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
       - 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
       - 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
@@ -147,8 +179,10 @@
       - A21. Analytics, Admin & Operations Dashboards (2.F)
       - A22. Commerce, Billing & Profile Management (2.G) ✓
       - A23. Integrations, Enablement & Invitations (2.H) ✓
-      - A24. Support, Knowledge & Feedback (2.I)
-      - A25. Shared Layout, Theming & Component Infrastructure (2.J)
+      - ✓ A24. Support, Knowledge & Feedback (2.I)
+        *`SupportKnowledgeBaseService` freshness descriptors, `SupportTicketModel.buildKnowledgeSummary`, and `LearnerDashboardService` auto-persisted metadata now keep ticket records, SLA cues, and cached knowledge suggestions aligned across portal, dashboard, and offline states.*
+      - ✓ A25. Shared Layout, Theming & Component Infrastructure (2.J)
+        *`ThemeProvider.jsx`, `ThemeSwitcher.jsx`, and tokenised layouts (`MainLayout.jsx`, `DashboardLayout.jsx`, `styles.css`) expose shared theme, contrast, and breakpoint contexts so every React surface honours the same design-system scaffolding.*
       - A26. Flutter Authentication & Identity (3.A)
       - A27. Flutter Community Feed & Engagement (3.B)
       - A28. Flutter Lessons, Assessments & Offline Learning (3.C)
