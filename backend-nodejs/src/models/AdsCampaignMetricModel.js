@@ -89,15 +89,13 @@ export default class AdsCampaignMetricModel {
     }
 
     const query = connection(TABLE)
-      .select({
-        campaignId: 'campaign_id',
-        impressions: connection.raw('SUM(impressions)::bigint'),
-        clicks: connection.raw('SUM(clicks)::bigint'),
-        conversions: connection.raw('SUM(conversions)::bigint'),
-        spendCents: connection.raw('SUM(spend_cents)::bigint'),
-        revenueCents: connection.raw('SUM(revenue_cents)::bigint'),
-        lastMetricDate: connection.raw('MAX(metric_date)')
-      })
+      .select({ campaignId: 'campaign_id' })
+      .sum({ impressions: 'impressions' })
+      .sum({ clicks: 'clicks' })
+      .sum({ conversions: 'conversions' })
+      .sum({ spendCents: 'spend_cents' })
+      .sum({ revenueCents: 'revenue_cents' })
+      .max({ lastMetricDate: 'metric_date' })
       .whereIn('campaign_id', campaignIds)
       .groupBy('campaign_id');
 
@@ -129,13 +127,11 @@ export default class AdsCampaignMetricModel {
     since.setUTCHours(0, 0, 0, 0);
 
     const rows = await connection(TABLE)
-      .select({
-        impressions: connection.raw('SUM(impressions)::bigint'),
-        clicks: connection.raw('SUM(clicks)::bigint'),
-        conversions: connection.raw('SUM(conversions)::bigint'),
-        spendCents: connection.raw('SUM(spend_cents)::bigint'),
-        revenueCents: connection.raw('SUM(revenue_cents)::bigint')
-      })
+      .sum({ impressions: 'impressions' })
+      .sum({ clicks: 'clicks' })
+      .sum({ conversions: 'conversions' })
+      .sum({ spendCents: 'spend_cents' })
+      .sum({ revenueCents: 'revenue_cents' })
       .where({ campaign_id: campaignId })
       .andWhere('metric_date', '>=', since)
       .first();
@@ -159,14 +155,12 @@ export default class AdsCampaignMetricModel {
     since.setUTCHours(0, 0, 0, 0);
 
     const rows = await connection(TABLE)
-      .select({
-        campaignId: 'campaign_id',
-        impressions: connection.raw('SUM(impressions)::bigint'),
-        clicks: connection.raw('SUM(clicks)::bigint'),
-        conversions: connection.raw('SUM(conversions)::bigint'),
-        spendCents: connection.raw('SUM(spend_cents)::bigint'),
-        revenueCents: connection.raw('SUM(revenue_cents)::bigint')
-      })
+      .select({ campaignId: 'campaign_id' })
+      .sum({ impressions: 'impressions' })
+      .sum({ clicks: 'clicks' })
+      .sum({ conversions: 'conversions' })
+      .sum({ spendCents: 'spend_cents' })
+      .sum({ revenueCents: 'revenue_cents' })
       .whereIn('campaign_id', campaignIds)
       .andWhere('metric_date', '>=', since)
       .groupBy('campaign_id');
