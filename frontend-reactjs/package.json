@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@edulure/api-sdk": "file:../sdk-typescript",
-    "@headlessui/react": "^1.7.17",
+    "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.1.3",
     "axios": "^1.7.7",
     "clsx": "^2.1.0",
