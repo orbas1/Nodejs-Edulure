@@ -459,7 +459,9 @@ describe('AdminRevenueManagementController', () => {
       expect.objectContaining({
         reference: 'REV-1001',
         amountCents: 12345,
-        metadata: expect.objectContaining({ reason: 'Partner true-up', lastUpdatedBy: 42 })
+        metadata: expect.objectContaining({ reason: 'Partner true-up', lastUpdatedBy: 42 }),
+        createdBy: 42,
+        updatedBy: 42
       })
     );
     expectSuccessfulResponse(res, 201);
@@ -478,10 +480,25 @@ describe('AdminRevenueManagementController', () => {
       9,
       expect.objectContaining({
         status: 'settled',
-        metadata: expect.objectContaining({ audit: 'reviewed', lastUpdatedBy: 42 })
+        metadata: expect.objectContaining({ audit: 'reviewed', lastUpdatedBy: 42 }),
+        updatedBy: 42
       })
     );
     expectSuccessfulResponse(res);
+  });
+
+  it('returns a 404 when an adjustment cannot be found for update', async () => {
+    RevenueAdjustmentModel.updateById.mockResolvedValue(null);
+    const res = createMockRes();
+
+    await AdminRevenueManagementController.updateAdjustment(
+      createMockReq({ params: { adjustmentId: '404' }, body: { status: 'approved' } }),
+      res,
+      next
+    );
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 404 }));
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it('deletes an adjustment by id', async () => {

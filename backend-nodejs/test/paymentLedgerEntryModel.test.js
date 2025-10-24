@@ -23,7 +23,7 @@ function createConnectionMock() {
         id: 99,
         paymentIntentId: storedPayload.payment_intent_id,
         entryType: storedPayload.entry_type,
-        amount: storedPayload.amount,
+        amountCents: storedPayload.amount_cents,
         currency: storedPayload.currency,
         details: storedPayload.details,
         recordedAt: storedPayload.recorded_at ?? '2024-01-01T00:00:00.000Z'
@@ -49,7 +49,7 @@ describe('PaymentLedgerEntryModel.record', () => {
       {
         paymentIntentId: 'pi_123',
         entryType: 'Charge / Manual',
-        amount: '1250.7',
+        amountCents: '1250.7',
         currency: 'gb p',
         details: {
           reference: 'INV-123',
@@ -64,13 +64,13 @@ describe('PaymentLedgerEntryModel.record', () => {
     expect(connection.__getStoredPayload()).toMatchObject({
       payment_intent_id: 'pi_123',
       entry_type: 'charge---manual',
-      amount: 1251,
+      amount_cents: 1251,
       currency: 'GBP'
     });
     expect(result).toMatchObject({
       paymentIntentId: 'pi_123',
       entryType: 'charge---manual',
-      amount: 1251,
+      amountCents: 1251,
       currency: 'GBP'
     });
     expect(result.details).toMatchObject({

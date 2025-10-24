@@ -4867,7 +4867,7 @@ export async function seed(knex) {
     await trx('payment_ledger_entries').insert({
       payment_intent_id: subscriptionPaymentId,
       entry_type: 'charge',
-      amount: 167112,
+      amount_cents: 167112,
       currency: 'USD',
       details: JSON.stringify({
         provider: 'stripe',

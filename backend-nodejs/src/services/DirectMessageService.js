@@ -37,7 +37,13 @@ export default class DirectMessageService {
       : THREAD_DEFAULT_LIMIT;
     const requestedOffset = Number(query.offset ?? 0);
     const offset = Number.isFinite(requestedOffset) ? Math.max(Math.floor(requestedOffset), 0) : 0;
-    const threads = await DirectMessageThreadModel.listForUser(userId, { ...query, limit, offset });
+    const includeArchived = Boolean(query.includeArchived);
+    const threads = await DirectMessageThreadModel.listForUser(userId, {
+      ...query,
+      includeArchived,
+      limit,
+      offset
+    });
     if (!threads.length) {
       return { threads: [], limit, offset };
     }
@@ -59,6 +65,19 @@ export default class DirectMessageService {
       return acc;
     }, new Map());
 
+    const viewerParticipants = participantsByThread.map((participants) =>
+      participants.find((participant) => participant.userId === userId) ?? null
+    );
+
+    const unreadCounts = await Promise.all(
+      viewerParticipants.map((participant, index) => {
+        if (!participant) {
+          return Promise.resolve(0);
+        }
+        return DirectMessageModel.countSince(threadIds[index], participant.lastReadAt);
+      })
+    );
+
     const results = [];
     for (let index = 0; index < threads.length; index += 1) {
       const thread = threads[index];
@@ -66,13 +85,17 @@ export default class DirectMessageService {
         ...participant,
         user: userMap.get(participant.userId) ?? null
       }));
-      const viewerParticipant = participants.find((participant) => participant.userId === userId);
+      const viewerParticipant = viewerParticipants[index];
       if (!viewerParticipant) {
         continue;
       }
-      const unreadCount = await DirectMessageModel.countSince(thread.id, viewerParticipant.lastReadAt);
+      const unreadCount = unreadCounts[index] ?? 0;
       results.push({
-        thread,
+        thread: {
+          ...thread,
+          viewerArchivedAt: viewerParticipant.archivedAt ?? null,
+          isArchived: Boolean(thread.archivedAt) || Boolean(viewerParticipant.archivedAt)
+        },
         participants,
         latestMessage: latestMap.get(thread.id) ?? null,
         unreadCount
@@ -241,6 +264,19 @@ export default class DirectMessageService {
         trx
       );
 
+      await DirectMessageParticipantModel.setArchivedState(
+        threadId,
+        userId,
+        { archivedAt: null },
+        trx
+      );
+
+      await DirectMessageThreadModel.setArchiveState(
+        threadId,
+        { archivedAt: null, archivedBy: null },
+        trx
+      );
+
       await DomainEventModel.record(
         {
           entityType: 'direct_message',
@@ -260,6 +296,71 @@ export default class DirectMessageService {
     realtimeService.broadcastMessage(threadId, message, participants);
 
     return message;
+  }
+
+  static async archiveThread(threadId, userId, { reason } = {}) {
+    await ensureParticipant(threadId, userId);
+    const archivedAt = new Date();
+    let archivedThread;
+
+    await db.transaction(async (trx) => {
+      await DirectMessageParticipantModel.setArchivedState(
+        threadId,
+        userId,
+        { archivedAt },
+        trx
+      );
+
+      const participants = await DirectMessageParticipantModel.listForThread(threadId, trx);
+      if (participants.every((participant) => participant.archivedAt)) {
+        archivedThread = await DirectMessageThreadModel.setArchiveState(
+          threadId,
+          {
+            archivedAt,
+            archivedBy: userId,
+            archiveMetadata: { reason: reason ?? null }
+          },
+          trx
+        );
+      } else {
+        archivedThread = await DirectMessageThreadModel.findById(threadId, trx);
+      }
+    });
+
+    const participants = await DirectMessageParticipantModel.listForThread(threadId);
+    realtimeService.broadcastThreadUpsert(archivedThread, participants, { archived: true });
+
+    return { thread: archivedThread, archivedAt };
+  }
+
+  static async restoreThread(threadId, userId) {
+    await ensureParticipant(threadId, userId);
+    let restoredThread;
+
+    await db.transaction(async (trx) => {
+      await DirectMessageParticipantModel.setArchivedState(
+        threadId,
+        userId,
+        { archivedAt: null },
+        trx
+      );
+
+      const participants = await DirectMessageParticipantModel.listForThread(threadId, trx);
+      if (participants.some((participant) => participant.archivedAt)) {
+        restoredThread = await DirectMessageThreadModel.findById(threadId, trx);
+      } else {
+        restoredThread = await DirectMessageThreadModel.setArchiveState(
+          threadId,
+          { archivedAt: null, archivedBy: null, archiveMetadata: {} },
+          trx
+        );
+      }
+    });
+
+    const participants = await DirectMessageParticipantModel.listForThread(threadId);
+    realtimeService.broadcastThreadUpsert(restoredThread, participants, { archived: false });
+
+    return { thread: restoredThread };
   }
 
   static async markRead(threadId, userId, payload = {}) {

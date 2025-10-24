@@ -544,6 +544,7 @@ describe('ReportingPaymentsRevenueDailyView', () => {
 describe('RevenueAdjustmentModel', () => {
   it('creates adjustments with sanitised payloads', async () => {
     const inserts = [];
+    const auditInserts = [];
     const createdRow = {
       id: 77,
       publicId: 'adj-1',
@@ -572,6 +573,13 @@ describe('RevenueAdjustmentModel', () => {
       {
         table: 'revenue_adjustments',
         first: createdRow
+      },
+      {
+        table: 'revenue_adjustment_audit_logs',
+        onInsert: (payload) => {
+          auditInserts.push(payload);
+          return [1];
+        }
       }
     ]);
 
@@ -594,9 +602,18 @@ describe('RevenueAdjustmentModel', () => {
     expect(inserts).toHaveLength(1);
     expect(inserts[0]).toMatchObject({
       public_id: 'adj-1',
-      amount_cents: 1500.6,
+      amount_cents: 1501,
       metadata: JSON.stringify({ comment: 'ok' })
     });
+    expect(auditInserts).toHaveLength(1);
+    expect(auditInserts[0]).toMatchObject({
+      adjustment_id: 77,
+      action: 'created',
+      performed_by: 'ops-user'
+    });
+    expect(JSON.parse(auditInserts[0].changed_fields)).toEqual(
+      expect.arrayContaining(['status', 'amountCents', 'currency', 'effectiveAt', 'notes', 'metadata'])
+    );
     expect(adjustment).toEqual({
       id: 77,
       publicId: 'adj-1',

@@ -93,7 +93,7 @@ function toConversationThread(thread, participants, messages, currentUserId) {
     topic: metadata.topic ?? null,
     pinned: metadata.pinned === true,
     muted: Boolean(userParticipant?.record.isMuted),
-    archived: metadata.archived === true,
+    archived: Boolean(thread.viewerArchivedAt ?? thread.archivedAt ?? metadata.archived),
     emojiTag: metadata.emojiTag ?? metadata.emoji ?? null
   };
 }

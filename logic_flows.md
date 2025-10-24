@@ -715,40 +715,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Migrate, reseed sample courses, rehearse editing flows to inspect snapshots, update SDK/docs, and roll out alongside UI surfaces that consume new history APIs.
 
 ### 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
-1. **Appraisal:** Comprehensive schema covering communities, programming, posts, reactions, moderation, social graph, and direct messaging.
-2. **Functionality:** Supports feed ranking, event scheduling, chat threading, moderation workflows, and donor tracking for community monetisation.
-3. **Logic Usefulness:** Enables auditing, analytics, and personalisation features across social experiences.
-4. **Redundancies:** Reaction counts stored in multiple tables; ensure single source to prevent drift.
-5. **Placeholders Or non-working functions or stubs:** Geo fields exist but rely on TODO integrations; document fallback behaviour.
-6. **Duplicate Functions:** Soft delete flags differ between modules; standardise semantics.
-7. **Improvements need to make:** Adopt partitioning for high-volume posts, add indexes for trending queries, and integrate event recurrence tables.
-8. **Styling improvements:** Document schema diagrams for community dashboards with accessible colours.
-9. **Efficiency analysis and improvement:** Use partial indexes for moderation queries, add caching for membership lookups, and compress message payload columns.
-10. **Strengths to Keep:** Rich relational design, audit fields, and support for monetisation flows.
-11. **Weaknesses to remove:** Manual cleanup of orphaned attachments; add cascading rules or scheduled jobs.
-12. **Styling and Colour review changes:** Align schema visualisations with design tokens to differentiate entity categories.
-13. **CSS, orientation, placement and arrangement changes:** Provide UI layout hints for representing relationships (threads, events, leaderboards).
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify column descriptions, particularly for moderation statuses, and remove redundant language.
-15. **Change Checklist Tracker:** Update community schema change checklist, websocket contract review, and moderation QA before deployment.
-16. **Full Upgrade Plan & Release Steps:** Stage migrations, run load tests, update caching layers, coordinate with moderation team, and release with monitoring.
+1. **Appraisal:** Migrations `20250425120000_community_reaction_constraints.js` and `20250425123000_direct_message_archival.js` harden reactions and direct-messaging tables with dedupe passes, archive columns, and composite indexes, while `DirectMessageThreadModel`/`DirectMessageParticipantModel` surface archive metadata alongside the existing thread schema.
+2. **Functionality:** `DirectMessageService.listThreads`, `.archiveThread`, and `.restoreThread` now coordinate per-user and thread-level archive transitions, broadcast updates through `RealtimeService.broadcastThreadUpsert`, and reuse participant helpers so controllers/routing simply validate payloads before delegating.
+3. **Logic Usefulness:** Viewer-specific archive timestamps (`viewerArchivedAt`) are hydrated for API consumers and `MobileCommunicationService.getInbox`, ensuring inbox clients can hide or group archived conversations without recalculating state, while deduped reactions guarantee badge counts stay trustworthy.
+4. **Redundancies:** The pre-migration reaction cleanup removes historical duplicates so `ReactionModel` no longer competes with view-layer dedupe, and archive writes centralise in `setArchiveState`/`setArchivedState`, replacing bespoke `UPDATE` statements across services.
+5. **Placeholders Or non-working functions or stubs:** Archive reason codes still accept free-form metadata—`DirectMessageThreadModel.setArchiveState` and `DirectMessageService.archiveThread` note the TODO to lock this to enumerated reason codes once product finalises taxonomy.
+6. **Duplicate Functions:** Per-user archive resets now flow through `DirectMessageParticipantModel.setArchivedState`, keeping controller, service, and mobile flows aligned instead of repeating null-reset logic when sending messages or restoring threads.
+7. **Improvements need to make:** Add websocket regression tests covering `inbox.thread.upserted` payloads, wire archive reason enums to the mobile contract, and propagate archive metadata to analytics once the reporting schema lands.
+8. **Styling improvements:** Inbox payloads maintain existing `toConversationThread` shape; the new `archived` flag simply extends metadata so the mobile UI preserves established chips, avatar slots, and reaction placeholders without layout regressions.
+9. **Efficiency analysis and improvement:** Archive indexes (`direct_message_threads_archived_idx`, `direct_message_participants_archive_idx`) keep retrieval bounded, thread pagination clamps respect env limits, reaction dedupe executes inside a single transaction to avoid long-lived locks on active feeds, and unread counters now execute in parallel rather than sequential queries for each thread.
+10. **Strengths to Keep:** Domain-event hooks, thread reuse for 1:1 conversations, and social graph metadata remain untouched, now augmented with archive telemetry and reaction guarantees that fit existing moderation and analytics surfaces.
+11. **Weaknesses to remove:** Archive metadata is still opaque JSON and direct-message analytics lack actor attribution for archive actions; schedule follow-up migrations to normalise reason codes and event sources.
+12. **Styling and Colour review changes:** No UI palette shifts were required—the messaging schema changes strictly enrich payloads so existing Annex colour tokens and badge treatments remain canonical.
+13. **CSS, orientation, placement and arrangement changes:** Conversation ordering continues to leverage `updatedAt`/`lastMessageAt`; only archive-aware consumers optionally tuck threads into an "Archived" rail, leaving established feed, leaderboard, and event layouts intact.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** API copy (“Threads fetched”, “Thread archived”) stays concise while documentation now calls out archive metadata fields and reaction-constraint names to avoid ambiguity for integrators.
+15. **Change Checklist Tracker:** Apply both migrations, re-run Vitest suites (`directMessageService`, `chatHttpRoutes`), verify websocket payloads in staging, and review mobile inbox snapshots before toggling archive affordances.
+16. **Full Upgrade Plan & Release Steps:** Deploy migrations in order, recycle DM worker pods to pick up new schema, brief mobile/web teams on the archive contract, update moderation playbooks with the dedupe step, then monitor domain-event streams for duplicate reaction cleanup during rollout.
 
 ### 5.D Commerce & Finance Schema (`models/InvoiceModel.js`, `models/SubscriptionModel.js`, `models/PaymentAttemptModel.js`, `models/EscrowPayoutModel.js`, `models/CommunityDonationModel.js`, `migrations/*billing*`, `migrations/*finance*`)
-1. **Appraisal:** Ledger tables covering invoices, subscriptions, payment attempts, escrow payouts, donation ledgers, and reconciliation metadata.
-2. **Functionality:** Supports monetisation services, finance dashboards, reconciliation jobs, and audit exports.
-3. **Logic Usefulness:** Provides traceability for revenue analytics, refunds, and payout flows.
-4. **Redundancies:** Status enums repeated across models; centralise to avoid mismatch.
-5. **Placeholders Or non-working functions or stubs:** Usage records table stubbed; annotate with roadmap.
-6. **Duplicate Functions:** Currency handling repeated in model hooks; consolidate.
-7. **Improvements need to make:** Add double-entry ledger tables, integrate with accounting exports, and include audit trails for manual adjustments.
-8. **Styling improvements:** Update ER diagrams with finance palette and include layout hints for invoice tables in UI.
-9. **Efficiency analysis and improvement:** Index invoice status/date fields, partition donation history, and optimise queries used by reconciliation job.
-10. **Strengths to Keep:** Detailed audit fields, reconciliation metadata, and integration with services.
-11. **Weaknesses to remove:** Manual ledger adjustments lacking metadata; add structured logging and approvals.
-12. **Styling and Colour review changes:** Align finance schema documentation colours with accessibility guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Provide UI layout guidance for finance reports and statements.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify column definitions, ensure consistent terminology (invoice vs receipt), and remove redundant notes.
-15. **Change Checklist Tracker:** Update finance migration checklist, reconciliation QA, and export validation before release.
-16. **Full Upgrade Plan & Release Steps:** Stage migrations, sync sandbox billing data, coordinate with finance, and deploy during agreed window.
+1. **Appraisal:** Finance migrations `20250425130000_payment_ledger_amount_precision.js` and `20250425133000_revenue_adjustment_audit_logs.js` align ledger columns to `amount_cents` naming, introduce audit-log storage, and pair with currency helpers in `src/utils/currency.js` plus updated models for intents, ledger entries, and adjustments.
+2. **Functionality:** `PaymentIntentModel`/`PaymentLedgerEntryModel` normalise currency and minor units on create/update, `RevenueAdjustmentModel` records every change through `RevenueAdjustmentAuditModel`, and `AdminRevenueManagementController.summary` now combines adjustments with payment/revenue snapshots for dashboards.
+3. **Logic Usefulness:** Normalised minor-unit storage prevents floating-point drift, audit rows capture before/after snapshots for manual overrides, merged metadata patches keep historical JSON intact while stamping `lastUpdatedBy`, and finance APIs emit consistent currency codes for downstream reconciliation and analytics jobs.
+4. **Redundancies:** Central `snapCurrencyPayload` helpers eliminate ad-hoc rounding scattered through services, ledger rename migration removes the lingering `amount` alias that previously forced dual-field handling in reporting views, and bootstrap seeds now write `amount_cents` so fixtures align with the runtime schema.
+5. **Placeholders Or non-working functions or stubs:** Delete audit events still miss `performedBy` context when invoked outside controller pathways, and currency helper lacks multi-currency fallback tables until finance defines allowed codes.
+6. **Duplicate Functions:** Revenue adjustment diffing consolidates change detection into `diffAdjustments`, replacing repeated object-spread comparisons, and audit writes flow through `RevenueAdjustmentAuditModel.record` instead of bespoke insert calls per controller.
+7. **Improvements need to make:** Extend audit logging to capture actor IDs for delete flows, expand currency helper validation to consult ISO metadata, and add integration coverage ensuring finance webhooks honour the renamed ledger column.
+8. **Styling improvements:** API responses keep existing numeric/ISO fields so finance UI palettes remain untouched; documentation now highlights audit trails for handbook screenshots rather than changing component styling.
+9. **Efficiency analysis and improvement:** Ledger rename runs in-place with dialect-specific SQL to avoid table rebuilds, audit table indexes on `(adjustment_id, performed_at)` keep histories queryable, and controller summaries reuse aggregate SQL to avoid N+1 queries across payments/adjustments.
+10. **Strengths to Keep:** Existing reconciliation workflows, monetisation schedules, and revenue summaries stay intact while gaining consistent currency sanitisation and auditable adjustment trails.
+11. **Weaknesses to remove:** External exports still expect legacy `amount` field—coordinate consumers to adopt `amount_cents`, and ensure audit retention policies are defined before production backfill.
+12. **Styling and Colour review changes:** Finance documentation should call out audit timelines but keep established Annex palette; no CSS tokens changed by the schema work.
+13. **CSS, orientation, placement and arrangement changes:** Finance dashboards continue rendering totals, adjustments, and schedules in existing layouts; only metadata descriptors need to mention audit log availability and new amount naming.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Update docs to reference `amount_cents`, highlight audit log semantics (“action”, “changed_fields”), and remove outdated references to manual spreadsheet logging.
+15. **Change Checklist Tracker:** Run both finance migrations, execute `vitest` suites for ledger and revenue adjustment models, verify admin revenue summary aggregates, and confirm exports consuming ledger data handle the renamed column.
+16. **Full Upgrade Plan & Release Steps:** Apply schema migrations in sequence, backfill or reindex finance read models, sync audit documentation with finance ops, notify analytics of currency helper adoption, then monitor reconciliation jobs for anomalies post-release.
 
 ### 5.E Analytics, Governance & Observability Schema (`models/AnalyticsAlertModel.js`, `models/TelemetryExportModel.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`, `migrations/*analytics*`, `migrations/*governance*`)
 1. **Appraisal:** The schema family spans `analytics_alerts`, `analytics_forecasts`, `telemetry_*` tables, `configuration_entries`, compliance audit storage, and `platform_settings`, with each model layering environment descriptors via `buildEnvironmentColumns` so alerts, forecasts, telemetry, runtime config, and governance payloads stay environment aware and aligned across services.
