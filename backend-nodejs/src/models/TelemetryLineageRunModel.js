@@ -1,22 +1,8 @@
 import db from '../config/database.js';
 import { TABLES } from '../database/domains/telemetry.js';
 import jsonMergePatch from '../database/utils/jsonMergePatch.js';
-
-function parseJson(value, fallback = {}) {
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-
-  if (typeof value === 'object') {
-    return value;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch (_error) {
-    return fallback;
-  }
-}
+import { buildEnvironmentColumns } from '../utils/environmentContext.js';
+import { readJsonColumn, writeJsonColumn } from '../utils/modelUtils.js';
 
 function toDomain(row) {
   if (!row) {
@@ -31,10 +17,17 @@ function toDomain(row) {
     status: row.status,
     startedAt: row.started_at,
     completedAt: row.completed_at,
-    input: parseJson(row.input, {}),
-    output: parseJson(row.output, {}),
+    input: readJsonColumn(row.input, {}),
+    output: readJsonColumn(row.output, {}),
     errorMessage: row.error_message,
-    metadata: parseJson(row.metadata, {}),
+    metadata: readJsonColumn(row.metadata, {}),
+    environment: {
+      key: row.environment_key ?? null,
+      name: row.environment_name ?? null,
+      tier: row.environment_tier ?? null,
+      region: row.environment_region ?? null,
+      workspace: row.environment_workspace ?? null
+    },
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -47,7 +40,7 @@ export default class TelemetryLineageRunModel {
   }
 
   static async startRun(
-    { tool, modelName, input = {}, metadata = {}, startedAt = new Date() },
+    { tool, modelName, input = {}, metadata = {}, startedAt = new Date(), environment },
     connection = db
   ) {
     if (!tool || !modelName) {
@@ -59,8 +52,9 @@ export default class TelemetryLineageRunModel {
       model_name: modelName,
       status: 'running',
       started_at: startedAt,
-      input: JSON.stringify(input ?? {}),
-      metadata: JSON.stringify(metadata ?? {})
+      input: writeJsonColumn(input ?? {}),
+      metadata: writeJsonColumn(metadata ?? {}),
+      ...buildEnvironmentColumns(environment ?? {})
     };
 
     const [id] = await connection(TABLES.LINEAGE_RUNS).insert(insertPayload);
@@ -80,7 +74,7 @@ export default class TelemetryLineageRunModel {
     const updatePayload = {
       status: normalizedStatus,
       completed_at: completedAt,
-      output: JSON.stringify(output ?? {})
+      output: writeJsonColumn(output ?? {})
     };
 
     const mergeExpression = jsonMergePatch(connection, 'metadata', metadata);

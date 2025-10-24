@@ -168,8 +168,8 @@
         16. **Full Upgrade Plan & Release Steps.** Migrate, reseed sample courses, rehearse editing flows to inspect snapshots, update SDK/docs, and deploy alongside UI consumers of the new history APIs.
       - 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
       - 5.D Commerce & Finance Schema (`models/InvoiceModel.js`, `models/SubscriptionModel.js`, `models/PaymentAttemptModel.js`, `models/EscrowPayoutModel.js`, `models/CommunityDonationModel.js`, `migrations/*billing*`, `migrations/*finance*`)
-      - 5.E Analytics, Governance & Observability Schema (`models/AnalyticsAlertModel.js`, `models/TelemetryExportModel.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`, `migrations/*analytics*`, `migrations/*governance*`)
-      - 5.F Marketing, Content & Enablement Schema (`models/BlogPostModel.js`, `models/BlogCategoryModel.js`, `models/EbookModel.js`, `models/AdsCampaignModel.js`, `models/EnablementGuideModel.js`, `models/IntegrationProviderModel.js`, `migrations/*marketing*`, `migrations/*integration*`)
+      - ✓ 5.E Analytics, Governance & Observability Schema (`models/AnalyticsAlertModel.js`, `models/TelemetryExportModel.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`, `migrations/*analytics*`, `migrations/*governance*`)
+      - ✓ 5.F Marketing, Content & Enablement Schema (`models/BlogPostModel.js`, `models/BlogCategoryModel.js`, `models/EbookModel.js`, `models/AdsCampaignModel.js`, `models/EnablementGuideModel.js`, `models/IntegrationProviderModel.js`, `migrations/*marketing*`, `migrations/*integration*`)
       - 6.A Generated API Client & Runtime Configuration (`src/generated/`, `src/index.ts`, `src/runtime/configure.ts`, `src/runtime/base.ts`)
       - 6.B Authentication & Session Utilities (`src/runtime/auth.ts`, `src/runtime/tokenStore.ts`, `src/runtime/configure.ts`)
       - 7.A Environment Provisioning & Infrastructure as Code (`infrastructure/terraform/`, `docker-compose.yml`, `infrastructure/environments/`)
@@ -305,8 +305,8 @@
       - A39. Learning Content Schema (5.B)
       - A40. Community, Social & Messaging Schema (5.C)
       - A41. Commerce & Finance Schema (5.D)
-      - A42. Analytics, Governance & Observability Schema (5.E)
-      - A43. Marketing, Content & Enablement Schema (5.F)
+      - A42. Analytics, Governance & Observability Schema (5.E) ✓
+      - A43. Marketing, Content & Enablement Schema (5.F) ✓
       - A44. SDK Generated Client & Runtime Configuration (6.A)
       - A45. SDK Authentication & Session Utilities (6.B)
       - A46. Environment Provisioning & Infrastructure as Code (7.A)

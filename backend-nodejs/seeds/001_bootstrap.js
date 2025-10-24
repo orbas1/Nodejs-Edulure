@@ -16,6 +16,7 @@ import {
 } from '../src/models/communityEventConstants.js';
 import { ensureSeedImage } from './_helpers/seedAssets.js';
 import { buildEnvironmentColumns, getEnvironmentDescriptor } from '../src/utils/environmentContext.js';
+import enablementContentService from '../src/services/EnablementContentService.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -8058,7 +8059,8 @@ export async function seed(knex) {
       completed_at: new Date('2025-04-05T10:20:05Z'),
       file_key: telemetryBatchKey,
       checksum: makeHash('telemetry-seed-governance-dashboard'),
-      metadata: JSON.stringify({ bucket: 'edulure-data-seeds', trigger: 'seed', previewCount: 1, byteLength: 4096 })
+      metadata: JSON.stringify({ bucket: 'edulure-data-seeds', trigger: 'seed', previewCount: 1, byteLength: 4096 }),
+      ...createEnvironmentColumns()
     });
 
     await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert([
@@ -8073,7 +8075,8 @@ export async function seed(knex) {
         effective_at: telemetryReceivedAt,
         recorded_by: 'system',
         evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryIpHash }),
-        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap admin analytics consent' })
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap admin analytics consent' }),
+        ...createEnvironmentColumns()
       },
       {
         user_id: learnerId,
@@ -8086,7 +8089,8 @@ export async function seed(knex) {
         effective_at: telemetryReceivedAt,
         recorded_by: 'system',
         evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryLearnerIpHash }),
-        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap learner analytics consent' })
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap learner analytics consent' }),
+        ...createEnvironmentColumns()
       },
       {
         user_id: flowPreviewUserId,
@@ -8099,7 +8103,8 @@ export async function seed(knex) {
         effective_at: telemetryReceivedAt,
         recorded_by: 'system',
         evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryInstructorIpHash }),
-        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap instructor analytics consent' })
+        metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap instructor analytics consent' }),
+        ...createEnvironmentColumns()
       }
     ]);
 
@@ -8145,7 +8150,8 @@ export async function seed(knex) {
         seeded: true,
         exportHint: 'governance-dashboard'
       }),
-      tags: JSON.stringify(['governance', 'dashboard', 'seed'])
+      tags: JSON.stringify(['governance', 'dashboard', 'seed']),
+      ...createEnvironmentColumns()
     });
 
     const checkpointPreview = {
@@ -8329,7 +8335,8 @@ export async function seed(knex) {
         trigger: 'seed',
         previewCount: surveyEvents.length,
         byteLength: 8192
-      })
+      }),
+      ...createEnvironmentColumns()
     });
 
     const surveyEventRows = surveyEvents.map((event) => {
@@ -8372,7 +8379,8 @@ export async function seed(knex) {
           batchUuid: surveyBatchUuid,
           cadence: event.payload.cadence
         }),
-        tags: JSON.stringify(['learner', 'survey', 'seed'])
+        tags: JSON.stringify(['learner', 'survey', 'seed']),
+        ...createEnvironmentColumns()
       };
     });
 
@@ -8432,7 +8440,8 @@ export async function seed(knex) {
         destination: 's3',
         checkpointHash,
         hasBacklog: false
-      })
+      }),
+      ...createEnvironmentColumns()
     });
 
     await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
@@ -8444,7 +8453,8 @@ export async function seed(knex) {
       completed_at: surveyBatchCompletedAt,
       input: JSON.stringify({ trigger: 'seed', eventUuids: surveyEvents.map((event) => event.eventUuid), batchUuid: surveyBatchUuid }),
       output: JSON.stringify({ batchUuid: surveyBatchUuid, destinationKey: surveyBatchKey, rowCount: surveyEvents.length }),
-      metadata: JSON.stringify({ trigger: 'seed', batchId: surveyBatchId, destination: 's3', hasBacklog: false })
+      metadata: JSON.stringify({ trigger: 'seed', batchId: surveyBatchId, destination: 's3', hasBacklog: false }),
+      ...createEnvironmentColumns()
     });
 
     const releaseChecklistEntries = [
@@ -8749,7 +8759,10 @@ export async function seed(knex) {
       started_at: trx.fn.now(),
       completed_at: trx.fn.now(),
       input: JSON.stringify({ source: 'telemetry_events', range: 'seed' }),
-      output: JSON.stringify({ recordsProcessed: 0, checksum: 'seed-init' })
+      output: JSON.stringify({ recordsProcessed: 0, checksum: 'seed-init' }),
+      ...createEnvironmentColumns()
     });
   });
+
+  await enablementContentService.refreshCache();
 }
