@@ -6,6 +6,7 @@ import logger from '../config/logger.js';
 import { featureFlagService, runtimeConfigService } from '../services/FeatureFlagService.js';
 import { featureFlagGovernanceService } from '../services/FeatureFlagGovernanceService.js';
 import { searchClusterService } from '../services/SearchClusterService.js';
+import { warmGraphQLGateway } from '../graphql/gatewayBootstrap.js';
 
 const bootstrapLogger = logger.child({ module: 'bootstrap' });
 
@@ -96,6 +97,11 @@ const INFRASTRUCTURE_SERVICES = {
     start: () => searchClusterService.start(),
     stop: () => searchClusterService.stop(),
     readyMessage: 'Search cluster polling active'
+  },
+  'graphql-gateway': {
+    start: () => warmGraphQLGateway(),
+    stop: (handle) => handle?.stop?.(),
+    readyMessage: 'GraphQL gateway warmed'
   }
 };
 
@@ -119,6 +125,12 @@ export async function startCoreInfrastructure({ services = Object.keys(INFRASTRU
 
       const status = result?.status ?? 'ready';
       const message = result?.message ?? descriptor.readyMessage ?? 'Ready';
+      const stopHandler =
+        typeof result?.stop === 'function'
+          ? () => Promise.resolve(result.stop())
+          : descriptor.stop
+            ? () => Promise.resolve(descriptor.stop(result))
+            : () => Promise.resolve();
 
       if (status === 'disabled' || status === 'degraded') {
         readiness?.markDegraded(name, message);
@@ -126,7 +138,7 @@ export async function startCoreInfrastructure({ services = Object.keys(INFRASTRU
         readiness?.markReady(name, message);
       }
 
-      started.push({ name, stop: descriptor.stop, status });
+      started.push({ name, stop: stopHandler, status });
     } catch (error) {
       readiness?.markFailed(name, error);
       bootstrapLogger.error({ err: error, service: name }, 'Infrastructure service failed to start');

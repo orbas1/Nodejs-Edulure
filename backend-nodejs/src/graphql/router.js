@@ -2,12 +2,13 @@ import { Router } from 'express';
 import { GraphQLError, Kind } from 'graphql';
 import { createHandler } from 'graphql-http/lib/use/express';
 
+import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 import { feedSchema } from './schema.js';
 import persistedQueryStore, { computeSha256 } from './persistedQueryStore.js';
 
-const DEFAULT_MAX_QUERY_DEPTH = 8;
-const DEFAULT_MAX_OPERATIONS = 1;
+const DEFAULT_MAX_QUERY_DEPTH = env.graphql?.maxOperationDepth ?? 8;
+const DEFAULT_MAX_OPERATIONS = env.graphql?.maxOperationsPerRequest ?? 1;
 
 const allowedActorRoles = new Set(['user', 'admin', 'instructor', 'service', 'moderator']);
 

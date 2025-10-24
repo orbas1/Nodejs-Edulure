@@ -446,14 +446,40 @@
          - 11.C.3 SettingsLayout (frontend-reactjs/src/components/settings/SettingsLayout.jsx)
          - 11.C.4 SettingsToggleField (frontend-reactjs/src/components/settings/SettingsToggleField.jsx)
          - 11.C.5 SystemPreferencesPanel (frontend-reactjs/src/components/settings/SystemPreferencesPanel.jsx)
-      - 12.A Bootstrap & Runtime Wiring
-         - 12.A.1 bootstrap (backend-nodejs/src/bootstrap/bootstrap.js)
-         - 12.A.2 database (backend-nodejs/src/config/database.js)
-         - 12.A.3 workerService (backend-nodejs/src/servers/workerService.js)
-      - 12.B Routing, Middleware & Entry Points
-         - 12.B.1 auth (backend-nodejs/src/middleware/auth.js)
-         - 12.B.2 runtimeConfig (backend-nodejs/src/middleware/runtimeConfig.js)
-         - 12.B.3 creation.routes (backend-nodejs/src/routes/creation.routes.js)
+      - ✓ 12.A Bootstrap & Runtime Wiring (`backend-nodejs/src/bootstrap/bootstrap.js`, `backend-nodejs/src/config/env.js`, `backend-nodejs/src/graphql/gatewayBootstrap.js`, `backend-nodejs/src/graphql/persistedQueryStore.js`, `backend-nodejs/src/graphql/router.js`, `backend-nodejs/src/servers/webServer.js`, `backend-nodejs/src/servers/workerService.js`)
+        1. **Appraisal.** GraphQL readiness is now part of the default bootstrap contract: `bootstrap/bootstrap.js` wires `warmGraphQLGateway` alongside database, feature flag, and search cluster lifecycles while `env.graphql` formalises persisted query locations and depth limits for every service runtime.
+        2. **Functionality.** `graphql/gatewayBootstrap.js` warms schema introspection, hydrates persisted queries into the shared in-memory store, and schedules safe refreshes using the new `replaceAll` helper on `persistedQueryStore.js`; readiness emitters in both `webServer.js` and `workerService.js` track the gateway as a first-class component and the infrastructure loop now honours async stop handles returned by bootstrap helpers.
+        3. **Logic Usefulness.** The gateway bootstrapper tolerates missing manifests by downgrading readiness rather than crashing the fleet, produces detailed readiness details (loaded counts, refresh cadence), and the env-sourced depth/operation limits feed directly into `graphql/router.js` so policy is centralised.
+        4. **Redundancies.** Prior duplicated stop semantics in `startCoreInfrastructure` are eliminated by funnelling all descriptors through a single `stopHandler`, ensuring services that return teardown callbacks (GraphQL cache refresh timers) clean up deterministically without bespoke wiring.
+        5. **Placeholders or Stubs.** Persisted query manifests remain optional; when absent, the bootstrapper marks the gateway degraded with explicit messaging so the operations team can stage manifests independently of code deploys.
+        6. **Duplicate Functions.** The `persistedQueryStore` gains `clear`/`replaceAll` so manifest loads no longer rely on ad-hoc map resets throughout the codebase—subsequent loaders should reuse these helpers instead of rolling custom eviction logic.
+        7. **Improvements Needed.** Surface refresh metrics (success/failure counters, last refresh timestamp) through Prometheus once the observability stack exposes GraphQL-specific gauges, and consider wiring `env.graphql.persistedQueriesPath` into configuration management for environment overrides.
+        8. **Styling Improvements.** N/A for runtime wiring; logging already uses structured payloads—ensure follow-up stories keep the `graphql-gateway` logger child consistent with existing naming conventions.
+        9. **Efficiency Analysis.** Cached manifests prevent recomputation on every GraphQL call, while readiness retries reuse the generic exponential backoff in `executeWithRetry`; the new `stopHandler` prevents redundant stop invocations during rollbacks.
+        10. **Strengths to Keep.** Centralised bootstrap orchestration, bounded retry logic, and readiness snapshots that expose loaded manifest counts give SRE and platform operations a predictable control plane for GraphQL availability.
+        11. **Weaknesses to Remove.** Future iterations should prune stale persisted queries by reconciling manifest hashes against live traffic; at present, `replaceAll` overwrites the in-memory cache but lacks differential metrics for removed entries.
+        12. **Styling & Colour Review.** Not applicable—ensure Grafana dashboards adopt the new readiness component name when visualising GraphQL status.
+        13. **CSS, Orientation & Placement.** Not applicable to backend bootstrapping; document the new readiness component placement in service topology diagrams instead.
+        14. **Text Analysis.** Bootstrap log messages highlight manifest paths and entry counts; maintain concise, action-oriented phrasing for on-call operators when extending messaging.
+        15. **Change Checklist Tracker.** Add GraphQL manifest validation, readiness probe assertions, and env regression checks to the release checklist before promoting stacks that rely on persisted queries.
+        16. **Full Upgrade Plan & Release Steps.** Roll out by enabling GraphQL readiness in staging, publishing manifests to storage, monitoring readiness degradation signals, and toggling refresh intervals per environment before enabling the feature in production.
+      - ✓ 12.B Routing, Middleware & Entry Points (`backend-nodejs/src/middleware/auth.js`, `backend-nodejs/src/middleware/runtimeConfig.js`, `backend-nodejs/src/routes/creation.routes.js`)
+        1. **Appraisal.** Middleware now shapes request actors, permissions, runtime config, and domain event lifecycles end-to-end—`auth.js` emits a canonical actor object, `runtimeConfig.js` exposes domain event helpers, and `creation.routes.js` registers contextual defaults for studio endpoints.
+        2. **Functionality.** Access tokens hydrate `req.actor`, `req.permissions`, and `req.session`, while runtime middleware adds `req.recordDomainEvent`/`req.registerDomainEventDefaults` for controllers to emit enriched domain events; creation routes seed defaults for project/template entities so downstream handlers inherit entity metadata automatically.
+        3. **Logic Usefulness.** Feature flag evaluation now leverages actor-aware context, and domain event defaults merge request metadata (trace IDs, correlation IDs, actor roles) with route-specific descriptors, dramatically reducing boilerplate when recording events.
+        4. **Redundancies.** Permissions derived from JWT scope/claims replace ad-hoc role checks spread across controllers, consolidating permission resolution in `auth.js` while `runtimeConfig` centralises request context enrichment for both REST and GraphQL flows.
+        5. **Placeholders or Stubs.** Event emission helpers currently target `DomainEventModel.record`; integrate dispatcher shortcuts in future if controllers require async fire-and-forget semantics beyond the model layer.
+        6. **Duplicate Functions.** By funnelling domain-event payload merging into `mergePayload`/`mergeDescriptors`, repeated deep merge logic across controllers can be removed as they adopt the middleware helpers.
+        7. **Improvements Needed.** Implement controller-level utilities to automatically invoke `req.recordDomainEvent` after mutating operations (e.g., project creation) and expand permission maps when additional roles (moderator, partner) come online.
+        8. **Styling Improvements.** N/A for backend middleware; ensure accompanying documentation references the new request properties so SDK consumers remain aligned.
+        9. **Efficiency Analysis.** Actor/permission derivation occurs once per request, and domain event defaults reuse the same array for merged descriptors; additional allocations are minimal compared with controller-level duplication they replace.
+        10. **Strengths to Keep.** Strong separation between authentication, runtime configuration, and routing metadata ensures consistent observability, while route-level defaults keep domain event payloads cohesive across REST and future GraphQL layers.
+        11. **Weaknesses to Remove.** Introduce graceful fallbacks when `req.recordDomainEvent` fails (e.g., emit logs without throwing) and continue auditing controllers so they rely on middleware-provided actor metadata instead of direct JWT parsing.
+        12. **Styling & Colour Review.** Not relevant to backend entry points; keep request-context logging fields stable for dashboard theming parity.
+        13. **CSS, Orientation & Placement.** Not applicable; ensure updated middleware ordering is documented in service flow diagrams to prevent regressions when composing Express routers.
+        14. **Text Analysis.** Error messages remain concise (“Invalid or expired token”, “Insufficient permissions”) and event helper exceptions clearly describe missing keys to streamline debugging.
+        15. **Change Checklist Tracker.** Expand QA sign-off to include domain-event smoke tests, permission-matrix validation for JWT claims, and route metadata assertions before releasing entry-point changes.
+        16. **Full Upgrade Plan & Release Steps.** Deploy middleware updates to staging, verify domain event emission via telemetry, audit permission-driven routes for regressions, and coordinate documentation updates before promoting to production.
       - 12.C Controllers & GraphQL Gateways
          - 12.C.1 EbookController (backend-nodejs/src/controllers/EbookController.js)
          - 12.C.2 schema (backend-nodejs/src/graphql/schema.js)

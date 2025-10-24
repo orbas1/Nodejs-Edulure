@@ -77,6 +77,26 @@ export class InMemoryPersistedQueryStore {
       this.entries.delete(oldestKey);
     }
   }
+
+  clear() {
+    this.entries.clear();
+  }
+
+  replaceAll(entries) {
+    this.clear();
+    if (!Array.isArray(entries)) {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+
+      const { hash, query } = entry;
+      this.set(hash, query);
+    }
+  }
 }
 
 export function computeSha256(input) {

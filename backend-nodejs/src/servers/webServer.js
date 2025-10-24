@@ -16,6 +16,7 @@ export async function startWebServer({ withSignalHandlers = true } = {}) {
       'feature-flags',
       'runtime-config',
       'search-cluster',
+      'graphql-gateway',
       'http-server',
       'socket-gateway',
       ...BACKGROUND_JOB_TARGETS

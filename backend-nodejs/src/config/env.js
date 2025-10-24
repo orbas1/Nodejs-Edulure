@@ -715,6 +715,16 @@ const envSchema = z
     SLO_CRITICAL_BURN_RATE: z.coerce.number().min(0.1).max(100).default(10),
     SLO_MIN_REQUESTS: z.coerce.number().int().min(1).max(1000000).default(200),
     SLO_DEFAULT_TREAT_4XX_AS_FAILURE: z.coerce.boolean().default(false),
+    GRAPHQL_PERSISTED_QUERIES_PATH: z.string().optional(),
+    GRAPHQL_PERSISTED_QUERIES_REFRESH_SECONDS: z
+      .coerce.number()
+      .int()
+      .min(0)
+      .max(24 * 60 * 60)
+      .default(5 * 60),
+    GRAPHQL_WARM_INTROSPECTION: z.coerce.boolean().default(true),
+    GRAPHQL_MAX_OPERATION_DEPTH: z.coerce.number().int().min(1).max(32).default(8),
+    GRAPHQL_MAX_OPERATIONS_PER_REQUEST: z.coerce.number().int().min(1).max(5).default(1),
     TELEMETRY_INGESTION_ENABLED: z.coerce.boolean().default(true),
     TELEMETRY_ALLOWED_SOURCES: z.string().optional(),
     TELEMETRY_STRICT_SOURCE_ENFORCEMENT: z.coerce.boolean().default(false),
@@ -1954,6 +1964,15 @@ export const env = {
       allowedIps: metricsAllowedIps
     },
     slo: sloConfig
+  },
+  graphql: {
+    persistedQueriesPath: raw.GRAPHQL_PERSISTED_QUERIES_PATH
+      ? path.resolve(projectRoot, raw.GRAPHQL_PERSISTED_QUERIES_PATH)
+      : null,
+    persistedQueriesRefreshIntervalMs: raw.GRAPHQL_PERSISTED_QUERIES_REFRESH_SECONDS * 1000,
+    warmIntrospection: raw.GRAPHQL_WARM_INTROSPECTION,
+    maxOperationDepth: raw.GRAPHQL_MAX_OPERATION_DEPTH,
+    maxOperationsPerRequest: raw.GRAPHQL_MAX_OPERATIONS_PER_REQUEST
   },
   telemetry: {
     ingestion: {
