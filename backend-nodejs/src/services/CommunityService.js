@@ -247,6 +247,103 @@ function buildRecordedSessions(resources, metadata = []) {
     : [];
 }
 
+const EVENT_ACCENT_MAP = new Map([
+  ['Webinar', 'iris'],
+  ['Workshop', 'amber'],
+  ['Event', 'emerald'],
+  ['Live Session', 'violet']
+]);
+
+function toDateOrNull(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function hoursUntil(date) {
+  if (!date) {
+    return null;
+  }
+  return (date.getTime() - Date.now()) / 3600000;
+}
+
+function computeEventPriority({ hoursUntilStart, isLive }) {
+  if (isLive) {
+    return 1;
+  }
+  if (hoursUntilStart === null) {
+    return 0.35;
+  }
+  if (hoursUntilStart < -24) {
+    return 0.25;
+  }
+  if (hoursUntilStart < 0) {
+    return 0.45;
+  }
+  if (hoursUntilStart < 1) {
+    return 0.92;
+  }
+  if (hoursUntilStart < 24) {
+    return 0.78;
+  }
+  if (hoursUntilStart < 72) {
+    return 0.62;
+  }
+  if (hoursUntilStart < 168) {
+    return 0.48;
+  }
+  return 0.32;
+}
+
+function determineLayoutVariant(priority) {
+  if (priority >= 0.85) {
+    return 'hero';
+  }
+  if (priority >= 0.6) {
+    return 'highlight';
+  }
+  return 'default';
+}
+
+function decorateEventForDisplay(event) {
+  const startsAtDate = toDateOrNull(event.startsAt ?? event.startAt);
+  const endsAtDate = toDateOrNull(event.endsAt ?? event.endAt);
+  const hoursUntilStart = hoursUntil(startsAtDate);
+  const isLive = hoursUntilStart !== null && Math.abs(hoursUntilStart) < 0.25;
+  const priorityScore = computeEventPriority({ hoursUntilStart, isLive });
+  const accentTone = EVENT_ACCENT_MAP.get(event.type) ?? (isLive ? 'rose' : 'teal');
+  const layoutVariant = determineLayoutVariant(priorityScore);
+  const startTimestamp = startsAtDate ? startsAtDate.getTime() : Number.POSITIVE_INFINITY;
+
+  return {
+    ...event,
+    startsAt: startsAtDate ? startsAtDate.toISOString() : null,
+    endsAt: endsAtDate ? endsAtDate.toISOString() : null,
+    status: isLive ? 'live' : hoursUntilStart !== null && hoursUntilStart < 0 ? 'completed' : 'scheduled',
+    priorityScore,
+    display: {
+      accentTone,
+      badgeTone: accentTone,
+      variant: layoutVariant,
+      emphasis: layoutVariant === 'hero' ? 'high' : layoutVariant === 'highlight' ? 'medium' : 'base',
+      timeline: {
+        isLive,
+        hoursUntilStart: hoursUntilStart !== null ? Number(hoursUntilStart.toFixed(2)) : null,
+        startTimestamp
+      },
+      layout: {
+        columns:
+          layoutVariant === 'hero'
+            ? { desktop: 2, tablet: 1, mobile: 1 }
+            : { desktop: 3, tablet: 2, mobile: 1 },
+        highlight: layoutVariant !== 'default'
+      }
+    }
+  };
+}
+
 function mergeEvents(eventRecords, webinars, metadataEvents = []) {
   const events = [];
   const seen = new Set();
@@ -298,7 +395,17 @@ function mergeEvents(eventRecords, webinars, metadataEvents = []) {
     });
   });
 
-  return events;
+  const decorated = events.map((event) => decorateEventForDisplay(event));
+  decorated.sort((a, b) => {
+    if (b.priorityScore === a.priorityScore) {
+      const aStart = a.display?.timeline?.startTimestamp ?? Number.POSITIVE_INFINITY;
+      const bStart = b.display?.timeline?.startTimestamp ?? Number.POSITIVE_INFINITY;
+      return aStart - bStart;
+    }
+    return b.priorityScore - a.priorityScore;
+  });
+
+  return decorated;
 }
 
 function buildSubscriptionSummary(metadata = {}, tiers = [], subscriptions = []) {

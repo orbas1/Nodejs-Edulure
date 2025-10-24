@@ -92,8 +92,10 @@
         *See Part 1.A for the 16-point breakdown covering auth flows, shared serializers, and release governance updates.*
       - ✅ A2. Learner Onboarding, Dashboard & Feedback (1.B)
         *See Part 1.B for the end-to-end dashboard narrative including layout metadata exports and onboarding orchestration.*
-      - A3. Courses, Catalogue & Creation Studio (1.C)
-      - A4. Community, Events & Programming (1.D)
+      - A3. Courses, Catalogue & Creation Studio (1.C) ✓
+        *`CourseModel.getCatalogueFilters`, `/catalogue/filters`, new catalogue filter indexes, and enriched seeds/tests keep catalogue facets, layout metadata, and upsell badges aligned across clients.*
+      - A4. Community, Events & Programming (1.D) ✓
+        *`CommunityService.mergeEvents` + `decorateEventForDisplay` now drive programming priority, accent mapping, and layout hints with refreshed community seeds.*
       - [x] A5. Feed, Social Graph & Direct Messaging (1.E)
       - [x] A6. Explorer, Search & Discovery (1.F)
       - A7. Commerce, Billing & Monetisation (1.G)
