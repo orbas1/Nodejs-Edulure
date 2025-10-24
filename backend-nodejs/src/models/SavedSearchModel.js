@@ -1,5 +1,37 @@
 import db from '../config/database.js';
 
+function parseStringArray(value, fallback = []) {
+  if (value === null || value === undefined) {
+    return [...fallback];
+  }
+  if (Array.isArray(value)) {
+    return Array.from(
+      new Set(
+        value
+          .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+          .filter((entry) => entry.length > 0)
+      )
+    );
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parseStringArray(parsed, fallback);
+      }
+    } catch (_error) {
+      const commaSplit = value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+      if (commaSplit.length) {
+        return Array.from(new Set(commaSplit));
+      }
+    }
+  }
+  return [...fallback];
+}
+
 function parseJson(value, fallback) {
   if (value === null || value === undefined) {
     return fallback;
@@ -26,6 +58,7 @@ function serialise(row) {
     entityTypes: parseJson(row.entity_types, []),
     filters: parseJson(row.filters, {}),
     globalFilters: parseJson(row.global_filters, {}),
+    deliveryChannels: parseStringArray(row.delivery_channels, []),
     sortPreferences: parseJson(row.sort_preferences, {}),
     isPinned: Boolean(row.is_pinned),
     lastUsedAt: row.last_used_at,
@@ -42,6 +75,7 @@ function toRowPayload(payload) {
     entity_types: JSON.stringify(payload.entityTypes ?? []),
     filters: JSON.stringify(payload.filters ?? {}),
     global_filters: JSON.stringify(payload.globalFilters ?? {}),
+    delivery_channels: JSON.stringify(parseStringArray(payload.deliveryChannels ?? [])),
     sort_preferences: JSON.stringify(payload.sortPreferences ?? {}),
     is_pinned: payload.isPinned ?? false,
     last_used_at: payload.lastUsedAt ?? null
@@ -94,6 +128,9 @@ export default class SavedSearchModel {
     }
     if (payload.sortPreferences !== undefined) {
       updates.sort_preferences = JSON.stringify(payload.sortPreferences ?? {});
+    }
+    if (payload.deliveryChannels !== undefined) {
+      updates.delivery_channels = JSON.stringify(parseStringArray(payload.deliveryChannels ?? []));
     }
     if (payload.isPinned !== undefined) {
       updates.is_pinned = Boolean(payload.isPinned);

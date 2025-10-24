@@ -37,6 +37,14 @@ export async function startWebServer({ withSignalHandlers = true } = {}) {
   }
 
   const server = http.createServer(app);
+  const activeConnections = new Set();
+
+  server.on('connection', (socket) => {
+    activeConnections.add(socket);
+    socket.on('close', () => {
+      activeConnections.delete(socket);
+    });
+  });
   let httpServerPending = false;
   let jobRunner = null;
   let realtimeAttachment = null;
@@ -103,6 +111,23 @@ export async function startWebServer({ withSignalHandlers = true } = {}) {
         readiness.markDegraded('http-server', 'Stopped');
         resolve();
       });
+      const deadline = Date.now() + 5_000;
+      for (const socket of activeConnections) {
+        socket.end();
+      }
+      const interval = setInterval(() => {
+        if (!activeConnections.size) {
+          clearInterval(interval);
+          return;
+        }
+
+        if (Date.now() >= deadline) {
+          for (const socket of activeConnections) {
+            socket.destroy();
+          }
+          clearInterval(interval);
+        }
+      }, 100);
     });
 
     if (jobRunner) {

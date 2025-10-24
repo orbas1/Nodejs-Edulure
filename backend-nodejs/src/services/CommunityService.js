@@ -18,6 +18,7 @@ import UserModel from '../models/UserModel.js';
 import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
 import UserProfileModel from '../models/UserProfileModel.js';
 import AdsPlacementService from './AdsPlacementService.js';
+import { summariseReactions } from '../services/ReactionAggregationService.js';
 
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 const RESOURCE_MANAGER_ROLES = new Set(['owner', 'admin', 'moderator']);
@@ -1724,14 +1725,12 @@ export default class CommunityService {
 
   static serializePost(post, communityOverride, context = {}) {
     const tags = toArray(post.tags);
-    const reactionSummary = parseJsonColumn(post.reactionSummary, {});
+    const rawReactionSummary = parseJsonColumn(post.reactionSummary, {});
+    const { breakdown: reactionBreakdown, total: totalReactions } = summariseReactions(rawReactionSummary);
     const metadata = parseJsonColumn(post.metadata, {});
     const moderationMetadata = parseJsonColumn(post.moderationMetadata, {});
     const previewMetadata = parseJsonColumn(post.previewMetadata, {});
     const assetMetadata = post.mediaAsset ? parseJsonColumn(post.mediaAsset.metadata, {}) : {};
-    const totalReactions = typeof reactionSummary.total === 'number'
-      ? reactionSummary.total
-      : Object.values(reactionSummary).reduce((sum, value) => (typeof value === 'number' ? sum + value : sum), 0);
 
     const authorName = (post.authorName ?? '').trim() || 'Community Member';
 
@@ -1801,7 +1800,7 @@ export default class CommunityService {
       media,
       stats: {
         reactions: totalReactions,
-        reactionBreakdown: reactionSummary,
+        reactionBreakdown,
         comments: Number(post.commentCount ?? 0)
       },
       moderation: {

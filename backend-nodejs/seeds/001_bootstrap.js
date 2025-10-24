@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 import { generateConsentPolicyChecksum } from '../src/database/domains/compliance.js';
-import { TABLES as TELEMETRY_TABLES } from '../src/database/domains/telemetry.js';
+import { TABLES as TELEMETRY_TABLES, generateTelemetryDedupeHash } from '../src/database/domains/telemetry.js';
 import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
@@ -153,6 +153,7 @@ export async function seed(knex) {
     await trx('content_assets').del();
     await trx('marketing_plan_features').del();
     await trx('marketing_plan_offers').del();
+    await trx('marketing_testimonials').del();
     await trx('marketing_blocks').del();
     await trx('marketing_leads').del();
     await trx('telemetry_lineage_runs').del();
@@ -873,6 +874,99 @@ export async function seed(knex) {
       cover_image_url: growthLabCover.url,
       metadata: JSON.stringify(growthLabMetadata)
     });
+
+    await trx('marketing_testimonials').insert([
+      {
+        slug: 'lena-ortiz',
+        variant: 'testimonial',
+        quote: 'We shipped our cohort in two weeks with the templates and live ops tools.',
+        author_name: 'Lena Ortiz',
+        author_title: 'Founder, CohortCraft',
+        persona: 'Cohort operations lead',
+        featured_product: 'Flow 5 Launch Kits',
+        surfaces: JSON.stringify(['home', 'learner-register']),
+        metadata: JSON.stringify({
+          localeKeys: {
+            quote: 'home.testimonials.items.lena.quote',
+            name: 'home.testimonials.items.lena.name',
+            role: 'home.testimonials.items.lena.role'
+          }
+        }),
+        position: 10
+      },
+      {
+        slug: 'noah-winter',
+        variant: 'testimonial',
+        quote: 'Billing, scheduling, and community rooms finally live in one workflow.',
+        author_name: 'Noah Winter',
+        author_title: 'Director, Global Learning Lab',
+        persona: 'Director of learning innovation',
+        featured_product: 'Unified campus workspace',
+        surfaces: JSON.stringify(['home']),
+        metadata: JSON.stringify({
+          localeKeys: {
+            quote: 'home.testimonials.items.noah.quote',
+            name: 'home.testimonials.items.noah.name',
+            role: 'home.testimonials.items.noah.role'
+          }
+        }),
+        position: 20
+      },
+      {
+        slug: 'ops-director-flow5',
+        variant: 'social_proof',
+        quote:
+          'Flow 5 onboarding kept our entire revenue pod aligned in the first week. We knew which communities to launch next.',
+        attribution: 'Operations Director · Flow 5',
+        persona: 'Revenue operations',
+        surfaces: JSON.stringify(['learner-register']),
+        metadata: JSON.stringify({ channel: 'learner', emphasis: 'onboarding' }),
+        position: 30
+      },
+      {
+        slug: 'creator-growth-lab',
+        variant: 'social_proof',
+        quote:
+          'The interest tags we submitted here now power our cohort roadmap. Edulure turned those signals into real launches.',
+        attribution: 'Program Lead · Creator Growth Lab',
+        persona: 'Program lead',
+        surfaces: JSON.stringify(['learner-register']),
+        metadata: JSON.stringify({ channel: 'learner', emphasis: 'signals' }),
+        position: 40
+      },
+      {
+        slug: 'global-campus-network',
+        variant: 'social_proof',
+        quote:
+          'International onboarding used to take days. Now the regional preferences we capture sync instantly across dashboards.',
+        attribution: 'Learning Ops Manager · Global Campus Network',
+        persona: 'Learning operations manager',
+        surfaces: JSON.stringify(['learner-register']),
+        metadata: JSON.stringify({ channel: 'learner', emphasis: 'international' }),
+        position: 50
+      },
+      {
+        slug: 'cohort-architect-guild',
+        variant: 'social_proof',
+        quote:
+          'The application captured everything we needed—portfolio links, cohort goals, even marketing campaigns—in one pass.',
+        attribution: 'Lead Instructor · Cohort Architect Guild',
+        persona: 'Instructor lead',
+        surfaces: JSON.stringify(['instructor-register']),
+        metadata: JSON.stringify({ channel: 'instructor', emphasis: 'application' }),
+        position: 60
+      },
+      {
+        slug: 'studio-growth-lab',
+        variant: 'social_proof',
+        quote: 'Edulure surfaced the right learners as soon as we submitted the form. Our waitlist converted within days.',
+        attribution: 'Founder · Studio Growth Lab',
+        persona: 'Studio founder',
+        surfaces: JSON.stringify(['instructor-register']),
+        metadata: JSON.stringify({ channel: 'instructor', emphasis: 'conversion' }),
+        position: 70
+      }
+    ]);
 
     await trx('marketing_blocks').insert([
       {
@@ -5432,6 +5526,7 @@ export async function seed(knex) {
       }),
       global_filters: JSON.stringify({ languages: ['en'] }),
       sort_preferences: JSON.stringify({ communities: 'trending', courses: 'rating' }),
+      delivery_channels: JSON.stringify([]),
       is_pinned: true,
       last_used_at: trx.fn.now()
     });
@@ -5780,6 +5875,126 @@ export async function seed(knex) {
         metadata: JSON.stringify({ cadence: 'biweekly' })
       }
     ]);
+
+    const telemetryConsentScope = 'product.analytics';
+    const telemetryConsentVersion = 'v1';
+    const telemetryCorrelationId = 'governance-dashboard-seed';
+    const telemetryBatchUuid = crypto.randomUUID();
+    const telemetryBatchKey = 'warehouse/telemetry/seed-governance-dashboard.jsonl.gz';
+    const telemetryOccurredAt = new Date('2025-04-05T10:15:00Z');
+    const telemetryReceivedAt = new Date('2025-04-05T10:15:02Z');
+    const telemetryPayload = {
+      view: 'governance_overview',
+      modulesLoaded: ['contracts', 'vendorAssessments', 'communications'],
+      widgetTelemetry: {
+        contractsRenewalCount: 3,
+        highRiskVendors: 2,
+        scheduledCommunications: 1
+      }
+    };
+    const telemetryIpHash = makeHash('203.0.113.42');
+
+    const [telemetryBatchId] = await trx(TELEMETRY_TABLES.EVENT_BATCHES).insert({
+      batch_uuid: telemetryBatchUuid,
+      status: 'exported',
+      destination: 's3',
+      events_count: 1,
+      started_at: new Date('2025-04-05T10:20:00Z'),
+      completed_at: new Date('2025-04-05T10:20:05Z'),
+      file_key: telemetryBatchKey,
+      checksum: makeHash('telemetry-seed-governance-dashboard'),
+      metadata: JSON.stringify({ bucket: 'edulure-data-seeds', trigger: 'seed', previewCount: 1, byteLength: 4096 })
+    });
+
+    await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert({
+      user_id: adminId,
+      tenant_id: 'global',
+      consent_scope: telemetryConsentScope,
+      consent_version: telemetryConsentVersion,
+      status: 'granted',
+      is_active: true,
+      recorded_at: telemetryReceivedAt,
+      effective_at: telemetryReceivedAt,
+      recorded_by: 'system',
+      evidence: JSON.stringify({ method: 'seed-bootstrap', source: 'qa.fixture', ipHash: telemetryIpHash }),
+      metadata: JSON.stringify({ seeded: true, notes: 'Bootstrap admin analytics consent' })
+    });
+
+    const telemetryDedupe = generateTelemetryDedupeHash({
+      eventName: 'governance.dashboard.loaded',
+      eventVersion: '2025.04',
+      occurredAt: telemetryOccurredAt,
+      userId: adminId,
+      sessionId: 'seed-admin-session',
+      correlationId: telemetryCorrelationId,
+      payload: telemetryPayload
+    });
+
+    const [telemetryEventId] = await trx(TELEMETRY_TABLES.EVENTS).insert({
+      tenant_id: 'global',
+      schema_version: 'v1',
+      event_name: 'governance.dashboard.loaded',
+      event_version: '2025.04',
+      event_source: 'web.admin',
+      occurred_at: telemetryOccurredAt,
+      received_at: telemetryReceivedAt,
+      user_id: adminId,
+      session_id: 'seed-admin-session',
+      device_id: 'seed-device-mac',
+      correlation_id: telemetryCorrelationId,
+      consent_scope: telemetryConsentScope,
+      consent_status: 'granted',
+      ingestion_status: 'exported',
+      ingestion_attempts: 1,
+      last_ingestion_attempt: telemetryReceivedAt,
+      export_batch_id: telemetryBatchId,
+      dedupe_hash: telemetryDedupe,
+      payload: JSON.stringify(telemetryPayload),
+      context: JSON.stringify({
+        actor: adminId,
+        network: { ipHash: telemetryIpHash, userAgent: 'edulure-admin/seed' },
+        location: { timezone: 'UTC' }
+      }),
+      metadata: JSON.stringify({
+        consentVersion: telemetryConsentVersion,
+        consentRecordedAt: telemetryReceivedAt,
+        batchUuid: telemetryBatchUuid,
+        seeded: true,
+        exportHint: 'governance-dashboard'
+      }),
+      tags: JSON.stringify(['governance', 'dashboard', 'seed'])
+    });
+
+    await trx(TELEMETRY_TABLES.FRESHNESS_MONITORS).insert([
+      {
+        pipeline_key: 'ingestion.raw',
+        last_event_at: telemetryOccurredAt,
+        status: 'healthy',
+        threshold_minutes: 15,
+        lag_seconds: 0,
+        metadata: JSON.stringify({ lastEventId: telemetryEventId, source: 'seed' })
+      },
+      {
+        pipeline_key: 'warehouse.export',
+        last_event_at: telemetryOccurredAt,
+        status: 'healthy',
+        threshold_minutes: 30,
+        lag_seconds: 45,
+        metadata: JSON.stringify({ batchUuid: telemetryBatchUuid, destinationKey: telemetryBatchKey })
+      }
+    ]);
+
+    await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
+      run_uuid: crypto.randomUUID(),
+      tool: 'dbt',
+      model_name: 'warehouse.telemetry_events',
+      status: 'success',
+      started_at: new Date('2025-04-05T10:20:00Z'),
+      completed_at: new Date('2025-04-05T10:20:05Z'),
+      input: JSON.stringify({ trigger: 'seed', eventIds: [telemetryEventId], batchUuid: telemetryBatchUuid }),
+      output: JSON.stringify({ batchUuid: telemetryBatchUuid, destinationKey: telemetryBatchKey, rowCount: 1 }),
+      metadata: JSON.stringify({ trigger: 'seed', batchId: telemetryBatchId, destination: 's3' })
+    });
 
     const releaseChecklistEntries = [
       {

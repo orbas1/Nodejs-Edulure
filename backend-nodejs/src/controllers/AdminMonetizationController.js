@@ -1,3 +1,5 @@
+import Joi from 'joi';
+
 import MonetizationFinanceService from '../services/MonetizationFinanceService.js';
 import { created, paginated, success } from '../utils/httpResponse.js';
 
@@ -8,6 +10,15 @@ function parsePagination(value, fallback) {
   }
   return Math.floor(numeric);
 }
+
+const acknowledgeParamsSchema = Joi.object({
+  runId: Joi.number().integer().positive().required()
+});
+
+const acknowledgeBodySchema = Joi.object({
+  channel: Joi.string().trim().max(40).default('admin_console'),
+  note: Joi.string().trim().max(500).allow('', null).optional()
+});
 
 export default class AdminMonetizationController {
   static async listCatalogItems(req, res, next) {
@@ -137,6 +148,41 @@ export default class AdminMonetizationController {
         meta: { tenantId }
       });
     } catch (error) {
+      next(error);
+    }
+  }
+
+  static async acknowledgeReconciliation(req, res, next) {
+    try {
+      const params = await acknowledgeParamsSchema.validateAsync(req.params, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const payload = await acknowledgeBodySchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const acknowledgement = await MonetizationFinanceService.acknowledgeReconciliationAlert(
+        {
+          runId: params.runId,
+          operatorId: req.user?.id ?? null,
+          operatorName: req.user?.name ?? req.user?.fullName ?? null,
+          operatorEmail: req.user?.email ?? null,
+          channel: payload.channel,
+          note: payload.note
+        }
+      );
+
+      return success(res, {
+        data: acknowledgement,
+        message: 'Reconciliation alert acknowledged'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
       next(error);
     }
   }

@@ -251,6 +251,9 @@ export class DomainEventDispatcherService {
 
   async processDispatch(dispatch) {
     const attemptNumber = dispatch.attemptCount + 1;
+    const maxAttemptsForDispatch = Number.isFinite(dispatch.maxAttempts) && dispatch.maxAttempts > 0
+      ? dispatch.maxAttempts
+      : this.maxAttempts;
     let event;
 
     try {
@@ -259,7 +262,12 @@ export class DomainEventDispatcherService {
       this.logger.error({ err: error, dispatchId: dispatch.id }, 'Failed to load domain event');
       await this.dispatchModel.markFailed(dispatch.id, {
         error,
-        nextAvailableAt: new Date(Date.now() + 60 * 1000)
+        nextAvailableAt: new Date(Date.now() + 60 * 1000),
+        metadata: {
+          attempts: attemptNumber,
+          maxAttempts: maxAttemptsForDispatch,
+          failureStage: 'event_load'
+        }
       });
       return;
     }
@@ -268,7 +276,11 @@ export class DomainEventDispatcherService {
       this.logger.warn({ dispatchId: dispatch.id, eventId: dispatch.eventId }, 'Domain event missing; acknowledging');
       await this.dispatchModel.markDelivered(dispatch.id, {
         deliveredAt: new Date(),
-        metadata: { reason: 'missing_event' }
+        metadata: {
+          reason: 'missing_event',
+          attempts: attemptNumber,
+          maxAttempts: maxAttemptsForDispatch
+        }
       });
       attemptCounter.inc({ event_type: 'unknown', outcome: 'acknowledged' }, 1);
       return;
@@ -279,13 +291,18 @@ export class DomainEventDispatcherService {
     attemptCounter.inc({ ...labels, outcome: 'started' }, 1);
 
     try {
+      const schemaVersion = dispatch.metadata?.schemaVersion ?? '1.0';
+      const recordedAt = dispatch.metadata?.recordedAt ?? null;
+
       const publishResult = await this.webhookBus.publish(event.eventType, event.payload, {
         source: 'domain-events',
         correlationId: `domain-event-${event.id}`,
         metadata: {
           entityType: event.entityType,
           entityId: event.entityId,
-          performedBy: event.performedBy
+          performedBy: event.performedBy,
+          schemaVersion,
+          recordedAt
         }
       });
 
@@ -293,6 +310,8 @@ export class DomainEventDispatcherService {
         deliveredAt: new Date(),
         metadata: {
           attempts: attemptNumber,
+          maxAttempts: maxAttemptsForDispatch,
+          deliveryChannel: dispatch.deliveryChannel,
           webhookEventId: publishResult?.id ?? null
         }
       });
@@ -304,7 +323,7 @@ export class DomainEventDispatcherService {
       const durationSeconds = (Date.now() - startedAt) / 1000;
       durationHistogram.observe({ ...labels, outcome: 'error' }, durationSeconds);
 
-      const terminal = attemptNumber >= this.maxAttempts;
+      const terminal = attemptNumber >= maxAttemptsForDispatch;
       const backoffSeconds = computeBackoffSeconds({
         attemptNumber,
         initialBackoffSeconds: this.initialBackoffSeconds,
@@ -320,6 +339,7 @@ export class DomainEventDispatcherService {
         terminal,
         metadata: {
           attempts: attemptNumber,
+          maxAttempts: maxAttemptsForDispatch,
           backoffSeconds
         }
       });

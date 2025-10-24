@@ -2,6 +2,25 @@ import db from '../config/database.js';
 import logger from '../config/logger.js';
 import SavedSearchModel from '../models/SavedSearchModel.js';
 
+function decorateSearch(search) {
+  if (!search) {
+    return null;
+  }
+  const channels = Array.isArray(search.deliveryChannels)
+    ? Array.from(
+        new Set(
+          search.deliveryChannels
+            .map((channel) => (typeof channel === 'string' ? channel.trim() : ''))
+            .filter((channel) => channel.length > 0)
+        )
+      )
+    : [];
+  return {
+    ...search,
+    deliveryChannels: channels
+  };
+}
+
 export class SavedSearchService {
   constructor({ savedSearchModel = SavedSearchModel, dbClient = db, loggerInstance = logger } = {}) {
     this.model = savedSearchModel;
@@ -10,7 +29,8 @@ export class SavedSearchService {
   }
 
   async list(userId) {
-    return this.model.listByUser(userId, this.db);
+    const searches = await this.model.listByUser(userId, this.db);
+    return searches.map((search) => decorateSearch(search));
   }
 
   async create(userId, payload) {
@@ -23,7 +43,7 @@ export class SavedSearchService {
       }
       const created = await this.model.create({ ...payload, userId }, trx);
       this.logger.info({ savedSearchId: created.id, userId }, 'Saved search created');
-      return created;
+      return decorateSearch(created);
     });
   }
 
@@ -47,7 +67,7 @@ export class SavedSearchService {
         throw error;
       }
       this.logger.info({ savedSearchId, userId }, 'Saved search updated');
-      return updated;
+      return decorateSearch(updated);
     });
   }
 
@@ -77,7 +97,7 @@ export class SavedSearchService {
       error.status = 404;
       throw error;
     }
-    return search;
+    return decorateSearch(search);
   }
 
   async getUsageSummary(userId) {
@@ -86,7 +106,8 @@ export class SavedSearchService {
     const recent = searches
       .filter((search) => search.lastUsedAt)
       .sort((a, b) => new Date(b.lastUsedAt) - new Date(a.lastUsedAt))
-      .slice(0, 5);
+      .slice(0, 5)
+      .map((search) => decorateSearch(search));
 
     return {
       total,

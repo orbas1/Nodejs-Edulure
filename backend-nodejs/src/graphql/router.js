@@ -4,6 +4,7 @@ import { createHandler } from 'graphql-http/lib/use/express';
 
 import logger from '../config/logger.js';
 import { feedSchema } from './schema.js';
+import persistedQueryStore, { computeSha256 } from './persistedQueryStore.js';
 
 const DEFAULT_MAX_QUERY_DEPTH = 8;
 const DEFAULT_MAX_OPERATIONS = 1;
@@ -237,6 +238,117 @@ function createIntrospectionRestrictionRule({ allowInProduction = false } = {}) 
 
 export function createGraphQLRouter({ schema = feedSchema, loggerInstance = logger } = {}) {
   const router = Router();
+
+  router.use((req, res, next) => {
+    if (!req.body) {
+      return next();
+    }
+
+    const normaliseOperations = (operations) => {
+      const items = Array.isArray(operations) ? operations : [operations];
+      const transformed = [];
+
+      for (const operation of items) {
+        if (!operation || typeof operation !== 'object') {
+          transformed.push(operation);
+          continue;
+        }
+
+        const persistedQueryExtensions = operation.extensions?.persistedQuery;
+        if (!persistedQueryExtensions) {
+          transformed.push(operation);
+          continue;
+        }
+
+        const { sha256Hash, version } = persistedQueryExtensions;
+        if (!sha256Hash) {
+          res.status(400).json({
+            data: null,
+            errors: [
+              {
+                message: 'Persisted query hash is required when using persistedQuery extensions.',
+                extensions: { code: 'PERSISTED_QUERY_HASH_MISSING' }
+              }
+            ]
+          });
+          return null;
+        }
+
+        if (version && Number(version) !== 1) {
+          res.status(400).json({
+            data: null,
+            errors: [
+              {
+                message: 'Unsupported persisted query version. Only version 1 is supported.',
+                extensions: { code: 'PERSISTED_QUERY_VERSION_UNSUPPORTED', version }
+              }
+            ]
+          });
+          return null;
+        }
+
+        if (operation.query) {
+          const trimmedQuery = String(operation.query).trim();
+          if (!trimmedQuery) {
+            res.status(400).json({
+              data: null,
+              errors: [
+                {
+                  message: 'Persisted query text must not be empty.',
+                  extensions: { code: 'PERSISTED_QUERY_EMPTY' }
+                }
+              ]
+            });
+            return null;
+          }
+
+          const computedHash = computeSha256(trimmedQuery);
+          if (computedHash !== sha256Hash.toLowerCase()) {
+            res.status(400).json({
+              data: null,
+              errors: [
+                {
+                  message: 'Persisted query hash does not match provided query.',
+                  extensions: { code: 'PERSISTED_QUERY_HASH_MISMATCH' }
+                }
+              ]
+            });
+            return null;
+          }
+
+          persistedQueryStore.set(sha256Hash, trimmedQuery);
+          transformed.push({ ...operation, query: trimmedQuery });
+          continue;
+        }
+
+        const storedQuery = persistedQueryStore.get(sha256Hash);
+        if (!storedQuery) {
+          res.status(404).json({
+            data: null,
+            errors: [
+              {
+                message: 'Persisted query not found. Submit the full query text to register it first.',
+                extensions: { code: 'PERSISTED_QUERY_NOT_FOUND', sha256Hash }
+              }
+            ]
+          });
+          return null;
+        }
+
+        transformed.push({ ...operation, query: storedQuery });
+      }
+
+      return Array.isArray(operations) ? transformed : transformed[0];
+    };
+
+    const nextBody = normaliseOperations(req.body);
+    if (nextBody === null) {
+      return undefined;
+    }
+
+    req.body = nextBody;
+    return next();
+  });
 
   const validationRules = [
     createOperationLimitRule(),

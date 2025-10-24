@@ -11,6 +11,11 @@ import {
   recordTelemetryIngestion,
   recordTelemetryFreshness
 } from '../observability/metrics.js';
+import {
+  formatZodIssues,
+  serialiseConsentRecord,
+  serialiseTelemetryEvent
+} from '../utils/telemetrySerializers.js';
 
 const PAYLOAD_SCHEMA = z
   .union([z.record(z.any()), z.array(z.any())])
@@ -35,14 +40,6 @@ const EVENT_SCHEMA = z.object({
   metadata: z.record(z.any()).default({}),
   tags: z.array(z.string().trim()).default([])
 });
-
-function formatValidationIssues(issues) {
-  return issues.map((issue) => ({
-    path: issue.path.length > 0 ? issue.path.join('.') : '',
-    message: issue.message,
-    code: issue.code
-  }));
-}
 
 function hashValue(value) {
   if (!value) {
@@ -117,7 +114,7 @@ export class TelemetryIngestionService {
       const error = new Error('Telemetry event payload is invalid');
       error.status = 422;
       error.code = 'INVALID_TELEMETRY_EVENT';
-      error.details = formatValidationIssues(validation.error.issues);
+      error.details = formatZodIssues(validation.error.issues);
       throw error;
     }
 
@@ -218,9 +215,9 @@ export class TelemetryIngestionService {
     });
 
     return {
-      event: eventRecord,
+      event: serialiseTelemetryEvent(eventRecord),
       duplicate,
-      consent: consentRecord,
+      consent: serialiseConsentRecord(consentRecord),
       suppressed: resolvedStatus === 'suppressed'
     };
   }

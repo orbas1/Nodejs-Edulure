@@ -16,6 +16,11 @@ const router = createApiRouter();
 
 router.get('/settings/profile', auth('admin'), AdminSettingsController.getAdminProfileSettings);
 router.put('/settings/profile', auth('admin'), AdminSettingsController.updateAdminProfileSettings);
+router.get(
+  '/settings/operational-overview',
+  auth('admin'),
+  AdminSettingsController.getOperationalGovernanceOverview
+);
 router.get('/settings/payments', auth('admin'), AdminSettingsController.getPaymentSettings);
 router.put('/settings/payments', auth('admin'), AdminSettingsController.updatePaymentSettings);
 router.get('/settings/emails', auth('admin'), AdminSettingsController.getEmailSettings);
@@ -44,6 +49,11 @@ router.post('/monetization/usage', auth('admin'), AdminMonetizationController.re
 router.get('/monetization/revenue-schedules', auth('admin'), AdminMonetizationController.listRevenueSchedules);
 router.post('/monetization/reconciliations/run', auth('admin'), AdminMonetizationController.triggerReconciliation);
 router.get('/monetization/reconciliations', auth('admin'), AdminMonetizationController.listReconciliationRuns);
+router.post(
+  '/monetization/reconciliations/:runId/acknowledgements',
+  auth('admin'),
+  AdminMonetizationController.acknowledgeReconciliation
+);
 
 router.get('/blog/posts', auth('admin'), AdminBlogController.list);
 router.post('/blog/posts', auth('admin'), AdminBlogController.create);

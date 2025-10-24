@@ -39,7 +39,9 @@ function toDomain(row) {
   };
 }
 
-export default class TelemetryEventBatchModel {
+export default class TelemetryExportModel {
+  static toDomain = toDomain;
+
   static async create(
     { destination = 's3', status = 'exporting', metadata = {}, startedAt = new Date() } = {},
     connection = db
@@ -58,6 +60,28 @@ export default class TelemetryEventBatchModel {
   static async findById(id, connection = db) {
     const row = await connection(TABLES.EVENT_BATCHES).where({ id }).first();
     return toDomain(row);
+  }
+
+  static async findByBatchUuid(batchUuid, connection = db) {
+    if (!batchUuid) {
+      return null;
+    }
+
+    const row = await connection(TABLES.EVENT_BATCHES).where({ batch_uuid: batchUuid }).first();
+    return toDomain(row);
+  }
+
+  static async listRecent({ limit = 20, destination } = {}, connection = db) {
+    const query = connection(TABLES.EVENT_BATCHES)
+      .orderBy('created_at', 'desc')
+      .limit(Math.max(1, limit));
+
+    if (destination) {
+      query.where({ destination });
+    }
+
+    const rows = await query;
+    return rows.map(toDomain);
   }
 
   static async markExported(

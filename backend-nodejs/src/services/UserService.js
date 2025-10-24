@@ -5,6 +5,7 @@ import db from '../config/database.js';
 import UserModel from '../models/UserModel.js';
 import UserProfileModel from '../models/UserProfileModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import { serializeUserWithProfile } from './serializers/userSerializer.js';
 
 const ALLOWED_ROLES = new Set(['user', 'instructor', 'admin', 'moderator', 'staff', 'service']);
 
@@ -242,88 +243,6 @@ function determineChangedFields(before, after, { includePassword = false } = {})
   return Array.from(new Set(changes));
 }
 
-function parseJson(value, fallback) {
-  if (!value && value !== 0) {
-    return fallback;
-  }
-
-  if (typeof value === 'object') {
-    return value;
-  }
-
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value);
-    } catch (_error) {
-      return fallback;
-    }
-  }
-
-  return fallback;
-}
-
-function parseAddress(value) {
-  if (!value) {
-    return null;
-  }
-
-  if (typeof value === 'object') {
-    return value;
-  }
-
-  const parsed = parseJson(value, null);
-  if (parsed) {
-    return parsed;
-  }
-
-  return { formatted: value };
-}
-
-function parseSocialLinks(raw) {
-  const parsed = parseJson(raw, []);
-  if (!Array.isArray(parsed)) {
-    return [];
-  }
-
-  return parsed
-    .map((entry) => ({
-      label: entry?.label ?? null,
-      url: entry?.url ?? null,
-      handle: entry?.handle ?? null
-    }))
-    .filter((entry) => entry.url);
-}
-
-function composeUser(userRecord, profileRecord) {
-  if (!userRecord) {
-    return null;
-  }
-
-  const { twoFactorEnabled, ...rest } = userRecord;
-  const profile = profileRecord
-    ? {
-        id: profileRecord.id,
-        displayName: profileRecord.displayName ?? null,
-        tagline: profileRecord.tagline ?? null,
-        location: profileRecord.location ?? null,
-        avatarUrl: profileRecord.avatarUrl ?? null,
-        bannerUrl: profileRecord.bannerUrl ?? null,
-        bio: profileRecord.bio ?? null,
-        socialLinks: parseSocialLinks(profileRecord.socialLinks),
-        metadata: parseJson(profileRecord.metadata, {}),
-        createdAt: profileRecord.createdAt ?? null,
-        updatedAt: profileRecord.updatedAt ?? null
-      }
-    : null;
-
-  return {
-    ...rest,
-    twoFactorEnabled: Boolean(twoFactorEnabled),
-    address: parseAddress(userRecord.address),
-    profile
-  };
-}
-
 function normaliseTwoFactorSecret(secret, { fieldName = 'twoFactorSecret' } = {}) {
   if (secret === undefined) {
     return undefined;
@@ -381,7 +300,7 @@ export default class UserService {
 
     const profiles = await UserProfileModel.findByUserIds(users.map((user) => user.id));
     const profileMap = new Map(profiles.map((profile) => [profile.userId, profile]));
-    return users.map((user) => composeUser(user, profileMap.get(user.id)));
+    return users.map((user) => serializeUserWithProfile(user, profileMap.get(user.id)));
   }
 
   static async getById(id) {
@@ -392,7 +311,7 @@ export default class UserService {
       throw error;
     }
     const profile = await UserProfileModel.findByUserId(id);
-    return composeUser(user, profile);
+    return serializeUserWithProfile(user, profile);
   }
 
   static async updateById(id, payload) {
@@ -438,7 +357,7 @@ export default class UserService {
         throw error;
       }
       const nextProfile = await UserProfileModel.findByUserId(id, trx);
-      return composeUser(nextUser, nextProfile);
+      return serializeUserWithProfile(nextUser, nextProfile);
     });
   }
 
@@ -511,7 +430,7 @@ export default class UserService {
         profileRecord = await UserProfileModel.upsert(createdUser.id, profilePayload, trx);
       }
 
-      const composed = composeUser(createdUser, profileRecord);
+      const composed = serializeUserWithProfile(createdUser, profileRecord);
 
       await DomainEventModel.record(
         {
@@ -545,7 +464,7 @@ export default class UserService {
       }
 
       const existingProfile = await UserProfileModel.findByUserId(id, trx);
-      const before = composeUser(existing, existingProfile);
+      const before = serializeUserWithProfile(existing, existingProfile);
 
       const updates = {};
       let passwordUpdated = false;
@@ -667,7 +586,7 @@ export default class UserService {
 
       const refreshedUser = await UserModel.findById(id, trx);
       const refreshedProfile = await UserProfileModel.findByUserId(id, trx);
-      const composed = composeUser(refreshedUser, refreshedProfile);
+      const composed = serializeUserWithProfile(refreshedUser, refreshedProfile);
 
       const changes = determineChangedFields(before, composed, {
         includePassword: passwordUpdated

@@ -1,6 +1,38 @@
 1. Part 1 — Logic Flows & End-to-End Analysis
-      - 1.A Identity, Sessions & Profile Security (`controllers/AuthController.js`, `controllers/UserController.js`, `controllers/SecurityOperationsController.js`, `controllers/VerificationController.js`, `services/AuthService.js`, `services/TwoFactorService.js`, `services/EmailVerificationService.js`, `services/SessionRegistry.js`, `models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`)
-      - 1.B Learner Onboarding, Dashboard & Feedback (`controllers/DashboardController.js`, `controllers/LearnerDashboardController.js`, `controllers/LearnerFeedbackController.js`, `controllers/SetupController.js`, `services/LearnerDashboardService.js`, `services/LearnerProgressService.js`, `services/SetupOrchestratorService.js`, `models/LearnerOnboardingResponseModel.js`, `models/DashboardWidgetModel.js`)
+      - ✅ 1.A Identity, Sessions & Profile Security (`controllers/AuthController.js`, `controllers/UserController.js`, `controllers/SecurityOperationsController.js`, `controllers/VerificationController.js`, `services/AuthService.js`, `services/TwoFactorService.js`, `services/EmailVerificationService.js`, `services/SessionRegistry.js`, `models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`)
+        1. **Appraisal.** The identity surface spans registration through impersonation safeguards, combining `AuthController.js`, `UserController.js`, and verification flows so a single pipeline enforces password, email, and device hygiene across web and mobile entry points.
+        2. **Functionality.** Login, refresh, and logout endpoints mint JWT/refresh tokens, enforce throttling, and hydrate sessions through `SessionRegistry.js` while verification APIs call `EmailVerificationService.js` to issue signed URLs with audit trails in `DomainEventModel.js`. SQL migrations (`001_create_users_table.sql`, `007_identity_onboarding_dashboard.sql`) now provision aligned identity, session, and challenge tables so seeds and runtime models share the same structure across environments.
+        3. **Logic Usefulness.** `AuthService.js` centralises hashing, session minting, and event emission so higher-level controllers stay declarative, and `SecurityOperationsController.js` gives responders consistent risk context for escalations.
+        4. **Redundancies.** Historical duplication between controller responses and `AuthService` sanitisation is resolved by the shared serializer in `services/serializers/userSerializer.js`, keeping profile, dashboard preferences, and session metadata aligned across identity entry points.
+        5. **Placeholders or Stubs.** Security posture exports still stub SIEM adapters; when wiring `DomainEventDispatcherService.js`, ensure downstream connectors enforce encryption-at-rest guarantees.
+        6. **Duplicate Functions.** The new serializer removes parallel implementations in `UserService.js` and `AuthService.js`; remaining overlaps like legacy `utils/sessionHelpers.js` should be retired once downstream tests migrate.
+        7. **Improvements Needed.** Introduce WebAuthn registration, breached password checks, and device binding so high-risk actions can trigger step-up verification via `TwoFactorService.js`.
+        8. **Styling Improvements.** Align notification templates invoked by `MailService.js` with colour tokens in `docs/design-system/tokens.md` and ensure verification states mirror the onboarding UI palette.
+        9. **Efficiency Analysis.** Cache password and policy lookups plus role aggregations by pushing them through `DistributedRuntimeCache.js`, reducing repeated reads during sign-in bursts.
+        10. **Strengths to Keep.** Role-aware two-factor enforcement, domain events for every sensitive transition, and structured throttling keep the security posture observable and auditable.
+        11. **Weaknesses to Remove.** Manual toggles for policy enforcement and cookie flag divergence between REST and GraphQL contexts should be normalised through governance-backed settings.
+        12. **Styling & Colour Review.** Refresh verification email gradients and inline badges to meet AA contrast ratios while matching web onboarding states.
+        13. **CSS, Orientation & Placement.** Provide JSON layout hints for transactional emails so spacing and iconography stay consistent with the React login forms.
+        14. **Text Analysis.** Audit password and MFA copy for clarity, reduce redundant warnings, and link to escalation playbooks maintained by support.
+        15. **Change Checklist Tracker.** Extend `qa/security-readiness-checklist.md` with MFA expiry, impersonation audit, and serializer regression tests before each release.
+        16. **Full Upgrade Plan & Release Steps.** Stage serializer rollout behind flags, canary new auth flows with secondary JWT keys, run penetration tests, coordinate support comms, and monitor analytics for anomalies before full deploy.
+      - ✅ 1.B Learner Onboarding, Dashboard & Feedback (`controllers/DashboardController.js`, `controllers/LearnerDashboardController.js`, `controllers/LearnerFeedbackController.js`, `controllers/SetupController.js`, `services/LearnerDashboardService.js`, `services/LearnerProgressService.js`, `services/SetupOrchestratorService.js`, `models/LearnerOnboardingResponseModel.js`, `models/DashboardWidgetModel.js`)
+        1. **Appraisal.** Onboarding forms, setup orchestration, and dashboard APIs collaborate to personalise journeys, merge invite flows, and surface telemetry-backed insights for every learner persona.
+        2. **Functionality.** `LearnerDashboardController.js` validates complex payloads, invokes `LearnerDashboardService.js` for wallet, finance, and tutoring operations, while `LearnerProgressService.js` aggregates enrolment progress snapshots consumed by dashboards. The shared SQL migration `007_identity_onboarding_dashboard.sql` seeds aligned course, module, lesson, enrollment, and onboarding tables so progress serializers, seeds, and API payloads stay in lockstep across deployments.
+        3. **Logic Usefulness.** Services normalise metadata, merge invite ledgers, and emit acknowledgement references so frontend clients and success teams share consistent state.
+        4. **Redundancies.** Layout hints now originate from `buildCourseCardLayoutMetadata` inside `LearnerProgressService.js`, removing the need for React and Flutter clients to maintain diverging grid constants.
+        5. **Placeholders or Stubs.** Some onboarding tasks still defer to TODO integrations (billing, HRIS); annotate backlog IDs and enforce deterministic responses until connectors arrive.
+        6. **Duplicate Functions.** Layout metadata is centralised in `buildDashboardLayoutFromSummaries`, preventing each widget hydrator from reimplementing card sizing and padding rules.
+        7. **Improvements Needed.** Layer cohort benchmarking, persona-driven onboarding paths, and partial form persistence to reduce abandonment.
+        8. **Styling Improvements.** API responses now include card padding, aspect ratios, and accent colours so downstream clients can map to design tokens without guesswork.
+        9. **Efficiency Analysis.** Continue batching progress queries and prefetching upcoming lessons; reuse the new layout metadata to enable memoised rendering on the client side.
+        10. **Strengths to Keep.** Strong Joi validation, audit events for onboarding transitions, and explicit acknowledgement references keep operations reliable and observable.
+        11. **Weaknesses to Remove.** Manual CSV feedback exports and static widget registries should be replaced with telemetry warehouse syncs and canonical definitions to avoid drift.
+        12. **Styling & Colour Review.** Align sentiment and streak badges with `docs/design-system/components/dashboard.md` to guarantee parity across surfaces.
+        13. **CSS, Orientation & Placement.** Grid hints returned alongside course summaries specify column spans and breakpoints, ensuring responsive layouts remain consistent on tablets and phones.
+        14. **Text Analysis.** Keep onboarding tooltips under 140 characters, remove jargon, and localise critical copy surfaced through `LearnerOnboardingResponseModel.js`.
+        15. **Change Checklist Tracker.** Add onboarding smoke tests, dashboard analytics validation, and layout snapshot checks to the release checklist.
+        16. **Full Upgrade Plan & Release Steps.** Ship new widgets behind feature flags, seed staging with anonymised telemetry, conduct usability studies, brief CSMs, and roll out once KPI uplifts are validated.
       - 1.C Courses, Catalogue & Creation Studio (`controllers/CourseController.js`, `controllers/CatalogueController.js`, `controllers/ContentController.js`, `controllers/CreationStudioController.js`, `controllers/ExplorerController.js`, `services/CourseAccessService.js`, `services/CreationStudioService.js`, `services/CreationAnalyticsService.js`, `services/CreationRecommendationService.js`, `models/CourseModel.js`, `models/LessonModel.js`, `models/AssessmentModel.js`)
       - 1.D Community, Events & Programming (`controllers/CommunityController.js`, `controllers/CommunityEngagementController.js`, `controllers/CommunityProgrammingController.js`, `controllers/CommunityOperationsController.js`, `controllers/CommunityMonetizationController.js`, `controllers/CommunityMemberAdminController.js`, `controllers/CommunityModerationController.js`, `controllers/CommunityChatController.js`, `services/CommunityService.js`, `services/CommunityEngagementService.js`, `services/CommunityProgrammingService.js`, `services/CommunityModerationService.js`, `services/CommunityDonationLifecycle.js`, `services/CommunityAffiliateCommissionService.js`, `services/CommunityOperationsService.js`, `models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/CommunityMembershipModel.js`)
       - 1.E Feed, Social Graph & Direct Messaging (`controllers/FeedController.js`, `controllers/SocialGraphController.js`, `controllers/DirectMessageController.js`, `services/LiveFeedService.js`, `services/SocialGraphService.js`, `services/DirectMessageService.js`, `services/SavedSearchService.js`, `models/PostModel.js`, `models/FeedItemModel.js`, `models/SocialGraphModel.js`, `models/DirectMessageThreadModel.js`)
@@ -11,9 +43,9 @@
       - 1.J Governance, Compliance & Runtime Control (`controllers/GovernanceController.js`, `controllers/ComplianceController.js`, `controllers/RuntimeConfigController.js`, `controllers/AdminFeatureFlagController.js`, `controllers/AdminControlController.js`, `controllers/AdminAuditLogController.js`, `services/FeatureFlagGovernanceService.js`, `services/GovernanceStakeholderService.js`, `services/ComplianceService.js`, `jobs/dataRetentionJob.js`, `jobs/dataPartitionJob.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`)
       - 1.K Integrations, Enablement & Environment Parity (`controllers/AdminIntegrationsController.js`, `controllers/EnablementController.js`, `controllers/IntegrationKeyInviteController.js`, `controllers/EnvironmentParityController.js`, `services/IntegrationOrchestratorService.js`, `services/IntegrationProviderService.js`, `services/EnablementContentService.js`, `services/EnvironmentParityService.js`, `services/IntegrationApiKeyService.js`, `models/IntegrationProviderModel.js`, `models/EnablementGuideModel.js`)
       - 1.L Media, Storage & Asset Pipeline (`controllers/MediaUploadController.js`, `services/AssetIngestionService.js`, `services/AssetService.js`, `services/StorageService.js`, `services/AntivirusService.js`, `models/AssetModel.js`, `models/AssetIngestionJobModel.js`, `models/AssetConversionOutputModel.js`)
-      - 1.M Release, Provider Transition & Platform Settings (`controllers/ReleaseManagementController.js`, `controllers/ProviderTransitionController.js`, `controllers/AdminSettingsController.js`, `services/ReleaseOrchestrationService.js`, `services/ProviderTransitionService.js`, `services/PlatformSettingsService.js`, `models/ReleaseChecklistModel.js`, `models/ProviderTransitionModel.js`, `models/PlatformSettingModel.js`)
-      - 1.N GraphQL Gateway & HTTP Bootstrapping (`graphql/schema.js`, `graphql/router.js`, `server.js`, `servers/websocket.server.js`, `bootstrap/`, `app.js`)
-      - 1.O Repositories, Data Access & Domain Events (`repositories/`, `services/DomainEventDispatcherService.js`, `services/ChangeDataCaptureService.js`, `models/DomainEventModel.js`, `models/JobStateModel.js`)
+      - ✅ 1.M Release, Provider Transition & Platform Settings (`controllers/ReleaseManagementController.js`, `controllers/ProviderTransitionController.js`, `controllers/AdminSettingsController.js`, `services/ReleaseOrchestrationService.js`, `services/ProviderTransitionService.js`, `services/PlatformSettingsService.js`, `models/ReleaseChecklistModel.js`, `models/ProviderTransitionModel.js`, `models/PlatformSettingModel.js`)
+      - ✅ 1.N GraphQL Gateway & HTTP Bootstrapping (`graphql/schema.js`, `graphql/router.js`, `server.js`, `servers/websocket.server.js`, `bootstrap/`, `app.js`)
+      - ✅ 1.O Repositories, Data Access & Domain Events (`repositories/`, `services/DomainEventDispatcherService.js`, `services/ChangeDataCaptureService.js`, `models/DomainEventModel.js`, `models/JobStateModel.js`)
       - 2.A Marketing, Storytelling & Acquisition (`src/pages/Home.jsx`, `src/pages/About.jsx`, `src/pages/Blog.jsx`, `src/pages/BlogPost.jsx`, `src/pages/Ebooks.jsx`, `src/pages/Terms.jsx`, `src/pages/Privacy.jsx`, `src/components/marketing/`, `src/data/marketing/`)
       - 2.B Authentication, Registration & Setup (`src/pages/Login.jsx`, `src/pages/Register.jsx`, `src/pages/InstructorRegister.jsx`, `src/pages/Setup.jsx`, `src/features/auth/`, `src/components/forms/`)
       - 2.C Learner Dashboard & Insights (`src/pages/dashboard/index.jsx`, `src/pages/dashboard/widgets/*`, `src/components/dashboard/`, `src/hooks/useLearnerDashboard.js`)
@@ -56,23 +88,25 @@
       - 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
       - 9.D Strategy, Valuation & Stakeholder Communication (`valuation/`, `docs/operations/strategy.md`, `user experience.md`)
    - Annex A: Expanded Analysis Narratives
-      - A1. Identity, Sessions & Profile Security (1.A)
-      - A2. Learner Onboarding, Dashboard & Feedback (1.B)
+      - ✅ A1. Identity, Sessions & Profile Security (1.A)
+        *See Part 1.A for the 16-point breakdown covering auth flows, shared serializers, and release governance updates.*
+      - ✅ A2. Learner Onboarding, Dashboard & Feedback (1.B)
+        *See Part 1.B for the end-to-end dashboard narrative including layout metadata exports and onboarding orchestration.*
       - A3. Courses, Catalogue & Creation Studio (1.C)
       - A4. Community, Events & Programming (1.D)
-      - A5. Feed, Social Graph & Direct Messaging (1.E)
-      - A6. Explorer, Search & Discovery (1.F)
+      - [x] A5. Feed, Social Graph & Direct Messaging (1.E)
+      - [x] A6. Explorer, Search & Discovery (1.F)
       - A7. Commerce, Billing & Monetisation (1.G)
       - A8. Ads, Growth & Content Marketing (1.H)
-      - A9. Analytics, Intelligence & Telemetry (1.I)
-      - A10. Governance, Compliance & Runtime Control (1.J)
+      - ✅ A9. Analytics, Intelligence & Telemetry (1.I)
+      - ✅ A10. Governance, Compliance & Runtime Control (1.J)
       - A11. Integrations, Enablement & Environment Parity (1.K) ✓
       - A12. Media, Storage & Asset Pipeline (1.L) ✓
-      - A13. Release, Provider Transition & Platform Settings (1.M)
-      - A14. GraphQL Gateway & HTTP Bootstrapping (1.N)
-      - A15. Repositories, Data Access & Domain Events (1.O)
-      - A16. Marketing, Storytelling & Acquisition (2.A)
-      - A17. Authentication, Registration & Setup (2.B)
+      - ✅ A13. Release, Provider Transition & Platform Settings (1.M)
+      - ✅ A14. GraphQL Gateway & HTTP Bootstrapping (1.N)
+      - ✅ A15. Repositories, Data Access & Domain Events (1.O)
+      - ✓ A16. Marketing, Storytelling & Acquisition (2.A)
+      - ✓ A17. Authentication, Registration & Setup (2.B)
       - A18. Learner Dashboard & Insights (2.C)
       - A19. Courses, Library & Live Sessions (2.D)
       - A20. Community, Events & Messaging (2.E)
@@ -129,7 +163,7 @@
       - B6. Flutter Mobile App Deep Dive (`Edulure-Flutter`)
          - B6.A. Mobile Learning Experience (`lib/modules/learning`, `lib/widgets/player`)
       - B7. Data & Analytics Platform
-         - B7.A. Warehouse & ETL (`infrastructure/data/warehouse`, `scripts/etl`)
+         - ✅ B7.A. Warehouse & ETL (`infrastructure/data/warehouse`, `scripts/etl`)
       - B8. Infrastructure & DevOps
          - B8.A. Deployment Pipeline (`infrastructure/pipeline`, `github/workflows`)
       - B9. Quality Assurance & Observability (`qa`, `backend-nodejs/observability`)
@@ -142,7 +176,7 @@
       - C4. Live Classes & Tutoring Operations (`frontend-reactjs/src/pages/dashboard/InstructorLiveClasses.jsx`, `frontend-reactjs/src/pages/dashboard/LearnerLiveClasses.jsx`, `frontend-reactjs/src/pages/dashboard/InstructorTutorBookings.jsx`, `backend-nodejs/src/controllers/InstructorBookingController.js`, `backend-nodejs/src/controllers/AdminBookingController.js`, `backend-nodejs/src/services/LearnerDashboardService.js`, `backend-nodejs/src/services/InstructorSchedulingService.js`, `backend-nodejs/src/models/TutorBookingModel.js`)
       - C5. Integration Credential Invitations & API Key Governance (`frontend-reactjs/src/pages/IntegrationCredentialInvite.jsx`, `frontend-reactjs/src/api/integrationInviteApi.js`, `frontend-reactjs/src/hooks/usePageMetadata.js`, `backend-nodejs/src/controllers/AdminIntegrationsController.js`, `backend-nodejs/src/services/IntegrationApiKeyService.js`, `backend-nodejs/src/services/IntegrationApiKeyInviteService.js`, `backend-nodejs/src/services/IntegrationDashboardService.js`)
       - C6. Admin Approvals, Operations & Setup Governance (`frontend-reactjs/src/pages/admin/sections/AdminApprovalsSection.jsx`, `frontend-reactjs/src/pages/admin/sections/AdminOperationsSection.jsx`, `frontend-reactjs/src/hooks/useSetupProgress.js`, `frontend-reactjs/src/pages/Admin.jsx`, `backend-nodejs/src/controllers/AdminSettingsController.js`, `backend-nodejs/src/services/PlatformSettingsService.js`, `backend-nodejs/src/services/ReleaseOrchestrationService.js`)
-      - C7. Legal, Privacy & Compliance Centre (`frontend-reactjs/src/pages/Terms.jsx`, `frontend-reactjs/src/pages/Privacy.jsx`, `frontend-reactjs/src/pages/LegalContact.jsx`, `backend-nodejs/src/controllers/ComplianceController.js`, `backend-nodejs/src/models/DataSubjectRequestModel.js`, `docs/compliance/policies/*`, `docs/legal/content`)
+      - ✅ C7. Legal, Privacy & Compliance Centre (`frontend-reactjs/src/pages/Terms.jsx`, `frontend-reactjs/src/pages/Privacy.jsx`, `frontend-reactjs/src/pages/LegalContact.jsx`, `backend-nodejs/src/controllers/ComplianceController.js`, `backend-nodejs/src/models/DataSubjectRequestModel.js`, `docs/compliance/policies/*`, `docs/legal/content`)
 2. Part 2 — User Experience Audit & Component Breakdown
       - 1.A Entrypoints & Layout Containers
          - 1.A.1 AdminShell (frontend-reactjs/src/layouts/AdminShell.jsx)

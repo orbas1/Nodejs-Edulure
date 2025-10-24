@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { normaliseReactionSummary as normaliseReactionSummaryAggregate, withReactionTotals } from '../services/ReactionAggregationService.js';
 
 const POST_COLUMNS = [
   'cp.id',
@@ -93,21 +94,45 @@ function normaliseTags(tags) {
 }
 
 function normaliseReactionSummary(summary) {
-  if (!summary || typeof summary !== 'object') {
-    return {};
-  }
+  return normaliseReactionSummaryAggregate(summary);
+}
 
-  return Object.entries(summary).reduce((acc, [key, value]) => {
-    const reactionKey = typeof key === 'string' ? key.trim().toLowerCase() : null;
-    const numeric = Number(value);
-    if (!reactionKey || !Number.isFinite(numeric)) {
-      return acc;
+function encodeCursor(payload) {
+  try {
+    return Buffer.from(JSON.stringify(payload)).toString('base64url');
+  } catch (_error) {
+    return null;
+  }
+}
+
+function buildPaginationMetadata({ page, perPage, total, items }) {
+  const safePerPage = Math.max(1, Number(perPage) || 1);
+  const pageCount = total ? Math.ceil(total / safePerPage) : 0;
+  const hasNext = pageCount ? page < pageCount : false;
+  const hasPrevious = pageCount ? page > 1 : false;
+  const lastItem = items[items.length - 1];
+  const firstItem = items[0];
+  const nextCursor = hasNext && lastItem
+    ? encodeCursor({ page: page + 1, anchor: lastItem.publishedAt ?? lastItem.createdAt ?? lastItem.id })
+    : null;
+  const previousCursor = hasPrevious && firstItem
+    ? encodeCursor({ page: page - 1, anchor: firstItem.publishedAt ?? firstItem.createdAt ?? firstItem.id })
+    : null;
+
+  return {
+    page,
+    perPage: safePerPage,
+    total,
+    pageCount,
+    hasNext,
+    hasPrevious,
+    nextPage: hasNext ? page + 1 : null,
+    previousPage: hasPrevious ? page - 1 : null,
+    cursors: {
+      next: nextCursor,
+      previous: previousCursor
     }
-    return {
-      ...acc,
-      [reactionKey]: Math.max(0, Math.trunc(numeric))
-    };
-  }, {});
+  };
 }
 
 function toDomain(record) {
@@ -166,6 +191,10 @@ function clamp(value, { min = 1, max = 100, defaultValue = 10 } = {}) {
 export default class CommunityPostModel {
   static toDomain(record) {
     return toDomain(record);
+  }
+
+  static buildPaginationMetadata(payload) {
+    return buildPaginationMetadata(payload);
   }
 
   static sanitisePagination({ page = 1, perPage = 10 } = {}) {
@@ -308,10 +337,9 @@ export default class CommunityPostModel {
   }
 
   static async updateReactionSummary(id, summary = {}, connection = db) {
-    const reactions = normaliseReactionSummary(summary);
-    const total = Object.values(reactions).reduce((sum, value) => sum + Number(value ?? 0), 0);
+    const reactions = withReactionTotals(summary);
     const payload = {
-      reaction_summary: JSON.stringify({ ...reactions, total }),
+      reaction_summary: JSON.stringify(reactions),
       updated_at: connection.fn.now()
     };
 
@@ -397,7 +425,7 @@ export default class CommunityPostModel {
       .count({ count: '*' })
       .first();
 
-    const items = await baseQuery
+    const rows = await baseQuery
       .orderByRaw('CASE WHEN cp.pinned_at IS NULL THEN 1 ELSE 0 END ASC')
       .orderBy('cp.pinned_at', 'desc')
       .orderBy('cp.published_at', 'desc')
@@ -406,15 +434,11 @@ export default class CommunityPostModel {
       .offset((page - 1) * perPage);
 
     const total = Number(totalRow?.count ?? 0);
+    const items = rows.map((item) => toDomain(item));
 
     return {
-      items: items.map((item) => toDomain(item)),
-      pagination: {
-        page,
-        perPage,
-        total,
-        pageCount: total ? Math.ceil(total / perPage) : 0
-      }
+      items,
+      pagination: buildPaginationMetadata({ page, perPage, total, items })
     };
   }
 
@@ -464,7 +488,7 @@ export default class CommunityPostModel {
       .count({ count: '*' })
       .first();
 
-    const items = await baseQuery
+    const rows = await baseQuery
       .orderByRaw('CASE WHEN cp.pinned_at IS NULL THEN 1 ELSE 0 END ASC')
       .orderBy('cp.pinned_at', 'desc')
       .orderBy('cp.published_at', 'desc')
@@ -473,15 +497,11 @@ export default class CommunityPostModel {
       .offset((page - 1) * perPage);
 
     const total = Number(totalRow?.count ?? 0);
+    const items = rows.map((item) => toDomain(item));
 
     return {
-      items: items.map((item) => toDomain(item)),
-      pagination: {
-        page,
-        perPage,
-        total,
-        pageCount: total ? Math.ceil(total / perPage) : 0
-      }
+      items,
+      pagination: buildPaginationMetadata({ page, perPage, total, items })
     };
   }
 }

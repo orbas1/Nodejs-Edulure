@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "communities": {
+      "defaultSort": "trending",
+      "scoreWeights": {
+        "members": 0.35,
+        "posts": 2,
+        "resources": 1.6,
+        "events": 2.4,
+        "reactions": 0.5
+      }
+    },
+    "courses": {
+      "defaultSort": "relevance"
+    },
+    "ebooks": {
+      "defaultSort": "relevance"
+    },
+    "tutors": {
+      "defaultSort": "relevance"
+    }
+  }
+}

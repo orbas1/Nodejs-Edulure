@@ -1,4 +1,7 @@
+import { createHash, randomUUID } from 'node:crypto';
+
 import db from '../config/database.js';
+import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
 import PaymentLedgerEntryModel from '../models/PaymentLedgerEntryModel.js';
@@ -14,8 +17,331 @@ import {
   recordRevenueReversal,
   updateDeferredRevenueBalance
 } from '../observability/metrics.js';
+import MonetizationAlertNotificationService from './MonetizationAlertNotificationService.js';
+import { normalizeCurrencyCode } from '../utils/currency.js';
 
 const serviceLogger = logger.child({ module: 'monetization-finance-service' });
+const alertNotifier = new MonetizationAlertNotificationService();
+
+const RECONCILIATION_SEVERITY_RANK = Object.freeze({
+  normal: 0,
+  low: 1,
+  medium: 2,
+  high: 3
+});
+
+function resolveReconciliationThresholds() {
+  const config = env.monetization?.reconciliation ?? {};
+  const varianceAlertBps = Number.isFinite(config.varianceAlertBps) ? config.varianceAlertBps : 250;
+  const varianceCriticalBps = Number.isFinite(config.varianceCriticalBps)
+    ? config.varianceCriticalBps
+    : Math.max(varianceAlertBps * 2, 400);
+  const usageVarianceAlertBps = Number.isFinite(config.usageVarianceAlertBps)
+    ? config.usageVarianceAlertBps
+    : 200;
+  const minimumInvoicedCents = Number.isFinite(config.minimumInvoicedCents) ? config.minimumInvoicedCents : 5000;
+  const alertCooldownMinutes = Number.isFinite(config.alertCooldownMinutes) ? config.alertCooldownMinutes : 120;
+
+  return {
+    varianceAlertBps,
+    varianceCriticalBps,
+    usageVarianceAlertBps,
+    minimumInvoicedCents,
+    alertCooldownMinutes
+  };
+}
+
+function computeAlertDigest(alerts = []) {
+  if (!Array.isArray(alerts) || alerts.length === 0) {
+    return null;
+  }
+  const hash = createHash('sha1');
+  for (const alert of alerts) {
+    hash.update(JSON.stringify({
+      type: alert.type,
+      severity: alert.severity,
+      message: alert.message,
+      details: alert.details ?? null
+    }));
+  }
+  return hash.digest('hex');
+}
+
+function minutesBetweenDates(start, end) {
+  if (!start || !end) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime())) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return Math.abs(endDate.getTime() - startDate.getTime()) / 60000;
+}
+
+function shouldDispatchNotifications({ evaluation, previousRun, digest }) {
+  if (!evaluation || !Array.isArray(evaluation.alerts) || evaluation.alerts.length === 0) {
+    return false;
+  }
+
+  if (!previousRun) {
+    return true;
+  }
+
+  const previousMetadata = previousRun.metadata ?? {};
+  const previousSeverity = previousMetadata.severity ?? previousMetadata.alertSeverity ?? 'normal';
+  const previousDigest = previousMetadata.alertDigest ?? previousMetadata.notifications?.lastDigest ?? null;
+  const previousSentAt = previousMetadata.notifications?.lastSentAt ?? null;
+
+  const severityRank = RECONCILIATION_SEVERITY_RANK[evaluation.severity] ?? 0;
+  const previousRank = RECONCILIATION_SEVERITY_RANK[previousSeverity] ?? 0;
+
+  if (severityRank > previousRank) {
+    return true;
+  }
+
+  if (digest && digest !== previousDigest) {
+    return true;
+  }
+
+  const cooldownMinutes = Number.isFinite(evaluation.thresholds?.alertCooldownMinutes)
+    ? evaluation.thresholds.alertCooldownMinutes
+    : resolveReconciliationThresholds().alertCooldownMinutes;
+
+  const elapsed = minutesBetweenDates(previousSentAt, new Date().toISOString());
+  return elapsed >= cooldownMinutes;
+}
+
+function normaliseCurrencyCode(value, fallback = 'GBP') {
+  return normalizeCurrencyCode(value, fallback ?? env.payments?.defaultCurrency ?? 'USD');
+}
+
+async function processReconciliationNotifications({ run, evaluation, previousRun, digest, connection }) {
+  if (!run || !evaluation || !Array.isArray(evaluation.alerts) || evaluation.alerts.length === 0) {
+    return run;
+  }
+
+  const notifierConfig = env.monetization?.reconciliation?.notifications ?? {};
+  const hasChannels =
+    typeof alertNotifier.hasChannels === 'function'
+      ? alertNotifier.hasChannels()
+      : Boolean(notifierConfig.emailRecipients?.length);
+
+  if (!hasChannels) {
+    return run;
+  }
+
+  const dispatchRequired = shouldDispatchNotifications({ evaluation, previousRun, digest });
+  if (!dispatchRequired) {
+    return run;
+  }
+
+  try {
+    const dispatchResult = await alertNotifier.dispatch({ run, evaluation, digest });
+    if (!dispatchResult || !Array.isArray(dispatchResult.channels) || dispatchResult.channels.length === 0) {
+      return run;
+    }
+
+    const sentAt = dispatchResult.sentAt ?? new Date().toISOString();
+    const channels = Array.from(new Set(dispatchResult.channels));
+    const recipients = dispatchResult.recipients ?? {};
+
+    const updatedRun = await MonetizationReconciliationRunModel.updateMetadata(
+      run.id,
+      (metadata = {}) => ({
+        ...metadata,
+        alertDigest: digest ?? metadata.alertDigest ?? null,
+        notifications: {
+          ...(metadata.notifications ?? {}),
+          lastSentAt: sentAt,
+          lastDigest: digest ?? metadata.notifications?.lastDigest ?? null,
+          channels,
+          recipients
+        }
+      }),
+      connection
+    );
+
+    return updatedRun ?? run;
+  } catch (error) {
+    serviceLogger.error({ err: error, runId: run.id }, 'Failed to dispatch monetization reconciliation alerts');
+    return run;
+  }
+}
+
+function sanitiseOperatorName(name) {
+  if (typeof name !== 'string') {
+    return null;
+  }
+  const trimmed = name.trim();
+  return trimmed.length ? trimmed.slice(0, 120) : null;
+}
+
+function sanitiseOperatorEmail(email) {
+  if (typeof email !== 'string') {
+    return null;
+  }
+  const trimmed = email.trim();
+  return trimmed.length <= 180 ? trimmed.toLowerCase() : trimmed.slice(0, 180).toLowerCase();
+}
+
+function sanitiseChannel(channel) {
+  if (typeof channel !== 'string') {
+    return 'manual';
+  }
+  const trimmed = channel.trim().toLowerCase();
+  return trimmed.length ? trimmed.slice(0, 40) : 'manual';
+}
+
+function sanitiseNote(note) {
+  if (typeof note !== 'string') {
+    return null;
+  }
+  const trimmed = note.trim();
+  if (!trimmed.length) {
+    return null;
+  }
+  return trimmed.slice(0, 500);
+}
+
+function buildAcknowledgement(payload = {}) {
+  return {
+    id: payload.id ?? randomUUID(),
+    acknowledgedAt: payload.acknowledgedAt ?? new Date().toISOString(),
+    operatorId: payload.operatorId ?? null,
+    operatorName: sanitiseOperatorName(payload.operatorName ?? payload.operator?.name),
+    operatorEmail: sanitiseOperatorEmail(payload.operatorEmail ?? payload.operator?.email),
+    channel: sanitiseChannel(payload.channel),
+    note: sanitiseNote(payload.note)
+  };
+}
+
+function formatAcknowledgements(metadata = {}) {
+  const entries = Array.isArray(metadata.acknowledgements) ? metadata.acknowledgements : [];
+  return entries
+    .map((entry) => ({
+      id: entry.id ?? null,
+      acknowledgedAt: entry.acknowledgedAt ?? null,
+      operatorId: entry.operatorId ?? null,
+      operatorName: entry.operatorName ?? null,
+      operatorEmail: entry.operatorEmail ?? null,
+      channel: entry.channel ?? 'manual',
+      note: entry.note ?? null
+    }))
+    .filter((entry) => entry.acknowledgedAt);
+}
+
+function formatNotificationMetadata(metadata = {}) {
+  const notifications = metadata.notifications ?? null;
+  if (!notifications) {
+    return null;
+  }
+
+  return {
+    lastSentAt: notifications.lastSentAt ?? null,
+    lastDigest: notifications.lastDigest ?? null,
+    channels: Array.isArray(notifications.channels) ? notifications.channels : [],
+    recipients: notifications.recipients ?? {}
+  };
+}
+
+function calculateBps(delta, denominator, minimum) {
+  const base = Math.max(Math.abs(Number(denominator ?? 0)), minimum ?? 1);
+  if (!Number.isFinite(base) || base <= 0) {
+    return 0;
+  }
+  const ratio = Number(delta ?? 0) / base;
+  if (!Number.isFinite(ratio)) {
+    return 0;
+  }
+  return Math.round(ratio * 10_000);
+}
+
+function elevateSeverity(current, candidate) {
+  const currentRank = RECONCILIATION_SEVERITY_RANK[current] ?? 0;
+  const candidateRank = RECONCILIATION_SEVERITY_RANK[candidate] ?? 0;
+  return candidateRank > currentRank ? candidate : current;
+}
+
+function buildVarianceMessage(bps, direction) {
+  const percentage = Math.abs(bps) / 100;
+  const descriptor = direction === 'above' ? 'above' : 'below';
+  return `Recognized revenue is ${descriptor} invoiced totals by ${percentage.toFixed(2)}%.`;
+}
+
+function evaluateReconciliationOutcome({ invoicedCents, recognizedCents, usageCents, deferredCents }) {
+  const thresholds = resolveReconciliationThresholds();
+  const alerts = [];
+  const varianceCents = Number(recognizedCents ?? 0) - Number(invoicedCents ?? 0);
+  const usageVarianceCents = Number(usageCents ?? 0) - Number(invoicedCents ?? 0);
+  const varianceBps = calculateBps(varianceCents, invoicedCents, thresholds.minimumInvoicedCents);
+  const usageVarianceBps = calculateBps(usageVarianceCents, invoicedCents, thresholds.minimumInvoicedCents);
+
+  let severity = 'normal';
+
+  if (Math.abs(varianceBps) >= thresholds.varianceAlertBps) {
+    const direction = varianceCents >= 0 ? 'above' : 'below';
+    const alertSeverity = Math.abs(varianceBps) >= thresholds.varianceCriticalBps ? 'high' : 'medium';
+    severity = elevateSeverity(severity, alertSeverity);
+    alerts.push({
+      type: 'recognized_vs_invoiced',
+      severity: alertSeverity,
+      message: buildVarianceMessage(varianceBps, direction),
+      suggestedAction:
+        direction === 'above'
+          ? 'Review revenue recognition schedules and confirm duplicate captures were not recorded.'
+          : 'Investigate missing revenue schedules or delayed recognition for captured invoices.',
+      details: {
+        varianceCents,
+        varianceBps
+      }
+    });
+  }
+
+  if (Math.abs(usageVarianceBps) >= thresholds.usageVarianceAlertBps) {
+    const usageSeverity = Math.abs(usageVarianceBps) >= thresholds.varianceCriticalBps ? 'high' : 'medium';
+    severity = elevateSeverity(severity, usageSeverity);
+    alerts.push({
+      type: 'usage_vs_invoiced',
+      severity: usageSeverity,
+      message:
+        usageVarianceCents >= 0
+          ? 'Usage billing exceeds captured invoices within the window.'
+          : 'Captured invoices exceed recorded usage within the window.',
+      suggestedAction:
+        usageVarianceCents >= 0
+          ? 'Verify usage aggregation and ensure invoices are generated for the recorded consumption.'
+          : 'Check whether usage events failed to ingest or were reconciled late.',
+      details: {
+        varianceCents: usageVarianceCents,
+        varianceBps: usageVarianceBps
+      }
+    });
+  }
+
+  if (Number(deferredCents ?? 0) < 0) {
+    severity = elevateSeverity(severity, 'high');
+    alerts.push({
+      type: 'deferred_balance_negative',
+      severity: 'high',
+      message: 'Deferred revenue balance is negative; schedules may have been reversed incorrectly.',
+      suggestedAction: 'Audit recent manual adjustments and ensure reversal entries are applied to the correct period.',
+      details: {
+        deferredCents: Number(deferredCents ?? 0)
+      }
+    });
+  }
+
+  return {
+    status: alerts.length > 0 ? 'attention' : 'completed',
+    severity,
+    varianceBps,
+    usageVarianceBps,
+    usageVarianceCents,
+    alerts,
+    thresholds
+  };
+}
 
 function resolveConnection(connection) {
   return connection ?? db;
@@ -347,7 +673,7 @@ class MonetizationFinanceService {
         quantity: coercePositiveInteger(event.quantity ?? 0),
         unitAmountCents: coercePositiveInteger(event.unitAmountCents ?? 0),
         amountCents: coercePositiveInteger(event.amountCents ?? 0),
-        currency: (event.currency ?? 'GBP').toUpperCase(),
+        currency: normaliseCurrencyCode(event.currency, 'GBP'),
         source: event.source ?? 'manual',
         externalReference: event.externalReference ?? null,
         paymentIntentId: event.paymentIntentId ?? null,
@@ -361,7 +687,7 @@ class MonetizationFinanceService {
     recordMonetizationUsage({
       productCode,
       source: event.source ?? 'manual',
-      currency: event.currency ?? 'GBP',
+      currency: normaliseCurrencyCode(event.currency, 'GBP'),
       amountCents: record.amountCents
     });
     return record;
@@ -423,7 +749,7 @@ class MonetizationFinanceService {
         revenueRecognitionMethod: recognitionMethod,
         recognitionDurationDays: recognitionMethod === 'deferred' ? duration : 0,
         unitAmountCents: coercePositiveInteger(item.unitAmount ?? 0),
-        currency: (item.currency ?? 'GBP').toUpperCase(),
+        currency: normaliseCurrencyCode(item.currency, 'GBP'),
         usageMetric: item.metadata?.usageMetric ?? null,
         revenueAccount: item.metadata?.revenueAccount ?? '4000-education-services',
         deferredRevenueAccount:
@@ -488,7 +814,7 @@ class MonetizationFinanceService {
         revenueRecognitionMethod: recognitionMethod,
         recognitionDurationDays: recognitionMethod === 'deferred' ? duration : 0,
         unitAmountCents: coercePositiveInteger(item.unitAmount ?? 0),
-        currency: (item.currency ?? 'GBP').toUpperCase(),
+        currency: normaliseCurrencyCode(item.currency, 'GBP'),
         usageMetric: item.metadata?.usageMetric ?? null,
         revenueAccount: item.metadata?.revenueAccount ?? '4000-education-services',
         deferredRevenueAccount:
@@ -725,7 +1051,7 @@ class MonetizationFinanceService {
     }
 
     const normalizedTenant = normaliseTenantId(tenantId ?? 'global');
-    const normalizedCurrency = (currency ?? 'GBP').toUpperCase();
+    const normalizedCurrency = normaliseCurrencyCode(currency, 'GBP');
     const appliedAt = toIsoDate(processedAt ?? new Date());
 
     const schedules = await MonetizationRevenueScheduleModel.listByPaymentIntent(
@@ -1000,6 +1326,11 @@ class MonetizationFinanceService {
       };
     }
 
+    const previousRun = await MonetizationReconciliationRunModel.latest(
+      { tenantId: normalizedTenant },
+      connection
+    );
+
     const paymentsQuery = queryConnection('payment_intents')
       .where({ status: 'succeeded' })
       .andWhereNotNull('captured_at')
@@ -1027,13 +1358,20 @@ class MonetizationFinanceService {
 
     const varianceCents = recognizedCents - invoicedCents;
     const varianceRatio = invoicedCents > 0 ? Number((varianceCents / invoicedCents).toFixed(4)) : 0;
+    const evaluation = evaluateReconciliationOutcome({
+      invoicedCents,
+      recognizedCents,
+      usageCents,
+      deferredCents
+    });
+    const alertDigest = computeAlertDigest(evaluation.alerts);
 
     const run = await MonetizationReconciliationRunModel.create(
       {
         tenantId: normalizedTenant,
         windowStart,
         windowEnd,
-        status: 'completed',
+        status: evaluation.status,
         invoicedCents,
         usageCents,
         recognizedCents,
@@ -1042,7 +1380,15 @@ class MonetizationFinanceService {
         varianceRatio,
         metadata: {
           reconciliationMethod: 'automated',
-          generatedAt: new Date().toISOString()
+          generatedAt: new Date().toISOString(),
+          varianceBps: evaluation.varianceBps,
+          usageVarianceCents: evaluation.usageVarianceCents,
+          usageVarianceBps: evaluation.usageVarianceBps,
+          severity: evaluation.severity,
+          alerts: evaluation.alerts,
+          thresholds: evaluation.thresholds,
+          alertCooldownMinutes: evaluation.thresholds.alertCooldownMinutes,
+          alertDigest
         }
       },
       connection
@@ -1050,7 +1396,15 @@ class MonetizationFinanceService {
 
     updateDeferredRevenueBalance({ tenantId: normalizedTenant, balanceCents: deferredCents });
 
-    return run;
+    const processedRun = await processReconciliationNotifications({
+      run,
+      evaluation,
+      previousRun,
+      digest: alertDigest,
+      connection
+    });
+
+    return processedRun;
   }
 
   static async getRevenueOverview({ tenantId = 'global', since, until, connection } = {}) {
@@ -1142,6 +1496,103 @@ class MonetizationFinanceService {
       return null;
     }
     return MonetizationReconciliationRunModel.latest(params, targetConnection);
+  }
+
+  static async listReconciliationAlerts({ tenantId = 'global', limit = 10, since } = {}, connection = db) {
+    const normalizedTenant = normaliseTenantId(tenantId);
+    const { connection: targetConnection } = resolveModelConnection(connection);
+    if (!targetConnection) {
+      return [];
+    }
+
+    const fetchLimit = Math.min(Math.max(limit, 1) * 3, 100);
+    const runs = await MonetizationReconciliationRunModel.list(
+      { tenantId: normalizedTenant, limit: fetchLimit },
+      targetConnection
+    );
+
+    const sinceDate = since ? new Date(since) : null;
+    const results = [];
+
+    for (const run of runs) {
+      const alerts = Array.isArray(run.metadata?.alerts) ? run.metadata.alerts : [];
+      if (!alerts.length) {
+        continue;
+      }
+
+      if (sinceDate && run.createdAt) {
+        const createdAt = new Date(run.createdAt);
+        if (Number.isFinite(createdAt.getTime()) && createdAt < sinceDate) {
+          continue;
+        }
+      }
+
+      const metadata = run.metadata ?? {};
+      results.push({
+        id: run.id,
+        tenantId: run.tenantId,
+        windowStart: run.windowStart,
+        windowEnd: run.windowEnd,
+        severity: metadata.severity ?? 'medium',
+        varianceCents: run.varianceCents,
+        varianceRatio: run.varianceRatio,
+        usageVarianceCents: metadata.usageVarianceCents ?? null,
+        varianceBps: metadata.varianceBps ?? null,
+        usageVarianceBps: metadata.usageVarianceBps ?? null,
+        alerts,
+        acknowledgements: formatAcknowledgements(metadata),
+        notifications: formatNotificationMetadata(metadata),
+        createdAt: run.createdAt,
+        updatedAt: run.updatedAt
+      });
+
+      if (results.length >= limit) {
+        break;
+      }
+    }
+
+    return results;
+  }
+
+  static async acknowledgeReconciliationAlert(
+    { runId, operatorId, operatorName, operatorEmail, channel, note } = {},
+    connection = db
+  ) {
+    if (!runId) {
+      const error = new Error('runId is required to acknowledge a reconciliation alert');
+      error.status = 422;
+      throw error;
+    }
+
+    const acknowledgement = buildAcknowledgement({
+      operatorId: operatorId ?? null,
+      operatorName,
+      operatorEmail,
+      channel,
+      note
+    });
+
+    const updatedRun = await MonetizationReconciliationRunModel.appendAcknowledgement(
+      { id: runId, acknowledgement },
+      connection
+    );
+
+    if (!updatedRun) {
+      const notFound = new Error('Reconciliation run not found');
+      notFound.status = 404;
+      throw notFound;
+    }
+
+    const metadata = updatedRun.metadata ?? {};
+
+    return {
+      id: updatedRun.id,
+      tenantId: updatedRun.tenantId,
+      acknowledgement,
+      acknowledgements: formatAcknowledgements(metadata),
+      notifications: formatNotificationMetadata(metadata),
+      updatedAt: updatedRun.updatedAt
+    };
   }
 
   static async listActiveTenants(connection = db) {

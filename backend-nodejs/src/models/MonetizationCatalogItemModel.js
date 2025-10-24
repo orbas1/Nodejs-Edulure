@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import { normalizeCurrencyCode } from '../utils/currency.js';
 
 const TABLE = 'monetization_catalog_items';
 
@@ -95,7 +96,7 @@ export default class MonetizationCatalogItemModel {
       revenue_recognition_method: payload.revenueRecognitionMethod ?? 'immediate',
       recognition_duration_days: payload.recognitionDurationDays ?? 0,
       unit_amount_cents: payload.unitAmountCents ?? 0,
-      currency: (payload.currency ?? 'GBP').toUpperCase(),
+      currency: normalizeCurrencyCode(payload.currency, 'GBP'),
       usage_metric: payload.usageMetric ?? null,
       revenue_account: payload.revenueAccount ?? '4000-education-services',
       deferred_revenue_account: payload.deferredRevenueAccount ?? '2050-deferred-revenue',
@@ -135,7 +136,7 @@ export default class MonetizationCatalogItemModel {
       payload.unit_amount_cents = updates.unitAmountCents;
     }
     if (updates.currency) {
-      payload.currency = updates.currency.toUpperCase();
+      payload.currency = normalizeCurrencyCode(updates.currency, 'GBP');
     }
     if (updates.usageMetric !== undefined) {
       payload.usage_metric = updates.usageMetric;

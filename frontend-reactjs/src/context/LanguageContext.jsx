@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 
+import { buildTestimonialDictionary } from '../data/marketing/testimonials.js';
+
 const STORAGE_KEY = 'edulure.language';
 
 export const SUPPORTED_LANGUAGES = Object.freeze([
@@ -156,18 +158,7 @@ const TRANSLATIONS = {
       },
       testimonials: {
         heading: 'Trusted by ambitious learning operators',
-        items: {
-          lena: {
-            quote: 'We shipped our cohort in two weeks with the templates and live ops tools.',
-            name: 'Lena Ortiz',
-            role: 'Founder, CohortCraft'
-          },
-          noah: {
-            quote: 'Billing, scheduling, and community rooms finally live in one workflow.',
-            name: 'Noah Winter',
-            role: 'Director, Global Learning Lab'
-          }
-        }
+        items: buildTestimonialDictionary()
       },
       perks: {
         eyebrow: 'Playful perks',

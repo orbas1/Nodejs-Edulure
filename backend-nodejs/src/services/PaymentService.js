@@ -25,6 +25,7 @@ import webhookEventBusService from './WebhookEventBusService.js';
 import IntegrationProviderService from './IntegrationProviderService.js';
 import MonetizationFinanceService from './MonetizationFinanceService.js';
 import CommunityAffiliateCommissionService from './CommunityAffiliateCommissionService.js';
+import { centsToCurrencyString, currencyStringToCents, normalizeCurrencyCode } from '../utils/currency.js';
 
 const COMMISSION_CATEGORY_MAP = Object.freeze({
   community_subscription: 'community_subscription',
@@ -39,19 +40,11 @@ const COMMISSION_CATEGORY_MAP = Object.freeze({
 });
 const MAX_COUPON_PERCENTAGE_BASIS_POINTS = Math.round(env.payments.coupons.maxPercentageDiscount * 100);
 
-function centsToCurrencyString(amount) {
-  return (Math.round(amount) / 100).toFixed(2);
-}
-
-function currencyStringToCents(value) {
+function normalizeTenantId(value) {
   if (!value) {
-    return 0;
+    return 'global';
   }
-  const parsed = Number.parseFloat(value);
-  if (Number.isNaN(parsed)) {
-    return 0;
-  }
-  return Math.round(parsed * 100);
+  return String(value).trim().toLowerCase() || 'global';
 }
 
 function normaliseEmail(value) {
@@ -384,7 +377,7 @@ class PaymentService {
   }
 
   static normalizeCurrency(currency) {
-    const normalized = (currency ?? env.payments.defaultCurrency).toUpperCase();
+    const normalized = normalizeCurrencyCode(currency, env.payments.defaultCurrency);
     if (!env.payments.allowedCurrencies.includes(normalized)) {
       const error = new Error(`Unsupported currency: ${normalized}`);
       error.status = 422;
@@ -1595,8 +1588,9 @@ class PaymentService {
     });
   }
 
-  static async getFinanceSummary({ startDate, endDate, currency }) {
+  static async getFinanceSummary({ startDate, endDate, currency, tenantId }) {
     const normalizedCurrency = currency ? this.normalizeCurrency(currency) : null;
+    const normalizedTenant = normalizeTenantId(tenantId);
 
     const paymentsQuery = db('payment_intents')
       .select('currency')
@@ -1618,7 +1612,7 @@ class PaymentService {
     }
 
     const rows = await paymentsQuery.groupBy('currency');
-    return rows.map((row) => {
+    const currencies = rows.map((row) => {
       const gross = Number(row.gross ?? 0);
       const discount = Number(row.discount ?? 0);
       const tax = Number(row.tax ?? 0);
@@ -1633,6 +1627,43 @@ class PaymentService {
         captured: Number(row.total ?? 0)
       };
     });
+
+    const [revenueOverview, latestReconciliation, alerts] = await Promise.all([
+      MonetizationFinanceService.getRevenueOverview({
+        tenantId: normalizedTenant,
+        since: startDate ?? null,
+        until: endDate ?? null
+      }),
+      MonetizationFinanceService.latestReconciliation({ tenantId: normalizedTenant }),
+      MonetizationFinanceService.listReconciliationAlerts({ tenantId: normalizedTenant, limit: 5 })
+    ]);
+
+    const latestMetadata = latestReconciliation?.metadata ?? {};
+    const monetization = {
+      tenantId: revenueOverview?.tenantId ?? normalizedTenant,
+      summary: revenueOverview?.summary ?? null,
+      deferredRevenueCents: revenueOverview?.deferredRevenueCents ?? 0,
+      recognizedRevenueCents: revenueOverview?.recognizedRevenueCents ?? 0,
+      generatedAt: revenueOverview?.generatedAt ?? new Date().toISOString(),
+      latestReconciliation: latestReconciliation
+        ? {
+            id: latestReconciliation.id,
+            status: latestReconciliation.status,
+            varianceCents: latestReconciliation.varianceCents,
+            varianceRatio: latestReconciliation.varianceRatio,
+            severity: latestMetadata.severity ?? 'normal',
+            alertCount: Array.isArray(latestMetadata.alerts) ? latestMetadata.alerts.length : 0,
+            varianceBps: latestMetadata.varianceBps ?? null,
+            usageVarianceBps: latestMetadata.usageVarianceBps ?? null,
+            windowStart: latestReconciliation.windowStart,
+            windowEnd: latestReconciliation.windowEnd,
+            generatedAt: latestMetadata.generatedAt ?? latestReconciliation.createdAt
+          }
+        : null,
+      alerts: alerts ?? []
+    };
+
+    return { currencies, monetization };
   }
 
   static async findDuplicatePayments({ since, windowMinutes = 30, limit = 200 } = {}) {

@@ -5,6 +5,8 @@ import db from '../config/database.js';
 import { env } from '../config/env.js';
 import deepMerge from '../utils/deepMerge.js';
 import TwoFactorService from './TwoFactorService.js';
+import releaseOrchestrationService from './ReleaseOrchestrationService.js';
+import ProviderTransitionService from './ProviderTransitionService.js';
 
 const SETTINGS_KEYS = Object.freeze({
   ADMIN_PROFILE: 'admin_profile',
@@ -386,6 +388,8 @@ const DEFAULT_MONETIZATION = Object.freeze({
       'Platform commission remains capped at 2.5% for communities and mentoring (5% on digital catalogues and 10% on live donations) with funds routed directly between customers and providers; the platform operates a non-custodial ledger to avoid FCA regulated activity.'
   }
 });
+
+const providerTransitionService = new ProviderTransitionService();
 
 function createStableId(prefix, seed = '') {
   const trimmed = typeof seed === 'string' ? seed.trim() : '';
@@ -2052,7 +2056,7 @@ export default class PlatformSettingsService {
       this.getSecuritySettings(connection),
       this.getFinanceSettings(connection),
       this.getMonetizationSettings(connection),
-      this.getIntegrationsSettings(connection)
+      this.getIntegrationSettings(connection)
     ]);
 
     return {
@@ -2062,6 +2066,133 @@ export default class PlatformSettingsService {
       monetization: deepMerge(DEFAULT_MONETIZATION, monetization ?? {}),
       integrations: deepMerge(DEFAULT_INTEGRATIONS, integrations ?? {}),
       generatedAt: new Date().toISOString()
+    };
+  }
+
+  static async getOperationalGovernanceOverview(
+    { environment, tenantScope = 'global', includeProviderDetails = false } = {},
+    connection = db
+  ) {
+    const [system, security, preferences, releaseSummary, releaseDashboard, providerAnnouncements] = await Promise.all([
+      this.getSystemSettings(connection),
+      this.getSecuritySettings(connection),
+      this.getPreferenceSettings(connection),
+      releaseOrchestrationService.summariseReadiness({ environment }),
+      releaseOrchestrationService.getDashboard({ environment }),
+      providerTransitionService.listActiveAnnouncements({
+        tenantScope,
+        includeDetails: includeProviderDetails
+      })
+    ]);
+
+    const maintenance = system?.maintenanceMode ?? DEFAULT_SYSTEM.maintenanceMode;
+    const operations = system?.operations ?? DEFAULT_SYSTEM.operations;
+    const observability = system?.observability ?? DEFAULT_SYSTEM.observability;
+
+    const securityEnforcement = security?.enforcement ?? DEFAULT_SECURITY_SETTINGS.enforcement;
+    const commsPreferences = preferences?.communications ?? DEFAULT_PREFERENCES.communications;
+
+    const toIsoString = (value) => {
+      if (!value) return null;
+      const date = value instanceof Date ? value : new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    };
+
+    const recentRuns = Array.isArray(releaseDashboard?.recent) ? releaseDashboard.recent : [];
+    const upcomingRuns = Array.isArray(releaseDashboard?.upcoming) ? releaseDashboard.upcoming : [];
+
+    const blockedRuns = recentRuns
+      .filter((run) => run.status === 'blocked')
+      .map((run) => ({
+        publicId: run.publicId,
+        versionTag: run.versionTag,
+        environment: run.environment,
+        readinessScore: run.metadata?.readinessScore ?? null,
+        changeWindowStart: run.changeWindowStart,
+        changeWindowEnd: run.changeWindowEnd
+      }));
+
+    const providerSummary = providerAnnouncements.reduce(
+      (acc, entry) => {
+        const announcement = entry?.announcement ?? {};
+        const ackTotal = entry?.acknowledgements?.total ?? 0;
+        const latestStatus = entry?.latestStatus?.statusCode ?? null;
+        const requiresAck = Boolean(announcement.ackRequired);
+
+        acc.total += 1;
+        if (requiresAck) {
+          acc.requiresAcknowledgement += 1;
+          if (ackTotal === 0) {
+            acc.pendingAcknowledgements += 1;
+          }
+        }
+        if (latestStatus === 'blocked') {
+          acc.blockedTransitions += 1;
+        }
+        acc.acknowledgementsRecorded += ackTotal;
+        return acc;
+      },
+      {
+        total: 0,
+        requiresAcknowledgement: 0,
+        pendingAcknowledgements: 0,
+        acknowledgementsRecorded: 0,
+        blockedTransitions: 0
+      }
+    );
+
+    const providerPayload = includeProviderDetails
+      ? providerAnnouncements
+      : providerAnnouncements.map((entry) => {
+          const announcement = entry?.announcement ?? {};
+          const acknowledgementCount = entry?.acknowledgements?.total ?? 0;
+          return {
+            slug: announcement.slug,
+            title: announcement.title,
+            summary: announcement.summary,
+            status: announcement.status,
+            ackRequired: Boolean(announcement.ackRequired),
+            ackDeadline: toIsoString(announcement.ackDeadline),
+            effectiveFrom: toIsoString(announcement.effectiveFrom),
+            effectiveTo: toIsoString(announcement.effectiveTo),
+            ownerEmail: announcement.ownerEmail ?? null,
+            tenantScope: announcement.tenantScope ?? 'global',
+            acknowledgementCount,
+            latestStatus: entry?.latestStatus ?? null,
+            metadata: announcement.metadata ?? {}
+          };
+        });
+
+    const releaseEnvironment = releaseSummary?.environment ?? environment ?? 'all';
+    const releaseSummaryPayload = releaseSummary
+      ? { ...releaseSummary, environment: releaseEnvironment }
+      : { environment: releaseEnvironment, totals: {}, evaluatedAt: new Date().toISOString() };
+    const releaseBreakdown = releaseDashboard?.breakdown ?? { statuses: {} };
+    const requiredGates = Array.isArray(releaseDashboard?.requiredGates)
+      ? releaseDashboard.requiredGates
+      : [];
+
+    return {
+      generatedAt: new Date().toISOString(),
+      environment: releaseEnvironment,
+      release: {
+        summary: releaseSummaryPayload,
+        breakdown: releaseBreakdown,
+        requiredGates,
+        upcoming: upcomingRuns,
+        blockedRuns
+      },
+      providerTransitions: {
+        metrics: providerSummary,
+        announcements: providerPayload
+      },
+      platform: {
+        maintenance,
+        operations,
+        observability,
+        security: securityEnforcement,
+        communications: commsPreferences
+      }
     };
   }
 
