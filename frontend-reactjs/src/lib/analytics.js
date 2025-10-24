@@ -41,3 +41,46 @@ export function trackDashboardSurfaceAction(surfaceId, action, metadata = {}) {
   trackEvent('dashboard:surface_action', { surfaceId, action, ...metadata });
 }
 
+function trackAuthEvent(event, metadata = {}) {
+  trackEvent(`auth:${event}`, metadata);
+}
+
+export function trackAuthView(surface, metadata = {}) {
+  if (!surface) return;
+  trackAuthEvent('view', { surface, ...metadata });
+}
+
+export function trackAuthAttempt(surface, outcome, metadata = {}) {
+  if (!surface || !outcome) return;
+  trackAuthEvent('attempt', { surface, outcome, ...metadata });
+}
+
+export function trackAuthInteraction(surface, interaction, metadata = {}) {
+  if (!surface || !interaction) return;
+  trackAuthEvent('interaction', { surface, interaction, ...metadata });
+}
+
+export function trackAuthAutoSave(surface, status, metadata = {}) {
+  if (!surface || !status) return;
+  trackAuthEvent('autosave', { surface, status, ...metadata });
+}
+
+function trackIntegrationInvite(event, metadata = {}) {
+  trackEvent(`integration_invite:${event}`, metadata);
+}
+
+export function trackIntegrationInviteEvent(event, metadata = {}) {
+  if (!event) return;
+  trackIntegrationInvite(event, metadata);
+}
+
+export function trackIntegrationInviteStatus(status, metadata = {}) {
+  if (!status) return;
+  trackIntegrationInvite('status', { status, ...metadata });
+}
+
+export function trackIntegrationInviteSubmit(outcome, metadata = {}) {
+  if (!outcome) return;
+  trackIntegrationInvite('submit', { outcome, ...metadata });
+}
+

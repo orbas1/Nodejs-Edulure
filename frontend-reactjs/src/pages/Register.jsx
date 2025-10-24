@@ -19,6 +19,7 @@ import {
   calculateOnboardingCompletion,
   validateOnboardingState
 } from '../utils/validation/onboarding.js';
+import { trackAuthAttempt, trackAuthAutoSave, trackAuthInteraction, trackAuthView } from '../lib/analytics.js';
 
 const SOCIAL_ROUTES = {
   google: '/auth/oauth/google',
@@ -122,6 +123,14 @@ export default function Register() {
   });
 
   useEffect(() => {
+    trackAuthView('register', {
+      default_role: defaultRole,
+      enforced_two_factor_roles: ENFORCED_TWO_FACTOR_ROLES.size,
+      social_providers: Object.keys(SOCIAL_ROUTES).length
+    });
+  }, [defaultRole]);
+
+  useEffect(() => {
     let active = true;
     (async () => {
       try {
@@ -174,11 +183,30 @@ export default function Register() {
     return resolveSocialProofFallback('learner-register');
   }, [marketingContent]);
 
+  useEffect(() => {
+    if (autoSaveStatus === 'idle') return;
+    trackAuthAutoSave('register', autoSaveStatus, {
+      has_email: Boolean(formState.email),
+      progress: onboardingProgress.progress
+    });
+  }, [autoSaveStatus, formState.email, onboardingProgress.progress]);
+
+  useEffect(() => {
+    if (!twoFactorEnrollment?.enabled) return;
+    trackAuthInteraction('register', 'two_factor_enrolled', {
+      enforced: Boolean(twoFactorEnrollment.enforced)
+    });
+  }, [twoFactorEnrollment]);
+
   const handleSocialSignOn = useCallback(
     (provider) => {
       const route = SOCIAL_ROUTES[provider];
       if (!route) return;
       const destination = `${oauthBase}${route}`;
+      trackAuthAttempt('register', 'social_redirect', {
+        provider,
+        destination: route
+      });
       if (typeof window !== 'undefined') {
         window.location.assign(destination);
       }
@@ -209,6 +237,10 @@ export default function Register() {
       setTwoFactorLocked(enforced);
       setTwoFactorEnabled((prev) => (enforced ? true : prev));
       setTwoFactorEnrollment(null);
+      trackAuthInteraction('register', 'role_change', {
+        role: value,
+        enforced
+      });
     }
   };
 
@@ -218,7 +250,9 @@ export default function Register() {
   };
 
   const toggleMarketingOptIn = () => {
-    updateField('marketingOptIn', !formState.marketingOptIn);
+    const nextValue = !formState.marketingOptIn;
+    updateField('marketingOptIn', nextValue);
+    trackAuthInteraction('register', 'marketing_opt_in_toggle', { enabled: nextValue });
   };
 
   const handleTermsChange = (event) => {
@@ -272,6 +306,10 @@ export default function Register() {
     setErrors(validation.errors);
     if (!validation.isValid) {
       setError('Please review the highlighted fields.');
+      trackAuthAttempt('register', 'validation_error', {
+        error_count: Object.keys(validation.errors ?? {}).length,
+        role: formState.role
+      });
       return;
     }
 
@@ -301,6 +339,14 @@ export default function Register() {
     if (!onboardingPayload.invites?.length) {
       delete onboardingPayload.invites;
     }
+
+    trackAuthAttempt('register', 'submit', {
+      role: cleaned.role,
+      marketing_opt_in: cleaned.marketingOptIn,
+      has_invites: Boolean(onboardingPayload.invites?.length),
+      two_factor_locked: twoFactorLocked,
+      two_factor_enabled: twoFactorLocked ? true : twoFactorEnabled
+    });
 
     try {
       setIsSubmitting(true);
@@ -337,12 +383,21 @@ export default function Register() {
       const securityMessage = result.twoFactor?.enabled
         ? ' Email one-time codes are now active and will be sent whenever you sign in.'
         : '';
+      trackAuthAttempt('register', 'success', {
+        role: cleaned.role,
+        verification_status: verificationStatus ?? 'unknown',
+        two_factor_enabled: Boolean(result.twoFactor?.enabled)
+      });
       setSuccess(`${baseMessage}${securityMessage}`.trim());
       setTimeout(() => navigate('/login'), 1600);
     } catch (err) {
       const message =
         err?.original?.response?.data?.message ?? err?.message ?? 'Unable to create your account right now.';
       setError(message);
+      trackAuthAttempt('register', 'failure', {
+        role: formState.role,
+        code: err?.original?.response?.data?.code ?? err?.code ?? 'unknown'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -640,7 +695,11 @@ export default function Register() {
               aria-disabled={twoFactorLocked}
               onClick={() => {
                 if (twoFactorLocked) return;
-                setTwoFactorEnabled((prev) => !prev);
+                setTwoFactorEnabled((prev) => {
+                  const next = !prev;
+                  trackAuthInteraction('register', 'two_factor_toggle', { next, locked: false });
+                  return next;
+                });
               }}
               className={`relative inline-flex h-7 w-14 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
                 (twoFactorLocked ? true : twoFactorEnabled) ? 'bg-primary' : 'bg-slate-300'

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import AuthForm from '../components/auth/AuthForm.jsx';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { API_BASE_URL } from '../api/httpClient.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { createLoginState, validateLoginState } from '../utils/validation/auth.js';
+import { trackAuthAttempt, trackAuthInteraction, trackAuthView } from '../lib/analytics.js';
 
 const SOCIAL_ROUTES = {
   google: '/auth/oauth/google',
@@ -16,6 +17,7 @@ const SOCIAL_ROUTES = {
 };
 
 const EMAIL_CODE_TTL_MINUTES = 5;
+const TWO_FACTOR_FIELD_ID = 'login-two-factor-code';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -25,6 +27,7 @@ export default function Login() {
   const [formError, setFormError] = useState(null);
   const [isTwoFactorRequired, setIsTwoFactorRequired] = useState(false);
   const [showTwoFactorInput, setShowTwoFactorInput] = useState(false);
+  const lastTwoFactorStatus = useRef(null);
 
   usePageMetadata({
     title: 'Secure login · Edulure',
@@ -47,12 +50,38 @@ export default function Login() {
       const route = SOCIAL_ROUTES[provider];
       if (!route) return;
       const destination = `${oauthBase}${route}`;
+      trackAuthAttempt('login', 'social_redirect', {
+        provider,
+        destination: route
+      });
       if (typeof window !== 'undefined') {
         window.location.assign(destination);
       }
     },
     [oauthBase]
   );
+
+  useEffect(() => {
+    trackAuthView('login', {
+      social_providers: Object.keys(SOCIAL_ROUTES).length,
+      has_remember_me: true
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!showTwoFactorInput) {
+      lastTwoFactorStatus.current = null;
+      return;
+    }
+    if (lastTwoFactorStatus.current === 'focused') {
+      return;
+    }
+    const input = document.getElementById(TWO_FACTOR_FIELD_ID);
+    if (input) {
+      input.focus();
+      lastTwoFactorStatus.current = 'focused';
+    }
+  }, [showTwoFactorInput]);
 
   const updateField = useCallback((name, value) => {
     setFormState((prev) => ({ ...prev, [name]: value }));
@@ -74,8 +103,18 @@ export default function Login() {
     setFieldErrors(validation.errors);
     if (!validation.isValid) {
       setFormError('Please review the highlighted fields and try again.');
+      trackAuthAttempt('login', 'validation_error', {
+        method: 'password',
+        error_count: Object.keys(validation.errors ?? {}).length
+      });
       return;
     }
+
+    trackAuthAttempt('login', 'submit', {
+      method: 'password',
+      has_two_factor_code: Boolean(validation.cleaned.twoFactorCode),
+      remember_me: Boolean(validation.cleaned.rememberMe)
+    });
 
     try {
       const payload = {
@@ -89,6 +128,10 @@ export default function Login() {
       setFormState(() => createLoginState({ rememberMe: validation.cleaned.rememberMe }));
       setIsTwoFactorRequired(false);
       setShowTwoFactorInput(false);
+      trackAuthAttempt('login', 'success', {
+        method: 'password',
+        two_factor_challenge: Boolean(validation.cleaned.twoFactorCode)
+      });
     } catch (err) {
       const message =
         err?.original?.response?.data?.message ?? err?.message ?? 'Unable to sign in. Please try again.';
@@ -103,24 +146,43 @@ export default function Login() {
         setShowTwoFactorInput(true);
         setIsTwoFactorRequired(true);
         setFormError(deliveredMessage);
+        trackAuthInteraction('login', 'two_factor_prompt', {
+          reason: 'required',
+          delivered: details.delivered !== false
+        });
         return;
       }
       if (code === 'TWO_FACTOR_INVALID') {
         setShowTwoFactorInput(true);
         setIsTwoFactorRequired(true);
         setFormError('That email security code was invalid or expired. Request a new code and try again.');
+        trackAuthInteraction('login', 'two_factor_prompt', { reason: 'invalid' });
         return;
       }
       if (code === 'TWO_FACTOR_SETUP_REQUIRED') {
         setShowTwoFactorInput(true);
         setIsTwoFactorRequired(true);
         setFormError('Multi-factor email codes must be configured before access. Check your security settings.');
+        trackAuthInteraction('login', 'two_factor_prompt', { reason: 'setup_required' });
         return;
       }
 
       setFormError(message);
+      trackAuthAttempt('login', 'failure', {
+        method: 'password',
+        code: code ?? 'unknown',
+        two_factor_required: showTwoFactorInput || isTwoFactorRequired
+      });
     }
   };
+
+  useEffect(() => {
+    if (!showTwoFactorInput) return;
+    trackAuthInteraction('login', 'two_factor_visible', {
+      has_code: Boolean(formState.twoFactorCode?.length),
+      required: isTwoFactorRequired
+    });
+  }, [showTwoFactorInput, formState.twoFactorCode, isTwoFactorRequired]);
 
   return (
     <AuthForm
@@ -182,11 +244,15 @@ export default function Login() {
             required={isTwoFactorRequired}
             helper="6-digit code sent to your Edulure email"
             error={fieldErrors.twoFactorCode}
+            id={TWO_FACTOR_FIELD_ID}
           />
         ) : (
           <button
             type="button"
-            onClick={() => setShowTwoFactorInput(true)}
+            onClick={() => {
+              setShowTwoFactorInput(true);
+              trackAuthInteraction('login', 'two_factor_toggle', { source: 'manual' });
+            }}
             className="text-xs font-semibold text-primary transition hover:text-primary-dark"
           >
             Have an email code?

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 
 import InviteSecurityChecklist from '../components/integrations/InviteSecurityChecklist.jsx';
@@ -6,6 +6,11 @@ import InviteStatusBanner from '../components/integrations/InviteStatusBanner.js
 import InviteSummaryCard from '../components/integrations/InviteSummaryCard.jsx';
 import useIntegrationInvite from '../hooks/useIntegrationInvite.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import {
+  trackIntegrationInviteEvent,
+  trackIntegrationInviteStatus,
+  trackIntegrationInviteSubmit
+} from '../lib/analytics.js';
 
 export default function IntegrationCredentialInvite() {
   const { token } = useParams();
@@ -21,7 +26,8 @@ export default function IntegrationCredentialInvite() {
     countdown,
     documentationStatus,
     refresh,
-    isExpired
+    isExpired,
+    lastFetchedAt
   } = useIntegrationInvite({ inviteToken: token ?? '' });
 
   const metaDescription = useMemo(() => {
@@ -44,6 +50,15 @@ export default function IntegrationCredentialInvite() {
       environment: invite?.environment ?? 'unspecified'
     }
   });
+
+  useEffect(() => {
+    if (!token || !invite) return;
+    trackIntegrationInviteEvent('view', {
+      provider: invite.provider ?? invite.providerLabel ?? 'unknown',
+      environment: invite.environment ?? 'unspecified',
+      has_expiry: Boolean(invite.expiresAt)
+    });
+  }, [invite, token]);
 
   const documentationBanner = useMemo(() => {
     if (!documentationStatus) {
@@ -72,10 +87,60 @@ export default function IntegrationCredentialInvite() {
 
   const statusTone = status === 'error' ? 'danger' : status === 'success' ? 'success' : 'info';
 
+  useEffect(() => {
+    if (!documentationStatus?.state || documentationStatus.state === 'checking') {
+      return;
+    }
+    trackIntegrationInviteStatus(documentationStatus.state, {
+      provider: invite?.provider ?? invite?.providerLabel ?? 'unknown'
+    });
+  }, [documentationStatus?.state, invite?.provider, invite?.providerLabel]);
+
+  useEffect(() => {
+    if (status === 'idle' || status === 'submitting') return;
+    trackIntegrationInviteStatus(status, {
+      provider: invite?.provider ?? invite?.providerLabel ?? 'unknown',
+      has_message: Boolean(message)
+    });
+  }, [status, invite?.provider, invite?.providerLabel, message]);
+
+  useEffect(() => {
+    if (!isExpired) return;
+    trackIntegrationInviteStatus('expired', {
+      provider: invite?.provider ?? invite?.providerLabel ?? 'unknown'
+    });
+  }, [isExpired, invite?.provider, invite?.providerLabel]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
-    await submit();
+    const provider = invite?.provider ?? invite?.providerLabel ?? 'unknown';
+    trackIntegrationInviteSubmit('attempt', {
+      provider,
+      has_rotation_override: Boolean(form.rotationIntervalDays),
+      has_expiry: Boolean(form.keyExpiresAt)
+    });
+    const result = await submit();
+    if (result?.ok) {
+      trackIntegrationInviteSubmit('success', {
+        provider,
+        rotation_interval: result.payload?.invite?.rotationIntervalDays ?? form.rotationIntervalDays || null
+      });
+    } else {
+      trackIntegrationInviteSubmit('failure', {
+        provider,
+        has_message: Boolean(message)
+      });
+    }
   };
+
+  const handleRefresh = useCallback(() => {
+    const provider = invite?.provider ?? invite?.providerLabel ?? 'unknown';
+    trackIntegrationInviteEvent('refresh', {
+      provider,
+      last_fetched_at: lastFetchedAt
+    });
+    return refresh();
+  }, [invite?.provider, invite?.providerLabel, lastFetchedAt, refresh]);
 
   if (loading && !invite) {
     return (
@@ -97,7 +162,7 @@ export default function IntegrationCredentialInvite() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-16">
-      <InviteSummaryCard invite={invite} countdown={countdown} onRefresh={() => refresh()} />
+      <InviteSummaryCard invite={invite} countdown={countdown} onRefresh={handleRefresh} />
       {documentationBanner ? <InviteStatusBanner tone={documentationBanner.tone} message={documentationBanner.message} /> : null}
       {message ? <InviteStatusBanner tone={statusTone} message={message} /> : null}
       {isExpired ? (
