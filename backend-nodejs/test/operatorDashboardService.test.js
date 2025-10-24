@@ -14,6 +14,7 @@ describe('OperatorDashboardService release readiness integration', () => {
   let partitionService;
   let releaseService;
   let governanceContractModel;
+  let integrationInviteModel;
   let now;
 
   beforeEach(() => {
@@ -38,20 +39,65 @@ describe('OperatorDashboardService release readiness integration', () => {
     };
 
     incidentsModel = {
-      listActive: vi.fn().mockResolvedValue([]),
+      listActive: vi.fn().mockResolvedValue([
+        {
+          incidentUuid: 'inc-001',
+          severity: 'critical',
+          status: 'open',
+          reportedAt: '2025-04-18T16:30:00Z',
+          acknowledgement: { ackBreached: true },
+          resolution: { resolutionBreached: false },
+          metadata: {
+            reference: 'FRAUD-221',
+            watchers: 12,
+            detectionChannel: 'fraud-monitor',
+            summary: 'Payment gateway flagged a spike in disputes.',
+            recommendedActions: ['Escalate to fraud team'],
+            playbooks: [{ id: 'fraud-default', title: 'Fraud default playbook' }]
+          },
+          category: 'fraud'
+        }
+      ]),
       listRecentlyResolved: vi.fn().mockResolvedValue([])
     };
 
     integrationDashboardService = {
-      buildSnapshot: vi.fn().mockResolvedValue({ integrations: [], searchIndex: [] })
+      buildSnapshot: vi.fn().mockResolvedValue({
+        integrations: [
+          {
+            id: 'stripe',
+            name: 'Stripe',
+            health: 'critical',
+            summary: { openFailures: 3 }
+          },
+          {
+            id: 'slack',
+            name: 'Slack',
+            health: 'operational',
+            summary: { openFailures: 0 }
+          }
+        ],
+        searchIndex: []
+      })
     };
 
     const kycOverview = {
       metrics: [],
-      queue: [],
-      slaBreaches: 0,
-      manualReviewQueue: 0,
-      gdpr: { dsar: { overdue: 0 }, ico: {} }
+      queue: [
+        {
+          id: 'kyc-1',
+          user: { name: 'Skylar Ops', email: 'skylar@edulure.com' },
+          status: 'review',
+          documentsSubmitted: 3,
+          documentsRequired: 4,
+          riskScore: 72,
+          waitingHours: 1.25,
+          lastSubmittedAt: '2025-04-18T17:30:00Z'
+        }
+      ],
+      slaBreaches: 1,
+      manualReviewQueue: 2,
+      gdpr: { dsar: { overdue: 1, dueSoon: 2 }, ico: {}, owner: 'Privacy Desk' }
     };
 
     identityVerificationService = {
@@ -61,7 +107,7 @@ describe('OperatorDashboardService release readiness integration', () => {
     complianceService = {
       summarisePolicyAttestations: vi
         .fn()
-        .mockResolvedValue({ policies: [], totals: { required: 0, granted: 0, outstanding: 0, coverage: 100 } })
+        .mockResolvedValue({ policies: [], totals: { required: 10, granted: 8, outstanding: 2, coverage: 80 } })
     };
 
     auditEventService = {
@@ -173,6 +219,20 @@ describe('OperatorDashboardService release readiness integration', () => {
         total: 1
       })
     };
+
+    integrationInviteModel = {
+      list: vi.fn().mockResolvedValue([
+        {
+          id: 'invite-1',
+          provider: 'stripe',
+          alias: 'Production',
+          ownerEmail: 'ops@edulure.com',
+          status: 'pending',
+          requestedAt: new Date('2025-04-18T15:45:00Z'),
+          expiresAt: new Date('2025-04-25T15:45:00Z')
+        }
+      ])
+    };
   });
 
   afterEach(() => {
@@ -191,6 +251,7 @@ describe('OperatorDashboardService release readiness integration', () => {
       storage: { createDownloadUrl: vi.fn() },
       releaseService,
       governanceContractModel,
+      integrationInviteModel,
       nowProvider: () => now,
       loggerInstance: logger
     });
@@ -227,5 +288,40 @@ describe('OperatorDashboardService release readiness integration', () => {
       vendorName: 'ShieldGuard Security',
       obligations: expect.arrayContaining(['Upload pen test report'])
     });
+
+    expect(integrationInviteModel.list).toHaveBeenCalledWith({ status: 'pending' });
+    expect(result.dashboard.approvals).toMatchObject({
+      pendingCount: 3,
+      categories: { integrations: 1, compliance: 1, release: 1 }
+    });
+    expect(result.dashboard.approvals.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'Integration' }),
+        expect.objectContaining({ type: 'Compliance' }),
+        expect.objectContaining({ type: 'Release' })
+      ])
+    );
+
+    expect(result.dashboard.operations.support).toMatchObject({
+      backlog: 1,
+      pendingMemberships: 2,
+      followRequests: 1,
+      avgResponseMinutes: 150,
+      dailyActiveMembers: 12
+    });
+    expect(result.dashboard.operations.risk).toMatchObject({
+      failedPayments: 1,
+      refundsPending: 2,
+      alertsOpen: 1
+    });
+    expect(result.dashboard.operations.platform).toMatchObject({
+      activeIntegrations: 1,
+      degradedIntegrations: 0,
+      releaseGatesPending: 1,
+      policyCoverage: 80
+    });
+    expect(result.dashboard.operations.upcomingLaunches).toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: expect.stringContaining('Security') })])
+    );
   });
 });

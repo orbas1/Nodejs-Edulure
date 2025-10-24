@@ -10,6 +10,8 @@ import dataPartitionService from './DataPartitionService.js';
 import storageService from './StorageService.js';
 import releaseOrchestrationService from './ReleaseOrchestrationService.js';
 import GovernanceContractModel from '../models/GovernanceContractModel.js';
+import IntegrationApiKeyInviteModel from '../models/IntegrationApiKeyInviteModel.js';
+import { getProviderDefinition } from './IntegrationProviderRegistry.js';
 import PlatformSettingsService, {
   normaliseAdminProfile as exportedNormaliseAdminProfile,
   normalisePaymentSettings as exportedNormalisePaymentSettings,
@@ -118,6 +120,95 @@ const DEFAULT_MONETIZATION_SETTINGS_FALLBACK = Object.freeze({
   subscriptions: { plans: [] },
   upsells: []
 });
+
+const inviteDateFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+function formatInviteDate(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return inviteDateFormatter.format(date);
+}
+
+function resolveProviderLabel(provider) {
+  const definition = getProviderDefinition?.(provider);
+  if (definition && definition.label) {
+    return definition.label;
+  }
+  return provider;
+}
+
+function buildInviteApprovalItem(invite) {
+  const providerLabel = resolveProviderLabel(invite.provider);
+  const aliasSuffix = invite.alias ? ` · ${invite.alias}` : '';
+  const expiresAt = formatInviteDate(invite.expiresAt);
+  const submittedAt = formatInviteDate(invite.requestedAt);
+
+  return {
+    id: invite.id ? `invite-${invite.id}` : `invite-${providerLabel}`,
+    name: `${providerLabel}${aliasSuffix}`,
+    type: 'Integration',
+    summary:
+      expiresAt
+        ? `Requested by ${invite.ownerEmail ?? 'operator'} · Expires ${expiresAt}`
+        : `Requested by ${invite.ownerEmail ?? 'operator'} · No expiry set`,
+    status: (invite.status ?? 'pending').toUpperCase(),
+    submittedAt,
+    amount: null,
+    action: 'Review invite'
+  };
+}
+
+function buildComplianceApprovalItem(entry, index) {
+  const actor = entry.user?.name || entry.user?.email || `Verification ${index + 1}`;
+  const docsSubmitted = Number(entry.documentsSubmitted ?? 0);
+  const docsRequired = Number(entry.documentsRequired ?? 0);
+  const waitingMinutes = Number.isFinite(entry.waitingHours) ? Math.round(entry.waitingHours * 60) : null;
+
+  const summaryParts = [
+    `Risk score ${Number(entry.riskScore ?? 0).toFixed(0)}`,
+    `${docsSubmitted}/${docsRequired} documents`
+  ];
+
+  if (waitingMinutes !== null) {
+    summaryParts.push(`Waiting ${waitingMinutes} mins`);
+  }
+
+  return {
+    id: entry.id ? `kyc-${entry.id}` : `kyc-${index}`,
+    name: actor,
+    type: 'Compliance',
+    summary: summaryParts.join(' · '),
+    status: (entry.status ?? 'REVIEW').toUpperCase(),
+    submittedAt: formatInviteDate(entry.lastSubmittedAt ?? entry.submittedAt),
+    amount: null,
+    action: 'Open case'
+  };
+}
+
+function buildReleaseApprovalItem(task, index) {
+  const submittedAt = formatInviteDate(task.lastEvaluatedAt ?? task.updatedAt ?? null);
+  const owner = task.ownerEmail ? `Owner ${task.ownerEmail}` : null;
+  const summaryParts = [task.notes ?? 'Pending readiness review'];
+  if (owner) {
+    summaryParts.push(owner);
+  }
+
+  return {
+    id: task.id ?? `release-${index}`,
+    name: task.label ?? task.gateKey ?? 'Release gate',
+    type: 'Release',
+    summary: summaryParts.join(' · '),
+    status: (task.status ?? 'pending').toUpperCase(),
+    submittedAt,
+    amount: null,
+    action: 'Review gate'
+  };
+}
 
 const normaliseAdminProfile =
   typeof exportedNormaliseAdminProfile === 'function'
@@ -803,6 +894,7 @@ export default class OperatorDashboardService {
     storage = storageService,
     releaseService = releaseOrchestrationService,
     governanceContractModel = GovernanceContractModel,
+    integrationInviteModel = IntegrationApiKeyInviteModel,
     nowProvider = () => new Date(),
     loggerInstance = logger.child({ service: 'OperatorDashboardService' })
   } = {}) {
@@ -816,6 +908,7 @@ export default class OperatorDashboardService {
     this.storage = storage;
     this.releaseService = releaseService;
     this.governanceContractModel = governanceContractModel;
+    this.integrationInviteModel = integrationInviteModel;
     this.nowProvider = nowProvider;
     this.logger = loggerInstance;
   }
@@ -1083,6 +1176,99 @@ export default class OperatorDashboardService {
     };
   }
 
+
+  async #buildApprovalQueue({ now, complianceSnapshot, releaseReadiness }) {
+    let invites = [];
+    if (this.integrationInviteModel && typeof this.integrationInviteModel.list === 'function') {
+      try {
+        invites = await this.integrationInviteModel.list({ status: 'pending' });
+      } catch (error) {
+        this.logger.warn({ err: error }, 'Failed to load pending integration invites for operator approvals');
+      }
+    }
+
+    const complianceQueue = Array.isArray(complianceSnapshot?.queue) ? complianceSnapshot.queue : [];
+    const releaseTasks = Array.isArray(releaseReadiness?.tasks) ? releaseReadiness.tasks : [];
+
+    const inviteItems = invites.slice(0, 5).map((invite) => buildInviteApprovalItem(invite));
+    const complianceItems = complianceQueue.slice(0, 5).map((entry, index) => buildComplianceApprovalItem(entry, index));
+    const releaseItems = releaseTasks.slice(0, 5).map((task, index) => buildReleaseApprovalItem(task, index));
+
+    const pendingCount = invites.length + complianceQueue.length + releaseTasks.length;
+
+    return {
+      pendingCount,
+      categories: {
+        integrations: invites.length,
+        compliance: complianceQueue.length,
+        release: releaseTasks.length
+      },
+      items: [...inviteItems, ...complianceItems, ...releaseItems].slice(0, 10),
+      refreshedAt: now.toISOString()
+    };
+  }
+
+  #buildOperationsSnapshot({ queueSummary, complianceSnapshot, integrationStats, releaseReadiness, approvals }) {
+    const supportBacklog = Array.isArray(complianceSnapshot?.queue) ? complianceSnapshot.queue.length : 0;
+    const manualReviews = Number(complianceSnapshot?.manualReviewQueue ?? 0);
+    const followRequests = Number(approvals?.categories?.integrations ?? 0);
+    const averageOpenMinutes = queueSummary?.averageOpenHours
+      ? Math.round(queueSummary.averageOpenHours * 60)
+      : null;
+    const watchers = queueSummary?.watchers ?? 0;
+
+    const highRiskAlerts = Number(complianceSnapshot?.risk?.severityTotals?.high ?? 0);
+    const criticalAlerts = Number(complianceSnapshot?.risk?.severityTotals?.critical ?? 0);
+    const dsarDueSoon = Number(complianceSnapshot?.gdpr?.dsar?.dueSoon ?? 0);
+
+    const totalRiskAlerts = Number.isFinite(highRiskAlerts + criticalAlerts)
+      ? highRiskAlerts + criticalAlerts
+      : 0;
+    const alertsOpen = totalRiskAlerts > 0 ? totalRiskAlerts : Number(queueSummary?.totalOpen ?? 0);
+
+    const financeGateCount = Array.isArray(releaseReadiness?.tasks)
+      ? releaseReadiness.tasks.filter((task) =>
+          typeof task.gateKey === 'string' && task.gateKey.toLowerCase().includes('finance')
+        ).length
+      : 0;
+
+    const upcomingLaunches = Array.isArray(releaseReadiness?.tasks)
+      ? releaseReadiness.tasks.slice(0, 9).map((task, index) => ({
+          id: task.id ?? `release-${index}`,
+          title: task.label ?? task.gateKey ?? 'Release gate',
+          community: task.gateKey ?? 'Release readiness',
+          startAt: task.targetDate ?? task.lastEvaluatedAt ?? releaseReadiness?.latestRun?.scheduledAt ?? null,
+          callToAction:
+            task.status === 'pending' ? 'Review gate' : task.status === 'in_progress' ? 'Monitor' : null,
+          owner: task.ownerEmail ?? releaseReadiness?.latestRun?.ownerEmail ?? ''
+        }))
+      : [];
+
+    return {
+      support: {
+        backlog: supportBacklog,
+        pendingMemberships: manualReviews,
+        followRequests,
+        avgResponseMinutes: averageOpenMinutes ?? undefined,
+        dailyActiveMembers: watchers
+      },
+      risk: {
+        payoutsProcessing: financeGateCount,
+        failedPayments: integrationStats?.critical ?? 0,
+        refundsPending: dsarDueSoon,
+        alertsOpen
+      },
+      platform: {
+        activeIntegrations: integrationStats?.operational ?? 0,
+        degradedIntegrations: integrationStats?.degraded ?? 0,
+        releaseGatesPending: Array.isArray(releaseReadiness?.tasks) ? releaseReadiness.tasks.length : 0,
+        policyCoverage: complianceSnapshot?.attestations?.totals?.coverage ?? null
+      },
+      upcomingLaunches
+    };
+  }
+
+
   async #loadSettingsSnapshot() {
     const safeCall = async (factory, fallback) => {
       try {
@@ -1305,6 +1491,15 @@ export default class OperatorDashboardService {
       storageUsage
     });
 
+    const approvals = await this.#buildApprovalQueue({ now, complianceSnapshot, releaseReadiness });
+    const operations = this.#buildOperationsSnapshot({
+      queueSummary,
+      complianceSnapshot,
+      integrationStats,
+      releaseReadiness,
+      approvals
+    });
+
     return {
       dashboard: {
         meta: {
@@ -1338,6 +1533,8 @@ export default class OperatorDashboardService {
         integrations: integrationSnapshot,
         compliance: complianceSnapshot,
         release: releaseReadiness,
+        approvals,
+        operations,
         settings: settingsSnapshot
       },
       searchIndex: [
