@@ -5359,6 +5359,12 @@ export async function seed(knex) {
       }
     ]);
 
+    const supportNotificationPreferences = {
+      digest: 'daily',
+      channels: { email: true, sms: false, inApp: true },
+      categories: { incidents: true, productUpdates: true, billing: true }
+    };
+
     const supportCaseAlphaCreatedAt = new Date('2025-02-01T08:30:00Z');
     const supportCaseAlphaUpdatedAt = new Date('2025-02-01T09:10:00Z');
     const [supportCaseAlphaInsert] = await trx('learner_support_cases').insert(
@@ -5401,9 +5407,19 @@ export async function seed(knex) {
         follow_up_due_at: new Date('2025-02-01T12:30:00Z'),
         ai_summary_generated_at: new Date('2025-02-01T08:35:00Z'),
         metadata: JSON.stringify({
+          requester: {
+            name: 'Amina Diallo',
+            email: 'amina.diallo@edulure.test',
+            timezone: 'America/New_York'
+          },
+          notificationPreferences: supportNotificationPreferences,
           intake: { channel: 'portal', attachments: 1 },
           firstResponseMinutes: 28
         }),
+        requester_name: 'Amina Diallo',
+        requester_email: 'amina.diallo@edulure.test',
+        requester_timezone: 'America/New_York',
+        notification_preferences: JSON.stringify(supportNotificationPreferences),
         created_at: supportCaseAlphaCreatedAt,
         updated_at: supportCaseAlphaUpdatedAt
       },
@@ -5473,9 +5489,19 @@ export async function seed(knex) {
         follow_up_due_at: new Date('2025-02-05T14:10:00Z'),
         ai_summary_generated_at: new Date('2025-02-04T14:15:00Z'),
         metadata: JSON.stringify({
+          requester: {
+            name: 'Amina Diallo',
+            email: 'amina.diallo@edulure.test',
+            timezone: 'America/New_York'
+          },
+          notificationPreferences: supportNotificationPreferences,
           intake: { channel: 'portal', attachments: 0 },
           renewalAmountCents: 12900
         }),
+        requester_name: 'Amina Diallo',
+        requester_email: 'amina.diallo@edulure.test',
+        requester_timezone: 'America/New_York',
+        notification_preferences: JSON.stringify(supportNotificationPreferences),
         created_at: supportCaseBetaCreatedAt,
         updated_at: supportCaseBetaCreatedAt
       },

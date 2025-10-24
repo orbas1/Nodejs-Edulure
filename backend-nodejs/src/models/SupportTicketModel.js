@@ -100,6 +100,101 @@ function serialiseMetadata(value) {
   }
 }
 
+function coerceString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
+
+function normaliseEmail(value) {
+  const candidate = coerceString(value);
+  if (!candidate) {
+    return null;
+  }
+  const lowered = candidate.toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lowered) ? lowered : null;
+}
+
+function normaliseRequester(value) {
+  if (value === null || value === undefined) {
+    return { name: null, email: null, timezone: null };
+  }
+
+  if (typeof value === 'string') {
+    const parsed = parseJson(value, {});
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { name: null, email: null, timezone: null };
+    }
+    return normaliseRequester(parsed);
+  }
+
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return { name: null, email: null, timezone: null };
+  }
+
+  const nameCandidate =
+    value.name ?? value.fullName ?? value.displayName ?? value.contactName ?? value.contact ?? null;
+  const emailCandidate = value.email ?? value.address ?? value.contactEmail ?? value.contact ?? null;
+  const timezoneCandidate = value.timezone ?? value.timeZone ?? value.tz ?? null;
+
+  return {
+    name: coerceString(nameCandidate),
+    email: normaliseEmail(emailCandidate),
+    timezone: coerceString(timezoneCandidate)
+  };
+}
+
+function normaliseNotificationPreferences(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  let source = value;
+  if (typeof value === 'string') {
+    source = parseJson(value, null);
+  }
+
+  if (!source || typeof source !== 'object' || Array.isArray(source)) {
+    return null;
+  }
+
+  const digestCandidate = source.digest ?? source.cadence ?? source.frequency ?? null;
+  const digest = coerceString(digestCandidate);
+
+  const normaliseBooleanMap = (input) => {
+    if (!input || typeof input !== 'object') {
+      return {};
+    }
+    return Object.entries(input).reduce((acc, [key, raw]) => {
+      const label = coerceString(key);
+      if (!label) {
+        return acc;
+      }
+      acc[label] = Boolean(raw);
+      return acc;
+    }, {});
+  };
+
+  const channels = normaliseBooleanMap(source.channels);
+  const categories = normaliseBooleanMap(source.categories);
+
+  if (!digest && Object.keys(channels).length === 0 && Object.keys(categories).length === 0) {
+    return null;
+  }
+
+  return { digest, channels, categories };
+}
+
+function serialiseNotificationPreferences(value) {
+  const normalised = normaliseNotificationPreferences(value);
+  if (!normalised) {
+    return null;
+  }
+  return JSON.stringify(normalised);
+}
+
 function normaliseAttachmentInput(payload) {
   if (!payload) {
     return [];
@@ -203,6 +298,24 @@ function mapCase(row, messages = []) {
   if (!row) {
     return null;
   }
+  const metadata = parseJson(row.metadata, {});
+  const columnRequester = normaliseRequester({
+    name: row.requester_name,
+    email: row.requester_email,
+    timezone: row.requester_timezone
+  });
+  const metadataRequester = normaliseRequester(metadata.requester ?? metadata.requestor);
+  const requester = {
+    name: columnRequester.name ?? metadataRequester.name ?? null,
+    email: columnRequester.email ?? metadataRequester.email ?? null,
+    timezone: columnRequester.timezone ?? metadataRequester.timezone ?? null
+  };
+  const notificationPreferences =
+    normaliseNotificationPreferences(row.notification_preferences) ??
+    normaliseNotificationPreferences(
+      metadata.notificationPreferences ?? metadata.notification_preferences
+    );
+
   return {
     id: row.id,
     reference: row.reference,
@@ -214,7 +327,7 @@ function mapCase(row, messages = []) {
     satisfaction: row.satisfaction,
     owner: row.owner,
     lastAgent: row.last_agent,
-    metadata: parseJson(row.metadata, {}),
+    metadata,
     knowledgeSuggestions: normaliseKnowledgeSuggestions(row.knowledge_suggestions),
     escalationBreadcrumbs: normaliseBreadcrumbs(row.escalation_breadcrumbs),
     aiSummary: row.ai_summary ?? null,
@@ -222,7 +335,9 @@ function mapCase(row, messages = []) {
     aiSummaryGeneratedAt: toIso(row.ai_summary_generated_at),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
-    messages: messages.map((message) => mapMessage(message)).filter(Boolean)
+    messages: messages.map((message) => mapMessage(message)).filter(Boolean),
+    requester,
+    notificationPreferences
   };
 }
 
@@ -269,6 +384,55 @@ function buildCreatePayload(userId, payload = {}) {
   const initialBreadcrumbs = breadcrumbs.length ? breadcrumbs : buildInitialBreadcrumbs({ subject, createdAt, category: payload.category });
 
   const knowledgeSuggestions = serialiseJson(payload.knowledgeSuggestions ?? []);
+  const rawMetadata =
+    typeof payload.metadata === 'string'
+      ? parseJson(payload.metadata, {})
+      : payload.metadata && typeof payload.metadata === 'object'
+        ? { ...payload.metadata }
+        : {};
+  const requesterInput =
+    payload.requester ?? payload.requestor ?? rawMetadata.requester ?? rawMetadata.requestor ?? null;
+  const requester = normaliseRequester(requesterInput);
+  const notificationPreferencesInput =
+    payload.notificationPreferences ??
+    payload.notification_preferences ??
+    rawMetadata.notificationPreferences ??
+    rawMetadata.notification_preferences ??
+    null;
+  const notificationPreferences = normaliseNotificationPreferences(notificationPreferencesInput);
+  const attachmentsCount = (() => {
+    if (Array.isArray(payload.attachments)) {
+      return payload.attachments.length;
+    }
+    const messageList = Array.isArray(payload.messages)
+      ? payload.messages
+      : Array.isArray(payload.initialMessages)
+        ? payload.initialMessages
+        : [];
+    if (!messageList.length) {
+      return 0;
+    }
+    return messageList.reduce((count, message) => {
+      if (Array.isArray(message.attachments)) {
+        return count + message.attachments.length;
+      }
+      if (Array.isArray(message.files)) {
+        return count + message.files.length;
+      }
+      return count;
+    }, 0);
+  })();
+
+  const metadata = {
+    ...rawMetadata,
+    requester,
+    notificationPreferences,
+    intake: {
+      ...(rawMetadata.intake ?? {}),
+      channel: rawMetadata.intake?.channel ?? payload.channel ?? 'portal',
+      attachments: attachmentsCount
+    }
+  };
   const breadcrumbPayload = serialiseJson(initialBreadcrumbs);
 
   const caseRecord = {
@@ -282,12 +446,16 @@ function buildCreatePayload(userId, payload = {}) {
     satisfaction: payload.satisfaction ?? null,
     owner: payload.owner ?? null,
     last_agent: payload.lastAgent ?? payload.owner ?? null,
-    metadata: serialiseMetadata(payload.metadata ?? {}),
+    metadata: serialiseMetadata(metadata),
     knowledge_suggestions: knowledgeSuggestions,
     escalation_breadcrumbs: breadcrumbPayload,
     ai_summary: payload.aiSummary ?? null,
     follow_up_due_at: followUpDueAt,
     ai_summary_generated_at: toIso(payload.aiSummaryGeneratedAt ?? new Date()),
+    requester_name: requester.name ?? null,
+    requester_email: requester.email ?? null,
+    requester_timezone: requester.timezone ?? null,
+    notification_preferences: serialiseNotificationPreferences(notificationPreferences),
     created_at: toIso(createdAt),
     updated_at: toIso(payload.updatedAt ?? createdAt)
   };
@@ -308,8 +476,27 @@ function buildCreatePayload(userId, payload = {}) {
   return { caseRecord, messageRecords, breadcrumbs: initialBreadcrumbs };
 }
 
-function buildUpdatePayload(updates = {}) {
+function buildUpdatePayload(updates = {}, existing = {}) {
   const payload = {};
+  const existingMetadata = parseJson(existing.metadata, {});
+  let nextMetadata = existingMetadata;
+  let metadataChanged = false;
+  let metadataExplicitlyProvided = false;
+  const ensureMetadataObject = () => {
+    if (!nextMetadata || typeof nextMetadata !== 'object' || Array.isArray(nextMetadata)) {
+      nextMetadata = {};
+    }
+  };
+  const existingRequester = normaliseRequester({
+    name: existing.requester_name,
+    email: existing.requester_email,
+    timezone: existing.requester_timezone
+  });
+  const existingNotificationPreferences =
+    normaliseNotificationPreferences(existing.notification_preferences) ??
+    normaliseNotificationPreferences(
+      existingMetadata.notificationPreferences ?? existingMetadata.notification_preferences
+    );
   if (updates.subject) {
     payload.subject = updates.subject;
   }
@@ -335,7 +522,12 @@ function buildUpdatePayload(updates = {}) {
     payload.satisfaction = updates.satisfaction;
   }
   if (updates.metadata !== undefined) {
-    payload.metadata = serialiseMetadata(updates.metadata);
+    nextMetadata =
+      typeof updates.metadata === 'object' && !Array.isArray(updates.metadata)
+        ? { ...existingMetadata, ...updates.metadata }
+        : updates.metadata;
+    metadataExplicitlyProvided = true;
+    ensureMetadataObject();
   }
   if (updates.knowledgeSuggestions !== undefined) {
     payload.knowledge_suggestions = serialiseJson(updates.knowledgeSuggestions ?? []);
@@ -349,6 +541,67 @@ function buildUpdatePayload(updates = {}) {
   }
   if (updates.followUpDueAt !== undefined) {
     payload.follow_up_due_at = toIso(updates.followUpDueAt);
+  }
+  const requesterUpdate = updates.requester ?? updates.requestor;
+  if (requesterUpdate !== undefined) {
+    const requester = normaliseRequester(requesterUpdate);
+    payload.requester_name = requester.name ?? null;
+    payload.requester_email = requester.email ?? null;
+    payload.requester_timezone = requester.timezone ?? null;
+    ensureMetadataObject();
+    nextMetadata = { ...nextMetadata, requester };
+    metadataChanged = true;
+  }
+  if (updates.requesterName !== undefined) {
+    payload.requester_name = coerceString(updates.requesterName);
+    ensureMetadataObject();
+    nextMetadata = {
+      ...nextMetadata,
+      requester: {
+        ...normaliseRequester(nextMetadata.requester ?? existingRequester),
+        name: coerceString(updates.requesterName)
+      }
+    };
+    metadataChanged = true;
+  }
+  if (updates.requesterEmail !== undefined) {
+    payload.requester_email = normaliseEmail(updates.requesterEmail);
+    ensureMetadataObject();
+    nextMetadata = {
+      ...nextMetadata,
+      requester: {
+        ...normaliseRequester(nextMetadata.requester ?? existingRequester),
+        email: normaliseEmail(updates.requesterEmail)
+      }
+    };
+    metadataChanged = true;
+  }
+  if (updates.requesterTimezone !== undefined) {
+    payload.requester_timezone = coerceString(updates.requesterTimezone);
+    ensureMetadataObject();
+    nextMetadata = {
+      ...nextMetadata,
+      requester: {
+        ...normaliseRequester(nextMetadata.requester ?? existingRequester),
+        timezone: coerceString(updates.requesterTimezone)
+      }
+    };
+    metadataChanged = true;
+  }
+  const notificationPreferencesUpdate =
+    updates.notificationPreferences ?? updates.notification_preferences;
+  if (notificationPreferencesUpdate !== undefined) {
+    const preferences = normaliseNotificationPreferences(notificationPreferencesUpdate);
+    payload.notification_preferences = serialiseNotificationPreferences(preferences);
+    ensureMetadataObject();
+    nextMetadata = {
+      ...nextMetadata,
+      notificationPreferences: preferences ?? existingNotificationPreferences ?? null
+    };
+    metadataChanged = true;
+  }
+  if (metadataChanged || metadataExplicitlyProvided) {
+    payload.metadata = serialiseMetadata(nextMetadata);
   }
   if (Object.keys(payload).length === 0) {
     return payload;
@@ -382,6 +635,9 @@ export default class SupportTicketModel {
   static serialiseAttachments = serialiseAttachments;
   static normaliseKnowledgeSuggestions = normaliseKnowledgeSuggestions;
   static normaliseBreadcrumbs = normaliseBreadcrumbs;
+  static normaliseNotificationPreferences = normaliseNotificationPreferences;
+  static serialiseNotificationPreferences = serialiseNotificationPreferences;
+  static normaliseRequester = normaliseRequester;
   static mapMessage = mapMessage;
   static mapCase = mapCase;
   static buildCreatePayload = buildCreatePayload;
@@ -400,6 +656,9 @@ export const __testables = {
   serialiseAttachments,
   normaliseKnowledgeSuggestions,
   normaliseBreadcrumbs,
+  normaliseNotificationPreferences,
+  serialiseNotificationPreferences,
+  normaliseRequester,
   mapMessage,
   mapCase,
   buildCreatePayload,

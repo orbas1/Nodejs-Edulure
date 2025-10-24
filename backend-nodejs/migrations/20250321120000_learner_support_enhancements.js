@@ -4,8 +4,25 @@ export async function up(knex) {
   const hasAiSummary = await knex.schema.hasColumn('learner_support_cases', 'ai_summary');
   const hasFollowUpDueAt = await knex.schema.hasColumn('learner_support_cases', 'follow_up_due_at');
   const hasAiSummaryGeneratedAt = await knex.schema.hasColumn('learner_support_cases', 'ai_summary_generated_at');
+  const hasRequesterName = await knex.schema.hasColumn('learner_support_cases', 'requester_name');
+  const hasRequesterEmail = await knex.schema.hasColumn('learner_support_cases', 'requester_email');
+  const hasRequesterTimezone = await knex.schema.hasColumn('learner_support_cases', 'requester_timezone');
+  const hasNotificationPreferences = await knex.schema.hasColumn(
+    'learner_support_cases',
+    'notification_preferences'
+  );
 
-  if (!hasEscalationBreadcrumbs || !hasKnowledgeSuggestions || !hasAiSummary || !hasFollowUpDueAt || !hasAiSummaryGeneratedAt) {
+  if (
+    !hasEscalationBreadcrumbs ||
+    !hasKnowledgeSuggestions ||
+    !hasAiSummary ||
+    !hasFollowUpDueAt ||
+    !hasAiSummaryGeneratedAt ||
+    !hasRequesterName ||
+    !hasRequesterEmail ||
+    !hasRequesterTimezone ||
+    !hasNotificationPreferences
+  ) {
     await knex.schema.alterTable('learner_support_cases', (table) => {
       if (!hasEscalationBreadcrumbs) {
         table.json('escalation_breadcrumbs').nullable();
@@ -22,6 +39,24 @@ export async function up(knex) {
       if (!hasAiSummaryGeneratedAt) {
         table.datetime('ai_summary_generated_at').nullable();
       }
+      if (!hasRequesterName) {
+        table.string('requester_name', 180).nullable();
+      }
+      if (!hasRequesterEmail) {
+        table.string('requester_email', 180).nullable();
+      }
+      if (!hasRequesterTimezone) {
+        table.string('requester_timezone', 64).nullable();
+      }
+      if (!hasNotificationPreferences) {
+        table.json('notification_preferences').nullable();
+      }
+    });
+  }
+
+  if (!hasRequesterEmail) {
+    await knex.schema.alterTable('learner_support_cases', (table) => {
+      table.index(['requester_email'], 'idx_learner_support_cases_requester_email');
     });
   }
 
@@ -53,6 +88,19 @@ export async function down(knex) {
   const hasAiSummary = await knex.schema.hasColumn('learner_support_cases', 'ai_summary');
   const hasFollowUpDueAt = await knex.schema.hasColumn('learner_support_cases', 'follow_up_due_at');
   const hasAiSummaryGeneratedAt = await knex.schema.hasColumn('learner_support_cases', 'ai_summary_generated_at');
+  const hasRequesterName = await knex.schema.hasColumn('learner_support_cases', 'requester_name');
+  const hasRequesterEmail = await knex.schema.hasColumn('learner_support_cases', 'requester_email');
+  const hasRequesterTimezone = await knex.schema.hasColumn('learner_support_cases', 'requester_timezone');
+  const hasNotificationPreferences = await knex.schema.hasColumn(
+    'learner_support_cases',
+    'notification_preferences'
+  );
+
+  if (hasRequesterEmail) {
+    await knex.schema.alterTable('learner_support_cases', (table) => {
+      table.dropIndex(['requester_email'], 'idx_learner_support_cases_requester_email');
+    });
+  }
 
   await knex.schema.alterTable('learner_support_cases', (table) => {
     if (hasEscalationBreadcrumbs) {
@@ -69,6 +117,18 @@ export async function down(knex) {
     }
     if (hasAiSummaryGeneratedAt) {
       table.dropColumn('ai_summary_generated_at');
+    }
+    if (hasNotificationPreferences) {
+      table.dropColumn('notification_preferences');
+    }
+    if (hasRequesterTimezone) {
+      table.dropColumn('requester_timezone');
+    }
+    if (hasRequesterEmail) {
+      table.dropColumn('requester_email');
+    }
+    if (hasRequesterName) {
+      table.dropColumn('requester_name');
     }
   });
 

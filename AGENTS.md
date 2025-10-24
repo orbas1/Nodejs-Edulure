@@ -119,20 +119,22 @@
             2. Debounce timers, abort controllers, and memoised state prevent overlapping searches; cache entries hydrate UI instantly while a fresh request runs in the background.
             3. When the service errors, the hook revives the last cached payload (even if stale), exposes a `stale` flag, and keeps the failure surfaced so agents know guidance may be out of date.
             4. Consumers receive `{ suggestions, cached, stale, lastFetchedAt, latestQuery }` alongside `search`/`reset`, letting TicketForm render freshness badges and offline messaging without duplicating heuristics.
-            5. `TicketForm` preloads requester name, email, and timezone from the authenticated session, while inline validation keeps subject, description, and contact fields error-aware as learners draft.
+            5. `TicketForm` preloads requester name, email, and timezone from the authenticated session, serialises notification preferences, and keeps subject/description/contact fields error-aware as learners draft so payloads align with backend schema.
             6. Digest cadence, channel, and category preferences persist via `edulure:support-preferences:<userId>`; banners confirm saves and prompt retries if storage fails.
             7. The stepper-guided layout separates triage metadata from the context narrative, carries attachment previews with deterministic IDs, and preserves selections across panel toggles.
             8. Knowledge suggestions show “Latest guidance” / “Cached guidance (stale)” with relative timestamps, reiterate offline fallback copy, and include article runtime metrics for triage.
             9. Submissions bundle attachments, cached knowledge suggestions, requester metadata, timezone, and notification preferences so backend orchestration and local caches stay aligned.
+            10. `LearnerDashboardService.createSupportTicket` feeds the payload into `SupportTicketModel.buildCreatePayload`, which calculates SLA windows, stores requester columns (`requester_name/email/timezone`), and serialises notification preferences + breadcrumbs before `LearnerSupportRepository` emits a `case_created` domain event.
          - A24.2 Support Case Enrichment & Dashboard Presentation (`frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx`, `frontend-reactjs/src/hooks/useLearnerSupportCases.js`)
             1. `LearnerSupport` seeds cases from the dashboard payload, renders requester chips (name, email, timezone), and keeps selection state stable as data refreshes.
-            2. Case actions (`createCase`, `updateCase`, `addMessage`, `closeCase`, `reopenCase`, `deleteCase`) pass requester + notification preference payloads so API calls remain schema-complete.
+            2. Case actions (`createCase`, `updateCase`, `addMessage`, `closeCase`, `reopenCase`, `deleteCase`) pass requester + notification preference payloads so `LearnerSupportRepository` can persist column + metadata updates without drift.
             3. Notification badges in the timeline surface digest cadence and channel opt-ins, keeping learners aware of how follow-ups will arrive.
             4. `useLearnerSupportCases` normalises requester/notification metadata, knowledge suggestions, breadcrumbs, and attachments before persisting to `edulure.dashboard.supportCases.v1`.
             5. Local persistence keeps cases available offline, merges remote updates by ID, and sorts via status precedence then recency for predictable dashboard ordering.
             6. SLA stats compute awaiting-learner counts, average agent response minutes, and latest-update markers that power the dashboard hero metrics.
             7. Message timelines maintain chronological ordering, tag the last learner/support responders, and expose attachment metadata for quick downloads.
             8. Offline ticket creation surfaces status banners while retaining queued attachments and cached knowledge suggestions, preventing context loss during reconnect.
+            9. Seeds in `backend-nodejs/seeds/001_bootstrap.js` populate `support_articles` plus sample cases with requester + notification preferences so dashboards render realistic data immediately after migrations.
       - ✓ A25. Shared Layout, Theming & Component Infrastructure (2.J)
          - A25.1 Theme Provider & Preference Persistence (`frontend-reactjs/src/providers/ThemeProvider.jsx`, `frontend-reactjs/src/main.jsx`)
             1. `ThemeProvider` boots with stored preferences (or defaults), tracking `mode`, `contrast`, and resolved variants to keep UI and tooling in sync.

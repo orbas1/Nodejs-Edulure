@@ -2636,6 +2636,18 @@ export default class LearnerDashboardService {
     }
     const description = payload.description ?? '';
     const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+    const requester =
+      payload.requester ??
+      payload.requestor ??
+      (payload.metadata && typeof payload.metadata === 'object' ? payload.metadata.requester : null);
+    const notificationPreferences =
+      payload.notificationPreferences ??
+      payload.notification_preferences ??
+      (payload.metadata && typeof payload.metadata === 'object'
+        ? payload.metadata.notificationPreferences ?? payload.metadata.notification_preferences
+        : null);
+    const metadataBase =
+      payload.metadata && typeof payload.metadata === 'object' ? { ...payload.metadata } : {};
     const knowledgeSuggestions = await SupportKnowledgeBaseService.buildSuggestionsForTicket({
       subject: payload.subject,
       description,
@@ -2656,6 +2668,8 @@ export default class LearnerDashboardService {
       channel: 'Portal',
       knowledgeSuggestions,
       aiSummary,
+      requester,
+      notificationPreferences,
       messages: description
         ? [
             {
@@ -2667,9 +2681,12 @@ export default class LearnerDashboardService {
           ]
         : [],
       metadata: {
-        ...(payload.metadata ?? {}),
+        ...metadataBase,
+        requester,
+        notificationPreferences,
         intake: {
-          channel: 'portal',
+          ...(metadataBase.intake ?? {}),
+          channel: (metadataBase.intake ?? {}).channel ?? 'portal',
           attachments: attachments.length
         }
       }

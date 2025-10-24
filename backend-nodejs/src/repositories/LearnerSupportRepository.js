@@ -97,7 +97,15 @@ export default class LearnerSupportRepository {
         priority: caseRecord.priority,
         status: caseRecord.status,
         channel: caseRecord.channel,
-        messageCount: messageRecords.length
+        messageCount: messageRecords.length,
+        requester: {
+          name: caseRecord.requester_name ?? null,
+          email: caseRecord.requester_email ?? null,
+          timezone: caseRecord.requester_timezone ?? null
+        },
+        notificationPreferences: SupportTicketModel.normaliseNotificationPreferences(
+          caseRecord.notification_preferences
+        )
       },
       userId
     );
@@ -111,7 +119,7 @@ export default class LearnerSupportRepository {
       return null;
     }
 
-    const payload = SupportTicketModel.buildUpdatePayload(updates);
+    const payload = SupportTicketModel.buildUpdatePayload(updates, existing);
     if (Object.keys(payload).length === 0) {
       return this.findCase(userId, caseId);
     }
@@ -119,8 +127,15 @@ export default class LearnerSupportRepository {
     await db('learner_support_cases').where({ user_id: userId, id: caseId }).update(payload);
     const updated = await this.findCase(userId, caseId);
 
-    const updatedFields = Object.keys(payload);
+    const updatedFields = Object.keys(payload).filter((field) => field !== 'updated_at');
     const statusChanged = updatedFields.includes('status') && payload.status !== existing.status;
+    const notificationPreferences = payload.notification_preferences
+      ? SupportTicketModel.normaliseNotificationPreferences(payload.notification_preferences)
+      : undefined;
+    const requesterUpdated =
+      ['requester_name', 'requester_email', 'requester_timezone'].filter((key) =>
+        updatedFields.includes(key)
+      ).length > 0;
 
     await recordCaseEvent(
       caseId,
@@ -128,7 +143,15 @@ export default class LearnerSupportRepository {
       {
         updatedFields,
         previousStatus: existing.status,
-        nextStatus: updated?.status ?? payload.status ?? existing.status
+        nextStatus: updated?.status ?? payload.status ?? existing.status,
+        requester: requesterUpdated
+          ? {
+              name: updated?.requester?.name ?? null,
+              email: updated?.requester?.email ?? null,
+              timezone: updated?.requester?.timezone ?? null
+            }
+          : undefined,
+        notificationPreferences
       },
       userId
     );
