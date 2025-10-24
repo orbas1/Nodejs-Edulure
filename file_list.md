@@ -144,6 +144,10 @@ This document lists all files in the repository, grouped by their top-level dire
 - `backend-nodejs/scripts/verify-schema-drift.js`
 - `backend-nodejs/scripts/wait-for-db.js`
 - `backend-nodejs/seeds/001_bootstrap.js`
+- `backend-nodejs/seeds/002_search_documents.js`
+- `backend-nodejs/seeds/003_platform_settings_provider_transitions.js`
+- `backend-nodejs/seeds/004_navigation_annex.js`
+- `backend-nodejs/seeds/005_environment_blueprints.js`
 - `backend-nodejs/src/app.js`
 - `backend-nodejs/src/bin/realtime.js`
 - `backend-nodejs/src/bin/web.js`

@@ -134,3 +134,9 @@ export async function seed(knex) {
     }
   });
 }
+
+export const __test__ = {
+  loadManifest,
+  createRecord,
+  deriveBlueprintRecords
+};
