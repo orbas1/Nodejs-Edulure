@@ -3121,6 +3121,184 @@ export async function seed(knex) {
       }
     ]);
 
+    const [commandCenterManifestId] = await trx('lesson_download_manifests').insert({
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleKickoffId,
+      version: 1,
+      status: 'published',
+      bundle_url: 'https://cdn.edulure.com/offline/ops/launch-command-center.v1.zip',
+      checksum_sha256: makeHash('offline-launch-command-center-v1'),
+      size_bytes: 24_576_000,
+      published_at: trx.fn.now(),
+      metadata: JSON.stringify({
+        moduleSlug: 'launch-command-center',
+        lessons: ['command-center-blueprint'],
+        includesTranscripts: true,
+        manifestVersion: 'v1'
+      })
+    });
+
+    const [incidentManifestId] = await trx('lesson_download_manifests').insert({
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleIncidentId,
+      version: 1,
+      status: 'published',
+      bundle_url: 'https://cdn.edulure.com/offline/ops/incident-simulation.v1.zip',
+      checksum_sha256: makeHash('offline-incident-simulation-v1'),
+      size_bytes: 31_457_280,
+      published_at: trx.fn.now(),
+      metadata: JSON.stringify({
+        moduleSlug: 'incident-simulation-drills',
+        lessons: ['funnel-telemetry-deep-dive'],
+        includesAssessments: true,
+        manifestVersion: 'v1'
+      })
+    });
+
+    await trx('lesson_download_assets').insert([
+      {
+        manifest_id: commandCenterManifestId,
+        asset_type: 'video',
+        label: 'Command Center Walkthrough',
+        asset_url: 'https://cdn.edulure.com/offline/ops/command-center-video.mp4',
+        checksum_sha256: makeHash('command-center-video.mp4'),
+        size_bytes: 18_874_368,
+        metadata: JSON.stringify({ durationSeconds: 900, contentType: 'video/mp4' })
+      },
+      {
+        manifest_id: commandCenterManifestId,
+        asset_type: 'document',
+        label: 'Runbook Worksheet',
+        asset_url: 'https://cdn.edulure.com/offline/ops/command-center-worksheet.pdf',
+        checksum_sha256: makeHash('command-center-worksheet.pdf'),
+        size_bytes: 2_359_296,
+        metadata: JSON.stringify({ contentType: 'application/pdf', pages: 8 })
+      },
+      {
+        manifest_id: incidentManifestId,
+        asset_type: 'ebook',
+        label: 'Telemetry Deep Dive Reading',
+        asset_url: 'https://cdn.edulure.com/offline/ops/funnel-telemetry.epub',
+        checksum_sha256: makeHash('funnel-telemetry.epub'),
+        size_bytes: 12_582_912,
+        metadata: JSON.stringify({ contentType: 'application/epub+zip', chapters: 6 })
+      },
+      {
+        manifest_id: incidentManifestId,
+        asset_type: 'assessment',
+        label: 'Simulation Checklist',
+        asset_url: 'https://cdn.edulure.com/offline/ops/incident-sim-checklist.json',
+        checksum_sha256: makeHash('incident-sim-checklist.json'),
+        size_bytes: 196_608,
+        metadata: JSON.stringify({ contentType: 'application/json', rubric: true })
+      }
+    ]);
+
+    await trx('lesson_progress_sync_queue').insert([
+      {
+        public_id: crypto.randomUUID(),
+        enrollment_id: opsEnrollmentId,
+        lesson_id: telemetryLessonId,
+        module_id: opsModuleIncidentId,
+        status: 'pending',
+        progress_percent: 25,
+        requires_review: 0,
+        attempts: 0,
+        last_attempt_at: null,
+        last_error: null,
+        payload: JSON.stringify({
+          notes: 'Queued during field visit',
+          recordedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+          offline: true,
+          device: 'iOS',
+          localLogId: 'seed-offline-log-1',
+          source: 'mobile.offline'
+        }),
+        metadata: JSON.stringify({
+          moduleSlug: 'incident-simulation-drills',
+          lessonSlug: 'funnel-telemetry-deep-dive',
+          appVersion: '1.42.0',
+          networkQuality: 'offline'
+        })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        enrollment_id: opsEnrollmentId,
+        lesson_id: commandCenterLessonId,
+        module_id: opsModuleKickoffId,
+        status: 'completed',
+        progress_percent: 100,
+        requires_review: 0,
+        attempts: 1,
+        last_attempt_at: new Date(Date.now() - 90 * 60 * 1000),
+        last_error: null,
+        synced_at: new Date(Date.now() - 45 * 60 * 1000),
+        completed_at: new Date(Date.now() - 45 * 60 * 1000),
+        payload: JSON.stringify({
+          notes: 'Synced after reconnecting at HQ',
+          recordedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+          offline: true,
+          device: 'Android',
+          localLogId: 'seed-offline-log-0',
+          source: 'mobile.offline'
+        }),
+        metadata: JSON.stringify({
+          moduleSlug: 'launch-command-center',
+          lessonSlug: 'command-center-blueprint',
+          appVersion: '1.42.0',
+          networkQuality: 'wifi'
+        })
+      }
+    ]);
+
+    const [syncQueueActionId] = await trx('instructor_quick_actions').insert({
+      public_id: crypto.randomUUID(),
+      instructor_id: instructorId,
+      title: 'Review automation capstone submissions',
+      description: 'Audit the latest learner uploads and approve the top playbooks.',
+      action_type: 'review',
+      status: 'pending',
+      priority: 2,
+      due_at: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+      requires_sync: true,
+      metadata: JSON.stringify({ surface: 'mobile.dashboard', origin: 'seed', offlineEnabled: true })
+    });
+
+    const [opsPulseActionId] = await trx('instructor_quick_actions').insert({
+      public_id: crypto.randomUUID(),
+      instructor_id: instructorId,
+      title: 'Publish weekly ops pulse update',
+      description: 'Summarise automation KPIs and post to the instructor dashboard feed.',
+      action_type: 'communication',
+      status: 'in_progress',
+      priority: 3,
+      due_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      requires_sync: false,
+      metadata: JSON.stringify({ channel: 'dashboard', template: 'ops-weekly-pulse' }),
+      last_synced_at: trx.fn.now()
+    });
+
+    await trx('instructor_quick_action_events').insert([
+      {
+        action_id: syncQueueActionId,
+        event_key: 'action.created',
+        performed_by: instructorId,
+        details: JSON.stringify({ status: 'pending', note: 'Seeded quick action for offline sync demo' })
+      },
+      {
+        action_id: opsPulseActionId,
+        event_key: 'action.created',
+        performed_by: instructorId,
+        details: JSON.stringify({ status: 'in_progress', note: 'Weekly cadence seeded' })
+      },
+      {
+        action_id: opsPulseActionId,
+        event_key: 'status.transition',
+        performed_by: instructorId,
+        details: JSON.stringify({ previousStatus: 'pending', status: 'in_progress', requiresSync: false })
+      }
+    ]);
+
     const automationGoalDueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     await trx('learner_course_goals').insert({
       goal_uuid: crypto.randomUUID(),

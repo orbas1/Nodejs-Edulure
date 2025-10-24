@@ -494,41 +494,41 @@ This compendium maps the execution paths, responsibilities, and release consider
 15. **Change Checklist Tracker:** Include feed regression, offline sync QA, and websocket throughput tests in mobile release checklist.
 16. **Full Upgrade Plan & Release Steps:** Pilot via TestFlight/Play staged rollout, monitor analytics, collect user feedback, and expand to all cohorts.
 
-### 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
-1. **Appraisal:** Mobile lesson player supporting streaming, downloads, quizzes, and progress sync with resilient offline handling.
-2. **Functionality:** Widgets manage media playback, offline bundle storage, quiz attempts, submission queues, and note-taking.
-3. **Logic Usefulness:** Background isolates process downloads, encryption, and upload retries ensuring consistent state even with intermittent connectivity.
-4. **Redundancies:** Download manager logic repeated across lessons and resources; refactor into shared service.
-5. **Placeholders Or non-working functions or stubs:** Offline rubric review flagged TODO; display helpful messaging.
-6. **Duplicate Functions:** Progress tracking repeated in progress service and lesson components; centralise to avoid divergence.
-7. **Improvements need to make:** Introduce adaptive hints, offline certificate viewer, and analytics instrumentation for offline usage.
-8. **Styling improvements:** Align typography, spacing, and progress bars with design tokens and ensure dark mode fidelity.
-9. **Efficiency analysis and improvement:** Optimise chunk sizes, reuse cached transcripts, and throttle analytics to reduce battery usage.
-10. **Strengths to Keep:** Robust offline support and reliable submission handling.
-11. **Weaknesses to remove:** Complex nested navigation for assessments; simplify flows with stepper patterns.
-12. **Styling and Colour review changes:** Ensure progress indicators meet contrast requirements across themes.
-13. **CSS, orientation, placement and arrangement changes:** Enhance layout for landscape orientation and tablets.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Keep prompts concise, avoid duplicate hints, and ensure instructions remain supportive.
-15. **Change Checklist Tracker:** Update offline QA, crash recovery testing, and analytics validation before releases.
-16. **Full Upgrade Plan & Release Steps:** Stage updates with phased rollout, monitor offline metrics, refresh docs, and coordinate with backend for manifest updates.
+### 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`, `backend-nodejs/src/services/LessonOfflineService.js`)
+1. **Appraisal:** Offline learning now spans Flutter Hive caches and Node services backed by dedicated schema (`lesson_download_manifests`, `lesson_download_assets`, `lesson_progress_sync_queue`). The mobile viewer still orchestrates downloads locally, but manifests and sync queues are mirrored in Postgres with seed data so Annex A28/B6 flows stay coherent across platforms.
+2. **Functionality:** New REST hooks (`GET /courses/:slug/offline/manifests`, `GET|POST|PATCH /courses/:slug/offline/progress`) expose manifest bundles and learner sync tasks. Flutter screens call `LessonDownloadService`/`ProgressService`, while backend controllers validate slugs, resolve module IDs, enqueue Hive-captured logs, and return status-rich payloads for queue banners and retry chips.
+3. **Logic Usefulness:** `LessonOfflineService` resolves modules/lessons from course slugs, hydrates assets for each manifest, and normalises payload/metadata with retry counters before persisting via `LessonProgressSyncQueueModel`. Flutter providers consume the same status taxonomy so watchers, tests, and dashboard banners stay aligned with server truth.
+4. **Redundancies:** We still maintain Riverpod `ProgressStore` state alongside the server-backed queue; consolidating history derivation into the new service (or exposing a single hydration endpoint) would prevent divergent timestamps between Hive and REST responses. Snackbar copy for offline states also lives in both Dart widgets and controller responses—extract shared constants to avoid drift.
+5. **Placeholders Or non-working functions or stubs:** Mobile downloads continue to run in `simulateDownloads` mode, manifest bundle URLs point at CDN examples, and checksum validation happens via seeded hashes only. Wiring the real download adapters plus integrity checks remains open before graduating Annex A28 from pilot.
+6. **Duplicate Functions:** `ProgressStore.recordProgress` still writes directly to `LearningPersistenceService` while the backend queue owns reconciliation metadata; routing all persistence through the new REST handlers would eliminate duplicate serialization logic and centralise analytics.
+7. **Improvements need to make:** Add checksum and storage-quota errors to offline banners, propagate queue telemetry into Annex B6 dashboards, surface server-side retry affordances in Flutter, and expose manifest versioning so clients can diff assets without redownloading entire bundles.
+8. **Styling improvements:** Flutter cards already respect design tokens, but backend responses now include `assets[*].assetType`/`metadata`—mirror those into theming helpers so transcript buttons, rubrics, and empty states render consistently in dark mode.
+9. **Efficiency analysis and improvement:** Database manifests reuse `module_id`/`version` uniqueness, queue writes batch JSON payloads, and controllers clamp status updates. Next iterations should batch manifest fetches when multiple modules are requested and memoise queue lookups during rapid sync retries.
+10. **Strengths to Keep:** End-to-end parity—Hive caches, REST endpoints, migrations, and seeds—gives learners confidence that offline notes reconcile, while tests still cover client-side queue lifecycle. Backend models keep metadata typed, and controllers enforce enrollment checks before accepting sync logs.
+11. **Weaknesses to remove:** Offline share affordances remain placeholders, queue updates lack granular error codes (storage full vs network), and we still refresh whole module lists on a single download change. Adopt diffed list rendering and enrich controller errors to reduce uncertainty.
+12. **Styling and Colour review changes:** Align backend status strings with Flutter badge palette (`queued`, `downloading`, `completed`, `failed`) so API consumers inherit the same tonal guidance and Annex B6 screenshots stay accurate.
+13. **CSS, orientation, placement and arrangement changes:** Tablets still stretch module stacks; once manifest summaries return `assets` metadata, introduce responsive two-column layouts with persistent offline drawers per Annex guidance.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Backend now returns actionable copy in queue payloads (notes, recordedAt). Harmonise those strings with Flutter snackbars, keep them under 120 characters, and document localisation keys before translation.
+15. **Change Checklist Tracker:** Extend release runs to cover `lesson_download_manifests` migrations, seed refresh, API smoke tests for offline endpoints, Flutter `flutter test`, and manual Hive reset to confirm reconciliation.
+16. **Full Upgrade Plan & Release Steps:** Roll manifests to staging, validate queue endpoints with synthetic data, ship beta cohorts with feature flags, monitor sync latency via the new tables, harden download adapters, and publish Annex B6/A28 doc updates before GA.
 
-### 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`)
-1. **Appraisal:** Lightweight instructor toolkit providing announcements, attendance tracking, grading approvals, and scheduling adjustments on the go.
-2. **Functionality:** Widgets expose quick action tiles, offline queueing, and push-triggered deep links for urgent tasks.
-3. **Logic Usefulness:** Services sync quick actions with backend, track state until confirmation, and emit analytics for operational oversight.
-4. **Redundancies:** Quick action definitions duplicated across config files; centralise to guarantee consistent labelling.
-5. **Placeholders Or non-working functions or stubs:** Attendance sync stub awaiting backend endpoint; clearly communicate limitation.
-6. **Duplicate Functions:** Notification handling repeated across features; unify into shared notification service.
-7. **Improvements need to make:** Add voice dictation, schedule overview, and analytics dashboards for instructor performance.
-8. **Styling improvements:** Align quick action tiles, icons, and typography with design tokens and ensure accessible contrasts.
-9. **Efficiency analysis and improvement:** Memoise quick action widgets and reduce rebuilds when state unchanged.
-10. **Strengths to Keep:** Offline-first queueing and ergonomic action flows.
-11. **Weaknesses to remove:** Limited feedback when actions queued; add status indicators and retry UI.
-12. **Styling and Colour review changes:** Harmonise action state colours across light/dark themes.
-13. **CSS, orientation, placement and arrangement changes:** Optimise grid for phones and tablets with responsive columns.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Keep action labels short, ensure confirmation messages remain clear, and localise instructions.
-15. **Change Checklist Tracker:** Include instructor flows, push notification QA, and offline queue verification in release checklist.
-16. **Full Upgrade Plan & Release Steps:** Pilot with select instructors, monitor telemetry, iterate on UX, and roll out broadly after validation.
+### 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`, `backend-nodejs/src/services/InstructorQuickActionsService.js`)
+1. **Appraisal:** Instructor dashboards now talk to real backend storage—`instructor_quick_actions` and `_events` tables seed representative tasks, while Flutter cards consume Riverpod streams wired to new REST endpoints. Annex A29/C4 flows cover quick actions, offline sync badges, and scheduling helpers end-to-end.
+2. **Functionality:** `InstructorQuickActionsController` serves `GET/POST /instructor/quick-actions`, `PATCH /quick-actions/:id`, and `POST /quick-actions/:id/sync`. Flutter `_QuickActionsCard` still drives UI interactions (`_markQuickActionInProgress`, `_syncQuickActions`) but now receives persisted state, audit history, and sync timestamps from Node.
+3. **Logic Usefulness:** `InstructorQuickActionsService` validates status transitions, stamps `completedAt`/`lastSyncedAt`, records audit events via `InstructorQuickActionEventModel`, and merges metadata updates. Seeds showcase pending and in-progress actions so dashboard charts, Riverpod caches, and backend analytics read the same state.
+4. **Redundancies:** Status copy remains duplicated between Flutter enums and backend event payloads; extracting a shared token map (or exposing status labels from the API) would prevent mismatched chip text across platforms.
+5. **Placeholders Or non-working functions or stubs:** Deep links to live class rosters and attendance metrics still stub out in Flutter, and backend events presently capture notes but not rich actor context (e.g., impersonation IDs). Fill these gaps to satisfy Annex C4 audit requirements.
+6. **Duplicate Functions:** Local sample creation logic persists both in Dart (`_createSampleQuickAction`) and backend seeds. Move canonical seed definitions into a shared JSON or rely on the new `POST /quick-actions` endpoint to avoid copy drift.
+7. **Improvements need to make:** Add background jobs to auto-close stale tasks, surface completion analytics, introduce bulk transitions, and emit webhooks or notifications when instructors mark actions complete so Annex A29 reporting flows stay proactive.
+8. **Styling improvements:** Backend responses expose `actionType`, `priority`, and `requiresSync`; plumb those into Flutter theming (iconography, badge colour) so quick action cards, empty states, and error banners match design tokens.
+9. **Efficiency analysis and improvement:** Database indices on `(instructor_id,status)` keep queries fast, and services run inside transactions to avoid race conditions. Next: cache list responses when filters repeat and debounce transition calls when instructors toggle statuses rapidly.
+10. **Strengths to Keep:** Offline-friendly queueing, deterministic ordering, immediate UI feedback, seeded audit events, and scheduling helpers produce a cohesive operations cockpit. Backend controllers enforce instructor auth and return consistent status envelopes for Flutter cards.
+11. **Weaknesses to remove:** There is still no progress indicator for long-running syncs, metadata merges ignore nested structures, and event payloads omit actor display names. Enrich responses and add streaming updates to reduce polling.
+12. **Styling and Colour review changes:** Ensure backend status strings align with Flutter chip colours (“pending”, “in_progress”, “completed”, “failed”) and add accessibility metadata so dashboards mirror Annex C4 palettes in both mobile and web surfaces.
+13. **CSS, orientation, placement and arrangement changes:** With backend history available, enhance tablet/desktop layouts to show timeline columns alongside quick action stacks, and introduce responsive wrapping so cards and schedule grids coexist without vertical sprawl.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Harmonise event notes and snackbar copy—backend defaults should stay concise (<100 chars), reference the action title, and avoid jargon so instructors immediately understand next steps.
+15. **Change Checklist Tracker:** Release trains must verify the new migrations, seed scripts, quick-action APIs, Flutter card smoke tests, and audit event logging before marking Annex A29 items complete.
+16. **Full Upgrade Plan & Release Steps:** Roll migrations to staging, reseed quick actions, validate controller endpoints with integration tests, update Flutter to surface backend audit history, capture Annex A29/C4 documentation updates, and monitor completion/sync metrics post-release.
 
 ### 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)
 1. **Appraisal:** Mobile billing flows via in-app purchase integrations and backend reconciliation for upgrades, downgrades, and renewals.
@@ -1279,18 +1279,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Run end-to-end tests with backend staging, monitor crash analytics, and coordinate push notification updates.
 
 ### A28. Flutter Lessons, Assessments & Offline Learning (3.C)
-- **Operational Depth:** Lesson downloads, assessment execution, and progress syncing operate with background isolates to preserve responsiveness.
-- **Gaps & Risks:** Offline completion sync lacks conflict resolution; plan merge strategy. Assessment timer copy inconsistent.
-- **Resilience & Efficiency:** Schedule background syncs intelligently, deduplicate downloads, and compress assets.
-- **UX & Communications:** Provide consistent progress indicators, accessible colour schemes, and concise instructions.
-- **Change Management:** Validate offline scenarios, update QA scripts, and coordinate instructor communications.
+- **Operational Depth:** Offline bundles now live in `lesson_download_manifests`/`lesson_download_assets`, `LessonOfflineService` resolves slugs to IDs, and REST endpoints mirror Hive queues so Flutter isolates, Riverpod providers, and backend telemetry observe the same manifest + progress state.
+- **Gaps & Risks:** Conflict resolution between multiple devices remains manual, checksums are seeded placeholders, and download adapters still simulate transfers—production rollout requires real integrity checks and merge semantics.
+- **Resilience & Efficiency:** Server controllers clamp status transitions, reuse indexes, and stream compact JSON; next steps include batching manifest hydration, throttling rapid sync retries, and surfacing storage-quota errors to clients.
+- **UX & Communications:** API payloads return status copy, notes, and `recordedAt` timestamps—align snackbar text, colour tokens, and accessibility hints across mobile/web so Annex B6 visuals remain consistent.
+- **Change Management:** Add migration verification (`lesson_download_*`, `lesson_progress_sync_queue`), reseed environments, smoke test offline endpoints plus Flutter Hive resets, update Annex A28 documentation, and brief support on new sync telemetry.
 
 ### A29. Flutter Instructor Quick Actions & Operations (3.D)
-- **Operational Depth:** Instructor dashboards provide attendance, grading, and scheduling via dedicated services.
-- **Gaps & Risks:** Scheduling conflicts detection minimal; improve before scaling. Quick actions reuse stale API endpoints.
-- **Resilience & Efficiency:** Cache instructor stats, prefetch rosters, and optimise network retries.
-- **UX & Communications:** Align iconography with design guidelines, ensure CTA placement intuitive, and update copy for clarity.
-- **Change Management:** Include instructor feedback loops, update documentation, and test across device sizes.
+- **Operational Depth:** `InstructorQuickActionsService` persists actions/events, new routes expose list/transition/sync flows, and Flutter cards consume real audit history alongside scheduling helpers so Annex C4 operations run on shared data.
+- **Gaps & Risks:** Deep links and attendance hooks are still TODO, metadata merges ignore nested keys, and bulk transitions or SLA alerts remain future work—capture these before expanding cohorts.
+- **Resilience & Efficiency:** Database indices plus transactional updates keep transitions safe; next iteration should cache filtered lists, debounce rapid status toggles, and publish webhooks for telemetry.
+- **UX & Communications:** Backend status strings map to Flutter chips; ensure chip palettes, empty states, and sync badges reflect Annex copy decks and localisation guidance.
+- **Change Management:** Cover new migrations/seeds in release checklists, regression test instructor dashboard widgets, document API payloads for CSM enablement, and monitor completion/sync metrics post-launch.
 
 ### A30. Flutter Billing & Subscription Management (3.E)
 - **Operational Depth:** Integrations wrap native billing SDKs, managing entitlements and receipts with backend reconciliation.

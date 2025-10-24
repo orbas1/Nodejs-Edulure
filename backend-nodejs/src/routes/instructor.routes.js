@@ -1,5 +1,6 @@
 import InstructorBookingController from '../controllers/InstructorBookingController.js';
 import InstructorOrchestrationController from '../controllers/InstructorOrchestrationController.js';
+import InstructorQuickActionsController from '../controllers/InstructorQuickActionsController.js';
 import InstructorSchedulingController from '../controllers/InstructorSchedulingController.js';
 import auth from '../middleware/auth.js';
 import { createApiRouter } from './routerFactory.js';
@@ -34,5 +35,10 @@ router.post(
 );
 router.post('/orchestration/mentor-invite', auth('instructor'), InstructorOrchestrationController.sendMentorInvite);
 router.post('/orchestration/pricing-export', auth('instructor'), InstructorOrchestrationController.exportPricing);
+
+router.get('/quick-actions', auth('instructor'), InstructorQuickActionsController.list);
+router.post('/quick-actions', auth('instructor'), InstructorQuickActionsController.create);
+router.patch('/quick-actions/:actionId', auth('instructor'), InstructorQuickActionsController.transition);
+router.post('/quick-actions/:actionId/sync', auth('instructor'), InstructorQuickActionsController.markSynced);
 
 export default router;

@@ -58,8 +58,8 @@
       - 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
       - 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
       - 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
-      - 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
-      - 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`)
+      - 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`) ✓
+      - 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`) ✓
       - 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)
       - 3.F Notifications, Messaging & Support (`lib/features/notifications/`, `lib/features/support/`, `lib/services/push_service.dart`, `lib/services/inbox_service.dart`)
       - 4.A Community Reminder Job (`communityReminderJob.js`)
@@ -117,8 +117,8 @@
       - A25. Shared Layout, Theming & Component Infrastructure (2.J)
       - A26. Flutter Authentication & Identity (3.A)
       - A27. Flutter Community Feed & Engagement (3.B)
-      - A28. Flutter Lessons, Assessments & Offline Learning (3.C)
-      - A29. Flutter Instructor Quick Actions & Operations (3.D)
+      - A28. Flutter Lessons, Assessments & Offline Learning (3.C) ✓
+      - A29. Flutter Instructor Quick Actions & Operations (3.D) ✓
       - A30. Flutter Billing & Subscription Management (3.E)
       - A31. Flutter Notifications, Messaging & Support (3.F)
       - A32. Community Reminder Job (4.A)

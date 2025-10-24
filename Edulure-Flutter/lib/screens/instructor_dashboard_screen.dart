@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
+import '../provider/instructor/instructor_providers.dart';
 import '../services/course_service.dart';
 import '../services/dashboard_service.dart';
+import '../services/instructor_service.dart';
+import '../services/scheduling_service.dart';
 import '../services/session_manager.dart';
 
-class InstructorDashboardScreen extends StatefulWidget {
+class InstructorDashboardScreen extends ConsumerStatefulWidget {
   const InstructorDashboardScreen({super.key});
 
   @override
-  State<InstructorDashboardScreen> createState() => _InstructorDashboardScreenState();
+  ConsumerState<InstructorDashboardScreen> createState() => _InstructorDashboardScreenState();
 }
 
-class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
+class _InstructorDashboardScreenState extends ConsumerState<InstructorDashboardScreen> {
   final CourseService _service = CourseService();
   CourseDashboard? _dashboard;
   bool _loading = true;
@@ -547,6 +552,81 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
     return email.isNotEmpty ? email[0].toUpperCase() : 'I';
   }
 
+  Widget _buildQuickActions(BuildContext context) {
+    final quickActionsAsync = ref.watch(instructorQuickActionsStreamProvider);
+    final schedulingService = ref.watch(instructorSchedulingServiceProvider);
+    return quickActionsAsync.when(
+      loading: () => const _QuickActionsLoadingCard(),
+      error: (error, _) => _QuickActionsErrorCard(error: error),
+      data: (actions) {
+        final pending = actions.where((action) => action.status != InstructorQuickActionStatus.completed).toList();
+        final offlineQueue = actions.where((action) => action.requiresSync).toList();
+        final slots = schedulingService.generateSlots(actions: pending, maxSlots: 3);
+        final workloadSummary = schedulingService.describeWorkload(actions);
+        return _QuickActionsCard(
+          actions: actions,
+          offlineQueue: offlineQueue,
+          slots: slots,
+          workloadSummary: workloadSummary,
+          onAddSample: () => _createSampleQuickAction(context),
+          onSync: () => _syncQuickActions(context),
+          onComplete: (action) => _completeQuickAction(context, action),
+          onMarkInProgress: (action) => _markQuickActionInProgress(context, action),
+          onRetry: (action) => _retryQuickAction(context, action),
+        );
+      },
+    );
+  }
+
+  Future<void> _createSampleQuickAction(BuildContext context) async {
+    final service = ref.read(instructorQuickActionsServiceProvider);
+    final action = await service.createAction(
+      title: 'Follow up with learners',
+      description: 'Send summary notes and action items to the latest live session cohort.',
+      dueAt: DateTime.now().add(const Duration(hours: 6)),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Added quick action "${action.title}"')),
+    );
+  }
+
+  Future<void> _syncQuickActions(BuildContext context) async {
+    final service = ref.read(instructorQuickActionsServiceProvider);
+    await service.syncOfflineActions();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Offline updates synced')), 
+    );
+  }
+
+  Future<void> _markQuickActionInProgress(BuildContext context, InstructorQuickAction action) async {
+    final service = ref.read(instructorQuickActionsServiceProvider);
+    await service.markInProgress(action.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Marked "${action.title}" as in progress')),
+    );
+  }
+
+  Future<void> _completeQuickAction(BuildContext context, InstructorQuickAction action) async {
+    final service = ref.read(instructorQuickActionsServiceProvider);
+    await service.markCompleted(action.id, requiresSync: true);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Completed "${action.title}" (queued for sync)')),
+    );
+  }
+
+  Future<void> _retryQuickAction(BuildContext context, InstructorQuickAction action) async {
+    final service = ref.read(instructorQuickActionsServiceProvider);
+    await service.retryAction(action.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Retry queued for "${action.title}"')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -588,11 +668,13 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('We could not load the latest data',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(fontWeight: FontWeight.w600, color: Colors.red.shade700)),
+                                  Text(
+                                    'We could not load the latest data',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600, color: Colors.red.shade700),
+                                  ),
                                   const SizedBox(height: 8),
                                   Text(
                                     _error!,
@@ -609,13 +691,19 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                             ),
                           _buildHeroCard(context),
                           const SizedBox(height: 20),
+                          _buildQuickActions(context),
+                          const SizedBox(height: 20),
                           _buildServiceSuiteBanner(context),
                           const SizedBox(height: 20),
                           _buildMetricHighlights(context),
                           const SizedBox(height: 20),
+                          _buildLiveClassroomsSection(context),
+                          const SizedBox(height: 20),
                           _buildPipelineSection(context),
                           const SizedBox(height: 20),
                           _buildProductionSection(context),
+                          const SizedBox(height: 20),
+                          _buildAdsSuite(context),
                           const SizedBox(height: 20),
                           _buildRevenueSection(context),
                           const SizedBox(height: 20),
@@ -623,47 +711,6 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                         ],
                       ),
               ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('We could not load the latest data',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w600, color: Colors.red.shade700)),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _error!,
-                                  style: TextStyle(color: Colors.red.shade700),
-                                ),
-                                const SizedBox(height: 12),
-                                FilledButton.icon(
-                                  onPressed: _load,
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('Retry'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        _buildHeroCard(context),
-                        const SizedBox(height: 20),
-                        _buildServiceSuiteBanner(context),
-                        const SizedBox(height: 20),
-                        _buildMetricHighlights(context),
-                        const SizedBox(height: 20),
-                        _buildLiveClassroomsSection(context),
-                        const SizedBox(height: 20),
-                        _buildPipelineSection(context),
-                        const SizedBox(height: 20),
-                        _buildProductionSection(context),
-                        const SizedBox(height: 20),
-                        _buildAdsSuite(context),
-                        const SizedBox(height: 20),
-                        _buildRevenueSection(context),
-                        const SizedBox(height: 20),
-                        _buildInsightsSection(context),
-                      ],
-                    ),
             ),
     );
   }
@@ -1813,6 +1860,260 @@ class _RevenueSliceRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _QuickActionsLoadingCard extends StatelessWidget {
+  const _QuickActionsLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: const Padding(
+        padding: EdgeInsets.all(24),
+        child: Row(
+          children: [
+            SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)),
+            SizedBox(width: 16),
+            Expanded(child: Text('Fetching quick actions…')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionsErrorCard extends StatelessWidget {
+  const _QuickActionsErrorCard({this.error});
+
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Unable to load quick actions: ${error ?? 'unknown error'}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionsCard extends StatelessWidget {
+  const _QuickActionsCard({
+    required this.actions,
+    required this.offlineQueue,
+    required this.slots,
+    required this.workloadSummary,
+    required this.onAddSample,
+    required this.onSync,
+    required this.onComplete,
+    required this.onMarkInProgress,
+    required this.onRetry,
+  });
+
+  final List<InstructorQuickAction> actions;
+  final List<InstructorQuickAction> offlineQueue;
+  final List<InstructorScheduleSlot> slots;
+  final String workloadSummary;
+  final Future<void> Function() onAddSample;
+  final Future<void> Function() onSync;
+  final Future<void> Function(InstructorQuickAction action) onComplete;
+  final Future<void> Function(InstructorQuickAction action) onMarkInProgress;
+  final Future<void> Function(InstructorQuickAction action) onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final formatter = DateFormat('MMM d • HH:mm');
+    final pendingActions = actions.take(4).toList();
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Instructor quick actions',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                FilledButton.tonalIcon(
+                  onPressed: () async => onAddSample(),
+                  icon: const Icon(Icons.add_task_outlined),
+                  label: const Text('Add sample'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(workloadSummary, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            if (offlineQueue.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondaryContainer.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.sync_problem_outlined, color: theme.colorScheme.secondary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '${offlineQueue.length} action(s) queued for sync',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async => onSync(),
+                      child: const Text('Sync now'),
+                    ),
+                  ],
+                ),
+              ),
+            if (pendingActions.isEmpty)
+              const Text('No active quick actions — you are all caught up!')
+            else
+              ...pendingActions.map((action) {
+                final dueLabel = action.dueAt != null ? formatter.format(action.dueAt!.toLocal()) : 'No due date';
+                final statusColor = _statusColor(theme, action.status);
+                final statusLabel = _statusLabel(action.status);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: theme.colorScheme.surfaceVariant.withOpacity(0.6)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              action.title,
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          Chip(
+                            label: Text(statusLabel),
+                            backgroundColor: statusColor.withOpacity(0.15),
+                            labelStyle: theme.textTheme.labelMedium?.copyWith(color: statusColor),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(action.description, style: theme.textTheme.bodyMedium),
+                      const SizedBox(height: 6),
+                      Text('Due $dueLabel', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        children: [
+                          if (action.status == InstructorQuickActionStatus.pending)
+                            TextButton.icon(
+                              onPressed: () async => onMarkInProgress(action),
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('Start'),
+                            ),
+                          if (action.status == InstructorQuickActionStatus.inProgress ||
+                              action.status == InstructorQuickActionStatus.pending)
+                            FilledButton.tonalIcon(
+                              onPressed: () async => onComplete(action),
+                              icon: const Icon(Icons.check_circle_outline),
+                              label: const Text('Complete'),
+                            ),
+                          if (action.status == InstructorQuickActionStatus.failed)
+                            TextButton.icon(
+                              onPressed: () async => onRetry(action),
+                              icon: const Icon(Icons.refresh_outlined),
+                              label: const Text('Retry'),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            if (slots.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Suggested schedule', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: slots
+                    .map(
+                      (slot) => Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: theme.colorScheme.primary.withOpacity(0.08),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(slot.label, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            Text('${formatter.format(slot.start.toLocal())} — ${formatter.format(slot.end.toLocal())}',
+                                style: theme.textTheme.bodySmall),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Color _statusColor(ThemeData theme, InstructorQuickActionStatus status) {
+    switch (status) {
+      case InstructorQuickActionStatus.pending:
+        return theme.colorScheme.primary;
+      case InstructorQuickActionStatus.inProgress:
+        return theme.colorScheme.tertiary;
+      case InstructorQuickActionStatus.completed:
+        return theme.colorScheme.secondary;
+      case InstructorQuickActionStatus.failed:
+        return theme.colorScheme.error;
+    }
+  }
+
+  static String _statusLabel(InstructorQuickActionStatus status) {
+    switch (status) {
+      case InstructorQuickActionStatus.pending:
+        return 'Pending';
+      case InstructorQuickActionStatus.inProgress:
+        return 'In progress';
+      case InstructorQuickActionStatus.completed:
+        return 'Completed';
+      case InstructorQuickActionStatus.failed:
+        return 'Failed';
+    }
   }
 }
 

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
+import '../services/lesson_download_service.dart';
 
 enum _CourseCatalogAction { refresh, restoreSeed }
 
@@ -435,7 +438,7 @@ class _CourseList extends StatelessWidget {
   }
 }
 
-class _CourseDetail extends StatefulWidget {
+class _CourseDetail extends ConsumerStatefulWidget {
   const _CourseDetail({
     required this.course,
     required this.onUpdateModule,
@@ -445,11 +448,12 @@ class _CourseDetail extends StatefulWidget {
   final void Function(String moduleId, int completedLessons) onUpdateModule;
 
   @override
-  State<_CourseDetail> createState() => _CourseDetailState();
+  ConsumerState<_CourseDetail> createState() => _CourseDetailState();
 }
 
-class _CourseDetailState extends State<_CourseDetail> {
+class _CourseDetailState extends ConsumerState<_CourseDetail> {
   late Course _course;
+  final Set<String> _pendingDownloads = <String>{};
 
   @override
   void initState() {
@@ -465,6 +469,318 @@ class _CourseDetailState extends State<_CourseDetail> {
     } else {
       _course = widget.course;
     }
+  }
+
+  bool _isPending(String moduleId) => _pendingDownloads.contains(moduleId);
+
+  void _setPending(String moduleId, bool value) {
+    setState(() {
+      if (value) {
+        _pendingDownloads.add(moduleId);
+      } else {
+        _pendingDownloads.remove(moduleId);
+      }
+    });
+  }
+
+  LessonDownloadRecord? _downloadForModule(
+    List<LessonDownloadRecord> downloads,
+    String moduleId,
+  ) {
+    for (final record in downloads) {
+      if (record.courseId == _course.id && record.moduleId == moduleId) {
+        return record;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _queueModuleDownload(CourseModule module) async {
+    final service = ref.read(lessonDownloadServiceProvider);
+    _setPending(module.id, true);
+    try {
+      await service.queueDownload(
+        courseId: _course.id,
+        moduleId: module.id,
+        moduleTitle: module.title,
+        assetUrls: _moduleAssets(module),
+        expectedSizeBytes: max(1, module.lessonCount) * 15 * 1024 * 1024,
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Queued offline bundle for ${module.title}')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to queue download: $error')),
+      );
+    } finally {
+      if (mounted) {
+        _setPending(module.id, false);
+      }
+    }
+  }
+
+  Future<void> _cancelModuleDownload(LessonDownloadRecord record) async {
+    final service = ref.read(lessonDownloadServiceProvider);
+    _setPending(record.moduleId, true);
+    try {
+      await service.cancelDownload(record.id, reason: 'Cancelled from course viewer');
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cancelled offline download for ${record.moduleTitle}')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to cancel download: $error')),
+      );
+    } finally {
+      if (mounted) {
+        _setPending(record.moduleId, false);
+      }
+    }
+  }
+
+  Future<void> _retryModuleDownload(LessonDownloadRecord record) async {
+    final service = ref.read(lessonDownloadServiceProvider);
+    _setPending(record.moduleId, true);
+    try {
+      await service.retryDownload(record.id);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Retrying offline bundle for ${record.moduleTitle}')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to retry download: $error')),
+      );
+    } finally {
+      if (mounted) {
+        _setPending(record.moduleId, false);
+      }
+    }
+  }
+
+  Future<void> _removeModuleDownload(LessonDownloadRecord record) async {
+    final service = ref.read(lessonDownloadServiceProvider);
+    _setPending(record.moduleId, true);
+    try {
+      await service.removeDownload(record.id);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Removed offline bundle for ${record.moduleTitle}')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to remove download: $error')),
+      );
+    } finally {
+      if (mounted) {
+        _setPending(record.moduleId, false);
+      }
+    }
+  }
+
+  Future<void> _showManifest(LessonDownloadRecord record) async {
+    if (!mounted) {
+      return;
+    }
+    final manifest = record.manifestPath ?? 'Manifest path unavailable';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(manifest)),
+    );
+  }
+
+  List<String> _moduleAssets(CourseModule module) {
+    return <String>[
+      'https://cdn.edulure.com/courses/${_course.id}/${module.id}/lesson-pack.zip',
+      'https://cdn.edulure.com/courses/${_course.id}/${module.id}/notes.pdf',
+    ];
+  }
+
+  String _formatDownloadSize(LessonDownloadRecord record) {
+    final bytes = record.downloadedBytes ?? record.expectedSizeBytes;
+    if (bytes == null || bytes <= 0) {
+      return '';
+    }
+    const units = ['B', 'KB', 'MB', 'GB'];
+    var value = bytes.toDouble();
+    var unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex++;
+    }
+    final formatted = value >= 10 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+    return '$formatted ${units[unitIndex]}';
+  }
+
+  Widget _buildOfflineSection(
+    BuildContext context,
+    CourseModule module,
+    LessonDownloadRecord? record, {
+    required bool isLoading,
+    required Object? error,
+  }) {
+    final theme = Theme.of(context);
+    final pending = _isPending(module.id);
+
+    String statusText;
+    IconData icon;
+    Color? iconColor;
+
+    if (record == null) {
+      if (isLoading) {
+        statusText = 'Loading offline status…';
+        icon = Icons.sync;
+        iconColor = theme.colorScheme.primary;
+      } else if (error != null) {
+        statusText = 'Offline status unavailable';
+        icon = Icons.error_outline;
+        iconColor = theme.colorScheme.error;
+      } else {
+        statusText = 'Offline bundle not cached yet';
+        icon = Icons.cloud_download_outlined;
+        iconColor = theme.colorScheme.primary;
+      }
+    } else {
+      switch (record.status) {
+        case LessonDownloadStatus.queued:
+          statusText = 'Queued for download — preparing offline bundle';
+          icon = Icons.schedule_outlined;
+          iconColor = theme.colorScheme.primary;
+          break;
+        case LessonDownloadStatus.downloading:
+          final progressLabel = (record.progress * 100).clamp(0, 100).toStringAsFixed(0);
+          statusText = 'Downloading $progressLabel%';
+          icon = Icons.cloud_download;
+          iconColor = theme.colorScheme.primary;
+          break;
+        case LessonDownloadStatus.completed:
+          final size = _formatDownloadSize(record);
+          statusText = 'Available offline${size.isEmpty ? '' : ' • $size'}';
+          icon = Icons.offline_pin_outlined;
+          iconColor = theme.colorScheme.secondary;
+          break;
+        case LessonDownloadStatus.failed:
+          statusText = record.errorMessage == null
+              ? 'Download failed'
+              : 'Download failed — ${record.errorMessage}';
+          icon = Icons.error_outline;
+          iconColor = theme.colorScheme.error;
+          break;
+      }
+    }
+
+    final actions = <Widget>[];
+    if (record == null) {
+      actions.add(
+        FilledButton.tonalIcon(
+          onPressed: pending || isLoading ? null : () => _queueModuleDownload(module),
+          icon: const Icon(Icons.download_outlined),
+          label: const Text('Download for offline'),
+        ),
+      );
+    } else {
+      switch (record.status) {
+        case LessonDownloadStatus.queued:
+        case LessonDownloadStatus.downloading:
+          actions.add(
+            TextButton.icon(
+              onPressed: pending ? null : () => _cancelModuleDownload(record),
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Cancel download'),
+            ),
+          );
+          break;
+        case LessonDownloadStatus.completed:
+          actions.add(
+            TextButton.icon(
+              onPressed: pending ? null : () => _removeModuleDownload(record),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Remove offline copy'),
+            ),
+          );
+          actions.add(
+            TextButton.icon(
+              onPressed: record.manifestPath == null ? null : () => _showManifest(record),
+              icon: const Icon(Icons.description_outlined),
+              label: const Text('View manifest path'),
+            ),
+          );
+          break;
+        case LessonDownloadStatus.failed:
+          actions.add(
+            FilledButton.tonalIcon(
+              onPressed: pending ? null : () => _retryModuleDownload(record),
+              icon: const Icon(Icons.refresh_outlined),
+              label: const Text('Retry download'),
+            ),
+          );
+          actions.add(
+            TextButton.icon(
+              onPressed: pending ? null : () => _removeModuleDownload(record),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Clear record'),
+            ),
+          );
+          break;
+      }
+    }
+
+    final showProgress = record != null &&
+        (record.status == LessonDownloadStatus.downloading || record.status == LessonDownloadStatus.queued);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: iconColor ?? theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                statusText,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ],
+        ),
+        if (showProgress) ...[
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: record!.progress > 0 ? record.progress.clamp(0, 1) : null,
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: actions,
+        ),
+      ],
+    );
   }
 
   Future<void> _launchExternal(String url) async {
@@ -488,6 +804,10 @@ class _CourseDetailState extends State<_CourseDetail> {
   Widget build(BuildContext context) {
     final progressText = (_course.overallProgress * 100).toStringAsFixed(0);
     final currency = NumberFormat.simpleCurrency().format(_course.price);
+    final downloadsAsync = ref.watch(lessonDownloadManifestProvider);
+    final downloads = downloadsAsync.value ?? const <LessonDownloadRecord>[];
+    final offlineError = downloadsAsync.hasError ? downloadsAsync.error : null;
+    final offlineLoading = downloadsAsync.isLoading;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -685,6 +1005,7 @@ class _CourseDetailState extends State<_CourseDetail> {
           ..._course.modules.map(
             (module) {
               final moduleProgress = module.completionRatio;
+              final downloadRecord = _downloadForModule(downloads, module.id);
               return Card(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 margin: const EdgeInsets.only(bottom: 16),
@@ -723,6 +1044,14 @@ class _CourseDetailState extends State<_CourseDetail> {
                             onPressed: () => _openProgressUpdateDialog(module),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildOfflineSection(
+                        context,
+                        module,
+                        downloadRecord,
+                        isLoading: offlineLoading,
+                        error: offlineError,
                       ),
                     ],
                   ),

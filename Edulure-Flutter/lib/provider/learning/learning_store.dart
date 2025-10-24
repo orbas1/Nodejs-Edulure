@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/learning_persistence_service.dart';
+import '../../services/lesson_download_service.dart';
+import '../../services/progress_service.dart';
 import 'learning_models.dart';
 
 final _random = Random();
@@ -694,4 +696,35 @@ final liveSessionStoreProvider = StateNotifierProvider<LiveSessionStore, List<Li
 final progressStoreProvider = StateNotifierProvider<ProgressStore, List<ModuleProgressLog>>((ref) {
   final persistence = ref.watch(learningPersistenceProvider);
   return ProgressStore(persistence: persistence);
+});
+
+final lessonDownloadServiceProvider = Provider<LessonDownloadService>((ref) {
+  final service = LessonDownloadService();
+  unawaited(service.ensureReady());
+  ref.onDispose(() {
+    unawaited(service.dispose());
+  });
+  return service;
+});
+
+final lessonDownloadManifestProvider = StreamProvider<List<LessonDownloadRecord>>((ref) {
+  final service = ref.watch(lessonDownloadServiceProvider);
+  unawaited(service.ensureReady());
+  return service.watchDownloads();
+});
+
+final progressServiceProvider = Provider<ProgressService>((ref) {
+  final persistence = ref.watch(learningPersistenceProvider);
+  final service = ProgressService(persistence: persistence);
+  unawaited(service.ensureReady());
+  ref.onDispose(() {
+    unawaited(service.dispose());
+  });
+  return service;
+});
+
+final progressSyncQueueProvider = StreamProvider<List<ProgressSyncTask>>((ref) {
+  final service = ref.watch(progressServiceProvider);
+  unawaited(service.ensureReady());
+  return service.watchQueue();
 });
