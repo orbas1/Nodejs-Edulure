@@ -342,8 +342,8 @@
          - 5.A.9 LearnerSocial (frontend-reactjs/src/pages/dashboard/LearnerSocial.jsx)
          - 5.A.10 LearnerSupport (frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx)
             1. **Appraise.** `LearnerSupport.jsx` now elevates SLA visibility with semantic badges while `useLearnerSupportCases.js` deduplicates conversation messages and attachments, aligning Annex C1’s learner workspace with the Annex A18 dashboard expectations.
-            2. **Function.** `getSlaBadgeDescriptor`, `formatSlaDeadline`, and the enriched hook fields (`slaStatus`, `assignmentLabel`) power the new case list chips, stats grid, and SLA checkpoint summaries so learners instantly understand ownership and timing.
-            3. **Usefulness.** Knowledge suggestions render inline cards sourced from `knowledgeSuggestions`, the escalation breadcrumbs surface chronological status shifts, and badge tooltips contextualise countdowns, reducing time-to-resolution without leaving the workspace.
+            2. **Function.** `getSlaBadgeDescriptor`, `formatSlaDeadline`, and the enriched hook fields (`slaStatus`, `assignmentLabel`, `slaMinutesRemaining`) power list chips, stats grids, and SLA checkpoint summaries while the composer pipes payloads through `createSupportTicket`, `replyToSupportTicket`, and `closeSupportTicket` APIs.
+            3. **Usefulness.** Knowledge suggestions render inline cards sourced from `knowledgeSuggestions` while `DashboardService.getDashboardForUser` now hydrates the `knowledgeBase` array with top-ranked `support_articles` via `SupportKnowledgeBaseService.searchArticles`, ensuring the annex playbooks reflect live data alongside escalation breadcrumbs and tooltips.
             4. **Redundant.** Message normalisation now merges duplicate IDs and attachments, eliminating the prior UI jitter when optimistic updates appended the same payload twice.
             5. **Placeholders.** Contact fallbacks still reference placeholder `href="#"` channels when the API omits live links, and voice-call scheduling remains disabled until telephony integrations land.
             6. **Duplicates.** SLA formatting logic lives solely in `LearnerSupport.jsx`; future work should move the badge descriptor into the shared dashboard formatting utilities to avoid duplicating countdown text across widgets.
@@ -373,7 +373,7 @@
          - 5.B.1 LearnerUpcomingSection (frontend-reactjs/src/pages/dashboard/learner/sections/LearnerUpcomingSection.jsx)
             1. **Appraise.** `LearnerUpcomingSection.jsx` now adds urgency descriptors, semantic badges, and action-aware styling so the Annex C1 commitments rail mirrors Annex A18 priorities.
             2. **Function.** `resolveActionVariant`, `resolveLinkTarget`, and urgency data attributes drive tailored CTA treatments, external link handling, and analytics-friendly tagging.
-            3. **Usefulness.** Learners see contextual copy (“Upcoming soon”, “Scheduled and on track”) alongside host, date, and relative labels, clarifying next steps without opening the event.
+            3. **Usefulness.** Learners see contextual copy (“Upcoming soon”, “Scheduled and on track”) alongside host, date, relative labels, and urgency descriptors with analytics-friendly `data-urgency` attributes driven by `normaliseUpcoming` in `LearnerOverview.jsx`.
             4. **Redundant.** Button rendering no longer duplicates target/rel logic—the helper centralises external link decisions while preserving mailto/self navigation.
             5. **Placeholders.** Disabled CTAs still render greyed buttons when no actionable `href` exists; future revisions could hide them entirely or surface alternative prompts.
             6. **Duplicates.** Urgency text aligns with the shared dashboard urgency vocabulary; remaining duplication inside `LearnerOverview.normaliseUpcoming` can move to a reusable formatter later.
