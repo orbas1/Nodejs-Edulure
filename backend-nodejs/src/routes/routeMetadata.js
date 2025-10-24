@@ -1245,6 +1245,30 @@ const ROUTE_DEFINITIONS = [
     statusPageComponent: 'api-blog'
   },
   {
+    name: 'qa',
+    capability: 'quality-assurance-readiness',
+    description: 'QA readiness coverage, manual checklists, and fixture catalog endpoints.',
+    basePath: '/qa',
+    flagKey: 'platform.api.v1.qa',
+    defaultState: 'enabled',
+    fallbackStatus: 404,
+    disabledMessage: 'Quality automation APIs are not enabled for this deployment.',
+    audience: 'internal',
+    owners: ['quality-engineering'],
+    serviceTier: 'supporting',
+    tags: ['api', 'v1', 'qa'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'admin',
+      allowedRoles: ['admin', 'operator']
+    },
+    cors: {
+      allowedOrigins: ['@env:app.corsOrigins'],
+      allowedMethods: ['GET', 'POST']
+    },
+    statusPageComponent: 'api-quality-assurance'
+  },
+  {
     name: 'provider-transition',
     capability: 'provider-transition-program',
     description: 'Provider transition announcements, acknowledgements, and migration status endpoints.',

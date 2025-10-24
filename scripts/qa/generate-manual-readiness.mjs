@@ -78,8 +78,37 @@ async function main() {
   }
 
   const checklistPath = path.resolve(repoRoot, options.checklistPath);
-  const rawChecklist = await readFile(checklistPath, 'utf8');
-  const checklist = JSON.parse(rawChecklist);
+  let checklist;
+  try {
+    const rawChecklist = await readFile(checklistPath, 'utf8');
+    checklist = JSON.parse(rawChecklist);
+  } catch (error) {
+    if (error.code !== 'ENOENT' || !manualQaPolicies.checklist?.slug) {
+      throw error;
+    }
+
+    const { default: QaReadinessService } = await import('../../backend-nodejs/src/services/QaReadinessService.js');
+    try {
+      const dbChecklist = await QaReadinessService.getManualChecklist(manualQaPolicies.checklist.slug);
+      checklist = {
+        title: dbChecklist.title,
+        version: dbChecklist.version,
+        updatedAt: dbChecklist.updatedAt,
+        items: (dbChecklist.items ?? []).map((item) => ({
+          id: item.itemKey,
+          description: item.label,
+          owner: item.ownerTeam,
+          status: item.defaultStatus,
+          evidence: item.evidenceExamples ?? [],
+          lastVerifiedAt: item.metadata?.lastVerifiedAt ?? null
+        }))
+      };
+    } finally {
+      if (typeof QaReadinessService.closeConnections === 'function') {
+        await QaReadinessService.closeConnections();
+      }
+    }
+  }
 
   const matrix = await collectCoverageMatrix({
     repoRoot,

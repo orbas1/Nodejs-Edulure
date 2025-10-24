@@ -1442,25 +1442,25 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Include onboarding script output in release readiness notes, keep `file_list.md` updated with helper scripts, and review guide copy during quarterly enablement updates.
 
 ### A50. Automated Test Suites & Coverage (8.A)
-- **Operational Depth:** Unit, integration, and end-to-end tests span backend, frontend, and mobile modules with coverage tracking.
-- **Gaps & Risks:** Coverage thresholds static; revisit to align with risk tolerance. Some flaky tests quarantined without clear owners.
-- **Resilience & Efficiency:** Parallelise test runs, use hermetic fixtures, and monitor runtime trends.
-- **UX & Communications:** Publish coverage dashboards, document flaky test triage, and maintain onboarding guides for QA.
-- **Change Management:** Integrate test updates into release planning, enforce ownership, and review gaps regularly.
+- **Operational Depth:** The migration `20250501120000_qa_readiness.js` provisions `qa_test_surfaces`, `qa_test_suites`, and `qa_test_suite_runs`, giving each automated suite (backend vitest, frontend vitest, Flutter widget tests) a persisted coverage history. `QaReadinessService` aggregates those tables so `/api/v1/qa/surfaces` exposes live metrics and `ReleaseOrchestrationService` can hydrate the `quality-verification` gate with real coverage and failure-rate data before scoring a run.
+- **Gaps & Risks:** Failure-rate inputs default to 0/1 when CI does not publish totals; wiring explicit pass/fail counts from pipelines will tighten accuracy. Additional suites (e.g., load, contract) should be registered once their jobs emit deterministic reports, otherwise the readiness API will omit them.
+- **Resilience & Efficiency:** `scripts/qa/collect-coverage.mjs --persist` now writes matrix results directly into the QA tables, reusing indexed lookups (`suite_id`, `completed_at`) so repeated ingestions remain cheap. The coverage API responds from precomputed aggregates, and release auto-evaluations update gate metrics in-place instead of rehydrating raw JSON.
+- **UX & Communications:** Teams can self-serve coverage via `/api/v1/qa/surfaces` or the persisted JSON at `qa/reports/coverage-matrix.json`, while the QA route metadata documents contact ownership (`quality-engineering`) for status pages. Documentation in `logic_flows.md` and `QA` CLI help text call out the new `--persist`, `--commit`, and `--run-id` switches so pipeline engineers know how to publish evidence.
+- **Change Management:** Apply the migration, rerun `npm --workspace backend-nodejs run seed -- 006_qa_readiness.js`, and execute `npm run qa:coverage -- --persist --commit <sha>` so the readiness database reflects the latest build. Release managers should confirm `ReleaseOrchestrationService` now auto-injects coverage into the `quality-verification` gate and update change logs when thresholds shift.
 
 ### A51. Manual QA & Release Governance (8.B)
-- **Operational Depth:** QA scripts, checklists, and governance docs ensure manual validation of key flows.
-- **Gaps & Risks:** Some checklists outdated relative to new features. Feedback loop from QA to engineering needs tooling.
-- **Resilience & Efficiency:** Digitise checklists, track completion metrics, and integrate with ticketing.
-- **UX & Communications:** Keep docs readable, highlight critical paths, and include screenshots.
-- **Change Management:** Update checklists per release, hold retrospectives, and align with compliance.
+- **Operational Depth:** Manual governance lives in `qa_manual_checklists`/`qa_manual_checklist_items`, seeded by `006_qa_readiness.js` from `qa/release/core_release_checklist.json`. `QaReadinessService.getManualChecklist` powers `/api/v1/qa/checklists/:slug`, and `scripts/qa/generate-manual-readiness.mjs` now falls back to that database slug when the JSON file is absent, ensuring release artefacts are generated even if the filesystem copy drifts.
+- **Gaps & Risks:** Only the core release checklist is seeded; additional runbooks must add rows or the fallback API will emit an empty set. Evidence attachment still relies on downstream storage, so missing S3 artefacts can block the governance gate until automation publishes them.
+- **Resilience & Efficiency:** The release readiness script injects fresh coverage/evidence metrics into the `quality-verification` gate and validates outstanding manual items via `QaReadinessService`, reducing duplicate parsing of JSON files. Reusable helpers in `manualReadiness.js` summarise outstanding counts while the CLI creates both Markdown and JSON snapshots under `qa/reports/`.
+- **UX & Communications:** `/api/v1/qa/checklists` enumerates available slugs for operations dashboards, and the generated `qa/reports/manual-qa-readiness.md` references evidence filenames so CAB reviewers see what was uploaded. The QA API advertises owners and cadence metadata from the seed, keeping release and support teams aligned on responsibilities.
+- **Change Management:** Update the JSON checklist or seed rows, rerun `npm --workspace backend-nodejs run seed -- 006_qa_readiness.js`, and regenerate artefacts with `npm run qa:manual-readiness`. When coverage jobs change, re-run the release readiness script so gate metrics and manual evidence stay synchronised in the database and the release summary.
 
 ### A52. Test Data, Fixtures & Sandboxes (8.C)
-- **Operational Depth:** Seeds, fixtures, and sandbox configs support repeatable testing.
-- **Gaps & Risks:** Fixture drift occurs when schema changes; enforce generation scripts. Sandboxes lack anonymisation toggles.
-- **Resilience & Efficiency:** Automate refreshes, version fixtures, and provide data subsets for quick tests.
-- **UX & Communications:** Document fixture usage, ensure naming intuitive, and note privacy constraints.
-- **Change Management:** Schedule refresh cadence, align with QA, and audit privacy compliance.
+- **Operational Depth:** Fixture registries now live in `qa_fixture_sets` and `qa_sandbox_environments`, seeded with navigation-annex datasets and mobile beta labs. `QaReadinessService.listFixtureSets`/`listSandboxes` expose the catalogue through `/api/v1/qa/fixtures` and `/api/v1/qa/sandboxes`, linking each sandbox to its canonical seed command, anonymisation strategy, and refresh cadence for deterministic QA environments.
+- **Gaps & Risks:** Sandbox metadata is descriptive only; enforcing anonymisation or runtime health still requires external automation. Additional sandboxes must populate owner contacts and refresh schedules or the API will surface incomplete operational guidance.
+- **Resilience & Efficiency:** The fixture tables reuse indexed foreign keys so sandboxes inherit fixture updates automatically, and `scripts/qa/export-scenarios.mjs` continues to regenerate navigation annex payloads referenced by the fixture metadata. QA seeds capture last refresh timestamps, helping teams detect stale datasets without querying live infrastructure.
+- **UX & Communications:** QA engineers can query `/api/v1/qa/sandboxes` with `status` or `environmentType` filters to locate usable environments, while fixture metadata highlights seed commands (`npm run qa:export-scenarios`, `npm run qa:manual-readiness`) for onboarding guides. The new tables document regions, VPN requirements, and contacts, improving handoffs between automation and manual QA crews.
+- **Change Management:** When fixture content changes, update `006_qa_readiness.js`, rerun seeds, and regenerate exports with `npm run qa:export-scenarios`. Align sandbox refresh cadences with privacy reviews and keep the QA API consumers informed via the route metadata and release notes whenever environments are added or retired.
 
 ### A53. Product & Technical Guides (9.A)
 - **Operational Depth:** `navigation_annex_backlog_items` and the enhanced `documentationIndex` aggregate ensure `/api/v1/navigation/annex`, the handbook summary, and the notification panel all expose the same epic, impacted files, and documentation anchors seeded in `004_navigation_annex.js`.

@@ -56,6 +56,7 @@ export const manualQaPolicies = {
   },
   checklist: {
     defaultPath: 'qa/release/core_release_checklist.json',
+    slug: 'core-release-readiness',
     evidenceField: 'evidence'
   }
 };

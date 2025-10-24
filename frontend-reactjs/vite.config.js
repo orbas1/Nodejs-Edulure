@@ -41,7 +41,9 @@ export default defineConfig({
     setupFiles: './test/setupTests.js',
     css: true,
     coverage: {
-      reporter: ['text', 'html'],
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+      reportsDirectory: './coverage',
       exclude: ['node_modules', 'dist']
     }
   }

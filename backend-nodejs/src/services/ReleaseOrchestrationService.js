@@ -3,6 +3,7 @@ import ReleaseRunModel from '../models/ReleaseRunModel.js';
 import ReleaseGateResultModel from '../models/ReleaseGateResultModel.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
+import QaReadinessService from './QaReadinessService.js';
 import {
   recordReleaseGateEvaluation,
   recordReleaseRunStatus
@@ -237,15 +238,26 @@ class ReleaseOrchestrationService {
 
     const gateSeed = input.initialGates ?? {};
     const createdGates = [];
+    let qualityGateMetrics;
     for (const item of snapshot) {
       const seed = gateSeed[item.slug] ?? {};
+      let metrics = seed.metrics ?? {};
+      if (item.slug === 'quality-verification' && (!metrics || Object.keys(metrics).length === 0)) {
+        qualityGateMetrics = qualityGateMetrics ?? (await QaReadinessService.resolveQualityGateMetrics());
+        metrics = {
+          ...metrics,
+          coverage: qualityGateMetrics.coverage ?? metrics?.coverage ?? null,
+          testFailureRate: qualityGateMetrics.testFailureRate ?? metrics?.testFailureRate ?? null,
+          evidence: qualityGateMetrics.evidence ?? metrics?.evidence ?? []
+        };
+      }
       const gate = await ReleaseGateResultModel.create({
         runId: run.id,
         checklistItemId: item.id,
         gateKey: item.slug,
         status: seed.status ?? 'pending',
         ownerEmail: seed.ownerEmail ?? item.defaultOwnerEmail ?? initiatedByEmail,
-        metrics: seed.metrics ?? {},
+        metrics,
         notes: seed.notes ?? null,
         lastEvaluatedAt: seed.lastEvaluatedAt ?? null
       });
@@ -347,9 +359,20 @@ class ReleaseOrchestrationService {
 
     const updatedGateResults = [];
 
+    let evaluationQualityMetrics;
     for (const gate of gatesWithSnapshot) {
       if (!gate.snapshot) {
         continue;
+      }
+
+      if (gate.gateKey === 'quality-verification') {
+        evaluationQualityMetrics = evaluationQualityMetrics ?? (await QaReadinessService.resolveQualityGateMetrics());
+        gate.metrics = {
+          ...gate.metrics,
+          coverage: evaluationQualityMetrics.coverage ?? gate.metrics?.coverage ?? null,
+          testFailureRate: evaluationQualityMetrics.testFailureRate ?? gate.metrics?.testFailureRate ?? null,
+          evidence: evaluationQualityMetrics.evidence ?? gate.metrics?.evidence ?? []
+        };
       }
 
       if (gate.snapshot.autoEvaluated && (gate.status === 'pending' || gate.status === 'in_progress')) {
