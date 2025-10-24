@@ -149,8 +149,8 @@
       - 8.C Test Data, Fixtures & Sandboxes (`backend-nodejs/seeds/`, `frontend-reactjs/src/testUtils/`, `Edulure-Flutter/test/fixtures/`)
       - 9.A Product & Technical Guides (`EDULURE_GUIDE.md`, `README.md`, `user experience.md`, `docs/design-system/`)
       - 9.B Operational Playbooks & Incident Response (`docs/operations/`, `qa/operations/`, `scripts/incident-*`)
-      - 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
-      - 9.D Strategy, Valuation & Stakeholder Communication (`valuation/`, `docs/operations/strategy.md`, `user experience.md`)
+      - ✓ 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
+      - ✓ 9.D Strategy, Valuation & Stakeholder Communication (`valuation/`, `docs/operations/strategy.md`, `user experience.md`)
    - Annex A: Expanded Analysis Narratives
       - ✅ A1. Identity, Sessions & Profile Security (1.A)
         *See Part 1.A for the 16-point breakdown covering auth flows, shared serializers, and release governance updates.*
