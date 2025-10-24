@@ -150,6 +150,18 @@ export default class IntegrationApiKeyInviteModel {
     return mapRow(row);
   }
 
+  static async listPendingForAlias({ provider, environment, alias }, connection = db) {
+    const rows = await query(connection)
+      .where({ provider, environment, alias })
+      .whereNull('completed_at')
+      .whereNull('cancelled_at')
+      .where('status', '=', 'pending')
+      .orderBy('requested_at', 'asc')
+      .orderBy('created_at', 'asc');
+
+    return rows.map((row) => mapRow(row));
+  }
+
   static async list(filters = {}, connection = db) {
     const builder = query(connection).orderBy('requested_at', 'desc');
 

@@ -687,7 +687,7 @@ export default class IntegrationApiKeyInviteService {
             reason: reason ?? 'delegated-rotation',
             notes: invite.metadata?.notes ?? null
           },
-          { connection: trx }
+          { connection: trx, skipInviteId: invite.id }
         );
       } else {
         result = await this.apiKeyService.createKey(
@@ -702,7 +702,7 @@ export default class IntegrationApiKeyInviteService {
             createdBy: actor,
             notes: invite.metadata?.notes ?? null
           },
-          { connection: trx }
+          { connection: trx, skipInviteId: invite.id }
         );
       }
 

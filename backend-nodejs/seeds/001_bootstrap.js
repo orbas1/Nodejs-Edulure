@@ -144,6 +144,9 @@ export async function seed(knex) {
     await trx('community_members').del();
     await trx('asset_conversion_outputs').del();
     await trx('asset_ingestion_jobs').del();
+    await trx('integration_api_key_invites').del();
+    await trx('integration_api_keys').del();
+    await trx('environment_parity_snapshots').del();
     await trx('ebook_read_progress').del();
     await trx('content_asset_events').del();
     await trx('content_audit_logs').del();
@@ -1489,6 +1492,262 @@ export async function seed(knex) {
       metadata: JSON.stringify({ chapters: 8 })
     });
 
+    const integrationSeedNow = new Date('2025-02-18T10:15:00Z');
+
+    const hubspotKey = {
+      provider: 'hubspot',
+      environment: 'production',
+      alias: 'revops-prod',
+      ownerEmail: 'revops@edulure.com',
+      keyValue: 'hs_prod_key_37e9b64c0d12a5f8b6c4d2e1',
+      rotationIntervalDays: 90,
+      expiresAt: new Date('2025-12-31T23:59:59Z'),
+      createdBy: 'system:seed',
+      notes: 'CRM sync pipelines for revenue operations.'
+    };
+
+    const encryptedHubspot = DataEncryptionService.encryptStructured(
+      { secret: hubspotKey.keyValue },
+      {
+        classificationTag: 'integration-secret',
+        fingerprintValues: [
+          hubspotKey.provider,
+          hubspotKey.environment,
+          hubspotKey.alias,
+          hubspotKey.keyValue.slice(-8)
+        ]
+      }
+    );
+
+    const [hubspotKeyId] = await trx('integration_api_keys').insert({
+      provider: hubspotKey.provider,
+      environment: hubspotKey.environment,
+      alias: hubspotKey.alias,
+      owner_email: hubspotKey.ownerEmail,
+      last_four: hubspotKey.keyValue.slice(-4),
+      key_hash: DataEncryptionService.hash(hubspotKey.keyValue),
+      encrypted_key: encryptedHubspot.ciphertext,
+      encryption_key_id: encryptedHubspot.keyId,
+      classification_tag: encryptedHubspot.classificationTag,
+      rotation_interval_days: hubspotKey.rotationIntervalDays,
+      last_rotated_at: integrationSeedNow,
+      next_rotation_at: new Date(
+        integrationSeedNow.getTime() + hubspotKey.rotationIntervalDays * 24 * 60 * 60 * 1000
+      ),
+      expires_at: hubspotKey.expiresAt,
+      status: 'active',
+      metadata: JSON.stringify({
+        rotationHistory: [
+          {
+            rotatedAt: integrationSeedNow.toISOString(),
+            rotatedBy: hubspotKey.createdBy,
+            reason: 'initial-provision'
+          }
+        ],
+        lastRotatedBy: hubspotKey.createdBy,
+        notes: hubspotKey.notes,
+        lastHealthCheckAt: integrationSeedNow.toISOString()
+      }),
+      created_by: hubspotKey.createdBy,
+      updated_by: hubspotKey.createdBy,
+      created_at: integrationSeedNow,
+      updated_at: integrationSeedNow
+    });
+
+    const openAiKey = {
+      provider: 'openai',
+      environment: 'staging',
+      alias: 'labs-staging',
+      ownerEmail: 'labs@edulure.com',
+      keyValue: 'openai_staging_key_04af92e3b65d7c18f0a2c4b6',
+      rotationIntervalDays: 60,
+      expiresAt: new Date('2025-11-01T00:00:00Z'),
+      createdBy: 'system:seed',
+      notes: 'Used for experimental content generation sandbox.'
+    };
+
+    const encryptedOpenAi = DataEncryptionService.encryptStructured(
+      { secret: openAiKey.keyValue },
+      {
+        classificationTag: 'integration-secret',
+        fingerprintValues: [
+          openAiKey.provider,
+          openAiKey.environment,
+          openAiKey.alias,
+          openAiKey.keyValue.slice(-8)
+        ]
+      }
+    );
+
+    const [openAiKeyId] = await trx('integration_api_keys').insert({
+      provider: openAiKey.provider,
+      environment: openAiKey.environment,
+      alias: openAiKey.alias,
+      owner_email: openAiKey.ownerEmail,
+      last_four: openAiKey.keyValue.slice(-4),
+      key_hash: DataEncryptionService.hash(openAiKey.keyValue),
+      encrypted_key: encryptedOpenAi.ciphertext,
+      encryption_key_id: encryptedOpenAi.keyId,
+      classification_tag: encryptedOpenAi.classificationTag,
+      rotation_interval_days: openAiKey.rotationIntervalDays,
+      last_rotated_at: integrationSeedNow,
+      next_rotation_at: new Date(
+        integrationSeedNow.getTime() + openAiKey.rotationIntervalDays * 24 * 60 * 60 * 1000
+      ),
+      expires_at: openAiKey.expiresAt,
+      status: 'active',
+      metadata: JSON.stringify({
+        rotationHistory: [
+          {
+            rotatedAt: integrationSeedNow.toISOString(),
+            rotatedBy: openAiKey.createdBy,
+            reason: 'initial-provision'
+          }
+        ],
+        lastRotatedBy: openAiKey.createdBy,
+        notes: openAiKey.notes,
+        webhookStatus: 'pending-validation'
+      }),
+      created_by: openAiKey.createdBy,
+      updated_by: openAiKey.createdBy,
+      created_at: integrationSeedNow,
+      updated_at: integrationSeedNow
+    });
+
+    const hubspotInviteToken = 'HUB-REVOPS-2025-ONBOARD';
+    await trx('integration_api_key_invites').insert({
+      id: crypto.randomUUID(),
+      provider: 'hubspot',
+      environment: 'production',
+      alias: hubspotKey.alias,
+      api_key_id: hubspotKeyId,
+      owner_email: hubspotKey.ownerEmail,
+      requested_by: 'admin@edulure.com',
+      requested_at: new Date('2025-02-17T08:30:00Z'),
+      expires_at: new Date('2025-02-20T08:30:00Z'),
+      status: 'completed',
+      token_hash: makeHash(hubspotInviteToken),
+      rotation_interval_days: hubspotKey.rotationIntervalDays,
+      key_expires_at: hubspotKey.expiresAt,
+      completed_at: new Date('2025-02-17T09:05:00Z'),
+      completed_by: 'partner.techlead@example.com',
+      last_sent_at: new Date('2025-02-17T08:35:00Z'),
+      send_count: 1,
+      metadata: JSON.stringify({
+        notes: 'Seed fulfilment for CRM onboarding',
+        reason: 'initial-handoff',
+        fulfilledBy: 'partner.techlead@example.com'
+      })
+    });
+
+    const openAiInviteToken = 'OPENAI-LABS-2025-Q2';
+    await trx('integration_api_key_invites').insert({
+      id: crypto.randomUUID(),
+      provider: 'openai',
+      environment: 'staging',
+      alias: openAiKey.alias,
+      api_key_id: openAiKeyId,
+      owner_email: openAiKey.ownerEmail,
+      requested_by: 'integrations@edulure.com',
+      requested_at: new Date('2025-02-18T07:15:00Z'),
+      expires_at: new Date('2025-03-04T07:15:00Z'),
+      status: 'pending',
+      token_hash: makeHash(openAiInviteToken),
+      rotation_interval_days: openAiKey.rotationIntervalDays,
+      key_expires_at: openAiKey.expiresAt,
+      last_sent_at: new Date('2025-02-18T07:20:00Z'),
+      send_count: 1,
+      metadata: JSON.stringify({
+        notes: 'Awaiting partner confirmation',
+        reason: 'staging-refresh',
+        reminderPolicy: { cadenceDays: [3, 7], escalateAfterDays: 10 }
+      })
+    });
+
+    const anthropicInviteToken = 'ANTHROPIC-PROTOTYPE-ROTATE';
+    await trx('integration_api_key_invites').insert({
+      id: crypto.randomUUID(),
+      provider: 'anthropic',
+      environment: 'production',
+      alias: 'claude-live',
+      api_key_id: null,
+      owner_email: 'mlops@edulure.com',
+      requested_by: 'integrations@edulure.com',
+      requested_at: new Date('2025-01-12T11:00:00Z'),
+      expires_at: new Date('2025-01-22T11:00:00Z'),
+      status: 'cancelled',
+      token_hash: makeHash(anthropicInviteToken),
+      rotation_interval_days: 45,
+      key_expires_at: null,
+      cancelled_at: new Date('2025-01-15T09:45:00Z'),
+      cancelled_by: 'system:auto-close',
+      last_sent_at: new Date('2025-01-13T11:15:00Z'),
+      send_count: 2,
+      metadata: JSON.stringify({
+        autoClosed: true,
+        autoClosedReason: 'key-rotated',
+        autoClosedAt: '2025-01-15T09:45:00Z',
+        autoClosedBy: 'system:auto-close',
+        notes: 'Invite closed automatically after manual rotation.'
+      })
+    });
+
+    await trx('environment_parity_snapshots').insert([
+      {
+        environment_name: 'production',
+        environment_provider: 'aws',
+        environment_tier: 'prod',
+        release_channel: 'stable',
+        git_sha: '3f2c9ab7',
+        manifest_version: '2025.02.18',
+        manifest_hash: makeHash('prod-manifest-2025-02-18'),
+        status: 'healthy',
+        mismatches_count: 0,
+        mismatches: JSON.stringify([]),
+        dependencies: JSON.stringify([
+          { component: 'database', status: 'healthy' },
+          { component: 'redis', status: 'healthy' }
+        ]),
+        metadata: JSON.stringify({ runtimeHost: 'seed-prod-1', runtimeRegion: 'us-east-1' }),
+        generated_at: new Date('2025-02-18T09:00:00Z'),
+        created_at: new Date('2025-02-18T09:00:00Z'),
+        updated_at: new Date('2025-02-18T09:00:00Z')
+      },
+      {
+        environment_name: 'staging',
+        environment_provider: 'aws',
+        environment_tier: 'staging',
+        release_channel: 'candidate',
+        git_sha: '7ad12f4c',
+        manifest_version: '2025.02.15',
+        manifest_hash: makeHash('staging-manifest-2025-02-17'),
+        status: 'drifted',
+        mismatches_count: 2,
+        mismatches: JSON.stringify([
+          {
+            component: 'modules.integration-orchestrator',
+            status: 'drifted',
+            expected: { hash: '8f4b32a6', path: 'infrastructure/modules/integration-orchestrator' },
+            observed: { hash: '9c1d0b77', path: 'infrastructure/modules/integration-orchestrator' }
+          },
+          {
+            component: 'scripts.bootstrap',
+            status: 'missing',
+            expected: { path: 'scripts/bootstrap.sh' },
+            observed: null
+          }
+        ]),
+        dependencies: JSON.stringify([
+          { component: 'database', status: 'healthy' },
+          { component: 'redis', status: 'failed', message: 'AUTH failure' }
+        ]),
+        metadata: JSON.stringify({ runtimeHost: 'seed-staging-1', runtimeRegion: 'eu-west-1' }),
+        generated_at: new Date('2025-02-17T16:45:00Z'),
+        created_at: new Date('2025-02-17T16:45:00Z'),
+        updated_at: new Date('2025-02-17T16:45:00Z')
+      }
+    ]);
+
     const growthPlaybookCover = await ensureSeedImage('ebook-creator-funnel', {
       title: 'Creator Funnel Intelligence',
       subtitle: 'Forecast actionable growth signals',
@@ -1697,9 +1956,9 @@ export async function seed(knex) {
       }
     ]);
 
-    const now = new Date();
-    const minutesAgo = (minutes) => new Date(now.getTime() - minutes * 60000).toISOString();
-    const minutesFromNow = (minutes) => new Date(now.getTime() + minutes * 60000).toISOString();
+    const moderationTimeline = new Date();
+    const minutesAgo = (minutes) => new Date(moderationTimeline.getTime() - minutes * 60000).toISOString();
+    const minutesFromNow = (minutes) => new Date(moderationTimeline.getTime() + minutes * 60000).toISOString();
 
     const opsCaseMetadata = {
       summary: 'Review automation roadmap update for release guardrails before broad publish.',
@@ -2721,7 +2980,7 @@ export async function seed(knex) {
       approved_at: trx.fn.now()
     });
 
-    const now = new Date();
+    const paymentNow = new Date();
     const subscriptionPublicId = crypto.randomUUID();
     const providerIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
     const providerChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
@@ -2738,8 +2997,8 @@ export async function seed(knex) {
       times_redeemed: 1,
       is_stackable: false,
       status: 'active',
-      valid_from: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-      valid_until: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+      valid_from: new Date(paymentNow.getTime() - 7 * 24 * 60 * 60 * 1000),
+      valid_until: new Date(paymentNow.getTime() + 60 * 24 * 60 * 60 * 1000),
       metadata: JSON.stringify({ campaign: 'growth-insiders', createdBy: 'seed' })
     });
 
@@ -2755,8 +3014,8 @@ export async function seed(knex) {
       times_redeemed: 0,
       is_stackable: false,
       status: 'active',
-      valid_from: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
-      valid_until: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+      valid_from: new Date(paymentNow.getTime() - 3 * 24 * 60 * 60 * 1000),
+      valid_until: new Date(paymentNow.getTime() + 90 * 24 * 60 * 60 * 1000),
       metadata: JSON.stringify({ campaign: 'bundle-promo', createdBy: 'seed' })
     });
 
@@ -2846,7 +3105,7 @@ export async function seed(knex) {
       effective_from: trx.fn.now()
     });
 
-    const [tutorSupportCatalogId] = await trx('monetization_catalog_items').insert({
+    const [_tutorSupportCatalogId] = await trx('monetization_catalog_items').insert({
       public_id: crypto.randomUUID(),
       tenant_id: 'global',
       product_code: 'ops-masterclass-tutor-support',
@@ -2873,7 +3132,7 @@ export async function seed(knex) {
       effective_from: trx.fn.now()
     });
 
-    const [communityBundleCatalogId] = await trx('monetization_catalog_items').insert({
+    const [_communityBundleCatalogId] = await trx('monetization_catalog_items').insert({
       public_id: crypto.randomUUID(),
       tenant_id: 'global',
       product_code: 'ops-masterclass-community-bundle',

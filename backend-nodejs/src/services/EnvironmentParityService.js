@@ -8,6 +8,7 @@ import { env } from '../config/env.js';
 import { healthcheck as databaseHealthcheck } from '../config/database.js';
 import logger from '../config/logger.js';
 import { getRedisClient } from '../config/redisClient.js';
+import EnvironmentParitySnapshotModel from '../models/EnvironmentParitySnapshotModel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..', '..');
@@ -47,8 +48,78 @@ async function loadManifest(manifestFilePath) {
   return JSON.parse(contents);
 }
 
+function computeManifestHash(manifest) {
+  const serialized = JSON.stringify(manifest ?? {});
+  return createHash()
+    .update(serialized)
+    .digest('hex');
+}
+
+function mapMismatch(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  return {
+    component: entry.component ?? null,
+    status: entry.status ?? null,
+    expected: entry.expected ?? null,
+    observed: entry.observed ?? null
+  };
+}
+
+function normaliseMismatchList(list = []) {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  return list
+    .map((entry) => mapMismatch(entry))
+    .filter((entry) => entry && entry.component);
+}
+
+function diffMismatches(previous = [], current = []) {
+  const prevMap = new Map();
+  for (const entry of normaliseMismatchList(previous)) {
+    prevMap.set(entry.component, entry);
+  }
+
+  const introduced = [];
+  const changed = [];
+  const currentMap = new Map();
+
+  for (const entry of normaliseMismatchList(current)) {
+    currentMap.set(entry.component, entry);
+    const previousEntry = prevMap.get(entry.component);
+    if (!previousEntry) {
+      introduced.push(entry);
+    } else if (previousEntry.status !== entry.status) {
+      changed.push({
+        component: entry.component,
+        from: previousEntry.status,
+        to: entry.status,
+        expected: entry.expected,
+        observed: entry.observed
+      });
+    }
+  }
+
+  const resolved = [];
+  for (const entry of prevMap.values()) {
+    if (!currentMap.has(entry.component)) {
+      resolved.push(entry);
+    }
+  }
+
+  const limitList = (items) => items.slice(0, 10);
+
+  return {
+    introduced: limitList(introduced),
+    resolved: limitList(resolved),
+    changed: limitList(changed)
+  };
+}
+
 export class EnvironmentParityService {
-  constructor({ envConfig = env, manifestResolver, cacheTtlMs } = {}) {
+  constructor({ envConfig = env, manifestResolver, cacheTtlMs, historyLimit } = {}) {
     this.env = envConfig;
     const manifestFilePath =
       envConfig.environment.manifestPath ?? path.join(infrastructureRoot, 'environment-manifest.json');
@@ -57,6 +128,10 @@ export class EnvironmentParityService {
     this.logger = logger.child({ module: 'environmentParity' });
     const configuredTtl = cacheTtlMs ?? Number(envConfig.environment?.parityCacheTtlMs ?? 120000);
     this.cacheTtlMs = Number.isFinite(configuredTtl) && configuredTtl > 0 ? configuredTtl : 120000;
+    const configuredHistoryLimit = historyLimit ?? Number(envConfig.environment?.parityHistoryLimit ?? 5);
+    this.historyLimit = Number.isFinite(configuredHistoryLimit) && configuredHistoryLimit > 0
+      ? Math.min(Math.max(Math.round(configuredHistoryLimit), 1), 50)
+      : 5;
     this.cachedReport = null;
     this.cacheExpiresAt = 0;
   }
@@ -212,19 +287,70 @@ export class EnvironmentParityService {
 
     const parityStatus = this.deriveParitySummary({ mismatches, dependencies });
 
+    const environmentDescriptor = {
+      name: this.env.environment.name ?? 'unknown',
+      provider: this.env.environment.provider ?? 'unspecified',
+      region: this.env.environment.region ?? null,
+      tier: this.env.environment.tier ?? null,
+      deploymentStrategy: this.env.environment.deploymentStrategy ?? null,
+      parityBudgetMinutes: this.env.environment.parityBudgetMinutes ?? null,
+      infrastructureOwner: this.env.environment.infrastructureOwner ?? null,
+      gitSha: this.env.environment.gitSha ?? null,
+      releaseChannel: this.env.environment.releaseChannel ?? null,
+      host: os.hostname()
+    };
+
+    const manifestVersion = manifest?.version ?? null;
+    const manifestHash = computeManifestHash({ manifest, runtime });
+
+    const previousSnapshot = await EnvironmentParitySnapshotModel.findLatestForEnvironment({
+      environmentName: environmentDescriptor.name,
+      environmentProvider: environmentDescriptor.provider
+    });
+
+    const snapshot = await EnvironmentParitySnapshotModel.recordSnapshot({
+      environmentName: environmentDescriptor.name,
+      environmentProvider: environmentDescriptor.provider,
+      environmentTier: environmentDescriptor.tier,
+      releaseChannel: environmentDescriptor.releaseChannel,
+      gitSha: environmentDescriptor.gitSha,
+      manifestVersion,
+      manifestHash,
+      status: parityStatus,
+      mismatchesCount: mismatches.length,
+      mismatches,
+      dependencies,
+      metadata: {
+        runtimeHost: environmentDescriptor.host,
+        runtimeRegion: environmentDescriptor.region,
+        deploymentStrategy: environmentDescriptor.deploymentStrategy
+      },
+      generatedAt: new Date()
+    });
+
+    const delta = diffMismatches(previousSnapshot?.mismatches, mismatches);
+    const historyEntries = await EnvironmentParitySnapshotModel.listRecent(
+      {
+        environmentName: environmentDescriptor.name,
+        environmentProvider: environmentDescriptor.provider,
+        limit: this.historyLimit,
+        excludeIds: snapshot ? [snapshot.id] : []
+      }
+    );
+
     const report = {
       environment: {
-        name: this.env.environment.name,
-        provider: this.env.environment.provider,
-        region: this.env.environment.region,
-        tier: this.env.environment.tier,
-        deploymentStrategy: this.env.environment.deploymentStrategy,
-        parityBudgetMinutes: this.env.environment.parityBudgetMinutes,
-        infrastructureOwner: this.env.environment.infrastructureOwner,
-        gitSha: this.env.environment.gitSha,
-        releaseChannel: this.env.environment.releaseChannel,
-        host: os.hostname(),
-        manifestVersion: manifest.version
+        name: environmentDescriptor.name,
+        provider: environmentDescriptor.provider,
+        region: environmentDescriptor.region,
+        tier: environmentDescriptor.tier,
+        deploymentStrategy: environmentDescriptor.deploymentStrategy,
+        parityBudgetMinutes: environmentDescriptor.parityBudgetMinutes,
+        infrastructureOwner: environmentDescriptor.infrastructureOwner,
+        gitSha: environmentDescriptor.gitSha,
+        releaseChannel: environmentDescriptor.releaseChannel,
+        host: environmentDescriptor.host,
+        manifestVersion
       },
       dependencies,
       manifest: {
@@ -234,7 +360,43 @@ export class EnvironmentParityService {
       mismatches,
       status: parityStatus,
       generatedAt: new Date().toISOString(),
-      cached: false
+      cached: false,
+      snapshot: snapshot
+        ? {
+            id: snapshot.id,
+            status: snapshot.status,
+            mismatchCount: snapshot.mismatchesCount,
+            manifestHash: snapshot.manifestHash,
+            generatedAt: snapshot.generatedAt?.toISOString?.() ?? snapshot.generatedAt
+          }
+        : null,
+      previousSnapshot: previousSnapshot
+        ? {
+            id: previousSnapshot.id,
+            status: previousSnapshot.status,
+            mismatchCount: previousSnapshot.mismatchesCount,
+            manifestHash: previousSnapshot.manifestHash,
+            generatedAt:
+              previousSnapshot.generatedAt?.toISOString?.() ?? previousSnapshot.generatedAt
+          }
+        : null,
+      delta: {
+        summary: {
+          introduced: delta.introduced.length,
+          resolved: delta.resolved.length,
+          changed: delta.changed.length
+        },
+        introduced: delta.introduced,
+        resolved: delta.resolved,
+        changed: delta.changed
+      },
+      history: historyEntries.map((entry) => ({
+        id: entry.id,
+        status: entry.status,
+        mismatchCount: entry.mismatchesCount,
+        manifestHash: entry.manifestHash,
+        generatedAt: entry.generatedAt?.toISOString?.() ?? entry.generatedAt
+      }))
     };
 
     this.cachedReport = report;

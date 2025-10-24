@@ -1,5 +1,8 @@
+import db from '../config/database.js';
 import IntegrationApiKeyModel from '../models/IntegrationApiKeyModel.js';
+import IntegrationApiKeyInviteModel from '../models/IntegrationApiKeyInviteModel.js';
 import dataEncryptionService from './DataEncryptionService.js';
+import logger from '../config/logger.js';
 import {
   DEFAULT_CREDENTIAL_POLICY,
   getCredentialPolicy,
@@ -9,6 +12,7 @@ import {
 
 const ALLOWED_ENVIRONMENTS = new Set(['production', 'staging', 'sandbox']);
 const SENSITIVE_EMAIL_DOMAINS = new Set(['gmail.com', 'yahoo.com', 'hotmail.com']);
+const integrationLogger = logger.child({ module: 'integrationApiKeyService' });
 export const MIN_ROTATION_DAYS = DEFAULT_CREDENTIAL_POLICY.minRotationDays;
 export const MAX_ROTATION_DAYS = DEFAULT_CREDENTIAL_POLICY.maxRotationDays;
 export const ROTATION_WARNING_DAYS = 14;
@@ -141,6 +145,57 @@ function sanitizeRotationHistory(history = []) {
     }));
 }
 
+async function closePendingInvitesForAlias(
+  { provider, environment, alias, connection, reason, closedBy, excludeInviteId },
+  now = new Date()
+) {
+  const invites = await IntegrationApiKeyInviteModel.listPendingForAlias(
+    { provider, environment, alias },
+    connection
+  );
+
+  const actionable = invites.filter((invite) => invite.id !== excludeInviteId);
+  if (!actionable.length) {
+    return;
+  }
+
+  const actor = closedBy ?? 'system:auto-close';
+  const cancelledAt = now instanceof Date ? now : new Date(now);
+  const metadataReason = reason ?? 'api-key-updated';
+
+  for (const invite of actionable) {
+    const metadata = {
+      ...(invite.metadata ?? {}),
+      autoClosed: true,
+      autoClosedReason: metadataReason,
+      autoClosedAt: cancelledAt.toISOString(),
+      autoClosedBy: actor
+    };
+
+    await IntegrationApiKeyInviteModel.updateById(
+      invite.id,
+      {
+        status: 'cancelled',
+        cancelledAt,
+        cancelledBy: actor,
+        metadata
+      },
+      connection
+    );
+  }
+
+  integrationLogger.info(
+    {
+      provider,
+      environment,
+      alias,
+      inviteIds: actionable.map((invite) => invite.id),
+      reason: metadataReason
+    },
+    'Closed pending integration invites after API key update'
+  );
+}
+
 export default class IntegrationApiKeyService {
   constructor({
     model = IntegrationApiKeyModel,
@@ -235,8 +290,9 @@ export default class IntegrationApiKeyService {
       createdBy,
       notes
     },
-    { connection } = {}
+    options = {}
   ) {
+    const { connection = db, skipInviteId } = options;
     const normalisedProvider = normaliseProvider(provider);
     if (!normalisedProvider) {
       throw Object.assign(new Error('Provider is not recognised'), { status: 422 });
@@ -304,7 +360,7 @@ export default class IntegrationApiKeyService {
       notes: noteText
     };
 
-    const createArgs = [
+    const record = await this.model.create(
       {
         provider: normalisedProvider,
         environment: normalisedEnvironment,
@@ -323,19 +379,28 @@ export default class IntegrationApiKeyService {
         metadata,
         createdBy: createdBy ?? ownerEmailAddress,
         updatedBy: createdBy ?? ownerEmailAddress
-      }
-    ];
+      },
+      connection
+    );
 
-    if (connection !== undefined) {
-      createArgs.push(connection);
-    }
-
-    const record = await this.model.create(...createArgs);
+    await closePendingInvitesForAlias(
+      {
+        provider: normalisedProvider,
+        environment: normalisedEnvironment,
+        alias: resolvedAlias,
+        connection,
+        reason: 'api-key-created',
+        closedBy: createdBy ?? ownerEmailAddress,
+        excludeInviteId: skipInviteId
+      },
+      now
+    );
 
     return this.sanitize(record);
   }
 
-  async rotateKey(id, { keyValue, rotationIntervalDays, expiresAt, rotatedBy, reason, notes }, { connection } = {}) {
+  async rotateKey(id, { keyValue, rotationIntervalDays, expiresAt, rotatedBy, reason, notes }, options = {}) {
+    const { connection = db, skipInviteId } = options;
     const record = await this.model.findById(id, connection);
     if (!record) {
       throw Object.assign(new Error('API key not found'), { status: 404 });
@@ -409,6 +474,19 @@ export default class IntegrationApiKeyService {
     }
 
     const updated = await this.model.updateById(...updateArgs);
+
+    await closePendingInvitesForAlias(
+      {
+        provider: record.provider,
+        environment: record.environment,
+        alias: record.alias,
+        connection,
+        reason: reason ?? 'rotation-complete',
+        closedBy: rotatedBy ?? record.metadata?.lastRotatedBy ?? record.ownerEmail,
+        excludeInviteId: skipInviteId
+      },
+      now
+    );
 
     return this.sanitize(updated);
   }
