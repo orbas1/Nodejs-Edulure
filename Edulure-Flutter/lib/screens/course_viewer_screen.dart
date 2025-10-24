@@ -117,10 +117,13 @@ class _CourseViewerScreenState extends ConsumerState<CourseViewerScreen> {
                       Expanded(
                         child: _CourseDetail(
                           course: selectedCourse!,
-                          onUpdateModule: (moduleId, completed) {
-                            ref
-                                .read(courseStoreProvider.notifier)
-                                .updateModuleProgress(courseId: selectedCourse.id, moduleId: moduleId, completedLessons: completed);
+                          onUpdateModule: (moduleId, completed) async {
+                            await ref.read(learningProgressControllerProvider).updateModuleProgress(
+                                  courseId: selectedCourse.id,
+                                  moduleId: moduleId,
+                                  completedLessons: completed,
+                                  note: 'Manual update from course viewer',
+                                );
                           },
                         ),
                       ),
@@ -266,11 +269,12 @@ class _CourseViewerScreenState extends ConsumerState<CourseViewerScreen> {
           heightFactor: 0.9,
           child: _CourseDetail(
             course: course,
-            onUpdateModule: (moduleId, completed) {
-              ref.read(courseStoreProvider.notifier).updateModuleProgress(
+            onUpdateModule: (moduleId, completed) async {
+              await ref.read(learningProgressControllerProvider).updateModuleProgress(
                     courseId: course.id,
                     moduleId: moduleId,
                     completedLessons: completed,
+                    note: 'Updated from course detail sheet',
                   );
             },
           ),
@@ -442,7 +446,7 @@ class _CourseDetail extends StatefulWidget {
   });
 
   final Course course;
-  final void Function(String moduleId, int completedLessons) onUpdateModule;
+  final Future<void> Function(String moduleId, int completedLessons) onUpdateModule;
 
   @override
   State<_CourseDetail> createState() => _CourseDetailState();
@@ -768,7 +772,7 @@ class _CourseDetailState extends State<_CourseDetail> {
     );
 
     if (result != null && module != null) {
-      widget.onUpdateModule(module.id, result);
+      await widget.onUpdateModule(module.id, result);
     }
   }
 }
