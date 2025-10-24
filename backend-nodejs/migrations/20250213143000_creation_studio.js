@@ -5,6 +5,12 @@ import {
   ensureUuidExtension,
   jsonDefault
 } from './_helpers/schema.js';
+import {
+  CREATION_COLLABORATOR_ROLES,
+  CREATION_PROJECT_STATUSES,
+  CREATION_PROJECT_TYPES,
+  CREATION_TEMPLATE_TYPES
+} from '../src/constants/creationStudio.js';
 
 const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, '{}');
 const JSON_EMPTY_ARRAY = (knex) => jsonDefault(knex, '[]');
@@ -24,13 +30,8 @@ export async function up(knex) {
         .references('id')
         .inTable('users')
         .onDelete('CASCADE');
-      table
-        .enum('type', ['course', 'ebook', 'community', 'ads_asset'])
-        .notNullable();
-      table
-        .enum('status', ['draft', 'ready_for_review', 'in_review', 'changes_requested', 'approved', 'published', 'archived'])
-        .notNullable()
-        .defaultTo('draft');
+      table.enum('type', CREATION_PROJECT_TYPES).notNullable();
+      table.enum('status', CREATION_PROJECT_STATUSES).notNullable().defaultTo('draft');
       table.string('title', 240).notNullable();
       table.text('summary');
       table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
@@ -70,10 +71,7 @@ export async function up(knex) {
         .references('id')
         .inTable('users')
         .onDelete('CASCADE');
-      table
-        .enum('role', ['owner', 'editor', 'commenter', 'viewer'])
-        .notNullable()
-        .defaultTo('editor');
+      table.enum('role', CREATION_COLLABORATOR_ROLES).notNullable().defaultTo('editor');
       table.json('permissions').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
       table.timestamp('added_at').defaultTo(knex.fn.now());
       table.timestamp('removed_at');
@@ -87,12 +85,10 @@ export async function up(knex) {
     await knex.schema.createTable('creation_templates', (table) => {
       table.increments('id').primary();
       table.uuid('public_id').notNullable().unique().defaultTo(defaultUuid(knex));
-      table
-        .enum('type', ['course', 'ebook', 'community', 'ads_asset'])
-        .notNullable();
+      table.enum('type', CREATION_TEMPLATE_TYPES).notNullable();
       table.string('title', 200).notNullable();
       table.text('description');
-      table.json('schema').notNullable();
+      table.json('schema').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.integer('version').unsigned().notNullable().defaultTo(1);
       table.boolean('is_default').notNullable().defaultTo(false);
       table
@@ -133,10 +129,7 @@ export async function up(knex) {
         .references('id')
         .inTable('users')
         .onDelete('CASCADE');
-      table
-        .enum('role', ['owner', 'editor', 'commenter', 'viewer'])
-        .notNullable()
-        .defaultTo('editor');
+      table.enum('role', CREATION_COLLABORATOR_ROLES).notNullable().defaultTo('editor');
       table.json('capabilities').notNullable().defaultTo(JSON_EMPTY_ARRAY(knex));
       table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT(knex));
       table.timestamp('joined_at').defaultTo(knex.fn.now());
