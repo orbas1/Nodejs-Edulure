@@ -46,6 +46,7 @@
   --radius-xl: 2rem;
   --radius-xxl: 2.75rem;
   --radius-pill: 999px;
+  --uploads-progress-radius: 0.75rem;
 
   /* Shadows */
   --shadow-card: 0 24px 60px -30px rgba(15, 23, 42, 0.18);

@@ -63,6 +63,7 @@ import CommunitySafety from './pages/dashboard/community/CommunitySafety.jsx';
 import CommunityCommunications from './pages/dashboard/community/CommunityCommunications.jsx';
 import LearnerSocial from './pages/dashboard/LearnerSocial.jsx';
 import LearnerCommunityChats from './pages/dashboard/LearnerCommunityChats.jsx';
+import NavigationAnnex from './pages/handbook/NavigationAnnex.jsx';
 const DashboardLayout = lazy(() => import('./layouts/DashboardLayout.jsx'));
 const DashboardHome = lazy(() => import('./pages/dashboard/DashboardHome.jsx'));
 const LearnerFinancial = lazy(() => import('./pages/dashboard/LearnerFinancial.jsx'));
@@ -158,6 +159,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/handbook/navigation-annex" element={<NavigationAnnex />} />
         <Route path="/integrations/credential-invite/:token" element={<IntegrationCredentialInvite />} />
         <Route path="/setup" element={<Setup />} />
       </Route>

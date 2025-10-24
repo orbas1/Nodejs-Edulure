@@ -103,6 +103,8 @@ function InstructorCourseCreate({
     [blueprints.length, lifecycle.length, lifecycleSummary, overview.averageReadiness, overview.modules, overview.outstanding]
   );
 
+  const uploadProgress = Math.min(Math.max(overview.averageReadiness, 0), 100);
+
   const defaultGenerateOutline = useCallback(async () => {
     if (!instructorOrchestration?.generateCourseOutline) {
       return;
@@ -216,6 +218,39 @@ function InstructorCourseCreate({
         isSyncing={pendingAction === 'lms'}
       />
       <CourseCreationSummaryCards cards={summaryCards} />
+      <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Upload pipeline readiness</h2>
+            <p className="text-sm text-slate-600">
+              Media ingest shares the shell-wide queue. Progress reflects blueprint asset readiness scored during orchestration.
+            </p>
+          </div>
+          <span className="text-sm font-semibold text-primary">{uploadProgress}% ready</span>
+        </div>
+        <div
+          className="mt-4 h-2 w-full bg-slate-100"
+          style={{ borderRadius: 'var(--uploads-progress-radius)' }}
+          aria-hidden="true"
+        >
+          <div
+            className="h-full bg-primary transition-all"
+            style={{
+              width: `${uploadProgress}%`,
+              borderRadius: 'var(--uploads-progress-radius)'
+            }}
+            role="progressbar"
+            aria-valuenow={uploadProgress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          />
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          {overview.outstanding
+            ? `${overview.outstanding} outstanding upload tasks remain for launch parity.`
+            : 'Upload orchestration is complete across all blueprints.'}
+        </p>
+      </section>
       <section className="space-y-6">
         {blueprints.map((blueprint) => (
           <CourseBlueprintCard key={blueprint.id} blueprint={blueprint} />

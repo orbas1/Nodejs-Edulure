@@ -1454,29 +1454,29 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Schedule refresh cadence, align with QA, and audit privacy compliance.
 
 ### A53. Product & Technical Guides (9.A)
-- **Operational Depth:** Guides articulate product narratives, user journeys, and technical architecture.
-- **Gaps & Risks:** Some diagrams outdated. Documentation lacks changelog linking guides to releases.
+- **Operational Depth:** `navigation_annex_backlog_items` seeds the Annex A53 backlog so `GET /api/v1/navigation/annex` and the handbook render the same epic summaries for each navigation surface.
+- **Gaps & Risks:** Some diagrams outdated. Documentation lacks changelog linking guides to releases; ensure seed updates include references to revised artefacts.
 - **Resilience & Efficiency:** Automate doc linting, enforce broken-link checks, and structure navigation.
 - **UX & Communications:** Maintain consistent tone, accessibility, and cross-linking.
 - **Change Management:** Version docs, align with releases, and solicit stakeholder reviews.
 
 ### A54. Operational Playbooks & Incident Response (9.B)
-- **Operational Depth:** Playbooks cover incidents, on-call rotations, and recovery procedures.
-- **Gaps & Risks:** Some scripts reference deprecated tooling. Playbook ownership unclear.
+- **Operational Depth:** `navigation_annex_operation_tasks` provides the Annex A54 checklist powering the notification panel and runbooks, keeping operational readiness steps in sync with releases.
+- **Gaps & Risks:** Some scripts reference deprecated tooling. Playbook ownership unclear; document who maintains the annex seeds.
 - **Resilience & Efficiency:** Run regular drills, update contacts, and automate alert routing.
 - **UX & Communications:** Keep instructions concise, include diagrams, and highlight escalation paths.
 - **Change Management:** Review quarterly, capture lessons learned, and archive superseded docs.
 
 ### A55. Design System Assets & UX Research (9.C)
-- **Operational Depth:** Design tokens, component libraries, and research summaries guide UI consistency.
-- **Gaps & Risks:** Token updates lag adoption in codebases. Research archives missing metadata.
+- **Operational Depth:** `navigation_annex_design_dependencies` now enumerates token adoption, QA checks, and references so design reviews consume the same annex payload as the application.
+- **Gaps & Risks:** Token updates lag adoption in codebases. Research archives missing metadata; keep annex entries current when tokens move.
 - **Resilience & Efficiency:** Automate token syncs, publish Figma export scripts, and maintain repository of findings.
 - **UX & Communications:** Ensure documentation accessible, include before/after visuals, and note accessibility results.
 - **Change Management:** Align releases with design reviews, update tokens, and communicate changes broadly.
 
 ### A56. Strategy, Valuation & Stakeholder Communication (9.D)
-- **Operational Depth:** Strategy docs, valuation models, and stakeholder updates track company direction.
-- **Gaps & Risks:** Financial models rely on manual data entry; automate imports. Stakeholder comms need version history.
+- **Operational Depth:** Strategy narratives and metrics reside in `navigation_annex_strategy_narratives` and `navigation_annex_strategy_metrics`, letting stakeholders query Annex A56 directly through the new API.
+- **Gaps & Risks:** Financial models rely on manual data entry; automate imports. Stakeholder comms need version history and should reference annex seeds for traceability.
 - **Resilience & Efficiency:** Build scripts to refresh valuation inputs, store snapshots, and secure sensitive data.
 - **UX & Communications:** Present narratives with clear visuals, consistent tone, and accessible summaries.
 - **Change Management:** Schedule executive reviews, document approvals, and archive prior versions for auditing.
