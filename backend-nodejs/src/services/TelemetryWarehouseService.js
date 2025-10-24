@@ -13,6 +13,7 @@ import {
   recordTelemetryFreshness
 } from '../observability/metrics.js';
 import { serialiseTelemetryEvent } from '../utils/telemetrySerializers.js';
+import { getEnvironmentDescriptor } from '../utils/environmentContext.js';
 
 function normalisePrefix(prefix, fallback) {
   const source = (prefix ?? fallback ?? '').trim();
@@ -108,6 +109,8 @@ export class TelemetryWarehouseService {
     const freshnessConfig = config?.freshness ?? {};
     const lineageConfig = config?.lineage ?? {};
 
+    this.environment = getEnvironmentDescriptor(config?.environment ?? {});
+
     const defaultBucket = env.storage?.privateBucket;
     const prefix = normalisePrefix(exportConfig.prefix, 'warehouse/telemetry');
 
@@ -141,7 +144,10 @@ export class TelemetryWarehouseService {
 
     const batchSize = Math.max(1, limit ?? this.config.export.batchSize);
     const candidateLimit = Math.max(1, batchSize + 1);
-    const candidateEvents = await this.eventModel.listPendingForExport({ limit: candidateLimit });
+    const candidateEvents = await this.eventModel.listPendingForExport({
+      limit: candidateLimit,
+      environment: this.environment
+    });
     const hasBacklog = candidateEvents.length > batchSize;
     const events = hasBacklog ? candidateEvents.slice(0, batchSize) : candidateEvents;
 
@@ -164,7 +170,8 @@ export class TelemetryWarehouseService {
     const startTime = Date.now();
     const batch = await this.batchModel.create({
       destination: this.config.export.destination,
-      metadata: { trigger, requestedSize: batchSize }
+      metadata: { trigger, requestedSize: batchSize },
+      environment: this.environment
     });
 
     let lineageRun = null;
@@ -173,7 +180,8 @@ export class TelemetryWarehouseService {
         tool: this.config.lineage.tool,
         modelName: 'warehouse.telemetry_events',
         input: { trigger, eventIds: events.map((event) => event.id) },
-        metadata: { trigger, batchId: batch.id }
+        metadata: { trigger, batchId: batch.id },
+        environment: this.environment
       });
     }
 

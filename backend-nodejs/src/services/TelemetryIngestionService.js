@@ -16,6 +16,7 @@ import {
   serialiseConsentRecord,
   serialiseTelemetryEvent
 } from '../utils/telemetrySerializers.js';
+import { getEnvironmentDescriptor } from '../utils/environmentContext.js';
 
 const PAYLOAD_SCHEMA = z
   .union([z.record(z.any()), z.array(z.any())])
@@ -83,6 +84,8 @@ export class TelemetryIngestionService {
     const ingestionConfig = config?.ingestion ?? {};
     const freshnessConfig = config?.freshness ?? {};
 
+    this.environment = getEnvironmentDescriptor(config?.environment ?? {});
+
     this.config = {
       enabled: ingestionConfig.enabled !== false,
       defaultScope: ingestionConfig.defaultScope ?? 'product.analytics',
@@ -95,11 +98,11 @@ export class TelemetryIngestionService {
   }
 
   async registerConsentDecision(payload) {
-    return this.consentModel.recordDecision(payload);
+    return this.consentModel.recordDecision({ ...payload, environment: this.environment });
   }
 
   async getActiveConsent(query) {
-    return this.consentModel.getActiveConsent(query);
+    return this.consentModel.getActiveConsent({ ...query, environment: this.environment });
   }
 
   async ingestEvent(rawPayload, { actorId, ipAddress, userAgent } = {}) {
@@ -185,7 +188,8 @@ export class TelemetryIngestionService {
       context,
       metadata,
       tags: parsed.tags,
-      dedupeHash
+      dedupeHash,
+      environment: this.environment
     });
 
     const resolvedStatus = duplicate ? 'duplicate' : event.ingestionStatus;

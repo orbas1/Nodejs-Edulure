@@ -94,6 +94,13 @@ export function serialiseTelemetryEvent(event) {
     exportBatchId: event.exportBatchId ?? event.export_batch_id ?? null,
     dedupeHash: event.dedupeHash ?? event.dedupe_hash ?? null,
     tenantId: event.tenantId ?? event.tenant_id ?? 'global',
+    environment: {
+      key: event.environment?.key ?? event.environment_key ?? null,
+      name: event.environment?.name ?? event.environment_name ?? null,
+      tier: event.environment?.tier ?? event.environment_tier ?? null,
+      region: event.environment?.region ?? event.environment_region ?? null,
+      workspace: event.environment?.workspace ?? event.environment_workspace ?? null
+    },
     userId: event.userId ?? event.user_id ?? null,
     sessionId: event.sessionId ?? event.session_id ?? null,
     deviceId: event.deviceId ?? event.device_id ?? null,
@@ -113,6 +120,13 @@ export function serialiseConsentRecord(record) {
     id: record.id ?? null,
     userId: record.userId ?? record.user_id ?? null,
     tenantId: record.tenantId ?? record.tenant_id ?? 'global',
+    environment: {
+      key: record.environment?.key ?? record.environment_key ?? null,
+      name: record.environment?.name ?? record.environment_name ?? null,
+      tier: record.environment?.tier ?? record.environment_tier ?? null,
+      region: record.environment?.region ?? record.environment_region ?? null,
+      workspace: record.environment?.workspace ?? record.environment_workspace ?? null
+    },
     consentScope: record.consentScope ?? record.consent_scope ?? null,
     consentVersion: record.consentVersion ?? record.consent_version ?? null,
     status: record.status ?? null,

@@ -1,27 +1,13 @@
 import db from '../config/database.js';
 import { TABLES } from '../database/domains/telemetry.js';
 import jsonMergePatch from '../database/utils/jsonMergePatch.js';
-
-function parseJson(value, fallback = {}) {
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-
-  if (typeof value === 'object') {
-    return value;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch (_error) {
-    return fallback;
-  }
-}
-
-function parseArray(value, fallback = []) {
-  const parsed = parseJson(value, fallback);
-  return Array.isArray(parsed) ? parsed : fallback;
-}
+import { buildEnvironmentColumns } from '../utils/environmentContext.js';
+import {
+  readJsonArrayColumn,
+  readJsonColumn,
+  writeJsonArrayColumn,
+  writeJsonColumn
+} from '../utils/modelUtils.js';
 
 function toDomain(row) {
   if (!row) {
@@ -32,6 +18,13 @@ function toDomain(row) {
     id: row.id,
     eventUuid: row.event_uuid,
     tenantId: row.tenant_id,
+    environment: {
+      key: row.environment_key ?? null,
+      name: row.environment_name ?? null,
+      tier: row.environment_tier ?? null,
+      region: row.environment_region ?? null,
+      workspace: row.environment_workspace ?? null
+    },
     schemaVersion: row.schema_version,
     eventName: row.event_name,
     eventVersion: row.event_version,
@@ -48,10 +41,10 @@ function toDomain(row) {
     ingestionAttempts: row.ingestion_attempts,
     lastIngestionAttempt: row.last_ingestion_attempt,
     exportBatchId: row.export_batch_id,
-    payload: parseJson(row.payload, {}),
-    context: parseJson(row.context, {}),
-    metadata: parseJson(row.metadata, {}),
-    tags: parseArray(row.tags, []),
+    payload: readJsonColumn(row.payload, {}),
+    context: readJsonColumn(row.context, {}),
+    metadata: readJsonColumn(row.metadata, {}),
+    tags: readJsonArrayColumn(row.tags, []),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     dedupeHash: row.dedupe_hash
@@ -79,6 +72,7 @@ export default class TelemetryEventModel {
 
     const insertPayload = {
       tenant_id: payload.tenantId ?? 'global',
+      ...buildEnvironmentColumns(payload.environment ?? {}),
       schema_version: payload.schemaVersion ?? 'v1',
       event_name: payload.eventName,
       event_version: payload.eventVersion ?? null,
@@ -96,10 +90,10 @@ export default class TelemetryEventModel {
       last_ingestion_attempt: payload.lastIngestionAttempt ?? null,
       export_batch_id: payload.exportBatchId ?? null,
       dedupe_hash: payload.dedupeHash,
-      payload: JSON.stringify(payload.payload ?? {}),
-      context: JSON.stringify(payload.context ?? {}),
-      metadata: JSON.stringify(payload.metadata ?? {}),
-      tags: JSON.stringify(Array.isArray(payload.tags) ? payload.tags : [])
+      payload: writeJsonColumn(payload.payload ?? {}),
+      context: writeJsonColumn(payload.context ?? {}),
+      metadata: writeJsonColumn(payload.metadata ?? {}),
+      tags: writeJsonArrayColumn(payload.tags ?? [])
     };
 
     try {
@@ -122,9 +116,10 @@ export default class TelemetryEventModel {
     return toDomain(row);
   }
 
-  static async listPendingForExport({ limit = 5000 } = {}, connection = db) {
+  static async listPendingForExport({ limit = 5000, environment } = {}, connection = db) {
+    const envColumns = buildEnvironmentColumns(environment ?? {});
     const rows = await connection(TABLES.EVENTS)
-      .where({ ingestion_status: 'pending' })
+      .where({ ingestion_status: 'pending', environment_key: envColumns.environment_key })
       .orderBy('occurred_at', 'asc')
       .limit(limit);
 
@@ -153,7 +148,7 @@ export default class TelemetryEventModel {
     return connection(TABLES.EVENTS).whereIn('id', ids).update(updatePayload);
   }
 
-  static async markExportFailed(ids, error, connection = db) {
+  static async markExportFailed(ids, error, { classification = 'transient' } = {}, connection = db) {
     if (!Array.isArray(ids) || ids.length === 0) {
       return 0;
     }
@@ -161,11 +156,12 @@ export default class TelemetryEventModel {
     const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
     const failureMetadata = {
       lastError: message.slice(0, 500),
-      lastFailureAt: new Date().toISOString()
+      lastFailureAt: new Date().toISOString(),
+      failureClassification: classification
     };
 
     const updatePayload = {
-      ingestion_status: 'pending',
+      ingestion_status: classification === 'permanent' ? 'failed' : 'pending',
       ingestion_attempts: connection.raw('ingestion_attempts + 1'),
       last_ingestion_attempt: connection.fn.now()
     };

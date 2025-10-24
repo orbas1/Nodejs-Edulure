@@ -169,6 +169,7 @@ const TABLE_DEFINITIONS = {
     table.integer('coupon_id').notNullable();
     table.string('payment_intent_id');
     table.integer('user_id');
+    table.text('metadata');
     table.timestamp('created_at').defaultTo(connection.fn.now());
   },
   payment_intents(table) {
@@ -239,6 +240,7 @@ const TABLE_DEFINITIONS = {
     table.increments('id');
     table.string('key').notNullable();
     table.text('value');
+    table.integer('version').defaultTo(1);
     table.timestamp('created_at').defaultTo(connection.fn.now());
     table.timestamp('updated_at').defaultTo(connection.fn.now());
   },
@@ -697,7 +699,7 @@ describe('Group 23 model flows', () => {
     });
 
     const themeSetting = await PlatformSettingModel.upsert('ui.theme', { mode: 'dark', accent: '#663399' }, connection);
-    expect(themeSetting).toMatchObject({ value: { mode: 'dark', accent: '#663399' } });
+    expect(themeSetting).toMatchObject({ value: { mode: 'dark', accent: '#663399' }, version: 1 });
 
     const show = await PodcastShowModel.create(
       {
