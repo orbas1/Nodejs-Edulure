@@ -32,6 +32,14 @@ import useFeedInteractions from '../hooks/useFeedInteractions.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 import { preloadImage } from '../utils/mediaCache.js';
+import {
+  computeCommunityEngagementScore,
+  extractCommunityPersonas,
+  getPersonaLabel,
+  PERSONA_LABEL_ENTRIES,
+  resolveLastActivity,
+  summarisePersonaCounts
+} from '../utils/communityPersona.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -65,7 +73,8 @@ const FALLBACK_COMMUNITY_DETAIL = {
     timezone: 'Global / UTC',
     analyticsKey: 'EDU-REVOPS-01',
     classroomReference: 'Cohort-2024-Q2',
-    registrationUrl: 'https://app.edulure.com/register'
+    registrationUrl: 'https://app.edulure.com/register',
+    personas: ['operators', 'instructors']
   },
   ratings: {
     average: 4.9,
@@ -384,6 +393,26 @@ function formatCurrency(amount, currency = 'USD') {
   }
 }
 
+function formatRelativeActivity(value) {
+  if (!value) {
+    return null;
+  }
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return null;
+  }
+  const diffMs = Date.now() - timestamp.getTime();
+  const day = 1000 * 60 * 60 * 24;
+  if (diffMs < day) {
+    return 'Active today';
+  }
+  const days = Math.round(diffMs / day);
+  if (days <= 7) {
+    return `Active ${days} day${days === 1 ? '' : 's'} ago`;
+  }
+  return `Active ${formatDate(value)}`;
+}
+
 function normaliseDetail(detail, resources) {
   if (!detail) {
     return { ...FALLBACK_COMMUNITY_DETAIL, classrooms: { ...FALLBACK_COMMUNITY_DETAIL.classrooms, recorded: resources } };
@@ -528,6 +557,10 @@ export default function Communities() {
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState(null);
   const [subscriptionCheckouts, setSubscriptionCheckouts] = useState([]);
+  const [directoryQuery, setDirectoryQuery] = useState('');
+  const [personaFilter, setPersonaFilter] = useState('all');
+  const [ndaFilter, setNdaFilter] = useState('all');
+  const [sortOption, setSortOption] = useState('momentum');
 
   const selectedCommunityId = selectedCommunity?.id ?? null;
 
@@ -540,6 +573,125 @@ export default function Communities() {
     }
     return null;
   }, [communityDetail, selectedCommunity]);
+
+  const directoryCommunities = useMemo(() => {
+    return communities
+      .filter((community) => community && String(community.id) !== String(ALL_COMMUNITIES_NODE.id))
+      .map((community) => {
+        const personas = extractCommunityPersonas(community);
+        const personaLabels = personas.map(getPersonaLabel);
+        const stats = community?.stats ?? {};
+        const members = Number(stats.members ?? 0);
+        const posts = Number(stats.posts ?? 0);
+        const resourcesCount = Number(stats.resources ?? 0);
+        const eventsCount = Number(stats.events ?? community?.events?.length ?? 0);
+        const lastActivityAt = resolveLastActivity(community);
+        const engagementScore = computeCommunityEngagementScore(community);
+        const coverage = Number(community?.membershipMap?.totalCountries ?? 0);
+        const monetisation = community?.metadata?.monetisation ?? community?.pricingTier ?? null;
+
+        return {
+          raw: community,
+          personas,
+          personaLabels,
+          members,
+          posts,
+          resources: resourcesCount,
+          events: eventsCount,
+          lastActivityAt,
+          engagementScore,
+          coverage,
+          monetisation,
+          ndaRequired: Boolean(community?.metadata?.ndaRequired),
+          description: community?.description ?? '',
+          focus: community?.metadata?.focus ?? '',
+          status: community?.membership?.status ?? null
+        };
+      });
+  }, [communities]);
+
+  const personaSummary = useMemo(() => summarisePersonaCounts(communities), [communities]);
+
+  const personaFilterOptions = useMemo(() => {
+    const available = new Set();
+    directoryCommunities.forEach((entry) => {
+      entry.personas.forEach((persona) => available.add(persona));
+    });
+    return PERSONA_LABEL_ENTRIES.filter((entry) => available.has(entry.id));
+  }, [directoryCommunities]);
+
+  const totalRegionsCovered = useMemo(
+    () =>
+      directoryCommunities.reduce(
+        (max, entry) => (entry.coverage && entry.coverage > max ? entry.coverage : max),
+        0
+      ),
+    [directoryCommunities]
+  );
+
+  const ndaCounts = useMemo(() => {
+    return directoryCommunities.reduce(
+      (acc, entry) => {
+        if (entry.ndaRequired) {
+          acc.secured += 1;
+        } else {
+          acc.open += 1;
+        }
+        return acc;
+      },
+      { open: 0, secured: 0 }
+    );
+  }, [directoryCommunities]);
+
+  const filteredDirectory = useMemo(() => {
+    const query = directoryQuery.trim().toLowerCase();
+    const parsed = directoryCommunities.filter((entry) => {
+      if (personaFilter !== 'all' && !entry.personas.includes(personaFilter)) {
+        return false;
+      }
+      if (ndaFilter === 'nda' && !entry.ndaRequired) {
+        return false;
+      }
+      if (ndaFilter === 'open' && entry.ndaRequired) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      const haystack = [
+        entry.raw?.name ?? '',
+        entry.description,
+        entry.focus,
+        entry.personaLabels.join(' ')
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+
+    const sorted = [...parsed];
+    if (sortOption === 'members') {
+      sorted.sort((a, b) => b.members - a.members || a.raw.name.localeCompare(b.raw.name));
+      return sorted;
+    }
+    if (sortOption === 'recent') {
+      const getTime = (value) => {
+        if (!value) return 0;
+        const timestamp = new Date(value).getTime();
+        return Number.isNaN(timestamp) ? 0 : timestamp;
+      };
+      sorted.sort((a, b) => getTime(b.lastActivityAt) - getTime(a.lastActivityAt));
+      return sorted;
+    }
+
+    sorted.sort((a, b) => {
+      if (b.engagementScore === a.engagementScore) {
+        return b.members - a.members;
+      }
+      return b.engagementScore - a.engagementScore;
+    });
+    return sorted;
+  }, [directoryCommunities, directoryQuery, personaFilter, ndaFilter, sortOption]);
 
   const communityKeywords = useMemo(() => {
     const keywords = new Set();
@@ -1464,6 +1616,7 @@ export default function Communities() {
                   selected={selectedCommunity}
                   onSelect={setSelectedCommunity}
                   disabled={isLoadingCommunities}
+                  enableSearch
                 />
                 <p className="text-xs text-slate-500">
                   Manage membership, joining, and community insights from the right-hand control panel.
@@ -1479,6 +1632,195 @@ export default function Communities() {
             {resourcesError && (
               <p className="mt-6 rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{resourcesError}</p>
             )}
+          </section>
+
+          <section className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl space-y-3">
+                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+                  Persona-aligned discovery
+                </span>
+                <h2 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
+                  Find the community chapter that matches your operating focus.
+                </h2>
+                <p className="text-sm leading-6 text-slate-600">
+                  Filter by persona, access model, and momentum before you deep-dive into live classrooms, resource libraries, and sponsorship programmes.
+                </p>
+                <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <span className="rounded-full bg-slate-100 px-3 py-1">
+                    {numberFormatter.format(directoryCommunities.length)} active communities
+                  </span>
+                  {totalRegionsCovered > 0 && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1">
+                      {numberFormatter.format(totalRegionsCovered)} regions represented
+                    </span>
+                  )}
+                  <span className="rounded-full bg-slate-100 px-3 py-1">
+                    {numberFormatter.format(ndaCounts.open)} open access · {numberFormatter.format(ndaCounts.secured)} secured
+                  </span>
+                </div>
+              </div>
+              <dl className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                {personaSummary.slice(0, 4).map((entry) => (
+                  <div key={entry.id} className="rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{entry.label}</dt>
+                    <dd className="mt-2 text-xl font-semibold text-slate-900">{numberFormatter.format(entry.count)}</dd>
+                    <p className="mt-1 text-xs text-slate-500">Communities tailored to this persona</p>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,_1fr)_minmax(0,_260px)]">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <label className="flex w-full flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:max-w-xs">
+                  Search directory
+                  <input
+                    type="search"
+                    value={directoryQuery}
+                    onChange={(event) => setDirectoryQuery(event.target.value)}
+                    placeholder="Search by name, focus, or tag"
+                    className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
+                <div className="grid w-full gap-4 sm:max-w-3xl sm:grid-cols-3">
+                  <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Persona focus
+                    <select
+                      value={personaFilter}
+                      onChange={(event) => setPersonaFilter(event.target.value)}
+                      className="rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="all">All personas</option>
+                      {personaFilterOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Access model
+                    <select
+                      value={ndaFilter}
+                      onChange={(event) => setNdaFilter(event.target.value)}
+                      className="rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="all">All access levels</option>
+                      <option value="open">Open enrolment</option>
+                      <option value="nda">NDA required</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Sort by
+                    <select
+                      value={sortOption}
+                      onChange={(event) => setSortOption(event.target.value)}
+                      className="rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="momentum">Momentum score</option>
+                      <option value="members">Member count</option>
+                      <option value="recent">Recent activity</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
+                Persona filters mirror the taxonomy documented in <span className="font-semibold text-slate-700">user_experience.md</span>. Use these lenses to scope live programming, moderator coverage, and monetisation pilots.
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredDirectory.length === 0 ? (
+                <div className="sm:col-span-2 xl:col-span-3 rounded-3xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-sm text-slate-600">
+                  No communities match your filters yet. Adjust persona, access, or try a broader search.
+                </div>
+              ) : (
+                filteredDirectory.map((entry) => {
+                  const isActive =
+                    selectedCommunityId !== null &&
+                    String(entry.raw.id) === String(selectedCommunityId);
+                  const lastActiveLabel = formatRelativeActivity(entry.lastActivityAt);
+
+                  return (
+                    <button
+                      key={entry.raw.id}
+                      type="button"
+                      onClick={() => setSelectedCommunity(entry.raw)}
+                      className={`flex h-full flex-col gap-4 rounded-3xl border p-5 text-left shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                        isActive
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-slate-200 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg'
+                      }`}
+                      aria-pressed={isActive}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{entry.raw.name}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {entry.focus || entry.description || 'Persona-aligned programming and peer pods.'}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2 text-[11px] font-semibold text-primary">
+                          {entry.personaLabels.map((label) => (
+                            <span key={label} className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1">
+                              {label}
+                            </span>
+                          ))}
+                          {entry.ndaRequired && (
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+                              NDA required
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <dl className="grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-slate-200 bg-white/60 px-3 py-2">
+                          <dt>Members</dt>
+                          <dd className="mt-1 text-sm font-semibold text-slate-900">
+                            {numberFormatter.format(entry.members)}
+                          </dd>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-white/60 px-3 py-2">
+                          <dt>Live signals</dt>
+                          <dd className="mt-1 text-sm font-semibold text-slate-900">
+                            {numberFormatter.format(entry.posts + entry.events)} updates
+                          </dd>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-white/60 px-3 py-2">
+                          <dt>Resource depth</dt>
+                          <dd className="mt-1 text-sm font-semibold text-slate-900">
+                            {numberFormatter.format(entry.resources)} items
+                          </dd>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-white/60 px-3 py-2">
+                          <dt>Momentum</dt>
+                          <dd className="mt-1 text-sm font-semibold text-slate-900">
+                            Score {numberFormatter.format(entry.engagementScore)}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="mt-auto flex flex-wrap items-center gap-3 text-[11px] font-semibold text-slate-500">
+                        {lastActiveLabel && <span className="rounded-full bg-slate-100 px-3 py-1">{lastActiveLabel}</span>}
+                        {entry.coverage > 0 && (
+                          <span className="rounded-full bg-slate-100 px-3 py-1">
+                            {numberFormatter.format(entry.coverage)} countries represented
+                          </span>
+                        )}
+                        {entry.monetisation && (
+                          <span className="rounded-full bg-slate-100 px-3 py-1">{entry.monetisation}</span>
+                        )}
+                        {entry.status && (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                            {entry.status === 'active' ? 'Member' : entry.status}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </section>
 
           <CommunityCrudManager />
