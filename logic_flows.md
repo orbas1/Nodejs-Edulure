@@ -902,14 +902,14 @@ This compendium maps the execution paths, responsibilities, and release consider
 
 ### 8.A Automated Test Suites & Coverage
 1. **Appraisal:** Comprehensive automated coverage across backend Vitest suites, frontend component tests, and Flutter widget/unit tests with shared mocks.
-2. **Functionality:** Tests run via npm/yarn commands, orchestrated in CI with coverage reporting captured in `backend-test-results.json` and corresponding frontend outputs.
+2. **Functionality:** Tests run via npm/yarn commands, orchestrated in CI with coverage reporting captured in `backend-test-results.json` and corresponding frontend outputs, while `scripts/qa/collect-coverage.mjs` aggregates backend, frontend, and Flutter summaries against the Annex thresholds.
 3. **Logic Usefulness:** Ensures regressions surface early, validates contracts across controllers, services, and UI flows, and feeds into release gating.
 4. **Redundancies:** Duplicate mock factories exist in multiple packages; consolidate to reduce maintenance overhead.
 5. **Placeholders Or non-working functions or stubs:** Several pending tests flagged TODO, especially around realtime flows; track progress.
 6. **Duplicate Functions:** Utility helpers for date formatting repeated across test suites; centralise for consistency.
 7. **Improvements need to make:** Expand coverage for websocket, offline, and monetisation edge cases; integrate mutation testing for critical modules.
 8. **Styling improvements:** Harmonise snapshot styling, align test name formatting, and ensure code fences in docs match design guidelines.
-9. **Efficiency analysis and improvement:** Parallelise suites, cache dependencies, and adopt selective testing based on git diff.
+9. **Efficiency analysis and improvement:** Parallelise suites, cache dependencies, adopt selective testing based on git diff, and export JSON summaries once `npm run qa:coverage` completes so subsequent governance steps reuse cached coverage state.
 10. **Strengths to Keep:** Broad coverage, shared fixtures, and integration with release governance.
 11. **Weaknesses to remove:** Flaky tests due to timing; stabilise with deterministic utilities and improved mocks.
 12. **Styling and Colour review changes:** Align coverage dashboards with accessible palettes for readability.
@@ -920,14 +920,14 @@ This compendium maps the execution paths, responsibilities, and release consider
 
 ### 8.B Manual QA & Release Governance (`qa/`, `update_template/`, `docs/operations/qa.md`)
 1. **Appraisal:** Structured manual QA frameworks, readiness templates, and compliance artefacts ensuring disciplined releases.
-2. **Functionality:** Provides checklists, risk assessment forms, sign-off workflows, and release note templates.
+2. **Functionality:** Provides checklists, risk assessment forms, sign-off workflows, and release note templates, now supplemented by `scripts/qa/generate-manual-readiness.mjs`, which compiles Markdown/JSON evidence packs and is invoked automatically from `scripts/release/run-readiness.mjs`.
 3. **Logic Usefulness:** Aligns cross-functional teams, enforces regulatory requirements, and documents residual risk before launch.
 4. **Redundancies:** Duplicate checklist sections across templates; consolidate to reduce confusion.
 5. **Placeholders Or non-working functions or stubs:** Some governance sections flagged TBD; schedule completion.
 6. **Duplicate Functions:** Release note generators appear in multiple scripts; centralise to maintain consistent voice.
 7. **Improvements need to make:** Digitise checklists, integrate with project management tools, and automate artifact storage.
 8. **Styling improvements:** Harmonise template formatting, typography, and colour usage to improve readability.
-9. **Efficiency analysis and improvement:** Auto-populate checklist sections from CI outputs and telemetry to reduce manual effort.
+9. **Efficiency analysis and improvement:** Auto-populate checklist sections from CI outputs and telemetry to reduce manual effort, with the readiness script generating coverage summaries so teams attach artefacts without rerunning tooling.
 10. **Strengths to Keep:** Thorough coverage, compliance alignment, and cross-team visibility.
 11. **Weaknesses to remove:** Manual data entry causing delays; automate via forms and APIs.
 12. **Styling and Colour review changes:** Align template palette with brand while maintaining accessibility.
@@ -938,14 +938,14 @@ This compendium maps the execution paths, responsibilities, and release consider
 
 ### 8.C Test Data, Fixtures & Sandboxes (`backend-nodejs/seeds/`, `frontend-reactjs/src/testUtils/`, `Edulure-Flutter/test/fixtures/`)
 1. **Appraisal:** Shared fixtures and seeds providing deterministic data for automated tests, QA environments, and demos.
-2. **Functionality:** Seeds populate courses, communities, billing plans, and analytics data while fixtures power component snapshots and service mocks.
+2. **Functionality:** Seeds populate courses, communities, billing plans, and analytics data while fixtures power component snapshots and service mocks, consolidated through `qa/test-data/navigationAnnex.js` so backend and frontend tests share canonical annex data and `scripts/qa/export-scenarios.mjs` serialises the same dataset for sandboxes.
 3. **Logic Usefulness:** Enables reproducible scenarios, supports debugging, and accelerates onboarding.
 4. **Redundancies:** Duplicate fixture definitions across frontend and backend; consolidate or share via JSON exports.
 5. **Placeholders Or non-working functions or stubs:** Some seed data uses placeholder copy; update to representative content.
 6. **Duplicate Functions:** Date helpers repeated; centralise for consistent temporal behaviour.
 7. **Improvements need to make:** Add scenario tagging, synthetic analytics data, and scripts to refresh sandboxes quickly.
 8. **Styling improvements:** Ensure fixture-generated UI states align with latest design tokens to avoid snapshot churn.
-9. **Efficiency analysis and improvement:** Optimise seed scripts for idempotency and speed, and support partial refresh for targeted tests.
+9. **Efficiency analysis and improvement:** Optimise seed scripts for idempotency and speed, support partial refresh for targeted tests, and reuse the exported scenario JSON when reseeding QA environments to avoid hand-crafted payloads.
 10. **Strengths to Keep:** Rich, domain-accurate data and cross-surface consistency.
 11. **Weaknesses to remove:** Manual steps to load sandboxes; automate within CI pipelines.
 12. **Styling and Colour review changes:** Align fixture-generated imagery with brand palette.

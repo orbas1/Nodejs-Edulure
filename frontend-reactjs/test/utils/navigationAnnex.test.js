@@ -1,26 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { mergeAnnexQuickActions } from '../../src/navigation/utils.js';
+import { navigationAnnexScenario } from '../../../qa/test-data/navigationAnnex.js';
 
 function buildStaticActions() {
-  return [
-    {
-      id: 'create-post',
-      label: 'New post',
-      description: 'Publish an announcement or share a win with your community.',
-      to: '/dashboard/learner/communities',
-      icon: () => null,
-      analyticsId: 'quick-action-create-post'
-    },
-    {
-      id: 'launch-session',
-      label: 'Schedule live session',
-      description: 'Spin up a live classroom with chat, recordings, and attendance.',
-      to: '/dashboard/instructor/live-classes',
-      icon: () => null,
-      analyticsId: 'quick-action-launch-session'
-    }
-  ];
+  return navigationAnnexScenario.quickActions.map((action) => ({
+    ...action,
+    icon: () => null
+  }));
 }
 
 describe('mergeAnnexQuickActions', () => {
