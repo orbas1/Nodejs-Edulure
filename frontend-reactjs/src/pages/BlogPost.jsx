@@ -187,6 +187,10 @@ export default function BlogPost() {
   }, [post?.permalink, post?.shareUrl, canonicalPath]);
 
   const heroImage = post?.media?.[0]?.mediaUrl ?? null;
+  const articleLanguage = post?.language ?? 'en-GB';
+  const timeRequired = post?.readingTimeMinutes
+    ? `PT${Math.max(1, Math.round(post.readingTimeMinutes))}M`
+    : undefined;
 
   const structuredData = useMemo(() => {
     if (!post) {
@@ -206,9 +210,33 @@ export default function BlogPost() {
             '@type': 'Person',
             name: post.author.name
           }
-        : undefined
+        : undefined,
+      publisher: {
+        '@type': 'Organization',
+        name: 'Blackwellen Ltd',
+        url: 'https://www.edulure.com',
+        logo: {
+          '@type': 'ImageObject',
+          url: 'https://www.edulure.com/static/brand/wordmark.png'
+        }
+      },
+      keywords: tagKeywords,
+      articleSection: post.category?.name ?? undefined,
+      inLanguage: articleLanguage,
+      isAccessibleForFree: true,
+      wordCount: wordCount ?? undefined,
+      timeRequired
     };
-  }, [post, metaDescription, canonicalUrlForStructured, heroImage]);
+  }, [
+    post,
+    metaDescription,
+    canonicalUrlForStructured,
+    heroImage,
+    tagKeywords,
+    articleLanguage,
+    wordCount,
+    timeRequired
+  ]);
 
   usePageMetadata({
     title: post?.title ?? 'Edulure blog insight',

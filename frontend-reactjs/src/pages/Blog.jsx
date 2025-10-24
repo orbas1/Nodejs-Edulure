@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { fetchBlogPosts, fetchBlogCategories, fetchBlogTags } from '../api/blogApi.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const INITIAL_FILTERS = Object.freeze({ category: '', tags: [], search: '' });
 
@@ -107,6 +108,71 @@ export default function Blog() {
   const hasActiveFilters = Boolean(
     filters.category || filters.search.trim().length > 0 || (filters.tags?.length ?? 0) > 0
   );
+
+  const metaDescription = useMemo(() => {
+    if (featuredPost?.excerpt) {
+      return featuredPost.excerpt;
+    }
+    if (featuredPost?.title) {
+      return `Explore "${featuredPost.title}" and additional Edulure stories covering enablement, community wins, and product strategy.`;
+    }
+    return 'Discover Edulure product updates, customer stories, and growth playbooks curated for operators and educators.';
+  }, [featuredPost]);
+
+  const structuredData = useMemo(() => {
+    if (!posts.length) {
+      return null;
+    }
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Blog',
+      name: 'Edulure Insights',
+      url: 'https://www.edulure.com/blog',
+      inLanguage: 'en-GB',
+      blogPost: posts.slice(0, 12).map((post) => ({
+        '@type': 'BlogPosting',
+        headline: post.title,
+        datePublished: post.publishedAt ?? undefined,
+        url: post.slug ? `https://www.edulure.com/blog/${post.slug}` : undefined,
+        image: post.heroImage ?? undefined,
+        articleSection: post.category?.name ?? undefined,
+        keywords: Array.isArray(post.tags) ? post.tags.map((tag) => tag?.name ?? tag?.slug).filter(Boolean) : undefined,
+        interactionStatistic: post.viewCount
+          ? {
+              '@type': 'InteractionCounter',
+              interactionType: 'https://schema.org/ViewAction',
+              userInteractionCount: post.viewCount
+            }
+          : undefined
+      }))
+    };
+  }, [posts]);
+
+  const resultsSummary = useMemo(() => {
+    if (loading) {
+      return 'Loading articles';
+    }
+    if (error) {
+      return 'Unable to load blog articles';
+    }
+    if (pagination.total > 0) {
+      const scope = hasActiveFilters ? 'matching your filters' : 'available';
+      return `${pagination.total} article${pagination.total === 1 ? '' : 's'} ${scope}.`;
+    }
+    return 'No articles available yet';
+  }, [loading, error, pagination.total, hasActiveFilters]);
+
+  usePageMetadata({
+    title: hasActiveFilters ? 'Filtered Edulure blog' : 'Edulure blog insights',
+    description: metaDescription,
+    canonicalPath: '/blog',
+    structuredData,
+    analytics: {
+      page_type: 'blog_index',
+      has_filters: hasActiveFilters,
+      visible_count: posts.length
+    }
+  });
 
   const handleCategoryChange = (slug) => {
     setFilters((prev) => ({ ...prev, category: prev.category === slug ? '' : slug }));
@@ -237,6 +303,9 @@ export default function Blog() {
           </aside>
 
           <div className="space-y-8">
+            <div aria-live="polite" className="sr-only" role="status">
+              {resultsSummary}
+            </div>
             {loading ? (
               <div className="flex h-40 items-center justify-center rounded-3xl border border-dashed border-primary/30 bg-white">
                 <p className="text-sm font-semibold text-primary">Loading articles…</p>
