@@ -19,6 +19,8 @@
     "dev:stack": "node ./scripts/dev-stack.mjs",
     "dev:observability": "node ./scripts/observability-stack.mjs",
     "onboard": "node ./scripts/onboard.mjs",
+    "sync:design-tokens": "node ./scripts/sync-design-tokens.cjs",
+    "generate:strategy-brief": "node ./scripts/generate-strategy-brief.cjs",
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

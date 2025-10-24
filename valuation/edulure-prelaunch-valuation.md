@@ -41,3 +41,12 @@ Combining these elements yields an indicative midpoint valuation of **£0.90M**,
 2. **Document infrastructure-as-code** for R2, Meilisearch, and mobile CI pipelines to reinforce operational readiness during diligence.
 3. **Produce financial models** translating community engagement metrics, streak retention, and premium subscriptions into revenue projections.
 4. **Establish post-launch KPI cadence** (DAU, streak recovery rate, churn) aligning investor updates with the telemetry available across web and mobile clients.
+
+## KPI scoreboard linkage (Q3 FY25)
+`npm run generate:strategy-brief` exports the live KPI table into `valuation/generated-scorecard.md`, keeping valuation inputs aligned with stakeholder reporting. Key links:
+
+- **Activation** — Conversion uplift targets (20% trial → paid, 75% onboarding completion) validate the growth premium baked into the midpoint valuation.
+- **Retention** — Streak health, live attendance, and NPS goals protect recurring revenue assumptions and justify the execution premium.
+- **Efficiency** — Support minutes per ticket, upload readiness, and ARPU improvements map directly to the cost-based triangulation and margin sensitivities described above.
+
+Embed the generated table in diligence packets or board materials to show how valuation drivers correspond to real telemetry and accountable owners.

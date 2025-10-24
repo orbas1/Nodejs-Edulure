@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'bootstrap/app_bootstrap.dart';
+import 'core/design_tokens.dart';
 import 'core/feature_flags/feature_flag_notifier.dart';
 import 'screens/assessments_screen.dart';
 import 'screens/blog_screen.dart';
@@ -134,16 +135,10 @@ class EdulureApp extends ConsumerWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF2D62FF),
-              primary: const Color(0xFF2D62FF),
-              secondary: const Color(0xFFFF7A59),
-            ),
-            scaffoldBackgroundColor: Colors.white,
-            textTheme: textTheme,
-            useMaterial3: true,
-          ),
+          theme: DesignTokens.lightTheme(textTheme),
+          darkTheme: DesignTokens.darkTheme(textTheme),
+          highContrastTheme: DesignTokens.highContrastTheme(textTheme),
+          themeMode: ThemeMode.system,
           routes: routes,
           builder: (context, child) {
             if (child == null) {

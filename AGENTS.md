@@ -247,8 +247,42 @@
             14. **Text Analysis.** Panel copy now highlights cadence, nav item, and runbook link, providing the succinct, action-first tone operations requested in Annex A54 drills.
             15. **Change Checklist Tracker.** Before releasing annex updates run `npm --workspace backend-nodejs test -- navigationAnnexRepository`, `npm --workspace frontend-reactjs test -- NavigationAnnex`, and capture refreshed evidence in `docs/operations/navigation-readiness.md`.
             16. **Full Upgrade Plan & Release Steps.** Update seeds, reseed staging, validate the annex API by role, smoke the notification panel, rehearse the operational runbook, and publish drill notes with annex screenshots.
-      - 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
-      - 9.D Strategy, Valuation & Stakeholder Communication (`valuation/`, `docs/operations/strategy.md`, `user experience.md`)
+      - ✓ 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
+         - 9.C.1 Unified token and research workflow (`docs/design-system/design_tokens.json`, `scripts/sync-design-tokens.cjs`, `frontend-reactjs/src/styles/tokens.css`, `Edulure-Flutter/lib/core/design_tokens.dart`, `Edulure-Flutter/lib/main.dart`, `docs/design-system/README.md`, `user experience.md`)
+            1. **Appraise.** Tokens now originate from `design_tokens.json` and flow through the sync script into CSS and Flutter outputs, removing manual divergence between clients.
+            2. **Function.** `npm run sync:design-tokens` regenerates web variables and the `DesignTokens` Dart helper; `main.dart` consumes the helper to deliver light/dark/high-contrast themes with shared spacing and focus styles.
+            3. **Usefulness.** Designers audit one JSON file and see their changes reflected in both React (`tokens.css`) and Flutter (`design_tokens.dart`) while the ledger in `user experience.md` captures research context.
+            4. **Redundant.** The ad-hoc Flutter `ThemeData` scaffold and scattered colour constants were eliminated in favour of importing `DesignTokens`.
+            5. **Placeholders.** Component-specific tokens (e.g., typography for table cells) are still TODOs—extend the JSON before cutting bespoke overrides.
+            6. **Duplicate Functions.** High-contrast overrides now come from the generator, so React media queries and Flutter constructors no longer maintain separate copies.
+            7. **Improvements Needed.** Next iteration should emit Storybook fixtures or visual diffs so QA can preview token shifts automatically.
+            8. **Styling Improvements.** Shared padding, border radii, and focus rings flow into Flutter inputs and React forms, aligning with Annex colour guidance documented in the README.
+            9. **Efficiency.** Deterministic generation avoids hand edits, keeps `:root`, `[data-theme]`, and `[data-contrast]` overrides in sync, and prevents stale Flutter themes.
+            10. **Strengths to Keep.** Preserve the JSON-first source, multi-mode coverage, and research checklist linking sync runs to captured evidence.
+            11. **Weaknesses to Remove.** Translate CSS shadow strings into structured Flutter BoxShadow constants and add automated contrast tests to catch regressions faster.
+            12. **Palette Review.** Running the sync updates palette values across both platforms, satisfying WCAG AA checks surfaced in the UX ledger’s accessibility audit.
+            13. **Layout.** Grid defaults (`--grid-min-column`, `--grid-gap`) and button padding now align across Flutter and React, preserving component density specs.
+            14. **Text Analysis.** Documentation emphasises the JSON → sync workflow and trims duplicate instructions about manual edits.
+            15. **Change Checklist.** Edit `design_tokens.json`, execute the sync script, review `tokens.css`, `design_tokens.dart`, and `main.dart`, then update `user experience.md` with research outcomes.
+            16. **Upgrade Plan.** Coordinate releases by syncing tokens, validating Flutter/web builds, capturing screenshots, and notifying design/research stakeholders via the ledger.
+      - ✓ 9.D Strategy, Valuation & Stakeholder Communication (`valuation/`, `docs/operations/strategy.md`, `user experience.md`)
+         - 9.D.1 KPI scorecard automation and comms tooling (`valuation/stakeholder_scorecard.json`, `scripts/generate-strategy-brief.cjs`, `docs/operations/strategy.md`, `valuation/generated-scorecard.md`, `docs/operations/templates/`, `valuation/edulure-prelaunch-valuation.md`)
+            1. **Appraise.** Strategic metrics now live in `stakeholder_scorecard.json`, generating consistent scorecards and narratives across strategy and valuation docs.
+            2. **Function.** `npm run generate:strategy-brief` builds `docs/operations/strategy.md` plus `generated-scorecard.md`, while valuation commentary references the same data for diligence.
+            3. **Usefulness.** Leadership, finance, and design ops pull a single briefing that lists KPI owners, cadences, and sources, mirrored in new board/investor templates.
+            4. **Redundant.** Manual KPI tables in valuation and stakeholder memos were replaced by the generated scorecard to prevent drift.
+            5. **Placeholders.** Additional metrics (e.g., paid marketing CAC) should be appended to the JSON to expand coverage without touching docs.
+            6. **Duplicate Functions.** Narrative tone and cadence guidance now come from the generator and shared templates instead of repeated prose across updates.
+            7. **Improvements Needed.** Future work should ingest telemetry directly and export PDF/CSV artefacts for rapid board distribution.
+            8. **Styling Improvements.** Markdown layouts for strategy docs and templates align with Annex tone while referencing UX research outcomes for message consistency.
+            9. **Efficiency.** Scripted output eliminates hand-formatted tables and lets teams embed `generated-scorecard.md` anywhere with zero rework.
+            10. **Strengths to Keep.** Maintain the JSON-first workflow, automated narrative generation, and linkage into valuation narratives and communication outlines.
+            11. **Weaknesses to Remove.** Add schema validation so missing owners, cadences, or units fail fast before distribution.
+            12. **Palette Review.** Templates call back to design-system outputs and UX research so downstream decks keep typography and colour usage on brand.
+            13. **Layout.** Generated tables stay narrow enough for docs and PDF export, and templates structure sections so stakeholder updates remain scannable.
+            14. **Text Analysis.** Generated copy focuses on outcomes, strips jargon, and explicitly ties metrics to strategy pillars for clarity.
+            15. **Change Checklist.** Update the JSON, rerun the generator, review strategy + valuation docs, refresh templates, and log supporting UX insights when metrics shift.
+            16. **Upgrade Plan.** Align cadence updates by editing the JSON alongside valuation refreshes, regenerating artefacts, circulating them to leadership, and syncing notes back into `user experience.md`.
    - Annex A: Expanded Analysis Narratives
       - ✅ A1. Identity, Sessions & Profile Security (1.A)
         *See Part 1.A for the 16-point breakdown covering auth flows, shared serializers, and release governance updates.*
