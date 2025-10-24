@@ -6,6 +6,9 @@ import { TABLES as TELEMETRY_TABLES, generateTelemetryDedupeHash } from '../src/
 import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
+import CourseModel from '../src/models/CourseModel.js';
+import CourseVersionSnapshotModel from '../src/models/CourseVersionSnapshotModel.js';
+import UserRoleAssignmentModel from '../src/models/UserRoleAssignmentModel.js';
 import {
   COMMUNITY_EVENT_PARTICIPANT_STATUSES,
   COMMUNITY_EVENT_REMINDER_CHANNELS,
@@ -108,6 +111,7 @@ export async function seed(knex) {
     await trx('course_assignments').del();
     await trx('course_lessons').del();
     await trx('course_modules').del();
+    await trx('course_version_snapshots').del();
     await trx('courses').del();
     await trx('community_affiliate_payouts').del();
     await trx('community_subscriptions').del();
@@ -208,95 +212,172 @@ export async function seed(knex) {
     await trx('user_sessions').del();
     await trx('user_email_verification_tokens').del();
     await trx('user_profiles').del();
+    await trx('user_role_assignments').del();
     await trx('communities').del();
     await trx('users').del();
+
+    const resolveInsertedId = (result) => {
+      if (Array.isArray(result)) {
+        if (result.length === 0) {
+          return null;
+        }
+        return resolveInsertedId(result[0]);
+      }
+      if (result && typeof result === 'object') {
+        if (result.id !== undefined && result.id !== null) {
+          return result.id;
+        }
+        if (result.insertId !== undefined && result.insertId !== null) {
+          return result.insertId;
+        }
+      }
+      return result ?? null;
+    };
+
+    const normaliseId = (value) => {
+      if (typeof value === 'bigint') {
+        return Number(value);
+      }
+      return value;
+    };
+
+    const insertUserWithRole = async (
+      attributes,
+      { roleKey, assignedBy, metadata = {}, scopeType = 'global', scopeId = null } = {}
+    ) => {
+      const insertResult = await trx('users').insert(attributes);
+      const resolvedId = normaliseId(resolveInsertedId(insertResult));
+      if (!resolvedId) {
+        throw new Error('Failed to insert seeded user');
+      }
+
+      const finalRole = roleKey ?? attributes.role ?? 'user';
+      await UserRoleAssignmentModel.assign(
+        {
+          userId: resolvedId,
+          roleKey: finalRole,
+          scopeType,
+          scopeId,
+          assignedBy: assignedBy ?? resolvedId,
+          metadata: { seed: true, ...metadata }
+        },
+        trx
+      );
+
+      return resolvedId;
+    };
+
+    const recordCourseSeedSnapshot = async (courseId, actorId) => {
+      if (!courseId) {
+        return;
+      }
+      const courseRecord = await CourseModel.findById(courseId, trx);
+      if (!courseRecord) {
+        return;
+      }
+      await CourseVersionSnapshotModel.recordInitial(courseRecord, trx, {
+        actorId: actorId ?? courseRecord.instructorId ?? null
+      });
+    };
 
     const passwordHash = await bcrypt.hash('LaunchReady!2024', 12);
     const operationsSyncStartedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     const studioSessionStartedAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
-    const [adminId] = await trx('users').insert({
-      first_name: 'Amina',
-      last_name: 'Diallo',
-      email: 'amina.diallo@edulure.test',
-      password_hash: passwordHash,
-      role: 'admin',
-      email_verified_at: trx.fn.now(),
-      failed_login_attempts: 0,
-      last_login_at: trx.fn.now(),
-      password_changed_at: trx.fn.now(),
-      dashboard_preferences: JSON.stringify({ pinnedNavigation: ['admin-operations', 'admin-governance'] }),
-      unread_community_count: 9,
-      pending_payouts: 2,
-      active_live_room: JSON.stringify({
-        id: 'live_ops_sync',
-        title: 'Weekly operations sync',
-        startedAt: operationsSyncStartedAt,
+    const adminId = await insertUserWithRole(
+      {
+        first_name: 'Amina',
+        last_name: 'Diallo',
+        email: 'amina.diallo@edulure.test',
+        password_hash: passwordHash,
         role: 'admin',
-        roomUrl: 'https://live.edulure.test/ops-sync'
-      })
-    });
+        email_verified_at: trx.fn.now(),
+        failed_login_attempts: 0,
+        last_login_at: trx.fn.now(),
+        password_changed_at: trx.fn.now(),
+        dashboard_preferences: JSON.stringify({ pinnedNavigation: ['admin-operations', 'admin-governance'] }),
+        unread_community_count: 9,
+        pending_payouts: 2,
+        active_live_room: JSON.stringify({
+          id: 'live_ops_sync',
+          title: 'Weekly operations sync',
+          startedAt: operationsSyncStartedAt,
+          role: 'admin',
+          roomUrl: 'https://live.edulure.test/ops-sync'
+        })
+      },
+      { metadata: { context: 'seed.bootstrap', role: 'admin' } }
+    );
 
-    const [instructorId] = await trx('users').insert({
-      first_name: 'Kai',
-      last_name: 'Watanabe',
-      email: 'kai.watanabe@edulure.test',
-      password_hash: passwordHash,
-      role: 'instructor',
-      email_verified_at: trx.fn.now(),
-      failed_login_attempts: 0,
-      last_login_at: trx.fn.now(),
-      password_changed_at: trx.fn.now(),
-      dashboard_preferences: JSON.stringify({ pinnedNavigation: ['instructor-studio', 'instructor-clients'] }),
-      unread_community_count: 5,
-      pending_payouts: 1,
-      active_live_room: JSON.stringify({
-        id: 'live_course_build',
-        title: 'Cohort design working session',
-        startedAt: studioSessionStartedAt,
-        courseId: 'course-automation-fundamentals',
+    const instructorId = await insertUserWithRole(
+      {
+        first_name: 'Kai',
+        last_name: 'Watanabe',
+        email: 'kai.watanabe@edulure.test',
+        password_hash: passwordHash,
         role: 'instructor',
-        roomUrl: 'https://live.edulure.test/cohort-design'
-      })
-    });
+        email_verified_at: trx.fn.now(),
+        failed_login_attempts: 0,
+        last_login_at: trx.fn.now(),
+        password_changed_at: trx.fn.now(),
+        dashboard_preferences: JSON.stringify({ pinnedNavigation: ['instructor-studio', 'instructor-clients'] }),
+        unread_community_count: 5,
+        pending_payouts: 1,
+        active_live_room: JSON.stringify({
+          id: 'live_course_build',
+          title: 'Cohort design working session',
+          startedAt: studioSessionStartedAt,
+          courseId: 'course-automation-fundamentals',
+          role: 'instructor',
+          roomUrl: 'https://live.edulure.test/cohort-design'
+        })
+      },
+      { assignedBy: adminId, metadata: { context: 'seed.bootstrap', role: 'instructor' } }
+    );
 
-    const [learnerId] = await trx('users').insert({
-      first_name: 'Noemi',
-      last_name: 'Carvalho',
-      email: 'noemi.carvalho@edulure.test',
-      password_hash: passwordHash,
-      role: 'user',
-      email_verified_at: trx.fn.now(),
-      failed_login_attempts: 0,
-      last_login_at: trx.fn.now(),
-      password_changed_at: trx.fn.now(),
-      dashboard_preferences: JSON.stringify({ pinnedNavigation: ['learner-community'] }),
-      unread_community_count: 7,
-      pending_payouts: 0,
-      active_live_room: null
-    });
+    const learnerId = await insertUserWithRole(
+      {
+        first_name: 'Noemi',
+        last_name: 'Carvalho',
+        email: 'noemi.carvalho@edulure.test',
+        password_hash: passwordHash,
+        role: 'user',
+        email_verified_at: trx.fn.now(),
+        failed_login_attempts: 0,
+        last_login_at: trx.fn.now(),
+        password_changed_at: trx.fn.now(),
+        dashboard_preferences: JSON.stringify({ pinnedNavigation: ['learner-community'] }),
+        unread_community_count: 7,
+        pending_payouts: 0,
+        active_live_room: null
+      },
+      { assignedBy: adminId, metadata: { context: 'seed.bootstrap', role: 'learner' } }
+    );
 
-    const [flowPreviewUserId] = await trx('users').insert({
-      first_name: 'Jordan',
-      last_name: 'Rivera',
-      email: 'flow5-preview@edulure.test',
-      password_hash: passwordHash,
-      role: 'instructor',
-      email_verified_at: null,
-      failed_login_attempts: 0,
-      last_login_at: null,
-      password_changed_at: null,
-      dashboard_preferences: JSON.stringify({ pinnedNavigation: ['instructor-onboarding'] }),
-      unread_community_count: 0,
-      pending_payouts: 0,
-      active_live_room: null,
-      two_factor_enabled: 0,
-      two_factor_secret: null,
-      two_factor_enrolled_at: null,
-      two_factor_last_verified_at: null,
-      created_at: trx.fn.now(),
-      updated_at: trx.fn.now()
-    });
+    const flowPreviewUserId = await insertUserWithRole(
+      {
+        first_name: 'Jordan',
+        last_name: 'Rivera',
+        email: 'flow5-preview@edulure.test',
+        password_hash: passwordHash,
+        role: 'instructor',
+        email_verified_at: null,
+        failed_login_attempts: 0,
+        last_login_at: null,
+        password_changed_at: null,
+        dashboard_preferences: JSON.stringify({ pinnedNavigation: ['instructor-onboarding'] }),
+        unread_community_count: 0,
+        pending_payouts: 0,
+        active_live_room: null,
+        two_factor_enabled: 0,
+        two_factor_secret: null,
+        two_factor_enrolled_at: null,
+        two_factor_last_verified_at: null,
+        created_at: trx.fn.now(),
+        updated_at: trx.fn.now()
+      },
+      { assignedBy: adminId, metadata: { context: 'seed.bootstrap', role: 'instructor', profile: 'flow-preview' } }
+    );
 
     const adminVerificationRef = makeVerificationRef();
     const instructorVerificationRef = makeVerificationRef();
@@ -3610,7 +3691,7 @@ export async function seed(knex) {
       colors: ['#f97316', '#fb923c']
     });
 
-    const [opsAutomationCourseId] = await trx('courses').insert({
+    const opsAutomationCourseInsert = await trx('courses').insert({
       public_id: crypto.randomUUID(),
       instructor_id: instructorId,
       title: 'Automation Launch Masterclass',
@@ -3793,8 +3874,10 @@ export async function seed(knex) {
         }
       })
     });
+    const opsAutomationCourseId = normaliseId(resolveInsertedId(opsAutomationCourseInsert));
+    await recordCourseSeedSnapshot(opsAutomationCourseId, instructorId);
 
-    const [analyticsStoryCourseId] = await trx('courses').insert({
+    const analyticsStoryCourseInsert = await trx('courses').insert({
       public_id: crypto.randomUUID(),
       instructor_id: instructorId,
       title: 'Data Storytelling Accelerator',
@@ -3847,8 +3930,10 @@ export async function seed(knex) {
         }
       })
     });
+    const analyticsStoryCourseId = normaliseId(resolveInsertedId(analyticsStoryCourseInsert));
+    await recordCourseSeedSnapshot(analyticsStoryCourseId, instructorId);
 
-    const [communityBuilderCourseId] = await trx('courses').insert({
+    const communityBuilderCourseInsert = await trx('courses').insert({
       public_id: crypto.randomUUID(),
       instructor_id: instructorId,
       title: 'Community Builder Bootcamp',
@@ -3898,6 +3983,8 @@ export async function seed(knex) {
         programmingTracks: ['Welcome journeys', 'Flagship events', 'Member success rituals']
       })
     });
+    const communityBuilderCourseId = normaliseId(resolveInsertedId(communityBuilderCourseInsert));
+    await recordCourseSeedSnapshot(communityBuilderCourseId, instructorId);
 
     const [opsModuleKickoffId] = await trx('course_modules').insert({
       course_id: opsAutomationCourseId,
@@ -6278,29 +6365,35 @@ export async function seed(knex) {
     const subtractMinutes = (minutes) => new Date(timelineNow.getTime() - minutes * 60 * 1000);
     const addMinutes = (minutes) => new Date(timelineNow.getTime() + minutes * 60 * 1000);
 
-    const [fieldOpsUserId] = await trx('users').insert({
-      first_name: 'Mira',
-      last_name: 'Patel',
-      email: 'mira.patel@edulure.test',
-      password_hash: passwordHash,
-      role: 'instructor',
-      email_verified_at: trx.fn.now(),
-      failed_login_attempts: 0,
-      last_login_at: trx.fn.now(),
-      password_changed_at: trx.fn.now()
-    });
+    const fieldOpsUserId = await insertUserWithRole(
+      {
+        first_name: 'Mira',
+        last_name: 'Patel',
+        email: 'mira.patel@edulure.test',
+        password_hash: passwordHash,
+        role: 'instructor',
+        email_verified_at: trx.fn.now(),
+        failed_login_attempts: 0,
+        last_login_at: trx.fn.now(),
+        password_changed_at: trx.fn.now()
+      },
+      { assignedBy: adminId, metadata: { context: 'seed.bootstrap', role: 'instructor', team: 'field-ops' } }
+    );
 
-    const [emergencyOpsUserId] = await trx('users').insert({
-      first_name: 'Jonah',
-      last_name: 'Adeyemi',
-      email: 'jonah.adeyemi@edulure.test',
-      password_hash: passwordHash,
-      role: 'instructor',
-      email_verified_at: trx.fn.now(),
-      failed_login_attempts: 0,
-      last_login_at: trx.fn.now(),
-      password_changed_at: trx.fn.now()
-    });
+    const emergencyOpsUserId = await insertUserWithRole(
+      {
+        first_name: 'Jonah',
+        last_name: 'Adeyemi',
+        email: 'jonah.adeyemi@edulure.test',
+        password_hash: passwordHash,
+        role: 'instructor',
+        email_verified_at: trx.fn.now(),
+        failed_login_attempts: 0,
+        last_login_at: trx.fn.now(),
+        password_changed_at: trx.fn.now()
+      },
+      { assignedBy: adminId, metadata: { context: 'seed.bootstrap', role: 'instructor', team: 'emergency-ops' } }
+    );
 
     const [kaiProviderId] = await trx('field_service_providers').insert({
       user_id: instructorId,

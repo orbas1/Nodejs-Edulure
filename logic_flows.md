@@ -680,7 +680,7 @@ This compendium maps the execution paths, responsibilities, and release consider
 
 ### 5.A Identity & Access Schema (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
 1. **Appraisal:** Migration `20250415120000_user_role_assignments.js` adds a dedicated assignment table with cascades and composite indexes, backed by the new `UserRoleAssignmentModel` so role governance finally lives in a first-class schema.
-2. **Functionality:** `AuthService.register`, `login`, and `refreshSession` now pipe through `serializeUserWithAuthorizations`, automatically assigning default roles, embedding aggregated `roles` claims in JWTs, and exposing `roleAssignments` via `serializeUser` responses.
+2. **Functionality:** `AuthService.register`, `login`, and `refreshSession` now pipe through `serializeUserWithAuthorizations`, automatically assigning default roles, embedding aggregated `roles` claims in JWTs, and exposing `roleAssignments` via `serializeUser` responses, while `backend-nodejs/seeds/001_bootstrap.js` channels fixture creation through `UserRoleAssignmentModel.assign` so default accounts ship with live assignment metadata.
 3. **Logic Usefulness:** Downstream dashboards and API consumers can inspect role lists plus assignment metadata without custom joins, enabling access reviews and impersonation audits directly from auth payloads.
 4. **Redundancies:** Inline role-array handling inside AuthService has been replaced by `normaliseRoleIdentifier`/`buildRoleList`, removing string trimming logic duplicated across controllers and middleware.
 5. **Placeholders Or non-working functions or stubs:** `UserRoleAssignmentModel.pruneExpired` is ready but not yet wired to a scheduler; hook it into background jobs to retire expired assignments automatically.
@@ -693,12 +693,12 @@ This compendium maps the execution paths, responsibilities, and release consider
 12. **Styling and Colour review changes:** Identity documentation should highlight new assignment chips using the compliance-friendly palette shared across Annex A38 assets.
 13. **CSS, orientation, placement and arrangement changes:** Plan admin matrices that surface scope, expiry, and metadata columns derived from `serializeUser` output to keep UI aligned with backend payloads.
 14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refresh copy in docs/tooltips to describe aggregated `roles` arrays and assignment provenance so operators know how to interpret the new payloads.
-15. **Change Checklist Tracker:** Run migration `20250415120000_user_role_assignments.js`, backfill assignments, validate JWT `roles` claims, and smoke-test login/refresh flows before release.
+15. **Change Checklist Tracker:** Run migration `20250415120000_user_role_assignments.js`, backfill assignments, validate JWT `roles` claims, reseed via `npm --workspace backend-nodejs run seed` to confirm `user_role_assignments` hydration, and smoke-test login/refresh flows before release.
 16. **Full Upgrade Plan & Release Steps:** Apply migrations, seed identity fixtures, deploy backend, update annex documentation, and rehearse session rotation verifying role metadata end-to-end prior to enabling in production.
 
 ### 5.B Learning Content Schema (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
 1. **Appraisal:** Migration `20250415121000_course_version_snapshots.js` adds course snapshot history plus version columns on modules and lessons, orchestrated by the new `CourseVersionSnapshotModel`.
-2. **Functionality:** `CourseModel.create` records an initial snapshot while `updateById` persists diffs (`changes` array + summary) after every update, providing end-to-end version history.
+2. **Functionality:** `CourseModel.create` records an initial snapshot while `updateById` persists diffs (`changes` array + summary) after every update, providing end-to-end version history, and the bootstrap seed replays `CourseVersionSnapshotModel.recordInitial` for each fixture course so sample data carries authentic history rows.
 3. **Logic Usefulness:** Stored snapshots expose before/after payloads for analytics, rollback planning, and editorial audits without bespoke exports.
 4. **Redundancies:** Legacy TODOs around versioning are resolved—diff logic now centralised so services no longer need ad-hoc history serializers.
 5. **Placeholders Or non-working functions or stubs:** Snapshot actor attribution falls back to instructor/admin IDs; wire additional workflow context when collaborative editing launches.
@@ -711,7 +711,7 @@ This compendium maps the execution paths, responsibilities, and release consider
 12. **Styling and Colour review changes:** Document UI cues for version timelines (timestamps, summaries) aligned with Annex palette tokens used across curriculum dashboards.
 13. **CSS, orientation, placement and arrangement changes:** Provide layout guidance for diff cards/timelines leveraging `changes` arrays (field labels with before/after values) in admin tooling.
 14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Update docs/release notes to describe automatic change summaries and highlight how the `changes` array enumerates updated fields.
-15. **Change Checklist Tracker:** Apply migration `20250415121000_course_version_snapshots.js`, confirm snapshot creation on course create/update, and verify version defaults seeded to `1` for modules/lessons.
+15. **Change Checklist Tracker:** Apply migration `20250415121000_course_version_snapshots.js`, confirm snapshot creation on course create/update, reseed to ensure `course_version_snapshots` captures initial fixture rows, and verify version defaults seeded to `1` for modules/lessons.
 16. **Full Upgrade Plan & Release Steps:** Migrate, reseed sample courses, rehearse editing flows to inspect snapshots, update SDK/docs, and roll out alongside UI surfaces that consume new history APIs.
 
 ### 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
