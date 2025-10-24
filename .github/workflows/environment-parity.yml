@@ -48,7 +48,7 @@ jobs:
           exit 0
       - name: Upload release readiness report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-readiness-report
           path: reports/release/readiness-summary.json
@@ -154,7 +154,7 @@ jobs:
           npm run zap:baseline -- --url "${STAGING_APP_URL:-https://staging.edulure.com}"
       - name: Upload security header report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: staging-security-headers
           path: reports/security/zap-header-validation.json
