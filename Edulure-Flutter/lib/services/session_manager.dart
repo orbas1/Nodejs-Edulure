@@ -20,6 +20,7 @@ class SessionManager {
   static const _adsActionBox = 'ads_governance_actions';
   static const _notificationPreferencesBox = 'notification_preferences';
   static const _notificationOutboxBox = 'notification_outbox';
+  static const _feedSnapshotBox = 'feed_snapshots';
   static const _providerTransitionBox = 'provider_transition_announcements';
   static const _billingAccountBox = 'billing_account';
   static const _billingOutboxBox = 'billing_outbox';
@@ -53,6 +54,7 @@ class SessionManager {
     await _openBox(_adsActionBox, optional: true);
     await _openBox(_notificationPreferencesBox, optional: true);
     await _openBox(_notificationOutboxBox, optional: true);
+    await _openBox(_feedSnapshotBox, optional: true);
     await _openBox(_providerTransitionBox, optional: true);
     await _openBox(_billingAccountBox, optional: true);
     await _openBox(_billingOutboxBox, optional: true);
@@ -80,6 +82,12 @@ class SessionManager {
   static Box get notificationPreferencesCache =>
       Hive.box(_notificationPreferencesBox);
   static Box get notificationOutbox => Hive.box(_notificationOutboxBox);
+  static Box? get feedSnapshotCacheOrNull {
+    if (!Hive.isBoxOpen(_feedSnapshotBox) || _disabledCaches.contains(_feedSnapshotBox)) {
+      return null;
+    }
+    return Hive.box(_feedSnapshotBox);
+  }
   static Box? get providerTransitionCache =>
       Hive.isBoxOpen(_providerTransitionBox) ? Hive.box(_providerTransitionBox) : null;
   static Box get billingAccountCache => Hive.box(_billingAccountBox);
@@ -180,6 +188,7 @@ class SessionManager {
     await _clearIfAvailable(_adsActionBox);
     await _clearIfAvailable(_notificationPreferencesBox);
     await _clearIfAvailable(_notificationOutboxBox);
+    await _clearIfAvailable(_feedSnapshotBox);
     await _clearIfAvailable(_providerTransitionBox);
     await _clearIfAvailable(_billingAccountBox);
     await _clearIfAvailable(_billingOutboxBox);

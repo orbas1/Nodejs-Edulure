@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/community_service.dart';
+import '../../services/feed_cache_service.dart';
 import '../../services/live_feed_service.dart';
 
 final liveFeedServiceProvider = Provider<LiveFeedService>((ref) {
@@ -13,10 +16,15 @@ final communityServiceProvider = Provider<CommunityService>((ref) {
   return CommunityService();
 });
 
+final feedCacheServiceProvider = Provider<FeedCacheService>((ref) {
+  return FeedCacheService();
+});
+
 final liveFeedControllerProvider = StateNotifierProvider<LiveFeedController, LiveFeedState>((ref) {
   return LiveFeedController(
     feedService: ref.watch(liveFeedServiceProvider),
     communityService: ref.watch(communityServiceProvider),
+    cacheService: ref.watch(feedCacheServiceProvider),
   );
 });
 
@@ -114,13 +122,18 @@ class LiveFeedFilters {
 }
 
 class LiveFeedController extends StateNotifier<LiveFeedState> {
-  LiveFeedController({required LiveFeedService feedService, required CommunityService communityService})
-      : _feedService = feedService,
+  LiveFeedController({
+    required LiveFeedService feedService,
+    required CommunityService communityService,
+    required FeedCacheService cacheService,
+  })  : _feedService = feedService,
         _communityService = communityService,
+        _cache = cacheService,
         super(const LiveFeedState(context: FeedContext.global));
 
   final LiveFeedService _feedService;
   final CommunityService _communityService;
+  final FeedCacheService _cache;
 
   Future<void> bootstrap({FeedContext? context, CommunitySummary? community}) async {
     await refresh(
@@ -131,25 +144,56 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
 
   Future<void> refresh({FeedContext? context, CommunitySummary? community, LiveFeedFilters? filters}) async {
     final nextContext = context ?? state.context;
+    final effectiveFilters = filters ?? state.filters;
     final resolvedCommunity = nextContext == FeedContext.community ? community ?? state.community : null;
-    state = state.copyWith(
+    final cached = _cache.loadSnapshot(
       context: nextContext,
-      community: resolvedCommunity,
-      filters: filters ?? state.filters,
-      loading: true,
-      page: 1,
-      clearError: true,
+      communityId: resolvedCommunity?.id,
+      range: effectiveFilters.range,
+      search: effectiveFilters.search,
+      postType: effectiveFilters.postType,
     );
+    var perPage = state.perPage;
+    if (cached != null) {
+      perPage = cached.snapshot.pagination.perPage;
+      state = state.copyWith(
+        context: nextContext,
+        community: resolvedCommunity,
+        filters: effectiveFilters,
+        loading: true,
+        entries: cached.snapshot.items,
+        snapshot: cached.snapshot,
+        page: cached.snapshot.pagination.page,
+        perPage: cached.snapshot.pagination.perPage,
+        canLoadMore: cached.snapshot.pagination.hasMore,
+        highlights: cached.snapshot.highlights,
+        analytics: cached.snapshot.analytics,
+        placements: cached.placements,
+        lastSyncedAt: cached.cachedAt,
+        analyticsLoading: cached.snapshot.analytics == null,
+        clearError: true,
+      );
+    } else {
+      state = state.copyWith(
+        context: nextContext,
+        community: resolvedCommunity,
+        filters: effectiveFilters,
+        loading: true,
+        page: 1,
+        perPage: perPage,
+        clearError: true,
+      );
+    }
 
     try {
       final snapshot = await _feedService.fetchFeed(
         context: nextContext,
         community: resolvedCommunity?.id,
         page: 1,
-        perPage: state.perPage,
-        range: state.filters.range,
-        search: state.filters.search,
-        postType: state.filters.postType,
+        perPage: perPage,
+        range: effectiveFilters.range,
+        search: effectiveFilters.search,
+        postType: effectiveFilters.postType,
       );
       final placements = await _resolvePlacements(snapshot);
       state = state.copyWith(
@@ -163,8 +207,10 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
         analytics: snapshot.analytics,
         placements: placements,
         lastSyncedAt: DateTime.now(),
+        filters: effectiveFilters,
         clearError: true,
       );
+      unawaited(_persistSnapshot());
       if (snapshot.analytics == null) {
         await reloadAnalytics();
       }
@@ -191,7 +237,9 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
       state = state.copyWith(
         analytics: analytics,
         analyticsLoading: false,
+        snapshot: state.snapshot?.copyWith(analytics: analytics),
       );
+      unawaited(_persistSnapshot());
     } catch (error, stackTrace) {
       debugPrint('Failed to fetch feed analytics: $error\n$stackTrace');
       state = state.copyWith(analyticsLoading: false);
@@ -214,7 +262,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
         search: state.filters.search,
         postType: state.filters.postType,
       );
-      final combined = <FeedEntry>[...state.entries, ...snapshot.items];
+      final combined = _mergeEntries(state.entries, snapshot.items);
       state = state.copyWith(
         entries: combined,
         page: snapshot.pagination.page,
@@ -227,6 +275,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
           analytics: state.analytics,
         ),
       );
+      unawaited(_persistSnapshot());
     } catch (error, stackTrace) {
       debugPrint('Failed to load more feed entries: $error\n$stackTrace');
       state = state.copyWith(
@@ -255,6 +304,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
       snapshot: state.snapshot?.copyWith(items: [entry, ...state.entries]),
       lastSyncedAt: DateTime.now(),
     );
+    unawaited(_persistSnapshot());
     if (state.context == FeedContext.community && state.community?.id != community.id) {
       await selectContext(FeedContext.community, community: community);
     }
@@ -307,6 +357,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
       snapshot: state.snapshot?.copyWith(items: updatedEntries),
       lastSyncedAt: DateTime.now(),
     );
+    unawaited(_persistSnapshot());
   }
 
   void _removePost({required String postId}) {
@@ -316,6 +367,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
       snapshot: state.snapshot?.copyWith(items: filtered),
       lastSyncedAt: DateTime.now(),
     );
+    unawaited(_persistSnapshot());
   }
 
   Future<List<FeedPlacement>> _resolvePlacements(FeedSnapshot snapshot) async {
@@ -368,5 +420,56 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
       return error.message ?? 'Network error';
     }
     return error.toString();
+  }
+
+  Future<void> _persistSnapshot() async {
+    final snapshot = state.snapshot;
+    if (snapshot == null) {
+      return;
+    }
+    await _cache.saveSnapshot(
+      context: state.context,
+      communityId: state.community?.id,
+      range: state.filters.range,
+      search: state.filters.search,
+      postType: state.filters.postType,
+      snapshot: snapshot,
+      placements: state.placements,
+    );
+  }
+
+  List<FeedEntry> _mergeEntries(List<FeedEntry> existing, List<FeedEntry> incoming) {
+    final Map<String, FeedEntry> merged = <String, FeedEntry>{};
+    var fallbackIndex = 0;
+
+    void addEntry(FeedEntry entry, {bool preferIncoming = false}) {
+      final key = _entryKey(entry) ?? 'anon-${fallbackIndex++}';
+      if (!merged.containsKey(key) || preferIncoming) {
+        merged[key] = entry;
+      }
+    }
+
+    for (final entry in existing) {
+      addEntry(entry);
+    }
+    for (final entry in incoming) {
+      addEntry(entry, preferIncoming: true);
+    }
+    return merged.values.toList(growable: false);
+  }
+
+  String? _entryKey(FeedEntry entry) {
+    if (entry.kind == FeedEntryKind.post && entry.post != null) {
+      final id = entry.post!.id;
+      if (id.isNotEmpty) {
+        return 'post:$id';
+      }
+    }
+    if (entry.kind == FeedEntryKind.ad && entry.ad != null) {
+      final ad = entry.ad!;
+      final placement = ad.placementId.isNotEmpty ? ad.placementId : ad.slot;
+      return 'ad:$placement:${ad.campaignId}:${ad.slot}';
+    }
+    return null;
   }
 }
