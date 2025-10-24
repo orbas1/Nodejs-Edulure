@@ -5,6 +5,7 @@ import db from '../config/database.js';
 import UserModel from '../models/UserModel.js';
 import UserProfileModel from '../models/UserProfileModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import UserRoleAssignmentModel from '../models/UserRoleAssignmentModel.js';
 
 const ALLOWED_ROLES = new Set(['user', 'instructor', 'admin', 'moderator', 'staff', 'service']);
 
@@ -26,6 +27,30 @@ function normaliseString(value) {
 function normaliseEmail(value) {
   const trimmed = normaliseString(value);
   return trimmed ? trimmed.toLowerCase() : null;
+}
+
+function normaliseRecoveryEmail(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  return normaliseEmail(value);
+}
+
+async function assertRecoveryEmailAvailable(email, excludeUserId, connection = db) {
+  if (!email) {
+    return;
+  }
+
+  const existing = await UserModel.findByRecoveryEmail(email, connection);
+  if (existing && existing.id !== excludeUserId) {
+    const error = new Error('Recovery email already in use');
+    error.status = 409;
+    error.field = 'recoveryEmail';
+    throw error;
+  }
 }
 
 function stripEmptyEntries(object) {
@@ -294,7 +319,7 @@ function parseSocialLinks(raw) {
     .filter((entry) => entry.url);
 }
 
-function composeUser(userRecord, profileRecord) {
+function composeUser(userRecord, profileRecord, assignments = []) {
   if (!userRecord) {
     return null;
   }
@@ -320,7 +345,8 @@ function composeUser(userRecord, profileRecord) {
     ...rest,
     twoFactorEnabled: Boolean(twoFactorEnabled),
     address: parseAddress(userRecord.address),
-    profile
+    profile,
+    roleAssignments: Array.isArray(assignments) ? assignments : []
   };
 }
 
@@ -381,7 +407,19 @@ export default class UserService {
 
     const profiles = await UserProfileModel.findByUserIds(users.map((user) => user.id));
     const profileMap = new Map(profiles.map((profile) => [profile.userId, profile]));
-    return users.map((user) => composeUser(user, profileMap.get(user.id)));
+    const assignments = await UserRoleAssignmentModel.listActiveByUserIds(
+      users.map((user) => user.id)
+    );
+    const assignmentMap = new Map();
+    for (const assignment of assignments) {
+      const list = assignmentMap.get(assignment.userId) ?? [];
+      list.push(assignment);
+      assignmentMap.set(assignment.userId, list);
+    }
+
+    return users.map((user) =>
+      composeUser(user, profileMap.get(user.id), assignmentMap.get(user.id) ?? [])
+    );
   }
 
   static async getById(id) {
@@ -392,7 +430,8 @@ export default class UserService {
       throw error;
     }
     const profile = await UserProfileModel.findByUserId(id);
-    return composeUser(user, profile);
+    const assignments = await UserRoleAssignmentModel.listActiveByUserId(id);
+    return composeUser(user, profile, assignments);
   }
 
   static async updateById(id, payload) {
@@ -438,7 +477,8 @@ export default class UserService {
         throw error;
       }
       const nextProfile = await UserProfileModel.findByUserId(id, trx);
-      return composeUser(nextUser, nextProfile);
+      const nextAssignments = await UserRoleAssignmentModel.listActiveByUserId(id, trx);
+      return composeUser(nextUser, nextProfile, nextAssignments);
     });
   }
 
@@ -465,6 +505,11 @@ export default class UserService {
         throw error;
       }
 
+      const recoveryEmail = normaliseRecoveryEmail(payload.recoveryEmail);
+      if (recoveryEmail) {
+        await assertRecoveryEmailAvailable(recoveryEmail, null, trx);
+      }
+
       const providedPassword = normaliseString(payload.password);
       const temporaryPassword = providedPassword && providedPassword.length >= 8 ? providedPassword : generateTemporaryPassword();
       const passwordHash = await bcrypt.hash(temporaryPassword, PASSWORD_SALT_ROUNDS);
@@ -481,6 +526,9 @@ export default class UserService {
       const twoFactorLastVerifiedAt = parseIsoDate(payload.twoFactorLastVerifiedAt, {
         fieldName: 'twoFactorLastVerifiedAt'
       });
+      const recoveryEmailVerifiedAt = parseIsoDate(payload.recoveryEmailVerifiedAt, {
+        fieldName: 'recoveryEmailVerifiedAt'
+      });
 
       if (payload.twoFactorEnabled && !twoFactorSecret) {
         const error = new Error('Two-factor secret is required when enabling two-factor authentication');
@@ -488,11 +536,16 @@ export default class UserService {
         throw error;
       }
 
+      const effectiveRecoveryEmail = recoveryEmail ?? null;
+      const effectiveRecoveryEmailVerifiedAt = effectiveRecoveryEmail ? recoveryEmailVerifiedAt ?? null : null;
+
       const createdUser = await UserModel.create(
         {
           firstName,
           lastName: normaliseString(payload.lastName),
           email,
+          recoveryEmail: effectiveRecoveryEmail,
+          recoveryEmailVerifiedAt: effectiveRecoveryEmailVerifiedAt,
           passwordHash,
           role: role ? role.toLowerCase() : 'user',
           age: payload.age ?? null,
@@ -505,13 +558,18 @@ export default class UserService {
         trx
       );
 
+      await UserRoleAssignmentModel.syncDefaultRole(createdUser.id, createdUser.role, trx, {
+        grantedBy: actor?.id ?? null
+      });
+
       let profileRecord = null;
       const profilePayload = normaliseProfileInput(payload.profile);
       if (profilePayload) {
         profileRecord = await UserProfileModel.upsert(createdUser.id, profilePayload, trx);
       }
 
-      const composed = composeUser(createdUser, profileRecord);
+      const assignments = await UserRoleAssignmentModel.listActiveByUserId(createdUser.id, trx);
+      const composed = composeUser(createdUser, profileRecord, assignments);
 
       await DomainEventModel.record(
         {
@@ -545,7 +603,8 @@ export default class UserService {
       }
 
       const existingProfile = await UserProfileModel.findByUserId(id, trx);
-      const before = composeUser(existing, existingProfile);
+      const existingAssignments = await UserRoleAssignmentModel.listActiveByUserId(id, trx);
+      const before = composeUser(existing, existingProfile, existingAssignments);
 
       const updates = {};
       let passwordUpdated = false;
@@ -578,6 +637,17 @@ export default class UserService {
         }
 
         updates.email = email;
+      }
+
+      if (payload.recoveryEmail !== undefined) {
+        const recoveryEmail = normaliseRecoveryEmail(payload.recoveryEmail);
+        if (recoveryEmail) {
+          await assertRecoveryEmailAvailable(recoveryEmail, id, trx);
+        }
+        updates.recoveryEmail = recoveryEmail ?? null;
+        if (recoveryEmail === null) {
+          updates.recoveryEmailVerifiedAt = null;
+        }
       }
 
       if (payload.role !== undefined) {
@@ -613,6 +683,13 @@ export default class UserService {
       });
       if (nextTwoFactorLastVerifiedAt !== undefined) {
         updates.twoFactorLastVerifiedAt = nextTwoFactorLastVerifiedAt;
+      }
+
+      const nextRecoveryEmailVerifiedAt = parseIsoDate(payload.recoveryEmailVerifiedAt, {
+        fieldName: 'recoveryEmailVerifiedAt'
+      });
+      if (nextRecoveryEmailVerifiedAt !== undefined) {
+        updates.recoveryEmailVerifiedAt = nextRecoveryEmailVerifiedAt;
       }
 
       if (payload.password !== undefined) {
@@ -667,7 +744,11 @@ export default class UserService {
 
       const refreshedUser = await UserModel.findById(id, trx);
       const refreshedProfile = await UserProfileModel.findByUserId(id, trx);
-      const composed = composeUser(refreshedUser, refreshedProfile);
+      await UserRoleAssignmentModel.syncDefaultRole(id, refreshedUser.role, trx, {
+        grantedBy: actor?.id ?? null
+      });
+      const refreshedAssignments = await UserRoleAssignmentModel.listActiveByUserId(id, trx);
+      const composed = composeUser(refreshedUser, refreshedProfile, refreshedAssignments);
 
       const changes = determineChangedFields(before, composed, {
         includePassword: passwordUpdated

@@ -1294,18 +1294,40 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Coordinate schema migrations, document rollbacks, and alert data teams.
 
 ### A38. Identity & Access Schema (5.A)
-- **Operational Depth:** Models enforce tenant scoping, MFA relationships, and role assignments.
-- **Gaps & Risks:** Index coverage missing on recovery email lookup; add migrations. Some foreign keys lack cascade rules.
-- **Resilience & Efficiency:** Optimise queries with composite indexes, maintain audit triggers, and version schema changes.
-- **UX & Communications:** Document ER diagrams, ensure schema docs mention retention policies.
-- **Change Management:** Run migration rehearsals, update ORM models, and notify security stakeholders.
+1. **Appraisal.** The identity schema now anchors around `users`, `user_sessions`, `user_two_factor_challenges`, and the newly provisioned `user_role_assignments` table introduced by `20250318120000_identity_access_schema_enhancements.js`, enabling granular tenant-scoped authorisation records alongside recovery metadata.
+2. **Functionality.** `UserModel` exposes recovery email fields, while `UserRoleAssignmentModel` and `UserService` coordinate automatic provisioning via `syncDefaultRole`, guaranteeing that every role mutation is mirrored in durable audit rows with expiry, revocation, and metadata channels.
+3. **Logic Usefulness.** Role assignment synchronisation ensures GraphQL and REST controllers can source consistent authorities without duplicating logic, and recovery email lookup paths now benefit from explicit unique indexes for password reset and support flows.
+4. **Redundancies.** Historic single-role storage on `users.role` is retained for backwards compatibility but now mirrors the assignment ledger; future refactors should deprecate duplicate role persistence to avoid drift between columns and ledger rows.
+5. **Placeholders or Non-working Functions.** Comprehensive bulk role orchestration helpers are not yet exposed; multi-tenant assignment management remains TODO pending admin tooling, and recovery-email verification messaging still lacks notification templates.
+6. **Duplicate Functions.** Email normalisation exists in both `UserModel` and `UserService`; consolidating into a shared utility will prevent regressions when validation rules evolve.
+7. **Improvements Needed.** Extend `syncDefaultRole` to capture actor context beyond IDs (e.g., service tokens), surface assignment history via reporting endpoints, and emit domain events for role grant/revoke operations to keep downstream systems in sync.
+8. **Styling Improvements.** Backend response payloads now include `roleAssignments`; API reference examples should be restyled to highlight assignment arrays distinctly from legacy `role` strings for clarity in docs and SDK typings.
+9. **Efficiency Analysis.** Composite indexes on `(user_id, tenant_id, role)` and dedicated recovery email uniqueness drastically reduce lookup scans, yet further batching for `listActiveByUserIds` could coalesce assignment hydration during bulk user listings.
+10. **Strengths to Keep.** Transactional updates now persist role assignments and profile updates atomically, preserving audit fidelity while new migrations enforce ON DELETE cascade semantics across identity artefacts.
+11. **Weaknesses to Remove.** The schema still lacks dedicated history tables for two-factor resets and recovery email verifications; consider journaling those events to close forensic gaps.
+12. **Styling & Colour Review Changes.** Update internal ERDs to colour-code identity tables (users, sessions, assignments) distinctly and document tenant scope legends so governance teams can interpret diagrams rapidly.
+13. **CSS, Orientation, Placement.** Although backend-only, admin UI designs should position role-assignment editors adjacent to recovery-email management to reflect coupled persistence semantics.
+14. **Text Analysis & Copy.** Revise security playbooks to explain the new `user_role_assignments` ledger, recovery email expectations, and replication guarantees; ensure support macros avoid ambiguous language about “primary email only”.
+15. **Change Checklist Tracker.** Track completion of the migration rollout, ORM updates (`UserModel`, `UserRoleAssignmentModel`, `UserService`), assignment hydration in list/get endpoints, and documentation refresh for recovery flows.
+16. **Full Upgrade Plan & Release Steps.** Step 1 deploy migration `20250318120000_identity_access_schema_enhancements.js`; Step 2 roll out backend code (`UserService`, models) with canary verification; Step 3 update API docs/SDKs to surface `roleAssignments`; Step 4 coordinate security communications and monitor role ledger growth.
 
 ### A39. Learning Content Schema (5.B)
-- **Operational Depth:** Defines courses, modules, lessons, assessments, and certificates with relational integrity.
-- **Gaps & Risks:** Lack of version tables for modules; introduce to capture history. Assessment question bank lacks unique constraints.
-- **Resilience & Efficiency:** Partition large tables, cache derived metrics, and enforce cascading deletes carefully.
-- **UX & Communications:** Provide schema diagrams to content teams, document naming conventions.
-- **Change Management:** Coordinate with content ops, rehearse migrations, and update analytics mappings.
+1. **Appraisal.** Course delivery now tracks snapshots through `course_module_versions` and formalises assessment items with `course_assessment_questions`, ensuring editorial history and evaluation content are first-class citizens.
+2. **Functionality.** `CourseModuleVersionModel` captures each module mutation with diffs and metadata, while `CourseAssessmentQuestionModel` enforces unique question identifiers per assignment and serialises options, answers, and metadata.
+3. **Logic Usefulness.** `CourseAssignmentModel.listByCourseIds` now enriches responses with `questionCount`, enabling dashboards to surface assessment coverage without expensive joins, and module updates automatically trigger version captures.
+4. **Redundancies.** Legacy ad-hoc assessment storage is superseded by the question bank; retire bespoke JSON blobs embedded in course metadata to prevent duplication and divergence.
+5. **Placeholders or Non-working Functions.** Question replacement API scaffolding (`replaceAssignmentQuestions`) currently deletes and reinserts records; future iterations should diff intelligently and preserve audit trails per item.
+6. **Duplicate Functions.** JSON parsing helpers are scattered across course models; consolidate into a shared serializer to maintain consistent handling of metadata and options across modules, lessons, and assessments.
+7. **Improvements Needed.** Wire module version history into instructor UI timelines, expose question bank CRUD endpoints, and integrate certificate issuance with the new assessment ledger for pass/fail audits.
+8. **Styling Improvements.** Update schema diagrams to highlight lineage between `course_modules`, `course_module_versions`, and `course_assessment_questions`, adopting consistent iconography for versioned versus transactional tables.
+9. **Efficiency Analysis.** Newly added indexes on `course_module_versions` (`module_id`, `version`) and `course_assessment_questions` (`assignment_id`, `position`) keep retrievals efficient, though bulk snapshot recording should batch writes when migrating legacy data.
+10. **Strengths to Keep.** The schema preserves cascading deletes to keep module versions and questions tidy when parent artefacts are removed, while diff payloads facilitate downstream analytics without reconstructing history manually.
+11. **Weaknesses to Remove.** Lesson entities still lack explicit version tracking; extend the versioning pattern to lessons and certificates to deliver end-to-end content provenance.
+12. **Styling & Colour Review Changes.** Learning ops documentation should colour-code assessment tables separately from content authoring tables, clarifying boundaries between static resources and evaluative instruments.
+13. **CSS, Orientation, Placement.** Update instructor dashboards to position question counts beside assignment cards and surface module revision timelines in a chronological layout, mirroring the new persistence model.
+14. **Text Analysis & Copy.** Revise course governance copy to communicate how question IDs remain stable across edits, and instruct authors on providing change reasons that feed `course_module_versions.change_reason`.
+15. **Change Checklist Tracker.** Track migration execution (`20250318121500_learning_content_schema_enhancements.js`), backfill validations, model integrations (`CourseModuleModel`, `CourseModuleVersionModel`, `CourseAssessmentQuestionModel`), and dashboard updates consuming question counts.
+16. **Full Upgrade Plan & Release Steps.** Step 1 apply migration enabling module versions and question bank; Step 2 hydrate historical data snapshots; Step 3 release backend services exposing new models; Step 4 update authoring tooling and analytics to consume revision timelines and assessment inventories.
 
 ### A40. Community, Social & Messaging Schema (5.C)
 - **Operational Depth:** Captures community metadata, events, posts, reactions, and direct messages.

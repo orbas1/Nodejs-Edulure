@@ -38,6 +38,8 @@ const BASE_COLUMNS = [
   'first_name as firstName',
   'last_name as lastName',
   'email',
+  'recovery_email as recoveryEmail',
+  'recovery_email_verified_at as recoveryEmailVerifiedAt',
   'role',
   'age',
   'address',
@@ -59,6 +61,17 @@ export default class UserModel {
     return connection('users').where({ email }).whereNull('deleted_at').first();
   }
 
+  static async findByRecoveryEmail(email, connection = db) {
+    if (!email) {
+      return null;
+    }
+    const normalised = typeof email === 'string' ? email.trim().toLowerCase() : email;
+    return connection('users')
+      .where({ recovery_email: normalised })
+      .whereNull('deleted_at')
+      .first();
+  }
+
   static async forUpdateByEmail(email, connection = db) {
     return connection('users').where({ email }).whereNull('deleted_at').forUpdate().first();
   }
@@ -68,6 +81,11 @@ export default class UserModel {
       first_name: user.firstName,
       last_name: user.lastName ?? null,
       email: user.email,
+      recovery_email:
+        user.recoveryEmail && typeof user.recoveryEmail === 'string'
+          ? user.recoveryEmail.trim().toLowerCase()
+          : user.recoveryEmail ?? null,
+      recovery_email_verified_at: user.recoveryEmailVerifiedAt ?? null,
       password_hash: user.passwordHash,
       role: user.role ?? 'user',
       age: user.age ?? null,
@@ -107,6 +125,15 @@ export default class UserModel {
     }
     if (updates.email !== undefined) {
       payload.email = updates.email ?? null;
+    }
+    if (updates.recoveryEmail !== undefined) {
+      payload.recovery_email =
+        updates.recoveryEmail && typeof updates.recoveryEmail === 'string'
+          ? updates.recoveryEmail.trim().toLowerCase()
+          : updates.recoveryEmail ?? null;
+    }
+    if (updates.recoveryEmailVerifiedAt !== undefined) {
+      payload.recovery_email_verified_at = updates.recoveryEmailVerifiedAt ?? null;
     }
     if (updates.role !== undefined) {
       payload.role = updates.role ?? 'user';

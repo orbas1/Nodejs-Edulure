@@ -36,8 +36,8 @@
       - 4.D Moderation Follow-Up Job (`moderationFollowUpJob.js`)
       - 4.E Monetization Reconciliation Job (`monetizationReconciliationJob.js`)
       - 4.F Telemetry Warehouse Job (`telemetryWarehouseJob.js`)
-      - 5.A Identity & Access Schema (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
-      - 5.B Learning Content Schema (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
+      - ✅ 5.A Identity & Access Schema — Annex A38, Annex B1 (B1.B) (`models/UserModel.js`, `models/UserSessionModel.js`, `models/TwoFactorChallengeModel.js`, `models/UserRoleAssignmentModel.js`, `migrations/*user*`)
+      - ✅ 5.B Learning Content Schema — Annex A39, Annex B2 (`models/CourseModel.js`, `models/LessonModel.js`, `models/ModuleModel.js`, `models/AssessmentModel.js`, `models/CertificateModel.js`, `migrations/*course*`)
       - 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
       - 5.D Commerce & Finance Schema (`models/InvoiceModel.js`, `models/SubscriptionModel.js`, `models/PaymentAttemptModel.js`, `models/EscrowPayoutModel.js`, `models/CommunityDonationModel.js`, `migrations/*billing*`, `migrations/*finance*`)
       - 5.E Analytics, Governance & Observability Schema (`models/AnalyticsAlertModel.js`, `models/TelemetryExportModel.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`, `migrations/*analytics*`, `migrations/*governance*`)
@@ -114,10 +114,10 @@
       - A56. Strategy, Valuation & Stakeholder Communication (9.D)
       - B1. Backend Identity & Security Cluster
          - B1.A. Authentication & Session Flow (`backend-nodejs/src/controllers/auth`, `services/auth`, `middleware/sessionGuard.js`)
-         - B1.B. Authorization & Role Management (`backend-nodejs/src/services/authorization`, `database/migrations/*roles*`)
+         - ✅ B1.B. Authorization & Role Management (`backend-nodejs/src/services/authorization`, `database/migrations/*roles*`)
       - B2. Backend Learning Delivery Cluster
-         - B2.A. Course Authoring & Lesson Orchestration (`backend-nodejs/src/controllers/lessons`, `services/lessons`, `models/Lesson.ts`)
-         - B2.B. Assessment Engine (`backend-nodejs/src/services/assessments`, `routes/assessments.js`, `frontend-reactjs/src/pages/assessments`)
+         - ✅ B2.A. Course Authoring & Lesson Orchestration (`backend-nodejs/src/controllers/lessons`, `services/lessons`, `models/Lesson.ts`)
+         - ✅ B2.B. Assessment Engine (`backend-nodejs/src/services/assessments`, `routes/assessments.js`, `frontend-reactjs/src/pages/assessments`)
       - B3. Backend Community & Engagement Cluster
          - B3.A. Community Feed & Posts (`backend-nodejs/src/controllers/feed`, `services/feed`, `frontend-reactjs/src/pages/community/Feed.jsx`)
          - B3.B. Leaderboards & Recognition (`backend-nodejs/src/services/leaderboard`, `frontend-reactjs/src/pages/community/Leaderboard.jsx`)

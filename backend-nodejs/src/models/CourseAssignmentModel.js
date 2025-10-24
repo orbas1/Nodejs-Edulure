@@ -50,7 +50,25 @@ export default class CourseAssignmentModel {
       .orderBy('course_id', 'asc')
       .orderBy('module_id', 'asc')
       .orderBy('id', 'asc');
-    return rows.map((row) => this.deserialize(row));
+    const assignmentIds = rows.map((row) => row.id);
+    let counts = [];
+    if (assignmentIds.length) {
+      counts = await connection('course_assessment_questions')
+        .select('assignment_id')
+        .count({ total: '*' })
+        .whereIn('assignment_id', assignmentIds)
+        .groupBy('assignment_id');
+    }
+
+    const countMap = new Map(
+      counts.map((row) => [row.assignment_id ?? row.assignmentId, Number(row.total ?? 0)])
+    );
+
+    return rows.map((row) => {
+      const record = this.deserialize(row);
+      record.questionCount = countMap.get(row.id) ?? 0;
+      return record;
+    });
   }
 
   static deserialize(record) {
