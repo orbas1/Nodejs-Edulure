@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   ArrowTopRightOnSquareIcon,
@@ -60,6 +60,7 @@ MetricTile.defaultProps = {
 export default function ExplorerPreviewDrawer({ open, onClose, hit, entityType }) {
   const containerRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const [shareStatus, setShareStatus] = useState('idle');
   useFocusTrap(containerRef, { enabled: open, initialFocus: closeButtonRef });
 
   useEffect(() => {
@@ -72,6 +73,12 @@ export default function ExplorerPreviewDrawer({ open, onClose, hit, entityType }
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) {
+      setShareStatus('idle');
+    }
+  }, [open]);
 
   useEffect(() => {
     if (open && hit) {
@@ -98,6 +105,19 @@ export default function ExplorerPreviewDrawer({ open, onClose, hit, entityType }
     hit.url ??
     hit.permalink ??
     (hit.slug ? `/${entityType}/${hit.slug}` : null);
+
+  const handleCopyLink = async () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const shareUrl = targetHref ? new URL(targetHref, window.location.origin).toString() : window.location.href;
+      await navigator.clipboard.writeText(shareUrl);
+      setShareStatus('copied');
+      setTimeout(() => setShareStatus('idle'), 3000);
+    } catch (error) {
+      console.warn('Unable to copy explorer link', error);
+      setShareStatus('error');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-slate-900/40 backdrop-blur-sm" role="dialog" aria-modal="true">
@@ -185,6 +205,24 @@ export default function ExplorerPreviewDrawer({ open, onClose, hit, entityType }
               <ArrowTopRightOnSquareIcon className="h-4 w-4" />
             </a>
           ) : null}
+
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+          >
+            Share quick link
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              {shareStatus === 'copied' ? 'Copied' : shareStatus === 'error' ? 'Retry' : 'Copy'}
+            </span>
+          </button>
+          <span className="sr-only" aria-live="polite">
+            {shareStatus === 'copied'
+              ? 'Link copied to clipboard'
+              : shareStatus === 'error'
+                ? 'Unable to copy link'
+                : ''}
+          </span>
 
           {primaryAction && (!targetHref || primaryAction.href !== targetHref) ? (
             <a

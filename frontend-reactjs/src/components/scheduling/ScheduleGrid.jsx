@@ -11,6 +11,10 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
   day: 'numeric'
 });
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, {
+  numeric: 'auto'
+});
+
 function createTimeFormatter(timezone) {
   try {
     return new Intl.DateTimeFormat(undefined, {
@@ -34,16 +38,21 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function formatRange(start, end, timezone) {
+function formatRange(start, end, eventTimezone, viewerTimezone) {
   const startDate = toDate(start);
   const endDate = toDate(end);
   if (!startDate && !endDate) {
-    return 'Schedule TBC';
+    return { label: 'Schedule TBC', secondary: null };
   }
 
-  const timeFormatter = createTimeFormatter(timezone);
-  if (!endDate) {
-    return `${dateFormatter.format(startDate)} • ${timeFormatter.format(startDate)}`;
+  const displayTimezone = viewerTimezone || eventTimezone;
+  const timeFormatter = createTimeFormatter(displayTimezone);
+  let label = 'Schedule TBC';
+
+  if (!startDate) {
+    label = `Until ${dateFormatter.format(endDate)}`;
+  } else if (!endDate) {
+    label = `${dateFormatter.format(startDate)} • ${timeFormatter.format(startDate)}`;
   }
 
   const sameDay =
@@ -52,11 +61,66 @@ function formatRange(start, end, timezone) {
     startDate.getMonth() === endDate.getMonth() &&
     startDate.getDate() === endDate.getDate();
 
-  if (sameDay) {
-    return `${dateFormatter.format(startDate)} • ${timeFormatter.format(startDate)} – ${timeFormatter.format(endDate)}`;
+  if (startDate && endDate) {
+    if (sameDay) {
+      label = `${dateFormatter.format(startDate)} • ${timeFormatter.format(startDate)} – ${timeFormatter.format(endDate)}`;
+    } else {
+      label = `${dateFormatter.format(startDate)} → ${dateFormatter.format(endDate)}`;
+    }
   }
 
-  return `${dateFormatter.format(startDate)} → ${dateFormatter.format(endDate)}`;
+  let secondary = null;
+  if (eventTimezone && viewerTimezone && eventTimezone !== viewerTimezone && startDate) {
+    const eventFormatter = createTimeFormatter(eventTimezone);
+    if (!endDate) {
+      secondary = `${dateFormatter.format(startDate)} • ${eventFormatter.format(startDate)} (${eventTimezone})`;
+    } else if (sameDay) {
+      secondary = `${eventFormatter.format(startDate)} – ${eventFormatter.format(endDate)} (${eventTimezone})`;
+    } else {
+      secondary = `${dateFormatter.format(startDate)} → ${dateFormatter.format(endDate)} (${eventTimezone})`;
+    }
+  }
+
+  return { label, secondary };
+}
+
+function selectRelativeUnit(diffMs) {
+  const abs = Math.abs(diffMs);
+  if (abs < 3600000) {
+    return { unit: 'minute', value: Math.round(diffMs / 60000) };
+  }
+  if (abs < 86400000) {
+    return { unit: 'hour', value: Math.round(diffMs / 3600000) };
+  }
+  return { unit: 'day', value: Math.round(diffMs / 86400000) };
+}
+
+function formatRelativeLabel(start, end) {
+  const now = Date.now();
+  const startDate = toDate(start);
+  const endDate = toDate(end);
+  if (startDate && endDate && now >= startDate.getTime() && now <= endDate.getTime()) {
+    return 'Live now';
+  }
+  if (startDate) {
+    const diff = startDate.getTime() - now;
+    const { unit, value } = selectRelativeUnit(diff);
+    if (value === 0) {
+      return diff >= 0 ? 'Starting now' : 'Started moments ago';
+    }
+    const formatted = relativeTimeFormatter.format(value, unit);
+    return diff >= 0 ? `Starts ${formatted}` : `Started ${formatted}`;
+  }
+  if (endDate) {
+    const diff = endDate.getTime() - now;
+    const { unit, value } = selectRelativeUnit(diff);
+    if (value === 0) {
+      return diff >= 0 ? 'Ending now' : 'Ended moments ago';
+    }
+    const formatted = relativeTimeFormatter.format(value, unit);
+    return diff >= 0 ? `Ends ${formatted}` : `Ended ${formatted}`;
+  }
+  return null;
 }
 
 function resolveOccupancy(occupancy = {}) {
@@ -80,7 +144,13 @@ function resolveAttendance(attendance = {}) {
   return `${total} checkpoint${total === 1 ? '' : 's'} • ${label}`;
 }
 
-export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessions scheduled', showAttendance = true }) {
+export default function ScheduleGrid({
+  events,
+  onSelect,
+  emptyLabel = 'No sessions scheduled',
+  showAttendance = true,
+  viewerTimezone
+}) {
   if (!Array.isArray(events) || events.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
@@ -92,11 +162,12 @@ export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessio
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {events.map((event) => {
-        const scheduleLabel = formatRange(event.startAt, event.endAt, event.timezone);
+        const scheduleInfo = formatRange(event.startAt, event.endAt, event.timezone, viewerTimezone);
         const occupancyLabel = resolveOccupancy(event.occupancy);
         const attendanceLabel = resolveAttendance(event.attendance);
         const status = event.status ? String(event.status).toLowerCase() : 'scheduled';
         const stage = event.stage ?? 'Live classroom';
+        const relativeLabel = formatRelativeLabel(event.startAt, event.endAt);
         const Wrapper = onSelect ? 'button' : 'div';
         const wrapperProps = onSelect
           ? {
@@ -104,6 +175,15 @@ export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessio
               onClick: () => onSelect(event)
             }
           : {};
+        const statusTone =
+          status === 'live'
+            ? 'bg-emerald-100 text-emerald-700'
+            : status === 'completed'
+              ? 'bg-slate-100 text-slate-600'
+              : status === 'cancelled'
+                ? 'bg-rose-100 text-rose-600'
+                : 'bg-primary/10 text-primary';
+        const ariaLabel = `${event.title ?? 'Scheduled session'} on ${scheduleInfo.label}`;
 
         return (
           <Wrapper
@@ -114,6 +194,7 @@ export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessio
                 ? 'hover:border-primary hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
                 : ''
             }`}
+            aria-label={ariaLabel}
           >
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-3">
@@ -121,26 +202,24 @@ export default function ScheduleGrid({ events, onSelect, emptyLabel = 'No sessio
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{stage}</p>
                   <p className="mt-1 text-base font-semibold text-slate-900">{event.title ?? 'Scheduled session'}</p>
                 </div>
-                <span
-                  className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                    status === 'live'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : status === 'completed'
-                        ? 'bg-slate-100 text-slate-600'
-                        : 'bg-primary/10 text-primary'
-                  }`}
-                >
+                <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusTone}`}>
                   {status}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-600">
                 <CalendarDaysIcon className="h-4 w-4 text-primary" aria-hidden="true" />
-                <span>{scheduleLabel}</span>
+                <span>{scheduleInfo.label}</span>
               </div>
-              {event.timezone && (
+              {scheduleInfo.secondary ? (
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <ClockIcon className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                  <span>{event.timezone}</span>
+                  <span>{scheduleInfo.secondary}</span>
+                </div>
+              ) : null}
+              {relativeLabel ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <ClockIcon className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                  <span>{relativeLabel}</span>
                 </div>
               )}
             </div>
@@ -185,5 +264,14 @@ ScheduleGrid.propTypes = {
   ),
   onSelect: PropTypes.func,
   emptyLabel: PropTypes.string,
-  showAttendance: PropTypes.bool
+  showAttendance: PropTypes.bool,
+  viewerTimezone: PropTypes.string
+};
+
+ScheduleGrid.defaultProps = {
+  events: [],
+  onSelect: null,
+  emptyLabel: 'No sessions scheduled',
+  showAttendance: true,
+  viewerTimezone: null
 };

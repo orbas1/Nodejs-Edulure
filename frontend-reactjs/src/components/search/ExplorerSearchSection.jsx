@@ -243,6 +243,15 @@ export default function ExplorerSearchSection({
       .filter(Boolean);
   }, [analytics]);
 
+  const highlightInsight = useMemo(() => {
+    if (!facetEntries.length) return null;
+    const primaryFacet = facetEntries[0];
+    if (!primaryFacet?.values?.length) return null;
+    const topValue = primaryFacet.values[0];
+    const label = topValue.label.replace(/_/g, ' ');
+    return `${topValue.count} results match ${label}`;
+  }, [facetEntries]);
+
   const handleSubmit = (event) => {
     event.preventDefault();
     setQuery(queryDraft.trim());
@@ -454,10 +463,17 @@ export default function ExplorerSearchSection({
           />
         </div>
 
+        {highlightInsight ? (
+          <div className="rounded-3xl border border-emerald-100 bg-emerald-50/80 p-5 text-sm text-emerald-700 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Discovery insight</p>
+            <p className="mt-2 font-semibold">{highlightInsight}</p>
+          </div>
+        ) : null}
+
         {error ? (
           <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-600" role="alert">
             {error}
-            </div>
+          </div>
           ) : null}
 
         {loading && !results.length ? (
