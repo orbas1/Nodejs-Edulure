@@ -467,7 +467,7 @@
         14. **Text Analysis.** Copy references Annex linkages (C5 invite governance, C6 approvals, C7 compliance telemetry) and maintains action-oriented language consistent with legal tone-of-voice guidelines.
         15. **Change Checklist Tracker.** `docs/compliance/legal-release-checklist.md` enumerates release tasks, QA steps, and rollback considerations for legal updates.
         16. **Full Upgrade Plan & Release Steps.** Validate DSAR metrics in dashboards, run backend compliance tests, review structured data, publish updated docs, and coordinate announcements with legal/compliance leads.
-        17. **Back-end Integration.** `ComplianceService` now enriches DSR records with `dueInHours` and `deadlineState`, `complianceHttpRoutes.test.js` asserts the fields, and the Legal Contact page routes stakeholders to the correct compliance workflows.
+        17. **Back-end Integration.** `ComplianceService` now enriches DSR records with `dueInHours` and `deadlineState`, `DataSubjectRequestModel` persists assignment/resolution history aligned with the Annex migrations, `001_bootstrap.js` seeds showcase the metadata shape, `complianceHttpRoutes.test.js` asserts the fields, and the Legal Contact page routes stakeholders to the correct compliance workflows.
 2. Part 2 — User Experience Audit & Component Breakdown
       - ✓ 1.A Entrypoints & Layout Containers
          - 1.A.1 AdminShell (frontend-reactjs/src/layouts/AdminShell.jsx)
