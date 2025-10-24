@@ -4,13 +4,70 @@ import { NavLink } from 'react-router-dom';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import { Menu, Transition } from '@headlessui/react';
 
+const badgeShape = PropTypes.oneOfType([
+  PropTypes.string,
+  PropTypes.shape({
+    label: PropTypes.node,
+    tone: PropTypes.oneOf(['info', 'notice', 'success', 'alert', 'critical'])
+  })
+]);
+
 const itemShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
   name: PropTypes.string.isRequired,
   to: PropTypes.string.isRequired,
   icon: PropTypes.elementType,
-  end: PropTypes.bool
+  end: PropTypes.bool,
+  badge: badgeShape
 });
+
+function resolveBadge(badge) {
+  if (!badge) {
+    return null;
+  }
+  if (typeof badge === 'string') {
+    return { label: badge, tone: 'notice' };
+  }
+  return {
+    label: badge.label ?? null,
+    tone: badge.tone ?? 'notice'
+  };
+}
+
+function toneToClassName(tone) {
+  switch (tone) {
+    case 'critical':
+      return 'bg-rose-100 text-rose-700';
+    case 'alert':
+      return 'bg-amber-100 text-amber-700';
+    case 'success':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'notice':
+      return 'bg-sky-100 text-sky-700';
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
+}
+
+function Badge({ badge }) {
+  const resolved = resolveBadge(badge);
+  if (!resolved?.label) {
+    return null;
+  }
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${toneToClassName(resolved.tone)}`}>
+      {resolved.label}
+    </span>
+  );
+}
+
+Badge.propTypes = {
+  badge: badgeShape
+};
+
+Badge.defaultProps = {
+  badge: null
+};
 
 function DrawerSection({ section, isOpen, onToggle, onNavigate }) {
   return (
@@ -57,8 +114,11 @@ function DrawerSection({ section, isOpen, onToggle, onNavigate }) {
                     }`
                   }
                 >
-                  {Icon ? <Icon className="h-4 w-4 text-slate-400" aria-hidden="true" /> : null}
-                  <span>{child.name}</span>
+                  <span className="flex flex-1 items-center gap-2">
+                    {Icon ? <Icon className="h-4 w-4 text-slate-400" aria-hidden="true" /> : null}
+                    <span className="flex-1 truncate">{child.name}</span>
+                    <Badge badge={child.badge} />
+                  </span>
                 </NavLink>
               </li>
             );
@@ -74,6 +134,7 @@ DrawerSection.propTypes = {
     id: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired,
     icon: PropTypes.elementType,
+    badge: badgeShape,
     children: PropTypes.arrayOf(itemShape).isRequired
   }).isRequired,
   isOpen: PropTypes.bool.isRequired,
@@ -111,7 +172,10 @@ function CollapsedDrawerSection({ section, onNavigate }) {
         leaveTo="transform scale-95 opacity-0"
       >
         <Menu.Items className="absolute left-full top-1/2 z-50 w-64 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-3 text-sm shadow-2xl focus:outline-none">
-          <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{section.name}</p>
+          <div className="flex items-center justify-between gap-2 px-2 pb-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{section.name}</p>
+            <Badge badge={section.badge} />
+          </div>
           <div className="flex flex-col gap-1">
             {section.children.map((child) => {
               const ChildIcon = child.icon;
@@ -135,8 +199,11 @@ function CollapsedDrawerSection({ section, onNavigate }) {
                         }`
                       }
                     >
-                      {ChildIcon ? <ChildIcon className="h-4 w-4 text-slate-400" aria-hidden="true" /> : null}
-                      <span>{child.name}</span>
+                      <span className="flex flex-1 items-center gap-2">
+                        {ChildIcon ? <ChildIcon className="h-4 w-4 text-slate-400" aria-hidden="true" /> : null}
+                        <span className="flex-1 truncate">{child.name}</span>
+                        <Badge badge={child.badge} />
+                      </span>
                     </NavLink>
                   )}
                 </Menu.Item>
@@ -154,6 +221,7 @@ CollapsedDrawerSection.propTypes = {
     id: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired,
     icon: PropTypes.elementType,
+    badge: badgeShape,
     children: PropTypes.arrayOf(itemShape).isRequired
   }).isRequired,
   onNavigate: PropTypes.func

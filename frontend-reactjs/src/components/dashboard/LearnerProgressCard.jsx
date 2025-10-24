@@ -15,6 +15,27 @@ function formatProgressLabel(value) {
   return `${Math.max(0, Math.min(100, Math.round(numeric)))}% complete`;
 }
 
+const statusToneClass = {
+  info: 'bg-sky-100 text-sky-700',
+  notice: 'bg-slate-100 text-slate-600',
+  success: 'bg-emerald-100 text-emerald-700',
+  warning: 'bg-amber-100 text-amber-700',
+  danger: 'bg-rose-100 text-rose-700'
+};
+
+function normaliseStatus(status) {
+  if (!status) {
+    return null;
+  }
+  if (typeof status === 'string') {
+    return { label: status, tone: 'info' };
+  }
+  return {
+    label: status.label ?? null,
+    tone: status.tone ?? 'info'
+  };
+}
+
 export default function LearnerProgressCard({
   title,
   status,
@@ -29,10 +50,11 @@ export default function LearnerProgressCard({
   meta,
   loading,
   className,
+  streaming,
   children
 }) {
   if (loading) {
-    return <SkeletonPanel className={className} />;
+    return <SkeletonPanel className={className} streaming />;
   }
 
   const cardClassName = clsx(
@@ -44,24 +66,42 @@ export default function LearnerProgressCard({
   );
 
   const resolvedNextLabel = nextLabel || goal?.nextStep || null;
-  const resolvedGoalStatus = goal?.statusLabel || goal?.status || null;
+  const resolvedGoalStatus = normaliseStatus(goal?.status ?? goal?.statusLabel ?? null);
   const resolvedGoalDue = goal?.dueLabel || goal?.dueDate || null;
+  const resolvedStatus = normaliseStatus(status);
+  const assistiveText = meta?.assistiveText ?? null;
+  const timestampLabel = meta?.timestampLabel ?? null;
 
   return (
     <article className={cardClassName}>
       <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="dashboard-kicker text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {status ?? 'Active program'}
-          </p>
-          <h3 className="mt-1 text-lg font-semibold text-slate-900">{title}</h3>
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {resolvedStatus?.label ? (
+              <span
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold ${
+                  statusToneClass[resolvedStatus.tone] ?? statusToneClass.info
+                }`}
+              >
+                {streaming ? <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current" aria-hidden="true" /> : null}
+                {resolvedStatus.label}
+              </span>
+            ) : (
+              <p className="dashboard-kicker text-xs font-semibold uppercase tracking-wide text-slate-500">Active program</p>
+            )}
+            {resolvedGoalStatus?.label ? (
+              <span
+                className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${
+                  statusToneClass[resolvedGoalStatus.tone] ?? statusToneClass.success
+                }`}
+              >
+                {resolvedGoalStatus.label}
+              </span>
+            ) : null}
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
           {instructor ? <p className="text-sm text-slate-600">With {instructor}</p> : null}
         </div>
-        {resolvedGoalStatus ? (
-          <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            {resolvedGoalStatus}
-          </span>
-        ) : null}
       </header>
 
       <div className="space-y-3">
@@ -88,9 +128,7 @@ export default function LearnerProgressCard({
 
       {(primaryAction || secondaryAction) && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {primaryAction ? (
-            <ActionButton action={primaryAction} variant="primary" />
-          ) : null}
+          {primaryAction ? <ActionButton action={primaryAction} variant="primary" /> : null}
           {secondaryAction ? <ActionButton action={secondaryAction} variant="ghost" /> : null}
         </div>
       )}
@@ -112,9 +150,11 @@ export default function LearnerProgressCard({
 
       {children}
 
-      {meta?.lastUpdatedLabel ? (
-        <footer className="text-right text-xs text-slate-400">
-          Updated {meta.lastUpdatedLabel}
+      {(assistiveText || meta?.lastUpdatedLabel || timestampLabel) ? (
+        <footer className="mt-1 space-y-1 text-right text-xs text-slate-400">
+          {assistiveText ? <p className="text-left text-[11px] uppercase tracking-wide text-slate-400">{assistiveText}</p> : null}
+          {meta?.lastUpdatedLabel ? <p>Updated {meta.lastUpdatedLabel}</p> : null}
+          {timestampLabel ? <p>{timestampLabel}</p> : null}
         </footer>
       ) : null}
     </article>
@@ -146,13 +186,31 @@ function ActionButton({ action, variant }) {
 
 LearnerProgressCard.propTypes = {
   title: PropTypes.string.isRequired,
-  status: PropTypes.string,
+  status: PropTypes.oneOfType([
+    PropTypes.string,
+    PropTypes.shape({
+      label: PropTypes.node,
+      tone: PropTypes.oneOf(['info', 'notice', 'success', 'warning', 'danger'])
+    })
+  ]),
   instructor: PropTypes.string,
   progressPercent: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   nextLabel: PropTypes.string,
   goal: PropTypes.shape({
-    statusLabel: PropTypes.string,
-    status: PropTypes.string,
+    statusLabel: PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.shape({
+        label: PropTypes.node,
+        tone: PropTypes.oneOf(['info', 'notice', 'success', 'warning', 'danger'])
+      })
+    ]),
+    status: PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.shape({
+        label: PropTypes.node,
+        tone: PropTypes.oneOf(['info', 'notice', 'success', 'warning', 'danger'])
+      })
+    ]),
     dueLabel: PropTypes.string,
     dueDate: PropTypes.string,
     nextStep: PropTypes.string,
@@ -180,10 +238,13 @@ LearnerProgressCard.propTypes = {
     })
   }),
   meta: PropTypes.shape({
-    lastUpdatedLabel: PropTypes.string
+    lastUpdatedLabel: PropTypes.string,
+    assistiveText: PropTypes.node,
+    timestampLabel: PropTypes.string
   }),
   loading: PropTypes.bool,
   className: PropTypes.string,
+  streaming: PropTypes.bool,
   children: PropTypes.node
 };
 
@@ -200,6 +261,7 @@ LearnerProgressCard.defaultProps = {
   meta: null,
   loading: false,
   className: '',
+  streaming: false,
   children: null
 };
 

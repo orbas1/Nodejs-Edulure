@@ -382,14 +382,70 @@
          - 3.C.2 SocialSignOn (frontend-reactjs/src/components/SocialSignOn.jsx)
          - 3.C.3 AuthForm (frontend-reactjs/src/components/auth/AuthForm.jsx)
          - 3.C.4 FormStepper (frontend-reactjs/src/components/forms/FormStepper.jsx)
-      - 4.A Dashboard Overview & Switcher Pages
+      - ✓ 4.A Dashboard Overview & Switcher Pages — Annex A18 (Learner Dashboard & Insights)
+        1. **Appraisal.** Bookings, ebooks, affiliate, assessments, inbox, and course viewer routes now boot through `useDashboardSurface.js` plus `DashboardSwitcherHeader.jsx`, ensuring every overview inherits the user_experience.md guidance on shared scaffolding, metadata slots, and hook-based analytics.
+        2. **Functionality.** Each switcher calls `trackView` on mount, wires `trackAction` to important CTAs, and exposes a consistent `refresh` handler so stale flags, pending counters, and role-driven copy hydrate from the surface registry without per-screen plumbing.
+        3. **Usefulness.** `DashboardSwitcherHeader` renders last-synced timestamps, service health, offline tones, and micro-metrics sourced from `surface.metrics`, letting operators prioritise follow-up before digging into tabular modules or modals.
+        4. **Redundancies.** Legacy hero blocks, ad-hoc analytics, and bespoke timestamp ribbons were removed; the hook now owns surface hydration, thereby aligning with user_experience.md mandates against duplicate state orchestration.
+        5. **Placeholders.** Role fallbacks (e.g., when an admin views learner-only screens) route through `DashboardStateMessage.jsx` with assistive text and badge props so empty shells remain instructive rather than silent gaps.
+        6. **Duplicates.** `CourseViewer.jsx`, `DashboardInbox.jsx`, and each switcher import the shared header, keeping typography, badge geometry, and CTA placement identical to the canonical layout enumerated in user_experience.md Section 4.
+        7. **Improvements Needed.** Course viewer still lacks downloadable lesson packs and collaborative note-taking; those Annex follow-ons will plug into the hook-provided `surface` context to broadcast new states once delivered.
+        8. **Styling.** Header status chips honour the emerald/amber/rose gradient pairings described in user_experience.md, pairing tone tokens with `dashboard-pill` classes so urgency semantics stay consistent across surfaces and navigation.
+        9. **Efficiency.** `CourseViewer.jsx` memoises sanitised workspace URLs via the `URL` constructor and resolves Learnspace origins once per course, preventing repeated string parsing on re-renders.
+        10. **Strengths.** `handleRefresh` couples dashboard `refresh` with `useLearnerProgress` reloads, keeping lesson progress charts, next-step prompts, and header timestamps in sync—mirroring the “paired data refresh” pattern in user_experience.md.
+        11. **Weaknesses.** Inbox moderation still performs linear filtering for large queues; pagination and saved filters remain backlog tasks even though the foundation now tracks view/load metrics for future optimisation.
+        12. **Palette.** Headers inherit the muted slate shell background while primary signal chips lean on the success/notice/alert scheme mandated by user_experience.md, matching AppSidebar badges and Field Service statuses.
+        13. **Layout.** Responsive gap utilities guarantee header metrics, action rows, and stream indicators maintain the documented 24px rhythm from mobile through desktop breakpoints.
+        14. **Text.** CTA copy references explicit actions (“Refresh dashboards”, “Switch to an eligible Learnspace”, “Launch Learnspace securely”), aligning with the UX tone matrix instead of generic “Try again” verbiage.
+        15. **Spacing.** Header clusters lock to 8px/16px spacing increments, which prevents jagged stacking when metric pills wrap and honours the density rulesets captured in user_experience.md Annex A18.
+        16. **Shape.** Pill buttons (“Launch Learnspace”, “Back to courses”) reuse dashboard pill tokens with focus-visible outlines, satisfying the rounded geometry guidelines and accessible focus cues documented for dashboards.
+        17. **Effects.** Streaming states light up with pulse indicators and skeleton shimmer classes, giving near-real-time feedback as inbox threads or learner progress hydrate without diverging from shared animation tokens.
+        18. **Thumbs.** `DashboardInbox.jsx` surfaces offline/online badges, uses `DashboardActionFeedback` to persist toasts, and pipes realtime connection events to the header so operations staff remain informed as mandated for Annex C1.
+        19. **Media.** Course viewer launches validated workspace URLs in new tabs with `noopener` guards and rejects unsafe schemes, closing the security gap noted in user_experience.md while preserving keyboard focus hints.
+        20. **Buttons.** Shared `refresh` callbacks and `trackAction('launch_workspace')` instrumentation ensure telemetry remains consistent and deduplicated across switcher buttons and inline CTAs.
+        21. **Interact.** Inbox composer shortcuts (Enter to send) and thread filters remain intact while now reporting actions through the hook, providing analytics coverage without sacrificing expected behaviour.
+        22. **Missing.** Affiliate and assessments switchers still await deeper analytics/insights cards; their layout now reserves header metric slots and tone-aware CTAs for upcoming Annex C6/C3 stories.
+        23. **Design.** The header stacks hero copy, status chips, and metric pills in a single reusable component so forthcoming surfaces (communities, operations) can plug in without recalculating layout maths.
+        24. **Clone.** `useDashboardSurface` centralises stale detection, metrics, and analytics wiring keyed on IDs (`bookings`, `ebooks`, `course-viewer`, `inbox`), eliminating the clone risk flagged in user_experience.md.
+        25. **Framework.** `lib/analytics.js` exports `trackDashboardSurfaceAction` and related helpers so launches, refreshes, and modal interactions flow through a unified analytics surface schema.
+        26. **Checklist.** Regression passes should cover Learnspace launch guards, offline/online inbox copy, stale badge transitions, and role-based switcher gating, followed by the targeted Vitest suite once tooling is available.
+        27. **Nav.** Sidebar badges and drawer navigation now consume the same surface registry data (via `statusByRoute`), making navigation chips and header metrics agree on queue counts and service tone.
+        28. **Release.** Shipping Annex A18 requires migrating straggling dashboard routes to the hook/header duo, executing `npm --prefix frontend-reactjs test -- DashboardSwitches`, and refreshing enablement docs with the shared surface contract.
          - 4.A.1 CourseViewer (frontend-reactjs/src/pages/dashboard/CourseViewer.jsx)
          - 4.A.2 DashboardAffiliate (frontend-reactjs/src/pages/dashboard/DashboardAffiliate.jsx)
          - 4.A.3 DashboardAssessments (frontend-reactjs/src/pages/dashboard/DashboardAssessments.jsx)
          - 4.A.4 DashboardBookingsSwitch (frontend-reactjs/src/pages/dashboard/DashboardBookingsSwitch.jsx)
          - 4.A.5 DashboardEbooksSwitch (frontend-reactjs/src/pages/dashboard/DashboardEbooksSwitch.jsx)
          - 4.A.6 DashboardInbox (frontend-reactjs/src/pages/dashboard/DashboardInbox.jsx)
-      - 4.B Dashboard Shared Components & Feedback
+      - ✓ 4.B Dashboard Shared Components & Feedback — Annex C1/C3/C6
+        1. **Appraisal.** Shared dashboard primitives now broadcast surface-aware state: navigation badges, state messages, learner metrics, skeletons, and service banners reuse the same tone maps and assistive slots outlined in user_experience.md for learner support, field ops, and admin governance.
+        2. **Functionality.** `DashboardStateMessage.jsx` accepts badges, dual actions, assistive text, and timestamp metadata, allowing Annex C1/C3/C6 screens to present loading/error/empty states without wrapping components.
+        3. **Usefulness.** `FieldServiceConflictModal.jsx` integrates `useDashboardSurface('bookings')`, exposing dispatch health, pending counts, last synced timestamps, and refresh triggers while tracking reload/apply telemetry events.
+        4. **Redundancies.** `DashboardNavigation.jsx` and `AppSidebar.jsx` share a single badge resolver and tone translator so collapsed menus no longer render `[object Object]` and status copy stays in sync with header chips.
+        5. **Placeholders.** `SkeletonPanel.jsx` now offers a streaming pulse, `aria-live` hints, and a `variant` prop so inline loaders can swap between block and row treatments without duplicating markup.
+        6. **Duplicates.** `LearnerProgressCard.jsx`, `MetricCard.jsx`, and `VerificationStatusCard.jsx` consume common tone maps and status normalisers, removing hand-coded colour strings and aligning copy with the persona-specific lexicon from user_experience.md.
+        7. **Improvements Needed.** Verification cards still await SLA countdown timers and reviewer avatars; the new assistive slots and metadata footer keep space reserved for those upcoming Annex C6 experiences.
+        8. **Styling.** Status chips honour `info/notice/success/alert/critical` semantics while pill buttons adopt shared `dashboard-pill`/`dashboard-primary-pill` classes, locking typography and contrast to accessibility thresholds.
+        9. **Efficiency.** Skeleton shimmer reuses a consolidated keyframe so the bundle no longer ships per-component animations, satisfying performance pointers from user_experience.md.
+        10. **Strengths.** `ServiceHealthBanner.jsx` handles loading/error/success with skeleton placeholders, tone-aware alerts, and retry CTAs, ensuring operators retain context even during transient outages.
+        11. **Weaknesses.** Metric cards still lack sparkline context; data hooks must expose richer time-series before chart overlays land.
+        12. **Styling & Colour Review.** Progress, verification, and conflict surfaces now use unified badges, ensuring cross-module colour pairings pass WCAG contrast while matching the doc’s brand tokens.
+        13. **CSS, Orientation & Placement.** Responsive padding/gap tokens keep cards, modals, and banners aligned on 16px grid lines so modules slot into dashboards without manual overrides.
+        14. **Text Analysis.** Assistive text fields provide concise coaching (“Review backlog before dispatching crews”, “Learners notified via email”) without overwhelming headings, in line with the microcopy guidance.
+        15. **Spacing.** Metadata footers in cards and messages follow a 12px stack to keep timestamps legible but unobtrusive, per the spacing heuristics in user_experience.md.
+        16. **Shape.** Buttons, badges, and skeletons stick to rounded-full or rounded-xl radii, preserving the geometric system across dashboards, modals, and inline loaders.
+        17. **Effects.** Streaming toggles (pulse dots, shimmer overlays) share CSS classes, ensuring consistent reduced-motion handling and preventing flicker when cards enter realtime states.
+        18. **Thumbs.** Conflict modal service chips and action buttons give dispatchers instant readouts on platform health before deciding between reload, merge, or continue editing paths.
+        19. **Media.** Verification tables retain secure document metadata while tone-aware badges highlight manual review, reducing confusion for compliance leads vetting uploads.
+        20. **Buttons.** `DashboardStateMessage` supports primary/secondary/link variants, enabling surfaces to present retry, escalation, or external link CTAs with consistent styling and analytics instrumentation.
+        21. **Interact.** Navigation badges include screen-reader text when the sidebar collapses, keeping status changes accessible per user_experience.md’s interaction accessibility checklist.
+        22. **Missing.** `AnalyticsSummaryCard.jsx` scaffolding awaits live recommendation feeds; the component now supports streaming badges and assistive copy to plug in when data lands.
+        23. **Design.** Badge/tone helpers make admin setup alerts, learner support states, and field service modals plug-and-play without redefining palette logic each time.
+        24. **Clone.** `SkeletonPanel` variants and `StatusChip` helpers prevent repeated inline loader markup or ad-hoc badges, tackling the duplication risks flagged during the UX audit.
+        25. **Framework.** Analytics helpers expose `trackDashboardSurfaceAction`, enabling modals, launch buttons, and conflict resolution flows to report actions uniformly across Annex surfaces.
+        26. **Checklist.** QA should confirm sidebar badges display labels, conflict modal tracking fires on reload/apply, verification chips reflect backend states, and skeleton shimmer respects reduced motion preferences.
+        27. **Nav.** App sidebar renders tone-aware badges with optional health tooltips, mirroring the surface registry so navigation becomes a live operations panel rather than static links.
+        28. **Release.** Roll Annex C1/C3/C6 updates by aligning Storybook stories with new props, running `npm --prefix frontend-reactjs test -- DashboardSwitches` (pending Vitest install), and updating enablement docs to document badge/skeleton utilities.
          - 4.B.1 AnalyticsSummaryCard (frontend-reactjs/src/components/dashboard/AnalyticsSummaryCard.jsx)
          - 4.B.2 DashboardActionFeedback (frontend-reactjs/src/components/dashboard/DashboardActionFeedback.jsx)
          - 4.B.3 DashboardNavigation (frontend-reactjs/src/components/dashboard/DashboardNavigation.jsx)

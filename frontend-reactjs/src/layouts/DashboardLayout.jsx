@@ -20,8 +20,199 @@ import { useRealtime } from '../context/RealtimeContext.jsx';
 import {
   trackNavigationSelect,
   trackNotificationOpen,
-  trackNotificationPreferenceChange
+  trackNotificationPreferenceChange,
+  trackDashboardSurfaceView
 } from '../lib/analytics.js';
+
+function coerceNumber(value, fallback = 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.replace(/[^0-9.-]+/g, ''));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+function coerceTimestamp(value) {
+  if (!value) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value.getTime() : null;
+  }
+  try {
+    const parsed = new Date(value);
+    const time = parsed.getTime();
+    return Number.isFinite(time) ? time : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function formatCount(value) {
+  const amount = coerceNumber(value, 0);
+  if (amount >= 1000) {
+    return `${(amount / 1000).toFixed(1)}k`;
+  }
+  return amount.toString();
+}
+
+function buildSurfaceRegistry(dashboard, role) {
+  if (!dashboard || typeof dashboard !== 'object') {
+    return {};
+  }
+
+  const now = Date.now();
+  const baseHealth = dashboard.serviceHealth ?? dashboard.health ?? {};
+  const resolvedRole = role?.toLowerCase() ?? 'learner';
+
+  const registry = {};
+
+  const registerSurface = (id, descriptor = {}) => {
+    if (!id) return;
+    const lastSyncedAt = coerceTimestamp(descriptor.lastSyncedAt ?? descriptor.syncedAt ?? dashboard.syncedAt ?? null);
+    const metrics = Array.isArray(descriptor.metrics) ? descriptor.metrics : [];
+    registry[id] = {
+      id,
+      role: resolvedRole,
+      title: descriptor.title ?? null,
+      description: descriptor.description ?? descriptor.summary ?? null,
+      unreadCount: coerceNumber(descriptor.unreadCount ?? descriptor.unread ?? 0),
+      pendingCount: coerceNumber(descriptor.pendingCount ?? descriptor.pending ?? descriptor.unread ?? 0),
+      lastSyncedAt,
+      stale: typeof lastSyncedAt === 'number' ? now - lastSyncedAt > 5 * 60 * 1000 : false,
+      metrics,
+      service: descriptor.service ?? id,
+      serviceHealth:
+        descriptor.serviceHealth ?? baseHealth[id] ?? baseHealth[descriptor.service] ?? baseHealth.default ?? 'operational',
+      status: descriptor.status ?? null,
+      trend: descriptor.trend ?? null,
+      nextAction: descriptor.nextAction ?? null
+    };
+  };
+
+  const learnerData = dashboard.learner ?? {};
+  const instructorData = dashboard.instructor ?? {};
+
+  const bookingsData =
+    dashboard.bookings ??
+    learnerData.bookings ??
+    instructorData.bookings ??
+    dashboard.fieldServices ??
+    null;
+  registerSurface('bookings', {
+    title: resolvedRole === 'instructor' ? 'Tutor bookings' : 'Learner bookings',
+    description:
+      resolvedRole === 'instructor'
+        ? 'Coordinate tutor availability, dispatch conflicts, and learner reschedules.'
+        : 'Track upcoming sessions, reschedule requests, and concierge handoffs.',
+    unreadCount: bookingsData?.unreadCount ?? bookingsData?.openConflicts ?? bookingsData?.pendingCount,
+    pendingCount: bookingsData?.pendingCount ?? bookingsData?.openRequests,
+    metrics: [
+      {
+        label: 'Pending',
+        value: formatCount(bookingsData?.pendingCount ?? bookingsData?.pending?.length ?? 0)
+      },
+      {
+        label: 'Scheduled',
+        value: formatCount(bookingsData?.scheduledCount ?? bookingsData?.scheduled?.length ?? 0)
+      },
+      {
+        label: 'Conflicts',
+        value: formatCount(bookingsData?.openConflicts ?? bookingsData?.conflicts?.length ?? 0)
+      }
+    ],
+    lastSyncedAt: bookingsData?.lastSyncedAt ?? bookingsData?.updatedAt ?? bookingsData?.refreshedAt,
+    service: 'field-services'
+  });
+
+  const ebooksData = dashboard.ebooks ?? learnerData.ebooks ?? instructorData.ebooks ?? null;
+  registerSurface('ebooks', {
+    title: 'E-book workspace',
+    description:
+      resolvedRole === 'instructor'
+        ? 'Manage publications, monetisation, and reader feedback.'
+        : 'Resume reading, sync highlights, and download offline collections.',
+    unreadCount: ebooksData?.unreadCount ?? ebooksData?.inReview ?? 0,
+    metrics: [
+      { label: 'Library', value: formatCount(ebooksData?.libraryCount ?? ebooksData?.library?.length ?? 0) },
+      { label: 'In progress', value: formatCount(ebooksData?.inProgressCount ?? ebooksData?.inProgress ?? 0) },
+      { label: 'Completed', value: formatCount(ebooksData?.completedCount ?? ebooksData?.completed ?? 0) }
+    ],
+    lastSyncedAt: ebooksData?.syncedAt ?? ebooksData?.updatedAt ?? ebooksData?.refreshedAt,
+    service: 'catalogue'
+  });
+
+  const affiliateData = dashboard.affiliate ?? instructorData.affiliate ?? null;
+  registerSurface('affiliate', {
+    title: 'Affiliate partners',
+    description: 'Analyse partner performance, manage payouts, and export campaign ledgers.',
+    unreadCount: affiliateData?.alerts ?? affiliateData?.openTasks ?? 0,
+    pendingCount: affiliateData?.outstandingPayouts ?? affiliateData?.pending ?? 0,
+    metrics: [
+      { label: 'Active', value: formatCount(affiliateData?.summary?.activeChannels ?? affiliateData?.active ?? 0) },
+      { label: 'Outstanding', value: affiliateData?.summary?.outstanding ?? affiliateData?.outstanding ?? '—' },
+      { label: 'Total', value: formatCount(affiliateData?.summary?.totalChannels ?? affiliateData?.total ?? 0) }
+    ],
+    lastSyncedAt: affiliateData?.syncedAt ?? affiliateData?.updatedAt,
+    service: 'commerce'
+  });
+
+  const assessmentsData = dashboard.assessments ?? learnerData.assessments ?? null;
+  registerSurface('assessments', {
+    title: 'Assessment planner',
+    description: 'Review checkpoints, grading queues, and certification readiness.',
+    unreadCount: assessmentsData?.awaitingGrading ?? assessmentsData?.pending ?? 0,
+    pendingCount: assessmentsData?.dueSoon ?? assessmentsData?.overdue ?? 0,
+    metrics: [
+      { label: 'Due soon', value: formatCount(assessmentsData?.dueSoon ?? 0) },
+      { label: 'Overdue', value: formatCount(assessmentsData?.overdue ?? 0) },
+      { label: 'Completed', value: formatCount(assessmentsData?.completed ?? assessmentsData?.completedCount ?? 0) }
+    ],
+    lastSyncedAt: assessmentsData?.syncedAt ?? assessmentsData?.updatedAt,
+    service: 'learning'
+  });
+
+  const inboxData = dashboard.inbox ?? dashboard.support ?? instructorData.inbox ?? null;
+  registerSurface('inbox', {
+    title: resolvedRole === 'instructor' ? 'Community inbox' : 'Support inbox',
+    description:
+      resolvedRole === 'instructor'
+        ? 'Moderate community threads, respond to learners, and escalate incidents.'
+        : 'Triage learner support tickets, automate follow-ups, and surface escalations.',
+    unreadCount: inboxData?.unreadCount ?? inboxData?.openTickets ?? 0,
+    pendingCount: inboxData?.pendingCount ?? inboxData?.backlog ?? 0,
+    metrics: [
+      { label: 'Open', value: formatCount(inboxData?.openTickets ?? inboxData?.open ?? 0) },
+      { label: 'Waiting', value: formatCount(inboxData?.waiting ?? inboxData?.awaitingResponse ?? 0) },
+      { label: 'SLA risk', value: formatCount(inboxData?.slaRisk ?? inboxData?.breached ?? 0) }
+    ],
+    lastSyncedAt: inboxData?.syncedAt ?? inboxData?.updatedAt,
+    service: 'support'
+  });
+
+  const courseViewerData = dashboard.course ?? learnerData.course ?? null;
+  registerSurface('course-viewer', {
+    title: 'Course workspace',
+    description: 'Monitor module progression, live sessions, and certificate readiness.',
+    unreadCount: courseViewerData?.unreadAnnouncements ?? 0,
+    pendingCount: courseViewerData?.nextLessons ?? 0,
+    metrics: [
+      { label: 'Active modules', value: formatCount(courseViewerData?.activeModules ?? 0) },
+      { label: 'Completed', value: formatCount(courseViewerData?.completedLessons ?? 0) },
+      { label: 'Certificates', value: formatCount(courseViewerData?.certificatesReady ?? 0) }
+    ],
+    lastSyncedAt: courseViewerData?.syncedAt ?? courseViewerData?.updatedAt,
+    service: 'learning'
+  });
+
+  return registry;
+}
 
 function buildDashboardNotifications(session, dashboard) {
   const baseNotifications = buildShellNotifications(session);
@@ -41,20 +232,42 @@ function buildDashboardNotifications(session, dashboard) {
   return [...supplemental, ...baseNotifications];
 }
 
-function deriveSidebarStatuses(dashboard, role) {
-  if (!dashboard) return {};
+function deriveSidebarStatuses(surfaceRegistry, role) {
+  if (!surfaceRegistry) return {};
   const statuses = {};
   const normalisedRole = role?.toLowerCase();
-  if (dashboard.liveSessions?.activeCount && normalisedRole !== 'admin') {
-    const target = normalisedRole === 'instructor' ? 'instructor-live' : 'learner-live';
-    statuses[target] = `${dashboard.liveSessions.activeCount} live`;
+
+  const bookingsSurface = surfaceRegistry.bookings;
+  if (bookingsSurface && bookingsSurface.pendingCount > 0) {
+    const targetId = normalisedRole === 'instructor' ? 'instructor-bookings' : 'learner-bookings';
+    statuses[targetId] = {
+      label: `${bookingsSurface.pendingCount} pending`,
+      tone: bookingsSurface.pendingCount > 5 ? 'alert' : 'notice',
+      health: bookingsSurface.serviceHealth
+    };
   }
-  if (dashboard.financial?.overdueInvoices && normalisedRole === 'admin') {
-    statuses['admin-ads'] = 'Action';
+
+  const inboxSurface = surfaceRegistry.inbox;
+  if (inboxSurface && inboxSurface.pendingCount > 0) {
+    const targetId = normalisedRole === 'admin' ? 'admin-support' : normalisedRole === 'instructor' ? 'instructor-inbox' : null;
+    if (targetId) {
+      statuses[targetId] = {
+        label: `${inboxSurface.pendingCount} queue`,
+        tone: inboxSurface.pendingCount > 10 ? 'critical' : 'notice',
+        health: inboxSurface.serviceHealth
+      };
+    }
   }
-  if (dashboard.support?.openTickets && normalisedRole !== 'learner') {
-    statuses[normalisedRole === 'admin' ? 'admin-support' : 'instructor-inbox'] = `${dashboard.support.openTickets} open`;
+
+  const assessmentsSurface = surfaceRegistry.assessments;
+  if (assessmentsSurface && assessmentsSurface.pendingCount > 0 && normalisedRole === 'learner') {
+    statuses['learner-assessments'] = {
+      label: `${assessmentsSurface.pendingCount} due`,
+      tone: assessmentsSurface.pendingCount > 3 ? 'alert' : 'notice',
+      health: assessmentsSurface.serviceHealth
+    };
   }
+
   return statuses;
 }
 
@@ -90,6 +303,10 @@ export default function DashboardLayout() {
   );
 
   const dashboardData = dashboards?.[resolvedRole] ?? null;
+  const surfaceRegistry = useMemo(
+    () => buildSurfaceRegistry(dashboardData, resolvedRole),
+    [dashboardData, resolvedRole]
+  );
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState({
@@ -126,8 +343,8 @@ export default function DashboardLayout() {
   const presence = useMemo(() => derivePresence(session, realtimeConnected), [session, realtimeConnected]);
 
   const sidebarStatuses = useMemo(
-    () => deriveSidebarStatuses(dashboardData, resolvedRole),
-    [dashboardData, resolvedRole]
+    () => deriveSidebarStatuses(surfaceRegistry, resolvedRole),
+    [surfaceRegistry, resolvedRole]
   );
 
   const pinnedNavigation = useMemo(() => {
@@ -206,6 +423,29 @@ export default function DashboardLayout() {
 
   const showEmptyState = !loading && !error && !dashboardData;
 
+  useEffect(() => {
+    const surfaceEntries = Object.values(surfaceRegistry ?? {});
+    surfaceEntries.forEach((surface) => {
+      if (!surface) return;
+      trackDashboardSurfaceView(surface.id, {
+        role: resolvedRole,
+        origin: 'dashboard-shell',
+        stale: surface.stale,
+        pending: surface.pendingCount
+      });
+    });
+  }, [surfaceRegistry, resolvedRole]);
+
+  const outletContext = useMemo(
+    () => ({
+      role: resolvedRole,
+      dashboard: dashboardData,
+      refresh,
+      surfaceRegistry
+    }),
+    [resolvedRole, dashboardData, refresh, surfaceRegistry]
+  );
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <a className="skip-link" href="#dashboard-main">
@@ -266,7 +506,7 @@ export default function DashboardLayout() {
               description="Start enrolling learners, launching communities, or scheduling sessions to populate this workspace."
             />
           ) : (
-            <Outlet />
+            <Outlet context={outletContext} />
           )}
         </main>
       </div>

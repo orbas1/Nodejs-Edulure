@@ -3,6 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchThreads, fetchThreadMessages, sendThreadMessage, markThreadRead } from '../../api/inboxApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useRealtime } from '../../context/RealtimeContext.jsx';
+import DashboardSwitcherHeader from '../../components/dashboard/DashboardSwitcherHeader.jsx';
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
+import useDashboardSurface from '../../hooks/useDashboardSurface.js';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -53,6 +57,9 @@ export function filterThreadEntries(entries, { term = '', filter = 'all', curren
 }
 
 export default function DashboardInbox() {
+  const { surface, refresh, trackView, trackAction } = useDashboardSurface('inbox', {
+    origin: 'dashboard-inbox'
+  });
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const currentUserId = session?.user?.id;
@@ -89,6 +96,17 @@ export default function DashboardInbox() {
       ? 'bg-emerald-100 text-emerald-700'
       : 'bg-slate-200 text-slate-500';
   const connectionLabel = offline ? 'Offline' : connected ? 'Live' : 'Reconnecting…';
+  const headerCopy = useMemo(
+    () => ({
+      title: 'Inbox operations hub',
+      description: 'Coordinate with peers, instructors, and teams. Real-time updates arrive via Edulure Realtime.'
+    }),
+    []
+  );
+
+  useEffect(() => {
+    trackView({ threads: threads.length, unread: unreadThreadCount, offline });
+  }, [trackView, threads.length, unreadThreadCount, offline]);
 
   useEffect(() => {
     if (!filteredThreads.length) {
@@ -304,12 +322,22 @@ export default function DashboardInbox() {
         );
       }
       setComposer('');
+      trackAction('send_message', { threadId: selectedThreadId });
     } catch (error) {
       setMessagesError(error.message ?? 'Unable to send message');
+      trackAction('send_message_error', {
+        threadId: selectedThreadId,
+        reason: error instanceof Error ? error.message : 'unknown'
+      });
     } finally {
       setSendInFlight(false);
     }
   };
+
+  const handleRefresh = useCallback(() => {
+    loadThreads();
+    refresh?.();
+  }, [loadThreads, refresh]);
 
   const handleComposerKeyDown = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -320,23 +348,35 @@ export default function DashboardInbox() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Inbox</h1>
-          <p className="text-sm text-slate-600">
-            Coordinate with peers, instructors, and teams. Real-time updates arrive via Edulure Realtime.
-          </p>
-        </div>
-        <span
-          className={classNames(
-            'inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-wide',
-            connectionTone
-          )}
-        >
+      <DashboardSwitcherHeader
+        title={headerCopy.title}
+        description={headerCopy.description}
+        surface={surface}
+        onRefresh={handleRefresh}
+      />
+
+      <div className="flex items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-600">
+        <span>Realtime status</span>
+        <span className={classNames('inline-flex items-center gap-2 rounded-full px-3 py-1', connectionTone)}>
           <span className={`inline-block h-2 w-2 rounded-full ${offline ? 'bg-rose-500' : 'bg-current'}`} />
           {connectionLabel}
         </span>
       </div>
+
+      {threadsError ? (
+        <DashboardActionFeedback
+          feedback={{ tone: 'error', message: threadsError }}
+          onDismiss={() => setThreadsError(null)}
+          persistKey="dashboard-inbox-threads"
+        />
+      ) : null}
+      {messagesError ? (
+        <DashboardActionFeedback
+          feedback={{ tone: 'warning', message: messagesError }}
+          onDismiss={() => setMessagesError(null)}
+          persistKey="dashboard-inbox-messages"
+        />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <aside className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -413,11 +453,6 @@ export default function DashboardInbox() {
             </div>
           </div>
           {threadsLoading && <p className="text-xs text-slate-400">Loading threads…</p>}
-          {threadsError && (
-            <p className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600" role="alert">
-              {threadsError}
-            </p>
-          )}
           <div className="mt-3 space-y-2">
             {filteredThreads.map((entry) => {
               const isActive = entry.thread.id === selectedThreadId;
@@ -469,11 +504,6 @@ export default function DashboardInbox() {
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {messagesLoading && <p className="text-xs text-slate-400">Loading conversation…</p>}
-            {messagesError && (
-              <p className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600" role="alert">
-                {messagesError}
-              </p>
-            )}
             {messages.map((message) => {
               const isMine = message.senderId === currentUserId;
               const senderName = formatName(message.sender);

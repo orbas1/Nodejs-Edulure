@@ -1,18 +1,36 @@
-import { useOutletContext } from 'react-router-dom';
+import { useEffect } from 'react';
 
+import DashboardSwitcherHeader from '../../components/dashboard/DashboardSwitcherHeader.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import useDashboardSurface from '../../hooks/useDashboardSurface.js';
 import LearnerEbooks from './LearnerEbooks.jsx';
 import InstructorEbooks from './InstructorEbooks.jsx';
 
 export default function DashboardEbooksSwitch() {
-  const { role, refresh } = useOutletContext();
+  const { role, surface, trackView, refresh } = useDashboardSurface('ebooks', {
+    origin: 'dashboard-ebooks-switch'
+  });
+
+  useEffect(() => {
+    trackView();
+  }, [trackView]);
 
   if (role === 'instructor') {
-    return <InstructorEbooks />;
+    return (
+      <div className="space-y-6">
+        <DashboardSwitcherHeader surface={surface} onRefresh={refresh} />
+        <InstructorEbooks />
+      </div>
+    );
   }
 
   if (role === 'learner') {
-    return <LearnerEbooks />;
+    return (
+      <div className="space-y-6">
+        <DashboardSwitcherHeader surface={surface} onRefresh={refresh} />
+        <LearnerEbooks />
+      </div>
+    );
   }
 
   const copyByRole = {

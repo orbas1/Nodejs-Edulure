@@ -31,3 +31,13 @@ export function trackNotificationPreferenceChange(groupId, enabled) {
   trackEvent('notification:preference_change', { groupId, enabled });
 }
 
+export function trackDashboardSurfaceView(surfaceId, metadata = {}) {
+  if (!surfaceId) return;
+  trackEvent('dashboard:surface_view', { surfaceId, ...metadata });
+}
+
+export function trackDashboardSurfaceAction(surfaceId, action, metadata = {}) {
+  if (!surfaceId || !action) return;
+  trackEvent('dashboard:surface_action', { surfaceId, action, ...metadata });
+}
+
