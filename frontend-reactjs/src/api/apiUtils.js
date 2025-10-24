@@ -31,7 +31,7 @@ export function normaliseListResponse(response, { defaultData = [], defaultMeta 
   return { data, meta, pagination };
 }
 
-export function createListCacheConfig(tag, { ttl = 15_000, varyByToken = true } = {}) {
+export function createListCacheConfig(tag, { ttl = 15_000, varyByToken = true, varyByEnvironment = true } = {}) {
   if (!tag) {
     return undefined;
   }
@@ -39,7 +39,8 @@ export function createListCacheConfig(tag, { ttl = 15_000, varyByToken = true } 
   return {
     ttl,
     tags,
-    varyByToken
+    varyByToken,
+    varyByEnvironment
   };
 }
 

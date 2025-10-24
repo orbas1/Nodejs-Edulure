@@ -1,6 +1,14 @@
 import axios from 'axios';
 
 import { responseCache } from './cache.js';
+import {
+  buildEnvironmentHeaders,
+  getEnvironmentCacheKey,
+  getEnvironmentContext,
+  resetEnvironmentContext,
+  resolveEnvironmentDescriptor,
+  setEnvironmentContext
+} from '../utils/environment.js';
 
 const DEFAULT_TIMEOUT = 15_000;
 
@@ -228,7 +236,8 @@ const normaliseCacheOptions = (cache) => {
     ...cache,
     enabled: cache.enabled ?? true,
     tags: normaliseTagList(cache.tags ?? []),
-    varyByHeaders
+    varyByHeaders,
+    varyByEnvironment: cache.varyByEnvironment ?? true
   };
 };
 
@@ -241,6 +250,7 @@ async function request(
     data,
     params,
     token,
+    environment,
     signal,
     onUploadProgress,
     onDownloadProgress,
@@ -264,16 +274,23 @@ async function request(
     finalHeaders.Authorization = `Bearer ${tokenForHeaders}`;
   }
 
+  const environmentDescriptor = resolveEnvironmentDescriptor(environment);
+  const environmentHeaders = buildEnvironmentHeaders(environmentDescriptor);
+  Object.assign(finalHeaders, environmentHeaders);
+  const environmentCacheKey = getEnvironmentCacheKey(environmentDescriptor);
+
   const useCache = methodUpper === 'GET' && cacheOptions.enabled;
   const varyByToken = cacheOptions.varyByToken ?? true;
   const varyByHeaders = cacheOptions.varyByHeaders ?? [];
+  const varyByEnvironment = cacheOptions.varyByEnvironment ?? true;
   const cacheKey = useCache
     ? responseCache.createKey({
         method: methodUpper,
         path: path.trim(),
         params,
         token: varyByToken ? tokenForHeaders : undefined,
-        headers: pickHeaders(finalHeaders, varyByHeaders)
+        headers: pickHeaders(finalHeaders, varyByHeaders),
+        environment: varyByEnvironment ? environmentCacheKey : undefined
       })
     : null;
 
@@ -310,7 +327,9 @@ async function request(
   if (useCache) {
     const ttlNumber = Number(cacheOptions.ttl);
     const ttl = Number.isFinite(ttlNumber) && ttlNumber > 0 ? ttlNumber : undefined;
-    responseCache.set(cacheKey, responseData, { ttl, tags: cacheOptions.tags });
+    const environmentTags = environmentDescriptor.key ? [`env:${environmentDescriptor.key}`] : [];
+    const cacheTags = mergeTagLists(cacheOptions.tags, environmentTags);
+    responseCache.set(cacheKey, responseData, { ttl, tags: cacheTags });
   }
 
   const tagsToInvalidate = mergeTagLists(cacheOptions.invalidateTags, invalidateTags);
@@ -349,5 +368,9 @@ export {
   responseCache,
   setAuthTokenResolver,
   clearAuthTokenResolver,
-  setDefaultHeaders
+  setDefaultHeaders,
+  getEnvironmentContext,
+  setEnvironmentContext,
+  resetEnvironmentContext,
+  resolveEnvironmentDescriptor
 };
