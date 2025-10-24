@@ -2231,7 +2231,8 @@ export async function seed(knex) {
       metadata: JSON.stringify({
         notes: 'Seed fulfilment for CRM onboarding',
         reason: 'initial-handoff',
-        fulfilledBy: 'partner.techlead@example.com'
+        fulfilledBy: 'partner.techlead@example.com',
+        documentationUrl: 'https://docs.edulure.com/integrations/hubspot/production-handbook'
       })
     });
 
@@ -2256,7 +2257,8 @@ export async function seed(knex) {
       metadata: JSON.stringify({
         notes: 'Awaiting partner confirmation',
         reason: 'staging-refresh',
-        reminderPolicy: { cadenceDays: [3, 7], escalateAfterDays: 10 }
+        reminderPolicy: { cadenceDays: [3, 7], escalateAfterDays: 10 },
+        documentationUrl: 'https://docs.edulure.com/integrations/openai/staging-credential-handoff'
       })
     });
 
@@ -2285,7 +2287,8 @@ export async function seed(knex) {
         autoClosedReason: 'key-rotated',
         autoClosedAt: '2025-01-15T09:45:00Z',
         autoClosedBy: 'system:auto-close',
-        notes: 'Invite closed automatically after manual rotation.'
+        notes: 'Invite closed automatically after manual rotation.',
+        documentationUrl: 'https://docs.edulure.com/integrations/anthropic/credential-rotation'
       })
     });
 
