@@ -641,40 +641,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Stage job, validate against sandbox data, update runbooks, coordinate with moderators, and deploy gradually.
 
 ### 4.E Monetization Reconciliation Job (`monetizationReconciliationJob.js`)
-1. **Appraisal:** Reconciles billing provider data with internal ledger, flagging discrepancies and updating invoice states.
-2. **Functionality:** Ingests provider events, matches ledger entries, recalculates balances, and writes audit logs with remediation recommendations.
-3. **Logic Usefulness:** Ensures finance accuracy, informs operations of mismatches, and powers dashboards with reconciliation status.
-4. **Redundancies:** Invoice matching logic overlaps with `PaymentService.js`; unify to maintain consistent rules.
-5. **Placeholders Or non-working functions or stubs:** Tax export integration flagged TODO; highlight in finance dashboards.
-6. **Duplicate Functions:** Currency normalisation repeated; reuse shared helper.
-7. **Improvements need to make:** Add anomaly detection, automatic retry of transient failures, and push notifications for critical discrepancies.
-8. **Styling improvements:** Provide structured report output with colour-coded status for finance UI.
-9. **Efficiency analysis and improvement:** Batch provider fetches, parallelise reconciliation per account, and cache ledger snapshots.
-10. **Strengths to Keep:** Detailed logging, integration with audit services, and configurable reconciliation windows.
-11. **Weaknesses to remove:** Manual reconciliation notes; offer inline comment system.
-12. **Styling and Colour review changes:** Align finance report palette with accessible colours.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout specs for reconciliation dashboards and CSV exports.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refine discrepancy descriptions to be concise and actionable.
-15. **Change Checklist Tracker:** Include reconciliation dry run, finance approval, and ledger snapshot validation before release.
-16. **Full Upgrade Plan & Release Steps:** Run sandbox reconciliation, review with finance, update docs, deploy with alerting on anomalies.
+1. **Appraisal:** A single orchestrated worker now handles revenue recognition, reconciliation, alerting, and pause/resume safeguards, replacing ad-hoc tenant scripts.
+2. **Functionality:** `runCycle` resolves tenants, recognises deferred revenue, invokes `MonetizationFinanceService.runReconciliation`, then persists outcomes, variance history, and alert state before emitting metrics.
+3. **Logic Usefulness:** Each run captures currency-aware breakdowns (invoiced, recognised, usage, deferred, variance) so finance instantly inspects discrepancies per ISO currency without drilling into databases.
+4. **Redundancies:** Consolidated job metrics, variance-history updates, and failure digest hashing eliminate the bespoke loops formerly embedded across finance cron tasks.
+5. **Placeholders Or non-working functions or stubs:** Manual journal overrides are not yet folded into the currency breakdown helper; until adjustment tables are integrated the digest excludes those offsets.
+6. **Duplicate Functions:** Reconciliation metadata updates now flow through `MonetizationReconciliationRunModel.updateMetadata`, avoiding duplicate history maintenance in downstream services.
+7. **Improvements need to make:** Add regression coverage for the tenant pause/resume state machine and pipe acknowledgement digests into notifications so responders see who triaged the variance.
+8. **Styling improvements:** Structured logs emit `outcome`, `alerts`, window bounds, and tenant counts to align Splunk dashboards with finance runbooks without additional JSON reshaping.
+9. **Efficiency analysis and improvement:** Tenant caching, grouped SQL aggregation, and hrtime-derived durations feed Prometheus counters so slow tenants or noisy windows surface automatically.
+10. **Strengths to Keep:** Failure backoff with cooldown-based pausing, alert digest hashing, and acknowledgement-aware metadata maintain resilient finance workflows.
+11. **Weaknesses to remove:** Idle tenants still inherit the global recognition window; introduce per-tenant overrides once policy storage lands in `PlatformSettingModel`.
+12. **Styling and Colour review changes:** Align finance dashboard palettes and alert severities with `docs/operations/finance` vocabulary to keep operations copy consistent.
+13. **CSS, orientation, placement and arrangement changes:** Provide dashboard layout hints that surface variance history timelines, acknowledgement counts, and truncated currency summaries per tenant.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Warn/alert copy references severity levels (“finance alerts”, “paused after repeated failures”) to match incident scripts without redundant phrasing.
+15. **Change Checklist Tracker:** Release checklist now covers Prometheus counter validation, variance-history growth review, alert digest inspection, and paused-tenant resumption verification.
+16. **Full Upgrade Plan & Release Steps:** Stage read-only finance validation, backfill currency metadata, confirm alert delivery in staging, then promote with dashboard updates and acknowledgement walkthroughs.
 
 ### 4.F Telemetry Warehouse Job (`telemetryWarehouseJob.js`)
-1. **Appraisal:** Coordinates telemetry exports to warehouses, ensuring analytics teams receive timely data.
-2. **Functionality:** Batches events, compresses payloads, uploads to storage, records freshness metrics, and updates job states.
-3. **Logic Usefulness:** Keeps analytics pipelines healthy and enables downstream BI workloads without manual intervention.
-4. **Redundancies:** Compression logic duplicated with analytics controller; centralise to avoid mismatched formats.
-5. **Placeholders Or non-working functions or stubs:** BigQuery streaming flagged TODO; ensure scheduler skips gracefully.
-6. **Duplicate Functions:** Export schema definitions repeated; move to shared config for consistent columns.
-7. **Improvements need to make:** Add incremental schema evolution handling, automatic retry, and alerting on lag thresholds.
-8. **Styling improvements:** Provide export status payload for dashboards with palette references.
-9. **Efficiency analysis and improvement:** Parallelise chunk uploads, reuse compression buffers, and throttle to respect warehouse quotas.
-10. **Strengths to Keep:** Robust error handling, detailed logging, and integration with observability metrics.
-11. **Weaknesses to remove:** Manual retry triggers; automate with exponential backoff.
-12. **Styling and Colour review changes:** Align export dashboard colours with analytics theme.
-13. **CSS, orientation, placement and arrangement changes:** Offer layout hints for export status tables and timelines.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Simplify status messaging while keeping actions clear.
-15. **Change Checklist Tracker:** Add export QA, schema review, and lag monitoring updates to release tracker.
-16. **Full Upgrade Plan & Release Steps:** Stage updates, backfill sample data, validate dashboards, coordinate with data team, and deploy with alerting on lag metrics.
+1. **Appraisal:** The exporter now encrypts checkpoints, surfaces backlog pressure, and self-schedules flushes so ingestion stays in lockstep with warehouse sinks.
+2. **Functionality:** `runCycle` delegates to `TelemetryWarehouseService.exportPendingEvents`, records metrics, handles pause/backoff states, and triggers timed follow-up runs when backpressure persists.
+3. **Logic Usefulness:** Summaries expose exported counts, batch size, backlog hints, and checkpoint previews (event id/timestamp) so downstream jobs reconcile cursor state without decrypting payloads.
+4. **Redundancies:** Shared `buildCheckpointDescriptor` and metrics instrumentation replace bespoke JSON snippets across freshness monitors and batch metadata.
+5. **Placeholders Or non-working functions or stubs:** Backlog detection currently reports “>= batchSize”; extend event models with a count endpoint before exposing remaining-record estimates.
+6. **Duplicate Functions:** Background job outcomes now standardise through `recordBackgroundJobRun`, keeping success/failure counters aligned with other workers.
+7. **Improvements need to make:** Add smoke tests that decrypt checkpoints under rotated keys and assert checksum alignment to catch crypto regressions early.
+8. **Styling improvements:** Cycle logs annotate duration, backlog state, and exported counts with phrasing reused in Annex 12.F runbooks for consistent observability copy.
+9. **Efficiency analysis and improvement:** Hrtime durations, configurable backpressure delays, and capped retry cycles drain spikes without overwhelming storage or lineage processors.
+10. **Strengths to Keep:** Compression, lineage auto-recording, freshness checkpoints, and hashed metadata continue delivering durable exports alongside the sealed cursor state.
+11. **Weaknesses to remove:** CLI triggers inherit default delays; expose per-trigger overrides so incident responders can accelerate backlog recovery without code edits.
+12. **Styling and Colour review changes:** Maintain observability dashboard palettes by surfacing backlog/severity tokens within summaries for downstream UI renderers.
+13. **CSS, orientation, placement and arrangement changes:** Provide table/timeline layout guidance showing checkpoint previews, backlog flags, and duration metrics to align analytics UI with job output.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Warning messages (“Telemetry export job paused after repeated failures”, “Scheduled additional telemetry export to drain backlog”) mirror ops scripts to keep instructions actionable.
+15. **Change Checklist Tracker:** Release plans validate S3 checksum metadata, decrypt sample checkpoints, confirm Prometheus counters, and review backlog flush logs in staging.
+16. **Full Upgrade Plan & Release Steps:** Roll out encryption keys, canary backpressure loop, verify dashboards, then brief analytics teams before enabling production runs.
 
 ## 5. Database & Data Management (`backend-nodejs/src/models/`, `backend-nodejs/migrations/`)
 
@@ -1335,18 +1335,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Track playbook updates, run tabletop exercises, and monitor alert fatigue.
 
 ### A36. Monetization Reconciliation Job (4.E)
-- **Operational Depth:** Compares platform ledger with processor exports, logging variances for finance review.
-- **Gaps & Risks:** Missing support for multi-currency reconciliation; plan extension. Error handling currently logs without alerting.
-- **Resilience & Efficiency:** Stream reconciliation, parallelise by account, and store historical diffs.
-- **UX & Communications:** Generate dashboards with actionable remediation steps.
-- **Change Management:** Schedule finance reviews, archive reports, and update compliance documentation.
+- **Operational Depth:** Automates tenant-scoped revenue recognition, reconciliation, alerting, and variance-history persistence with currency-level visibility for auditors.
+- **Gaps & Risks:** Manual journal overrides remain outside the currency breakdown helper; document roadmap for ingesting adjustment tables and tightening acknowledgement coverage.
+- **Resilience & Efficiency:** Tenant caching, hrtime-duration metrics, and hashed failure digests keep the worker performant while pausing safely after repeated errors.
+- **UX & Communications:** Structured summaries surface severity, alert counts, acknowledgement totals, and truncated currency digests ready for finance dashboards.
+- **Change Management:** Release playbooks validate Prometheus counters, review variance-history growth, test alert delivery, and confirm paused tenants resume after cooldown.
 
 ### A37. Telemetry Warehouse Job (4.F)
-- **Operational Depth:** Batches events into warehouse schemas, maintaining idempotency with cursor checkpoints.
-- **Gaps & Risks:** Checkpoint files lack encryption; secure them. Schema changes require manual intervention.
-- **Resilience & Efficiency:** Implement backpressure controls, compress payloads, and monitor lag.
-- **UX & Communications:** Publish lag metrics, provide troubleshooting guides.
-- **Change Management:** Coordinate schema migrations, document rollbacks, and alert data teams.
+- **Operational Depth:** Exports batched telemetry with encrypted checkpoints, backlog detection, and backpressure-driven rescheduling.
+- **Gaps & Risks:** Remaining gap on precise backlog sizing and CLI-trigger delay overrides; roadmap includes count endpoints and trigger-specific configuration.
+- **Resilience & Efficiency:** Hrtime durations, configurable backpressure delay, and capped retries drain spikes without overwhelming storage while standardised metrics capture outcomes.
+- **UX & Communications:** Logs and summaries mirror Annex 12.F phrasing, exposing backlog flags, checkpoint previews, and duration metrics for observability dashboards.
+- **Change Management:** Checklist covers decrypting sample checkpoints, verifying checksum metadata, confirming Prometheus counters, and reviewing backlog flush logs before promotion.
 
 ### A38. Identity & Access Schema (5.A)
 - **Operational Depth:** Models enforce tenant scoping, MFA relationships, and role assignments.
