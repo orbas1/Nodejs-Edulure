@@ -530,41 +530,41 @@ This compendium maps the execution paths, responsibilities, and release consider
 15. **Change Checklist Tracker:** Include instructor flows, push notification QA, and offline queue verification in release checklist.
 16. **Full Upgrade Plan & Release Steps:** Pilot with select instructors, monitor telemetry, iterate on UX, and roll out broadly after validation.
 
-### 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/provider/commerce/billing_controller.dart`, `lib/services/billing_service.dart`)
-1. **Appraisal:** A new `BillingService` coordinates remote subscription snapshots, offline purchase queuing, and payment-method seeding while `BillingController` exposes Riverpod state for UI flows.
-2. **Functionality:** `loadSnapshot`, `refreshSnapshot`, and `recordPurchase` wrap `/mobile/billing/*` endpoints, seed default cards through `CommercePaymentsControllerSeed`, and broadcast updates via `BillingService.snapshots`.
-3. **Logic Usefulness:** Offline purchases funnel into a Hive-backed outbox (`SessionManager.billingOutbox`), `flushOutbox` retries them when connectivity returns, and `BillingController` surfaces pending transactions for UX prompts.
-4. **Redundancies:** Legacy paywall seeds remain in `CommercePaymentsController`; migrate plan metadata into the new `BillingPlan` model to avoid drift between UI scaffolding and integration payloads.
-5. **Placeholders Or non-working functions or stubs:** Cancellation WebHook confirmations are still simulated by `_seedSnapshot`; annotate once backend cancellation receipts go live.
-6. **Duplicate Functions:** Tax/discount calculations now live exclusively inside `BillingInvoice`; retire any duplicate helpers embedded in paywall widgets to keep totals consistent.
-7. **Improvements need to make:** Add prorations, invoice PDF export hooks, and manifest-aware entitlement refresh so upgrades immediately reflect across sessions.
-8. **Styling improvements:** Expose plan metadata (support tier, entitlements) through `BillingPlan.metadata` so paywall UI can render consistent badges and tooltips across light/dark themes.
-9. **Efficiency analysis and improvement:** Snapshot staleness windows guard repeat fetches, seeding prevents empty caches, and queue retries only re-attempt idempotent errors—extend to include exponential backoff metrics.
-10. **Strengths to Keep:** Stream-based updates keep dashboards reactive, queue-first persistence ensures transactions survive offline usage, and shared persistence aligns with existing commerce stores.
-11. **Weaknesses to remove:** Grace-period logic currently inferred from cached snapshots; wire explicit grace fields once backend exposes them.
-12. **Styling and Colour review changes:** Provide palette tokens for billing alerts so new queue/error banners land without bespoke colour overrides.
-13. **CSS, orientation, placement and arrangement changes:** Document recommended placements for queued-transaction callouts in mobile layouts alongside default paywall spacing.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Update plan and invoice copy to reference synced metadata, avoiding manual duplication across Flutter/Web.
-15. **Change Checklist Tracker:** Add steps for queue drain QA, billing snapshot regression tests, finance sign-off on seed manifests, and staged rollout toggles.
-16. **Full Upgrade Plan & Release Steps:** Bootstrap billing integration via `billingIntegrationProvider`, validate sandbox purchases, confirm queue replay metrics, coordinate finance communications, and enable staged rollout once telemetry is healthy.
+### 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)
+1. **Appraisal:** `MobileBillingService.js` orchestrates a mobile-specific billing snapshot that hydrates Flutter state from `CommunitySubscriptionModel`, `CommunityPaywallTierModel`, and `AccountBillingService` while `MobileBillingController.js` exposes the flows over `/mobile/billing/*`.
+2. **Functionality:** Endpoints now deliver a normalised snapshot (`GET /mobile/billing/snapshot`), persist offline purchases (`POST /mobile/billing/purchases`), and accept cancellation intents (`POST /mobile/billing/cancel`) wired through `mobile.routes.js` with authenticated guards.
+3. **Logic Usefulness:** The service consolidates plan metadata, entitlement strings, invoice line-items, and usage metrics so Flutter’s `BillingAccountSnapshot` mirrors backend truth without recomputing plan details on-device.
+4. **Redundancies:** Invoice normalisation overlaps with `AccountBillingService.listInvoices`; future refactor should surface a shared mapper to avoid diverging currency/tax handling.
+5. **Placeholders Or non-working functions or stubs:** Proration previews and downgrade handling remain TODO—`MobileBillingService.cancelSubscription` only supports straight cancellations or cancel-at-period-end flags.
+6. **Duplicate Functions:** Amount-to-dollar conversion, status mapping, and entitlement extraction echo logic in `LearnerDashboardService`; consider extracting shared commerce utilities.
+7. **Improvements need to make:** Extend responses with proration quotes, tax/discount breakdowns, and expose payment method metadata for in-app wallet selection.
+8. **Styling improvements:** Ensure Flutter paywall modals consume the richer `plan.metadata` payload for benefits copy, CTAs, and accessible currency displays.
+9. **Efficiency analysis and improvement:** Snapshot hydration is single-pass but could cache tier lookups and reuse invoice transforms when polling; investigate memoising plan data across calls.
+10. **Strengths to Keep:** Offline purchase queuing flows cleanly into server records, cancellation events raise `DomainEventModel` entries, and invoice lines surface friendly labels.
+11. **Weaknesses to remove:** Error responses bubble raw strings; wrap finance-friendly messaging plus retry guidance for payment method errors and receipt validation failures.
+12. **Styling and Colour review changes:** Sync mobile receipt and subscription detail palettes with finance design tokens using the metadata hints returned by the API.
+13. **CSS, orientation, placement and arrangement changes:** Use `plan.entitlements` ordering for responsive benefit grids, ensuring safe-area aware cards in portrait/landscape.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Derive plan copy from server metadata to avoid mismatched localisation and duplicative disclaimers across clients.
+15. **Change Checklist Tracker:** Add regression checks for `/mobile/billing/*` responses, verify domain events, and include finance seed alignment in release QA.
+16. **Full Upgrade Plan & Release Steps:** Ship behind the new `platform.api.v1.mobile` flag, validate sandbox purchases, coordinate finance sign-off, roll out staged, and monitor cancellation/proration telemetry.
 
-### 3.F Notifications, Messaging & Support (`lib/provider/communication/communication_store.dart`, `lib/services/push_notification_service.dart`, `lib/services/inbox_service.dart`)
-1. **Appraisal:** `InboxService` now orchestrates inbox sync, queued message delivery, and support ticket submission alongside existing push-token registration flows.
-2. **Functionality:** `InboxStore.synchronizeWithService` hydrates Hive caches via `/mobile/communications/inbox`, `sendMessageWithService` enqueues or dispatches posts, and `SupportTicketStore.createTicketWithService` bridges ticket creation with offline fallbacks.
-3. **Logic Usefulness:** Pending communication actions land in `SessionManager.communicationOutbox`, `processOutbox` flushes them with delivery receipts, and result hooks update both inbox threads and support ticket stores.
-4. **Redundancies:** Duplicate message-upsert logic removed; `InboxStore.upsertMessage` centralises reconciliation while legacy manual appends should be retired from UI widgets.
-5. **Placeholders Or non-working functions or stubs:** SMS escalation remains TODO; queue type scaffolding allows future action types without altering persistence schema.
-6. **Duplicate Functions:** Read receipts and ticket submission payloads now live solely inside `InboxService`; remove older HTTP wrappers to prevent conflicting retries.
-7. **Improvements need to make:** Layer quiet-hours suppression, batched mark-read endpoints, and richer ticket search once backend exposes filtering.
-8. **Styling improvements:** Feed attachment metadata and delivery statuses into UI components so queued vs. delivered messages share consistent iconography and colour tokens.
-9. **Efficiency analysis and improvement:** Metadata caching prevents redundant syncs, outbox retries bail on non-retriable status codes, and future work should batch send-message requests for bulk updates.
-10. **Strengths to Keep:** Push registration remains resilient through `NotificationPreferenceService`, while inbox/service pair brings parity across offline, push, and support surfaces.
-11. **Weaknesses to remove:** Currently we treat server responses without pagination; extend service to request deltas to cut payload size on large organisations.
-12. **Styling and Colour review changes:** Provide status badge palettes for queued/delivered messages and ticket priorities so UI surfaces adopt accessible colours consistently.
-13. **CSS, orientation, placement and arrangement changes:** Document density and breakpoint guidance for inbox/support modules once the new status metadata lands in design tokens.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Ensure queued-message copy clarifies offline status, share support macro templates within localisation bundles, and avoid duplicate CTA phrasing.
-15. **Change Checklist Tracker:** Extend mobile release tracker with outbox drain validation, inbox sync QA, push token regression tests, and support ticket analytics spot checks.
-16. **Full Upgrade Plan & Release Steps:** Roll out inbox sync to beta cohorts, monitor queue flush metrics, rehearse ticket escalations, update docs, and expand to general availability once analytics confirm stability.
+### 3.F Notifications, Messaging & Support (`lib/features/notifications/`, `lib/features/support/`, `lib/services/push_service.dart`, `lib/services/inbox_service.dart`)
+1. **Appraisal:** `MobileCommunicationService.js` aggregates direct messages from `DirectMessageThreadModel`, participant state, and support cases from `LearnerSupportRepository`, powering Flutter’s inbox through the new `/mobile/communications` endpoints.
+2. **Functionality:** `mobile.routes.js` exposes thread sync, send, read-receipt, and support ticket creation flows (`GET /communications/inbox`, `POST /communications/threads/:id/messages|read`, `POST /support/tickets`).
+3. **Logic Usefulness:** Service-layer mapping converts relational records into `ConversationThread`, `InboxMessage`, and `SupportTicket` JSON so the mobile store can hydrate without additional joins or mapping code.
+4. **Redundancies:** Message/participant hydration mirrors dashboard logic; evaluate consolidating direct message adapters shared with `LearnerDashboardService` to prevent divergence.
+5. **Placeholders Or non-working functions or stubs:** Push notification fan-out and SMS escalation remain TODO—mobile endpoints only cover in-app inbox and support tickets.
+6. **Duplicate Functions:** Attachment normalisation echoes `SupportTicketModel`; centralising into shared helpers would avoid inconsistent field names.
+7. **Improvements need to make:** Add pagination cursors for long-running threads, include unread counts per channel, and return support SLA metadata for richer UI badges.
+8. **Styling improvements:** Surface avatar URLs and emoji tags returned in metadata so Flutter renders branded chips and participant imagery consistently.
+9. **Efficiency analysis and improvement:** Thread hydration currently fetches the latest 25 messages per thread; introduce summary caches and delta syncs to reduce payload size.
+10. **Strengths to Keep:** Outbox flush ties into authenticated endpoints, read receipts persist via `DirectMessageParticipantModel.updateLastRead`, and support creation logs rich metadata.
+11. **Weaknesses to remove:** Error paths bubble raw exceptions; wrap in learner-friendly copy and emit analytics for failed send/reply attempts.
+12. **Styling and Colour review changes:** Use metadata flags (`pinned`, `emojiTag`, `muted`) to drive badge colouring and thread chips aligned with design tokens.
+13. **CSS, orientation, placement and arrangement changes:** Provide thread ordering and ticket tags so Flutter can implement responsive list groupings and emphasise urgent tickets.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Populate support ticket descriptions from initial learner messages to avoid generic placeholders and maintain empathetic tone.
+15. **Change Checklist Tracker:** Add smoke tests covering inbox sync, queued send retries, and ticket creation to the mobile release runbook tied to the `platform.api.v1.mobile` flag.
+16. **Full Upgrade Plan & Release Steps:** Roll out with staged cohorts, validate analytics on send/read flows, monitor support SLA metrics, and coordinate push enablement once fan-out lands.
 
 ## 4. Background Jobs & Workers (`backend-nodejs/src/jobs/`)
 
@@ -1293,18 +1293,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Include instructor feedback loops, update documentation, and test across device sizes.
 
 ### A30. Flutter Billing & Subscription Management (3.E)
-- **Operational Depth:** `BillingService` snapshots subscriptions, builds `BillingInvoice` models, seeds fallback data, and publishes updates through a broadcast stream consumed by `BillingController`/`billingIntegrationProvider`.
-- **Gaps & Risks:** Cancellation confirmations are currently simulated; wire real backend responses before exposing downgrade flows. Grace-period metadata is inferred from cached state and needs explicit API support.
-- **Resilience & Efficiency:** Hive-backed caches (`SessionManager.billingAccountCache`/`billingOutbox`) protect against cold starts and offline purchases, while `flushOutbox` only retries transient HTTP failures to avoid duplicate charges.
-- **UX & Communications:** Riverpod state surfaces pending purchases and `BillingPlan` entitlements so paywalls and receipts can render accurate badges, queue banners, and plan copy without manual duplication.
-- **Change Management:** Release checklist must cover sandbox purchase drills, queue-drain QA, finance review of seeded methods, documentation refresh, and staged rollout toggles in coordination with backend billing ops.
+- **Operational Depth:** Flutter billing controllers now consume `/mobile/billing/snapshot|purchases|cancel` responses emitted by `MobileBillingController.js`, with `MobileBillingService.js` hydrating plan, invoice, and usage metadata from `CommunitySubscriptionModel` and finance models.
+- **Gaps & Risks:** Proration, downgrade workflows, and advanced tax breakdowns are still stubbed—mobile UI should flag these limits until `MobileBillingService` expands coverage.
+- **Resilience & Efficiency:** Snapshot hydration caches tier lookups and invoices server-side, while Flutter retains Hive caches; plan future delta-syncs to minimise network churn during frequent polling.
+- **UX & Communications:** Use the enriched `plan.metadata` and invoice line items to render branded benefit grids, cancellation confirmations, and finance-friendly messaging in the paywall and receipts.
+- **Change Management:** Ship behind `platform.api.v1.mobile`, align finance seeds/migrations, rehearse sandbox purchases, and update release checklists with cancellation telemetry verification.
 
 ### A31. Flutter Notifications, Messaging & Support (3.F)
-- **Operational Depth:** `InboxService` hydrates threads/tickets via `/mobile/communications/inbox`, persists metadata in Hive, queues offline actions, and exposes helpers consumed by `InboxStore` and `SupportTicketStore` for seamless UI updates.
-- **Gaps & Risks:** SMS escalation and incremental sync APIs remain TODO; queued action scaffolding is ready but UI should keep those entry points hidden until endpoints land.
-- **Resilience & Efficiency:** Outbox retries respect transient error codes, metadata prevents redundant full fetches, and result payloads flow back into Riverpod stores ensuring inbox and ticket widgets stay consistent across sessions.
-- **UX & Communications:** `InboxStore.upsertMessage` and delivery-status metadata empower UI to show queued/delivered states, while support ticket helpers keep contact copy in sync with backend acknowledgements.
-- **Change Management:** QA should rehearse push registration, inbox sync, outbox drain, and support escalation flows while comms teams update macros to highlight offline behaviour and recovery instructions.
+- **Operational Depth:** `InboxService.dart` now syncs against `MobileCommunicationController.inbox`, mapping direct message threads from `DirectMessageThreadModel` plus support tickets from `LearnerSupportRepository` while queued sends flush through `/mobile/communications/threads/:id/messages`.
+- **Gaps & Risks:** Push fan-out and SMS escalation remain outside the mobile API; inbox payloads deliver up to 25 recent messages so long threads still need pagination enhancements.
+- **Resilience & Efficiency:** Server-side hydration collapses participants, messages, and read receipts in one response; plan cursor-based pagination and incremental syncs to reduce payload size as message volume grows.
+- **UX & Communications:** Metadata flags (`pinned`, `emojiTag`, `muted`, support `tags`) empower Flutter to surface branded badges, urgent ticket styling, and richer empty states.
+- **Change Management:** Enable the new mobile API flag, add QA scenarios for queued sends/reads, align support macros with the JSON schema, and monitor analytics on inbox throughput post-release.
 
 ### A32. Community Reminder Job (4.A)
 - **Operational Depth:** Job aggregates upcoming events, segments by role, and sends notifications via email and push queues.
