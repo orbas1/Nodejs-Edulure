@@ -276,18 +276,23 @@ function normaliseAction(action, fallback, t, { type = 'link' } = {}) {
     return null;
   }
   const label = translate(t, fallback.labelKey ?? fallback.key, action?.label ?? action?.text ?? fallback.fallbackLabel ?? fallback.fallback);
+  const analyticsId = action?.analyticsId ?? fallback.analyticsId ?? action?.key ?? fallback.key ?? null;
   if (type === 'link') {
-    const to = typeof action?.to === 'string' && action.to.length ? action.to : typeof action?.href === 'string' && action.href.startsWith('/') ? action.href : fallback.to;
+    const to = typeof action?.to === 'string' && action.to.length
+      ? action.to
+      : typeof action?.href === 'string' && action.href.startsWith('/')
+        ? action.href
+        : fallback.to;
     if (!to) {
       return null;
     }
-    return { to, label, analyticsId: fallback.analyticsId ?? action?.analyticsId };
+    return { to, label, analyticsId };
   }
   const href = typeof action?.href === 'string' && action.href.length ? action.href : action?.to ?? fallback.href;
   if (!href) {
     return null;
   }
-  return { href, label, analyticsId: fallback.analyticsId ?? action?.analyticsId };
+  return { href, label, analyticsId };
 }
 
 function ensureMedia(blockMedia, t) {
@@ -375,9 +380,11 @@ export function buildHeroPayload({ block, t }) {
   const secondaryAction = normaliseAction(block?.secondaryCta, HERO_ACTIONS.secondary, t, { type: 'link' });
   const tertiaryAction = normaliseAction(block?.tertiaryCta, HERO_ACTIONS.tertiary, t, { type: 'anchor' });
 
+  const surface = block?.payload?.surface ?? block?.metadata?.surface ?? block?.slug ?? block?.id ?? 'home-hero';
+
   return {
     block: block ?? null,
-    surface: block?.slug ?? block?.id ?? 'home-hero',
+    surface,
     eyebrow: translate(t, HERO_COPY.eyebrow.key, block?.eyebrow ?? HERO_COPY.eyebrow.fallback),
     statusLabel: translate(
       t,
@@ -469,7 +476,7 @@ export function buildPillarPayload({ blocks, t, fallback = VALUE_PROPOSITION_PIL
         pillarFallback.descriptionKey,
         match?.description ?? match?.summary ?? pillarFallback.fallback.description
       ),
-      analyticsId: pillarFallback.analyticsId,
+      analyticsId: match?.analyticsId ?? pillarFallback.analyticsId,
       actions: actionsSource
         .map((action, index) => {
           const fallbackAction = pillarFallback.actions.find((item) => item.key === action.key) ?? pillarFallback.actions[index] ?? pillarFallback.actions[0];
