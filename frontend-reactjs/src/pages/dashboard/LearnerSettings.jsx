@@ -144,6 +144,8 @@ export default function LearnerSettings() {
     form: systemForm,
     setForm: setSystemForm,
     saving: systemSaving,
+    lastFetchedAt: systemLastFetchedAt,
+    lastSavedAt: systemLastSavedAt,
     refresh: refreshSystemPreferences,
     persist: persistSystemPreferences,
     handleInputChange: handleSystemInputChange,
@@ -206,6 +208,42 @@ export default function LearnerSettings() {
     () => (Array.isArray(financeForm.documents) ? financeForm.documents : []),
     [financeForm.documents]
   );
+
+  const systemLayoutLastSavedAt = systemLastSavedAt ?? systemLastFetchedAt ?? null;
+
+  const systemLastSavedLabel = useMemo(() => {
+    if (!systemLayoutLastSavedAt) return null;
+    const resolved = systemLayoutLastSavedAt instanceof Date ? systemLayoutLastSavedAt : new Date(systemLayoutLastSavedAt);
+    if (Number.isNaN(resolved.getTime())) {
+      return null;
+    }
+    return new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      minute: '2-digit',
+      month: 'short',
+      day: 'numeric'
+    }).format(resolved);
+  }, [systemLayoutLastSavedAt]);
+
+  const handleResetSystemPreferences = () => {
+    setStatusMessage({ type: 'info', message: 'Restoring preferences from your last sync…' });
+    refreshSystemPreferences();
+  };
+
+  const handleResetPersonalisation = () => {
+    setSystemForm((previous) => ({
+      ...previous,
+      preferences: {
+        ...previous.preferences,
+        analyticsOptIn: DEFAULT_SYSTEM_FORM.preferences.analyticsOptIn,
+        adPersonalisation: DEFAULT_SYSTEM_FORM.preferences.adPersonalisation,
+        sponsoredHighlights: DEFAULT_SYSTEM_FORM.preferences.sponsoredHighlights,
+        adDataUsageAcknowledged: DEFAULT_SYSTEM_FORM.preferences.adDataUsageAcknowledged,
+        recommendedTopics: [...DEFAULT_SYSTEM_FORM.preferences.recommendedTopics]
+      }
+    }));
+    setStatusMessage({ type: 'info', message: 'Personalisation toggles reset. Save to apply changes.' });
+  };
 
   const handleFinanceInputChange = (event) => {
     const { name, type, checked, value } = event.target;
@@ -528,6 +566,11 @@ export default function LearnerSettings() {
           </>
         }
         status={statusBanner}
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Settings' }
+        ]}
+        lastSavedAt={systemLayoutLastSavedAt}
       >
         <SystemPreferencesPanel
           form={systemForm}
@@ -542,6 +585,11 @@ export default function LearnerSettings() {
           onAdPersonalisationChange={handleAdPersonalisationChange}
           disableActions={disableActions}
           isSaving={pendingAction === 'system' || systemSaving}
+          systemLastSavedLabel={systemLastSavedLabel}
+          personalisationLastSavedLabel={systemLastSavedLabel}
+          onResetSystem={handleResetSystemPreferences}
+          onResetPersonalisation={handleResetPersonalisation}
+          syncStatus={statusMessage?.message}
         />
 
         <SettingsAccordion

@@ -4,6 +4,8 @@ import LiveClassroomModel from '../models/LiveClassroomModel.js';
 import CourseModel from '../models/CourseModel.js';
 import TutorProfileModel from '../models/TutorProfileModel.js';
 import MonetizationCatalogItemModel from '../models/MonetizationCatalogItemModel.js';
+import { env } from '../config/env.js';
+import { distributedRuntimeCache } from '../services/DistributedRuntimeCache.js';
 import { success } from '../utils/httpResponse.js';
 
 const liveClassroomQuerySchema = Joi.object({
@@ -181,6 +183,17 @@ function mapTutorToCatalogue(tutor) {
   };
 }
 
+const filterLayoutDescriptor = Object.freeze({
+  recommendedColumns: { desktop: 3, tablet: 2, mobile: 1 },
+  stickyFacets: true,
+  accentTone: 'emerald',
+  badgeVariant: 'pill',
+  analyticsEvent: 'catalogue.filters.viewed'
+});
+
+const primaryFacets = Object.freeze(['categories', 'levels']);
+const secondaryFacets = Object.freeze(['languages', 'deliveryFormats']);
+
 export default class CatalogueController {
   static async listLiveClassrooms(req, res, next) {
     try {
@@ -315,6 +328,77 @@ export default class CatalogueController {
       });
     } catch (error) {
       return next(withValidationStatus(error));
+    }
+  }
+
+  static async listFilters(_req, res, next) {
+    try {
+      const cache = distributedRuntimeCache;
+      const ttlSeconds = Math.max(30, env.catalogue?.filterCacheTtlSeconds ?? 600);
+      const ttlMs = ttlSeconds * 1000;
+
+      let snapshot = cache ? await cache.readCatalogueFilters() : null;
+      const cacheHit = Boolean(snapshot?.value);
+
+      if (!snapshot?.value) {
+        const raw = await CourseModel.getCatalogueFilters();
+        const decorated = {
+          ...raw,
+          refreshedAt: raw.generatedAt,
+          layout: filterLayoutDescriptor,
+          facets: {
+            primary: primaryFacets,
+            secondary: secondaryFacets,
+            tagCloudKey: 'tags',
+            totals: raw.totals
+          }
+        };
+
+        let lockToken = null;
+        if (cache?.writeCatalogueFilters) {
+          try {
+            lockToken = await cache.acquireCatalogueFiltersLock?.();
+            if (lockToken) {
+              const fresh = await cache.readCatalogueFilters();
+              snapshot = fresh?.value ? fresh : await cache.writeCatalogueFilters(decorated, { ttlMs });
+            } else {
+              snapshot =
+                (await cache.writeCatalogueFilters(decorated, { ttlMs })) ?? {
+                  value: decorated,
+                  updatedAt: new Date().toISOString(),
+                  version: Date.now()
+                };
+            }
+          } finally {
+            if (lockToken) {
+              await cache.releaseCatalogueFiltersLock?.(lockToken);
+            }
+          }
+        }
+
+        if (!snapshot) {
+          snapshot = {
+            value: decorated,
+            updatedAt: new Date().toISOString(),
+            version: Date.now()
+          };
+        }
+      }
+
+      return success(res, {
+        data: snapshot.value,
+        meta: {
+          cache: {
+            hit: cacheHit,
+            updatedAt: snapshot.updatedAt ?? null,
+            version: snapshot.version ?? null,
+            ttlSeconds
+          }
+        },
+        message: cacheHit ? 'Catalogue filters retrieved from cache' : 'Catalogue filters refreshed'
+      });
+    } catch (error) {
+      return next(error);
     }
   }
 }

@@ -951,6 +951,17 @@ const envSchema = z
     DATA_RETENTION_RUN_ON_STARTUP: z.coerce.boolean().default(false),
     DATA_RETENTION_MAX_FAILURES: z.coerce.number().int().min(1).max(10).default(3),
     DATA_RETENTION_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
+    DATA_RETENTION_VERIFY: z.coerce.boolean().default(true),
+    DATA_RETENTION_VERIFY_FAIL_ON_RESIDUAL: z.coerce.boolean().default(true),
+    DATA_RETENTION_VERIFICATION_SAMPLE_SIZE: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(500)
+      .default(5),
+    DATA_RETENTION_REPORT_ENABLED: z.coerce.boolean().default(true),
+    DATA_RETENTION_REPORT_CHANNEL: z.string().default('governance.compliance'),
+    DATA_RETENTION_REPORT_AUDIENCE: z.string().default('compliance,legal'),
     DATA_PARTITIONING_ENABLED: z.coerce.boolean().default(true),
     DATA_PARTITIONING_SCHEMA: z.string().optional(),
     DATA_PARTITIONING_CRON: z.string().default('30 2 * * *'),
@@ -1049,6 +1060,15 @@ const envSchema = z
     MODERATION_FOLLOW_UP_CRON: z.string().default('*/10 * * * *'),
     MODERATION_FOLLOW_UP_TIMEZONE: z.string().default('Etc/UTC'),
     MODERATION_FOLLOW_UP_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(50),
+    MODERATION_FOLLOW_UP_ESCALATE_AFTER_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(14 * 24 * 60)
+      .default(120),
+    MODERATION_FOLLOW_UP_ESCALATION_ROLES: z.string().default('moderator,compliance_manager'),
+    MODERATION_FOLLOW_UP_AUDIT_SEVERITY: z.string().default('notice'),
+    MODERATION_FOLLOW_UP_ANALYTICS_ENABLED: z.coerce.boolean().default(true),
     CHAT_PRESENCE_DEFAULT_TTL_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(5),
     CHAT_PRESENCE_MAX_TTL_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(60),
     CHAT_MESSAGE_DEFAULT_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(50),
@@ -1434,8 +1454,16 @@ const redisKeyPrefix = normalizeRedisNamespace(raw.REDIS_KEY_PREFIX, 'edulure:ru
 const redisLockPrefix = normalizeRedisNamespace(raw.REDIS_LOCK_PREFIX, 'edulure:locks');
 const redisFeatureFlagKey = buildRedisKey(redisKeyPrefix, raw.REDIS_FEATURE_FLAG_CACHE_KEY);
 const redisRuntimeConfigKey = buildRedisKey(redisKeyPrefix, raw.REDIS_RUNTIME_CONFIG_CACHE_KEY);
+const redisCatalogueFiltersKey = buildRedisKey(
+  redisKeyPrefix,
+  raw.REDIS_CATALOGUE_FILTER_CACHE_KEY ?? 'catalogue:filters'
+);
 const redisFeatureFlagLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_FEATURE_FLAG_LOCK_KEY);
 const redisRuntimeConfigLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_RUNTIME_CONFIG_LOCK_KEY);
+const redisCatalogueFiltersLockKey = buildRedisKey(
+  redisLockPrefix,
+  raw.REDIS_CATALOGUE_FILTER_LOCK_KEY ?? 'catalogue:filters'
+);
 const redisTlsCa = maybeDecodeCertificate(raw.REDIS_TLS_CA);
 const partitionSchema = raw.DATA_PARTITIONING_SCHEMA ?? raw.DB_NAME;
 const partitionArchiveBucket = raw.DATA_PARTITIONING_ARCHIVE_BUCKET ?? storageBuckets.private;
@@ -1444,6 +1472,14 @@ const partitionMaxExportBytes = raw.DATA_PARTITIONING_MAX_EXPORT_MB
   ? raw.DATA_PARTITIONING_MAX_EXPORT_MB * 1024 * 1024
   : null;
 const partitionMaxExportRows = raw.DATA_PARTITIONING_MAX_EXPORT_ROWS ?? null;
+
+const catalogueFilterCacheTtlSeconds = (() => {
+  const parsed = Number(raw.CATALOGUE_FILTER_CACHE_TTL_SECONDS);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.max(30, Math.round(parsed));
+  }
+  return 600;
+})();
 
 export const env = {
   nodeEnv: raw.NODE_ENV,
@@ -1804,8 +1840,10 @@ export const env = {
     keys: {
       featureFlags: redisFeatureFlagKey,
       runtimeConfig: redisRuntimeConfigKey,
+      catalogueFilters: redisCatalogueFiltersKey,
       featureFlagLock: redisFeatureFlagLockKey,
-      runtimeConfigLock: redisRuntimeConfigLockKey
+      runtimeConfigLock: redisRuntimeConfigLockKey,
+      catalogueFiltersLock: redisCatalogueFiltersLockKey
     },
     commandTimeoutMs: raw.REDIS_COMMAND_TIMEOUT_MS,
     lockTtlMs: raw.REDIS_LOCK_TTL_SECONDS * 1000
@@ -1817,7 +1855,17 @@ export const env = {
     dryRun: raw.DATA_RETENTION_DRY_RUN,
     runOnStartup: raw.DATA_RETENTION_RUN_ON_STARTUP,
     maxConsecutiveFailures: raw.DATA_RETENTION_MAX_FAILURES,
-    failureBackoffMinutes: raw.DATA_RETENTION_FAILURE_BACKOFF_MINUTES
+    failureBackoffMinutes: raw.DATA_RETENTION_FAILURE_BACKOFF_MINUTES,
+    verification: {
+      enabled: raw.DATA_RETENTION_VERIFY,
+      failOnResidual: raw.DATA_RETENTION_VERIFY_FAIL_ON_RESIDUAL,
+      sampleSize: raw.DATA_RETENTION_VERIFICATION_SAMPLE_SIZE
+    },
+    reporting: {
+      enabled: raw.DATA_RETENTION_REPORT_ENABLED,
+      channel: raw.DATA_RETENTION_REPORT_CHANNEL,
+      audience: parseCsv(raw.DATA_RETENTION_REPORT_AUDIENCE ?? '')
+    }
   },
   partitioning: {
     enabled: raw.DATA_PARTITIONING_ENABLED,
@@ -1903,7 +1951,11 @@ export const env = {
       enabled: raw.MODERATION_FOLLOW_UP_ENABLED,
       cronExpression: raw.MODERATION_FOLLOW_UP_CRON,
       timezone: raw.MODERATION_FOLLOW_UP_TIMEZONE,
-      batchSize: raw.MODERATION_FOLLOW_UP_BATCH_SIZE
+      batchSize: raw.MODERATION_FOLLOW_UP_BATCH_SIZE,
+      escalateAfterMinutes: raw.MODERATION_FOLLOW_UP_ESCALATE_AFTER_MINUTES,
+      escalationRoles: parseCsv(raw.MODERATION_FOLLOW_UP_ESCALATION_ROLES ?? ''),
+      auditSeverity: raw.MODERATION_FOLLOW_UP_AUDIT_SEVERITY,
+      analyticsEnabled: raw.MODERATION_FOLLOW_UP_ANALYTICS_ENABLED
     }
   },
   search: {
@@ -2004,6 +2056,9 @@ export const env = {
       tool: raw.TELEMETRY_LINEAGE_TOOL,
       autoRecord: raw.TELEMETRY_LINEAGE_AUTO_RECORD
     }
+  },
+  catalogue: {
+    filterCacheTtlSeconds: catalogueFilterCacheTtlSeconds
   },
   release: {
     requiredGates: releaseRequiredGates,

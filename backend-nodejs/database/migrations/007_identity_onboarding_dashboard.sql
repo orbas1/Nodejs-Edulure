@@ -218,11 +218,11 @@ CREATE TABLE IF NOT EXISTS course_assignments (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS learner_system_preferences (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
-  language VARCHAR(12) NULL,
-  region VARCHAR(12) NULL,
-  timezone VARCHAR(64) NULL,
+  language VARCHAR(8) NOT NULL DEFAULT 'en',
+  region VARCHAR(32) NOT NULL DEFAULT 'US',
+  timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
   notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
   digest_enabled TINYINT(1) NOT NULL DEFAULT 1,
   auto_play_media TINYINT(1) NOT NULL DEFAULT 0,
@@ -233,4 +233,66 @@ CREATE TABLE IF NOT EXISTS learner_system_preferences (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY learner_system_preferences_user_unique (user_id),
   CONSTRAINT learner_system_preferences_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS learner_financial_profiles (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  auto_pay_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  reserve_target_cents INT UNSIGNED NOT NULL DEFAULT 0,
+  preferences JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY learner_financial_profiles_user_unique (user_id),
+  CONSTRAINT learner_financial_profiles_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT learner_financial_profiles_reserve_chk CHECK (reserve_target_cents >= 0)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS learner_payment_methods (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  label VARCHAR(120) NOT NULL,
+  brand VARCHAR(60) NOT NULL,
+  last4 VARCHAR(4) NOT NULL,
+  expiry VARCHAR(10) NOT NULL,
+  is_primary TINYINT(1) NOT NULL DEFAULT 0,
+  metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY learner_payment_methods_user_label_unique (user_id, label),
+  KEY learner_payment_methods_user_primary_idx (user_id, is_primary),
+  CONSTRAINT learner_payment_methods_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS learner_billing_contacts (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  name VARCHAR(150) NOT NULL,
+  email VARCHAR(180) NOT NULL,
+  phone VARCHAR(60) NULL,
+  company VARCHAR(150) NULL,
+  metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY learner_billing_contacts_user_email_unique (user_id, email),
+  KEY learner_billing_contacts_user_idx (user_id),
+  CONSTRAINT learner_billing_contacts_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS learner_finance_purchases (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  reference VARCHAR(64) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  amount_cents INT UNSIGNED NOT NULL DEFAULT 0,
+  currency CHAR(3) NOT NULL DEFAULT 'USD',
+  status VARCHAR(32) NOT NULL DEFAULT 'paid',
+  purchased_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY learner_finance_purchases_user_date_idx (user_id, purchased_at),
+  KEY learner_finance_purchases_user_status_idx (user_id, status),
+  CONSTRAINT learner_finance_purchases_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT learner_finance_purchases_amount_chk CHECK (amount_cents >= 0)
 ) ENGINE=InnoDB;

@@ -110,6 +110,75 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function incrementCount(map, rawValue) {
+  if (rawValue === null || rawValue === undefined) {
+    return;
+  }
+  const value = String(rawValue).trim();
+  if (!value) {
+    return;
+  }
+  map.set(value, (map.get(value) ?? 0) + 1);
+}
+
+function incrementFromArray(map, values) {
+  if (!Array.isArray(values)) {
+    return;
+  }
+  values.forEach((entry) => incrementCount(map, entry));
+}
+
+function toSortedCountList(map, { limit } = {}) {
+  const entries = Array.from(map.entries()).sort((a, b) => {
+    if (b[1] === a[1]) {
+      return a[0].localeCompare(b[0]);
+    }
+    return b[1] - a[1];
+  });
+
+  const sliced = typeof limit === 'number' && limit > 0 ? entries.slice(0, limit) : entries;
+  return sliced.map(([value, count]) => ({ value, count }));
+}
+
+export function buildCatalogueFilterSnapshot(rows, { tagLimit = 60 } = {}) {
+  const categoryCounts = new Map();
+  const levelCounts = new Map();
+  const languageCounts = new Map();
+  const deliveryCounts = new Map();
+  const tagCounts = new Map();
+  const skillCounts = new Map();
+
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const metadata = parseJson(row?.metadata, {});
+    const defaultCategory = metadata.defaultCategory ?? metadata.category ?? null;
+    const defaultLevel = metadata.defaultLevel ?? metadata.level ?? null;
+    const defaultDelivery = metadata.defaultDeliveryFormat ?? metadata.deliveryFormat ?? null;
+
+    incrementCount(categoryCounts, row?.category ?? defaultCategory);
+    incrementCount(levelCounts, row?.level ?? defaultLevel);
+    incrementCount(deliveryCounts, row?.deliveryFormat ?? defaultDelivery);
+
+    incrementFromArray(languageCounts, parseStringArray(row?.languages));
+    incrementFromArray(tagCounts, parseStringArray(row?.tags));
+    incrementFromArray(skillCounts, parseStringArray(row?.skills));
+  });
+
+  const now = new Date();
+
+  return {
+    generatedAt: now.toISOString(),
+    totals: {
+      coursesEvaluated: Array.isArray(rows) ? rows.length : 0
+    },
+    categories: toSortedCountList(categoryCounts),
+    levels: toSortedCountList(levelCounts),
+    deliveryFormats: toSortedCountList(deliveryCounts),
+    languages: toSortedCountList(languageCounts),
+    tags: toSortedCountList(tagCounts, { limit: tagLimit }),
+    skills: toSortedCountList(skillCounts, { limit: tagLimit })
+  };
+}
+
 export default class CourseModel {
   static normaliseSlug(value, fallback) {
     const base = value || fallback;
@@ -224,6 +293,25 @@ export default class CourseModel {
 
     const rows = await query;
     return rows.map((row) => this.deserialize(row));
+  }
+
+  static async getCatalogueFilters({ includeUnpublished = false, tagLimit = 60 } = {}, connection = db) {
+    const query = connection(TABLE).select(
+      'category',
+      'level',
+      'languages',
+      'tags',
+      'skills',
+      'delivery_format as deliveryFormat',
+      'metadata'
+    );
+
+    if (!includeUnpublished) {
+      query.where('status', 'published');
+    }
+
+    const rows = await query;
+    return buildCatalogueFilterSnapshot(rows, { tagLimit });
   }
 
   static async create(course, connection = db) {

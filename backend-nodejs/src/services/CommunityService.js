@@ -19,6 +19,7 @@ import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
 import UserProfileModel from '../models/UserProfileModel.js';
 import AdsPlacementService from './AdsPlacementService.js';
 import { summariseReactions } from '../services/ReactionAggregationService.js';
+import { buildCommunityPersonaSummary } from '../utils/communityPersona.js';
 
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 const RESOURCE_MANAGER_ROLES = new Set(['owner', 'admin', 'moderator']);
@@ -246,6 +247,103 @@ function buildRecordedSessions(resources, metadata = []) {
     : [];
 }
 
+const EVENT_ACCENT_MAP = new Map([
+  ['Webinar', 'iris'],
+  ['Workshop', 'amber'],
+  ['Event', 'emerald'],
+  ['Live Session', 'violet']
+]);
+
+function toDateOrNull(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function hoursUntil(date) {
+  if (!date) {
+    return null;
+  }
+  return (date.getTime() - Date.now()) / 3600000;
+}
+
+function computeEventPriority({ hoursUntilStart, isLive }) {
+  if (isLive) {
+    return 1;
+  }
+  if (hoursUntilStart === null) {
+    return 0.35;
+  }
+  if (hoursUntilStart < -24) {
+    return 0.25;
+  }
+  if (hoursUntilStart < 0) {
+    return 0.45;
+  }
+  if (hoursUntilStart < 1) {
+    return 0.92;
+  }
+  if (hoursUntilStart < 24) {
+    return 0.78;
+  }
+  if (hoursUntilStart < 72) {
+    return 0.62;
+  }
+  if (hoursUntilStart < 168) {
+    return 0.48;
+  }
+  return 0.32;
+}
+
+function determineLayoutVariant(priority) {
+  if (priority >= 0.85) {
+    return 'hero';
+  }
+  if (priority >= 0.6) {
+    return 'highlight';
+  }
+  return 'default';
+}
+
+function decorateEventForDisplay(event) {
+  const startsAtDate = toDateOrNull(event.startsAt ?? event.startAt);
+  const endsAtDate = toDateOrNull(event.endsAt ?? event.endAt);
+  const hoursUntilStart = hoursUntil(startsAtDate);
+  const isLive = hoursUntilStart !== null && Math.abs(hoursUntilStart) < 0.25;
+  const priorityScore = computeEventPriority({ hoursUntilStart, isLive });
+  const accentTone = EVENT_ACCENT_MAP.get(event.type) ?? (isLive ? 'rose' : 'teal');
+  const layoutVariant = determineLayoutVariant(priorityScore);
+  const startTimestamp = startsAtDate ? startsAtDate.getTime() : Number.POSITIVE_INFINITY;
+
+  return {
+    ...event,
+    startsAt: startsAtDate ? startsAtDate.toISOString() : null,
+    endsAt: endsAtDate ? endsAtDate.toISOString() : null,
+    status: isLive ? 'live' : hoursUntilStart !== null && hoursUntilStart < 0 ? 'completed' : 'scheduled',
+    priorityScore,
+    display: {
+      accentTone,
+      badgeTone: accentTone,
+      variant: layoutVariant,
+      emphasis: layoutVariant === 'hero' ? 'high' : layoutVariant === 'highlight' ? 'medium' : 'base',
+      timeline: {
+        isLive,
+        hoursUntilStart: hoursUntilStart !== null ? Number(hoursUntilStart.toFixed(2)) : null,
+        startTimestamp
+      },
+      layout: {
+        columns:
+          layoutVariant === 'hero'
+            ? { desktop: 2, tablet: 1, mobile: 1 }
+            : { desktop: 3, tablet: 2, mobile: 1 },
+        highlight: layoutVariant !== 'default'
+      }
+    }
+  };
+}
+
 function mergeEvents(eventRecords, webinars, metadataEvents = []) {
   const events = [];
   const seen = new Set();
@@ -297,7 +395,17 @@ function mergeEvents(eventRecords, webinars, metadataEvents = []) {
     });
   });
 
-  return events;
+  const decorated = events.map((event) => decorateEventForDisplay(event));
+  decorated.sort((a, b) => {
+    if (b.priorityScore === a.priorityScore) {
+      const aStart = a.display?.timeline?.startTimestamp ?? Number.POSITIVE_INFINITY;
+      const bStart = b.display?.timeline?.startTimestamp ?? Number.POSITIVE_INFINITY;
+      return aStart - bStart;
+    }
+    return b.priorityScore - a.priorityScore;
+  });
+
+  return decorated;
 }
 
 function buildSubscriptionSummary(metadata = {}, tiers = [], subscriptions = []) {
@@ -1573,11 +1681,18 @@ export default class CommunityService {
 
   static serializeCommunity(community) {
     const metadata = parseJsonColumn(community.metadata, {});
+    const rawEventCount =
+      community.eventCount ??
+      community.eventsCount ??
+      (Array.isArray(community.events) ? community.events.length : null) ??
+      (Array.isArray(metadata.events) ? metadata.events.length : null);
+    const eventCount = Number(rawEventCount ?? 0);
     const stats = {
       members: Number(community.memberCount ?? 0),
       resources: Number(community.resourceCount ?? 0),
       posts: Number(community.postCount ?? 0),
       channels: Number(community.channelCount ?? 0),
+      events: eventCount,
       lastActivityAt: community.lastActivityAt ?? community.updatedAt
     };
 
@@ -1591,6 +1706,18 @@ export default class CommunityService {
       canLeave: isActiveMembership(membershipInfo) && community.memberRole !== 'owner'
     };
 
+    const personaSnapshot = buildCommunityPersonaSummary(
+      {
+        ...community,
+        metadata
+      },
+      stats
+    );
+    const personaSummary = personaSnapshot.summary;
+    const personas = personaSnapshot.personas;
+    const resolvedLastActivity = personaSummary.lastActivityAt ?? stats.lastActivityAt;
+    const momentumScore = personaSummary.engagementScore;
+
     return {
       id: community.id,
       name: community.name,
@@ -1599,8 +1726,18 @@ export default class CommunityService {
       coverImageUrl: community.coverImageUrl,
       visibility: community.visibility,
       ownerId: community.ownerId,
-      metadata,
-      stats,
+      metadata: {
+        ...metadata,
+        personas,
+        personaSummary
+      },
+      personas,
+      personaSummary,
+      stats: {
+        ...stats,
+        lastActivityAt: resolvedLastActivity,
+        momentumScore
+      },
       membership: community.memberRole
         ? {
             role: community.memberRole,
@@ -1614,9 +1751,27 @@ export default class CommunityService {
   }
 
   static serializeCommunityDetail(community, membership, stats, channels, context = {}) {
+    const statsSnapshot = stats
+      ? {
+          memberCount: Number(stats.memberCount ?? 0),
+          resourceCount: Number(stats.resourceCount ?? 0),
+          postCount: Number(stats.postCount ?? 0),
+          channelCount: Number(stats.channelCount ?? 0),
+          eventCount: Number(stats.eventCount ?? 0),
+          lastActivityAt: stats.lastActivityAt ?? community.updatedAt
+        }
+      : {
+          memberCount: 0,
+          resourceCount: 0,
+          postCount: 0,
+          channelCount: 0,
+          eventCount: 0,
+          lastActivityAt: community.updatedAt ?? null
+        };
+
     const summary = this.serializeCommunity({
       ...community,
-      ...stats,
+      ...statsSnapshot,
       memberRole: membership?.role,
       memberStatus: membership?.status
     });
