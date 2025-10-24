@@ -3,6 +3,7 @@ import {
   ArrowUpTrayIcon,
   CheckCircleIcon,
   ChevronRightIcon,
+  ClockIcon,
   DocumentTextIcon,
   EnvelopeIcon,
   ExclamationTriangleIcon,
@@ -41,6 +42,13 @@ const STATUS_BADGES = {
   waiting: 'bg-amber-100 text-amber-700',
   resolved: 'bg-emerald-100 text-emerald-700',
   closed: 'bg-slate-100 text-slate-600'
+};
+
+const SLA_BADGES = {
+  overdue: 'bg-rose-100 text-rose-700',
+  risk: 'bg-amber-100 text-amber-700',
+  ok: 'bg-emerald-100 text-emerald-700',
+  none: 'bg-slate-100 text-slate-600'
 };
 
 const CATEGORY_OPTIONS = [
@@ -246,6 +254,55 @@ function SupportContactCard({ contact }) {
   );
 }
 
+function getSlaBadgeDescriptor(supportCase) {
+  if (!supportCase) {
+    return null;
+  }
+  const status = supportCase.slaStatus ?? 'none';
+  const className = SLA_BADGES[status] ?? SLA_BADGES.none;
+  if (!supportCase.followUpDueAt) {
+    return {
+      status,
+      className,
+      label: 'SLA pending',
+      description: 'Awaiting SLA assignment from support'
+    };
+  }
+  const relative = formatDashboardRelative(supportCase.followUpDueAt, {
+    fallback: 'soon',
+    numeric: 'auto'
+  });
+  if (status === 'overdue') {
+    return {
+      status,
+      className,
+      label: 'SLA breached',
+      description: `Breached ${relative}`
+    };
+  }
+  if (status === 'risk') {
+    return {
+      status,
+      className,
+      label: 'SLA at risk',
+      description: `Due ${relative}`
+    };
+  }
+  return {
+    status,
+    className,
+    label: 'SLA on track',
+    description: `Due ${relative}`
+  };
+}
+
+function formatSlaDeadline(supportCase) {
+  if (!supportCase?.followUpDueAt) {
+    return 'No SLA target assigned';
+  }
+  return formatDashboardDateTime(supportCase.followUpDueAt, { fallback: 'Soon' });
+}
+
 export default function LearnerSupport() {
   const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('support');
   const { session } = useAuth();
@@ -294,6 +351,7 @@ export default function LearnerSupport() {
   }, [statusMessage]);
 
   const selectedCase = cases.find((supportCase) => supportCase.id === selectedCaseId) ?? null;
+  const selectedCaseSlaBadge = selectedCase ? getSlaBadgeDescriptor(selectedCase) : null;
 
   const handleTicketSubmit = useCallback(
     async ({ subject, category, priority, description, attachments = [], knowledgeSuggestions = [] }) => {
@@ -624,44 +682,56 @@ export default function LearnerSupport() {
                 No support requests yet. Use “New request” to start one.
               </div>
             ) : (
-              cases.map((supportCase) => (
-                <button
-                  type="button"
-                  key={supportCase.id}
-                  onClick={() => setSelectedCaseId(supportCase.id)}
-                  className={`w-full rounded-3xl border px-5 py-4 text-left shadow-sm transition ${
-                    selectedCaseId === supportCase.id
-                      ? 'border-primary/50 bg-primary/5'
-                      : 'border-slate-200 bg-white hover:border-primary/40'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{supportCase.subject}</p>
-                      <p className="mt-1 text-xs text-slate-500">{supportCase.category}</p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        Updated {formatDashboardRelative(supportCase.updatedAt)}
-                      </p>
+              cases.map((supportCase) => {
+                const slaBadge = getSlaBadgeDescriptor(supportCase);
+                return (
+                  <button
+                    type="button"
+                    key={supportCase.id}
+                    onClick={() => setSelectedCaseId(supportCase.id)}
+                    className={`w-full rounded-3xl border px-5 py-4 text-left shadow-sm transition ${
+                      selectedCaseId === supportCase.id
+                        ? 'border-primary/50 bg-primary/5'
+                        : 'border-slate-200 bg-white hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{supportCase.subject}</p>
+                        <p className="mt-1 text-xs text-slate-500">{supportCase.category}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Updated {formatDashboardRelative(supportCase.updatedAt)}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                            PRIORITY_BADGES[supportCase.priority] ?? PRIORITY_BADGES.normal
+                          }`}
+                        >
+                          {supportCase.priority}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                            STATUS_BADGES[supportCase.status] ?? STATUS_BADGES.open
+                          }`}
+                        >
+                          {supportCase.status}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                            slaBadge?.className ?? SLA_BADGES.none
+                          }`}
+                          data-sla-status={slaBadge?.status ?? 'none'}
+                          title={slaBadge?.description}
+                        >
+                          {slaBadge?.label ?? 'SLA pending'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                          PRIORITY_BADGES[supportCase.priority] ?? PRIORITY_BADGES.normal
-                        }`}
-                      >
-                        {supportCase.priority}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                          STATUS_BADGES[supportCase.status] ?? STATUS_BADGES.open
-                        }`}
-                      >
-                        {supportCase.status}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
@@ -734,16 +804,85 @@ export default function LearnerSupport() {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned</p>
                     <p className="text-sm text-slate-700">
-                      {selectedCase.owner ?? selectedCase.lastAgent ?? 'Learner success desk'}
+                      {selectedCase.assignmentLabel}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Messages</p>
                     <p className="text-sm text-slate-700">{selectedCase.messageCount}</p>
                   </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next SLA checkpoint</p>
+                    <p className="text-sm text-slate-700">{formatSlaDeadline(selectedCase)}</p>
+                    <span
+                      className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                        selectedCaseSlaBadge?.className ?? SLA_BADGES.none
+                      }`}
+                      data-sla-status={selectedCaseSlaBadge?.status ?? 'none'}
+                      title={selectedCaseSlaBadge?.description}
+                    >
+                      {selectedCaseSlaBadge?.label ?? 'SLA pending'}
+                    </span>
+                  </div>
                 </div>
 
                 <MessageTimeline messages={selectedCase.messages} />
+
+                {selectedCase.knowledgeSuggestions?.length ? (
+                  <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center gap-2">
+                      <DocumentTextIcon className="h-5 w-5 text-primary" aria-hidden="true" />
+                      <p className="text-sm font-semibold text-slate-900">Suggested playbooks</p>
+                    </div>
+                    <ul className="space-y-3">
+                      {selectedCase.knowledgeSuggestions.map((suggestion) => (
+                        <li key={suggestion.id}>
+                          <a
+                            href={suggestion.url}
+                            className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm shadow-sm transition hover:border-primary/40"
+                          >
+                            <div>
+                              <p className="font-semibold text-slate-900">{suggestion.title}</p>
+                              {suggestion.excerpt ? (
+                                <p className="mt-1 text-xs text-slate-500">{suggestion.excerpt}</p>
+                              ) : null}
+                            </div>
+                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                              {suggestion.minutes} min
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {selectedCase.escalationBreadcrumbs?.length ? (
+                  <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2">
+                      <ClockIcon className="h-5 w-5 text-primary" aria-hidden="true" />
+                      <p className="text-sm font-semibold text-slate-900">Escalation timeline</p>
+                    </div>
+                    <ol className="space-y-3">
+                      {selectedCase.escalationBreadcrumbs.map((crumb) => (
+                        <li key={crumb.id} className="flex items-start gap-3">
+                          <span className="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              {formatDashboardDateTime(crumb.at, { fallback: 'Recently' })}
+                              {` · ${formatDashboardRelative(crumb.at, { fallback: 'moments ago', numeric: 'auto' })}`}
+                            </p>
+                            <p className="text-sm font-semibold text-slate-900">{crumb.label}</p>
+                            {crumb.note ? (
+                              <p className="text-xs text-slate-500">{crumb.note}</p>
+                            ) : null}
+                            <p className="text-xs text-slate-400">By {crumb.actor ?? 'system'}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ) : null}
 
                 <div className="space-y-3">
                   <label className="flex flex-col text-sm font-medium text-slate-700">

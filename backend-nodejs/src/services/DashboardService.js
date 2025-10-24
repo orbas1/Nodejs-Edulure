@@ -22,6 +22,7 @@ import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
 import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
 import OperatorDashboardService from './OperatorDashboardService.js';
 import { summariseReactions as aggregateReactionSummary } from '../services/ReactionAggregationService.js';
+import SupportKnowledgeBaseService from './SupportKnowledgeBaseService.js';
 
 function safeJsonParse(value, fallback) {
   if (!value) return fallback;
@@ -785,7 +786,8 @@ export function buildLearnerDashboard({
   adCampaigns = [],
   instructorApplication = null,
   supportCases = [],
-  supportMetrics = DEFAULT_SUPPORT_METRICS
+  supportMetrics = DEFAULT_SUPPORT_METRICS,
+  supportKnowledgeBase = DEFAULT_SUPPORT_KB
 } = {}) {
   const resolvedCommunityEvents = Array.isArray(communityEvents) ? communityEvents : [];
   const hasSignals =
@@ -841,6 +843,10 @@ export function buildLearnerDashboard({
     ...DEFAULT_SUPPORT_METRICS,
     ...(supportMetrics && typeof supportMetrics === 'object' ? supportMetrics : {})
   };
+  const knowledgeBaseArticles =
+    Array.isArray(supportKnowledgeBase) && supportKnowledgeBase.length
+      ? supportKnowledgeBase
+      : DEFAULT_SUPPORT_KB;
 
   const courseMap = new Map();
   const instructorDirectoryMap = ensureMap(instructorDirectory);
@@ -2571,7 +2577,7 @@ export function buildLearnerDashboard({
   };
   const supportSection = {
     cases: supportCasesList,
-    knowledgeBase: DEFAULT_SUPPORT_KB,
+    knowledgeBase: knowledgeBaseArticles,
     contacts: DEFAULT_SUPPORT_CONTACTS,
     serviceWindow: '24/7 global support',
     metrics: {
@@ -4831,6 +4837,7 @@ export default class DashboardService {
       : [];
 
     let supportCases = [];
+    let knowledgeBaseArticles = DEFAULT_SUPPORT_KB;
     const supportMetrics = {
       open: 0,
       waiting: 0,
@@ -4849,6 +4856,7 @@ export default class DashboardService {
     try {
       supportCases = await LearnerSupportRepository.listCases(user.id);
       const responseDurations = [];
+      const categoryHistogram = new Map();
       supportCases.forEach((supportCase) => {
         const status = (supportCase.status ?? 'open').toLowerCase();
         if (supportMetrics[status] !== undefined) {
@@ -4856,6 +4864,11 @@ export default class DashboardService {
         } else {
           supportMetrics.open += 1;
         }
+        const categoryLabel =
+          typeof supportCase.category === 'string' && supportCase.category.trim().length
+            ? supportCase.category.trim()
+            : 'General';
+        categoryHistogram.set(categoryLabel, (categoryHistogram.get(categoryLabel) ?? 0) + 1);
         const messages = Array.isArray(supportCase.messages) ? supportCase.messages : [];
         if (messages.length) {
           const latestMessage = messages[messages.length - 1];
@@ -4899,9 +4912,55 @@ export default class DashboardService {
           responseDurations.reduce((sum, value) => sum + value, 0) / responseDurations.length
         );
       }
+
+      try {
+        const sortedCategories = Array.from(categoryHistogram.entries()).sort((a, b) => b[1] - a[1]);
+        const topCategory = sortedCategories.length ? sortedCategories[0][0] : null;
+        const searchOptions = { limit: 6 };
+        if (topCategory) {
+          searchOptions.category = topCategory;
+        }
+
+        let articles = await SupportKnowledgeBaseService.searchArticles(searchOptions);
+        if ((!articles || !articles.length) && topCategory) {
+          articles = await SupportKnowledgeBaseService.searchArticles({ limit: 6 });
+        }
+
+        if (Array.isArray(articles) && articles.length) {
+          const deduped = new Map();
+          articles.forEach((article, index) => {
+            if (!article) {
+              return;
+            }
+            const id =
+              article.id ??
+              article.slug ??
+              (crypto.randomUUID ? crypto.randomUUID() : `kb-${Date.now()}-${index}`);
+            if (deduped.has(id)) {
+              return;
+            }
+            const minutes = Number.isFinite(Number(article.minutes)) ? Number(article.minutes) : 3;
+            deduped.set(id, {
+              id,
+              title: article.title ?? 'Support article',
+              excerpt: article.excerpt ?? article.summary ?? '',
+              url: article.url ?? '#',
+              category: article.category ?? 'General',
+              minutes,
+              helpfulnessScore: Number(article.helpfulnessScore ?? 0)
+            });
+          });
+          if (deduped.size) {
+            knowledgeBaseArticles = Array.from(deduped.values());
+          }
+        }
+      } catch (knowledgeBaseError) {
+        log.warn({ err: knowledgeBaseError }, 'Failed to load support knowledge base articles');
+      }
     } catch (error) {
       log.warn({ err: error }, 'Failed to load learner support workspace data');
       supportCases = [];
+      knowledgeBaseArticles = DEFAULT_SUPPORT_KB;
     }
 
     let courseWorkspaceInput = {
@@ -5451,7 +5510,8 @@ export default class DashboardService {
           adCampaigns: adCampaignsRaw,
           instructorApplication: instructorApplicationRaw,
           supportCases,
-          supportMetrics
+          supportMetrics,
+          supportKnowledgeBase: knowledgeBaseArticles
         }) ?? undefined;
     } catch (error) {
       log.warn({ err: error }, 'Failed to load learner dashboard data');
@@ -5794,7 +5854,8 @@ export default class DashboardService {
           adCampaigns: adCampaignsRaw,
           instructorApplication: instructorApplicationRaw,
           supportCases,
-          supportMetrics
+          supportMetrics,
+          supportKnowledgeBase: knowledgeBaseArticles
         }) ?? undefined;
 
       communitySnapshot =
