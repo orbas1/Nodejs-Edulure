@@ -12,12 +12,15 @@ import {
   COMMUNITY_EVENT_REMINDER_STATUSES
 } from '../src/models/communityEventConstants.js';
 import { ensureSeedImage } from './_helpers/seedAssets.js';
+import { buildEnvironmentColumns, getEnvironmentDescriptor } from '../src/utils/environmentContext.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
 const incidentEncryptionKey = process.env.SECURITY_INCIDENT_ENCRYPTION_KEY
   ? Buffer.from(process.env.SECURITY_INCIDENT_ENCRYPTION_KEY, 'hex')
   : crypto.createHash('sha256').update('edulure-security-seed-key').digest();
+const seedEnvironment = getEnvironmentDescriptor();
+const createEnvironmentColumns = () => ({ ...buildEnvironmentColumns(seedEnvironment) });
 
 const sealSensitive = (value) => {
   if (!value) {
@@ -4939,7 +4942,8 @@ export async function seed(knex) {
       filters: JSON.stringify({ courses: { level: ['advanced'] } }),
       global_filters: JSON.stringify({ languages: ['en'] }),
       sort_preferences: JSON.stringify({ courses: 'rating', communities: 'trending' }),
-      metadata: JSON.stringify({ source: 'seed', cohort: 'operations' })
+      metadata: JSON.stringify({ source: 'seed', cohort: 'operations' }),
+      ...createEnvironmentColumns()
     });
 
     await trx('explorer_search_event_entities').insert([
@@ -5078,7 +5082,8 @@ export async function seed(knex) {
         clicks: 205,
         conversions: 58,
         average_latency_ms: 198,
-        metadata: JSON.stringify({ cohort: 'operations', previewDigests: previewDigestsByEntity.all })
+        metadata: JSON.stringify({ cohort: 'operations', previewDigests: previewDigestsByEntity.all }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -5090,7 +5095,8 @@ export async function seed(knex) {
         clicks: 68,
         conversions: 14,
         average_latency_ms: 182,
-        metadata: JSON.stringify({ category: 'operations', previewDigests: previewDigestsByEntity.communities })
+        metadata: JSON.stringify({ category: 'operations', previewDigests: previewDigestsByEntity.communities }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -5102,7 +5108,8 @@ export async function seed(knex) {
         clicks: 92,
         conversions: 33,
         average_latency_ms: 166,
-        metadata: JSON.stringify({ track: 'automation', previewDigests: previewDigestsByEntity.courses })
+        metadata: JSON.stringify({ track: 'automation', previewDigests: previewDigestsByEntity.courses }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsTwoDaysAgo,
@@ -5114,7 +5121,8 @@ export async function seed(knex) {
         clicks: 45,
         conversions: 11,
         average_latency_ms: 132,
-        metadata: JSON.stringify({ locale: 'global', previewDigests: previewDigestsByEntity.tutors })
+        metadata: JSON.stringify({ locale: 'global', previewDigests: previewDigestsByEntity.tutors }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsYesterday,
@@ -5126,7 +5134,8 @@ export async function seed(knex) {
         clicks: 248,
         conversions: 66,
         average_latency_ms: 187,
-        metadata: JSON.stringify({ cohort: 'growth', previewDigests: previewDigestsByEntity.all })
+        metadata: JSON.stringify({ cohort: 'growth', previewDigests: previewDigestsByEntity.all }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsYesterday,
@@ -5138,7 +5147,8 @@ export async function seed(knex) {
         clicks: 84,
         conversions: 19,
         average_latency_ms: 170,
-        metadata: JSON.stringify({ category: 'growth', previewDigests: previewDigestsByEntity.communities })
+        metadata: JSON.stringify({ category: 'growth', previewDigests: previewDigestsByEntity.communities }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsYesterday,
@@ -5150,7 +5160,8 @@ export async function seed(knex) {
         clicks: 118,
         conversions: 35,
         average_latency_ms: 158,
-        metadata: JSON.stringify({ track: 'commerce', previewDigests: previewDigestsByEntity.courses })
+        metadata: JSON.stringify({ track: 'commerce', previewDigests: previewDigestsByEntity.courses }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsYesterday,
@@ -5162,7 +5173,8 @@ export async function seed(knex) {
         clicks: 46,
         conversions: 12,
         average_latency_ms: 128,
-        metadata: JSON.stringify({ locale: 'emea', previewDigests: previewDigestsByEntity.tutors })
+        metadata: JSON.stringify({ locale: 'emea', previewDigests: previewDigestsByEntity.tutors }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsToday,
@@ -5174,7 +5186,8 @@ export async function seed(knex) {
         clicks: 261,
         conversions: 74,
         average_latency_ms: 176,
-        metadata: JSON.stringify({ cohort: 'live-classroom', previewDigests: previewDigestsByEntity.all })
+        metadata: JSON.stringify({ cohort: 'live-classroom', previewDigests: previewDigestsByEntity.all }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsToday,
@@ -5186,7 +5199,8 @@ export async function seed(knex) {
         clicks: 88,
         conversions: 22,
         average_latency_ms: 164,
-        metadata: JSON.stringify({ category: 'live', previewDigests: previewDigestsByEntity.communities })
+        metadata: JSON.stringify({ category: 'live', previewDigests: previewDigestsByEntity.communities }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsToday,
@@ -5198,7 +5212,8 @@ export async function seed(knex) {
         clicks: 128,
         conversions: 38,
         average_latency_ms: 152,
-        metadata: JSON.stringify({ track: 'delivery', previewDigests: previewDigestsByEntity.courses })
+        metadata: JSON.stringify({ track: 'delivery', previewDigests: previewDigestsByEntity.courses }),
+        ...createEnvironmentColumns()
       },
       {
         metric_date: analyticsToday,
@@ -5210,7 +5225,8 @@ export async function seed(knex) {
         clicks: 45,
         conversions: 14,
         average_latency_ms: 121,
-        metadata: JSON.stringify({ locale: 'amer', previewDigests: previewDigestsByEntity.tutors })
+        metadata: JSON.stringify({ locale: 'amer', previewDigests: previewDigestsByEntity.tutors }),
+        ...createEnvironmentColumns()
       }
     ]);
 
@@ -5220,7 +5236,8 @@ export async function seed(knex) {
         severity: 'warning',
         message: 'Zero-result rate for tutors exceeded 18% in the last 24h',
         metadata: JSON.stringify({ zeroRate: 0.19, entity: 'tutors' }),
-        detected_at: new Date(analyticsToday.getTime() - 6 * 60 * 60 * 1000)
+        detected_at: new Date(analyticsToday.getTime() - 6 * 60 * 60 * 1000),
+        ...createEnvironmentColumns()
       },
       {
         alert_code: 'explorer.click-through-rate',
@@ -5228,7 +5245,8 @@ export async function seed(knex) {
         message: 'Explorer CTR recovered above baseline after experiment rollout',
         metadata: JSON.stringify({ ctr: 0.032, experiment: 'explorer.personalised-facets' }),
         detected_at: new Date(analyticsYesterday.getTime() + 8 * 60 * 60 * 1000),
-        resolved_at: analyticsToday
+        resolved_at: analyticsToday,
+        ...createEnvironmentColumns()
       }
     ]);
 
@@ -5241,7 +5259,8 @@ export async function seed(knex) {
         metric_value: 360 + i * 8,
         lower_bound: 320 + i * 6,
         upper_bound: 410 + i * 9,
-        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.35 })
+        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.35 }),
+        ...createEnvironmentColumns()
       });
       await trx('analytics_forecasts').insert({
         forecast_code: 'explorer.click-through-rate',
@@ -5249,7 +5268,8 @@ export async function seed(knex) {
         metric_value: Number((0.031 + i * 0.0005).toFixed(4)),
         lower_bound: Number((0.027 + i * 0.0004).toFixed(4)),
         upper_bound: Number((0.036 + i * 0.0006).toFixed(4)),
-        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.4 })
+        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.4 }),
+        ...createEnvironmentColumns()
       });
     }
 

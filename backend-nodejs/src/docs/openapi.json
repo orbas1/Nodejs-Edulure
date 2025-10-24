@@ -5253,6 +5253,16 @@
       "ExplorerAnalyticsSummary": {
         "type": "object",
         "properties": {
+          "environment": {
+            "type": "object",
+            "properties": {
+              "key": { "type": "string" },
+              "name": { "type": "string" },
+              "tier": { "type": "string", "nullable": true },
+              "region": { "type": "string", "nullable": true },
+              "workspace": { "type": "string", "nullable": true }
+            }
+          },
           "range": {
             "$ref": "#/components/schemas/ExplorerAnalyticsRange"
           },
@@ -5314,6 +5324,10 @@
             "items": {
               "$ref": "#/components/schemas/ExplorerAnalyticsAlert"
             }
+          },
+          "lastComputedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [

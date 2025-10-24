@@ -13,6 +13,7 @@ import {
   recordExplorerInteraction,
   recordExplorerSearchEvent
 } from '../observability/metrics.js';
+import { formatEnvironmentResponse, getEnvironmentDescriptor } from '../utils/environmentContext.js';
 
 const log = logger.child({ service: 'ExplorerAnalyticsService' });
 
@@ -81,8 +82,9 @@ function serialiseEntityRecord(entityType, entityResult) {
 }
 
 export class ExplorerAnalyticsService {
-  constructor({ loggerInstance = log } = {}) {
+  constructor({ loggerInstance = log, environmentDescriptor } = {}) {
     this.logger = loggerInstance;
+    this.environment = getEnvironmentDescriptor(environmentDescriptor);
   }
 
   async recordSearchExecution({
@@ -129,7 +131,8 @@ export class ExplorerAnalyticsService {
           filters,
           globalFilters,
           sortPreferences: sort,
-          metadata: { ...metadata, previewDigests }
+          metadata: { ...metadata, previewDigests },
+          environment: this.environment
         },
         trx
       );
@@ -147,7 +150,8 @@ export class ExplorerAnalyticsService {
           isZeroResult,
           displayedHits: totalDisplayed,
           totalHits: totalResults,
-          latencyMs: overallLatency
+          latencyMs: overallLatency,
+          environment: this.environment
         },
         trx
       );
@@ -158,7 +162,8 @@ export class ExplorerAnalyticsService {
           {
             metricDate: created.createdAt,
             entityType: 'all',
-            previews: aggregatePreviews
+            previews: aggregatePreviews,
+            environment: this.environment
           },
           trx
         );
@@ -172,7 +177,8 @@ export class ExplorerAnalyticsService {
             isZeroResult: record.isZeroResult,
             displayedHits: record.displayedHits,
             totalHits: record.totalHits,
-            latencyMs: record.processingTimeMs
+            latencyMs: record.processingTimeMs,
+            environment: this.environment
           },
           trx
         );
@@ -183,7 +189,8 @@ export class ExplorerAnalyticsService {
             {
               metricDate: created.createdAt,
               entityType: record.entityType,
-              previews
+              previews,
+              environment: this.environment
             },
             trx
           );
@@ -209,7 +216,8 @@ export class ExplorerAnalyticsService {
       eventUuid,
       entitySummaries: event.entities,
       totalDisplayed,
-      totalResults
+      totalResults,
+      environment: formatEnvironmentResponse(this.environment)
     };
   }
 
@@ -246,7 +254,8 @@ export class ExplorerAnalyticsService {
         {
           metricDate: event.createdAt,
           entityType: 'all',
-          clicks: 1
+          clicks: 1,
+          environment: this.environment
         },
         trx
       );
@@ -254,7 +263,8 @@ export class ExplorerAnalyticsService {
         {
           metricDate: event.createdAt,
           entityType: normalizedEntity,
-          clicks: 1
+          clicks: 1,
+          environment: this.environment
         },
         trx
       );
@@ -278,16 +288,22 @@ export class ExplorerAnalyticsService {
     await this.computeForecasts({ since, until });
 
     const [aggregateMap, dailyRows, topQueries, zeroResultQueries, baseTotals, adsSummary, experiments, searchVolumeForecast, ctrForecast, alerts] = await Promise.all([
-      ExplorerSearchDailyMetricModel.aggregateRange({ since, until }),
-      ExplorerSearchDailyMetricModel.listBetween({ since, until }),
-      ExplorerSearchEventModel.topQueries({ since, limit: 5, zeroResultOnly: false }),
-      ExplorerSearchEventModel.topQueries({ since, limit: 5, zeroResultOnly: true }),
-      ExplorerSearchEventModel.aggregateRange({ since }),
+      ExplorerSearchDailyMetricModel.aggregateRange({ since, until, environment: this.environment }),
+      ExplorerSearchDailyMetricModel.listBetween({ since, until, environment: this.environment }),
+      ExplorerSearchEventModel.topQueries({ since, limit: 5, zeroResultOnly: false, environment: this.environment }),
+      ExplorerSearchEventModel.topQueries({ since, limit: 5, zeroResultOnly: true, environment: this.environment }),
+      ExplorerSearchEventModel.aggregateRange({ since, environment: this.environment }),
       this.loadAdsSummary({ since, until }),
       this.loadExperiments(),
-      AnalyticsForecastModel.listByCode('explorer.search-volume', { limit: FORECAST_HORIZON_DAYS }),
-      AnalyticsForecastModel.listByCode('explorer.click-through-rate', { limit: FORECAST_HORIZON_DAYS }),
-      AnalyticsAlertModel.listRecent({ since: addDays(now, -14) })
+      AnalyticsForecastModel.listByCode('explorer.search-volume', {
+        limit: FORECAST_HORIZON_DAYS,
+        environment: this.environment
+      }),
+      AnalyticsForecastModel.listByCode('explorer.click-through-rate', {
+        limit: FORECAST_HORIZON_DAYS,
+        environment: this.environment
+      }),
+      AnalyticsAlertModel.listRecent({ since: addDays(now, -14), environment: this.environment })
     ]);
 
     const overall = aggregateMap.get('all') ?? {
@@ -325,6 +341,7 @@ export class ExplorerAnalyticsService {
       }));
 
     return {
+      environment: formatEnvironmentResponse(this.environment),
       range: {
         start: since.toISOString(),
         end: until.toISOString(),
@@ -347,21 +364,22 @@ export class ExplorerAnalyticsService {
         searchVolume: searchVolumeForecast,
         clickThroughRate: ctrForecast
       },
-      alerts
+      alerts,
+      lastComputedAt: until.toISOString()
     };
   }
 
   async getExplorerAlerts({ includeResolved = false } = {}) {
     if (includeResolved) {
-      return AnalyticsAlertModel.listRecent({ since: addDays(new Date(), -30) });
+      return AnalyticsAlertModel.listRecent({ since: addDays(new Date(), -30), environment: this.environment });
     }
-    return AnalyticsAlertModel.listOpen();
+    return AnalyticsAlertModel.listOpen({ environment: this.environment });
   }
 
   async evaluateHealth() {
     try {
       const since = addDays(new Date(), -1);
-      const metricsMap = await ExplorerSearchDailyMetricModel.aggregateRange({ since });
+      const metricsMap = await ExplorerSearchDailyMetricModel.aggregateRange({ since, environment: this.environment });
       const overall = metricsMap.get('all');
       if (!overall || overall.searches < MIN_SEARCHES_FOR_ALERT) {
         return;
@@ -388,14 +406,15 @@ export class ExplorerAnalyticsService {
   }
 
   async evaluateThresholdAlert({ code, triggered, message, metadata }) {
-    const existing = await AnalyticsAlertModel.findOpenByCode(code);
+    const existing = await AnalyticsAlertModel.findOpenByCode(code, { environment: this.environment });
     if (triggered) {
       if (!existing) {
         await AnalyticsAlertModel.create({
           alertCode: code,
           severity: 'warning',
           message,
-          metadata
+          metadata,
+          environment: this.environment
         });
       }
     } else if (existing) {
@@ -454,7 +473,8 @@ export class ExplorerAnalyticsService {
   async computeForecasts({ since, until }) {
     const history = await ExplorerSearchDailyMetricModel.listBetween({
       since: addDays(since ?? new Date(), -21),
-      until: until ?? new Date()
+      until: until ?? new Date(),
+      environment: this.environment
     });
     const allHistory = history.filter((row) => row.entityType === 'all');
     if (!allHistory.length) {
@@ -484,7 +504,8 @@ export class ExplorerAnalyticsService {
         metricValue: searchValue,
         lowerBound: searchLower,
         upperBound: searchUpper,
-        metadata: { methodology: 'exponential_smoothing', alpha: 0.35 }
+        metadata: { methodology: 'exponential_smoothing', alpha: 0.35 },
+        environment: this.environment
       });
 
       const ctrValue = Math.max(0, Number(searchForecast.forecast ? ctrForecast.forecast : ctrSeries.at(-1) ?? 0));
@@ -496,7 +517,8 @@ export class ExplorerAnalyticsService {
         metricValue: ctrValue,
         lowerBound: ctrLower,
         upperBound: ctrUpper,
-        metadata: { methodology: 'exponential_smoothing', alpha: 0.4 }
+        metadata: { methodology: 'exponential_smoothing', alpha: 0.4 },
+        environment: this.environment
       });
     }
   }

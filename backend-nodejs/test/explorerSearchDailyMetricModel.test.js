@@ -18,6 +18,11 @@ const createTables = async () => {
     table.bigInteger('conversions').notNullable().defaultTo(0);
     table.integer('average_latency_ms').notNullable().defaultTo(0);
     table.text('metadata').notNullable().defaultTo('{}');
+    table.string('environment_key').notNullable().defaultTo('local');
+    table.string('environment_name').notNullable().defaultTo('Local Development');
+    table.string('environment_tier').defaultTo('development');
+    table.string('environment_region').defaultTo('local');
+    table.string('environment_workspace');
     table.timestamp('created_at').defaultTo(connection.fn.now());
     table.timestamp('updated_at').defaultTo(connection.fn.now());
   });
