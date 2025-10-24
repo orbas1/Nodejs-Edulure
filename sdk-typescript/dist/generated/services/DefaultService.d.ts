@@ -23,6 +23,7 @@ import type { CommunityResource } from '../models/CommunityResource';
 import type { CommunityStreak } from '../models/CommunityStreak';
 import type { CouponPublic } from '../models/CouponPublic';
 import type { CreateCommunityChatMessageRequest } from '../models/CreateCommunityChatMessageRequest';
+import type { CreationRecommendationResponse } from '../models/CreationRecommendationResponse';
 import type { DashboardResponse } from '../models/DashboardResponse';
 import type { DirectMessage } from '../models/DirectMessage';
 import type { DirectMessageReadReceipt } from '../models/DirectMessageReadReceipt';
@@ -38,6 +39,9 @@ import type { EbookPurchaseIntentRequest } from '../models/EbookPurchaseIntentRe
 import type { EbookPurchaseIntentResponse } from '../models/EbookPurchaseIntentResponse';
 import type { EbookStateRequest } from '../models/EbookStateRequest';
 import type { EbookUpdateRequest } from '../models/EbookUpdateRequest';
+import type { FeedAnalyticsResponse } from '../models/FeedAnalyticsResponse';
+import type { FeedPlacementsResponse } from '../models/FeedPlacementsResponse';
+import type { FeedSnapshotResponse } from '../models/FeedSnapshotResponse';
 import type { FollowListItem } from '../models/FollowListItem';
 import type { FollowRecommendationItem } from '../models/FollowRecommendationItem';
 import type { FollowRelationship } from '../models/FollowRelationship';
@@ -1063,6 +1067,44 @@ export declare class DefaultService {
         data?: SocialPrivacySettings;
     })>;
     /**
+     * Retrieve aggregated live feed snapshot
+     * Returns a paginated feed composed of community posts, inline ad placements, and optional analytics highlights.
+     * @param context Feed context to aggregate.
+     * @param community Community slug or ID when retrieving a community feed.
+     * @param page
+     * @param perPage
+     * @param includeAnalytics
+     * @param includeHighlights
+     * @param range
+     * @param search
+     * @param postType
+     * @returns FeedSnapshotResponse Feed snapshot generated
+     * @throws ApiError
+     */
+    static getFeed(context?: 'global' | 'community', community?: string, page?: number, perPage?: number, includeAnalytics?: boolean, includeHighlights?: boolean, range?: '7d' | '30d' | '90d' | '180d' | '365d', search?: string, postType?: string): CancelablePromise<FeedSnapshotResponse>;
+    /**
+     * Compute feed analytics
+     * Returns engagement and ad performance analytics for the requested feed context.
+     * @param context
+     * @param community
+     * @param range
+     * @param search
+     * @param postType
+     * @returns FeedAnalyticsResponse Feed analytics generated
+     * @throws ApiError
+     */
+    static getFeedAnalytics(context?: 'global' | 'community', community?: string, range?: '7d' | '30d' | '90d' | '180d' | '365d', search?: string, postType?: string): CancelablePromise<FeedAnalyticsResponse>;
+    /**
+     * Resolve eligible ad placements
+     * Returns ad placements ranked for the supplied feed context.
+     * @param context
+     * @param limit
+     * @param keywords Comma separated keyword hints to improve targeting matches.
+     * @returns FeedPlacementsResponse Eligible placements resolved
+     * @throws ApiError
+     */
+    static getFeedPlacements(context?: 'global_feed' | 'community_feed' | 'search' | 'course_live', limit?: number, keywords?: string): CancelablePromise<FeedPlacementsResponse>;
+    /**
      * Identity verification summary
      * @returns any Operation successful
      * @throws ApiError
@@ -1221,5 +1263,15 @@ export declare class DefaultService {
     static getRuntimeCapabilityManifest(): CancelablePromise<(StandardResponse & {
         data?: CapabilityManifest;
     })>;
+    /**
+     * Fetch creation studio recommendations
+     * Returns prioritised actions for instructors based on project lifecycle, marketing coverage, and recency signals. Evaluations are gated by the `creation.recommendations` feature flag.
+     * @param limit Maximum number of recommendations to return (default 5).
+     * @param includeHistory When true, include recent generation metadata for observability.
+     * @param ownerId Admin-only override to evaluate recommendations for a specific instructor.
+     * @returns CreationRecommendationResponse Recommendations generated
+     * @throws ApiError
+     */
+    static getCreationRecommendations(limit?: number, includeHistory?: boolean, ownerId?: number): CancelablePromise<CreationRecommendationResponse>;
 }
 //# sourceMappingURL=DefaultService.d.ts.map

@@ -1,0 +1,1 @@
+{"version":3,"file":"FeedPlacementsResponse.d.ts","sourceRoot":"","sources":["../../../src/generated/models/FeedPlacementsResponse.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,MAAM,EAAE,MAAM,UAAU,CAAC;AACvC,OAAO,KAAK,EAAE,gBAAgB,EAAE,MAAM,oBAAoB,CAAC;AAC3D,MAAM,MAAM,sBAAsB,GAAG,CAAC,gBAAgB,GAAG;IACrD,IAAI,CAAC,EAAE,KAAK,CAAC,MAAM,CAAC,CAAC;CACxB,CAAC,CAAC"}

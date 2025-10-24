@@ -1,4 +1,5 @@
 import { OpenAPI } from '../generated/core/OpenAPI';
+import { sdkManifest } from './manifest';
 function normaliseBaseUrl(baseUrl) {
     if (!baseUrl) {
         throw new Error('configureSdk requires a baseUrl value');
@@ -22,12 +23,10 @@ async function resolveHeaders(headers, options) {
     }
     return resolved;
 }
-export function configureSdk({ baseUrl, version, getAccessToken, defaultHeaders, withCredentials, credentials }) {
+export function configureSdk({ baseUrl, version, getAccessToken, defaultHeaders, withCredentials, credentials, userAgent, onConfig }) {
     const normalisedBase = normaliseBaseUrl(baseUrl);
     OpenAPI.BASE = normalisedBase;
-    if (version) {
-        OpenAPI.VERSION = version;
-    }
+    OpenAPI.VERSION = version ?? sdkManifest.specVersion;
     if (typeof getAccessToken === 'function') {
         OpenAPI.TOKEN = async () => {
             const value = await getAccessToken();
@@ -40,10 +39,15 @@ export function configureSdk({ baseUrl, version, getAccessToken, defaultHeaders,
     else {
         OpenAPI.TOKEN = undefined;
     }
-    if (defaultHeaders) {
+    const staticUserAgent = userAgent ?? undefined;
+    if (defaultHeaders || staticUserAgent) {
         OpenAPI.HEADERS = async (options) => {
             const resolved = await resolveHeaders(defaultHeaders, options);
-            return resolved ?? {};
+            const headers = resolved ? { ...resolved } : {};
+            if (staticUserAgent && !headers['User-Agent'] && !headers['user-agent']) {
+                headers['User-Agent'] = staticUserAgent;
+            }
+            return headers;
         };
     }
     else {
@@ -55,6 +59,9 @@ export function configureSdk({ baseUrl, version, getAccessToken, defaultHeaders,
     }
     else if (credentials) {
         OpenAPI.CREDENTIALS = credentials;
+    }
+    if (onConfig) {
+        onConfig(OpenAPI);
     }
     return OpenAPI;
 }

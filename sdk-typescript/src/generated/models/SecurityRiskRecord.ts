@@ -1,0 +1,39 @@
+/* generated using openapi-typescript-codegen -- do not edit */
+/* istanbul ignore file */
+/* tslint:disable */
+/* eslint-disable */
+import type { SecurityRiskOwner } from './SecurityRiskOwner';
+export type SecurityRiskRecord = {
+    id: number;
+    riskUuid: string;
+    tenantId: string;
+    title: string;
+    description: string;
+    category?: string;
+    status: string;
+    severity: string;
+    likelihood: string;
+    residualSeverity?: string;
+    residualLikelihood?: string;
+    inherentRiskScore?: number;
+    residualRiskScore: number;
+    mitigationPlan?: string | null;
+    residualNotes?: string | null;
+    regulatoryDriver?: string | null;
+    reviewCadenceDays?: number;
+    identifiedAt?: string;
+    acceptedAt?: string | null;
+    remediatedAt?: string | null;
+    closedAt?: string | null;
+    lastReviewedAt?: string | null;
+    nextReviewAt?: string | null;
+    owner?: SecurityRiskOwner;
+    riskOwnerUserId?: number | null;
+    tags?: Array<string>;
+    detectionControls?: Array<string>;
+    mitigationControls?: Array<string>;
+    metadata?: Record<string, any>;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
