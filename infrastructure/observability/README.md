@@ -40,10 +40,13 @@ or pipeline notifications.
 
 Environment blueprints are now catalogued in the backend database via the
 `environment_blueprints` table (see migration `20250330140000_environment_blueprints_registry.js`).
-The registry is hydrated by the `backend-nodejs/seeds/003_environment_blueprints.js` seed which
+The registry is hydrated by the `backend-nodejs/seeds/005_environment_blueprints.js` seed which
 reads `infrastructure/environment-manifest.json`, computes the expected hashes for Terraform
 modules, and upserts records for each environment. The registry retains the SSM parameter name,
 runtime endpoint, observability dashboard hash, and alarm bindings used by Annex A46/A48 controls.
+Vitest coverage (`backend-nodejs/test/models/environmentBlueprintModel.test.js`,
+`backend-nodejs/test/seeds/environmentBlueprintSeed.test.js`) keeps the model serialisation and
+manifest-derived seed helpers aligned with the schema so drift is caught early.
 
 `EnvironmentParityService` ingests this registry when producing the `/api/v1/environment/health`
 report. Any drift between the manifest and persisted registry (e.g. mismatched hashes, missing SSM

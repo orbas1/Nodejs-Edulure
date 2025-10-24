@@ -35,22 +35,26 @@ This guide documents the day-to-day workflows, operational expectations, and arc
 
 ## Environment setup
 
-1. **Node.js toolchain**
+1. **Environment preflight**
+   - Run `npm run onboard` to verify Node/npm versions, Docker availability, workspace dependencies, and storage directories.
+     The script exits non-zero when prerequisites are missing and auto-creates `storage/local` for asset previews.
+
+2. **Node.js toolchain**
    - Run `nvm use` in the repo root to align with the pinned `20.12.2` runtime. Installation is blocked when older Node/npm versions are detected by `scripts/verify-node-version.mjs`.
    - Install dependencies via `npm install`. npm workspaces ensure backend, frontend, and SDK packages resolve their dependencies.
 
-2. **Database**
+3. **Database**
    - MySQL 8+ is recommended for native installs; ensure credentials align with `.env.example` in `backend-nodejs/`.
    - Alternatively, run `docker compose up postgres` (or `./scripts/bootstrap-environment.sh local`) to rely on the Postgres 15 container for development and testing.
 
-3. **Flutter SDK**
+4. **Flutter SDK**
    - Install Flutter 3.x and configure device simulators/emulators. Confirm setup with `flutter doctor` before working inside `Edulure-Flutter/`.
    - Mobile builds rely on the following `--dart-define` keys: `APP_ENV`, `API_BASE_URL`, `HTTP_CLIENT_TIMEOUT_MS`, `ENABLE_NETWORK_LOGGING`, `SENTRY_DSN`, and `SENTRY_TRACES_SAMPLE_RATE`. Production builds must point to an HTTPS API endpoint.
 
-4. **Terraform**
+5. **Terraform**
    - Install Terraform 1.5+ if you are responsible for infrastructure changes. Terraform operations run from `infrastructure/terraform/envs/<environment>`.
 
-5. **Environment files**
+6. **Environment files**
    - Duplicate `.env.example` files for each workspace (`backend-nodejs/.env.example`, `frontend-reactjs/.env.example` if provided) and customise values for your environment.
 
 ## Backend service
@@ -314,18 +318,26 @@ Use `docker compose logs -f backend` or `frontend` for streaming logs, and `dock
 
 ## Observability & telemetry
 
-- **Metrics:** `/metrics` endpoint exposes Prometheus counters and histograms such as `edulure_http_request_duration_seconds`, `edulure_feature_flag_evaluations_total`, and `edulure_telemetry_export_lag_seconds`.
-- **Tracing:** Incoming requests propagate trace IDs from `TRACE_HEADER_NAME` or generate new UUIDs. Logs include correlation IDs, user context, and redacted secrets.
+- **Local stack:** `npm run dev:observability` bootstraps Prometheus (9090) and Grafana (3001) using the Compose profile defined in
+  `docker-compose.yml`. The helper script waits for readiness and mirrors the instructions in
+  [`docs/operations/observability.md`](docs/operations/observability.md).
+- **Metrics:** `/metrics` exposes Prometheus counters, gauges, and histograms recorded by
+  `backend-nodejs/src/observability/metrics.js`, including HTTP latency, feature-flag decision totals, telemetry pipeline lag, and
+  background job throughput. Metrics require the credentials configured in `.env` (`METRICS_USERNAME` / `METRICS_PASSWORD`) or the
+  bearer token.
+- **Tracing:** `middleware/requestContext.js` propagates correlation IDs from `TRACE_HEADER_NAME` (default `x-request-id`) into log
+  entries, AsyncLocal spans, and HTTP metrics, keeping trace/span IDs aligned with Grafana panels.
+- **SLO snapshots:** Service level objectives live in `backend-nodejs/src/config/env.js` and are aggregated by
+  `backend-nodejs/src/observability/sloRegistry.js`. Query them via `GET /api/v1/observability/slos` or inspect the "Environment
+  Runtime Health" Grafana dashboard.
 - **Telemetry pipeline:**
-  - `POST /api/v1/telemetry/events` ingests user events, enforcing consent and deduplication.
-  - `POST /api/v1/telemetry/consents` records consent changes.
-  - `/api/v1/telemetry/freshness` reports ingestion/export lag for dashboards.
-  - Background exports push JSONL batches to Cloudflare R2 (or configured destination) with optional compression.
-- **Third-party analytics:** Segment, BigQuery, and optional Amplitude exporters configured via environment variables.
-- **Dashboards:** Monitor request error spikes, storage operation latency, and unhandled exceptions. Alerting thresholds are suggested in `backend-nodejs/README.md`.
-- **Runbooks:** Link SLO dashboards to incident playbooks stored in your internal wiki. Capture remediation steps in `qa/release/core_release_checklist.json` notes for recurring issues.
-- **Alert routing:** Hook Prometheus alerts into PagerDuty or Opsgenie; severity mapping lives in `infrastructure/terraform/modules/backend_service/alerts.tf`.
-- **Log retention:** Centralised logs ship to CloudWatch/ELK via Fluent Bit sidecars; retention mirrors governance policy defaults (90 days for prod, 30 for lower envs).
+  - `POST /api/v1/telemetry/events` and `/consents` handle ingestion with consent enforcement and deduplication.
+  - `/api/v1/telemetry/freshness` surfaces lag for runbooks and Grafana panels.
+  - Background exports stream JSONL batches to Cloudflare R2 (or configured destinations) with compression controlled by env vars.
+- **Alert routing:** Terraform modules emit CloudWatch alarms for CPU, memory, and request saturation; combine with SLO burn-rate
+  annotations for PagerDuty/Opsgenie integration.
+- **Log retention:** Structured logs stream through Pino to Fluent Bit sidecars, respecting the governance default (90-day retention
+  in production, 30 days in lower environments).
 
 ## Security & compliance
 

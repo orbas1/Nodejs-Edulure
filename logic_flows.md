@@ -863,40 +863,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Generate the deployment plan (`node scripts/release/deployment-pipeline.mjs --env <env>`), run readiness suites, execute descriptor export + blueprint curl checks, query the descriptor registry for evidence, attach artefacts to the QA checklist, and only then promote the release with parity health verified.
 
 ### 7.C Observability Stack & Runtime Telemetry (`infrastructure/observability/`, `backend-nodejs/src/observability/`, `docs/operations/observability.md`)
-1. **Appraisal:** Comprehensive observability stack configuring metrics, logs, tracing, dashboards, and alerting policies.
-2. **Functionality:** Sets up exporters, dashboards, alert routing, and instrumentation hooks integrated into backend bootstrapping.
-3. **Logic Usefulness:** Provides visibility into system health, supports SLO tracking, and enables proactive incident response.
-4. **Redundancies:** Dashboard JSON definitions duplicated; centralise to avoid inconsistent views.
-5. **Placeholders Or non-working functions or stubs:** Some alert rules flagged TODO; document expected triggers.
-6. **Duplicate Functions:** Metric definitions repeated between instrumentation and documentation; consolidate.
-7. **Improvements need to make:** Add SLO dashboards, automated incident response hooks, and noise reduction tuning.
-8. **Styling improvements:** Standardise dashboard theming, typography, and colour scales to match design tokens.
-9. **Efficiency analysis and improvement:** Optimise sampling rates, prune unused metrics, and configure retention policies.
-10. **Strengths to Keep:** Deep instrumentation coverage and alignment with runtime configuration.
-11. **Weaknesses to remove:** Manual alert routing; integrate with incident management automation.
-12. **Styling and Colour review changes:** Ensure dashboards use accessible palettes and consistent severity colours.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout templates for operations dashboards.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify alert descriptions, remove redundant jargon, and ensure actionable language.
-15. **Change Checklist Tracker:** Update observability checklist with alert tests, dashboard review, and metric coverage validation.
-16. **Full Upgrade Plan & Release Steps:** Deploy config to staging, validate alerts, roll out to production, and monitor noise levels.
+1. **Appraisal:** Observability is now a first-class stack: Docker Compose exposes Prometheus/Grafana via the `observability` profile, `scripts/observability-stack.mjs` orchestrates local boot, and `docs/operations/observability.md` captures Annex A48 runbooks.
+2. **Functionality:** The helper script validates Docker prerequisites, executes `docker compose --profile observability up -d`, waits for readiness, and surfaces login hints; provisioning manifests auto-load dashboards while `backend-nodejs/src/observability/metrics.js` and `sloRegistry.js` feed live telemetry, and the runtime registry is persisted through `backend-nodejs/migrations/20250330140000_environment_blueprints_registry.js`, `backend-nodejs/src/models/EnvironmentBlueprintModel.js`, and the manifest-driven seed in `backend-nodejs/seeds/005_environment_blueprints.js` backed by Vitest suites (`backend-nodejs/test/models/environmentBlueprintModel.test.js`, `backend-nodejs/test/seeds/environmentBlueprintSeed.test.js`).
+3. **Logic Usefulness:** Engineers can spin up telemetry in seconds, correlate HTTP SLO breaches with Grafana panels, and query `/api/v1/observability/slos` alongside Prometheus to confirm alert posture before shipping releases.
+4. **Redundancies:** Static dashboard exports remain the single source of truth and are mounted read-only into Grafana, preventing the drift caused by manual imports scattered across environments.
+5. **Placeholders Or non-working functions or stubs:** Terraform-driven alert destinations still reference environment-specific wiring; document PagerDuty/Opsgenie bindings before flipping alerts live in new regions.
+6. **Duplicate Functions:** Metric registration, SLO evaluation, and HTTP instrumentation all flow through `metrics.js`—the new stack retired ad-hoc curl snippets and bespoke docker-compose overrides previously documented in team wikis.
+7. **Improvements need to make:** Automate Prometheus retention settings per environment, add Alertmanager wiring for local drills, and ship golden signal dashboards for worker and realtime services.
+8. **Styling improvements:** Grafana dashboards inherit Edulure folders and use consistent severity palettes; future work should align panel typography with Annex accessibility tokens.
+9. **Efficiency analysis and improvement:** Prometheus scrapes both `backend:8080` and `host.docker.internal:4000`, while metrics middleware gates recording behind `METRICS_ENABLED` to avoid needless sampling in constrained environments.
+10. **Strengths to Keep:** AsyncLocal request context, per-route histograms, consent ledger gauges, and background job counters already exceed Annex coverage—retain this breadth when layering new alerts.
+11. **Weaknesses to remove:** Observability bootstrap currently assumes default `metrics` credentials; introduce secrets rotation hooks so security reviews don’t block rollout.
+12. **Styling and Colour review changes:** Dashboards ship with accessible colour ramps, but continue auditing contrast when importing additional panels into the "Edulure" Grafana folder.
+13. **CSS, orientation, placement and arrangement changes:** Dashboard JSON prescribes multi-column layouts (hero stats, burn-rate graphs, consent sparklines) ensuring operations see parity across staging and prod.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Observability docs emphasise actionable language (“Verify `/metrics` returns 200 with metrics credentials”) and tie annotations back to Terraform modules for clarity.
+15. **Change Checklist Tracker:** Release readiness now includes running `npm run dev:observability`, validating `/metrics` auth, confirming SLO annotations, reseeding `environment_blueprints`, and running the Vitest coverage that guards the registry helpers before capturing dashboard screenshots for Annex artefacts.
+16. **Full Upgrade Plan & Release Steps:** Ship updates by extending dashboard JSON, running the observability script locally, validating Prometheus scrape success, wiring Alertmanager targets, and updating `docs/operations/observability.md` before promoting to staging.
 
 ### 7.D Local Tooling & Developer Enablement (`file_list.md`, `EDULURE_GUIDE.md`, `backend-nodejs/README.md`, `frontend-reactjs/README.md`, `valuation/`, `scripts/setup-*`)
-1. **Appraisal:** Documentation and tooling aiding onboarding, environment setup, valuation analysis, and knowledge transfer.
-2. **Functionality:** Guides describe architecture, setup steps, valuation context, and developer workflows while scripts automate bootstrapping.
-3. **Logic Usefulness:** Ensures new contributors ramp quickly and align with platform strategy.
-4. **Redundancies:** Setup instructions duplicated across READMEs; consolidate into central guide with per-repo appendices.
-5. **Placeholders Or non-working functions or stubs:** Some valuation documents note TBD metrics; mark with roadmap context.
-6. **Duplicate Functions:** Bootstrap scripts repeated between backend and frontend; refactor into shared CLI.
-7. **Improvements need to make:** Add interactive onboarding CLI, embed video walkthroughs, and keep valuations refreshed quarterly.
-8. **Styling improvements:** Align documentation typography, headings, and colour usage with design system.
-9. **Efficiency analysis and improvement:** Automate environment verification, cache dependencies, and add linting to docs pipeline.
-10. **Strengths to Keep:** Comprehensive guides, checklists, and cross-functional context.
-11. **Weaknesses to remove:** Outdated screenshots and stale instructions; schedule regular reviews.
-12. **Styling and Colour review changes:** Ensure documentation uses accessible colours and consistent formatting.
-13. **CSS, orientation, placement and arrangement changes:** Provide responsive layout for docs when rendered in portals.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Edit for concision, remove duplicate sections, and maintain consistent tone.
-15. **Change Checklist Tracker:** Track documentation updates alongside releases, including valuation adjustments and onboarding script changes.
-16. **Full Upgrade Plan & Release Steps:** Consolidate docs, automate linting, review with stakeholders, publish updates, and communicate via release notes.
+1. **Appraisal:** Local enablement now revolves around `scripts/onboard.mjs`, refreshed documentation in `EDULURE_GUIDE.md`, and `docs/operations/observability.md`, removing guesswork from setup and telemetry rehearsal.
+2. **Functionality:** `npm run onboard` audits Node/npm versions, Docker/Compose presence, dependency installs, and bootstraps `storage/local`; the guide calls out the script alongside the Compose-driven dev stack and new observability workflow.
+3. **Logic Usefulness:** Contributors receive deterministic feedback (pass/warn/fail) before touching code, while the guide links to telemetry, infrastructure, and release playbooks so teams align on expectations.
+4. **Redundancies:** Environment steps that used to be scattered across README snippets are centralised—`EDULURE_GUIDE.md` now references the onboarding script and the observability runbook instead of duplicating instructions.
+5. **Placeholders Or non-working functions or stubs:** Valuation artefacts still await the next quarterly refresh; flag these in the valuation directory so finance partners know which sheets are authoritative.
+6. **Duplicate Functions:** Process supervisor logic is shared between `dev-stack.mjs` and the new observability script; onboarding leverages existing helpers, avoiding one-off shell scripts.
+7. **Improvements need to make:** Extend `npm run onboard` with Windows-specific dependency hints, surface Flutter SDK checks, and integrate lint/doc verification.
+8. **Styling improvements:** Documentation keeps consistent heading levels and inline code formatting; future iterations can embed annotated screenshots for Docker Desktop toggles.
+9. **Efficiency analysis and improvement:** Automated checks catch missing `node_modules` or `.env` files upfront, saving context-switching during onboarding sprints.
+10. **Strengths to Keep:** The process supervisor, bootstrap shell script, and EDULURE guide continue to deliver a cohesive story across backend, frontend, mobile, and observability.
+11. **Weaknesses to remove:** Onboarding currently assumes local Docker access; add remote dev container guidance for contributors without admin privileges.
+12. **Styling and Colour review changes:** Keep docs aligned with Annex typography tokens; the new sections already follow the established style but need periodic proofreading.
+13. **CSS, orientation, placement and arrangement changes:** When rendering in internal portals, ensure the callouts for `npm run onboard` and `npm run dev:observability` remain highlighted—consider adding summary cards in future updates.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** New copy emphasises actionable steps (“Run `npm run onboard`”) and links supporting artefacts, trimming previous generic prose.
+15. **Change Checklist Tracker:** Each release should confirm the onboarding script passes, docs reference current ports/credentials, file listings (`file_list.md`) include new helper scripts, and the targeted Vitest suites for the environment blueprint registry stay green to guard database drift.
+16. **Full Upgrade Plan & Release Steps:** Iterate by expanding onboarding diagnostics, updating EDULURE guide screenshots, syncing valuation docs, and communicating tooling changes via release notes and Annex updates.
 
 ## 8. QA, Testing & Governance (`qa/`, `backend-nodejs/test/`, `frontend-reactjs/src/pages/__tests__/`, `backend-test-results.json`)
 
@@ -1428,18 +1428,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Version scripts, run dry-run builds, and communicate pipeline changes to teams.
 
 ### A48. Observability Stack & Runtime Telemetry (7.C)
-- **Operational Depth:** Infrastructure integrates logging, tracing, metrics, and alerting with dashboards for service health.
-- **Gaps & Risks:** Log retention defaults may violate compliance; review policies. Alert thresholds hard-coded.
-- **Resilience & Efficiency:** Automate dashboard provisioning, enable anomaly detection, and ensure high-cardinality metrics sampled.
-- **UX & Communications:** Publish runbooks, ensure dashboards accessible, and use consistent colour coding.
-- **Change Management:** Review alerts quarterly, rehearse incident drills, and document updates.
+- **Operational Depth:** `docker-compose.yml` now exposes Prometheus and Grafana under the `observability` profile, `scripts/observability-stack.mjs` automates startup and readiness polling, and `docs/operations/observability.md` documents the telemetry workflow end-to-end.
+- **Gaps & Risks:** Alert destinations in Terraform still require PagerDuty/Opsgenie wiring per environment; metrics authentication defaults (`metrics` / `metrics-pass-123`) should be rotated before production rollout.
+- **Resilience & Efficiency:** Prometheus scrapes both Compose and host targets, SLOs are evaluated in-process via `sloRegistry.js`, and dashboards are provisioned automatically from versioned JSON, minimising manual drift.
+- **UX & Communications:** Grafana dashboards sit in the "Edulure" folder with consistent palettes, while the observability playbook lists validation steps and credentials so on-call staff have a single reference.
+- **Change Management:** Each release checklist includes running `npm run dev:observability`, verifying `/metrics` auth, capturing dashboard screenshots, and updating the observability playbook when thresholds shift.
 
 ### A49. Local Tooling & Developer Enablement (7.D)
-- **Operational Depth:** Guides, scripts, and tooling streamline onboarding, environment setup, and valuation modelling.
-- **Gaps & Risks:** Some scripts outdated post Node upgrade; refresh compatibility. Documentation lacks troubleshooting for Windows.
-- **Resilience & Efficiency:** Provide automated diagnostics, cache dependencies, and maintain template repositories.
-- **UX & Communications:** Ensure docs concise, include screenshots, and surface command summaries.
-- **Change Management:** Version onboarding checklists, solicit feedback, and update quarterly.
+- **Operational Depth:** `scripts/onboard.mjs` validates prerequisites, the EDULURE guide references the command alongside dev stack instructions, and observability docs now link from onboarding material.
+- **Gaps & Risks:** Valuation artefacts still require quarterly refresh and Windows-specific setup guidance remains TODO; track follow-ups in valuation and onboarding docs.
+- **Resilience & Efficiency:** Automated checks catch missing dependencies or `.env` files before running dev servers, and `storage/local` is created on demand for asset previews.
+- **UX & Communications:** Documentation consolidates setup steps, emphasises `npm run onboard` / `npm run dev:observability`, and links to the observability playbook for Annex compliance.
+- **Change Management:** Include onboarding script output in release readiness notes, keep `file_list.md` updated with helper scripts, and review guide copy during quarterly enablement updates.
 
 ### A50. Automated Test Suites & Coverage (8.A)
 - **Operational Depth:** Unit, integration, and end-to-end tests span backend, frontend, and mobile modules with coverage tracking.
