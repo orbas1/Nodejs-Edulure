@@ -15,6 +15,21 @@ const resolvedPasswordPolicy = resolvePasswordPolicy(runtimePasswordPolicy);
 const passwordPattern = buildPasswordPattern(resolvedPasswordPolicy);
 const passwordPolicySummary = describePasswordPolicy(resolvedPasswordPolicy);
 
+const clientMetadataSchema = Joi.object({
+  platform: Joi.string().trim().max(64).optional(),
+  appVersion: Joi.string().trim().max(64).optional(),
+  buildNumber: Joi.string().trim().max(64).optional(),
+  environment: Joi.string().trim().max(64).optional(),
+  timezone: Joi.string().trim().max(64).optional(),
+  locale: Joi.string().trim().max(64).optional(),
+  osVersion: Joi.string().trim().max(120).optional(),
+  deviceModel: Joi.string().trim().max(120).optional(),
+  deviceManufacturer: Joi.string().trim().max(120).optional(),
+  deviceId: Joi.string().trim().max(120).optional(),
+  releaseChannel: Joi.string().trim().max(64).optional(),
+  packageName: Joi.string().trim().max(120).optional()
+}).optional();
+
 const registerSchema = Joi.object({
   firstName: Joi.string().trim().min(2).max(120).required(),
   lastName: Joi.string().trim().max(120).allow('', null),
@@ -69,7 +84,8 @@ const loginSchema = Joi.object({
     .messages({
       'string.pattern.base': 'Two-factor code must be 6-10 digits.'
     })
-    .optional()
+    .optional(),
+  client: clientMetadataSchema
 });
 
 const verifyEmailSchema = Joi.object({
@@ -81,17 +97,80 @@ const resendVerificationSchema = Joi.object({
 });
 
 const refreshSchema = Joi.object({
-  refreshToken: Joi.string().min(24).required()
+  refreshToken: Joi.string().min(24).required(),
+  client: clientMetadataSchema
 });
 
 const logoutAllSchema = Joi.object({
   includeCurrent: Joi.boolean().default(false)
 });
 
-function buildContext(req) {
+function sanitizeClientMetadata(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return {};
+  }
+
+  const allowedKeys = new Set([
+    'platform',
+    'appVersion',
+    'buildNumber',
+    'environment',
+    'timezone',
+  'locale',
+  'osVersion',
+  'deviceModel',
+  'deviceManufacturer',
+  'deviceId',
+  'releaseChannel',
+  'packageName'
+]);
+
+  return Object.entries(metadata).reduce((acc, [key, value]) => {
+    if (!allowedKeys.has(key)) {
+      return acc;
+    }
+    if (value === undefined || value === null) {
+      return acc;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        acc[key] = trimmed.slice(0, 255);
+      }
+      return acc;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
+function buildContext(req, clientPayload = null) {
+  const forwardedIp = req.headers['x-forwarded-for']?.split(',').shift()?.trim();
+  const rawPlatform =
+    (clientPayload && typeof clientPayload.platform === 'string' && clientPayload.platform.trim()) ||
+    req.get('x-client-platform') ||
+    'web';
+  const platform = rawPlatform.trim().toLowerCase() || 'web';
+  const acceptedLocales = typeof req.acceptsLanguages === 'function' ? req.acceptsLanguages() : [];
+  const headerLocale = req.get('x-locale');
+  const headerTimezone = req.get('x-timezone');
+  const metadata = sanitizeClientMetadata({
+    ...clientPayload,
+    platform,
+    appVersion: clientPayload?.appVersion ?? req.get('x-app-version'),
+    buildNumber: clientPayload?.buildNumber ?? req.get('x-app-build'),
+    locale: clientPayload?.locale ?? headerLocale ?? acceptedLocales?.[0],
+    timezone: clientPayload?.timezone ?? headerTimezone,
+    osVersion: clientPayload?.osVersion ?? req.get('x-os-version')
+  });
+
   return {
-    ipAddress: req.headers['x-forwarded-for']?.split(',').shift()?.trim() ?? req.ip,
-    userAgent: req.get('user-agent')
+    ipAddress: forwardedIp ?? req.ip,
+    userAgent: req.get('user-agent'),
+    client: platform,
+    clientMetadata: metadata
   };
 }
 
@@ -140,11 +219,13 @@ export default class AuthController {
         abortEarly: false,
         stripUnknown: true
       });
+      const { client, ...credentials } = payload;
+      const context = buildContext(req, client ?? null);
       const result = await AuthService.login(
-        payload.email,
-        payload.password,
-        payload.twoFactorCode ?? null,
-        buildContext(req)
+        credentials.email,
+        credentials.password,
+        credentials.twoFactorCode ?? null,
+        context
       );
       return success(res, {
         data: result.data,
@@ -205,7 +286,9 @@ export default class AuthController {
         abortEarly: false,
         stripUnknown: true
       });
-      const result = await AuthService.refreshSession(payload.refreshToken, buildContext(req));
+      const { client, refreshToken } = payload;
+      const context = buildContext(req, client ?? null);
+      const result = await AuthService.refreshSession(refreshToken, context);
       return success(res, {
         data: result.data,
         message: 'Session refreshed successfully'

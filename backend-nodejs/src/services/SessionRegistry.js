@@ -37,7 +37,12 @@ function serializeSession(session) {
     revokedAt: revokedAt ? revokedAt.toISOString() : null,
     rotatedAt: rotatedAt ? rotatedAt.toISOString() : null,
     revokedReason: session.revokedReason ?? null,
-    revokedBy: session.revokedBy ?? null
+    revokedBy: session.revokedBy ?? null,
+    client: session.client ?? null,
+    clientMetadata:
+      session.clientMetadata && typeof session.clientMetadata === 'object'
+        ? { ...session.clientMetadata }
+        : {}
   };
 }
 

@@ -35,10 +35,24 @@ function toIso(value) {
 }
 
 function buildSessionPayload(session) {
+  const metadata = session.clientMetadata && typeof session.clientMetadata === 'object'
+    ? { ...session.clientMetadata }
+    : {};
+  const accessExpiry = toIso(session.accessTokenExpiresAt ?? null);
+  if (accessExpiry) {
+    metadata.accessTokenExpiresAt = accessExpiry;
+  }
+  const refreshExpiry = toIso(session.expiresAt);
+  if (refreshExpiry) {
+    metadata.refreshTokenExpiresAt = refreshExpiry;
+  }
+
   return {
     id: session.sessionId ?? session.id ?? null,
     expiresAt: toIso(session.expiresAt),
-    lastUsedAt: toIso(session.lastUsedAt ?? null)
+    lastUsedAt: toIso(session.lastUsedAt ?? null),
+    client: session.client ?? null,
+    metadata
   };
 }
 
@@ -54,6 +68,60 @@ function buildInvalidRefreshTokenError() {
   error.status = 401;
   error.code = 'INVALID_REFRESH_TOKEN';
   return error;
+}
+
+const CLIENT_METADATA_KEYS = new Set([
+  'platform',
+  'appVersion',
+  'buildNumber',
+  'environment',
+  'timezone',
+  'locale',
+  'osVersion',
+  'deviceModel',
+  'deviceManufacturer',
+  'deviceId',
+  'releaseChannel',
+  'packageName'
+]);
+
+function normalizeClientMetadata(rawMetadata = {}, client) {
+  const metadata = {};
+  if (client) {
+    metadata.platform = client;
+  }
+
+  if (!rawMetadata || typeof rawMetadata !== 'object') {
+    return metadata;
+  }
+
+  for (const [key, value] of Object.entries(rawMetadata)) {
+    if (!CLIENT_METADATA_KEYS.has(key)) {
+      continue;
+    }
+    if (value === undefined || value === null) {
+      continue;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        metadata[key] = trimmed.slice(0, 255);
+      }
+      continue;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      metadata[key] = value;
+    }
+  }
+
+  return metadata;
+}
+
+function resolveClientContext(context = {}) {
+  const raw = typeof context.client === 'string' ? context.client.trim().toLowerCase() : '';
+  const client = raw.length > 0 ? raw.slice(0, 64) : 'web';
+  const metadata = normalizeClientMetadata(context.clientMetadata ?? {}, client);
+  return { client, metadata };
 }
 
 export default class AuthService {
@@ -308,7 +376,9 @@ export default class AuthService {
             sessionId: session.sessionId,
             sessionExpiresAt: session.expiresAt.toISOString(),
             ipAddress: context.ipAddress ?? null,
-            userAgent: context.userAgent ?? null
+            userAgent: context.userAgent ?? null,
+            client: session.client ?? null,
+            clientMetadata: { ...(session.clientMetadata ?? {}) }
           }
         },
         trx
@@ -393,7 +463,9 @@ export default class AuthService {
             previousSessionId: session.id,
             sessionId: newSession.sessionId,
             ipAddress: context.ipAddress ?? null,
-            userAgent: context.userAgent ?? null
+            userAgent: context.userAgent ?? null,
+            client: newSession.client ?? null,
+            clientMetadata: { ...(newSession.clientMetadata ?? {}) }
           },
           performedBy: user.id
         },
@@ -498,6 +570,8 @@ export default class AuthService {
     const refreshToken = crypto.randomBytes(48).toString('base64url');
     const refreshTokenHash = hashRefreshToken(refreshToken);
     const expiresAt = new Date(Date.now() + env.security.refreshTokenTtlDays * 24 * 60 * 60 * 1000);
+    const { client, metadata: clientMetadata } = resolveClientContext(context);
+    const accessTokenExpiresAt = new Date(Date.now() + env.security.accessTokenTtlMinutes * 60 * 1000);
 
     const sessionRecord = await UserSessionModel.create(
       {
@@ -505,7 +579,9 @@ export default class AuthService {
         refreshTokenHash,
         userAgent: context.userAgent,
         ipAddress: context.ipAddress,
-        expiresAt
+        expiresAt,
+        client,
+        clientMetadata
       },
       connection
     );
@@ -558,7 +634,13 @@ export default class AuthService {
       expiresAt,
       tokenType: 'Bearer',
       sessionId: sessionRecord.id,
-      lastUsedAt: sessionRecord.lastUsedAt ?? new Date()
+      lastUsedAt: sessionRecord.lastUsedAt ?? new Date(),
+      accessTokenExpiresAt,
+      client: sessionRecord.client ?? client,
+      clientMetadata:
+        sessionRecord.clientMetadata && typeof sessionRecord.clientMetadata === 'object'
+          ? { ...sessionRecord.clientMetadata }
+          : { ...clientMetadata }
     };
   }
 
@@ -571,7 +653,8 @@ export default class AuthService {
           accessToken: session.accessToken,
           refreshToken: session.refreshToken,
           tokenType: session.tokenType,
-          expiresAt: session.expiresAt
+          expiresAt: session.expiresAt,
+          accessTokenExpiresAt: toIso(session.accessTokenExpiresAt ?? null)
         },
         session: buildSessionPayload(session)
       }

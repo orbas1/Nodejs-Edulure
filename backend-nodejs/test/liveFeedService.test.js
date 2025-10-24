@@ -17,6 +17,12 @@ const adsCampaignModelMock = {
 const adsCampaignMetricModelMock = {
   summariseByCampaignIds: vi.fn()
 };
+const communityFeedImpressionModelMock = {
+  record: vi.fn()
+};
+const communityGrowthExperimentModelMock = {
+  listActiveForCommunities: vi.fn()
+};
 
 vi.mock('../src/services/CommunityService.js', () => ({
   default: communityServiceMock
@@ -33,12 +39,20 @@ vi.mock('../src/models/AdsCampaignModel.js', () => ({
 vi.mock('../src/models/AdsCampaignMetricModel.js', () => ({
   default: adsCampaignMetricModelMock
 }));
+vi.mock('../src/models/CommunityFeedImpressionModel.js', () => ({
+  default: communityFeedImpressionModelMock
+}));
+vi.mock('../src/models/CommunityGrowthExperimentModel.js', () => ({
+  default: communityGrowthExperimentModelMock
+}));
 
 const LiveFeedService = await import('../src/services/LiveFeedService.js').then((module) => module.default);
 
 describe('LiveFeedService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    communityFeedImpressionModelMock.record.mockResolvedValue(undefined);
+    communityGrowthExperimentModelMock.listActiveForCommunities.mockResolvedValue([]);
   });
 
   it('returns aggregated feed with analytics and highlights for the global context', async () => {
@@ -216,5 +230,60 @@ describe('LiveFeedService', () => {
     });
     expect(placements).toHaveLength(2);
     expect(placements[0]).toMatchObject({ position: 1 });
+  });
+
+  it('generates cache digests that react to content changes', async () => {
+    communityServiceMock.listFeedForUser
+      .mockResolvedValueOnce({
+        items: [
+          {
+            kind: 'post',
+            post: {
+              id: 41,
+              title: 'Initial post',
+              updatedAt: '2025-01-01T00:00:00.000Z',
+              stats: { comments: 0, reactions: 0 },
+              community: { id: 4 }
+            }
+          }
+        ],
+        pagination: { page: 1, perPage: 20, total: 1, pageCount: 1 },
+        ads: { placements: [] }
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            kind: 'post',
+            post: {
+              id: 41,
+              title: 'Initial post',
+              updatedAt: '2025-01-02T00:00:00.000Z',
+              stats: { comments: 0, reactions: 0 },
+              community: { id: 4 }
+            }
+          }
+        ],
+        pagination: { page: 1, perPage: 20, total: 1, pageCount: 1 },
+        ads: { placements: [] }
+      });
+
+    creationProjectModelMock.list.mockResolvedValue([]);
+    adsCampaignModelMock.list.mockResolvedValue([]);
+    adsCampaignModelMock.findByPublicIds.mockResolvedValue([]);
+    adsCampaignMetricModelMock.summariseByCampaignIds.mockResolvedValue(new Map());
+
+    const args = {
+      actor: { id: 19, role: 'user' },
+      includeAnalytics: false,
+      includeHighlights: false
+    };
+
+    const first = await LiveFeedService.getFeed(args);
+    const second = await LiveFeedService.getFeed(args);
+
+    expect(first.cache.digest).toBeDefined();
+    expect(second.cache.digest).toBeDefined();
+    expect(second.cache.digest).not.toEqual(first.cache.digest);
+    expect(communityFeedImpressionModelMock.record).toHaveBeenCalled();
   });
 });

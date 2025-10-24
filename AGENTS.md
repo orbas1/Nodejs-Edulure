@@ -56,8 +56,40 @@
       - 2.H Integrations, Enablement & Invitations (`src/pages/IntegrationCredentialInvite.jsx`, `src/components/integrations/`, `src/hooks/useIntegrationInvite.js`)
       - 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
       - 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
-      - 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
-      - 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
+      - ✅ 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
+        1. **Appraisal.** Flutter auth surfaces shared validators, metadata-aware sessions, and offline continuation while backend sessions now record `client` provenance.
+        2. **Functionality.** `AuthService` injects client metadata into login/register/refresh, telemetry breadcrumbs capture success/failure, and `SessionManager` persists secure tokens alongside client context.
+        3. **Logic Usefulness.** Backend `AuthService.createSession` stores `client_metadata`, rotates sessions, and emits enriched Domain Events so analytics can segment by device and release channel.
+        4. **Redundancies.** `_resolveClientMetadata` caches package info, eliminating repeated lookups across flows; `_buildSessionMetadata` merges envelope + token metadata for downstream use.
+        5. **Placeholders.** Magic-link handlers remain TODO, but offline fallback now displays clear messaging and only engages when cached tokens remain valid.
+        6. **Duplicate Functions.** Secure storage interactions stay centralised in `SessionManager`, preventing drift between auth screens and background refreshers.
+        7. **Improvements Needed.** Upcoming work should add passkey enrolment, deeper device telemetry, and replay-safe offline refresh once APIs expose nonces.
+        8. **Styling.** Login/register strings reuse annex palette tokens and improved OTP hints while respecting keyboard/safe-area layouts.
+        9. **Efficiency.** Metadata resolution caches PackageInfo, Dio retries short-circuit once offline fallback triggers, and secure storage updates remain incremental.
+        10. **Strengths to Keep.** MFA flows, secure session storage, telemetry instrumentation, and feature-flag refresh hooks remain intact with richer analytics.
+        11. **Weaknesses to Remove.** Navigation between onboarding steps and passkey prompts still need consolidation in future iterations.
+        12. **Colour Review.** Offline and error snackbars apply brand-compliant tokens with AA contrast across light/dark modes.
+        13. **Layout.** Text fields and OTP inputs continue to honour large-text accessibility and keyboard insets across devices.
+        14. **Text.** Offline fallback copy highlights cached-session usage, while MFA errors and OTP hints guide next steps succinctly.
+        15. **Checklist.** QA covers metadata emission, offline continuation, MFA prompts, secure storage writes, and migration `20250405150000_user_session_client_metadata.js` execution.
+        16. **Release Plan.** Apply migration + seeds, validate `/auth/*` payloads include `client`, rehearse offline fallback, update Annex A26 docs, and monitor session telemetry post-deploy.
+      - ✅ 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
+        1. **Appraisal.** Feed delivery now includes backend digests, deduped highlights, and Hive caching aligned with Annex A27 requirements.
+        2. **Functionality.** `LiveFeedService` computes `cacheDigest`, stores metadata in Hive, and backend `/feed` emits `cache.digest` plus impression telemetry for momentum scoring.
+        3. **Logic Usefulness.** Digest-aware caching prevents redundant fetches, while `LiveFeedController` refreshes analytics/placements only when payloads change.
+        4. **Redundancies.** Shared parsing helpers remove duplicate Map conversions between feed/community spaces, and digests replace bespoke hash generation across clients.
+        5. **Placeholders.** Member map tabs remain TODO yet caching metadata already anticipates future payloads without schema churn.
+        6. **Duplicate Functions.** Cache pruning and highlight sorting centralise inside the service, avoiding widget-level duplication.
+        7. **Improvements Needed.** Diff-aware list rendering, websocket compression, and background notification sync remain on the backlog.
+        8. **Styling.** Cards retain annex spacing/colour tokens; offline notices and cache-state snackbars remain accessible.
+        9. **Efficiency.** Hive pruning runs before fetches, backend digests de-dup impression logging, and analytics reloads skip when cache keys match.
+        10. **Strengths to Keep.** Offline-first pagination, moderation tooling, and analytics instrumentation persist with richer caching signals.
+        11. **Weaknesses to Remove.** Websocket diffing still needs to adopt digest awareness to minimise UI churn.
+        12. **Colour Review.** Highlight badges and digest indicators adhere to brand palettes across light/dark modes.
+        13. **Layout.** Feed cards continue to respect large-text and landscape layouts without layout shifts when cache metadata updates.
+        14. **Text.** Digest/offline messaging stays concise, emphasising data staleness and retry guidance per Annex tone.
+        15. **Checklist.** QA validates digest propagation, Hive cache pruning, analytics refreshes, and community momentum logs before release.
+        16. **Release Plan.** Run backend migration/seeds, verify `/feed` digests, smoke-test cache hit/miss flows, update Annex A27 docs, and monitor telemetry during rollout.
       - ✓ 3.C Lessons, Assessments & Offline Learning (`Edulure-Flutter/lib/services/offline_learning_service.dart`, `Edulure-Flutter/lib/services/content_service.dart`, `Edulure-Flutter/lib/provider/learning/learning_store.dart`, `Edulure-Flutter/lib/screens/content_library_screen.dart`, `Edulure-Flutter/lib/screens/assessments_screen.dart`)
         1. **Appraisal.** `OfflineLearningService` now centralises download progress, assessment queues, and module snapshots, driving `LearningProgressController` so lessons, assessments, and analytics share one state engine.
         2. **Functionality.** `ContentService.downloadAsset` streams progress updates into the offline service, shows live progress in `ContentLibraryScreen`, throttles analytics, and `AssessmentsScreen` introduces an offline submission card with queue visibility, sync controls, and form capture.

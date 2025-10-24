@@ -161,6 +161,38 @@ class SessionManager {
         metadata['email'] = user['email'].toString();
       }
     }
+    final sessionEnvelope = session['session'];
+    if (sessionEnvelope is Map) {
+      final envelope = Map<String, dynamic>.from(sessionEnvelope as Map);
+      final sessionId = envelope['id'] ?? envelope['sessionId'];
+      if (sessionId != null) {
+        metadata['sessionId'] = sessionId.toString();
+      }
+      final client = envelope['client'];
+      if (client is String && client.trim().isNotEmpty) {
+        metadata['client'] = client.trim();
+      }
+      final envelopeMetadata = envelope['metadata'];
+      if (envelopeMetadata is Map) {
+        final nested = Map<String, dynamic>.from(envelopeMetadata as Map);
+        metadata['clientMetadata'] = nested;
+        for (final entry in nested.entries) {
+          final key = entry.key;
+          final value = entry.value;
+          if (value == null) {
+            continue;
+          }
+          if (value is String && value.trim().isEmpty) {
+            continue;
+          }
+          metadata.putIfAbsent(key, () => value);
+        }
+      }
+      final envelopeIssuedAt = envelope['issuedAt'] ?? envelope['issued_at'];
+      if (envelopeIssuedAt != null) {
+        metadata['issuedAt'] = envelopeIssuedAt.toString();
+      }
+    }
     if (session['sessionId'] != null) {
       metadata['sessionId'] = session['sessionId'].toString();
     }
@@ -193,6 +225,37 @@ class SessionManager {
           value == null || (value is String && value.trim().isEmpty),
     );
     return metadata;
+  }
+
+  static DateTime? _parseDateTime(dynamic value) {
+    if (value is DateTime) {
+      return value.toUtc();
+    }
+    if (value is String && value.isNotEmpty) {
+      final parsed = DateTime.tryParse(value);
+      return parsed?.toUtc();
+    }
+    return null;
+  }
+
+  static bool hasValidAccessToken({Duration tolerance = const Duration(seconds: 30)}) {
+    final metadata = getSessionMetadata();
+    if (metadata == null) {
+      return false;
+    }
+    dynamic candidate = metadata['accessTokenExpiresAt'];
+    if (candidate == null) {
+      final nested = metadata['clientMetadata'];
+      if (nested is Map && nested['accessTokenExpiresAt'] != null) {
+        candidate = nested['accessTokenExpiresAt'];
+      }
+    }
+    final expiry = _parseDateTime(candidate);
+    if (expiry == null) {
+      return false;
+    }
+    final threshold = DateTime.now().toUtc().add(-tolerance);
+    return expiry.isAfter(threshold);
   }
 
   static ValueListenable<Box<dynamic>> sessionListenable() {

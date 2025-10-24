@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:edulure_mobile/services/auth_client_metadata.dart';
 import 'package:edulure_mobile/services/auth_service.dart';
 
 class _InMemorySessionPersistence implements SessionPersistence {
@@ -49,6 +50,17 @@ class _FakeHttpClientAdapter extends HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+class _StaticMetadataResolver implements AuthClientMetadataResolver {
+  _StaticMetadataResolver(this._metadata);
+
+  final Map<String, dynamic> _metadata;
+
+  @override
+  Future<Map<String, dynamic>> resolve() async {
+    return Map<String, dynamic>.from(_metadata);
+  }
+}
+
 void main() {
   group('AuthService', () {
     test('login persists session and trims credentials', () async {
@@ -58,6 +70,11 @@ void main() {
         final payload = options.data as Map<String, dynamic>;
         expect(payload['email'], 'user@example.com');
         expect(payload['password'], 'super-secret');
+        expect(payload['client'], {
+          'platform': 'mobile',
+          'appVersion': '3.2.1',
+          'timezone': 'UTC',
+        });
         return ResponseBody.fromString(
           jsonEncode({
             'data': {
@@ -75,7 +92,15 @@ void main() {
         );
       });
       final persistence = _InMemorySessionPersistence();
-      final service = AuthService(dio, sessionPersistence: persistence);
+      final service = AuthService(
+        dio,
+        sessionPersistence: persistence,
+        clientMetadataResolver: _StaticMetadataResolver({
+          'platform': 'mobile',
+          'appVersion': '3.2.1',
+          'timezone': 'UTC',
+        }),
+      );
 
       final session = await service.login(' user@example.com ', 'super-secret');
 
@@ -98,7 +123,11 @@ void main() {
           },
         );
       });
-      final service = AuthService(dio, sessionPersistence: _InMemorySessionPersistence());
+      final service = AuthService(
+        dio,
+        sessionPersistence: _InMemorySessionPersistence(),
+        clientMetadataResolver: _StaticMetadataResolver({'platform': 'mobile'}),
+      );
 
       await expectLater(
         () => service.login('user@example.com', 'wrong'),
@@ -110,6 +139,8 @@ void main() {
       final dio = Dio(BaseOptions(baseUrl: 'https://example.com/api'));
       dio.httpClientAdapter = _FakeHttpClientAdapter((options, _) async {
         expect(options.path, '/auth/register');
+        final payload = options.data as Map<String, dynamic>;
+        expect(payload['client'], containsPair('platform', 'mobile'));
         return ResponseBody.fromString(
           jsonEncode({
             'data': {
@@ -127,7 +158,14 @@ void main() {
         );
       });
       final persistence = _InMemorySessionPersistence();
-      final service = AuthService(dio, sessionPersistence: persistence);
+      final service = AuthService(
+        dio,
+        sessionPersistence: persistence,
+        clientMetadataResolver: _StaticMetadataResolver({
+          'platform': 'mobile',
+          'appVersion': '2.0.0',
+        }),
+      );
 
       final session = await service.register(
         firstName: 'New',
@@ -148,6 +186,7 @@ void main() {
         expect(options.path, '/auth/refresh');
         final body = options.data as Map<String, dynamic>;
         expect(body['refreshToken'], 'stored-refresh');
+        expect(body['client'], containsPair('platform', 'mobile'));
         return ResponseBody.fromString(
           jsonEncode({
             'data': {
@@ -164,7 +203,14 @@ void main() {
           },
         );
       });
-      final service = AuthService(dio, sessionPersistence: persistence);
+      final service = AuthService(
+        dio,
+        sessionPersistence: persistence,
+        clientMetadataResolver: _StaticMetadataResolver({
+          'platform': 'mobile',
+          'timezone': 'UTC',
+        }),
+      );
 
       final refreshed = await service.refreshSession();
 
@@ -184,7 +230,11 @@ void main() {
           },
         );
       });
-      final service = AuthService(dio, sessionPersistence: persistence);
+      final service = AuthService(
+        dio,
+        sessionPersistence: persistence,
+        clientMetadataResolver: _StaticMetadataResolver({'platform': 'mobile'}),
+      );
 
       await expectLater(
         () => service.logout(),

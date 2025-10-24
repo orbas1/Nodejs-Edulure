@@ -44,6 +44,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return 'Unable to authenticate. Please check your credentials.';
   }
 
+  bool _isOfflineError(DioException error) {
+    if (error.type == DioExceptionType.connectionTimeout || error.type == DioExceptionType.connectionError) {
+      return true;
+    }
+    if (error.type == DioExceptionType.unknown) {
+      final description = error.error?.toString() ?? '';
+      return description.contains('SocketException') || description.contains('Connection refused');
+    }
+    return false;
+  }
+
+  bool _attemptOfflineContinuation() {
+    final session = SessionManager.getSession();
+    if (session == null) {
+      return false;
+    }
+    if (!SessionManager.hasValidAccessToken(tolerance: const Duration(minutes: 5))) {
+      return false;
+    }
+    if (!mounted) {
+      return false;
+    }
+    final user = session['user'];
+    final email = user is Map ? user['email']?.toString() : null;
+    setState(() {
+      _error = null;
+      _otpFieldError = null;
+    });
+    final message = email != null && email.isNotEmpty
+        ? 'Continuing offline as $email'
+        : 'Continuing offline with your cached session.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+    Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+    return true;
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -107,6 +145,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (error) {
       if (!mounted) return;
       if (error is DioException) {
+        if (_isOfflineError(error) && _attemptOfflineContinuation()) {
+          return;
+        }
         final response = error.response?.data;
         final code = response is Map ? response['code']?.toString() : null;
         if (code == 'TWO_FACTOR_REQUIRED') {
@@ -142,10 +183,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           return;
         }
       }
-        setState(() {
-          _error = _resolveErrorMessage(error);
-          _otpFieldError = null;
-        });
+      setState(() {
+        _error = _resolveErrorMessage(error);
+        _otpFieldError = null;
+      });
     } finally {
       if (mounted) {
         setState(() {

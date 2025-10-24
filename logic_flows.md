@@ -459,40 +459,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 ## 3. Flutter Mobile Shell (`Edulure-Flutter/`)
 
 ### 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
-1. **Appraisal:** Mobile onboarding flows mirroring web login, registration, MFA, and secure token handling with offline resilience.
-2. **Functionality:** Widgets cover registration forms, OTP verification, password resets, deep links, and biometric unlock tied to secure storage service.
-3. **Logic Usefulness:** Authentication service coordinates API calls, local storage, and analytics events so mobile sessions stay in sync with backend expectations.
-4. **Redundancies:** Validation logic appears in multiple forms; extract to shared validators for consistent error messaging.
-5. **Placeholders Or non-working functions or stubs:** Magic-link deep link handler flagged TODO; ensure fallback messaging guides users appropriately.
-6. **Duplicate Functions:** Secure storage wrappers repeated; consolidate to avoid inconsistent key naming.
-7. **Improvements need to make:** Add progressive profiling, support passkeys, and embed analytics instrumentation for drop-off tracking.
-8. **Styling improvements:** Align theming via `theme.dart` to mirror web tokens and ensure dark mode parity.
-9. **Efficiency analysis and improvement:** Optimise provider rebuilds, reuse Hive boxes, and debounce network calls to reduce battery impact.
-10. **Strengths to Keep:** Offline-aware login, biometric unlock, and thorough error handling.
-11. **Weaknesses to remove:** Fragmented navigation between onboarding steps; streamline using declarative routers.
-12. **Styling and Colour review changes:** Ensure security prompts use accessible colours consistent with brand guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Adjust layout for keyboard overlays and safe areas on various devices.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Polish helper copy, keep instructions concise, and localise security warnings.
-15. **Change Checklist Tracker:** Update mobile QA scenarios for MFA, biometric unlock, and offline login flows before releases.
-16. **Full Upgrade Plan & Release Steps:** Release behind staged rollout, monitor crashlytics and analytics, coordinate backend deep link support, and update store metadata.
+1. **Appraisal:** Mobile auth now mirrors production policies end-to-end: session metadata is persisted server-side, Flutter surfaces inline validation, and offline fallbacks respect cached credentials.
+2. **Functionality:** Login, register, and refresh payloads include client metadata (platform, version, locale) collected via `AuthClientMetadataResolver`, letting the backend store provenance in `user_sessions.client`/`client_metadata`.
+3. **Logic Usefulness:** `AuthService` injects metadata, records telemetry, and automatically hydrates secure storage; backend `AuthService.createSession` captures `clientMetadata`, emits it in responses, and Domain Events log client provenance.
+4. **Redundancies:** Shared validators in `auth_validators.dart` centralise email/password/OTP rules; `_resolveClientMetadata` prevents duplicated package-info lookups across auth flows.
+5. **Placeholders Or non-working functions or stubs:** Magic-link handlers remain TODO, but offline login now gracefully falls back when a cached token is still valid instead of surfacing opaque network errors.
+6. **Duplicate Functions:** Secure storage access stays encapsulated inside `SessionManager`; metadata parsing moved into `_buildSessionMetadata` so other features reuse the same source of truth.
+7. **Improvements need to make:** Future work includes passkey enrollment, richer device telemetry, and replay-safe offline login once refresh endpoints expose deterministic nonces.
+8. **Styling improvements:** Login/register screens reuse tokenised theming while new inline error copy and OTP hints align with Annex typography and colour guidance.
+9. **Efficiency analysis and improvement:** Client metadata requests cache PackageInfo results, `_resolveClientMetadata` short-circuits on success, and offline continuation bypasses redundant Dio retries when connectivity drops.
+10. **Strengths to Keep:** MFA enforcement, secure storage, and Riverpod integration remain intact while gaining telemetry breadcrumbs and device-aware session rotation.
+11. **Weaknesses to remove:** Navigation between onboarding steps should still be consolidated; follow-on work will address deep-link enrolment and passkey prompts.
+12. **Styling and Colour review changes:** Security prompts and offline snackbars reuse annex-compliant colour tokens and keep contrast ratios accessible across light/dark modes.
+13. **CSS, orientation, placement and arrangement changes:** Text-field focus, keyboard insets, and OTP stacks were confirmed against large-text accessibility and safe-area layouts.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Offline fallback copy highlights cached-session usage, two-factor errors instruct next steps, and metadata-driven analytics trimmed repetitive wording.
+15. **Change Checklist Tracker:** QA must cover metadata emission, offline continuation, MFA prompts, and migration `20250405150000_user_session_client_metadata.js` across staging and production, with automated guardrails in `backend-nodejs/test/authService.test.js` and `Edulure-Flutter/test/services/auth_service_test.dart` validating the client-metadata handshake.
+16. **Full Upgrade Plan & Release Steps:** Run the new migration + seeds, reseed staging, validate `/auth/login|refresh` payloads include `client`, smoke-test offline fallback, update Annex A26 documentation, and monitor session telemetry.
 
 ### 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
-1. **Appraisal:** Gesture-friendly community feed with offline caching, reactions, moderation, event reminders, and donation prompts tailored for mobile use.
-2. **Functionality:** Widgets render feed cards, support infinite scroll, manage optimistic updates, and integrate with community APIs for membership and programming data.
-3. **Logic Usefulness:** Services handle websocket subscription, fallback polling, and offline queueing to keep feed updates consistent across connectivity states.
-4. **Redundancies:** Feed card widgets duplicated between feed and community spaces; centralise to reduce maintenance overhead.
-5. **Placeholders Or non-working functions or stubs:** Member map tab marked TODO pending map SDK integration; display placeholder copy to manage expectations.
-6. **Duplicate Functions:** Reaction handling logic mirrored from web; extract to shared Dart mixin to maintain parity.
-7. **Improvements need to make:** Add haptic feedback, advanced filters, and summarised thread previews for long posts.
-8. **Styling improvements:** Harmonise card spacing, icon sizing, and badge styling with design tokens.
-9. **Efficiency analysis and improvement:** Implement pagination caching, background sync for notifications, and compress websocket payloads where possible.
-10. **Strengths to Keep:** Offline-first design, robust moderation tooling, and consistent analytics instrumentation.
-11. **Weaknesses to remove:** Rebuild-heavy architecture on feed updates; adopt list diffing to reduce UI churn.
-12. **Styling and Colour review changes:** Align badge colours with brand palette across light/dark modes.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout adjustments for large text accessibility and landscape orientation.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Ensure truncated text indicates expand affordances and keep CTA copy concise.
-15. **Change Checklist Tracker:** Include feed regression, offline sync QA, and websocket throughput tests in mobile release checklist.
-16. **Full Upgrade Plan & Release Steps:** Pilot via TestFlight/Play staged rollout, monitor analytics, collect user feedback, and expand to all cohorts.
+1. **Appraisal:** Live feed delivery now exposes cache digests, highlights dedupe, and backend impression logging, giving mobile parity with Annex A27 analytics and caching expectations.
+2. **Functionality:** `LiveFeedService.fetchFeed` reads/writes Hive caches with TTL + digest metadata, Riverpod controllers hydrate placements/analytics, and backend `/feed` responses ship a `cache.digest` hash for invalidation.
+3. **Logic Usefulness:** `_dedupeSnapshot` removes duplicate ads/posts while preserving `cacheDigest`, enabling the controller to detect server freshness; backend `computeFeedDigest` fingerprints posts, ads, and highlights to stabilise caching.
+4. **Redundancies:** Feed metadata and pagination hints remain centralised; digest computation replaces ad-hoc client hashes so Flutter, React, and tests share the same source.
+5. **Placeholders Or non-working functions or stubs:** Member map tab remains TODO; caching metadata already anticipates future map payloads without breaking schema.
+6. **Duplicate Functions:** Cache storage, digest metadata, and highlight sorting are shared via `FeedCacheRepository` + `LiveFeedService`, avoiding duplicate Map parsing across controllers and widgets.
+7. **Improvements need to make:** Upcoming work should add diff-aware list rendering, background prefetch for notifications, and websocket compression once server upgrades land.
+8. **Styling improvements:** Feed highlights and cache-derived badges continue using Annex spacing and icon sizing; offline notices retain accessible palette tokens.
+9. **Efficiency analysis and improvement:** Hive cache pruning runs before fetches, digests prevent redundant fetches, and backend momentum analytics only log once per digest/community to curb inserts.
+10. **Strengths to Keep:** Offline-first pagination, analytics opt-in, and moderation affordances persist with richer caching signals and telemetry.
+11. **Weaknesses to remove:** Websocket diffing is still pending; integrate feed-digest awareness into streaming handlers next.
+12. **Styling and Colour review changes:** Badge colours and highlight stripes remain harmonised with brand tokens while digest-driven banners reuse established accent colours.
+13. **CSS, orientation, placement and arrangement changes:** List/ad cards respect large-text and landscape breakpoints, and new cache state snackbars avoid layout shifts.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Cache/offline messaging stays concise, callouts highlight when data is stale, and analytics copy mirrors Annex tone.
+15. **Change Checklist Tracker:** QA must cover digest propagation, cache pruning, analytics reloads, and community momentum logging before release, backed by vitest coverage in `backend-nodejs/test/liveFeedService.test.js` and Flutter cache tests that assert digest metadata retention.
+16. **Full Upgrade Plan & Release Steps:** Ensure backend migration + seeds run, verify `/feed` responds with cache digests, test Hive cache hit/miss flows, update Annex A27 docs/screenshots, then roll out with telemetry monitoring.
 
 ### 3.C Lessons, Assessments & Offline Learning (`lib/screens/content_library_screen.dart`, `lib/screens/assessments_screen.dart`, `lib/provider/learning/learning_store.dart`, `lib/services/offline_learning_service.dart`, `lib/services/content_service.dart`)
 1. **Appraisal:** Offline-first learning now centres around `OfflineLearningService`, giving the Flutter client a single authority for downloads, progress snapshots, and queued assessment submissions while tying into the shared `LearningProgressController` so Riverpod state, Hive caches, and UI copy stay aligned.

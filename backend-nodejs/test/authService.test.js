@@ -9,6 +9,18 @@ const recordEventMock = vi.fn();
 const linkOnboardingMock = vi.fn();
 const issueVerificationMock = vi.fn();
 const shouldEnforceForRoleMock = vi.fn();
+const createSessionMock = vi.fn();
+const revokeExpiredSessionsMock = vi.fn();
+const pruneExcessSessionsMock = vi.fn();
+const findActiveByHashMock = vi.fn();
+const findByIdMock = vi.fn();
+const markRotatedMock = vi.fn();
+const touchMock = vi.fn();
+const revokeByIdMock = vi.fn();
+const revokeByHashMock = vi.fn();
+const rememberSessionMock = vi.fn();
+const markSessionRevokedMock = vi.fn();
+const jwtSignMock = vi.fn(() => 'signed-access-token');
 
 vi.mock('../src/config/database.js', () => ({
   default: { transaction: transactionSpy }
@@ -19,6 +31,33 @@ vi.mock('bcryptjs', () => ({
     hash: hashMock,
     compare: vi.fn()
   }
+}));
+
+vi.mock('jsonwebtoken', () => ({
+  default: {
+    sign: jwtSignMock
+  }
+}));
+
+vi.mock('../src/config/env.js', () => ({
+  env: {
+    security: {
+      jwtRefreshSecret: 'refresh-secret',
+      refreshTokenTtlDays: 30,
+      accessTokenTtlMinutes: 15,
+      maxActiveSessionsPerUser: 3,
+      jwtAudience: 'mobile-client',
+      jwtIssuer: 'edulure',
+      accountLockoutThreshold: 5,
+      accountLockoutWindowMinutes: 10,
+      accountLockoutDurationMinutes: 30,
+      sessionValidationCacheTtlMs: 60000
+    }
+  }
+}));
+
+vi.mock('../src/config/jwtKeyStore.js', () => ({
+  getActiveJwtKey: () => ({ secret: 'jwt-secret', algorithm: 'HS256', kid: 'kid-1' })
 }));
 
 vi.mock('../src/models/UserModel.js', () => ({
@@ -40,6 +79,20 @@ vi.mock('../src/models/LearnerOnboardingResponseModel.js', () => ({
   }
 }));
 
+vi.mock('../src/models/UserSessionModel.js', () => ({
+  default: {
+    create: createSessionMock,
+    revokeExpiredSessions: revokeExpiredSessionsMock,
+    pruneExcessSessions: pruneExcessSessionsMock,
+    findActiveByHash: findActiveByHashMock,
+    findById: findByIdMock,
+    markRotated: markRotatedMock,
+    touch: touchMock,
+    revokeById: revokeByIdMock,
+    revokeByHash: revokeByHashMock
+  }
+}));
+
 vi.mock('../src/services/EmailVerificationService.js', () => ({
   emailVerificationService: {
     issueVerification: issueVerificationMock
@@ -55,6 +108,13 @@ vi.mock('../src/services/TwoFactorService.js', () => ({
     isTwoFactorEnabled: vi.fn(),
     sanitizeCode: vi.fn(),
     updateEnforcementPolicy: vi.fn()
+  }
+}));
+
+vi.mock('../src/services/SessionRegistry.js', () => ({
+  sessionRegistry: {
+    remember: rememberSessionMock,
+    markRevoked: markSessionRevokedMock
   }
 }));
 
@@ -82,6 +142,11 @@ describe('AuthService.register', () => {
       expiresAt: verificationExpiry
     });
     linkOnboardingMock.mockResolvedValue(null);
+    createSessionMock.mockReset();
+    revokeExpiredSessionsMock.mockResolvedValue([]);
+    pruneExcessSessionsMock.mockResolvedValue([]);
+    rememberSessionMock.mockReset();
+    markSessionRevokedMock.mockReset();
   });
 
   it('hashes the password, links onboarding drafts, and returns verification metadata', async () => {
@@ -144,5 +209,105 @@ describe('AuthService.register', () => {
       status: 'pending',
       expiresAt: verificationExpiry.toISOString()
     });
+  });
+});
+
+describe('AuthService.createSession', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createSessionMock.mockReset();
+    revokeExpiredSessionsMock.mockResolvedValue([]);
+    pruneExcessSessionsMock.mockResolvedValue([]);
+    rememberSessionMock.mockReset();
+    markSessionRevokedMock.mockReset();
+    jwtSignMock.mockClear();
+  });
+
+  it('persists client metadata and returns enriched session envelope', async () => {
+    const sessionRecord = {
+      id: 91,
+      client: 'mobile',
+      clientMetadata: { platform: 'mobile', appVersion: '1.2.3', timezone: 'UTC' },
+      expiresAt: new Date('2025-05-01T00:00:00.000Z'),
+      lastUsedAt: new Date('2025-04-01T00:00:00.000Z')
+    };
+    createSessionMock.mockResolvedValue(sessionRecord);
+
+    const session = await AuthService.createSession(
+      { id: 7, email: 'device@example.com', role: 'learner' },
+      {
+        client: 'mobile',
+        clientMetadata: {
+          appVersion: '1.2.3',
+          timezone: 'UTC',
+          locale: 'en-US'
+        }
+      },
+      trxStub
+    );
+
+    expect(createSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 7,
+        client: 'mobile',
+        clientMetadata: expect.objectContaining({
+          platform: 'mobile',
+          appVersion: '1.2.3',
+          timezone: 'UTC',
+          locale: 'en-US'
+        })
+      }),
+      trxStub
+    );
+    expect(rememberSessionMock).toHaveBeenCalledWith(sessionRecord);
+    expect(session.client).toBe('mobile');
+    expect(session.sessionId).toBe(91);
+    expect(session.clientMetadata).toMatchObject({
+      platform: 'mobile',
+      appVersion: '1.2.3',
+      timezone: 'UTC',
+      locale: 'en-US'
+    });
+    expect(typeof session.refreshToken).toBe('string');
+    expect(jwtSignMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sid: 91 }),
+      'jwt-secret',
+      expect.objectContaining({ keyid: 'kid-1' })
+    );
+  });
+
+  it('normalises client metadata and ignores unsupported keys', async () => {
+    createSessionMock.mockResolvedValue({
+      id: 33,
+      client: 'android',
+      clientMetadata: { platform: 'android', timezone: 'UTC' },
+      expiresAt: new Date('2025-03-01T00:00:00.000Z'),
+      lastUsedAt: new Date('2025-02-01T00:00:00.000Z')
+    });
+
+    const session = await AuthService.createSession(
+      { id: 11, email: 'learner@example.com', role: 'learner' },
+      {
+        client: ' ANDROID ',
+        clientMetadata: {
+          timezone: 'UTC',
+          locale: 'en-GB',
+          appVersion: '0.9.0',
+          random: 'value'
+        }
+      },
+      trxStub
+    );
+
+    expect(createSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client: 'android',
+        clientMetadata: expect.not.objectContaining({ random: expect.anything() })
+      }),
+      trxStub
+    );
+    expect(session.client).toBe('android');
+    expect(session.clientMetadata.random).toBeUndefined();
+    expect(session.clientMetadata.locale).toBe('en-GB');
   });
 });

@@ -4,9 +4,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import '../core/config/app_config.dart';
 import '../core/network/dio_provider.dart';
 import '../core/telemetry/telemetry_service.dart';
 import 'api_config.dart';
+import 'auth_client_metadata.dart';
 import 'session_manager.dart';
 
 class AuthException extends DioException {
@@ -63,17 +65,43 @@ class _SessionManagerPersistence implements SessionPersistence {
   String? get refreshToken => SessionManager.getRefreshToken();
 }
 
+final authClientMetadataResolverProvider = Provider<AuthClientMetadataResolver>((ref) {
+  final config = ref.watch(appConfigProvider);
+  final telemetry = ref.watch(telemetryServiceProvider);
+  return AuthClientMetadataResolver(
+    config: config,
+    onError: (error, stackTrace) {
+      telemetry.recordBreadcrumb(
+        category: 'auth',
+        message: 'auth.clientMetadata.load_failed',
+        data: {'error': error.toString()},
+        level: SentryLevel.warning,
+      );
+      unawaited(
+        telemetry.captureException(
+          error,
+          stackTrace: stackTrace,
+          context: {'source': 'AuthClientMetadataResolver'},
+        ),
+      );
+    },
+  );
+});
+
 class AuthService {
   AuthService(
     this._dio, {
     SessionPersistence? sessionPersistence,
     TelemetryService? telemetry,
+    AuthClientMetadataResolver? clientMetadataResolver,
   })  : _sessionPersistence = sessionPersistence ?? _SessionManagerPersistence(),
-        _telemetry = telemetry;
+        _telemetry = telemetry,
+        _clientMetadataResolver = clientMetadataResolver;
 
   final Dio _dio;
   final SessionPersistence _sessionPersistence;
   final TelemetryService? _telemetry;
+  final AuthClientMetadataResolver? _clientMetadataResolver;
 
   Future<Map<String, dynamic>> login(
     String email,
@@ -86,6 +114,10 @@ class AuthService {
       if (twoFactorCode != null && twoFactorCode.trim().isNotEmpty)
         'twoFactorCode': twoFactorCode.trim(),
     };
+    final clientMetadata = await _resolveClientMetadata();
+    if (clientMetadata.isNotEmpty) {
+      payload['client'] = clientMetadata;
+    }
     final stopwatch = Stopwatch()..start();
     final twoFactorProvided = twoFactorCode?.trim().isNotEmpty == true;
     try {
@@ -161,6 +193,10 @@ class AuthService {
       'twoFactor': {'enabled': enableTwoFactor},
       if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
     };
+    final clientMetadata = await _resolveClientMetadata();
+    if (clientMetadata.isNotEmpty) {
+      payload['client'] = clientMetadata;
+    }
     final stopwatch = Stopwatch()..start();
     try {
       final response = await _dio.post(
@@ -233,12 +269,17 @@ class AuthService {
         type: DioExceptionType.unknown,
       );
     }
+    final payload = <String, dynamic>{'refreshToken': token};
+    final clientMetadata = await _resolveClientMetadata();
+    if (clientMetadata.isNotEmpty) {
+      payload['client'] = clientMetadata;
+    }
     final stopwatch = Stopwatch()..start();
     final automatic = refreshToken == null;
     try {
       final response = await _dio.post(
         '/auth/refresh',
-        data: {'refreshToken': token},
+        data: payload,
         options: ApiConfig.unauthenticatedOptions(),
       );
       final session = _extractSession(response.data);
@@ -341,6 +382,32 @@ class AuthService {
     );
   }
 
+  Future<Map<String, dynamic>> _resolveClientMetadata() async {
+    if (_clientMetadataResolver == null) {
+      return <String, dynamic>{};
+    }
+    try {
+      final metadata = await _clientMetadataResolver!.resolve();
+      return Map<String, dynamic>.from(metadata);
+    } catch (error, stackTrace) {
+      _telemetry?.recordBreadcrumb(
+        category: 'auth',
+        message: 'auth.clientMetadata.resolve_failed',
+        data: {'error': error.toString()},
+        level: SentryLevel.warning,
+      );
+      final telemetry = _telemetry;
+      if (telemetry != null) {
+        await telemetry.captureException(
+          error,
+          stackTrace: stackTrace,
+          context: {'source': 'AuthService._resolveClientMetadata'},
+        );
+      }
+      return <String, dynamic>{};
+    }
+  }
+
   String? _extractUserId(Map<String, dynamic> session) {
     final user = session['user'];
     if (user is Map && user['id'] != null) {
@@ -385,8 +452,10 @@ class AuthService {
 final authServiceProvider = Provider<AuthService>((ref) {
   final dio = ref.watch(dioProvider);
   final telemetry = ref.watch(telemetryServiceProvider);
+  final metadataResolver = ref.watch(authClientMetadataResolverProvider);
   return AuthService(
     dio,
     telemetry: telemetry,
+    clientMetadataResolver: metadataResolver,
   );
 });

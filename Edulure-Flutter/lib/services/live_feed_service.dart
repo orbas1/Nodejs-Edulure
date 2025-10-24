@@ -107,6 +107,7 @@ class LiveFeedService {
           'itemCount': snapshot.items.length,
           'highlightCount': snapshot.highlights.length,
           'range': snapshot.range?.key ?? range,
+          if (snapshot.cacheDigest != null) 'digest': snapshot.cacheDigest,
         },
       );
       _recordFeedEvent(
@@ -409,6 +410,8 @@ class LiveFeedService {
     return snapshot.copyWith(
       items: dedupedItems,
       highlights: dedupedHighlights,
+      cacheDigest: snapshot.cacheDigest,
+      cacheMetadata: snapshot.cacheMetadata,
     );
   }
 
@@ -452,7 +455,9 @@ class FeedSnapshot {
     this.highlights = const <FeedHighlight>[],
     this.adsSummary,
     this.range,
-  });
+    this.cacheDigest,
+    Map<String, dynamic> cacheMetadata = const <String, dynamic>{},
+  }) : cacheMetadata = Map.unmodifiable(Map<String, dynamic>.from(cacheMetadata));
 
   final FeedContext context;
   final CommunityReference? community;
@@ -463,6 +468,8 @@ class FeedSnapshot {
   final List<FeedHighlight> highlights;
   final FeedAdsSummary? adsSummary;
   final FeedRangeWindow? range;
+  final String? cacheDigest;
+  final Map<String, dynamic> cacheMetadata;
 
   factory FeedSnapshot.fromJson(JsonMap json) {
     final items = <FeedEntry>[];
@@ -474,6 +481,15 @@ class FeedSnapshot {
         }
       }
     }
+
+    final cacheMetadata = <String, dynamic>{};
+    final rawCache = json['cache'];
+    if (rawCache is Map<String, dynamic>) {
+      cacheMetadata.addAll(rawCache);
+    } else if (rawCache is Map) {
+      cacheMetadata.addAll(Map<String, dynamic>.from(rawCache as Map));
+    }
+    final cacheDigest = cacheMetadata.remove('digest')?.toString() ?? json['digest']?.toString();
 
     return FeedSnapshot(
       context: _parseFeedContext(json['context']) ?? FeedContext.global,
@@ -501,6 +517,8 @@ class FeedSnapshot {
           : json['range'] is Map
               ? FeedRangeWindow.fromJson(Map<String, dynamic>.from(json['range'] as Map))
               : null,
+      cacheDigest: cacheDigest,
+      cacheMetadata: cacheMetadata,
     );
   }
 
@@ -509,6 +527,8 @@ class FeedSnapshot {
     List<FeedEntry>? items,
     FeedAnalytics? analytics,
     List<FeedHighlight>? highlights,
+    String? cacheDigest,
+    Map<String, dynamic>? cacheMetadata,
   }) {
     return FeedSnapshot(
       context: context,
@@ -520,6 +540,8 @@ class FeedSnapshot {
       highlights: highlights ?? this.highlights,
       adsSummary: adsSummary,
       range: range,
+      cacheDigest: cacheDigest ?? this.cacheDigest,
+      cacheMetadata: cacheMetadata ?? this.cacheMetadata,
     );
   }
 

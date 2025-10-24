@@ -15,7 +15,9 @@ const BASE_COLUMNS = [
   'revoked_reason as revokedReason',
   'revoked_by as revokedBy',
   'rotated_at as rotatedAt',
-  'deleted_at as deletedAt'
+  'deleted_at as deletedAt',
+  'client',
+  'client_metadata as clientMetadata'
 ];
 
 function baseQuery(connection, { includeDeleted = false } = {}) {
@@ -72,6 +74,43 @@ function resolveInsertedId(result) {
   return null;
 }
 
+function parseClientMetadata(value) {
+  if (!value) {
+    return {};
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+  if (typeof value === 'object') {
+    if (value instanceof Buffer) {
+      try {
+        const decoded = value.toString('utf8');
+        const parsed = JSON.parse(decoded);
+        return typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+      } catch (_error) {
+        return {};
+      }
+    }
+    return { ...value };
+  }
+  return {};
+}
+
+function mapSessionRow(row) {
+  if (!row) {
+    return row;
+  }
+  return {
+    ...row,
+    clientMetadata: parseClientMetadata(row.clientMetadata)
+  };
+}
+
 export default class UserSessionModel {
   static query(connection = db, options = {}) {
     return baseQuery(connection, options);
@@ -84,7 +123,9 @@ export default class UserSessionModel {
       user_agent: session.userAgent ?? null,
       ip_address: session.ipAddress ?? null,
       expires_at: session.expiresAt,
-      last_used_at: connection.fn.now()
+      last_used_at: connection.fn.now(),
+      client: session.client ?? 'web',
+      client_metadata: session.clientMetadata ? JSON.stringify(session.clientMetadata) : JSON.stringify({})
     };
 
     const insertResult = await baseQuery(connection, { includeDeleted: true }).insert(payload, ['id']);
@@ -107,7 +148,7 @@ export default class UserSessionModel {
     if (forUpdate) {
       builder.forUpdate();
     }
-    return builder.first();
+    return builder.first().then(mapSessionRow);
   }
 
   static async findActiveByHash(refreshTokenHash, connection = db, { forUpdate = false } = {}) {
@@ -121,7 +162,7 @@ export default class UserSessionModel {
       builder.forUpdate();
     }
 
-    return builder.first();
+    return builder.first().then(mapSessionRow);
   }
 
   static async revokeById(id, reason, connection = db, revokedBy = null) {

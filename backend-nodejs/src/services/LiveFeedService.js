@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 import logger from '../config/logger.js';
 import CommunityService from './CommunityService.js';
 import AdsPlacementService from './AdsPlacementService.js';
@@ -81,6 +83,30 @@ function deriveEngagementMomentum({ posts, comments, reactions, uniqueCommunitie
   return Math.max(0, Math.min(100, Math.round(total)));
 }
 
+function computeFeedDigest({ items = [], highlights = [] } = {}) {
+  const hash = crypto.createHash('sha1');
+  hash.update('feed:v1');
+  for (const entry of items) {
+    if (!entry) continue;
+    if (entry.kind === 'post') {
+      const post = entry.post ?? {};
+      const id = post.id ?? 'unknown';
+      const updatedAt = post.updatedAt ?? post.modifiedAt ?? post.publishedAt ?? post.createdAt ?? '';
+      hash.update(`post:${id}:${updatedAt}`);
+    } else if (entry.kind === 'ad') {
+      const ad = entry.ad ?? {};
+      const key = `${ad.campaignId ?? 'campaign'}:${ad.placementId ?? 'placement'}:${ad.slot ?? 'slot'}`;
+      hash.update(`ad:${key}`);
+    }
+  }
+  for (const highlight of highlights) {
+    if (!highlight) continue;
+    const key = `${highlight.type ?? 'unknown'}:${highlight.id ?? 'highlight'}`;
+    hash.update(`highlight:${key}`);
+  }
+  return hash.digest('base64url');
+}
+
 export default class LiveFeedService {
   static async getFeed({
     actor,
@@ -110,6 +136,8 @@ export default class LiveFeedService {
     }
 
     const items = base.items.map((entry) => enrichFeedItem(entry, base.context));
+    const digest = computeFeedDigest({ items, highlights });
+    const generatedAt = new Date().toISOString();
 
     return {
       context: base.context,
@@ -119,13 +147,18 @@ export default class LiveFeedService {
         start: rangeWindow.start.toISOString(),
         end: rangeWindow.end.toISOString()
       },
-      generatedAt: new Date().toISOString(),
+      generatedAt,
       pagination: base.pagination,
       ads: base.ads,
       prefetch: base.prefetch ?? {},
       items,
       highlights,
-      analytics
+      analytics,
+      cache: {
+        digest,
+        generatedAt,
+        itemCount: items.length
+      }
     };
   }
 

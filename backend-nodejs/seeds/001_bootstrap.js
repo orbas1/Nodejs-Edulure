@@ -7598,7 +7598,15 @@ export async function seed(knex) {
         user_agent: 'Chrome/120.0 (Mac OS X)',
         ip_address: '102.89.10.8',
         expires_at: ninetyDaysFromNow,
-        last_used_at: timelineNow
+        last_used_at: timelineNow,
+        client: 'web',
+        client_metadata: JSON.stringify({
+          platform: 'web',
+          appVersion: '2025.4.1',
+          environment: 'staging',
+          locale: 'en-US',
+          timezone: 'America/New_York'
+        })
       },
       {
         user_id: instructorId,
@@ -7608,7 +7616,17 @@ export async function seed(knex) {
         expires_at: sixtyDaysAgo,
         last_used_at: sixtyDaysAgo,
         revoked_at: timelineNow,
-        revoked_reason: 'credential_rotation'
+        revoked_reason: 'credential_rotation',
+        client: 'mobile',
+        client_metadata: JSON.stringify({
+          platform: 'mobile',
+          appVersion: '0.1.0',
+          buildNumber: '42',
+          environment: 'staging',
+          locale: 'en-GB',
+          timezone: 'Europe/London',
+          osVersion: 'iOS 17.1'
+        })
       }
     ]);
 
