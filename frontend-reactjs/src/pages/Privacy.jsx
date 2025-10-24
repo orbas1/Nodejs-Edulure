@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import PageHero from '../components/PageHero.jsx';
+import { LegalNavigationList, LegalNavigationSelect } from '../components/legal/LegalNavigation.jsx';
+import useLegalDocumentNavigation from '../hooks/useLegalDocumentNavigation.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const lastUpdated = '24 November 2024';
@@ -219,6 +222,16 @@ const privacyPolicy = [
   }
 ];
 
+function createSectionIdFromHeading(heading) {
+  if (typeof heading !== 'string') {
+    return undefined;
+  }
+  return heading
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 const reviewSummary = [
   { label: 'Policy owner', value: policyOwner },
   { label: 'Data Protection Officer', value: 'Amelia Cross, dpo@edulure.com' },
@@ -228,6 +241,19 @@ const reviewSummary = [
 ];
 
 export default function Privacy() {
+  const sections = useMemo(
+    () =>
+      privacyPolicy.map((section, index) => ({
+        ...section,
+        id: createSectionIdFromHeading(section.heading) ?? `privacy-section-${index + 1}`
+      })),
+    []
+  );
+
+  const { activeSection, handleAnchorClick, handleMobileSelect } = useLegalDocumentNavigation({
+    sections
+  });
+
   usePageMetadata({
     title: 'Privacy Notice · Edulure',
     description: `${companyProfile.name} explains how learner, instructor, and community data is collected, used, and protected across the Edulure platform.`,
@@ -279,25 +305,62 @@ export default function Privacy() {
           </dl>
         </div>
 
-        {privacyPolicy.map((section) => (
-          <article key={section.heading} className="space-y-4">
-            <h2 className="text-2xl font-semibold text-slate-900">{section.heading}</h2>
-            {section.paragraphs.map((paragraph) => (
-              <p key={paragraph} className="leading-relaxed text-slate-600">
-                {paragraph}
+        <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="lg:w-1/3">
+              <h3 className="text-lg font-semibold text-slate-900">Browse key topics</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Jump to any part of the privacy notice. Navigation stays in sync as you scroll so you always know which
+                obligations you are reviewing.
               </p>
-            ))}
-            {section.bullets ? (
-              <ul className="list-disc space-y-2 pl-6 text-slate-600">
-                {section.bullets.map((bullet) => (
-                  <li key={bullet} className="leading-relaxed">
-                    {bullet}
-                  </li>
+            </div>
+            <div className="lg:w-2/3 space-y-4">
+              <LegalNavigationSelect
+                id="privacy-section-select"
+                sections={sections}
+                activeSection={activeSection}
+                onChange={handleMobileSelect}
+                className="lg:hidden"
+              />
+              <LegalNavigationList
+                sections={sections}
+                activeSection={activeSection}
+                onAnchorClick={handleAnchorClick}
+                className="hidden max-h-[360px] overflow-y-auto rounded-3xl border border-slate-200 bg-white/80 p-4 lg:block"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-12 lg:grid-cols-[260px_1fr]">
+          <LegalNavigationList
+            sections={sections}
+            activeSection={activeSection}
+            onAnchorClick={handleAnchorClick}
+            className="hidden h-fit rounded-3xl border border-slate-200 bg-white/80 p-4 text-sm lg:block lg:sticky lg:top-32"
+          />
+          <div className="space-y-12">
+            {sections.map((section) => (
+              <article key={section.id ?? section.heading} id={section.id} className="scroll-mt-32 space-y-4">
+                <h2 className="text-2xl font-semibold text-slate-900">{section.heading}</h2>
+                {section.paragraphs.map((paragraph) => (
+                  <p key={paragraph} className="leading-relaxed text-slate-600">
+                    {paragraph}
+                  </p>
                 ))}
-              </ul>
-            ) : null}
-          </article>
-        ))}
+                {section.bullets ? (
+                  <ul className="list-disc space-y-2 pl-6 text-slate-600">
+                    {section.bullets.map((bullet) => (
+                      <li key={bullet} className="leading-relaxed">
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </div>
 
         <div className="rounded-3xl border border-slate-200 bg-slate-900 p-6 text-slate-100 shadow-lg">
           <h3 className="text-xl font-semibold text-white">Need assistance?</h3>

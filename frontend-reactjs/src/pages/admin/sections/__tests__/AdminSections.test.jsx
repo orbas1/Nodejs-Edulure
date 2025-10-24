@@ -430,7 +430,8 @@ describe('Admin operational sections', () => {
 
     expect(screen.getByText(/pending item/i)).toBeInTheDocument();
     expect(screen.getByText(/1 items awaiting action/i)).toBeInTheDocument();
-    expect(screen.getByText('REVIEW')).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /review/i })).toBeInTheDocument();
   });
 
   it('renders activity alerts and events with fallbacks', () => {

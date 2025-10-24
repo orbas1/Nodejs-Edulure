@@ -32,7 +32,12 @@ import AdminGrowthSection from './admin/sections/AdminGrowthSection.jsx';
 import AdminRevenueManagementSection from './admin/sections/AdminRevenueManagementSection.jsx';
 import AdminAdsManagementSection from './admin/sections/AdminAdsManagementSection.jsx';
 import AdminReleaseSection from './admin/sections/AdminReleaseSection.jsx';
-import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
+import {
+  describeTimestamp,
+  formatDateTime,
+  formatNumber,
+  formatRelativeTime
+} from './admin/utils.js';
 
 const EMPTY_OBJECT = Object.freeze({});
 const EMPTY_ARRAY = Object.freeze([]);
@@ -173,21 +178,6 @@ function buildPlatformStats(platform) {
   return entries.filter(Boolean);
 }
 
-function describeTimestamp(value) {
-  if (!value) {
-    return null;
-  }
-
-  const relative = formatRelativeTime(value);
-  const exact = formatDateTime(value);
-
-  if (relative && exact && relative !== exact) {
-    return `${relative} (${exact})`;
-  }
-
-  return exact || relative;
-}
-
 export default function Admin() {
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -258,17 +248,10 @@ export default function Admin() {
   const alerts = activity.alerts ?? EMPTY_ARRAY;
   const events = activity.events ?? EMPTY_ARRAY;
 
-  const policyLastReviewed = useMemo(() => {
-    if (!policyLastReviewedRaw) {
-      return 'Awaiting review';
-    }
-    const relative = formatRelativeTime(policyLastReviewedRaw);
-    const exact = formatDateTime(policyLastReviewedRaw);
-    if (relative && relative !== exact) {
-      return `${relative} (${exact})`;
-    }
-    return exact || relative;
-  }, [policyLastReviewedRaw]);
+  const policyLastReviewed = useMemo(
+    () => describeTimestamp(policyLastReviewedRaw, { fallback: 'Awaiting review' }),
+    [policyLastReviewedRaw]
+  );
 
   const revenueCards = useMemo(() => {
     if (!revenueOverview) {

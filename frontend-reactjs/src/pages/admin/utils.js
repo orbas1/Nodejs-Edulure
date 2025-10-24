@@ -111,6 +111,21 @@ export function formatRelativeTime(value, reference = new Date()) {
   return 'just now';
 }
 
+export function describeTimestamp(value, { fallback = '—', reference = new Date() } = {}) {
+  if (!value) {
+    return fallback;
+  }
+
+  const relative = formatRelativeTime(value, reference);
+  const absolute = formatDateTime(value);
+
+  if (relative && absolute && relative !== absolute) {
+    return `${relative} (${absolute})`;
+  }
+
+  return absolute || relative || fallback;
+}
+
 export function formatDuration(seconds, { fallback = '—' } = {}) {
   const numeric = normaliseNumberCandidate(seconds);
   if (numeric === null) return fallback;

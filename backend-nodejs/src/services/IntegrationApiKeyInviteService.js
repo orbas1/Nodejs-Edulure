@@ -16,6 +16,8 @@ import IntegrationApiKeyService, {
   requireString
 } from './IntegrationApiKeyService.js';
 import {
+  DEFAULT_CREDENTIAL_POLICY,
+  getCredentialPolicy,
   getProviderDefinition,
   normaliseProviderId
 } from './IntegrationProviderRegistry.js';
@@ -179,6 +181,43 @@ function resolveProviderMeta(provider) {
   return { id: provider, label: provider };
 }
 
+const inviteDateFormatter = new Intl.DateTimeFormat('en-GB', {
+  dateStyle: 'medium',
+  timeStyle: 'short'
+});
+
+function formatInviteDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  try {
+    return inviteDateFormatter.format(date);
+  } catch (_error) {
+    return date.toISOString();
+  }
+}
+
+function describeRotationInterval(rotationIntervalDays, provider) {
+  if (Number.isFinite(rotationIntervalDays) && rotationIntervalDays > 0) {
+    const rounded = Math.round(rotationIntervalDays);
+    return `${rounded} day${rounded === 1 ? '' : 's'} rotation cadence`;
+  }
+
+  const policy = getCredentialPolicy(provider);
+  const fallback = policy?.defaultRotationDays ?? DEFAULT_CREDENTIAL_POLICY.defaultRotationDays;
+  if (Number.isFinite(fallback) && fallback > 0) {
+    return `${fallback} day${fallback === 1 ? '' : 's'} rotation (policy default)`;
+  }
+
+  return 'Refer to integration security policy';
+}
+
 export function sanitizeInviteToken(token) {
   const trimmed = typeof token === 'string' ? token.trim() : '';
   if (!trimmed) {
@@ -239,11 +278,15 @@ function sanitizeInvite(invite) {
     apiKeyId: invite.apiKeyId ?? null,
     status: invite.status,
     requestedAt: invite.requestedAt ? invite.requestedAt.toISOString() : null,
+    requestedAtDescription: formatInviteDate(invite.requestedAt),
     expiresAt: invite.expiresAt ? invite.expiresAt.toISOString() : null,
+    expiresAtDescription: formatInviteDate(invite.expiresAt),
     lastSentAt: invite.lastSentAt ? invite.lastSentAt.toISOString() : null,
     sendCount: invite.sendCount,
     rotationIntervalDays: invite.rotationIntervalDays,
+    rotationDescription: describeRotationInterval(invite.rotationIntervalDays, provider.id),
     keyExpiresAt: invite.keyExpiresAt ? invite.keyExpiresAt.toISOString() : null,
+    keyExpiresAtDescription: formatInviteDate(invite.keyExpiresAt),
     completedAt: invite.completedAt ? invite.completedAt.toISOString() : null,
     completedBy: invite.completedBy,
     cancelledAt: invite.cancelledAt ? invite.cancelledAt.toISOString() : null,
@@ -641,9 +684,13 @@ export default class IntegrationApiKeyInviteService {
       environment: invite.environment,
       alias: invite.alias,
       rotationIntervalDays: invite.rotationIntervalDays,
+      rotationDescription: describeRotationInterval(invite.rotationIntervalDays, provider.id),
       keyExpiresAt: invite.keyExpiresAt ? invite.keyExpiresAt.toISOString() : null,
+      keyExpiresAtDescription: formatInviteDate(invite.keyExpiresAt),
       requestedAt: invite.requestedAt ? invite.requestedAt.toISOString() : null,
+      requestedAtDescription: formatInviteDate(invite.requestedAt),
       expiresAt: invite.expiresAt ? invite.expiresAt.toISOString() : null,
+      expiresAtDescription: formatInviteDate(invite.expiresAt),
       notes: invite.metadata?.notes ?? null,
       reason: invite.metadata?.reason ?? null
     };

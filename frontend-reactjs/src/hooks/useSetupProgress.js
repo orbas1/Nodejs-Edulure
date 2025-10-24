@@ -24,6 +24,7 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [connectionState, setConnectionState] = useState('idle');
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
   const eventSourceRef = useRef(null);
   const pollIntervalRef = useRef(null);
@@ -44,6 +45,7 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
     });
     setLoading(false);
     setError(null);
+    setLastUpdatedAt(new Date().toISOString());
   }, []);
 
   const fetchSnapshot = useCallback(async () => {
@@ -178,6 +180,7 @@ export default function useSetupProgress({ autoStart = true, pollIntervalMs = DE
     loading,
     error,
     connectionState,
+    lastUpdatedAt,
     refresh: fetchSnapshot,
     reconnect: startStream
   };

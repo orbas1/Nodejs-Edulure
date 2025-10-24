@@ -1,13 +1,7 @@
 import PropTypes from 'prop-types';
 
+import { formatDashboardDateTime } from '../../utils/dashboardFormatting.js';
 import InviteExpiryCountdown from './InviteExpiryCountdown.jsx';
-
-function formatDisplayDate(value) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-}
 
 export default function InviteSummaryCard({ invite, countdown, onRefresh }) {
   if (!invite) {
@@ -47,17 +41,33 @@ export default function InviteSummaryCard({ invite, countdown, onRefresh }) {
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Rotation cadence</dt>
           <dd className="text-sm font-medium text-slate-800">
-            {invite.rotationIntervalDays ? `${invite.rotationIntervalDays} days` : 'Refer to security policy'}
+            {invite.rotationDescription ??
+              (invite.rotationIntervalDays
+                ? `${invite.rotationIntervalDays} days`
+                : 'Refer to security policy')}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Requested</dt>
+          <dd className="text-sm font-medium text-slate-800">
+            {invite.requestedAtDescription ??
+              formatDashboardDateTime(invite.requestedAt, { fallback: '—' })}
           </dd>
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Invitation expires</dt>
-          <dd className="text-sm font-medium text-slate-800">{formatDisplayDate(invite.expiresAt)}</dd>
+          <dd className="text-sm font-medium text-slate-800">
+            {invite.expiresAtDescription ??
+              formatDashboardDateTime(invite.expiresAt, { fallback: '—' })}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Key expiry</dt>
           <dd className="text-sm font-medium text-slate-800">
-            {invite.keyExpiresAt ? formatDisplayDate(invite.keyExpiresAt) : 'Set if the provider enforces expiry'}
+            {invite.keyExpiresAtDescription ??
+              (invite.keyExpiresAt
+                ? formatDashboardDateTime(invite.keyExpiresAt, { fallback: '—' })
+                : 'Set if the provider enforces expiry')}
           </dd>
         </div>
       </dl>
@@ -77,7 +87,12 @@ InviteSummaryCard.propTypes = {
     environment: PropTypes.string,
     rotationIntervalDays: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     expiresAt: PropTypes.string,
+    expiresAtDescription: PropTypes.string,
     keyExpiresAt: PropTypes.string,
+    keyExpiresAtDescription: PropTypes.string,
+    rotationDescription: PropTypes.string,
+    requestedAt: PropTypes.string,
+    requestedAtDescription: PropTypes.string,
     reason: PropTypes.string
   }),
   countdown: PropTypes.shape({

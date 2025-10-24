@@ -72,7 +72,7 @@ function resolveConnectionBadge(state) {
   }
 }
 
-function SetupStatusCard({ state, connectionState, error, history }) {
+function SetupStatusCard({ state, connectionState, error, history, lastUpdatedAt }) {
   const badge = resolveConnectionBadge(connectionState);
   const status = state?.status ?? 'idle';
   const activePreset = state?.activePreset ?? state?.lastPreset ?? '—';
@@ -113,6 +113,9 @@ function SetupStatusCard({ state, connectionState, error, history }) {
           Last error {state.lastError.taskId ?? '—'}: {state.lastError.message ?? '—'}
         </p>
       ) : null}
+      {lastUpdatedAt ? (
+        <p className="mt-3 text-xs text-slate-500">Snapshot updated {formatTimestamp(lastUpdatedAt)}</p>
+      ) : null}
       {lastCompletedRun ? (
         <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
           <p className="font-semibold text-slate-700">Last successful run</p>
@@ -128,14 +131,16 @@ SetupStatusCard.propTypes = {
   state: PropTypes.object,
   connectionState: PropTypes.string,
   error: PropTypes.string,
-  history: PropTypes.arrayOf(PropTypes.object)
+  history: PropTypes.arrayOf(PropTypes.object),
+  lastUpdatedAt: PropTypes.string
 };
 
 SetupStatusCard.defaultProps = {
   state: null,
   connectionState: 'idle',
   error: null,
-  history: undefined
+  history: undefined,
+  lastUpdatedAt: null
 };
 
 export default function AdminOperationsSection({ sectionId, supportStats, riskStats, platformStats }) {
@@ -143,7 +148,8 @@ export default function AdminOperationsSection({ sectionId, supportStats, riskSt
     state: setupState,
     connectionState: setupConnectionState,
     error: setupError,
-    history: setupHistory
+    history: setupHistory,
+    lastUpdatedAt: setupLastUpdatedAt
   } = useSetupProgress();
 
   return (
@@ -156,6 +162,7 @@ export default function AdminOperationsSection({ sectionId, supportStats, riskSt
         connectionState={setupConnectionState}
         error={setupError}
         history={setupHistory}
+        lastUpdatedAt={setupLastUpdatedAt}
       />
     </section>
   );
