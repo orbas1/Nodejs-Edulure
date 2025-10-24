@@ -454,12 +454,44 @@
          - 12.B.1 auth (backend-nodejs/src/middleware/auth.js)
          - 12.B.2 runtimeConfig (backend-nodejs/src/middleware/runtimeConfig.js)
          - 12.B.3 creation.routes (backend-nodejs/src/routes/creation.routes.js)
-      - 12.C Controllers & GraphQL Gateways
+      - ✅ 12.C Controllers & GraphQL Gateways
          - 12.C.1 EbookController (backend-nodejs/src/controllers/EbookController.js)
          - 12.C.2 schema (backend-nodejs/src/graphql/schema.js)
-      - 12.D Domain Models & Persistence
+        1. **Appraisal.** `EbookController.js` now deduplicates and sanitises author, tag, category, and language collections while the GraphQL schema clamps pagination and trims search parameters, aligning back-office payload hygiene with the curated catalogue expectations captured in `user_experience.md`.
+        2. **Functionality.** Normalisers convert mixed string/array payloads into trimmed sets, metadata is deep-cloned before persistence, and GraphQL exposes a `prefetch` JSON field so dashboard surfaces can hydrate hero modules alongside feed entries without ad-hoc REST calls. The sanitised collections now match the JSON columns enforced by `EbookModel.js`, keeping catalogue seeds and future content imports schema-valid.
+        3. **Logic Usefulness.** Languages are uppercased to keep locale badges consistent across marketing and learner storefronts, while keyword filtering on placements guarantees ad targeting terms mirror the UX taxonomy shared across web, React Native, and Flutter.
+        4. **Redundancies.** Centralising pagination parsing removes bespoke limit handling from downstream services and lets React and Flutter clients rely on a single rule-set rather than duplicating array dedupe logic per platform.
+        5. **Placeholders or Stubs.** GraphQL still delegates feature-flag awareness to `LiveFeedService`; wiring the new sanitised metadata through gateway-level analytics toggles remains on the backlog before exposing experimental feed variants.
+        6. **Duplicate Functions.** Shared helpers (`trimText`, `normalisePaginationInput`, `normaliseArray`) replace one-off string munging that previously lived in controllers, GraphQL resolvers, and client utilities.
+        7. **Improvements Needed.** Next iteration should surface currency validation errors from `EbookService` with localized copy so the UX writing guidelines in `user_experience.md` are enforced server-side.
+        8. **Styling Improvements.** Sanitised `metadata` payloads give design systems reliable hooks for cover gradients and content warnings, preventing mismatched accent colours across the ebook shelf, dashboard cards, and marketing pages.
+        9. **Efficiency Analysis.** Pagination and keyword clamps cap list sizes, guarding the GraphQL gateway and marketplace endpoints against oversized queries while keeping response payloads within telemetry budgets.
+        10. **Strengths to Keep.** Consistent Joi validation, shared normalisers, and the new GraphQL `prefetch` surface maintain observability and keep timeline hydration deterministic across channels.
+        11. **Weaknesses to Remove.** Ebooks still accept arbitrary metadata structures; a typed contract should eventually govern marketing highlights versus purchase funnels so analytics dashboards remain comparable.
+        12. **Styling & Colour Review.** With metadata sanitised, align ebook accent tokens with the brand palette documented in `user_experience.md` to avoid divergent gradients between marketing pages and instructor consoles.
+        13. **CSS, Orientation & Placement.** GraphQL prefetch data should feed layout engines so featured posts and placements reserve space before hydration, matching responsive breakpoints encoded in the UX specification.
+        14. **Text Analysis.** Normalised pricing errors and Joi feedback should inherit the concise tone-of-voice guidelines (≤120 characters, action-first) referenced in the support copy tables.
+        15. **Change Checklist Tracker.** Extend backend QA to cover pagination clamps, keyword trimming, and metadata sanitisation before promoting new feed or marketplace filters to production.
+        16. **Full Upgrade Plan & Release Steps.** Roll out the sanitisation helpers, observe API analytics for pagination shifts, stage GraphQL schema changes behind gateway versioning, update client SDKs, and publish the new payload contract to the platform changelog.
+      - ✅ 12.D Domain Models & Persistence
          - 12.D.1 ReportingPaymentsRevenueDailyView (backend-nodejs/src/models/ReportingPaymentsRevenueDailyView.js)
          - 12.D.2 LearnerSupportRepository (backend-nodejs/src/repositories/LearnerSupportRepository.js)
+        1. **Appraisal.** Daily revenue summaries now support currency scoping and hole-filling for timeline charts, while learner support persistence emits domain events for ticket creation, updates, messaging, and closure.
+        2. **Functionality.** Currency filters flow through SQL builders, date windows are generated server-side, repository list views respect status/limit options, and close/add operations refresh breadcrumbs and return mapped artefacts. The base `006_create_learner_support_tables.sql` migration now provisions breadcrumbs, AI summary, follow-up, and knowledge suggestion columns up-front so seeds and runtime models stay aligned without relying on ad-hoc alter statements.
+        3. **Logic Usefulness.** Domain events encode ticket state transitions so support analytics, CRM syncs, and notification workers can respond without scraping tables, fulfilling Annex A15 expectations.
+        4. **Redundancies.** Centralised limit/currency normalisers prevent controllers and services from reimplementing filter parsing for every dashboard or export routine.
+        5. **Placeholders or Stubs.** Event dispatchers still await downstream subscribers for satisfaction surveys and escalation routing; wire those handlers before exposing support telemetry to leadership dashboards.
+        6. **Duplicate Functions.** The new helpers replace bespoke pagination parsing scattered across repositories and services, keeping learner support and reporting consistent with the shared toolkit in Annex C1.
+        7. **Improvements Needed.** Add currency conversion hooks so finance summaries can express both native and platform base currencies without duplicating reporting SQL.
+        8. **Styling Improvements.** Filled date gaps give UX designers stable line charts and card gradients that match the reporting layouts catalogued in `user_experience.md`.
+        9. **Efficiency Analysis.** `whereIn` filters and capped case listings reduce redundant message hydration, cutting latency for learners scrolling large support histories.
+        10. **Strengths to Keep.** Breadcrumb updates, automatic follow-up recalculation, and serialised attachments maintain the thorough audit trail expected in support experiences.
+        11. **Weaknesses to Remove.** Satisfaction updates still rely on caller-provided scores; consider enforcing allowed ranges and storing the rater identity for governance checks.
+        12. **Styling & Colour Review.** Domain events should drive consistent badge states (open, pending, closed) so the support timeline palette mirrors the gradients specified in the UX audit.
+        13. **CSS, Orientation & Placement.** Filled reporting series align with dashboard spacing assumptions, preventing the empty-day collapse observed in previous user testing.
+        14. **Text Analysis.** Event payloads use verb-first labels (“case_created”, “case_closed”) that map cleanly to support copywriting guidelines and notification templates.
+        15. **Change Checklist Tracker.** Add coverage for `fillGaps` timelines and list option normalisation to regression suites before each release.
+        16. **Full Upgrade Plan & Release Steps.** Deploy reporting changes alongside analytics schema docs, broadcast the new domain events to downstream consumers, backfill historic gaps for SLA dashboards, and validate support timelines with CX before GA.
       - 12.E Services & Integrations
          - 12.E.1 HubSpotClient (backend-nodejs/src/integrations/HubSpotClient.js)
          - 12.E.2 CourseLiveService (backend-nodejs/src/services/CourseLiveService.js)
