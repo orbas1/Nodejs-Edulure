@@ -421,6 +421,23 @@ export class CommunityReminderJob {
       existingState?.version === reminderVersion &&
       existingState?.state?.status === 'sent'
     ) {
+      const priorState = existingState?.state ?? {};
+      await this.jobStateModel.save(this.jobKey, stateKey, {
+        version: reminderVersion,
+        state: {
+          ...priorState,
+          status: 'sent',
+          runId,
+          channel: reminder.channel,
+          persona,
+          dedupedAt: new Date().toISOString()
+        },
+        metadata: {
+          ...(existingState?.metadata ?? {}),
+          deduped: true,
+          lastRunId: runId
+        }
+      });
       aggregator.record({
         eventId: event.id,
         communityId: event.communityId,
@@ -431,7 +448,7 @@ export class CommunityReminderJob {
       });
       await this.reminderModel.markOutcome(reminder.id, {
         status: 'sent',
-        sentAt: existingState.state?.sentAt ? new Date(existingState.state.sentAt) : new Date(),
+        sentAt: priorState.sentAt ? new Date(priorState.sentAt) : new Date(),
         lastAttemptAt: new Date()
       });
       return { reminderId: reminder.id, status: 'deduped', persona };

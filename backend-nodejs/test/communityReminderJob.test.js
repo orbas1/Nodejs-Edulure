@@ -186,4 +186,91 @@ describe('CommunityReminderJob', () => {
     expect(summary.processed).toBe(1);
     expect(summary.dispatched).toHaveLength(1);
   });
+
+  it('enqueues push reminders into the notification queue', async () => {
+    const reminderVersion = '2024-11-20T11:58:00Z';
+    const reminders = [
+      {
+        id: 3,
+        eventId: 40,
+        userId: 200,
+        channel: 'push',
+        remindAt: reminderVersion,
+        metadata: { templateId: 'community-event-reminder' }
+      }
+    ];
+    reminderModel.listDue.mockResolvedValue(reminders);
+    reminderModel.markProcessing.mockResolvedValue(1);
+    eventModel.findById.mockResolvedValue({ id: 40, communityId: 9, title: 'Ops Summit' });
+    notificationModel.enqueue.mockResolvedValue({ id: 701, dedupeKey: 'community:40:user:200:remind' });
+
+    const job = buildJob();
+    const result = await job.runCycle('manual');
+
+    expect(notificationModel.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 200,
+        channel: 'push',
+        dedupeKey: expect.stringContaining('community:40:user:200'),
+        metadata: expect.objectContaining({ channel: 'push' })
+      })
+    );
+    expect(reminderModel.markOutcome).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({ status: 'sent' })
+    );
+    expect(jobStateModel.save).toHaveBeenCalledWith(
+      'community_reminder',
+      'reminder:3',
+      expect.objectContaining({
+        state: expect.objectContaining({ status: 'sent', channel: 'push' })
+      })
+    );
+    expect(metrics.recordBackgroundJobRun).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'success', processed: 1 })
+    );
+    expect(result.dispatched[0]).toEqual(expect.objectContaining({ status: 'queued' }));
+  });
+
+  it('skips duplicate reminders when job state already recorded a send', async () => {
+    const reminder = {
+      id: 5,
+      eventId: 33,
+      userId: 77,
+      channel: 'email',
+      remindAt: '2024-11-20T11:55:00Z',
+      metadata: {}
+    };
+    reminderModel.listDue.mockResolvedValue([reminder]);
+    reminderModel.markProcessing.mockResolvedValue(1);
+    eventModel.findById.mockResolvedValue({ id: 33, communityId: 5, title: 'Town Hall' });
+    const existingVersion = new Date(reminder.remindAt).toISOString();
+    jobStateModel.get.mockResolvedValueOnce({
+      version: existingVersion,
+      state: { status: 'sent', sentAt: '2024-11-20T11:00:00.000Z', delivery: { provider: 'smtp' } },
+      metadata: { seeded: true }
+    });
+
+    const job = buildJob();
+    const summary = await job.runCycle('manual');
+
+    expect(mailer.sendMail).not.toHaveBeenCalled();
+    expect(notificationModel.enqueue).not.toHaveBeenCalled();
+    expect(reminderModel.markOutcome).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ status: 'sent' })
+    );
+    expect(jobStateModel.save).toHaveBeenCalledWith(
+      'community_reminder',
+      'reminder:5',
+      expect.objectContaining({
+        metadata: expect.objectContaining({ deduped: true }),
+        state: expect.objectContaining({ status: 'sent', dedupedAt: expect.any(String) })
+      })
+    );
+    expect(metrics.recordBackgroundJobRun).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'success', processed: 1 })
+    );
+    expect(summary.dispatched[0]).toEqual(expect.objectContaining({ status: 'deduped' }));
+  });
 });
