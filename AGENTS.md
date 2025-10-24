@@ -436,10 +436,40 @@
          - 10.A.3 CheckoutDialog (frontend-reactjs/src/components/commerce/CheckoutDialog.jsx)
          - 10.A.4 CheckoutPriceSummary (frontend-reactjs/src/components/commerce/CheckoutPriceSummary.jsx)
          - 10.A.5 EdulureAds (frontend-reactjs/src/pages/dashboard/EdulureAds.jsx)
-      - 11.A Profile & Account Surfaces
-         - 11.A.1 Profile (frontend-reactjs/src/pages/Profile.jsx)
-      - 11.B Support & Success Workflows
-         - 11.B.1 TicketForm (frontend-reactjs/src/components/support/TicketForm.jsx)
+      - ✓ 11.A Profile & Account Surfaces — Annex A22 (Profile & Billing Management)
+         1. **Appraisal.** `IdentityVerificationService.js` now composes the same verification summary that fuels `pages/Profile.jsx`, so Annex A22 shows inline validation, audit chronology, and billing cross-links sourced from the production KYC tables instead of mock placeholders.
+         2. **Functionality.** `composeVerificationSummary` joins `KycVerificationModel`, `KycDocumentModel`, and `KycAuditLogModel` rows into a payload with decrypted document metadata, required/outstanding document arrays, and a timestamped timeline rendered by the React verification card.
+         3. **Usefulness.** Learners see backend-confirmed audit events (“submitted_for_review”, “review_approved”) beside local upload states, reducing reconciliation pings because the profile accurately mirrors compliance status.
+         4. **Redundancies.** Timeline construction moved from the client into the service, eliminating duplicate logic across `fetchVerificationSummary`, `attachVerificationDocument`, and `submitVerificationPackage` while giving the UI a single canonical feed.
+         5. **Placeholders.** When a tenant lacks audit rows the service falls back to deterministic “verification ready” messaging, keeping Annex copy stable until reviewers create history.
+         6. **Duplicates.** Document labels now come directly from `REQUIRED_DOCUMENT_TYPES`, preventing diverging helper text between backend policy and the profile upload checklist.
+         7. **Improvements Needed.** Next sprint should hydrate reviewer avatars and SLA countdowns in the timeline once compliance exposes enriched metadata through `KycAuditLogModel`.
+         8. **Styling.** Profile verification badges reuse Annex accent tokens while server responses supply label/description text so the React component no longer hardcodes design copy.
+         9. **Efficiency.** Timeline generation runs in SQL once per summary request and returns memo-friendly arrays, avoiding repeated client recomputation on every render.
+         10. **Strengths.** Backend-verified outstanding document lists, audit-fed timelines, and persisted upload metadata keep account owners, finance, and compliance reviewing the same state snapshot.
+         11. **Weaknesses.** Profile editing still lacks backend-driven localisation for validation strings; introduce translation scaffolding before rolling out to multilingual tenants.
+         12. **Styling & Colour Review.** Server-provided labels respect Annex typography hierarchy, and the UI continues to apply focus/hover states that match billing cards and consent ledgers.
+         13. **CSS, Orientation & Placement.** The verification pane preserves two-column balance on desktop while stacking timeline events beneath alerts on mobile without reflow glitches.
+         14. **Text Analysis.** Backend summaries surface concise, action-focused copy (“Upload the back of your government ID”) derived from compliance descriptions, keeping tooltips consistent across channels.
+         15. **Change Checklist Tracker.** QA now verifies audit ingestion, outstanding document gating, and failure messaging against seeded KYC data before approving Annex A22 shipments.
+         16. **Release.** Roll Annex A22 alongside compliance migrations: run `20250211104500_secure_kyc_financial_payloads.js`, backfill audit logs, brief support on new timeline semantics, and monitor submission completion rates.
+      - ✓ 11.B Support & Success Workflows — Annex C1 (Learner Support Workspace)
+         1. **Appraisal.** `LearnerSupportRepository.js` and `SupportTicketModel.js` now align with migrations/seeds so Annex C1’s workspace displays knowledge suggestions, breadcrumbs, and AI summaries backed by live database fields.
+         2. **Functionality.** `createSupportTicket`, `updateSupportTicket`, and message APIs persist escalation breadcrumbs, notification metadata, and AI context while `TicketForm.jsx` reads/writes the same structures surfaced in the learner dashboard.
+         3. **Usefulness.** Learners review suggestion chips and SLA breadcrumbs that match backend records, letting success agents continue cases without reconciling local-only state.
+         4. **Redundancies.** Shared option builders and repository helpers normalise categories, priorities, and breadcrumbs so both backend and modal reuse the same serialisation rules.
+         5. **Placeholders.** Notification preferences stay in local storage until the preference API lands, but schema columns (`knowledge_suggestions`, `follow_up_due_at`) keep production parity for when the server begins storing them.
+         6. **Duplicates.** Support migrations (`20250321120000_learner_support_enhancements.js`) and `database/install.sql` enforce identical columns across fresh installs, seeds, and runtime queries, avoiding drift between environments.
+         7. **Improvements Needed.** Wire analytics events for preference toggles and hydrate SMS availability from tenant configuration before widening Annex rollout.
+         8. **Styling.** Chips, focus traps, and toast semantics continue to match Annex colour tokens, and backend-driven suggestion text removes redundant hard-coded copy in the modal.
+         9. **Efficiency.** Repository helpers batch message inserts and breadcrumb updates, while the modal mutates shallow clones so React renders remain lightweight even with persisted metadata.
+         10. **Strengths.** Accessible modal patterns, persisted AI summaries, and knowledge suggestions sourced from `support_articles` keep success workflows observable end-to-end.
+         11. **Weaknesses.** Local-only notification storage prevents cross-device preference sync; a follow-up should store channel/digest choices server-side through the learner preferences service.
+         12. **Styling & Colour Review.** Error, warning, and success states reuse Annex palettes so toast colours, chips, and banners stay consistent across dashboard and modal surfaces.
+         13. **CSS, Orientation & Placement.** Grid utilities ensure preference toggles collapse into single-column stacks on small screens while preserving accessible hit targets.
+         14. **Text Analysis.** Support microcopy now references seeded articles (“Resolve recurring billing declines”) and AI summary blurbs kept under 140 characters for clarity.
+         15. **Change Checklist Tracker.** Regression passes now include repository timeline hydration, breadcrumb updates, and notification toggle persistence before C1 deployments.
+         16. **Release.** Sequence Annex C1 with the learner support migration bundle, reseed knowledge articles via `001_bootstrap.js`, publish enablement notes, and monitor case resolution SLAs post-launch.
       - 11.C Settings, Preferences & Profile Components
          - 11.C.1 ProfileIdentityEditor (frontend-reactjs/src/components/profile/ProfileIdentityEditor.jsx)
          - 11.C.2 SettingsAccordion (frontend-reactjs/src/components/settings/SettingsAccordion.jsx)
