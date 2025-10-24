@@ -22,4 +22,17 @@ export default class NavigationAnnexController {
       return next(error);
     }
   }
+
+  static async strategyBriefing(req, res, next) {
+    try {
+      const role = extractRole(req.query.role);
+      const briefing = await NavigationAnnexService.describeStrategyBriefing({ role });
+      return success(res, {
+        data: briefing,
+        message: 'Navigation strategy briefing resolved'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }

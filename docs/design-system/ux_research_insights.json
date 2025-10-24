@@ -1,0 +1,66 @@
+{
+  "generatedAt": "2025-10-18T00:00:00.000Z",
+  "source": "user_experience.md",
+  "insights": [
+    {
+      "id": "learner-support-sla",
+      "area": "Learner Support Workspace",
+      "component": "frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx",
+      "summary": "Dual-column workspace with SLA badges and sticky detail panes reduced escalation time and kept agents in a single context.",
+      "researchMethods": ["Remote usability study", "Session replay analysis"],
+      "lastValidated": "2025-09-02",
+      "evidence": {
+        "metric": "Mean time to resolve",
+        "baseline": "47m",
+        "observed": "33m",
+        "confidence": "0.92"
+      },
+      "recommendations": [
+        "Prioritise websocket-driven SLA updates to eliminate manual refreshes.",
+        "Expose agent ownership chips to reinforce accountability during hand-offs."
+      ],
+      "tags": ["support", "sla", "dashboard"],
+      "playbook": "/docs/operations/navigation-readiness.md#support-sla-validation"
+    },
+    {
+      "id": "learner-upcoming-urgency",
+      "area": "Learner Upcoming Commitments",
+      "component": "frontend-reactjs/src/components/dashboard/LearnerUpcomingSection.jsx",
+      "summary": "Urgency-tagged commitment cards with safe CTA handling improved clarity for next actions across learner personas.",
+      "researchMethods": ["Unmoderated prototype test", "Copy review"],
+      "lastValidated": "2025-08-15",
+      "evidence": {
+        "metric": "CTA comprehension score",
+        "baseline": "62%",
+        "observed": "86%",
+        "confidence": "0.88"
+      },
+      "recommendations": [
+        "Add timezone hints and ICS downloads to increase follow-through.",
+        "Instrument CTA clicks to track urgency impact."
+      ],
+      "tags": ["learner-dashboard", "upcoming", "cta"],
+      "playbook": "/docs/design-system/navigation-annex.md#learner-upcoming"
+    },
+    {
+      "id": "quick-actions-offline",
+      "area": "Instructor Quick Actions",
+      "component": "Edulure-Flutter/lib/screens/instructor_dashboard_screen.dart",
+      "summary": "Offline-ready instructor queue kept grading and announcements flowing even during intermittent connectivity.",
+      "researchMethods": ["Field observation", "Telemetry analysis"],
+      "lastValidated": "2025-07-28",
+      "evidence": {
+        "metric": "Offline completion rate",
+        "baseline": "54%",
+        "observed": "79%",
+        "confidence": "0.9"
+      },
+      "recommendations": [
+        "Surface sync history for transparency.",
+        "Add retry affordances for failed uploads."
+      ],
+      "tags": ["instructor", "offline", "quick-actions"],
+      "playbook": "/docs/operations/navigation-readiness.md#instructor-quick-actions"
+    }
+  ]
+}

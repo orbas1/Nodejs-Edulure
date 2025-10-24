@@ -1,0 +1,619 @@
+{
+  "generatedAt": "2025-10-24T21:09:36.857Z",
+  "source": "frontend-reactjs/src/styles/tokens.css",
+  "tokens": [
+    {
+      "mode": "light",
+      "group": "Brand tokens",
+      "name": "--color-amber",
+      "value": "#f59e0b"
+    },
+    {
+      "mode": "light",
+      "group": "Brand tokens",
+      "name": "--color-emerald",
+      "value": "#10b981"
+    },
+    {
+      "mode": "light",
+      "group": "Brand tokens",
+      "name": "--color-primary",
+      "value": "#2d62ff"
+    },
+    {
+      "mode": "light",
+      "group": "Brand tokens",
+      "name": "--color-primary-dark",
+      "value": "#1f3bb3"
+    },
+    {
+      "mode": "light",
+      "group": "Brand tokens",
+      "name": "--color-primary-soft",
+      "value": "#dbe4ff"
+    },
+    {
+      "mode": "light",
+      "group": "Brand tokens",
+      "name": "--color-rose",
+      "value": "#f43f5e"
+    },
+    {
+      "mode": "light",
+      "group": "Breakpoints",
+      "name": "--screen-2xl",
+      "value": "1536px"
+    },
+    {
+      "mode": "light",
+      "group": "Breakpoints",
+      "name": "--screen-lg",
+      "value": "1024px"
+    },
+    {
+      "mode": "light",
+      "group": "Breakpoints",
+      "name": "--screen-md",
+      "value": "768px"
+    },
+    {
+      "mode": "light",
+      "group": "Breakpoints",
+      "name": "--screen-sm",
+      "value": "480px"
+    },
+    {
+      "mode": "light",
+      "group": "Breakpoints",
+      "name": "--screen-xl",
+      "value": "1280px"
+    },
+    {
+      "mode": "light",
+      "group": "Breakpoints",
+      "name": "--screen-xs",
+      "value": "360px"
+    },
+    {
+      "mode": "light",
+      "group": "Focus + overlay",
+      "name": "--overlay-backdrop",
+      "value": "rgba(15, 23, 42, 0.6)"
+    },
+    {
+      "mode": "light",
+      "group": "Focus + overlay",
+      "name": "--shadow-focus-ring",
+      "value": "0 0 0 3px rgba(45, 98, 255, 0.35)"
+    },
+    {
+      "mode": "light",
+      "group": "Form",
+      "name": "--form-field-border",
+      "value": "rgba(148, 163, 184, 0.45)"
+    },
+    {
+      "mode": "light",
+      "group": "Form",
+      "name": "--form-field-border-strong",
+      "value": "rgba(79, 70, 229, 0.45)"
+    },
+    {
+      "mode": "light",
+      "group": "Form",
+      "name": "--form-field-padding-x",
+      "value": "1.25rem"
+    },
+    {
+      "mode": "light",
+      "group": "Form",
+      "name": "--form-field-padding-y",
+      "value": "0.875rem"
+    },
+    {
+      "mode": "light",
+      "group": "Form",
+      "name": "--form-field-shadow",
+      "value": "0 18px 45px -28px rgba(15, 23, 42, 0.35)"
+    },
+    {
+      "mode": "light",
+      "group": "Form",
+      "name": "--form-field-surface",
+      "value": "#ffffff"
+    },
+    {
+      "mode": "light",
+      "group": "Form",
+      "name": "--form-field-surface-focus",
+      "value": "#f8fbff"
+    },
+    {
+      "mode": "light",
+      "group": "Form",
+      "name": "--form-label-letterspacing",
+      "value": "0.025em"
+    },
+    {
+      "mode": "light",
+      "group": "Gradients",
+      "name": "--gradient-cta",
+      "value": "linear-gradient(135deg, #4338ca 0%, #6366f1 55%, #7c3aed 100%)"
+    },
+    {
+      "mode": "light",
+      "group": "Gradients",
+      "name": "--gradient-cta-hover",
+      "value": "linear-gradient(135deg, #3730a3 0%, #4f46e5 55%, #6d28d9 100%)"
+    },
+    {
+      "mode": "light",
+      "group": "Gradients",
+      "name": "--gradient-hero",
+      "value": "linear-gradient(135deg, #0f172a 0%, #1e1b4b 52%, #111827 100%)"
+    },
+    {
+      "mode": "light",
+      "group": "Gradients",
+      "name": "--gradient-marketing",
+      "value": "linear-gradient(160deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 64, 175, 0.92) 65%, rgba(15, 23, 42, 0.96) 100%)"
+    },
+    {
+      "mode": "light",
+      "group": "Grid system",
+      "name": "--grid-gap",
+      "value": "var(--space-6)"
+    },
+    {
+      "mode": "light",
+      "group": "Grid system",
+      "name": "--grid-min-column",
+      "value": "18rem"
+    },
+    {
+      "mode": "light",
+      "group": "Light theme surface + text tokens",
+      "name": "--color-border",
+      "value": "rgba(15, 23, 42, 0.12)"
+    },
+    {
+      "mode": "light",
+      "group": "Light theme surface + text tokens",
+      "name": "--color-surface",
+      "value": "#ffffff"
+    },
+    {
+      "mode": "light",
+      "group": "Light theme surface + text tokens",
+      "name": "--color-surface-muted",
+      "value": "#f8fafc"
+    },
+    {
+      "mode": "light",
+      "group": "Light theme surface + text tokens",
+      "name": "--color-surface-subtle",
+      "value": "#f1f5f9"
+    },
+    {
+      "mode": "light",
+      "group": "Light theme surface + text tokens",
+      "name": "--color-text",
+      "value": "#0f172a"
+    },
+    {
+      "mode": "light",
+      "group": "Light theme surface + text tokens",
+      "name": "--color-text-muted",
+      "value": "#475569"
+    },
+    {
+      "mode": "light",
+      "group": "Light theme surface + text tokens",
+      "name": "--color-text-subtle",
+      "value": "#64748b"
+    },
+    {
+      "mode": "light",
+      "group": "Media",
+      "name": "--media-thumb-aspect",
+      "value": "16 / 10"
+    },
+    {
+      "mode": "light",
+      "group": "Media",
+      "name": "--media-thumb-radius",
+      "value": "2.75rem"
+    },
+    {
+      "mode": "light",
+      "group": "Motion",
+      "name": "--motion-duration-fast",
+      "value": "120ms"
+    },
+    {
+      "mode": "light",
+      "group": "Motion",
+      "name": "--motion-duration-medium",
+      "value": "220ms"
+    },
+    {
+      "mode": "light",
+      "group": "Motion",
+      "name": "--motion-easing-standard",
+      "value": "cubic-bezier(0.16, 1, 0.3, 1)"
+    },
+    {
+      "mode": "light",
+      "group": "Radii",
+      "name": "--radius-lg",
+      "value": "1.25rem"
+    },
+    {
+      "mode": "light",
+      "group": "Radii",
+      "name": "--radius-pill",
+      "value": "999px"
+    },
+    {
+      "mode": "light",
+      "group": "Radii",
+      "name": "--radius-xl",
+      "value": "2rem"
+    },
+    {
+      "mode": "light",
+      "group": "Radii",
+      "name": "--radius-xxl",
+      "value": "2.75rem"
+    },
+    {
+      "mode": "light",
+      "group": "Radii",
+      "name": "--uploads-progress-radius",
+      "value": "0.75rem"
+    },
+    {
+      "mode": "light",
+      "group": "Shadows",
+      "name": "--shadow-card",
+      "value": "0 24px 60px -30px rgba(15, 23, 42, 0.18)"
+    },
+    {
+      "mode": "light",
+      "group": "Shadows",
+      "name": "--shadow-card-strong",
+      "value": "0 32px 84px -36px rgba(15, 23, 42, 0.32)"
+    },
+    {
+      "mode": "light",
+      "group": "Shadows",
+      "name": "--shadow-cta",
+      "value": "0 22px 52px -26px rgba(79, 70, 229, 0.7)"
+    },
+    {
+      "mode": "light",
+      "group": "Shadows",
+      "name": "--shadow-media",
+      "value": "0 40px 120px -48px rgba(15, 23, 42, 0.42)"
+    },
+    {
+      "mode": "light",
+      "group": "Skeleton",
+      "name": "--skeleton-base",
+      "value": "#e2e8f0"
+    },
+    {
+      "mode": "light",
+      "group": "Skeleton",
+      "name": "--skeleton-highlight",
+      "value": "#f8fafc"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-1",
+      "value": "0.25rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-10",
+      "value": "2.5rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-12",
+      "value": "3rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-16",
+      "value": "4rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-2",
+      "value": "0.5rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-3",
+      "value": "0.75rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-4",
+      "value": "1rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-5",
+      "value": "1.25rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-6",
+      "value": "1.5rem"
+    },
+    {
+      "mode": "light",
+      "group": "Spacing scale",
+      "name": "--space-8",
+      "value": "2rem"
+    },
+    {
+      "mode": "light",
+      "group": "Typography",
+      "name": "--font-family-sans",
+      "value": "'Inter', ui-sans-serif, system-ui"
+    },
+    {
+      "mode": "light",
+      "group": "Typography",
+      "name": "--font-size-root",
+      "value": "16px"
+    },
+    {
+      "mode": "light",
+      "group": "Typography",
+      "name": "--line-height-base",
+      "value": "1.5"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--color-border",
+      "value": "rgba(226, 232, 240, 0.2)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--color-primary-soft",
+      "value": "rgba(45, 98, 255, 0.24)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--color-surface",
+      "value": "#0f172a"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--color-surface-muted",
+      "value": "#111c33"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--color-surface-subtle",
+      "value": "#17284a"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--color-text",
+      "value": "#e2e8f0"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--color-text-muted",
+      "value": "#cbd5f5"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--color-text-subtle",
+      "value": "#a5b4fc"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--form-field-border",
+      "value": "rgba(148, 163, 184, 0.35)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--form-field-border-strong",
+      "value": "rgba(129, 140, 248, 0.55)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--form-field-shadow",
+      "value": "0 22px 60px -34px rgba(15, 23, 42, 0.8)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--form-field-surface",
+      "value": "rgba(15, 23, 42, 0.8)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--form-field-surface-focus",
+      "value": "rgba(30, 58, 138, 0.9)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--gradient-cta",
+      "value": "linear-gradient(135deg, #4338ca 0%, #4f46e5 55%, #7c3aed 100%)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--gradient-cta-hover",
+      "value": "linear-gradient(135deg, #3730a3 0%, #4338ca 55%, #6d28d9 100%)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--gradient-hero",
+      "value": "linear-gradient(135deg, #0b1120 0%, #1e1b4b 60%, #111827 100%)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--gradient-marketing",
+      "value": "linear-gradient(160deg, rgba(15, 23, 42, 1) 0%, rgba(30, 64, 175, 0.92) 55%, rgba(15, 23, 42, 0.96) 100%)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--overlay-backdrop",
+      "value": "rgba(15, 23, 42, 0.75)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--shadow-card",
+      "value": "0 24px 60px -30px rgba(15, 23, 42, 0.4)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--shadow-card-strong",
+      "value": "0 32px 84px -36px rgba(15, 23, 42, 0.6)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--shadow-cta",
+      "value": "0 22px 52px -26px rgba(99, 102, 241, 0.75)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--shadow-media",
+      "value": "0 40px 120px -48px rgba(15, 23, 42, 0.6)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--skeleton-base",
+      "value": "rgba(148, 163, 184, 0.35)"
+    },
+    {
+      "mode": "dark",
+      "group": "General",
+      "name": "--skeleton-highlight",
+      "value": "rgba(226, 232, 240, 0.35)"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-border",
+      "value": "rgba(15, 23, 42, 0.4)"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-primary",
+      "value": "#1d4ed8"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-primary-dark",
+      "value": "#1e3a8a"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-primary-soft",
+      "value": "#c7d2fe"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-surface",
+      "value": "#ffffff"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-surface-muted",
+      "value": "#ffffff"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-surface-subtle",
+      "value": "#f8fafc"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-text",
+      "value": "#0b1120"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-text-muted",
+      "value": "#111c33"
+    },
+    {
+      "mode": "mode-2",
+      "group": "General",
+      "name": "--color-text-subtle",
+      "value": "#1e293b"
+    }
+  ],
+  "summary": {
+    "groupCounts": {
+      "light:Brand tokens": 6,
+      "light:Breakpoints": 6,
+      "light:Focus + overlay": 2,
+      "light:Form": 8,
+      "light:Gradients": 4,
+      "light:Grid system": 2,
+      "light:Light theme surface + text tokens": 7,
+      "light:Media": 2,
+      "light:Motion": 3,
+      "light:Radii": 5,
+      "light:Shadows": 4,
+      "light:Skeleton": 2,
+      "light:Spacing scale": 10,
+      "light:Typography": 3,
+      "dark:General": 24,
+      "mode-2:General": 10
+    },
+    "modeCounts": {
+      "light": 64,
+      "dark": 24,
+      "mode-2": 10
+    }
+  }
+}

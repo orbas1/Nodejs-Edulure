@@ -37,6 +37,7 @@ import setupRoutes from './setup.routes.js';
 import navigationRoutes from './navigation.routes.js';
 import operatorRoutes from './operator.routes.js';
 import qaRoutes from './qa.routes.js';
+import designRoutes from './design.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 import { buildRouteRegistry } from './registryValidator.js';
 
@@ -79,7 +80,8 @@ const routerMap = {
   setup: setupRoutes,
   navigation: navigationRoutes,
   operator: operatorRoutes,
-  qa: qaRoutes
+  qa: qaRoutes,
+  design: designRoutes
 };
 
 export const apiRouteRegistry = buildRouteRegistry({
