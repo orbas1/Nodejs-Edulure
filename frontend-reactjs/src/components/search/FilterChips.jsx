@@ -29,6 +29,8 @@ function formatRangeValue(rawValue) {
   return null;
 }
 
+const MAX_MULTI_CHIPS = 12;
+
 export function buildFilterChips(filters = {}, definitions = []) {
   const definitionMap = new Map(definitions.map((item) => [item.key, item]));
   const chips = [];
@@ -43,7 +45,7 @@ export function buildFilterChips(filters = {}, definitions = []) {
     if (definition.type === 'multi' && Array.isArray(rawValue)) {
       rawValue
         .filter((value) => value !== null && value !== undefined && value !== '')
-        .slice(0, 12)
+        .slice(0, MAX_MULTI_CHIPS)
         .forEach((value) => {
           const displayValue = getOptionLabel(definition, value);
           chips.push({
@@ -103,7 +105,7 @@ export function buildFilterChips(filters = {}, definitions = []) {
   return chips;
 }
 
-export default function FilterChips({ filters, definitions, chips, onRemove }) {
+export default function FilterChips({ filters, definitions, chips, onRemove, onClearAll }) {
   const resolvedChips = useMemo(
     () => chips ?? buildFilterChips(filters, definitions),
     [chips, filters, definitions]
@@ -132,6 +134,15 @@ export default function FilterChips({ filters, definitions, chips, onRemove }) {
           <span className="sr-only">Remove {chip.label}</span>
         </button>
       ))}
+      {onClearAll ? (
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:border-primary hover:text-primary"
+          onClick={onClearAll}
+        >
+          Clear all
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -156,12 +167,14 @@ FilterChips.propTypes = {
       type: PropTypes.string
     })
   ),
-  onRemove: PropTypes.func.isRequired
+  onRemove: PropTypes.func.isRequired,
+  onClearAll: PropTypes.func
 };
 
 FilterChips.defaultProps = {
   filters: {},
   definitions: [],
-  chips: null
+  chips: null,
+  onClearAll: null
 };
 

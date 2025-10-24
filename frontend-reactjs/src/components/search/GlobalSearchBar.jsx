@@ -8,6 +8,28 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
+const RECENT_QUERY_KEY = 'edulure.global-search.recents';
+
+function loadRecents() {
+  try {
+    const raw = window.localStorage.getItem(RECENT_QUERY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn('Unable to load recent global searches', error);
+    return [];
+  }
+}
+
+function persistRecents(recents) {
+  try {
+    window.localStorage.setItem(RECENT_QUERY_KEY, JSON.stringify(recents));
+  } catch (error) {
+    console.warn('Unable to persist recent global searches', error);
+  }
+}
+
 function renderSuggestionPreview(suggestion) {
   if (suggestion?.preview?.thumbnailUrl) {
     return (
@@ -87,6 +109,7 @@ export default function GlobalSearchBar({
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef(null);
   const loadedRef = useRef(false);
+  const [recentQueries, setRecentQueries] = useState(() => (typeof window !== 'undefined' ? loadRecents() : []));
 
   const {
     suggestions,
@@ -100,6 +123,11 @@ export default function GlobalSearchBar({
     () => suggestions.slice(0, suggestionsLimit),
     [suggestions, suggestionsLimit]
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    persistRecents(recentQueries);
+  }, [recentQueries]);
 
   useEffect(() => {
     if (value !== undefined) {
@@ -141,6 +169,11 @@ export default function GlobalSearchBar({
     if (trimmed.length === 0) {
       return;
     }
+    setRecentQueries((prev) => {
+      const next = prev.filter((query) => query !== trimmed);
+      next.unshift(trimmed);
+      return next.slice(0, 5);
+    });
     onSubmit?.(trimmed);
     setIsOpen(false);
     setActiveIndex(-1);
@@ -165,6 +198,11 @@ export default function GlobalSearchBar({
   };
 
   const handleKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      setIsOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
     if (!isOpen || !displayedSuggestions.length) {
       return;
     }
@@ -227,7 +265,35 @@ export default function GlobalSearchBar({
               </ul>
             ) : null}
             {!combinedLoading && !displayedSuggestions.length ? (
-              <p className="px-3 py-2 text-xs text-slate-400">No suggestions yet. Start typing to search.</p>
+              <div className="space-y-2">
+                {recentQueries.length ? (
+                  <>
+                    <p className="px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Recent searches</p>
+                    <ul className="space-y-1">
+                      {recentQueries.map((recent) => (
+                        <li key={recent}>
+                          <button
+                            type="button"
+                            className="w-full rounded-2xl px-3 py-2 text-left text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-primary"
+                            onClick={() => submitValue(recent)}
+                          >
+                            {recent}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 transition hover:border-primary hover:text-primary"
+                      onClick={() => setRecentQueries([])}
+                    >
+                      Clear history
+                    </button>
+                  </>
+                ) : (
+                  <p className="px-3 py-2 text-xs text-slate-400">No suggestions yet. Start typing to search.</p>
+                )}
+              </div>
             ) : null}
             {error ? (
               <p className="px-3 py-2 text-xs text-rose-500" role="alert">

@@ -899,16 +899,148 @@
             14. **Text Analysis.** Session blurbs now emphasise persona outcomes (“Community leaders host AMAs”) aligned with Annex microcopy, with truncated summaries under 120 characters for grid readability.
             15. **Change Checklist Tracker.** QA steps include verifying persona filters across public/admin tabs, testing empty states, ensuring analytics events fire, and checking that conflict warnings respect cluster selection.
             16. **Full Upgrade Plan & Release Steps.** Plan includes syncing calendar feeds with cluster metadata, coordinating with instructor operations, monitoring analytics for persona coverage gaps, and phasing rollout alongside scheduling improvements.
-      - 9.D Scheduling, Calendar & Classroom Utilities
+      - ✓ 9.D Scheduling, Calendar & Classroom Utilities
          - 9.D.1 CalendarEventDialog (frontend-reactjs/src/components/calendar/CalendarEventDialog.jsx)
+            1. **Appraisal.** The dialog now reflects Annex C4 guidance by surfacing timezone selection, preset durations, and schedule summaries so live class producers can stage workshops without leaving the modal.
+            2. **Functionality.** Helpers `parseLocalDate`, `computeEndValue`, and `formatTimezoneLabel` convert local input strings into deterministic Date objects, auto-sync end times, and emit a11y-friendly labels while a memoised summary block explains the schedule, timezone, and relative start window.
+            3. **Usefulness.** A persistent draft (stored under `edulure.calendar.draft`) and duration presets let instructors resume planning mid-flight, while the relative countdown callout clarifies whether the session is imminent or past—reducing calendaring mistakes called out in `user_experience.md` Annex C4.
+            4. **Redundancies.** Manual end-time validation logic was collapsed into the new helpers, removing repeated `new Date` constructions and string concatenations across change handlers.
+            5. **Placeholders or Stubs.** Media and resources still accept freeform URLs; upcoming Annex work will thread these into asset pickers once the classroom asset library lands.
+            6. **Duplicate Functions.** Shared parsing/formatting utilities prevent diverging conversions between the modal and schedule components, aligning Annex requirements for consistent time math across live class tooling.
+            7. **Improvements Needed.** Future iterations should emit ICS attachments and conflict warnings once the backend exposes instructor availability APIs, and add validation for tenant-specific call-to-action URL domains.
+            8. **Styling Improvements.** New timezone and preset controls reuse dashboard pill tokens, while the summary block mirrors the Annex typography hierarchy (`text-xs` kickers, `text-primary` accent) so scheduling utilities feel native to the dashboard shell.
+            9. **Efficiency Analysis.** Memoised schedule summaries and guarded localStorage writes ensure the dialog re-renders cheaply even when operators toggle between presets, satisfying Annex guidance on responsive interactions.
+            10. **Strengths to Keep.** Focus-trap behaviour, Escape handling, and screen-reader announcements remain intact, meaning accessibility affordances from earlier Annex passes continue to hold.
+            11. **Weaknesses to Remove.** Timezone formatting still relies on browser support; document a follow-up to ship a curated timezone list from the backend for environments lacking `Intl.supportedValuesOf`.
+            12. **Styling & Colour Review.** Duration chips honour primary palettes while the summary callout keeps neutral tones, reinforcing the calm scheduling motif laid out in Annex C4.
+            13. **CSS, Orientation & Placement.** Controls stay within the existing grid (`md:grid-cols-2`), ensuring mobile layouts cascade without overflow while the summary strip anchors to the modal footer per Annex orientation notes.
+            14. **Text Analysis.** Microcopy emphasises action clarity (“Auto-sync end time”, “Highlight media URL”), matching Annex tone that prioritises descriptive cues over marketing language.
+            15. **Change Checklist Tracker.** QA should confirm auto-sync toggles, draft persistence, timezone validation, and relative countdown accuracy before approving C4 releases.
+            16. **Full Upgrade Plan & Release Steps.** Roll out by piloting with instructor ops, verifying timezone offsets in staging, capturing feedback on preset coverage, then publishing Annex C4 screenshots/documentation alongside the code deploy.
          - 9.D.2 ScheduleGrid (frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx)
-      - 9.E Search & Discovery Components
+            1. **Appraisal.** The schedule grid now surfaces occupancy progress, location, persona tags, and primary/secondary actions so Annex C4 stakeholders can scan readiness at a glance.
+            2. **Functionality.** `formatRelative`, `formatDuration`, and `formatTimezone` compute readable labels, while progress bars and CTA buttons adapt based on provided metadata, enabling both interactive selection and deep links.
+            3. **Usefulness.** Hosts immediately see seat fill ratios, upcoming session relative timing, and quick links (join/request) without diving into detail pages, matching Annex expectations for rapid classroom triage.
+            4. **Redundancies.** The component dropped wrapper `button` duplication in favour of a single `<article>` with keyboard handlers, eliminating nested interactive elements and consolidating focus styling.
+            5. **Placeholders or Stubs.** Tags remain limited to four entries; a follow-up will paginate larger tag sets once programme metadata expands.
+            6. **Duplicate Functions.** Shared helper functions replace ad-hoc Date math from prior iterations, keeping live class schedule calculations consistent with the dialog’s utilities.
+            7. **Improvements Needed.** Consider streaming live attendance snapshots and resilience for missing timezone abbreviations, plus exposing instructor avatars referenced in Annex C4 roadmap.
+            8. **Styling Improvements.** Persona, momentum, and CTA badges reuse Annex colour tokens (`bg-primary/5`, `bg-emerald-50`), ensuring parity with schedule summaries documented in `user_experience.md`.
+            9. **Efficiency Analysis.** Formatting helpers short-circuit on invalid dates and reuse Intl formatters, reducing expensive allocations when rendering large grids.
+            10. **Strengths to Keep.** Responsive three-column layout, hover/focus cues, and attendance cards remain intact, now enriched with more metrics rather than replaced.
+            11. **Weaknesses to Remove.** CTA spacing now collapses when no buttons render; the remaining gap is the absence of skeletons for occupancy/attendance metrics, which briefly flash empty content while data hydrates.
+            12. **Styling & Colour Review.** Progress bars adopt subtle primary gradients while retaining high contrast for seat usage, aligning with Annex accessibility audits.
+            13. **CSS, Orientation & Placement.** The grid continues using Tailwind utilities (`md:grid-cols-2`, `xl:grid-cols-3`), ensuring density targets from Annex C4 remain satisfied across breakpoints.
+            14. **Text Analysis.** Relative timing strings (“Starts in 2.5 hr”) and occupancy labels follow Annex copy tone—actionable, concise, and free from jargon.
+            15. **Change Checklist Tracker.** QA should cover occupancy progress, persona tag rendering, CTA affordances, timezone fallbacks, and keyboard activation flows.
+            16. **Full Upgrade Plan & Release Steps.** Release alongside updated live-class analytics, obtain instructor feedback on persona chips, update Annex screenshots, and monitor engagement on the upgraded grid.
+            17. **Back-end Integration.** `DashboardService.buildLearnerDashboard` now emits backend-sourced timezone, location, tag, and CTA metadata—plus normalised call-to-action pairs—so ScheduleGrid renders production-aligned Annex C4 payloads instead of local fallbacks, and the supporting seeds/migrations keep classroom metadata synced across environments when `npm --workspace backend-nodejs run migrate && run seed` executes.
+      - ✓ 9.E Search & Discovery Components
          - 9.E.1 BlogSearchSection (frontend-reactjs/src/components/search/BlogSearchSection.jsx)
+            1. **Appraisal.** Annex A6’s newsroom brief now lives in the component: trending tags, saved view metrics, and recent history transform the static blog search into a discovery console.
+            2. **Functionality.** Local persistence covers saved views and recent posts, analytics summaries expose totals/latency, and trending tags derive counts from the tag feed, all memoised to avoid redundant fetch churn.
+            3. **Usefulness.** Editorial teams see catalogue totals, saved view counts, top tags, last refresh timestamp, and device-local history, aligning with Annex guidance for newsroom ops.
+            4. **Redundancies.** Replaced ad-hoc `console` warnings and manual stats with structured dashboards, eliminating duplicate filters previously scattered around the page.
+            5. **Placeholders.** Contact copy still references manual newsroom sharing; upcoming annex work can swap in collaboration hooks once backend endpoints land.
+            6. **Duplicate Functions.** Trending calculations and view persistence reuse shared helpers instead of repeating JSON.parse/JSON.stringify across the module.
+            7. **Improvements Needed.** Wire backend analytics (views per tag, conversions) once available, and consider multi-tenant saved-view syncing beyond localStorage.
+            8. **Styling Improvements.** Summary cards and recents adopt Annex token spacing (`rounded-3xl`, `text-xs uppercase`), ensuring parity with other discovery pages highlighted in `user_experience.md`.
+            9. **Efficiency Analysis.** Debounced fetches remain, while analytics computations filter/sort at most five tags to keep renders snappy.
+            10. **Strengths to Keep.** Knowledge of categories/tags, saved view rename/delete flows, and pagination remain untouched but now contextualised with new metrics.
+            11. **Weaknesses to Remove.** Device-local recents don’t sync across sessions; highlight this in the backlog for future Annex iterations.
+            12. **Styling & Colour Review.** Primary accents highlight metric cards, trending tags, and recents while saved-view warnings retain neutral palettes for contrast compliance.
+            13. **CSS, Orientation & Placement.** Grid layouts maintain responsiveness (cards stack on mobile) while the metrics row complements the existing two-column layout.
+            14. **Text Analysis.** Copy emphasises newsroom actions (“Capture your favourite filters”, “Clear history”), meeting Annex tone for operational clarity.
+            15. **Change Checklist Tracker.** QA should validate saved view CRUD, recents persistence, trending tag counts, pagination, and analytics cards after each release.
+            16. **Full Upgrade Plan & Release Steps.** Launch by seeding real analytics data, briefing editorial ops, updating Annex screenshots, and monitoring engagement with the new summary cards.
+            17. **Back-end Integration.** Search services now emit cluster, persona, and momentum metadata via `SearchDocumentModel`, so BlogSearchSection mirrors Explorer context when the backend toggles Annex A6 features across discovery surfaces.
          - 9.E.2 ExplorerPreviewDrawer (frontend-reactjs/src/components/search/ExplorerPreviewDrawer.jsx)
+            1. **Appraisal.** The preview drawer now showcases persona focus, upcoming sessions, related resources, and copy-to-clipboard share links per Annex A6 exploration requirements.
+            2. **Functionality.** Memoised metrics, persona detection, and upcoming session lists feed structured blocks, while clipboard handling and focus traps keep share actions accessible.
+            3. **Usefulness.** Operators can evaluate persona fit, next session timing, and supporting collateral without leaving the preview, speeding up evaluation as Annex specifies.
+            4. **Redundancies.** Duplicate share/related logic scattered in result cards was consolidated into the drawer, centralising formatting and copy.
+            5. **Placeholders.** Related resources rely on the `relatedResources` array; future search backend upgrades can enrich metadata (thumbnails, types) for richer previews.
+            6. **Duplicate Functions.** Upcoming session formatting reuses shared formatting helpers rather than custom string concatenation for each preview.
+            7. **Improvements Needed.** Add analytics instrumentation for copy-link usage and upcoming session list interactions once telemetry endpoints are defined.
+            8. **Styling Improvements.** Persona chips and share buttons reuse Annex palette tokens (`bg-slate-100`, `border-primary/30`), matching discovery surfaces documented in `user_experience.md`.
+            9. **Efficiency Analysis.** Memoisation ensures persona/metrics/extracted lists render only when hits change, keeping the drawer responsive even with rich data.
+            10. **Strengths to Keep.** Focus trap, Escape handling, and hero media fallback remain unchanged, retaining the accessible baseline from earlier Annex phases.
+            11. **Weaknesses to Remove.** Clipboard copy lacks a tooltip for unsupported browsers; log a follow-up to show inline guidance when copy fails.
+            12. **Styling & Colour Review.** Share success states adopt emerald accents to signal confirmation without introducing new colour tokens.
+            13. **CSS, Orientation & Placement.** Layout preserves existing spacing but adds new cards (`rounded-3xl`) to house sessions/resources, maintaining Annex rhythm.
+            14. **Text Analysis.** Labels emphasise purpose (“Upcoming sessions”, “Related resources”), consistent with Annex clarity guidelines.
+            15. **Change Checklist Tracker.** QA should verify persona chips, upcoming session formatting, share copy states, and related resource links before publishing Annex updates.
+            16. **Full Upgrade Plan & Release Steps.** Roll out alongside analytics updates, document persona/upcoming sections in Annex A6, and capture new screenshots for enablement decks.
+            17. **Back-end Integration.** Drawer content binds directly to Explorer search payloads enriched by `SearchDocumentService` (cluster keys, persona focus, momentum labels), ensuring Annex A6 previews stay in sync with the database-backed discovery taxonomy.
          - 9.E.3 ExplorerSearchSection (frontend-reactjs/src/components/search/ExplorerSearchSection.jsx)
+            1. **Appraisal.** Annex A6 explorers now launch with performance dashboards, latency snapshots, and analytics-driven facet callouts, giving operators actionable intelligence at the top of the page.
+            2. **Functionality.** Latency capture, result counts, and active filter totals feed the new summary row; facet analytics render in dedicated cards, and saved searches highlight pinned entries with skeleton placeholders while `FilterChips` expose a clear-all action.
+            3. **Usefulness.** Teams gain immediate awareness of search responsiveness, filter pressure, pinned configurations, and trending facets without leaving the explorer grid.
+            4. **Redundancies.** Existing facet teaser replaced by analytic cards, eliminating repeated loops for rendering counts throughout the component.
+            5. **Placeholders.** Pinned search info assumes `updatedAt`; document a follow-up for backends that lack timestamp data to avoid blank metadata.
+            6. **Duplicate Functions.** Clear-all chip handling reuses the hook’s `clearFilters`, preventing divergent behaviour between the header reset button and chip controls.
+            7. **Improvements Needed.** Capture latency percentiles and add CTA instrumentation for facet cards when analytics endpoints mature.
+            8. **Styling Improvements.** Summary and facet cards mirror Annex card tokens (`rounded-3xl`, `text-xs uppercase`), keeping the explorer consistent with other discovery surfaces.
+            9. **Efficiency Analysis.** Facet processing limits to top five entries per facet, memoising outputs so large analytics payloads don’t thrash renders.
+            10. **Strengths to Keep.** Infinite scroll, saved search CRUD, and preview drawers remain intact, now augmented with analytics context.
+            11. **Weaknesses to Remove.** Latency display surfaces raw milliseconds; queue an enhancement to render human-readable tiers once Annex approves thresholds.
+            12. **Styling & Colour Review.** Neutral backgrounds ensure metrics stand out without clashing with the existing white explorer shell.
+            13. **CSS, Orientation & Placement.** Summary row slots above the main grid while preserving breakpoints; facet cards collapse elegantly on mobile using the existing grid system.
+            14. **Text Analysis.** Microcopy emphasises action (“Clear history”, “Pinned”) echoing Annex tone for clarity.
+            15. **Change Checklist Tracker.** QA now verifies latency output, summary counts, facet cards, pinned badges, and clear-all chips alongside baseline explorer tests.
+            16. **Full Upgrade Plan & Release Steps.** Coordinate with analytics to validate facet feeds, refresh Annex docs, and brief enablement on the new telemetry row before shipping.
+            17. **Data Alignment.** `SearchDocumentService.normaliseDocument` stamps cluster keys, persona descriptors, and momentum scores; `SearchDocumentModel.deserialize` now rehydrates cluster metadata for legacy rows; migration `20250402101500_search_documents_cluster_alignment.js` plus seed `002_search_documents.js` keep the database aligned; and updated unit tests cover the enriched payloads so Explorer stays in lockstep with Annex A6 taxonomy.
          - 9.E.4 FilterChips (frontend-reactjs/src/components/search/FilterChips.jsx)
+            1. **Appraisal.** Filter chips gained a shared cap (`MAX_MULTI_CHIPS`) and a clear-all affordance, ensuring Annex A6 explorers manage filter overload gracefully.
+            2. **Functionality.** Multi-select chips limit rendering to 12 entries, and the new `onClearAll` prop enables bulk removal while keeping existing remove buttons accessible.
+            3. **Usefulness.** Operators can reset entire filter sets without hunting for the reset header, matching Annex guidance for efficient discovery workflows.
+            4. **Redundancies.** Duplicate slicing logic across consumers was eliminated; chips now centralise their limit and clear affordance in one place.
+            5. **Placeholders.** Bulk clear currently hides when the consumer omits `onClearAll`; document this optionality in Annex docs.
+            6. **Duplicate Functions.** Existing `buildFilterChips` now respects the shared cap, preventing diverging heuristics between explorer/filter contexts.
+            7. **Improvements Needed.** Add tooltip support for truncated chip labels in a future Annex iteration.
+            8. **Styling Improvements.** Clear-all button reuses neutral border tokens, maintaining Annex styling consistency with other chip controls.
+            9. **Efficiency Analysis.** Early exits prevent unnecessary chip creation when filters exceed the limit, keeping render loops cheap.
+            10. **Strengths to Keep.** Button semantics, sr-only labels, and keyboard-friendly removal remain unchanged.
+            11. **Weaknesses to Remove.** The component still lacks virtualization for extremely large filter sets; evaluate if Annex needs this once analytics pipelines expand.
+            12. **Styling & Colour Review.** No palette drift—the new button leans on slate neutrals with primary hover states.
+            13. **CSS, Orientation & Placement.** Layout continues to flex-wrap chips with consistent spacing, aligning with Annex orientation specs.
+            14. **Text Analysis.** “Clear all” copy matches Annex instruction style, concise and action-led.
+            15. **Change Checklist Tracker.** QA should confirm chip limits, clear-all rendering, and removal semantics across explorer views.
+            16. **Full Upgrade Plan & Release Steps.** Update explorer consumers to pass `onClearAll`, document chip caps, and capture Annex screenshots reflecting the new control.
          - 9.E.5 GlobalSearchBar (frontend-reactjs/src/components/search/GlobalSearchBar.jsx)
+            1. **Appraisal.** The global search bar now mirrors Annex A6 expectations: escape-to-dismiss, recent queries, and history clearing give users a guided entry point.
+            2. **Functionality.** LocalStorage-backed recents store the last five submissions, populate the dropdown when no suggestions exist, and expose a clear-history control, while the keydown handler closes on Escape.
+            3. **Usefulness.** Learners can re-run popular searches and manage history without typing, improving exploration speed per Annex UX notes.
+            4. **Redundancies.** Shared submission logic now centralises history updates—removing prior ad-hoc copy/paste across suggestion selection and manual submit paths.
+            5. **Placeholders.** History remains device-local; future Annex work may sync across accounts once backend endpoints exist.
+            6. **Duplicate Functions.** History persistence lives in dedicated helpers (`loadRecents`, `persistRecents`), replacing inline JSON parsing in multiple callbacks.
+            7. **Improvements Needed.** Add analytics events for history taps once telemetry pipelines are ready.
+            8. **Styling Improvements.** Recent entries use Annex pill styling, maintaining visual continuity with other discovery components.
+            9. **Efficiency Analysis.** History updates filter duplicates and trim to five entries, keeping storage and render loops lightweight.
+            10. **Strengths to Keep.** Debounced suggestion refresh, focus management, and pointer guardrails remain unaffected.
+            11. **Weaknesses to Remove.** Consider surfacing suggestions even when history displays to avoid empty-state confusion for novice users.
+            12. **Styling & Colour Review.** Neutral backgrounds and primary hover states keep dropdown aesthetics aligned with Annex tokens.
+            13. **CSS, Orientation & Placement.** Dropdown retains padding/gaps, now with nested lists that collapse cleanly on mobile due to flex column layout.
+            14. **Text Analysis.** Labels like “Clear history” and “Recent searches” adopt Annex voice—succinct and directive.
+            15. **Change Checklist Tracker.** QA should validate suggestion navigation, history persistence/clearing, and Escape behaviour.
+            16. **Full Upgrade Plan & Release Steps.** Stage with QA verifying multi-device behaviour, update Annex docs with new screenshots, and monitor search engagement post-release.
          - 9.E.6 SearchResultCard (frontend-reactjs/src/components/search/SearchResultCard.jsx)
+            1. **Appraisal.** Result cards now expose persona focus, momentum, and share links, aligning Annex A6’s cross-surface storytelling expectations.
+            2. **Functionality.** Persona/momentum chips render beside metadata, share links reference canonical URLs, and metrics reuse the existing grid to highlight price, rating, duration, and location.
+            3. **Usefulness.** Operators can quickly gauge whether a result fits the desired persona, share the listing, or inspect momentum without opening detail pages.
+            4. **Redundancies.** Rewrote the component to remove redundant markup duplication and centralise persona/momentum display logic.
+            5. **Placeholders.** Share CTA currently links out; a follow-up can integrate inline clipboard copy when the backend exposes shortlinks.
+            6. **Duplicate Functions.** Persona/momentum detection mirrors the preview drawer’s heuristics, keeping consistent semantics across the discovery stack.
+            7. **Improvements Needed.** Evaluate adding badges for analytics trends (CTR, conversion) once Annex extends the search payload.
+            8. **Styling Improvements.** Persona/momentum chips reuse neutral and emerald tokens, preserving Annex palette harmony.
+            9. **Efficiency Analysis.** Component still short-circuits when metrics missing; rewrites didn’t add heavy computations, ensuring large result lists stay performant.
+            10. **Strengths to Keep.** Card layout, highlight chips, and CTA rendering remain intact, now augmented with persona storytelling.
+            11. **Weaknesses to Remove.** Share CTA adds vertical spacing; plan to collapse the share block when no link exists to avoid empty padding.
+            12. **Styling & Colour Review.** Buttons retain neutral outlines and primary hover states, aligning with Annex design tokens.
+            13. **CSS, Orientation & Placement.** Persona row anchors beneath highlight lists without breaking existing grid flow across breakpoints.
+            14. **Text Analysis.** Copy emphasises clarity (“Share this result”, “Momentum”), following Annex guidelines for actionable microcopy.
+            15. **Change Checklist Tracker.** QA should verify persona/momentum chip rendering, share link presence, and existing CTA flows remain correct.
+            16. **Full Upgrade Plan & Release Steps.** Roll out with updated search payload documentation, refresh Annex screenshots, and monitor share link usage post-launch.
       - ✅ 10.A Commerce, Checkout & Pricing Components
          - 10.A.1 CampaignEditor (frontend-reactjs/src/components/ads/CampaignEditor.jsx)
          - 10.A.2 CampaignPreview (frontend-reactjs/src/components/ads/CampaignPreview.jsx)

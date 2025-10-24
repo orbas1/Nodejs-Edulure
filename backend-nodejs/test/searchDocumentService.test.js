@@ -72,7 +72,9 @@ describe('SearchDocumentService', () => {
       metadata: {
         category: 'operations',
         tags: ['ops'],
-        languages: ['en']
+        languages: ['en'],
+        clusterKey: 'operations',
+        persona: 'Ops Leaders'
       },
       category: 'operations',
       languageCodes: ['en'],
@@ -133,6 +135,14 @@ describe('SearchDocumentService', () => {
     ]);
     expect(JSON.parse(insertedDoc.badges)).toEqual([{ type: 'level', label: 'Advanced' }]);
     expect(insertedDoc.monetisation_tag).toBe('Premium course');
+    expect(insertedDoc.cluster_key).toBe('operations');
+
+    const parsedMetadata = JSON.parse(insertedDoc.metadata);
+    expect(parsedMetadata.clusterKey).toBe('operations');
+    expect(parsedMetadata.cluster).toEqual({ key: 'operations', label: 'Operations' });
+    expect(parsedMetadata.persona).toBe('Ops Leaders');
+    expect(parsedMetadata.personaLabel).toBe('Ops Leaders');
+    expect(parsedMetadata.momentum).toEqual({ score: 80, label: 'High momentum (80)', trend: 'accelerating' });
 
     expect(queueEntries).toHaveLength(1);
     expect(queueOnConflictMock).toHaveBeenCalledWith(['entity_type', 'entity_id']);
