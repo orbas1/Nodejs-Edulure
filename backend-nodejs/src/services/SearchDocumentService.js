@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import logger from '../config/logger.js';
 import ExplorerSearchDailyMetricModel from '../models/ExplorerSearchDailyMetricModel.js';
+import { normaliseClusterKey } from '../utils/learningClusters.js';
 
 const ENTITY_PRIORITY = {
   courses: 'high',
@@ -784,6 +785,7 @@ export class SearchDocumentService {
         'enrolment_count',
         'release_at',
         'status',
+        'cluster_key',
         'is_published',
         'created_at',
         'updated_at'
@@ -813,6 +815,7 @@ export class SearchDocumentService {
         languages[0] ? `Language: ${languages[0].toUpperCase()}` : null
       ]);
       const monetisationTag = Number(row.price_amount ?? 0) > 0 ? 'Premium course' : 'Free course';
+      const clusterKey = normaliseClusterKey(row.cluster_key);
       const ctaLinks = [
         {
           type: 'primary',
@@ -849,6 +852,7 @@ export class SearchDocumentService {
         ctaLinks,
         badges,
         monetisationTag,
+        clusterKey,
         metadata: {
           type: 'course',
           category: row.category ?? null,
@@ -856,6 +860,7 @@ export class SearchDocumentService {
           deliveryFormat: row.delivery_format ?? null,
           languages,
           tags,
+          clusterKey,
           rating: {
             average: Number(row.rating_average ?? 0),
             count: Number(row.rating_count ?? 0)
@@ -1042,8 +1047,16 @@ export class SearchDocumentService {
       if (assetIds.length) {
         const rows = await executor('content_assets')
           .whereIn('id', assetIds)
-          .select('id', 'metadata');
-        assetMetadataById = new Map(rows.map((row) => [Number(row.id), parseJson(row.metadata, {})]));
+          .select('id', 'metadata', 'cluster_key');
+        assetMetadataById = new Map(
+          rows.map((row) => {
+            const metadata = parseJson(row.metadata, {});
+            if (!metadata.clusterKey && row.cluster_key) {
+              metadata.clusterKey = normaliseClusterKey(row.cluster_key);
+            }
+            return [Number(row.id), metadata];
+          })
+        );
       }
     }
 
@@ -1053,6 +1066,7 @@ export class SearchDocumentService {
       const categories = toStringArray(ebook.categories);
       const languages = toStringArray(ebook.languages);
       const assetMetadata = assetMetadataById.get(Number(ebook.asset_id)) ?? {};
+      const clusterKey = normaliseClusterKey(assetMetadata.clusterKey ?? ebook.cluster_key);
       const coverImage = assetMetadata.coverImageUrl ?? assetMetadata.thumbnailUrl ?? assetMetadata.previewUrl ?? null;
       const keywords = dedupeStrings([ebook.title, ebook.subtitle, tags, categories, authors, languages]);
       const highlightEntries = dedupeStrings([
@@ -1096,11 +1110,13 @@ export class SearchDocumentService {
         ctaLinks,
         badges,
         monetisationTag,
+        clusterKey,
         metadata: {
           authors,
           tags,
           categories,
           languages,
+          clusterKey,
           readingTimeMinutes: Number(ebook.reading_time_minutes ?? 0),
           price: {
             currency: ebook.price_currency ?? 'USD',

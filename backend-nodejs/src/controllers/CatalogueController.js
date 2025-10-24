@@ -135,6 +135,7 @@ function mapCourseToCatalogue(course, { catalogItemsByCode = new Map() } = {}) {
     isPublished: Boolean(course.isPublished),
     releaseAt: course.releaseAt ?? null,
     status: course.status ?? 'draft',
+    clusterKey: course.clusterKey ?? 'general',
     metadata,
     upsellBadges: buildUpsellBadges(course, catalogItemsByCode),
     highlights: Array.isArray(metadata.highlights) ? metadata.highlights : []

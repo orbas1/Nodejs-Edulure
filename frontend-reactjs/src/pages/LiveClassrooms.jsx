@@ -101,7 +101,8 @@ function createEmptyForm() {
     instructorId: '',
     topics: '',
     slug: '',
-    metadata: ''
+    metadata: '',
+    clusterKey: 'general'
   };
 }
 
@@ -674,7 +675,8 @@ export default function LiveClassrooms() {
       instructorId: classroom.instructorId ?? '',
       topics: Array.isArray(classroom.topics) ? classroom.topics.join(', ') : '',
       slug: classroom.slug ?? '',
-      metadata: classroom.metadata ? JSON.stringify(classroom.metadata, null, 2) : ''
+      metadata: classroom.metadata ? JSON.stringify(classroom.metadata, null, 2) : '',
+      clusterKey: classroom.clusterKey ?? getLiveClassroomCluster(classroom).key
     });
   };
 
@@ -718,6 +720,17 @@ export default function LiveClassrooms() {
         topics: normaliseTopics(form.topics),
         metadata: parseMetadata(form.metadata)
       };
+
+      const predictedSession = {
+        title: payload.title,
+        summary: payload.summary,
+        description: payload.description,
+        type: payload.type,
+        topics: payload.topics
+      };
+      const manualCluster = form.clusterKey?.toLowerCase().trim();
+      const heuristicCluster = getLiveClassroomCluster(predictedSession).key;
+      payload.clusterKey = manualCluster && manualCluster !== 'general' ? manualCluster : heuristicCluster;
 
       if (mode === 'edit' && editingId) {
         await adminControlApi.updateLiveStream({ token, id: editingId, payload });

@@ -94,7 +94,8 @@ function createEmptyForm() {
     isPublished: false,
     releaseAt: '',
     status: 'draft',
-    metadata: ''
+    metadata: '',
+    clusterKey: 'general'
   };
 }
 
@@ -188,6 +189,7 @@ function mapCatalogueCourse(course) {
     highlights: Array.isArray(course.highlights) ? course.highlights : [],
     instructor: course.instructorName ?? course.instructor ?? null,
     upsellBadges: Array.isArray(course.upsellBadges) ? course.upsellBadges : [],
+    clusterKey: course.clusterKey ?? (course.metadata?.clusterKey ?? 'general'),
     actions: [
       course.syllabusUrl
         ? { label: 'View syllabus', href: course.syllabusUrl }
@@ -1361,7 +1363,8 @@ export default function Courses() {
       isPublished: Boolean(course.isPublished),
       releaseAt: toDateInput(course.releaseAt),
       status: course.status ?? 'draft',
-      metadata: course.metadata ? JSON.stringify(course.metadata, null, 2) : ''
+      metadata: course.metadata ? JSON.stringify(course.metadata, null, 2) : '',
+      clusterKey: course.clusterKey ?? getCourseCluster(course).key
     });
     setUploadState({
       thumbnailUrl: course.thumbnailUrl ? { status: 'uploaded', url: course.thumbnailUrl } : { status: 'idle' },
@@ -1415,6 +1418,22 @@ export default function Courses() {
         status: form.status,
         metadata: parseMetadata(form.metadata)
       };
+
+      const predictedCourse = {
+        ...form,
+        title: payload.title,
+        summary: payload.summary,
+        description: payload.description,
+        level: payload.level,
+        category: payload.category,
+        skills: payload.skills,
+        tags: payload.tags,
+        deliveryFormat: payload.deliveryFormat,
+        metadata: payload.metadata
+      };
+      const manualCluster = form.clusterKey?.toLowerCase().trim();
+      const heuristicCluster = getCourseCluster(predictedCourse).key;
+      payload.clusterKey = manualCluster && manualCluster !== 'general' ? manualCluster : heuristicCluster;
 
       if (mode === 'edit' && editingId) {
         await adminControlApi.updateCourse({ token, id: editingId, payload });

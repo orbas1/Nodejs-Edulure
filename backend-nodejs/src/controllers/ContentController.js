@@ -3,6 +3,7 @@ import Joi from 'joi';
 import AssetService from '../services/AssetService.js';
 import MarketingContentService from '../services/MarketingContentService.js';
 import { success } from '../utils/httpResponse.js';
+import { LEARNING_CLUSTER_KEYS } from '../utils/learningClusters.js';
 
 const uploadSessionSchema = Joi.object({
   type: Joi.string().valid('powerpoint', 'ebook', 'pdf', 'document', 'video').required(),
@@ -95,7 +96,10 @@ const metadataUpdateSchema = Joi.object({
     .default({})
     .optional(),
   visibility: Joi.string().valid('workspace', 'private', 'public').optional(),
-  featureFlags: Joi.object({ showcasePinned: Joi.boolean().default(false) }).default({})
+  featureFlags: Joi.object({ showcasePinned: Joi.boolean().default(false) }).default({}),
+  clusterKey: Joi.string()
+    .valid(...LEARNING_CLUSTER_KEYS)
+    .optional()
 });
 
 export default class ContentController {

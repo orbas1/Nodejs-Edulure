@@ -387,9 +387,48 @@ export default function ContentLibrary() {
     }
     setMetadataSaving(true);
     setMetadataError(null);
-    setMetadataFeedback(null);
+   setMetadataFeedback(null);
     try {
       const payload = buildPayloadFromDraft(metadataDraft);
+      const existingCustom =
+        typeof selectedAsset.metadata?.custom === 'object' && selectedAsset.metadata?.custom
+          ? selectedAsset.metadata.custom
+          : {};
+      const existingMedia =
+        typeof existingCustom.media === 'object' && existingCustom.media ? existingCustom.media : {};
+      const existingShowcase =
+        typeof existingCustom.showcase === 'object' && existingCustom.showcase ? existingCustom.showcase : {};
+      const coverImage = payload.coverImage?.url
+        ? { url: payload.coverImage.url, alt: payload.coverImage.alt ?? null }
+        : null;
+      const predictedCustom = {
+        ...existingCustom,
+        title: payload.title ?? existingCustom.title,
+        description: payload.description ?? existingCustom.description,
+        categories: payload.categories ?? existingCustom.categories ?? [],
+        tags: payload.tags ?? existingCustom.tags ?? [],
+        media: {
+          ...existingMedia,
+          coverImage,
+          gallery: payload.gallery ?? existingMedia.gallery ?? []
+        },
+        showcase: {
+          ...existingShowcase,
+          ...payload.showcase
+        },
+        featureFlags: {
+          ...(existingCustom.featureFlags ?? {}),
+          ...(payload.featureFlags ?? {})
+        }
+      };
+      const predictedAsset = {
+        ...selectedAsset,
+        metadata: {
+          ...(selectedAsset.metadata ?? {}),
+          custom: predictedCustom
+        }
+      };
+      payload.clusterKey = getAssetCluster(predictedAsset).key;
       const response = await httpClient.patch(`/content/assets/${selectedAsset.publicId}/metadata`, payload, { token });
       const updated = response?.data;
       if (updated) {

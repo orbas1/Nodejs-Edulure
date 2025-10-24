@@ -1,6 +1,7 @@
 import slugify from 'slugify';
 
 import db from '../config/database.js';
+import { normaliseClusterKey } from '../utils/learningClusters.js';
 
 const TABLE = 'courses';
 
@@ -31,6 +32,7 @@ const BASE_COLUMNS = [
   'is_published as isPublished',
   'release_at as releaseAt',
   'status',
+  'cluster_key as clusterKey',
   'metadata',
   'created_at as createdAt',
   'updated_at as updatedAt'
@@ -253,6 +255,7 @@ export default class CourseModel {
       is_published: course.isPublished ?? false,
       release_at: course.releaseAt ?? null,
       status: course.status ?? 'draft',
+      cluster_key: normaliseClusterKey(course.clusterKey),
       metadata: serialiseJson(course.metadata ?? {}, {})
     };
 
@@ -286,6 +289,7 @@ export default class CourseModel {
     if (updates.releaseAt !== undefined) payload.release_at = updates.releaseAt ?? null;
     if (updates.status !== undefined) payload.status = updates.status;
     if (updates.metadata !== undefined) payload.metadata = serialiseJson(updates.metadata ?? {}, {});
+    if (updates.clusterKey !== undefined) payload.cluster_key = normaliseClusterKey(updates.clusterKey);
     if (updates.instructorId !== undefined) payload.instructor_id = updates.instructorId;
 
     if (Object.keys(payload).length === 0) {
@@ -318,6 +322,7 @@ export default class CourseModel {
       tags: parseStringArray(record.tags),
       languages: parseStringArray(record.languages),
       metadata: parseJson(record.metadata, {}),
+      clusterKey: record.clusterKey ? normaliseClusterKey(record.clusterKey) : 'general',
       releaseAt: toDate(record.releaseAt),
       createdAt: toDate(record.createdAt),
       updatedAt: toDate(record.updatedAt),

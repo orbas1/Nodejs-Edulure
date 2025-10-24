@@ -3025,6 +3025,10 @@
           "metadata": {
             "type": "object",
             "nullable": true
+          },
+          "clusterKey": {
+            "type": "string",
+            "description": "Learning cluster assignment used across discovery surfaces."
           }
         },
         "required": [

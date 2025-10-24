@@ -11,6 +11,7 @@ import EbookProgressModel from '../models/EbookProgressModel.js';
 import antivirusService from './AntivirusService.js';
 import storageService from './StorageService.js';
 import { assertMediaTypeCompliance } from './MediaTypePolicy.js';
+import { normaliseClusterKey } from '../utils/learningClusters.js';
 
 const DRM_SIGNATURE_SECRET = env.security.drmSignatureSecret;
 
@@ -586,6 +587,7 @@ export default class AssetService {
       const updatedCustom = { ...existingCustom };
       const updatedFields = [];
       const eventMetadata = {};
+      let nextClusterKey;
 
       if (payload.title !== undefined) {
         updatedCustom.title = trimToNull(payload.title, 140);
@@ -700,11 +702,22 @@ export default class AssetService {
         custom: updatedCustom
       };
 
+      if (payload.clusterKey !== undefined) {
+        nextClusterKey = normaliseClusterKey(payload.clusterKey);
+        newMetadata.clusterKey = nextClusterKey;
+        updatedFields.push('clusterKey');
+        eventMetadata.clusterKey = nextClusterKey;
+      }
+
       const patchPayload = { metadata: newMetadata };
       if (payload.visibility && payload.visibility !== asset.visibility) {
         patchPayload.visibility = payload.visibility;
         eventMetadata.visibility = payload.visibility;
         updatedFields.push('visibility');
+      }
+
+      if (nextClusterKey !== undefined) {
+        patchPayload.clusterKey = nextClusterKey;
       }
 
       const updatedAsset = await ContentAssetModel.patchById(asset.id, patchPayload, trx);

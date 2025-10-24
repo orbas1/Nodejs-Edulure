@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import slugify from 'slugify';
 
 import db from '../config/database.js';
+import { normaliseClusterKey } from '../utils/learningClusters.js';
 
 const TABLE = 'live_classrooms';
 
@@ -25,6 +26,7 @@ const BASE_COLUMNS = [
   'lc.start_at as startAt',
   'lc.end_at as endAt',
   'lc.topics',
+  'lc.cluster_key as clusterKey',
   'lc.metadata',
   'lc.created_at as createdAt',
   'lc.updated_at as updatedAt',
@@ -93,6 +95,7 @@ function deserialize(row) {
     startAt: toDate(row.startAt),
     endAt: toDate(row.endAt),
     topics: parseJson(row.topics, []),
+    clusterKey: normaliseClusterKey(row.clusterKey),
     metadata: parseJson(row.metadata, {}),
     createdAt: toDate(row.createdAt),
     updatedAt: toDate(row.updatedAt),
@@ -284,6 +287,7 @@ export default class LiveClassroomModel {
       start_at: classroom.startAt,
       end_at: classroom.endAt,
       topics: JSON.stringify(classroom.topics ?? []),
+      cluster_key: normaliseClusterKey(classroom.clusterKey),
       metadata: JSON.stringify(classroom.metadata ?? {})
     };
 
@@ -322,6 +326,7 @@ export default class LiveClassroomModel {
     if (updates.startAt !== undefined) payload.start_at = updates.startAt;
     if (updates.endAt !== undefined) payload.end_at = updates.endAt;
     if (updates.topics !== undefined) payload.topics = JSON.stringify(updates.topics ?? []);
+    if (updates.clusterKey !== undefined) payload.cluster_key = normaliseClusterKey(updates.clusterKey);
     if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
 
     if (Object.keys(payload).length === 0) {
