@@ -1,4 +1,9 @@
 import db from '../config/database.js';
+import {
+  applyEnvironmentFilter,
+  buildEnvironmentColumns,
+  getEnvironmentDescriptor
+} from '../utils/environmentContext.js';
 
 const TABLE = 'explorer_search_daily_metrics';
 const EMPTY_METADATA = '{}';
@@ -168,7 +173,14 @@ function toDomain(row) {
     averageLatencyMs: Number(row.average_latency_ms ?? row.averageLatencyMs ?? 0),
     metadata: parseMetadata(row.metadata),
     createdAt: row.created_at ? new Date(row.created_at) : row.createdAt ?? null,
-    updatedAt: row.updated_at ? new Date(row.updated_at) : row.updatedAt ?? null
+    updatedAt: row.updated_at ? new Date(row.updated_at) : row.updatedAt ?? null,
+    environment: {
+      key: row.environment_key ?? null,
+      name: row.environment_name ?? null,
+      tier: row.environment_tier ?? null,
+      region: row.environment_region ?? null,
+      workspace: row.environment_workspace ?? null
+    }
   };
 }
 
@@ -237,7 +249,8 @@ export default class ExplorerSearchDailyMetricModel {
       isZeroResult,
       displayedHits,
       totalHits,
-      latencyMs
+      latencyMs,
+      environment
     },
     connection = db
   ) {
@@ -247,9 +260,15 @@ export default class ExplorerSearchDailyMetricModel {
     const displayedDelta = toNonNegativeInteger(displayedHits);
     const totalDelta = toNonNegativeInteger(totalHits);
     const latency = toLatency(latencyMs);
+    const environmentDescriptor = getEnvironmentDescriptor(environment);
+    const environmentColumns = buildEnvironmentColumns(environmentDescriptor);
 
     return withTransaction(connection, async (trx) => {
-      const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
+      const existingQuery = trx(TABLE).where({
+        metric_date: date,
+        entity_type: normalisedEntityType
+      });
+      applyEnvironmentFilter(existingQuery, environmentDescriptor);
       const existing = await applyForUpdate(existingQuery).first();
 
       if (existing) {
@@ -287,7 +306,8 @@ export default class ExplorerSearchDailyMetricModel {
         clicks: 0,
         conversions: 0,
         average_latency_ms: latency,
-        metadata: EMPTY_METADATA
+        metadata: EMPTY_METADATA,
+        ...environmentColumns
       };
 
       const [id] = await trx(TABLE).insert(payload);
@@ -296,14 +316,22 @@ export default class ExplorerSearchDailyMetricModel {
     });
   }
 
-  static async incrementClicks({ metricDate, entityType, clicks = 1, conversions = 0 }, connection = db) {
+  static async incrementClicks(
+    { metricDate, entityType, clicks = 1, conversions = 0, environment },
+    connection = db
+  ) {
     const date = normaliseDate(metricDate);
     const normalisedEntityType = normaliseEntityType(entityType);
     const clicksDelta = toNonNegativeInteger(clicks);
     const conversionsDelta = toNonNegativeInteger(conversions);
+    const environmentDescriptor = getEnvironmentDescriptor(environment);
 
     return withTransaction(connection, async (trx) => {
-      const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
+      const existingQuery = trx(TABLE).where({
+        metric_date: date,
+        entity_type: normalisedEntityType
+      });
+      applyEnvironmentFilter(existingQuery, environmentDescriptor);
       const existing = await applyForUpdate(existingQuery).first();
 
       if (existing) {
@@ -332,7 +360,8 @@ export default class ExplorerSearchDailyMetricModel {
         clicks: clicksDelta,
         conversions: conversionsDelta,
         average_latency_ms: 0,
-        metadata: EMPTY_METADATA
+        metadata: EMPTY_METADATA,
+        ...buildEnvironmentColumns(environmentDescriptor)
       };
 
       const [id] = await trx(TABLE).insert(payload);
@@ -341,8 +370,10 @@ export default class ExplorerSearchDailyMetricModel {
     });
   }
 
-  static async listBetween({ since, until }, connection = db) {
+  static async listBetween({ since, until, environment }, connection = db) {
+    const envDescriptor = getEnvironmentDescriptor(environment);
     const query = connection(TABLE).select('*');
+    applyEnvironmentFilter(query, envDescriptor);
     if (since) {
       query.andWhere('metric_date', '>=', normaliseDate(since));
     }
@@ -354,7 +385,8 @@ export default class ExplorerSearchDailyMetricModel {
     return rows.map(toDomain);
   }
 
-  static async aggregateRange({ since, until }, connection = db) {
+  static async aggregateRange({ since, until, environment }, connection = db) {
+    const envDescriptor = getEnvironmentDescriptor(environment);
     const query = connection(TABLE)
       .select(
         'entity_type as entityType',
@@ -367,6 +399,7 @@ export default class ExplorerSearchDailyMetricModel {
         connection.raw('SUM(average_latency_ms * searches) AS latencyTotal')
       )
       .groupBy('entity_type');
+    applyEnvironmentFilter(query, envDescriptor);
 
     if (since) {
       query.andWhere('metric_date', '>=', normaliseDate(since));
@@ -395,7 +428,7 @@ export default class ExplorerSearchDailyMetricModel {
   }
 
   static async recordRefreshSummary(
-    { metricDate, entityType, refreshedAt = new Date(), documentCount = 0 },
+    { metricDate, entityType, refreshedAt = new Date(), documentCount = 0, environment },
     connection = db
   ) {
     const date = normaliseDate(metricDate ?? refreshedAt);
@@ -403,9 +436,15 @@ export default class ExplorerSearchDailyMetricModel {
     const { reference, deltaSeconds } = describeDeltaSeconds(refreshedAt);
     const refreshedIso = reference.toISOString();
     const safeDocumentCount = toNonNegativeInteger(documentCount);
+    const environmentDescriptor = getEnvironmentDescriptor(environment);
+    const environmentColumns = buildEnvironmentColumns(environmentDescriptor);
 
     return withTransaction(connection, async (trx) => {
-      const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
+      const existingQuery = trx(TABLE).where({
+        metric_date: date,
+        entity_type: normalisedEntityType
+      });
+      applyEnvironmentFilter(existingQuery, environmentDescriptor);
       const existing = await applyForUpdate(existingQuery).first();
       const nowIso = new Date().toISOString();
 
@@ -430,7 +469,8 @@ export default class ExplorerSearchDailyMetricModel {
           clicks: 0,
           conversions: 0,
           average_latency_ms: 0,
-          metadata: JSON.stringify(metadata)
+          metadata: JSON.stringify(metadata),
+          ...environmentColumns
         };
 
         const [id] = await trx(TABLE).insert(payload);
@@ -465,7 +505,7 @@ export default class ExplorerSearchDailyMetricModel {
   }
 
   static async appendPreviewDigests(
-    { metricDate, entityType, previews, limit = DEFAULT_PREVIEW_LIMIT },
+    { metricDate, entityType, previews, limit = DEFAULT_PREVIEW_LIMIT, environment },
     connection = db
   ) {
     if (!Array.isArray(previews) || !previews.length) {
@@ -482,8 +522,14 @@ export default class ExplorerSearchDailyMetricModel {
       return null;
     }
 
+    const environmentDescriptor = getEnvironmentDescriptor(environment);
+
     return withTransaction(connection, async (trx) => {
-      const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
+      const existingQuery = trx(TABLE).where({
+        metric_date: date,
+        entity_type: normalisedEntityType
+      });
+      applyEnvironmentFilter(existingQuery, environmentDescriptor);
       const existing = await applyForUpdate(existingQuery).first();
 
       if (!existing) {
@@ -497,7 +543,8 @@ export default class ExplorerSearchDailyMetricModel {
           clicks: 0,
           conversions: 0,
           average_latency_ms: 0,
-          metadata: JSON.stringify({ previewDigests: sanitisedPreviews.slice(0, limit) })
+          metadata: JSON.stringify({ previewDigests: sanitisedPreviews.slice(0, limit) }),
+          ...buildEnvironmentColumns(environmentDescriptor)
         };
 
         const [id] = await trx(TABLE).insert(payload);
@@ -519,10 +566,12 @@ export default class ExplorerSearchDailyMetricModel {
   }
 
   static async listPreviewDigests(
-    { since, entityTypes, limit = DEFAULT_PREVIEW_LIMIT } = {},
+    { since, entityTypes, limit = DEFAULT_PREVIEW_LIMIT, environment } = {},
     connection = db
   ) {
+    const envDescriptor = getEnvironmentDescriptor(environment);
     const query = connection(TABLE).select('*');
+    applyEnvironmentFilter(query, envDescriptor);
     const sinceDate = since ? normaliseDate(since) : null;
     if (sinceDate) {
       query.andWhere('metric_date', '>=', sinceDate);

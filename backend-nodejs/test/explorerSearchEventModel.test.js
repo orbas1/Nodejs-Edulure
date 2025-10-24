@@ -22,6 +22,11 @@ const createTables = async () => {
     table.text('global_filters').notNullable().defaultTo('{}');
     table.text('sort_preferences').notNullable().defaultTo('{}');
     table.text('metadata').notNullable().defaultTo('{}');
+    table.string('environment_key').notNullable().defaultTo('local');
+    table.string('environment_name').notNullable().defaultTo('Local Development');
+    table.string('environment_tier').defaultTo('development');
+    table.string('environment_region').defaultTo('local');
+    table.string('environment_workspace');
     table.timestamp('created_at').defaultTo(connection.fn.now());
   });
 };

@@ -365,7 +365,7 @@
          - 1.D.19 useSupportDashboard (frontend-reactjs/src/hooks/useSupportDashboard.js)
          - 1.D.20 useSystemPreferencesForm (frontend-reactjs/src/hooks/useSystemPreferencesForm.js)
          - 1.D.21 useTrustSafetyDashboard (frontend-reactjs/src/hooks/useTrustSafetyDashboard.js)
-      - 1.E API Clients & Data Contracts
+      - ✓ 1.E API Clients & Data Contracts — Annex A11 (Integrations & Environment Parity)
          - 1.E.1 adminAdsApi (frontend-reactjs/src/api/adminAdsApi.js)
          - 1.E.2 adminApi (frontend-reactjs/src/api/adminApi.js)
          - 1.E.3 adminGrowthApi (frontend-reactjs/src/api/adminGrowthApi.js)
@@ -398,7 +398,34 @@
          - 1.E.30 socialGraphApi (frontend-reactjs/src/api/socialGraphApi.js)
          - 1.E.31 userApi (frontend-reactjs/src/api/userApi.js)
          - 1.E.32 verificationApi (frontend-reactjs/src/api/verificationApi.js)
-      - 1.F Utilities, Data Fixtures & Libs
+            1. **Appraise.** API clients now honour Annex A11 parity mandates: `httpClient` routes every request through a shared environment descriptor so staging, sandbox, and production runbooks observe identical headers, cache segmentation, and parity tagging (frontend-reactjs/src/api/httpClient.js, frontend-reactjs/src/utils/environment.js).
+            2. **Functionality.** `request` injects `X-Edulure-Environment`, tier, region, and workspace headers derived from `resolveEnvironmentDescriptor`, while `createListCacheConfig` opts in to `varyByEnvironment` to prevent cross-environment cache bleed (frontend-reactjs/src/api/httpClient.js, frontend-reactjs/src/api/apiUtils.js).
+            3. **Usefulness.** Integrations dashboards now receive environment-aware explorer summaries because `analyticsApi` normalises responses through `analyticsContracts`, guaranteeing Annex payloads expose environment, totals, series, and governance forecasts in the expected schema (frontend-reactjs/src/api/analyticsApi.js, frontend-reactjs/src/api/analyticsContracts.js).
+            4. **Interoperability.** `attachEnvironmentToInteraction` enriches explorer telemetry with tier, region, and workspace hints so downstream ingestion can correlate partner beacons with the correct deployment (frontend-reactjs/src/api/analyticsContracts.js).
+            5. **Parity Signals.** Cached GETs encode the environment cache key, ensuring an ops engineer debugging sandbox traffic never sees production analytics cached responses (frontend-reactjs/src/api/httpClient.js).
+            6. **Governance Hooks.** Environment helpers expose audit stamps consumed by Annex tooling, letting ops capture request fingerprints for change logs (frontend-reactjs/src/utils/environment.js).
+            7. **Redundancies.** Environment derivation logic moved out of individual clients into `environment.js`, eliminating duplicate parsing and stop-gap constants (frontend-reactjs/src/utils/environment.js, frontend-reactjs/src/api/analyticsApi.js).
+            8. **Placeholders.** Interaction payloads still rely on caller-supplied identifiers; once backend issues canonical IDs we can drop the random UUID fallback in alerts (frontend-reactjs/src/api/analyticsContracts.js).
+            9. **Efficiency.** Cache tags now include `env:<key>` so invalidation routines can surgically prune environment-specific entries without evicting global data (frontend-reactjs/src/api/httpClient.js).
+            10. **Observability.** Normalised analytics summaries capture `lastComputedAt` timestamps, ensuring Annex A11 dashboards surface freshness metadata for audits (frontend-reactjs/src/api/analyticsContracts.js).
+            11. **Security.** Environment headers centralise workspace scoping, preventing bespoke clients from leaking privileged tenant identifiers into public environments (frontend-reactjs/src/api/httpClient.js).
+            12. **Consistency.** Explorer alerts, saved views, and summary payloads now follow a shared schema with coerced numbers, ISO dates, and deterministic defaults—avoiding ad-hoc shape checks across dashboards (frontend-reactjs/src/api/analyticsContracts.js, frontend-reactjs/src/api/analyticsApi.js).
+            13. **Extensibility.** `setEnvironmentContext`/`resolveEnvironmentDescriptor` APIs let feature flags or admin tools swap environments at runtime without rehydrating clients, supporting Annex parity rehearsals (frontend-reactjs/src/api/httpClient.js, frontend-reactjs/src/utils/environment.js).
+            14. **Testing.** Vitest coverage asserts that headers are emitted and caches segment correctly, reducing regression risk before Annex promotion (frontend-reactjs/test/api/httpClient.test.js, frontend-reactjs/test/utils/environment.test.js).
+            15. **Backward Compatibility.** If environment hints are absent, defaults fall back to local descriptors so existing local dev flows remain stable (frontend-reactjs/src/utils/environment.js).
+            16. **Error Handling.** `persistentCache` logs failures to resolve environment keys, capturing anomalies when Annex seeds or runtime config drift (frontend-reactjs/src/utils/persistentCache.js).
+            17. **Docs Alignment.** Implementation mirrors `user_experience.md` guidance on environment-aware navigation and analytics so UI, APIs, and governance playbooks speak the same vocabulary.
+            18. **Telemetry.** Explorer interactions include environment context for both `sendBeacon` and fallback POST flows, ensuring Annex ingestion parity across browser capabilities (frontend-reactjs/src/api/analyticsApi.js).
+            19. **Caching Strategy.** GET cache TTLs remain tunable while inheriting environment segmentation, keeping Annex dashboards responsive without stale cross-tenant bleed (frontend-reactjs/src/api/httpClient.js).
+            20. **Schema Guarantees.** Normalisers guard against `null` arrays and inconsistent property names, fulfilling Annex contract requirements for timeseries, breakdowns, and forecasts (frontend-reactjs/src/api/analyticsContracts.js).
+            21. **Governance Signals.** Generated audit stamps expose capture time plus environment facets, letting Annex compliance routines embed provenance in downstream artefacts (frontend-reactjs/src/utils/environment.js).
+            22. **DX Improvements.** Exported helpers (`setEnvironmentContext`, `resolveEnvironmentDescriptor`) provide ergonomic hooks for Storybook, SDKs, and test harnesses aligning with Annex developer enablement goals (frontend-reactjs/src/api/httpClient.js).
+            23. **Remaining Gaps.** Future work should plumb environment-aware retries/backoff into httpClient to fully satisfy Annex A11 resilience narratives.
+            24. **Release.** Promote after verifying environment headers in staging, confirming explorer analytics normalisation via curl, rerunning vitest suites, and documenting the parity rollout in Annex change logs.
+            25. **Data Layer Alignment.** `20250405101500_environment_analytics_alignment.js` adds environment key/name/tier/region/workspace columns and indexes to `explorer_search_events`, `explorer_search_daily_metrics`, `analytics_alerts`, and `analytics_forecasts`, while updating uniqueness constraints so backend models (`ExplorerSearchEventModel`, `ExplorerSearchDailyMetricModel`, `AnalyticsAlertModel`, `AnalyticsForecastModel`) and `EnvironmentParityService` operate on environment-scoped slices matching Annex A11 parity requirements.
+            26. **Backend Responses.** `ExplorerAnalyticsService` now threads the canonical descriptor from `utils/environmentContext.js` through search recordings, health checks, and summary payloads so `/api/analytics/explorer/summary` returns explicit environment metadata alongside segmented forecasts and alerts.
+            27. **Query Guardrails.** Centralised helpers pipe `applyEnvironmentFilter` into explorer models and add targeted vitest coverage so every event and daily metric query enforces `environment_key`, keeping analytics reads aligned with the Annex migration across descriptors, builders, and sqlite harnesses (backend-nodejs/src/utils/environmentContext.js, backend-nodejs/src/models/ExplorerSearchEventModel.js, backend-nodejs/src/models/ExplorerSearchDailyMetricModel.js, backend-nodejs/test/utils/environmentContext.test.js, backend-nodejs/test/explorerSearchEventModel.test.js, backend-nodejs/test/explorerSearchDailyMetricModel.test.js).
+      - ✓ 1.F Utilities, Data Fixtures & Libs — Annex A42 (Analytics & Governance Schema)
          - 1.F.1 marketingAltText (frontend-reactjs/src/data/marketingAltText.js)
          - 1.F.2 mockData (frontend-reactjs/src/data/mockData.js)
          - 1.F.3 liveSessionQueue (frontend-reactjs/src/utils/liveSessionQueue.js)
@@ -409,6 +436,27 @@
          - 1.F.8 uploads (frontend-reactjs/src/utils/uploads.js)
          - 1.F.9 auth (frontend-reactjs/src/utils/validation/auth.js)
          - 1.F.10 onboarding (frontend-reactjs/src/utils/validation/onboarding.js)
+            1. **Appraise.** Utilities now embed Annex A42 governance requirements: persistent caches record schema versions and environment keys so analytics fixtures never leak between tenants or outdated schemas (frontend-reactjs/src/utils/persistentCache.js).
+            2. **Functionality.** `createPersistentCache` accepts `environmentResolver` and `schemaVersion`, storing both alongside each entry and purging stale payloads when the runtime environment or schema drifts (frontend-reactjs/src/utils/persistentCache.js).
+            3. **Usefulness.** Analytics dashboards consuming cached governance snapshots receive environment-aligned data, eliminating the risk of staging artefacts appearing in production readiness panels (frontend-reactjs/src/utils/persistentCache.js).
+            4. **Integrity.** Cache reads invalidate mismatched environment keys or schema versions, upholding Annex audit controls for runtime analytics storage (frontend-reactjs/src/utils/persistentCache.js).
+            5. **Resilience.** Logger hooks capture failures resolving environment context, giving governance tooling visibility into misconfigured annex seeds (frontend-reactjs/src/utils/persistentCache.js).
+            6. **Observability.** Environment helpers expose audit stamps for downstream governance registries, ensuring every analytics export carries environment, tier, region, and capture time metadata (frontend-reactjs/src/utils/environment.js).
+            7. **Normalisation.** Newly added analytics contracts coerce explorer summaries, alerts, and revenue views into Annex A42 schemas, harmonising fixtures with governance dashboards (frontend-reactjs/src/api/analyticsContracts.js).
+            8. **Consistency.** Utilities share the same environment parser used by API clients, preventing divergent casing or workspace keys across fixtures and runtime libs (frontend-reactjs/src/utils/environment.js).
+            9. **Testing.** Vitest suites guard environment parsing, header generation, and cache segmentation, covering the governance-critical glue code added for Annex A42 (frontend-reactjs/test/utils/environment.test.js, frontend-reactjs/test/api/httpClient.test.js).
+            10. **Backfill Ready.** Cache writes now return environment and schema metadata so migration scripts can audit stored fixtures before Annex promotion (frontend-reactjs/src/utils/persistentCache.js).
+            11. **Governance Schema.** Explorer alert normalisation injects deterministic IDs, severity, acknowledgement state, and environment facets, matching Annex observability tables (frontend-reactjs/src/api/analyticsContracts.js).
+            12. **Telemetry Hygiene.** Forecast normalisers enforce ISO timestamps and numeric coercion, aligning with analytics warehouse expectations for Annex readiness (frontend-reactjs/src/api/analyticsContracts.js).
+            13. **Compliance Guardrails.** Cache pruning keeps expired entries from polluting governance scorecards, satisfying Annex retention policies (frontend-reactjs/src/utils/persistentCache.js).
+            14. **DX Support.** Environment helpers expose deterministic cache keys and audit stamps so developers can trace governance fixture provenance during QA (frontend-reactjs/src/utils/environment.js).
+            15. **Fallbacks.** When environment hints are absent, utilities fall back to defaults, keeping local analytics sandboxes operable while still stamping metadata (frontend-reactjs/src/utils/environment.js).
+            16. **Documentation Alignment.** Behaviour mirrors `user_experience.md` directives around analytics freshness, parity, and governance transparency, ensuring libs and fixtures uphold UX expectations.
+            17. **Gaps.** Next steps include piping governance schema validation into CI to automatically verify cache schema versions during Annex deployments.
+            18. **Release.** Validate by seeding caches in staging, confirming environment keys in IndexedDB via browser devtools, rerunning vitest, and logging Annex A42 updates in ops runbooks.
+            19. **Persistence.** Analytics fixtures now seed environment-aware records through `createEnvironmentColumns()` ensuring `explorer_search_daily_metrics`, `analytics_alerts`, and `analytics_forecasts` snapshots respect Annex A42 governance segmentation across migrations, models, and bootstrap data.
+            20. **Runtime Support.** Backend utilities share the new `environmentContext` helper, giving governance repositories (`EnvironmentParitySnapshotModel`, `ExplorerSearchDailyMetricModel`) direct access to descriptor columns for parity audits and schema purges.
+            21. **Test Harnesses.** SQLite-backed model suites mirror the Annex columns so parity helpers and descriptors stay validated during unit runs, preventing regressions between migrations and governance fixtures (backend-nodejs/test/utils/environmentContext.test.js, backend-nodejs/test/explorerSearchEventModel.test.js, backend-nodejs/test/explorerSearchDailyMetricModel.test.js).
       - ✓ 2.A Landing & Value Proposition Surfaces
          - 2.A.1 FeatureGrid (frontend-reactjs/src/components/FeatureGrid.jsx)
          - 2.A.2 PageHero (frontend-reactjs/src/components/PageHero.jsx)

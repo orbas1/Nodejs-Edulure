@@ -98,6 +98,37 @@ describe('httpClient request utilities', () => {
     clearAuthTokenResolver();
   });
 
+  it('attaches environment metadata headers to outgoing requests', async () => {
+    const { httpClient, setEnvironmentContext } = await loadHttpClient();
+
+    setEnvironmentContext({ key: 'staging', tier: 'staging', region: 'eu-west-1', workspace: 'demo' });
+
+    await httpClient.get('/status', { cache: false });
+
+    const config = requestMock.mock.calls.at(-1)[0];
+    expect(config.headers['X-Edulure-Environment']).toBe('staging');
+    expect(config.headers['X-Edulure-Environment-Tier']).toBe('staging');
+    expect(config.headers['X-Edulure-Region']).toBe('eu-west-1');
+    expect(config.headers['X-Edulure-Workspace']).toBe('demo');
+  });
+
+  it('segments cache entries by environment to preserve parity', async () => {
+    const { httpClient, setEnvironmentContext } = await loadHttpClient();
+
+    setEnvironmentContext({ key: 'staging' });
+    await httpClient.get('/cached-resource');
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    requestMock.mockClear();
+    await httpClient.get('/cached-resource');
+    expect(requestMock).not.toHaveBeenCalled();
+
+    setEnvironmentContext({ key: 'production' });
+    requestMock.mockResolvedValueOnce({ data: { ok: true } });
+    await httpClient.get('/cached-resource');
+    expect(requestMock).toHaveBeenCalledTimes(1);
+  });
+
   it('removes explicit content-type headers when sending FormData bodies', async () => {
     global.FormData = class FormDataMock {};
     const { httpClient } = await loadHttpClient();

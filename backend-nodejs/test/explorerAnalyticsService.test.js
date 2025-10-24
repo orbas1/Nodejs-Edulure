@@ -85,6 +85,13 @@ vi.mock('../src/observability/metrics.js', () => ({
 import { ExplorerAnalyticsService } from '../src/services/ExplorerAnalyticsService.js';
 
 const { eventModel, eventEntityModel, dailyMetricModel, interactionModel, alertModel, forecastModel, featureFlagModel, metrics } = mocks;
+const testEnvironment = {
+  key: 'test-env',
+  name: 'Test Env',
+  tier: 'qa',
+  region: 'us-test-1',
+  workspace: 'ops-hq'
+};
 
 function resetMocks() {
   vi.clearAllMocks();
@@ -109,7 +116,10 @@ describe('ExplorerAnalyticsService', () => {
       { entityType: 'tutors', isZeroResult: false }
     ]);
 
-    const service = new ExplorerAnalyticsService({ loggerInstance: { warn: vi.fn(), info: vi.fn() } });
+    const service = new ExplorerAnalyticsService({
+      loggerInstance: { warn: vi.fn(), info: vi.fn() },
+      environmentDescriptor: testEnvironment
+    });
 
     const result = await service.recordSearchExecution({
       query: 'automation',
@@ -148,7 +158,8 @@ describe('ExplorerAnalyticsService', () => {
         resultTotal: 20,
         isZeroResult: false,
         latencyMs: 200,
-        userId: 7
+        userId: 7,
+        environment: testEnvironment
       }),
       expect.any(Object)
     );
@@ -161,16 +172,19 @@ describe('ExplorerAnalyticsService', () => {
       expect.any(Object)
     );
     expect(dailyMetricModel.incrementForEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'all', displayedHits: 10, totalHits: 20 }),
+      expect.objectContaining({ entityType: 'all', displayedHits: 10, totalHits: 20, environment: testEnvironment }),
       expect.any(Object)
     );
     expect(dailyMetricModel.incrementForEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'courses', displayedHits: 6, totalHits: 12 }),
+      expect.objectContaining({ entityType: 'courses', displayedHits: 6, totalHits: 12, environment: testEnvironment }),
       expect.any(Object)
     );
     expect(metrics.recordExplorerSearchEvent).toHaveBeenCalledTimes(2);
     expect(result.totalResults).toBe(20);
     expect(result.entitySummaries).toHaveLength(2);
+    expect(result.environment).toEqual(
+      expect.objectContaining({ key: testEnvironment.key, tier: testEnvironment.tier, region: testEnvironment.region })
+    );
   });
 
   it('stores preview digests when supplied', async () => {
@@ -184,7 +198,10 @@ describe('ExplorerAnalyticsService', () => {
       { entityType: 'courses', isZeroResult: false }
     ]);
 
-    const service = new ExplorerAnalyticsService({ loggerInstance: { warn: vi.fn(), info: vi.fn() } });
+    const service = new ExplorerAnalyticsService({
+      loggerInstance: { warn: vi.fn(), info: vi.fn() },
+      environmentDescriptor: testEnvironment
+    });
 
     await service.recordSearchExecution({
       query: 'design',
@@ -226,11 +243,11 @@ describe('ExplorerAnalyticsService', () => {
     });
 
     expect(dailyMetricModel.appendPreviewDigests).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'all' }),
+      expect.objectContaining({ entityType: 'all', environment: testEnvironment }),
       expect.any(Object)
     );
     expect(dailyMetricModel.appendPreviewDigests).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'courses' }),
+      expect.objectContaining({ entityType: 'courses', environment: testEnvironment }),
       expect.any(Object)
     );
   });
@@ -245,7 +262,10 @@ describe('ExplorerAnalyticsService', () => {
       interactionType: 'click'
     });
 
-    const service = new ExplorerAnalyticsService({ loggerInstance: { warn: vi.fn() } });
+    const service = new ExplorerAnalyticsService({
+      loggerInstance: { warn: vi.fn() },
+      environmentDescriptor: testEnvironment
+    });
 
     const interaction = await service.recordInteraction({
       eventUuid: 'seed-event',
@@ -262,11 +282,11 @@ describe('ExplorerAnalyticsService', () => {
       expect.any(Object)
     );
     expect(dailyMetricModel.incrementClicks).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'all', clicks: 1 }),
+      expect.objectContaining({ entityType: 'all', clicks: 1, environment: testEnvironment }),
       expect.any(Object)
     );
     expect(dailyMetricModel.incrementClicks).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'courses', clicks: 1 }),
+      expect.objectContaining({ entityType: 'courses', clicks: 1, environment: testEnvironment }),
       expect.any(Object)
     );
     expect(eventEntityModel.incrementClicks).toHaveBeenCalledWith(41, 'courses', 1, expect.any(Object));
@@ -322,7 +342,10 @@ describe('ExplorerAnalyticsService', () => {
     ]);
     forecastModel.upsert.mockResolvedValue({});
 
-    const service = new ExplorerAnalyticsService({ loggerInstance: { warn: vi.fn() } });
+    const service = new ExplorerAnalyticsService({
+      loggerInstance: { warn: vi.fn() },
+      environmentDescriptor: testEnvironment
+    });
     service.loadAdsSummary = vi.fn().mockResolvedValue({ impressions: 1000, clicks: 120, conversions: 24, spendCents: 24000, revenueCents: 52000, clickThroughRate: 0.12, conversionRate: 0.2, roas: 2.17 });
 
     const summary = await service.getExplorerSummary({ rangeDays: 7 });
@@ -337,5 +360,8 @@ describe('ExplorerAnalyticsService', () => {
     expect(service.loadAdsSummary).toHaveBeenCalled();
     expect(featureFlagModel.all).toHaveBeenCalled();
     expect(forecastModel.listByCode).toHaveBeenCalledTimes(2);
+    expect(summary.environment).toEqual(
+      expect.objectContaining({ key: testEnvironment.key, name: testEnvironment.name })
+    );
   });
 });

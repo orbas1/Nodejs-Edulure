@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { buildEnvironmentColumns, getEnvironmentDescriptor } from '../utils/environmentContext.js';
 import { safeJsonParse, safeJsonStringify } from '../utils/modelUtils.js';
 
 export default class AnalyticsForecastModel {
@@ -35,7 +36,14 @@ export default class AnalyticsForecastModel {
       lowerBound: Number(row.lower_bound ?? 0),
       upperBound: Number(row.upper_bound ?? 0),
       metadata: safeJsonParse(row.metadata, {}),
-      generatedAt: row.generated_at ? new Date(row.generated_at) : null
+      generatedAt: row.generated_at ? new Date(row.generated_at) : null,
+      environment: {
+        key: row.environment_key ?? null,
+        name: row.environment_name ?? null,
+        tier: row.environment_tier ?? null,
+        region: row.environment_region ?? null,
+        workspace: row.environment_workspace ?? null
+      }
     };
   }
 
@@ -50,6 +58,8 @@ export default class AnalyticsForecastModel {
     const metricValue = this.normaliseNumeric(payload.metricValue);
     const lowerBound = this.normaliseNumeric(payload.lowerBound, { min: 0 });
     const upperBound = Math.max(metricValue, this.normaliseNumeric(payload.upperBound, { min: 0 }));
+    const environmentDescriptor = getEnvironmentDescriptor(payload.environment);
+    const environmentColumns = buildEnvironmentColumns(environmentDescriptor);
 
     return {
       forecast_code: payload.forecastCode,
@@ -57,7 +67,8 @@ export default class AnalyticsForecastModel {
       metric_value: metricValue,
       lower_bound: lowerBound,
       upper_bound: upperBound,
-      metadata: safeJsonStringify(payload.metadata)
+      metadata: safeJsonStringify(payload.metadata),
+      ...environmentColumns
     };
   }
 
@@ -66,7 +77,7 @@ export default class AnalyticsForecastModel {
 
     const result = await connection(this.TABLE)
       .insert(insertPayload)
-      .onConflict(['forecast_code', 'target_date'])
+      .onConflict(['environment_key', 'forecast_code', 'target_date'])
       .merge({
         metric_value: insertPayload.metric_value,
         lower_bound: insertPayload.lower_bound,
@@ -80,17 +91,17 @@ export default class AnalyticsForecastModel {
     return this.deserialize(row);
   }
 
-  static async listByCode(forecastCode, { limit = 14 } = {}, connection = db) {
+  static async listByCode(forecastCode, { limit = 14, environment } = {}, connection = db) {
     const rows = await connection(this.TABLE)
-      .where({ forecast_code: forecastCode })
+      .where({ forecast_code: forecastCode, environment_key: getEnvironmentDescriptor(environment).key })
       .orderBy('target_date', 'asc')
       .limit(limit);
     return rows.map((row) => this.deserialize(row)).filter(Boolean);
   }
 
-  static async latestForCode(forecastCode, connection = db) {
+  static async latestForCode(forecastCode, { environment } = {}, connection = db) {
     const row = await connection(this.TABLE)
-      .where({ forecast_code: forecastCode })
+      .where({ forecast_code: forecastCode, environment_key: getEnvironmentDescriptor(environment).key })
       .orderBy('generated_at', 'desc')
       .first();
     return this.deserialize(row);
