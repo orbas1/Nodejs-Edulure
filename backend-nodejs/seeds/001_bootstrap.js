@@ -135,6 +135,7 @@ export async function seed(knex) {
     await trx('community_message_reactions').del();
     await trx('community_channel_members').del();
     await trx('community_messages').del();
+    await trx('notification_dispatch_queue').del();
     await trx('direct_message_participants').del();
     await trx('direct_messages').del();
     await trx('direct_message_threads').del();
@@ -146,6 +147,7 @@ export async function seed(knex) {
     await trx('user_follows').del();
     await trx('user_privacy_settings').del();
     await trx('community_posts').del();
+    await trx('community_event_reminders').del();
     await trx('community_channels').del();
     await trx('community_members').del();
     await trx('asset_conversion_outputs').del();
@@ -173,6 +175,7 @@ export async function seed(knex) {
     await trx('setup_runs').del();
     await trx('release_checklist_items').del();
     await trx('domain_event_dispatch_queue').del();
+    await trx('background_job_states').del();
     await trx('domain_events').del();
     await trx('security_incidents').del();
     await trx('dsr_requests').del();
@@ -2653,15 +2656,21 @@ export async function seed(knex) {
     const emailChannel = COMMUNITY_EVENT_REMINDER_CHANNELS.includes('email')
       ? 'email'
       : COMMUNITY_EVENT_REMINDER_CHANNELS[0];
+    const pushChannel = COMMUNITY_EVENT_REMINDER_CHANNELS.includes('push')
+      ? 'push'
+      : COMMUNITY_EVENT_REMINDER_CHANNELS[0];
 
     if (opsSummitEvent?.id) {
+      const opsEmailReminderAt = new Date(opsCommunitySummitStart.getTime() - 30 * 60 * 1000);
+      const opsSmsReminderAt = new Date(opsCommunitySummitStart.getTime() - 45 * 60 * 1000);
+      const opsPushReminderAt = new Date(opsCommunitySummitStart.getTime() - 50 * 60 * 1000);
       await trx('community_event_reminders').insert([
         {
           event_id: opsSummitEvent.id,
           user_id: instructorId,
           status: reminderStatusPending,
           channel: emailChannel,
-          remind_at: new Date(opsCommunitySummitStart.getTime() - 30 * 60 * 1000),
+          remind_at: opsEmailReminderAt,
           metadata: JSON.stringify({ message: 'Automation Summit starts soon. Bring the incident workbook.' })
         },
         {
@@ -2669,16 +2678,29 @@ export async function seed(knex) {
           user_id: adminId,
           status: reminderStatusPending,
           channel: smsChannel,
-          remind_at: new Date(opsCommunitySummitStart.getTime() - 45 * 60 * 1000),
+          remind_at: opsSmsReminderAt,
           metadata: JSON.stringify({
             phoneNumber: '+15550001111',
             manageUrl: 'https://events.edulure.test/ops-summit/manage'
+          })
+        },
+        {
+          event_id: opsSummitEvent.id,
+          user_id: adminId,
+          status: reminderStatusPending,
+          channel: pushChannel,
+          remind_at: opsPushReminderAt,
+          metadata: JSON.stringify({
+            title: 'Summit kickoff reminder',
+            persona: 'ops-leads',
+            templateId: 'community-event-reminder'
           })
         }
       ]);
     }
 
     if (growthRoundtableEvent?.id) {
+      const adminSentReminderAt = new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000);
       await trx('community_event_reminders').insert([
         {
           event_id: growthRoundtableEvent.id,
@@ -2695,13 +2717,135 @@ export async function seed(knex) {
           user_id: adminId,
           status: reminderStatusSent,
           channel: emailChannel,
-          remind_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
-          sent_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
-          last_attempt_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
+          remind_at: adminSentReminderAt,
+          sent_at: adminSentReminderAt,
+          last_attempt_at: adminSentReminderAt,
           attempt_count: 1,
           metadata: JSON.stringify({ message: 'Roundtable reminder sent 24h ahead.' })
         }
       ]);
+    }
+
+    const seededReminderRows = await trx('community_event_reminders')
+      .select(
+        'id',
+        'event_id as eventId',
+        'user_id as userId',
+        'channel',
+        'remind_at as remindAt',
+        'status',
+        'metadata',
+        'sent_at as sentAt'
+      )
+      .orderBy('id', 'asc');
+
+    const notificationQueueInserts = [];
+    const jobStateInserts = [];
+    const nowIso = new Date().toISOString();
+
+    for (const row of seededReminderRows) {
+      let reminderMetadata = {};
+      if (row.metadata) {
+        try {
+          if (typeof row.metadata === 'string') {
+            reminderMetadata = JSON.parse(row.metadata);
+          } else if (typeof row.metadata === 'object') {
+            reminderMetadata = row.metadata;
+          }
+        } catch (_error) {
+          reminderMetadata = {};
+        }
+      }
+
+      if (row.status === reminderStatusSent) {
+        const personaLabel = reminderMetadata.persona ?? reminderMetadata.audienceLabel ?? 'member';
+        jobStateInserts.push({
+          job_key: 'community_reminder',
+          state_key: `reminder:${row.id}`,
+          version: row.remindAt ? new Date(row.remindAt).toISOString() : nowIso,
+          state_value: JSON.stringify({
+            status: 'sent',
+            channel: row.channel,
+            persona: personaLabel,
+            sentAt: row.sentAt ? new Date(row.sentAt).toISOString() : nowIso,
+            delivery: { provider: 'seed', channel: row.channel }
+          }),
+          metadata: JSON.stringify({ seeded: true, source: '001_bootstrap' })
+        });
+      }
+
+      if (row.channel === pushChannel || row.channel === 'in_app') {
+        const personaLabel = reminderMetadata.persona ?? reminderMetadata.audienceLabel ?? 'member';
+        const remindIso = row.remindAt ? new Date(row.remindAt).toISOString() : nowIso;
+        notificationQueueInserts.push({
+          user_id: row.userId,
+          channel: row.channel,
+          status: 'pending',
+          dedupe_key: `community:${row.eventId}:user:${row.userId}:remind:${remindIso}:${row.channel}`,
+          template_id: reminderMetadata.templateId ?? 'community-event-reminder',
+          title: reminderMetadata.title ?? 'Community event reminder',
+          body:
+            reminderMetadata.message ??
+            reminderMetadata.body ??
+            `Reminder seeded for ${personaLabel}.`,
+          payload: JSON.stringify({
+            eventId: row.eventId,
+            remindAt: remindIso,
+            persona: personaLabel
+          }),
+          metadata: JSON.stringify({
+            seeded: true,
+            channel: row.channel,
+            runId: 'seed-bootstrap'
+          }),
+          scheduled_at: new Date(),
+          available_at: new Date()
+        });
+      }
+    }
+
+    if (seededReminderRows.length > 0) {
+      const succeededCount = seededReminderRows.filter((row) => row.status !== 'failed').length;
+      const failedCount = seededReminderRows.length - succeededCount;
+      jobStateInserts.push({
+        job_key: 'community_reminder',
+        state_key: 'last_run',
+        version: nowIso,
+        state_value: JSON.stringify({
+          runId: 'seed-bootstrap',
+          processed: seededReminderRows.length,
+          succeeded: succeededCount,
+          failed: failedCount
+        }),
+        metadata: JSON.stringify({ seeded: true, source: '001_bootstrap' })
+      });
+    }
+
+    jobStateInserts.push({
+      job_key: 'data_partition',
+      state_key: 'last_summary',
+      version: nowIso,
+      state_value: JSON.stringify({
+        outcome: 'success',
+        executedAt: nowIso,
+        dryRun: false,
+        results: [
+          {
+            tableName: 'domain_events',
+            ensured: [{ status: 'ensured', partition: 'p202503' }],
+            archived: []
+          }
+        ]
+      }),
+      metadata: JSON.stringify({ seeded: true, source: '001_bootstrap' })
+    });
+
+    if (notificationQueueInserts.length > 0) {
+      await trx('notification_dispatch_queue').insert(notificationQueueInserts);
+    }
+
+    if (jobStateInserts.length > 0) {
+      await trx('background_job_states').insert(jobStateInserts);
     }
 
     const primaryPodcastReleaseOn = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
