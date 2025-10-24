@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import './styles.css';
+import ThemeProvider from './providers/ThemeProvider.jsx';
 import { LanguageProvider } from './context/LanguageContext.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { RuntimeConfigProvider } from './context/RuntimeConfigContext.jsx';
@@ -37,19 +38,21 @@ const routerBasename = resolveRouterBasename(import.meta.env.BASE_URL);
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter basename={routerBasename === '/' ? undefined : routerBasename}>
-      <LanguageProvider>
-        <AuthProvider>
-          <RuntimeConfigProvider>
-            <ServiceHealthProvider>
-              <RealtimeProvider>
-                <DashboardProvider>
-                  <App />
-                </DashboardProvider>
-              </RealtimeProvider>
-            </ServiceHealthProvider>
-          </RuntimeConfigProvider>
-        </AuthProvider>
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <RuntimeConfigProvider>
+              <ServiceHealthProvider>
+                <RealtimeProvider>
+                  <DashboardProvider>
+                    <App />
+                  </DashboardProvider>
+                </RealtimeProvider>
+              </ServiceHealthProvider>
+            </RuntimeConfigProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

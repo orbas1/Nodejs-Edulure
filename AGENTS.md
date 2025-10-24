@@ -113,8 +113,40 @@
       - A21. Analytics, Admin & Operations Dashboards (2.F)
       - A22. Commerce, Billing & Profile Management (2.G) ✓
       - A23. Integrations, Enablement & Invitations (2.H) ✓
-      - A24. Support, Knowledge & Feedback (2.I)
-      - A25. Shared Layout, Theming & Component Infrastructure (2.J)
+      - ✓ A24. Support, Knowledge & Feedback (2.I)
+         - A24.1 Support Ticket Creation & Launcher (`frontend-reactjs/src/components/support/TicketForm.jsx`, `frontend-reactjs/src/hooks/useSupportLauncher.js`, `frontend-reactjs/src/hooks/useLearnerSupportCases.js`)
+            1. `useSupportLauncher` normalises queries, builds cache keys per category, and stores OpenAPI responses with five-minute TTLs inside `edulure.support.knowledgeCache.v1` so repeated prompts resolve instantly.
+            2. Debounce timers, abort controllers, and memoised state prevent overlapping searches; cache entries hydrate UI instantly while a fresh request runs in the background.
+            3. When the service errors, the hook revives the last cached payload (even if stale), exposes a `stale` flag, and keeps the failure surfaced so agents know guidance may be out of date.
+            4. Consumers receive `{ suggestions, cached, stale, lastFetchedAt, latestQuery }` alongside `search`/`reset`, letting TicketForm render freshness badges and offline messaging without duplicating heuristics.
+            5. `TicketForm` preloads requester name, email, and timezone from the authenticated session, while inline validation keeps subject, description, and contact fields error-aware as learners draft.
+            6. Digest cadence, channel, and category preferences persist via `edulure:support-preferences:<userId>`; banners confirm saves and prompt retries if storage fails.
+            7. The stepper-guided layout separates triage metadata from the context narrative, carries attachment previews with deterministic IDs, and preserves selections across panel toggles.
+            8. Knowledge suggestions show “Latest guidance” / “Cached guidance (stale)” with relative timestamps, reiterate offline fallback copy, and include article runtime metrics for triage.
+            9. Submissions bundle attachments, cached knowledge suggestions, requester metadata, timezone, and notification preferences so backend orchestration and local caches stay aligned.
+         - A24.2 Support Case Enrichment & Dashboard Presentation (`frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx`, `frontend-reactjs/src/hooks/useLearnerSupportCases.js`)
+            1. `LearnerSupport` seeds cases from the dashboard payload, renders requester chips (name, email, timezone), and keeps selection state stable as data refreshes.
+            2. Case actions (`createCase`, `updateCase`, `addMessage`, `closeCase`, `reopenCase`, `deleteCase`) pass requester + notification preference payloads so API calls remain schema-complete.
+            3. Notification badges in the timeline surface digest cadence and channel opt-ins, keeping learners aware of how follow-ups will arrive.
+            4. `useLearnerSupportCases` normalises requester/notification metadata, knowledge suggestions, breadcrumbs, and attachments before persisting to `edulure.dashboard.supportCases.v1`.
+            5. Local persistence keeps cases available offline, merges remote updates by ID, and sorts via status precedence then recency for predictable dashboard ordering.
+            6. SLA stats compute awaiting-learner counts, average agent response minutes, and latest-update markers that power the dashboard hero metrics.
+            7. Message timelines maintain chronological ordering, tag the last learner/support responders, and expose attachment metadata for quick downloads.
+            8. Offline ticket creation surfaces status banners while retaining queued attachments and cached knowledge suggestions, preventing context loss during reconnect.
+      - ✓ A25. Shared Layout, Theming & Component Infrastructure (2.J)
+         - A25.1 Theme Provider & Preference Persistence (`frontend-reactjs/src/providers/ThemeProvider.jsx`, `frontend-reactjs/src/main.jsx`)
+            1. `ThemeProvider` boots with stored preferences (or defaults), tracking `mode`, `contrast`, and resolved variants to keep UI and tooling in sync.
+            2. System listeners watch `prefers-color-scheme` and `prefers-contrast`, updating React state live so auto modes remain responsive to OS changes.
+            3. The provider writes `data-theme` / `data-contrast` attributes to `<html>`, enabling Tailwind tokens and CSS vars to respond without re-render storms.
+            4. Preferences persist via `edulure.theme.preferences.v1`, catching storage failures gracefully to avoid blocking hydration.
+            5. API functions (`setMode`, `setContrast`, `toggleMode`) enforce allowed values, preventing invalid combinations from leaking downstream.
+            6. `main.jsx` wraps the entire app tree with the provider, ensuring layouts, charts, and dialog portals share the same theming context from first paint.
+         - A25.2 Theme Toggle Integration (`frontend-reactjs/src/components/common/ThemeModeToggle.jsx`, `frontend-reactjs/src/components/navigation/AppTopBar.jsx`)
+            1. The toggle’s quick button flips `toggleMode`, reflecting the resolved theme icon (sun/moon) and honouring aria labelling for assistive tech.
+            2. HeadlessUI menu panes group colour mode and contrast, highlight the active choice, and describe each option so designers and operators know what will change.
+            3. Active selections summarise underneath (`{buttonLabel} • {contrastLabel}`), giving at-a-glance audit trails for accessibility reviews.
+            4. `AppTopBar` mounts the toggle beside notifications/locale controls, inheriting navigation spacing so theming is one click away across dashboards.
+            5. Responsive classes collapse descriptive text on small screens while retaining iconography, keeping the control usable in constrained layouts.
       - A26. Flutter Authentication & Identity (3.A)
       - A27. Flutter Community Feed & Engagement (3.B)
       - A28. Flutter Lessons, Assessments & Offline Learning (3.C)

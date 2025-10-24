@@ -59,6 +59,24 @@ const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low — feedback or request' }
 ];
 
+const CHANNEL_LABELS = {
+  email: 'Email',
+  sms: 'SMS',
+  inApp: 'In-app'
+};
+
+const CATEGORY_LABELS = {
+  incidents: 'Incidents',
+  productUpdates: 'Product updates',
+  billing: 'Billing & account'
+};
+
+const DIGEST_LABELS = {
+  immediate: 'Real-time alerts',
+  daily: 'Daily digest',
+  weekly: 'Weekly summary'
+};
+
 function normaliseKnowledgeBase(articles) {
   if (!Array.isArray(articles)) {
     return [];
@@ -126,6 +144,20 @@ function createAttachmentMeta(file) {
     type: file.type,
     file
   };
+}
+
+function deriveUserName(user) {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+  if (user.name) {
+    return user.name;
+  }
+  const names = [user.firstName, user.lastName].filter(Boolean);
+  if (names.length) {
+    return names.join(' ');
+  }
+  return user.username ?? null;
 }
 
 function AttachmentList({ attachments }) {
@@ -294,9 +326,35 @@ export default function LearnerSupport() {
   }, [statusMessage]);
 
   const selectedCase = cases.find((supportCase) => supportCase.id === selectedCaseId) ?? null;
+  const selectedCasePreferences = useMemo(() => {
+    if (!selectedCase?.notificationPreferences) {
+      return null;
+    }
+    const prefs = selectedCase.notificationPreferences;
+    const channels = Object.entries(prefs.channels ?? {})
+      .filter(([, enabled]) => Boolean(enabled))
+      .map(([id]) => id);
+    const categories = Object.entries(prefs.categories ?? {})
+      .filter(([, enabled]) => Boolean(enabled))
+      .map(([id]) => id);
+    return {
+      digest: prefs.digest ?? null,
+      channels,
+      categories
+    };
+  }, [selectedCase]);
 
   const handleTicketSubmit = useCallback(
-    async ({ subject, category, priority, description, attachments = [], knowledgeSuggestions = [] }) => {
+    async ({
+      subject,
+      category,
+      priority,
+      description,
+      attachments = [],
+      knowledgeSuggestions = [],
+      notificationPreferences,
+      requester
+    }) => {
       const trimmedSubject = subject?.trim();
       const trimmedDescription = description?.trim();
       if (!trimmedSubject || !trimmedDescription) {
@@ -306,6 +364,11 @@ export default function LearnerSupport() {
 
       setPendingAction('create');
       const timestamp = new Date().toISOString();
+      const requesterPayload = {
+        name: requester?.name ?? session?.user?.name ?? deriveUserName(session?.user) ?? 'Learner',
+        email: requester?.email ?? session?.user?.email ?? null,
+        timezone: requester?.timezone ?? null
+      };
       let response;
       try {
         if (!token) {
@@ -319,7 +382,9 @@ export default function LearnerSupport() {
             priority,
             description: trimmedDescription,
             attachments,
-            knowledgeSuggestions
+            knowledgeSuggestions,
+            notificationPreferences,
+            requester: requesterPayload
           }
         });
         setStatusMessage({
@@ -348,6 +413,11 @@ export default function LearnerSupport() {
         status: remoteTicket.status ?? 'open',
         knowledgeSuggestions:
           remoteTicket.knowledgeSuggestions ?? remoteTicket.knowledge_suggestions ?? knowledgeSuggestions,
+        notificationPreferences:
+          remoteTicket.notificationPreferences ??
+          remoteTicket.notification_preferences ??
+          notificationPreferences,
+        requester: remoteTicket.requester ?? remoteTicket.requestor ?? requesterPayload,
         followUpDueAt: remoteTicket.followUpDueAt ?? remoteTicket.follow_up_due_at ?? null,
         aiSummary: remoteTicket.aiSummary ?? remoteTicket.ai_summary ?? null,
         escalationBreadcrumbs:
@@ -740,6 +810,60 @@ export default function LearnerSupport() {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Messages</p>
                     <p className="text-sm text-slate-700">{selectedCase.messageCount}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white/80 p-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Requester contact</p>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {selectedCase.requester?.name ?? 'Learner workspace contact'}
+                    </p>
+                    {selectedCase.requester?.email ? (
+                      <a
+                        href={`mailto:${selectedCase.requester.email}`}
+                        className="inline-flex items-center gap-2 text-xs font-semibold text-primary transition hover:underline"
+                      >
+                        {selectedCase.requester.email}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-slate-500">No email recorded.</p>
+                    )}
+                    {selectedCase.requester?.timezone ? (
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                        Timezone • {selectedCase.requester.timezone}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notification preferences</p>
+                    {selectedCasePreferences ? (
+                      <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                        {selectedCasePreferences.digest ? (
+                          <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+                            {DIGEST_LABELS[selectedCasePreferences.digest] ?? selectedCasePreferences.digest}
+                          </span>
+                        ) : null}
+                        {selectedCasePreferences.channels.length ? (
+                          selectedCasePreferences.channels.map((channel) => (
+                            <span key={channel} className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                              {CHANNEL_LABELS[channel] ?? channel}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-500">Channels pending</span>
+                        )}
+                        {selectedCasePreferences.categories.length ? (
+                          selectedCasePreferences.categories.map((category) => (
+                            <span key={category} className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+                              {CATEGORY_LABELS[category] ?? category}
+                            </span>
+                          ))
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500">Notification preferences have not been captured.</p>
+                    )}
                   </div>
                 </div>
 
