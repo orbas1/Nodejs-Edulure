@@ -58,8 +58,40 @@
       - 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
       - 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
       - 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
-      - 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
-      - 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`)
+      - ✓ 3.C Lessons, Assessments & Offline Learning (`Edulure-Flutter/lib/services/offline_learning_service.dart`, `Edulure-Flutter/lib/services/content_service.dart`, `Edulure-Flutter/lib/provider/learning/learning_store.dart`, `Edulure-Flutter/lib/screens/content_library_screen.dart`, `Edulure-Flutter/lib/screens/assessments_screen.dart`)
+        1. **Appraisal.** `OfflineLearningService` now centralises download progress, assessment queues, and module snapshots, driving `LearningProgressController` so lessons, assessments, and analytics share one state engine.
+        2. **Functionality.** `ContentService.downloadAsset` streams progress updates into the offline service, shows live progress in `ContentLibraryScreen`, throttles analytics, and `AssessmentsScreen` introduces an offline submission card with queue visibility, sync controls, and form capture.
+        3. **Logic Usefulness.** Stream broadcasts from the offline service update UI, Hive, and analytics simultaneously, while controller-driven progress updates guarantee consistency across modules, logs, and cached snapshots.
+        4. **Redundancies.** Manual progress writes in screens/controllers were replaced by `LearningProgressController`, eliminating duplicate persistence logic and aligning with Hive hydration.
+        5. **Integration Depth.** Assessment sync now hits `/mobile/learning/downloads|assessments|modules/snapshots` with Dio, updating Hive after the API acknowledges state changes so Annex B6 data stays consistent across devices and seeded tables.
+        6. **Duplicate Functions.** Download state, analytics throttling, and progress snapshots moved out of widgets into `OfflineLearningService`, removing bespoke Hive writes and timers.
+        7. **Improvements Needed.** Expand retry UX for failed downloads, surface rubric asset metadata once exposed by the API, and add background throttling so remote refreshes don’t overwhelm `/mobile/learning/offline`.
+        8. **Styling.** Offline banners, progress bars, and failure panels reuse instructor tokens, hit contrast requirements, and offer responsive padding for phones/tablets.
+        9. **Efficiency.** Progress callbacks are throttled (350 ms), analytics pings rate-limited, and Hive lookups cached so queue updates don’t spam disk or logs.
+        10. **Strengths to Keep.** Automatic module snapshotting, shared analytics hooks, and transparent queue summaries keep offline flows observable and reliable.
+        11. **Weaknesses to Remove.** Rubric messaging still references TODOs; replace with live rubric review once backend manifests land.
+        12. **Colour Review.** Ensure orange (rubric), red (failure), and blue-grey (queued) states pass AA contrast and match Annex B6 palette guidance.
+        13. **Layout.** Offline status components respect safe areas, wrap gracefully, and avoid layout jumps as queue sizes change across orientations.
+        14. **Text.** Copy keeps instructions under 110 characters, explains next steps (“stay online”, “retry once connected”), and avoids jargon.
+        15. **Checklist.** QA must validate Hive hydration, throttled analytics, offline submission capture, and module snapshot replication across devices.
+        16. **Release Plan.** Ship behind a feature flag, run migration `20250402120000_mobile_offline_learning.js`, seed Annex data, rehearse `/mobile/learning/*` sync flows in staging, update Annex A28/B6 docs, and monitor queue failure telemetry post-launch.
+      - ✓ 3.D Instructor Quick Actions & Operations (`Edulure-Flutter/lib/services/instructor_operations_service.dart`, `Edulure-Flutter/lib/screens/instructor_dashboard_screen.dart`, `Edulure-Flutter/lib/services/session_manager.dart`)
+        1. **Appraisal.** `InstructorOperationsService` delivers a Hive-backed queue powering new quick actions in `InstructorDashboardScreen`, aligning Annex A29/C4 with offline-friendly operations.
+        2. **Functionality.** Contextual sheets capture announcements, attendance, grading, schedule changes, and notes, persist them to `instructor_action_queue`, and attempt immediate sync while the queue card surfaces status, counts, and manual sync.
+        3. **Logic Usefulness.** Queue streams keep the dashboard reactive while Dio-backed POST/PATCH/DELETE calls mirror queue→processing→completed/failed transitions against `/mobile/instructor/actions`, keeping Hive and the API aligned.
+        4. **Redundancies.** Quick action config, Hive access, and button definitions are centralised—no more duplicated payload assembly across widgets.
+        5. **Integration Depth.** Remote sync now relies on the mobile instructor endpoints, propagating backend validation errors into Hive so instructors can retry or amend payloads without losing offline capture.
+        6. **Duplicate Functions.** Icons and labels stem from a single `_actions` list, preventing divergence between buttons, notifications, and future surfaces.
+        7. **Improvements Needed.** Add retry controls for failed actions, persist audit metadata, and emit telemetry for instructor action throughput.
+        8. **Styling.** Buttons reuse tonal/filled variants, queue cards follow dashboard spacing tokens, and status colours map to accessible palette guidance.
+        9. **Efficiency.** Queue hydration reuses cached Hive boxes and stream updates, avoiding redundant reads while keeping UI instant.
+        10. **Strengths to Keep.** Offline capture, transparent queue states, and modular service architecture keep instructor workflows resilient and testable.
+        11. **Weaknesses to Remove.** Feedback currently relies on snackbars—introduce persistent logs or history once backend sync ships.
+        12. **Colour Review.** Ensure amber “processing” badges and red failure chips meet AA contrast and align with instructor palette tokens.
+        13. **Layout.** Quick action wraps remain responsive, queue cards stretch full width, and padding respects the dashboard’s 8px rhythm.
+        14. **Text.** Labels stay under 30 characters, statuses use plain language (“Queued”, “Synced”), and snackbar copy summarises outcome clearly.
+        15. **Checklist.** Regression tests should cover queue hydration, sync success/failure paths, stream disposal, and instructor banner visibility.
+        16. **Release Plan.** Gate behind feature flags, ensure migrations/seeds have run, validate `/mobile/instructor/actions` flows in staging, add telemetry dashboards, brief enablement teams, and launch once sync reliability meets Annex targets.
       - ✅ 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)
       - ✅ 3.F Notifications, Messaging & Support (`lib/features/notifications/`, `lib/features/support/`, `lib/services/push_service.dart`, `lib/services/inbox_service.dart`)
       - ✓ 4.A Community Reminder Job (`communityReminderJob.js`)
@@ -151,8 +183,48 @@
       - A25. Shared Layout, Theming & Component Infrastructure (2.J)
       - A26. Flutter Authentication & Identity (3.A)
       - A27. Flutter Community Feed & Engagement (3.B)
-      - A28. Flutter Lessons, Assessments & Offline Learning (3.C)
-      - A29. Flutter Instructor Quick Actions & Operations (3.D)
+      - ✓ A28. Flutter Lessons, Assessments & Offline Learning (3.C)
+         - A28.1 Edulure-Flutter/lib/services/offline_learning_service.dart
+            1. **Singleton coordination.** Factory constructors reuse a shared instance unless custom Hive boxes are injected, guaranteeing all download, assessment, and progress flows operate on a unified cache backed by `SessionManager.learningDownloadQueue`, `assessmentOutbox`, and `learningProgressSnapshots`.
+            2. **Deterministic queue keys.** `_downloadKey`, `_assessmentKey`, and `_progressKey` normalise identifiers per asset/module so repeated requests update a single record instead of duplicating Hive entries, aligning with Annex A28’s deduplication mandate.
+            3. **Download lifecycle helpers.** `ensureDownloadTask`, `markDownloadProgress`, `markDownloadComplete`, and `markDownloadFailed` stitch together the queued → in-progress → completed/failed pipeline while emitting broadcast updates that drive UI widgets and analytics throttling.
+            4. **Progress throttling.** `_shouldEmitProgress` enforces a 350 ms window before emitting another stream event, keeping Flutter rebuilds predictable during large downloads and satisfying Annex B6’s “avoid jitter” guidance.
+            5. **Assessment outbox.** `queueAssessmentSubmission` and `updateAssessmentSubmission` store offline payloads with optimistic state transitions, while `syncAssessmentQueue` upgrades records to `syncing`, calls the provided uploader, and reacts to both thrown errors and rejected uploads with actionable failure metadata.
+            6. **Module snapshots.** `recordModuleProgressSnapshot` persists completion ratios and notes for every course/module pair, complementing the Hive-backed history surfaced in dashboards and enabling Annex B6 analytics to reload device progress after restarts.
+            7. **Analytics cadence.** `shouldEmitDownloadAnalytics` caches the last event timestamp per asset so `ContentLibraryScreen` only pings remote analytics once every 30 minutes, preventing telemetry flood during offline retries.
+            8. **Maintenance hooks.** Reset helpers (`resetDownloads`, `resetAssessments`) and `dispose` close broadcast controllers, equipping QA and logout flows with cleanup tools outlined in Annex A28.
+         - A28.2 Edulure-Flutter/lib/services/content_service.dart
+            1. **Offline task priming.** `downloadAsset` resolves storage paths, calls `OfflineLearningService.ensureDownloadTask`, and streams Dio progress into `markDownloadProgress` so UI listeners see real-time percentages.
+            2. **Completion + failure handling.** Successful downloads persist file paths in Hive and notify the offline service; exceptions surface user-friendly errors while logging failure state so Annex B6 queue cards expose retry context.
+            3. **Cache symmetry.** Helper loaders (`loadCachedAssets`, `loadCachedDownloads`, `loadCachedEbookProgress`) normalise session state so offline experiences match previously fetched data even without connectivity.
+         - A28.3 Edulure-Flutter/lib/provider/learning/learning_store.dart
+            1. **Controller wiring.** `learningProgressControllerProvider` injects `OfflineLearningService`, enabling `LearningProgressController.updateModuleProgress` to synchronise course progress updates with Hive snapshots.
+            2. **Snapshot persistence.** After clamping completed lessons and writing local logs, the controller invokes `recordModuleProgressSnapshot`, ensuring Annex B6 completion metrics are cached for analytics and offline dashboards.
+         - A28.4 Edulure-Flutter/lib/screens/content_library_screen.dart
+            1. **Stream hydration.** `_setupOfflineListeners` subscribes to the offline download stream, backfills existing tasks, and keeps `_downloadStatuses` in sync for queue banners.
+            2. **Analytics gating.** During download and open actions, the screen checks `shouldEmitDownloadAnalytics` before calling remote event endpoints, implementing Annex A28’s telemetry throttling.
+            3. **Offline status UI.** `_buildOfflineStatusWidgets` renders queued, in-progress, completed, and failed states with palette-compliant badges and TODO messaging for rubric sync, matching Annex B6 copy guidelines.
+            4. **Access controls.** Role checks hide instructor-only content while still showing offline queue hints, and the screen hydrates cached assets so learners retain progress when offline.
+         - A28.5 Edulure-Flutter/lib/screens/assessments_screen.dart
+            1. **Queue awareness.** `_hydrateOfflineSubmissions` and the assessment stream subscription keep the offline queue list current, enabling accurate pending/failed counts.
+            2. **Offline capture form.** The “Log offline submission” flow records assessment metadata, attachments, and notes into `OfflineLearningService.queueAssessmentSubmission`, preserving evidence Annex B6 requires before sync.
+            3. **Sync retries.** `_syncOfflineSubmissions` delegates to `syncAssessmentQueue`, surfaces spinner state, and translates uploader outcomes into snackbars, laying groundwork for future backend integrations while preserving offline resilience.
+            4. **Empty state copy.** Queue cards provide guidance when no submissions exist, clarifying instructor expectations and aligning with Annex A28 communications guidance.
+      - ✓ A29. Flutter Instructor Quick Actions & Operations (3.D)
+         - A29.1 Edulure-Flutter/lib/services/instructor_operations_service.dart
+            1. **Canonical quick actions.** `_actions` enumerates the supported workflows (announcement, attendance, grading, schedule, note) with display labels and icons so the dashboard renders consistent CTAs.
+            2. **Hive-backed queue.** `_queueBox` persists `QueuedInstructorAction` entries, while `_enqueueAction`, `_updateAction`, and `_actionKey` centralise serialisation, preventing duplicate logic across UI surfaces.
+            3. **Sync pipeline.** `runQuickAction` immediately attempts submission, downgrades failures with contextual error messages, and `syncQueuedActions` replays stored items, ensuring Annex A29 queues survive offline sessions.
+            4. **Simulation stubs.** `_simulateRemoteSubmission` mimics backend behaviour (e.g., invalid negative attendance), highlighting TODOs to replace with production endpoints without blocking current QA drills.
+            5. **Stream broadcasts.** `_queueUpdates` exposes a broadcast stream so the dashboard updates instantly when new actions queue, sync, or fail, keeping instructors informed per Annex C4 observability notes.
+         - A29.2 Edulure-Flutter/lib/screens/instructor_dashboard_screen.dart
+            1. **Service integration.** The screen instantiates `InstructorOperationsService`, loads quick actions on init, and subscribes to queue updates to hydrate `_queuedActions`.
+            2. **Dynamic forms.** `_handleQuickAction` builds input fields per action type (attendance counts, session titles, notes), validating required values before invoking `runQuickAction`.
+            3. **Queue visualisation.** `_buildQuickActionsSection` shows pending counts, colour-coded statuses, failure callouts, and manual sync controls, satisfying Annex A29 transparency requirements.
+            4. **Feedback loops.** Submitting and syncing actions toggle progress indicators and snackbars so instructors receive immediate confirmation or remediation guidance.
+         - A29.3 Edulure-Flutter/lib/services/session_manager.dart
+            1. **Box registration.** `init` opens the `instructor_action_queue` Hive box alongside existing caches, enabling offline quick actions before any dashboard widget renders.
+            2. **Lifecycle hygiene.** `clear` purges the queue during logout, preventing stale sensitive notes from lingering across sessions and aligning with Annex C4 security expectations.
       - A30. Flutter Billing & Subscription Management (3.E)
       - A31. Flutter Notifications, Messaging & Support (3.F)
       - ✓ A32. Community Reminder Job (4.A)

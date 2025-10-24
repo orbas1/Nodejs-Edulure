@@ -96,6 +96,10 @@ export async function seed(knex) {
     await trx('ebook_highlights').del();
     await trx('ebook_chapters').del();
     await trx('ebooks').del();
+    await trx('learning_offline_module_snapshots').del();
+    await trx('learning_offline_assessment_submissions').del();
+    await trx('learning_offline_downloads').del();
+    await trx('instructor_action_queue').del();
     await trx('course_progress').del();
     await trx('course_enrollments').del();
     await trx('course_assignments').del();
@@ -4064,6 +4068,102 @@ export async function seed(knex) {
         completed: false,
         progress_percent: 25,
         metadata: JSON.stringify({ lastLocation: 'section-2', note: 'Review telemetry thresholds' })
+      }
+    ]);
+
+    const opsCoursePublic = await trx('courses')
+      .select('public_id')
+      .where({ id: opsAutomationCourseId })
+      .first();
+    const opsModuleIncident = await trx('course_modules')
+      .select('slug')
+      .where({ id: opsModuleIncidentId })
+      .first();
+    const opsAsset = await trx('content_assets')
+      .select('public_id')
+      .where({ id: opsPlaybookAssetId })
+      .first();
+
+    const opsCoursePublicId = opsCoursePublic?.public_id ?? `course-${opsAutomationCourseId}`;
+    const opsModuleIncidentSlug = opsModuleIncident?.slug ?? 'incident-simulation-drills';
+    const opsAssetPublicId = opsAsset?.public_id ?? `asset-${opsPlaybookAssetId}`;
+
+    await trx('learning_offline_downloads').insert({
+      id: crypto.randomUUID(),
+      user_id: learnerId,
+      asset_public_id: opsAssetPublicId,
+      asset_id: opsPlaybookAssetId,
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleIncidentId,
+      course_public_id: opsCoursePublicId,
+      module_slug: opsModuleIncidentSlug,
+      filename: 'learning-ops-blueprint.pptx',
+      state: 'completed',
+      progress_ratio: 1,
+      file_path: '/offline/content/learning-ops-blueprint.pptx',
+      queued_at: trx.fn.now(),
+      completed_at: trx.fn.now(),
+      metadata: JSON.stringify({ annex: 'A28', seeded: true })
+    });
+
+    const automationAssignment = await trx('course_assignments')
+      .select('id')
+      .where({ course_id: opsAutomationCourseId, title: 'Automation Readiness Audit' })
+      .first();
+
+    await trx('learning_offline_assessment_submissions').insert({
+      id: crypto.randomUUID(),
+      user_id: learnerId,
+      client_submission_id: 'seed-automation-audit',
+      assignment_id: automationAssignment?.id ?? null,
+      assessment_key:
+        automationAssignment?.id != null
+          ? `assignment:${automationAssignment.id}`
+          : 'automation-readiness-audit',
+      state: 'queued',
+      payload: JSON.stringify({ draftScore: null, attachments: [], rubricVersion: 1 }),
+      queued_at: trx.fn.now(),
+      metadata: JSON.stringify({ annex: 'B6', seeded: true })
+    });
+
+    await trx('learning_offline_module_snapshots').insert({
+      id: crypto.randomUUID(),
+      user_id: learnerId,
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleIncidentId,
+      course_public_id: opsCoursePublicId,
+      module_slug: opsModuleIncidentSlug,
+      completion_ratio: 0.42,
+      notes: 'Seeded offline progress sync for Annex B6 audit.',
+      metadata: JSON.stringify({ annex: 'B6', seeded: true }),
+      captured_at: trx.fn.now()
+    });
+
+    await trx('instructor_action_queue').insert([
+      {
+        id: crypto.randomUUID(),
+        user_id: instructorId,
+        client_action_id: 'seed-announcement',
+        action_type: 'announcement',
+        state: 'processing',
+        payload: JSON.stringify({
+          audience: 'Ops Automation Cohort',
+          subject: 'Offline sync announcement',
+          priority: 'urgent'
+        }),
+        queued_at: trx.fn.now(),
+        processed_at: trx.fn.now(),
+        metadata: JSON.stringify({ annex: 'A29', seeded: true })
+      },
+      {
+        id: crypto.randomUUID(),
+        user_id: instructorId,
+        client_action_id: 'seed-attendance',
+        action_type: 'attendance',
+        state: 'queued',
+        payload: JSON.stringify({ sessionId: 'ops-live-101', attendees: 28, capturedOffline: true }),
+        queued_at: trx.fn.now(),
+        metadata: JSON.stringify({ annex: 'C4', seeded: true })
       }
     ]);
 

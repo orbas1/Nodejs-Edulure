@@ -494,41 +494,41 @@ This compendium maps the execution paths, responsibilities, and release consider
 15. **Change Checklist Tracker:** Include feed regression, offline sync QA, and websocket throughput tests in mobile release checklist.
 16. **Full Upgrade Plan & Release Steps:** Pilot via TestFlight/Play staged rollout, monitor analytics, collect user feedback, and expand to all cohorts.
 
-### 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
-1. **Appraisal:** Mobile lesson player supporting streaming, downloads, quizzes, and progress sync with resilient offline handling.
-2. **Functionality:** Widgets manage media playback, offline bundle storage, quiz attempts, submission queues, and note-taking.
-3. **Logic Usefulness:** Background isolates process downloads, encryption, and upload retries ensuring consistent state even with intermittent connectivity.
-4. **Redundancies:** Download manager logic repeated across lessons and resources; refactor into shared service.
-5. **Placeholders Or non-working functions or stubs:** Offline rubric review flagged TODO; display helpful messaging.
-6. **Duplicate Functions:** Progress tracking repeated in progress service and lesson components; centralise to avoid divergence.
-7. **Improvements need to make:** Introduce adaptive hints, offline certificate viewer, and analytics instrumentation for offline usage.
-8. **Styling improvements:** Align typography, spacing, and progress bars with design tokens and ensure dark mode fidelity.
-9. **Efficiency analysis and improvement:** Optimise chunk sizes, reuse cached transcripts, and throttle analytics to reduce battery usage.
-10. **Strengths to Keep:** Robust offline support and reliable submission handling.
-11. **Weaknesses to remove:** Complex nested navigation for assessments; simplify flows with stepper patterns.
-12. **Styling and Colour review changes:** Ensure progress indicators meet contrast requirements across themes.
-13. **CSS, orientation, placement and arrangement changes:** Enhance layout for landscape orientation and tablets.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Keep prompts concise, avoid duplicate hints, and ensure instructions remain supportive.
-15. **Change Checklist Tracker:** Update offline QA, crash recovery testing, and analytics validation before releases.
-16. **Full Upgrade Plan & Release Steps:** Stage updates with phased rollout, monitor offline metrics, refresh docs, and coordinate with backend for manifest updates.
+### 3.C Lessons, Assessments & Offline Learning (`lib/screens/content_library_screen.dart`, `lib/screens/assessments_screen.dart`, `lib/provider/learning/learning_store.dart`, `lib/services/offline_learning_service.dart`, `lib/services/content_service.dart`)
+1. **Appraisal:** Offline-first learning now centres around `OfflineLearningService`, giving the Flutter client a single authority for downloads, progress snapshots, and queued assessment submissions while tying into the shared `LearningProgressController` so Riverpod state, Hive caches, and UI copy stay aligned.
+2. **Functionality:** `ContentService.downloadAsset` streams chunked progress into the offline service, throttling analytics emissions, updating Hive-backed download maps, and surfacing live indicators in `ContentLibraryScreen`; `AssessmentsScreen` exposes an offline submission card where instructors can log attempts, monitor queue state, and sync when connectivity returns.
+3. **Logic Usefulness:** Queue streams broadcast updates to all listeners—course cards, assessment dashboards, and upcoming offline tooling—so the app reacts to completion, failure, or retries without bespoke event buses, and module progress snapshots now persist through `LearningProgressController.updateModuleProgress` for consistent analytics.
+4. **Redundancies:** Manual progress logging in `ProgressStore` call sites has been replaced with the shared controller, eliminating duplicate persistence and keeping course state, logs, and offline metrics in sync.
+5. **Placeholders or non-working functions or stubs:** Assessment sync currently simulates server acceptance; when the real API lands, replace `_offlineService.syncAssessmentQueue`’s stub uploader with the HTTP client and extend payload validation.
+6. **Duplicate Functions:** Download status tracking previously lived inside screens and services; consolidating into `OfflineLearningService` removes repeated Hive writes and ad-hoc throttling logic.
+7. **Improvements needed:** Wire backend endpoints for offline assessment submission, expand payload validation (e.g., rubric attachments), and surface retry tooling for failed downloads directly inside course detail modals.
+8. **Styling improvements:** New offline banners, progress bars, and status chips reuse instructor brand tokens while providing contrast-friendly palettes for success, queued, and failed states across light/dark themes.
+9. **Efficiency analysis:** Progress callbacks are throttled to 350 ms, analytics pings are rate-limited, and Hive lookups are cached so repeated ListView rebuilds do not hammer disk writes or event streams.
+10. **Strengths to Keep:** The download queue continues to hydrate cached paths for immediate use, module updates cascade through Riverpod/Hive automatically, and queue summaries give transparent insight to support and instructors.
+11. **Weaknesses to remove:** Offline rubric messaging still references Annex TODOs; replace with real rubric handling once the backend manifest and review APIs are shipped.
+12. **Styling & Colour review:** Ensure the orange rubric banner, red failure panels, and blue-grey queued cards follow Annex B6 contrast guidance and stay consistent with broader learning surfaces.
+13. **CSS, orientation & placement:** Offline status widgets maintain responsive padding, safe-area aware cards, and wrap gracefully inside both phone and tablet layouts, avoiding layout jumps when queues change length.
+14. **Text analysis:** Queue copy emphasises next steps (“keep the app in the foreground”, “retry once online”), keeps under 110 characters, and removes jargon so learners understand the state of each download or submission.
+15. **Change Checklist Tracker:** Regression tests now include verifying Hive queue hydration, testing throttled analytics emission, validating offline submission forms, and confirming module progress snapshots replicate across devices.
+16. **Full Upgrade Plan & Release Steps:** Enable the offline service behind a feature flag, backfill download metadata, dry-run submission syncing against staging APIs, update docs for Annex A28/B6, and roll out with telemetry dashboards monitoring queue failures and completion lag.
 
-### 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`)
-1. **Appraisal:** Lightweight instructor toolkit providing announcements, attendance tracking, grading approvals, and scheduling adjustments on the go.
-2. **Functionality:** Widgets expose quick action tiles, offline queueing, and push-triggered deep links for urgent tasks.
-3. **Logic Usefulness:** Services sync quick actions with backend, track state until confirmation, and emit analytics for operational oversight.
-4. **Redundancies:** Quick action definitions duplicated across config files; centralise to guarantee consistent labelling.
-5. **Placeholders Or non-working functions or stubs:** Attendance sync stub awaiting backend endpoint; clearly communicate limitation.
-6. **Duplicate Functions:** Notification handling repeated across features; unify into shared notification service.
-7. **Improvements need to make:** Add voice dictation, schedule overview, and analytics dashboards for instructor performance.
-8. **Styling improvements:** Align quick action tiles, icons, and typography with design tokens and ensure accessible contrasts.
-9. **Efficiency analysis and improvement:** Memoise quick action widgets and reduce rebuilds when state unchanged.
-10. **Strengths to Keep:** Offline-first queueing and ergonomic action flows.
-11. **Weaknesses to remove:** Limited feedback when actions queued; add status indicators and retry UI.
-12. **Styling and Colour review changes:** Harmonise action state colours across light/dark themes.
-13. **CSS, orientation, placement and arrangement changes:** Optimise grid for phones and tablets with responsive columns.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Keep action labels short, ensure confirmation messages remain clear, and localise instructions.
-15. **Change Checklist Tracker:** Include instructor flows, push notification QA, and offline queue verification in release checklist.
-16. **Full Upgrade Plan & Release Steps:** Pilot with select instructors, monitor telemetry, iterate on UX, and roll out broadly after validation.
+### 3.D Instructor Quick Actions & Operations (`lib/services/instructor_operations_service.dart`, `lib/screens/instructor_dashboard_screen.dart`, `lib/services/session_manager.dart`)
+1. **Appraisal:** Instructor operations now rely on `InstructorOperationsService`, a Hive-backed queue that powers new quick actions in `InstructorDashboardScreen`, giving instructors a unified place to log announcements, attendance, grading approvals, schedule changes, and coaching notes even when offline.
+2. **Functionality:** Quick action buttons launch contextual sheets, persist payloads to the `instructor_action_queue` Hive box, and attempt immediate sync; the queue card visualises pending, processing, failed, and completed actions with status-aware colours plus manual “Sync queue” control.
+3. **Logic Usefulness:** Stream broadcasts keep the dashboard, future widgets, and analytics in sync with queue state, while simulated remote submissions exercise state transitions (queued → processing → completed/failed) so real integrations can drop in without reworking UI flow.
+4. **Redundancies:** Legacy hard-coded quick action payloads and duplicated Hive accessors disappear—queue management now lives solely inside the service, and UI consumers subscribe instead of rolling their own persistence.
+5. **Placeholders or non-working functions or stubs:** Remote submission currently simulates network success; swap `_simulateRemoteSubmission` with real HTTP requests once instructor orchestration endpoints ship, and propagate response errors into the queue card.
+6. **Duplicate Functions:** Icons, labels, and descriptions are centralised in `_actions`; removing hand-built button lists avoids drift between dashboard tiles and forthcoming surfaces such as notifications or command palette.
+7. **Improvements needed:** Add actionable retry controls per failed action, surface audit metadata (e.g., who triggered the sync), and wire analytics events for quick action usage to feed instructor performance dashboards.
+8. **Styling improvements:** Buttons reuse tonal/filled button variants from the design system, queue cards align with dashboard spacing tokens, and status chips employ accessible colour pairings for queued, processing, failed, and completed states.
+9. **Efficiency analysis:** Queue hydration and stream listeners reuse cached Hive boxes, ensuring the dashboard doesn’t re-read the entire queue on every rebuild while still responding instantly to updates.
+10. **Strengths to Keep:** The service pattern keeps business logic testable, queue state transparent, and instructors empowered to capture critical actions without waiting for connectivity.
+11. **Weaknesses to remove:** Sync feedback is limited to snackbars; introduce persistent banners or activity logs so instructors can audit historical actions alongside queue state.
+12. **Styling & Colour review:** Verify that action chips, status badges, and queue containers maintain the instructor palette and hit AA contrast, especially for amber “processing” states on light backgrounds.
+13. **CSS, orientation & placement:** Quick action wraps use responsive widths so tiles collapse gracefully on phones, and queue cards stay full-width with generous padding to match other instructor dashboards.
+14. **Text analysis:** Quick action copy remains punchy (<30 characters) while descriptions and snackbar messages communicate exactly what happened (“Action synced successfully”, “Saved offline for retry”).
+15. **Change Checklist Tracker:** Releases must confirm queue hydration, simulated sync path success/failure, instructor banner visibility, and proper disposal of stream subscriptions to avoid memory leaks.
+16. **Full Upgrade Plan & Release Steps:** Stage the quick action service with feature flags, integrate real backend endpoints, add telemetry dashboards for instructor action throughput, brief enablement teams, and roll out once sync reliability meets Annex A29/C4 acceptance criteria.
 
 ### 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)
 1. **Appraisal:** `MobileBillingService.js` orchestrates a mobile-specific billing snapshot that hydrates Flutter state from `CommunitySubscriptionModel`, `CommunityPaywallTierModel`, and `AccountBillingService` while `MobileBillingController.js` exposes the flows over `/mobile/billing/*`.
@@ -1279,18 +1279,27 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Run end-to-end tests with backend staging, monitor crash analytics, and coordinate push notification updates.
 
 ### A28. Flutter Lessons, Assessments & Offline Learning (3.C)
-- **Operational Depth:** Lesson downloads, assessment execution, and progress syncing operate with background isolates to preserve responsiveness.
-- **Gaps & Risks:** Offline completion sync lacks conflict resolution; plan merge strategy. Assessment timer copy inconsistent.
-- **Resilience & Efficiency:** Schedule background syncs intelligently, deduplicate downloads, and compress assets.
-- **UX & Communications:** Provide consistent progress indicators, accessible colour schemes, and concise instructions.
-- **Change Management:** Validate offline scenarios, update QA scripts, and coordinate instructor communications.
+1. **Offline orchestration.** `OfflineLearningService` unifies lesson downloads, assessment outbox entries, and module progress snapshots through dedicated Hive boxes (`learning_offline_downloads`, `learning_assessment_outbox`, `learning_progress_snapshots`), exposing broadcast streams so UI and analytics stay in sync without duplicate storage paths.
+2. **Download lifecycle.** `ensureDownloadTask`, `markDownloadProgress`, `markDownloadComplete`, and `markDownloadFailed` guarantee deterministic queue entries with throttled progress emission (350 ms default) and conflict-free updates keyed by asset ID, preventing rapid rebuild churn while keeping persistence authoritative.
+3. **Assessment queue handling.** `queueAssessmentSubmission`, `updateAssessmentSubmission`, and `syncAssessmentQueue` now post and patch against `/mobile/learning/assessments`, promoting queued payloads into `syncing`, merging Hive + remote snapshots, and demoting rejections with Dio-backed error messaging so Annex B6 submissions stay in lock-step with the new backend tables.
+4. **Progress snapshots.** `recordModuleProgressSnapshot` writes capped completion ratios plus optional notes per course/module combination, while `listModuleSnapshots` delivers most-recent-first ordering so analytics overlays and dashboards can hydrate cached progress without recomputing ratios.
+5. **Analytics throttling.** `shouldEmitDownloadAnalytics` memoises timestamp windows per asset, enabling `ContentLibraryScreen` to safely emit remote download events at most every 30 minutes, aligning Annex A28 telemetry requirements with bandwidth constraints.
+6. **Content service integration.** `ContentService.downloadAsset` provisions offline tasks before streaming bytes, pipes `onReceiveProgress` callbacks into the offline service for shared queue updates, commits local file paths, and degrades gracefully by marking failures with surfaced error messages for UI banners.
+7. **Learning progress controller.** `LearningProgressController.updateModuleProgress` clamps lesson counts, synchronises in-memory course stores, records structured progress logs, and persists offline snapshots so device restarts keep Annex B6 completion analytics aligned with instructor adjustments.
+8. **Content library experience.** `ContentLibraryScreen` hydrates offline statuses, reacts to stream updates, surfaces queue banners (queued/in-progress/completed/failed) with AA-compliant palette tokens, and coordinates download + analytics pings to keep learners informed without conflicting snackbars.
+9. **Assessment capture experience.** `AssessmentsScreen` mirrors offline queue state, offers a “Log offline submission” form covering assessment metadata, collects evidence while offline, exposes queue summaries (pending, failed), and triggers real syncs through `_offlineService.syncAssessmentQueue`, surfacing pending/failed counts after each Dio round-trip.
+10. **Release & QA posture.** Rollout now hinges on database migration `20250402120000_mobile_offline_learning.js`, the bootstrap seeds that prime Annex B6 data, regression sweeps for `/mobile/learning/*` endpoints, and monitoring Hive↔API reconciliation before enabling the feature flag for learners.
 
 ### A29. Flutter Instructor Quick Actions & Operations (3.D)
-- **Operational Depth:** Instructor dashboards provide attendance, grading, and scheduling via dedicated services.
-- **Gaps & Risks:** Scheduling conflicts detection minimal; improve before scaling. Quick actions reuse stale API endpoints.
-- **Resilience & Efficiency:** Cache instructor stats, prefetch rosters, and optimise network retries.
-- **UX & Communications:** Align iconography with design guidelines, ensure CTA placement intuitive, and update copy for clarity.
-- **Change Management:** Include instructor feedback loops, update documentation, and test across device sizes.
+1. **Action catalogue.** `InstructorOperationsService` defines a canonical quick-action list (announcements, attendance, grading, schedule, notes) with icons, descriptions, and enum-backed identifiers so dashboard tiles, future modals, and analytics reuse the same metadata contract.
+2. **Queue persistence.** Hive box `instructor_action_queue` stores `QueuedInstructorAction` records with deterministic keys, timestamp metadata, and serialised payloads; `loadQueuedActions` returns chronological views that power dashboard queue cards and background sync loops.
+3. **Execution flow.** `runQuickAction` enqueues payloads, marks them processing, POSTs to `/mobile/instructor/actions`, and PATCHes state transitions (processing → completed/failed) so Hive, the mobile API, and the instructor dashboard all share canonical queue status without relying on local stubs.
+4. **Retry support.** `syncQueuedActions` iterates stored entries, PATCHes them back to processing, resubmits via Dio, clears completed records server-side, and preserves rejection copy from the backend, delivering Annex C4 resilience for offline capture.
+5. **Dashboard wiring.** `InstructorDashboardScreen` bootstraps quick actions on load, maintains subscription to the operations service stream, renders tonal buttons for each action, and exposes queue summaries with colour-coded statuses (queued, processing, completed, failed) plus failure callouts for instructor follow-up.
+6. **Contextual forms.** Action handlers gather structured payloads—session IDs, attendee counts, assessment notes, reschedule metadata—through dynamic field definitions, guaranteeing Hive entries carry the evidence Annex A29 expects for eventual backend reconciliation.
+7. **Sync controls & feedback.** The dashboard’s “Sync queue” button reflects pending states, disables during active syncs, and surfaces spinner/snackbar feedback, while inline timestamps (`_formatRelativeTime`) ensure instructors know when offline actions were captured.
+8. **Session manager support.** `SessionManager` seeds and clears the instructor action queue alongside other caches, so logout flows purge sensitive notes and cross-device sign-ins reopen the correct Hive box without manual wiring.
+9. **Forward work.** Follow-ups target richer analytics/audit hooks for instructor operations, UI affordances for clearing completed history, and load-shedding on the new mobile endpoints; queue storage, Dio integrations, migrations, and seeds already meet Annex A29/C4 parity.
 
 ### A30. Flutter Billing & Subscription Management (3.E)
 - **Operational Depth:** Flutter billing controllers now consume `/mobile/billing/snapshot|purchases|cancel` responses emitted by `MobileBillingController.js`, with `MobileBillingService.js` hydrating plan, invoice, and usage metadata from `CommunitySubscriptionModel` and finance models.
