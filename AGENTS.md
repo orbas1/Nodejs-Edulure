@@ -98,8 +98,8 @@
       - [x] A6. Explorer, Search & Discovery (1.F)
       - A7. Commerce, Billing & Monetisation (1.G)
       - A8. Ads, Growth & Content Marketing (1.H)
-      - A9. Analytics, Intelligence & Telemetry (1.I)
-      - A10. Governance, Compliance & Runtime Control (1.J)
+      - ✅ A9. Analytics, Intelligence & Telemetry (1.I)
+      - ✅ A10. Governance, Compliance & Runtime Control (1.J)
       - A11. Integrations, Enablement & Environment Parity (1.K)
       - A12. Media, Storage & Asset Pipeline (1.L)
       - A13. Release, Provider Transition & Platform Settings (1.M)
@@ -163,7 +163,7 @@
       - B6. Flutter Mobile App Deep Dive (`Edulure-Flutter`)
          - B6.A. Mobile Learning Experience (`lib/modules/learning`, `lib/widgets/player`)
       - B7. Data & Analytics Platform
-         - B7.A. Warehouse & ETL (`infrastructure/data/warehouse`, `scripts/etl`)
+         - ✅ B7.A. Warehouse & ETL (`infrastructure/data/warehouse`, `scripts/etl`)
       - B8. Infrastructure & DevOps
          - B8.A. Deployment Pipeline (`infrastructure/pipeline`, `github/workflows`)
       - B9. Quality Assurance & Observability (`qa`, `backend-nodejs/observability`)
@@ -176,7 +176,7 @@
       - C4. Live Classes & Tutoring Operations (`frontend-reactjs/src/pages/dashboard/InstructorLiveClasses.jsx`, `frontend-reactjs/src/pages/dashboard/LearnerLiveClasses.jsx`, `frontend-reactjs/src/pages/dashboard/InstructorTutorBookings.jsx`, `backend-nodejs/src/controllers/InstructorBookingController.js`, `backend-nodejs/src/controllers/AdminBookingController.js`, `backend-nodejs/src/services/LearnerDashboardService.js`, `backend-nodejs/src/services/InstructorSchedulingService.js`, `backend-nodejs/src/models/TutorBookingModel.js`)
       - C5. Integration Credential Invitations & API Key Governance (`frontend-reactjs/src/pages/IntegrationCredentialInvite.jsx`, `frontend-reactjs/src/api/integrationInviteApi.js`, `frontend-reactjs/src/hooks/usePageMetadata.js`, `backend-nodejs/src/controllers/AdminIntegrationsController.js`, `backend-nodejs/src/services/IntegrationApiKeyService.js`, `backend-nodejs/src/services/IntegrationApiKeyInviteService.js`, `backend-nodejs/src/services/IntegrationDashboardService.js`)
       - C6. Admin Approvals, Operations & Setup Governance (`frontend-reactjs/src/pages/admin/sections/AdminApprovalsSection.jsx`, `frontend-reactjs/src/pages/admin/sections/AdminOperationsSection.jsx`, `frontend-reactjs/src/hooks/useSetupProgress.js`, `frontend-reactjs/src/pages/Admin.jsx`, `backend-nodejs/src/controllers/AdminSettingsController.js`, `backend-nodejs/src/services/PlatformSettingsService.js`, `backend-nodejs/src/services/ReleaseOrchestrationService.js`)
-      - C7. Legal, Privacy & Compliance Centre (`frontend-reactjs/src/pages/Terms.jsx`, `frontend-reactjs/src/pages/Privacy.jsx`, `frontend-reactjs/src/pages/LegalContact.jsx`, `backend-nodejs/src/controllers/ComplianceController.js`, `backend-nodejs/src/models/DataSubjectRequestModel.js`, `docs/compliance/policies/*`, `docs/legal/content`)
+      - ✅ C7. Legal, Privacy & Compliance Centre (`frontend-reactjs/src/pages/Terms.jsx`, `frontend-reactjs/src/pages/Privacy.jsx`, `frontend-reactjs/src/pages/LegalContact.jsx`, `backend-nodejs/src/controllers/ComplianceController.js`, `backend-nodejs/src/models/DataSubjectRequestModel.js`, `docs/compliance/policies/*`, `docs/legal/content`)
 2. Part 2 — User Experience Audit & Component Breakdown
       - 1.A Entrypoints & Layout Containers
          - 1.A.1 AdminShell (frontend-reactjs/src/layouts/AdminShell.jsx)

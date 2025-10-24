@@ -5,6 +5,11 @@ import telemetryIngestionService from '../services/TelemetryIngestionService.js'
 import telemetryWarehouseService from '../services/TelemetryWarehouseService.js';
 import TelemetryFreshnessMonitorModel from '../models/TelemetryFreshnessMonitorModel.js';
 import { recordConsentMutationOutcome } from '../observability/metrics.js';
+import {
+  formatZodIssues,
+  serialiseConsentRecord,
+  serialiseTelemetryEvent
+} from '../utils/telemetrySerializers.js';
 
 const consentRequestSchema = z.object({
   consentScope: z.string().min(1, 'consentScope is required'),
@@ -21,21 +26,13 @@ const freshnessQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(200).default(50)
 });
 
-function formatValidationIssues(issues) {
-  return issues.map((issue) => ({
-    path: issue.path.length > 0 ? issue.path.join('.') : '',
-    message: issue.message,
-    code: issue.code
-  }));
-}
-
 function parseConsentRequest(payload) {
   const result = consentRequestSchema.safeParse(payload ?? {});
   if (!result.success) {
     const error = new Error('Telemetry consent payload is invalid');
     error.status = 422;
     error.code = 'INVALID_TELEMETRY_CONSENT';
-    error.details = formatValidationIssues(result.error.issues);
+    error.details = formatZodIssues(result.error.issues);
     throw error;
   }
   return result.data;
@@ -52,24 +49,6 @@ function resolveTenantId(req, explicitTenantId) {
   return typeof headerTenant === 'string' && headerTenant.trim() ? headerTenant.trim() : 'global';
 }
 
-function sanitiseEventResponse(event) {
-  if (!event) {
-    return null;
-  }
-  return {
-    id: event.id,
-    eventUuid: event.eventUuid,
-    eventName: event.eventName,
-    eventSource: event.eventSource,
-    consentScope: event.consentScope,
-    consentStatus: event.consentStatus,
-    ingestionStatus: event.ingestionStatus,
-    occurredAt: event.occurredAt,
-    receivedAt: event.receivedAt,
-    createdAt: event.createdAt
-  };
-}
-
 export default class TelemetryController {
   static async ingestEvent(req, res, next) {
     try {
@@ -81,11 +60,11 @@ export default class TelemetryController {
 
       const statusCode = result.duplicate ? 200 : 202;
       return res.status(statusCode).json({
-        status: result.event.ingestionStatus,
+        status: result.event?.ingestionStatus ?? 'pending',
         duplicate: result.duplicate,
         suppressed: result.suppressed,
-        consentStatus: result.event.consentStatus,
-        event: sanitiseEventResponse(result.event)
+        consentStatus: result.event?.consentStatus ?? null,
+        event: serialiseTelemetryEvent(result.event)
       });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -129,7 +108,7 @@ export default class TelemetryController {
         success: true
       });
 
-      return res.status(201).json({ consent: record });
+      return res.status(201).json({ consent: serialiseConsentRecord(record) });
     } catch (error) {
       recordConsentMutationOutcome({
         operation: operationKey,
