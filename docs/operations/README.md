@@ -22,3 +22,8 @@ This handbook provides quick-reference procedures for the admin console task lis
 - **Webhook delivery** – Monitor webhook failure dashboards; retry failed deliveries via the Admin tools section before escalating to partners.
 - **Sandbox parity** – Ensure partner sandbox environments mirror production settings after each release. Use the integration summary cards to verify feature toggles.
 - **Audit logging** – Export integration task completion logs weekly and archive them in secure storage for compliance review.
+
+## Navigation remediation playbooks
+
+- **Operational readiness** – follow the [navigation runbook](navigation-readiness.md) to execute Annex A54 tasks during rollout.
+- **Stakeholder briefing** – align quarterly storytelling with the [navigation strategy briefing](../strategy/navigation-briefing.md).

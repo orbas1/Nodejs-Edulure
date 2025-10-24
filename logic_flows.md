@@ -440,12 +440,12 @@ This compendium maps the execution paths, responsibilities, and release consider
 
 ### 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
 1. **Appraisal:** Application shell orchestrating routing, theming, internationalisation stubs, and shared component primitives used across experiences.
-2. **Functionality:** Layout components manage header/footer, sidebars, responsive breakpoints, and theme switching while providers expose contexts for analytics, auth, and feature flags.
-3. **Logic Usefulness:** Centralised theming ensures shared tokens propagate to marketing, dashboard, and admin surfaces, while layout primitives enforce consistent spacing.
+2. **Functionality:** Layout components manage header/footer, sidebars, responsive breakpoints, and theme switching while providers expose contexts for analytics, auth, feature flags, and the new `NavigationMetadataProvider` powering `/handbook/navigation-annex`.
+3. **Logic Usefulness:** Centralised theming and metadata providers keep product, operations, design, and strategy mappings in sync—`AppNotificationPanel` now renders Annex A53–A56 insights alongside notifications so cross-team readiness stays visible from the shell.
 4. **Redundancies:** Breakpoint definitions appear in CSS modules and JS utilities; consolidate into single source to avoid mismatch.
 5. **Placeholders Or non-working functions or stubs:** I18n scaffolding exists but lacks translation files; flag as TODO and guard UI toggles.
 6. **Duplicate Functions:** Theme toggling logic repeated in multiple components; centralise within theme provider to avoid state divergence.
-7. **Improvements need to make:** Add dark mode parity, integrate design tokens via CSS variables, and expose layout telemetry for UX monitoring.
+7. **Improvements need to make:** Add dark mode parity, integrate design tokens via CSS variables, expose layout telemetry for UX monitoring, and automate generation of navigation annex content from `navigation/metadata.js` to prevent drift.
 8. **Styling improvements:** Ensure typographic scale matches design-system documentation and unify spacing tokens across components.
 9. **Efficiency analysis and improvement:** Tree-shake unused icons, split vendor bundles, and memoise layout contexts.
 10. **Strengths to Keep:** Well-structured providers, accessible navigation scaffolding, and consistent design token usage.
@@ -453,7 +453,7 @@ This compendium maps the execution paths, responsibilities, and release consider
 12. **Styling and Colour review changes:** Align theme palettes with updated design tokens and ensure accessible defaults.
 13. **CSS, orientation, placement and arrangement changes:** Document layout grids and safe-area handling for different form factors.
 14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Review shared copy (footer, nav) for redundancy and clarity.
-15. **Change Checklist Tracker:** Include theming regression, layout smoke tests, and navigation accessibility audits in release tracker.
+15. **Change Checklist Tracker:** Include theming regression, layout smoke tests, navigation accessibility audits, and annex cross-checks (product backlog, operations runbook, design tokens, strategy metrics) in the release tracker.
 16. **Full Upgrade Plan & Release Steps:** Stage theming updates, run visual regression tests, update documentation, coordinate with design, and deploy with feature flag for progressive rollout.
 
 ## 3. Flutter Mobile Shell (`Edulure-Flutter/`)

@@ -711,120 +711,120 @@
             26. **Checklist.** Action items now include regenerating SDK, capturing CLI summary, listing manifest in new-files inventory, and reconciling manifest service totals against database migrations and seed snapshots.
             27. **Nav.** Clear headings point reviewers to manifest updates without scanning unrelated infrastructure notes.
             28. **Release.** Updated guides instruct teams to run the generator, publish hashes, and attach summaries to the backend change log before CAB submission.
-      - 15.A Docs & Unresolved Mappings ✓
-         - 15.A.1 Product Narrative Alignment (Annex A53 — `user_experience.md`)
-            1. **Appraise.** `user_experience.md` delivers 28-point audits per surface (e.g., 1.A Entrypoints, 1.B Navigation), yet product requirement linkage remains implicit; map each component synopsis to roadmap initiatives so PMs can trace backlog coverage.
-            2. **Function.** Embed cross-references from every audit (e.g., AdminShell, MainLayout) to corresponding product requirement IDs in `docs/product/roadmap.md` to transform descriptive notes into actionable traceability.
-            3. **Usefulness.** Clarify for PMs how each UX deficiency (e.g., duplicated navigation logic, missing skeleton loaders) ties to core outcomes—activation, retention, engagement—by annotating metrics or key results near the audit entries.
-            4. **Redundant.** Identify repeated recommendations across sections (design tokens, breadcrumb consolidation) and collapse them into a product-wide “experience parity” epic inside the annex to avoid backlog duplication.
-            5. **Placeholders.** Replace generic TODO prompts (“tests add, stories add”) with explicit product tickets and acceptance criteria referencing relevant modules (`frontend-reactjs/src/layouts/*.jsx`, `src/components/TopBar.jsx`).
-            6. **Duplicates.** `user_experience.md` often restates navigation consolidation needs; create a canonical navigation modernization initiative and reference it instead of rearticulating the same action across AdminShell, MainLayout, and TopBar.
-            7. **Improvements Needed.** Add a product impact legend (Critical, High, Medium, Low) adjacent to each recommendation to communicate sequencing priority for triage boards.
-            8. **Styling.** Harmonize terminology with product briefs (e.g., “Learner Dashboard Initiative,” “Adaptive Navigation”) to keep language aligned between design audits and product OKRs.
-            9. **Efficiency Analysis.** For each audit entry, append an estimate band (S/M/L) derived from existing implementation complexity to help PMs forecast delivery when planning sprints.
-            10. **Strengths to Keep.** Capture positive signals (responsive mega menus, modular shells) into a “retain” checklist that product discovery teams can leverage when exploring new verticals.
-            11. **Weaknesses to Remove.** Bundle shared shortcomings (hard-coded locales, missing breadcrumbs) into product debt themes and mark dependent squads to accelerate remediation sequencing.
-            12. **Palette.** Ensure the annex references brand palette updates tracked in `docs/design-system/colors.md`, signalling when product work depends on design system refreshes.
-            13. **Layout.** Document layout governance in the annex by linking to `frontend-reactjs/src/layouts/README.md` once created, so product teams understand structural impacts of requested changes.
-            14. **Text.** Encourage PM-authored copy updates for truncated menu labels by linking to `docs/content/style-guide.md`, clarifying the review source for textual revisions.
-            15. **Spacing.** Connect vertical rhythm fixes to the product accessibility initiative to underscore regulatory compliance drivers and avoid treating them as purely aesthetic tasks.
-            16. **Shape.** Map border-radius standardisation to the “Brand cohesion” objective so product leads can track acceptance testing across shells, dashboards, and marketing surfaces.
-            17. **Effects.** Tie hover/focus enhancements to the accessibility acceptance criteria; annotate which stories require VPAT updates upon completion.
-            18. **Thumbs.** Note avatar fallback workstreams within the “Profile personalization” epic to align product storytelling with the documented UX debt.
-            19. **Media.** Relate notification attachment previews to the media pipeline backlog, clarifying dependencies on backend assets and storage services.
-            20. **Buttons.** Reference the shared button system initiative within the annex, indicating design system ownership and expected handoff points to engineering.
-            21. **Interact.** Tag gesture and keyboard enhancements with the “Cross-device accessibility” objective so PMs can monitor parity milestones.
-            22. **Missing.** Flag absent breadcrumbs and skeleton loaders as gating items for the “Navigation clarity” roadmap theme, including readiness criteria before release.
-            23. **Design.** Highlight the need for modular header slots as part of the “Composable Layout Framework” epic that PMs maintain for scalability.
-            24. **Clone.** Document route metadata centralisation under a single backlog item to ensure clone-risk mitigation appears once in product reporting.
-            25. **Framework.** Reference the upcoming “Layout tokenization” product initiative that codifies spacing, typography, and color tokens for reuse.
-            26. **Checklist.** Provide a per-component readiness checklist (design sign-off, accessibility review, telemetry plan) embedded in the annex to complement the product release checklist.
-            27. **Nav.** Link to the canonical navigation map once documented (planned `docs/navigation/system.md`) so product stakeholders can evaluate new requests against current architecture.
-            28. **Release.** Outline a release gating flow: audit sign-off in `user_experience.md`, backlog ticket readiness, design approval, QA evidence, and update to release notes prior to deployment.
-         - 15.A.2 Operations & Support Readiness (Annex A54 — `user_experience.md`)
-            1. **Appraise.** Operations teams need explicit mapping from UX audits to support runbooks; annotate each deficiency with its operational risk (e.g., increased tickets due to missing breadcrumbs).
-            2. **Function.** Embed links from user experience entries to `docs/operations/` playbooks detailing incident handling for navigation or layout regressions.
-            3. **Usefulness.** Provide support-specific acceptance criteria (e.g., “mega menu accessible via keyboard reduces ticket type #427”) to quantify operational gains.
-            4. **Redundant.** Consolidate repeated support guidance across audits into a central operations appendix to prevent conflicting escalation instructions.
-            5. **Placeholders.** Replace placeholders like “tests add” with direct references to monitoring or alert updates operations expects when changes go live.
-            6. **Duplicates.** Ensure skeleton loader requirements point to a single operational readiness playbook entry, avoiding duplicate SOP updates.
-            7. **Improvements Needed.** Add instrumentation tasks (telemetry hooks, log categories) to each audit item so operations knows how to validate improvements post-release.
-            8. **Styling.** Align operations documentation tone with the standardized support vocabulary defined in `docs/operations/qa.md` to reduce misinterpretation.
-            9. **Efficiency Analysis.** Document expected reductions in average handle time (AHT) or deflection metrics once navigation and layout fixes deploy.
-            10. **Strengths to Keep.** Note operations-friendly elements already present (responsive layouts, context-driven runtime awareness) to preserve monitoring baselines.
-            11. **Weaknesses to Remove.** Highlight absence of live notification feeds as an operations gap and prescribe integration milestones with telemetry and incident tooling.
-            12. **Palette.** Document accessibility-driven contrast adjustments as compliance checkpoints that operations must verify during audits.
-            13. **Layout.** Flag spacing and responsive layout updates that may affect training screenshots, prompting updates to support guides.
-            14. **Text.** Provide canonical language for menu tooltips or truncation warnings so support scripts match the UI.
-            15. **Spacing.** Note when baseline grid changes require updates to PDF or print workflows used for compliance exports.
-            16. **Shape.** Communicate when corner radius adjustments could impact image masks or watermark overlays referenced in operations templates.
-            17. **Effects.** Document hover/focus state changes that require refreshed accessibility validation scripts within QA automation suites.
-            18. **Thumbs.** Clarify avatar fallback updates tie into account provisioning SOPs (e.g., verifying default avatars for SSO-only users).
-            19. **Media.** Associate notification attachment previews with retention policies and storage quotas operations manages.
-            20. **Buttons.** Track shared button updates requiring new step-by-step screenshots in support macros or chatbots.
-            21. **Interact.** Outline training updates for gesture support so support teams can coach mobile users effectively.
-            22. **Missing.** Identify missing breadcrumbs/skeletons as sources of confusion and describe interim mitigations for support teams until resolved.
-            23. **Design.** Flag modular header adoption as requiring updated monitoring dashboards for slot-specific performance metrics.
-            24. **Clone.** Document navigation metadata consolidation to ensure support teams reference the same route IDs when escalating issues.
-            25. **Framework.** Specify logging frameworks or observability tags to add so operations can correlate UX improvements with incident trends.
-            26. **Checklist.** Build an operational readiness checklist (monitoring, runbook updates, enablement sessions) for each audit-driven release.
-            27. **Nav.** Cross-link to routing diagnostics (`frontend-reactjs/src/routes.js`) enabling support teams to self-service route lookups during incidents.
-            28. **Release.** Define a support sign-off path requiring updated documentation, UAT transcripts, and notification to incident commanders before shipping UX changes.
+      - ✅ 15.A Docs & unresolved mappings (`frontend-reactjs/src/navigation/metadata.js`, `frontend-reactjs/src/context/NavigationMetadataContext.jsx`, `frontend-reactjs/src/components/navigation/AppNotificationPanel.jsx`, `frontend-reactjs/src/pages/handbook/NavigationAnnex.jsx`, `docs/product/navigation-backlog.md`, `docs/operations/navigation-readiness.md`, `docs/design-system/navigation-annex.md`, `docs/strategy/navigation-briefing.md`)
+         - 15.A.1 Documentation Coverage Gap (Annex A53 — Product backlog)
+            1. **Appraise.** `frontend-reactjs/src/navigation/metadata.js` now codifies UX audit items into `NAVIGATION_INITIATIVES`, giving every top-level route an explicit product epic identifier (UX-401…UX-408).
+            2. **Function.** `collectProductBacklog(role)` flattens primary navigation, quick actions, and dashboard sections so product owners receive a deduped epic list regardless of persona context.
+            3. **Usefulness.** The backlog doc at `docs/product/navigation-backlog.md` mirrors these epics with anchors that match in-app deep links (`/handbook/navigation-annex#ux-401-shell-registry`).
+            4. **Redundant.** Legacy narrative stubs inside `user_experience.md` no longer need manual cross-references; the annex consolidates routing metadata and backlog scope in one canonical source.
+            5. **Placeholders.** Product sections now link to real code touchpoints—`MainLayout.jsx`, `routes.js`, `AppTopBar.jsx`—eliminating “unresolved mapping” notes.
+            6. **Duplicates.** Deduplication is enforced via `dedupeById`, preventing repeat epics when multiple shells surface the same initiative.
+            7. **Improvements Needed.** Future automation should serialise the backlog doc directly from `NAVIGATION_INITIATIVES` to avoid manual Markdown drift.
+            8. **Styling.** `NavigationAnnex.jsx` renders backlog cards with consistent typography and tag styling, using the shared layout tokens referenced in `styles/tokens.css`.
+            9. **Efficiency.** Memoised mapping functions avoid recomputing metadata for repeated renders, keeping layout reflows minimal even as the annex grows.
+            10. **Strengths to Keep.** Strong coupling between metadata and docs ensures engineers can jump from annex anchors to code references instantly.
+            11. **Weaknesses to Remove.** Backlog still lacks automated status tracking; integrate with issue tracker to reflect progress.
+            12. **Palette.** Backlog badges reuse brand primary soft tints, aligning with shell styling to keep annex UI consistent with runtime.
+            13. **Layout.** Anchors list surfaces quick navigation to each epic, mirroring the structure described in `user_experience.md` for traceability.
+            14. **Text.** Epic descriptions in the backlog doc highlight objectives, scope, and deliverables tied to concrete files instead of generic prose.
+            15. **Spacing.** Section cards adopt `rounded-3xl` containers and tokenised padding to maintain readability on long-form annex pages.
+            16. **Shape.** Tag chips within the annex display the same rounded styles as navigation quick actions, reinforcing visual identity.
+            17. **Effects.** Interactive links use the shared focus ring tokens ensuring annex navigation remains accessible.
+            18. **Thumbs.** Quick access buttons open the underlying surface (e.g., `/courses`) so backlog owners can validate UI expectations directly.
+            19. **Media.** Handbook entries reference screenshot-ready components (TopBar, AppSidebar, InstructorCourseCreate) flagged for future documentation runs.
+            20. **Buttons.** Execution-plan links route to `NavigationAnnex` anchors, avoiding dead-end Markdown references.
+            21. **Interact.** Set-based origin tracking lists every navigation item contributing to an epic, clarifying cross-surface ownership.
+            22. **Missing.** Outstanding future work includes hooking backlog epics into analytics dashboards for automated status widgets.
+            23. **Design.** Annex cards inherit shared design tokens so product narratives align with the same grids used elsewhere in the shell.
+            24. **Clone.** Metadata functions remove the need for teams to recreate navigation matrices in spreadsheets—everything flows from a single JS source.
+            25. **Framework.** `NavigationMetadataProvider` wraps the shell so React children consume backlog, operations, and design data without bespoke wiring.
+            26. **Checklist.** Product review now requires confirming backlog anchors resolve, metadata exports include latest routes, and annex docs stay in sync.
+            27. **Nav.** `NavigationAnnex` quick links replicate the canonical navigation order, easing cross-checks during usability audits.
+            28. **Release.** Shipping backlog updates involves editing `navigation/metadata.js`, regenerating annex docs, and validating the handbook route before publishing release notes.
+         - 15.A.2 Operations Coverage Gap (Annex A54 — Runbooks & enablement)
+            1. **Appraise.** Operational requirements now live in `docs/operations/navigation-readiness.md`, breaking down runbooks per remediation stream.
+            2. **Function.** `buildOperationalChecklist(role)` filters annex tasks by persona, feeding `AppNotificationPanel` with role-aware readiness items.
+            3. **Usefulness.** Notification panel surfaces cadence, owner, and quick navigation to `/handbook/navigation-annex` anchors, reducing release friction for ops.
+            4. **Redundant.** Manual checklists previously scattered across comments are superseded by the structured annex runbook.
+            5. **Placeholders.** Every operations task now links to a live handbook section; no TODO placeholders remain in the UI or docs.
+            6. **Duplicates.** Deduped tasks ensure moderators or instructors don’t see the same runbook callout twice even when multiple nav items share a checklist.
+            7. **Improvements Needed.** Automate status capture (complete/deferred) inside the panel so operations can log progress without leaving the shell.
+            8. **Styling.** Operational chips adopt brand colours with accessible contrast, following design system guidance documented in the annex.
+            9. **Efficiency.** Checklist derivation runs in-memory and memoised, avoiding additional API calls while still reflecting metadata updates instantly.
+            10. **Strengths to Keep.** Integration between documentation and UI keeps runbooks front-of-mind during navigation workstreams.
+            11. **Weaknesses to Remove.** Ops tasks currently open handbook routes via router navigation; consider background prefetch for offline awareness.
+            12. **Palette.** Warning and success accents follow annex tone guidelines, giving teams instant visual cues on urgency.
+            13. **Layout.** Notification panel gains an operations column with consistent padding/spacing so checklists read cleanly alongside preferences.
+            14. **Text.** Task copy emphasises actionable verbs (“Verify registry export”, “Warm CDN caches”) aligned with operations playbook style.
+            15. **Spacing.** Additional section spacing in the panel keeps annex sections scannable without overwhelming the notification view.
+            16. **Shape.** Pills and cards reuse rounded corners to mirror shell components, maintaining familiarity.
+            17. **Effects.** Hover/focus states reuse tokenised transitions to keep interactive affordances accessible.
+            18. **Thumbs.** Operations handbook emphasises capturing screenshots and audit artefacts, supporting post-release retrospectives.
+            19. **Media.** Runbooks reference CDN cache warming and mention evidence capture, priming teams for asset gathering.
+            20. **Buttons.** “View runbook” call-to-action in the panel ensures one-click access to detailed procedures.
+            21. **Interact.** Panel triggers `onNavigate` so teams land on anchored sections without losing shell context.
+            22. **Missing.** Future iteration should expose completion toggles directly in the UI to update runbook status.
+            23. **Design.** Operational section headers clearly label Annex A54 to align with stakeholder expectations.
+            24. **Clone.** Single metadata source eliminates bespoke Notion or spreadsheet trackers for the same readiness tasks.
+            25. **Framework.** Handbook route (`/handbook/navigation-annex`) renders the same metadata-driven content, ensuring parity between UI and docs.
+            26. **Checklist.** Release managers must confirm operations tasks appear for each persona and that runbook links resolve pre-ship.
+            27. **Nav.** Handbook navigation includes anchors for every operational stream, enabling quick orientation during incidents.
+            28. **Release.** Ops go/no-go now requires verifying annex sections, capturing evidence, and updating the notification panel before declaring readiness.
          - 15.A.3 Design System Dependencies (Annex A55 — `user_experience.md`)
-            1. **Appraise.** Distill every design token, layout, and component gap in `user_experience.md` into traceable design system backlog items.
-            2. **Function.** Map shell, navigation, and button consolidation requirements to specific Figma libraries and component variants.
-            3. **Usefulness.** Provide designers with implementation references (`frontend-reactjs/src/styles.css`, `src/components/common/`) to accelerate parity between code and design assets.
-            4. **Redundant.** Remove redundant color/token guidance from component audits once centralised documentation exists inside the design system annex.
-            5. **Placeholders.** Replace placeholder imagery/text recommendations with explicit asset sourcing instructions (e.g., marketing CDN, DAM identifiers).
-            6. **Duplicates.** Align repeated “unify button styling” guidance into one canonical design system task referencing both marketing and app shells.
-            7. **Improvements Needed.** Add design QA steps (contrast ratios, responsive breakpoints) each time user experience entries propose visual updates.
-            8. **Styling.** Document color, typography, and spacing tokens required to fulfill the audits; include the token names for engineers to implement.
-            9. **Efficiency Analysis.** Estimate design debt burn-down by quantifying components requiring redesign vs. net-new creation.
-            10. **Strengths to Keep.** Capture positive design patterns (responsive mega menu, modular layout containers) to maintain in the system library.
-            11. **Weaknesses to Remove.** Highlight inconsistent rounding and hover treatments that the design system must rectify across all component variants.
-            12. **Palette.** Note palette harmonisation work and link to brand gradient updates tracked within `docs/design-system/colors.md`.
-            13. **Layout.** Outline the plan for 8px grid enforcement and mobile drawer animations within the design system guidelines.
-            14. **Text.** Provide microcopy standards for truncated labels, tooltip usage, and accessible titles as part of the design content strategy.
-            15. **Spacing.** Document margin/padding scales to be codified in Figma and CSS variable exports.
-            16. **Shape.** Describe the canonical border-radius scale and any exceptions for media or CTA components.
-            17. **Effects.** Define hover/focus/active state tokens and motion specs aligned with reduced-motion preferences.
-            18. **Thumbs.** Capture avatar fallback styles, default imagery, and alt-text guidance for the design system asset kit.
-            19. **Media.** Specify thumbnail, preview, and hero image treatments so engineering can pull from consistent asset templates.
-            20. **Buttons.** Detail primary/secondary/tertiary button hierarchies, icon alignment rules, and loading states matching audit findings.
-            21. **Interact.** Document multi-device interaction patterns (keyboard shortcuts, swipe gestures) in design playbooks for cross-platform parity.
-            22. **Missing.** Identify missing design assets (breadcrumbs, skeleton loaders) and schedule their creation with Figma component deliverables.
-            23. **Design.** Ensure modular header slots are represented in the design system with named regions and composition guidelines.
-            24. **Clone.** Provide reusable navigation metadata components and icons to prevent duplication when new layouts are built.
-            25. **Framework.** Describe the CSS/JS framework integration plan (e.g., CSS variables, Tailwind tokens) bridging design specs to code.
-            26. **Checklist.** Create a design sign-off checklist aligned with the audit’s readiness criteria (tokens applied, accessibility verified, documentation updated).
-            27. **Nav.** Document the canonical information architecture diagram and how it maps to layout components.
-            28. **Release.** Define the design system release cadence that accompanies UX remediation—component publish, changelog entry, and notification to engineering squads.
+            1. **Appraise.** Design dependencies documented in `docs/design-system/navigation-annex.md` enumerate token adoption across TopBar, AppNotificationPanel, and InstructorCourseCreate.
+            2. **Function.** `collectDesignDependencies` aggregates tokens, QA steps, and reference files so designers see a single list of required updates.
+            3. **Usefulness.** Notification panel exposes Annex A55 tokens inline, giving engineers quick reminders while reviewing alerts.
+            4. **Redundant.** Prior scattered TODOs about skeleton shimmer and button hierarchy are consolidated into the annex doc and metadata exports.
+            5. **Placeholders.** Placeholder guidance for upload progress styling is replaced by a real `uploadProgress` bar using the new `--uploads-progress-radius` token.
+            6. **Duplicates.** Token lists dedupe entries across navigation items, preventing conflicting instructions between marketing and dashboard shells.
+            7. **Improvements Needed.** Integrate automated linting to ensure components consume required tokens, preventing regression into ad-hoc styling.
+            8. **Styling.** Instructor upload bar, annex cards, and operations chips all consume shared CSS variables ensuring brand fidelity.
+            9. **Efficiency.** Central metadata avoids repeated imports; components read from context instead of fetching bespoke design configs.
+            10. **Strengths to Keep.** Shared token library in `styles/tokens.css` now includes `--uploads-progress-radius`, enabling consistent progress visualisation.
+            11. **Weaknesses to Remove.** Some legacy components still hard-code spacing; schedule migration using annex QA list.
+            12. **Palette.** Annex doc clarifies palette usage (primary soft tones, card shadows) to keep UI accessible.
+            13. **Layout.** Handbook cards use grid layout mirroring shell spacing to serve as living documentation of design intent.
+            14. **Text.** QA steps emphasise accessibility checks (contrast ratios, reduced motion) aligning with `user_experience.md` audits.
+            15. **Spacing.** Annex ensures 8px grid enforcement by explicitly calling out token usage; upload bar respects these tokens in code.
+            16. **Shape.** Border radius tokens apply to navigation chips and progress bars, avoiding mismatched rounding.
+            17. **Effects.** Hover/focus transitions across annex UI respect tokenised motion durations.
+            18. **Thumbs.** Notification panel now highlights avatar fallbacks and asset references, nudging designers to maintain consistency.
+            19. **Media.** Library previews and upload assets are flagged for consistent treatments in the design annex.
+            20. **Buttons.** Annex covers CTA hierarchy, ensuring Tutor marketplace and quick actions stay aligned.
+            21. **Interact.** Design doc points to multi-device interaction patterns, dovetailing with shell metadata for future gestures.
+            22. **Missing.** Figma library cross-links remain TODO; include once shared libraries ingest annex tokens.
+            23. **Design.** Metadata-driven annex keeps design specs in sync with actual code, reducing guesswork for designers.
+            24. **Clone.** Removing duplicate colour guidance across audits lowers maintenance overhead.
+            25. **Framework.** CSS variable additions ensure frameworks (React, Flutter) can ingest the same tokens.
+            26. **Checklist.** Designers must verify annex token adoption, QA steps, and references before sign-off.
+            27. **Nav.** Handbook anchors group design work per epic, ensuring nothing falls through during cross-team reviews.
+            28. **Release.** Design sign-off now includes annex verification alongside UI regression tests and docs updates.
          - 15.A.4 Strategy & Stakeholder Communication (Annex A56 — `user_experience.md`)
-            1. **Appraise.** Translate audit findings into executive-ready narratives explaining user impact, business risk, and sequencing rationale.
-            2. **Function.** Anchor each UX remediation theme to strategic pillars (Activation, Retention, Efficiency, Trust) used in quarterly planning decks.
-            3. **Usefulness.** Provide stakeholders with metric baselines (e.g., navigation click depth, support ticket volume) and expected improvements tied to each audit remedy.
-            4. **Redundant.** Consolidate overlapping messaging about navigation debt so leadership receives a single, coherent update rather than repeating per-component summaries.
-            5. **Placeholders.** Replace vague future-work statements with concrete strategic commitments including owner, timeline, and success metric.
-            6. **Duplicates.** Ensure strategy decks reference the same canonical annex rather than reproducing bespoke versions per team.
-            7. **Improvements Needed.** Introduce a maturity scoring rubric for each user journey to communicate progress across quarters.
-            8. **Styling.** Align tone with stakeholder communications guidelines (`docs/operations/strategy.md`), emphasising outcomes over technical detail when briefing executives.
-            9. **Efficiency Analysis.** Quantify opportunity cost (engineering cycles saved by unified navigation, faster onboarding) to reinforce prioritisation.
-            10. **Strengths to Keep.** Celebrate resilient architecture (context-aware shells, modular layout) to reassure stakeholders about platform stability.
-            11. **Weaknesses to Remove.** Highlight unresolved issues (hard-coded locales, placeholder notifications) and articulate mitigation plans with target dates.
-            12. **Palette.** Reference brand alignment efforts when discussing design work so strategy narratives capture cohesive identity goals.
-            13. **Layout.** Present information architecture diagrams illustrating before/after states for navigation and layout changes.
-            14. **Text.** Ensure copy strategy (tooltips, labels) is framed as part of the broader localisation and clarity initiatives.
-            15. **Spacing.** Tie spacing and rhythm improvements to accessibility compliance benchmarks and user satisfaction metrics.
-            16. **Shape.** Position visual consistency upgrades as brand trust enhancers for enterprise prospects.
-            17. **Effects.** Communicate accessibility-first motion guidance as part of inclusive design commitments.
-            18. **Thumbs.** Leverage avatar personalization narratives to showcase community-building efforts and user recognition improvements.
-            19. **Media.** Highlight media preview enhancements as crucial for rich collaboration workflows and future monetisation pathways.
-            20. **Buttons.** Frame unified CTA styling as a conversion optimisation initiative with measurable impact on key funnels.
-            21. **Interact.** Describe gesture/keyboard parity as a differentiator for hybrid learning environments and accessibility compliance.
-            22. **Missing.** Publicly track missing components (breadcrumbs, skeleton loaders) in strategy dashboards until delivered.
-            23. **Design.** Communicate modular header strategy as foundation for future extensibility (partners, white-label experiences).
-            24. **Clone.** Explain metadata centralisation as groundwork for automation (dynamic nav, personalised journeys).
-            25. **Framework.** Tie tokenisation and layout frameworks to long-term platform investment themes (DesignOps, Federation).
-            26. **Checklist.** Provide executive-ready checklists summarising progress, blockers, and next steps for each UX initiative.
-            27. **Nav.** Include navigation revamp milestones within strategy OKRs to ensure cross-team accountability.
-            28. **Release.** Outline the communications plan: pre-release stakeholder brief, launch announcement referencing annex updates, post-release metrics review.
+            1. **Appraise.** Strategic narratives captured in `docs/strategy/navigation-briefing.md` align audit findings to the Activation, Retention, Engagement, Expansion, and Efficiency pillars.
+            2. **Function.** `collectStrategyNarratives` groups metrics by pillar, letting `AppNotificationPanel` render executive-ready summaries alongside operational alerts.
+            3. **Usefulness.** Stakeholders can skim Annex A56 metrics (click depth, booking conversion, asset processing) without leaving the shell.
+            4. **Redundant.** Repeating messaging across decks is replaced by the central handbook, ensuring a single truth for leadership updates.
+            5. **Placeholders.** Strategy statements now include concrete targets rather than vague future goals.
+            6. **Duplicates.** Grouping by pillar prevents metrics from appearing multiple times when nav items share the same strategic theme.
+            7. **Improvements Needed.** Wire annex metrics into analytics dashboards for automatic progress updates.
+            8. **Styling.** Strategy cards in the notification panel use consistent badge styling to communicate context (“Strategy”) clearly.
+            9. **Efficiency.** Narrative aggregation occurs once per render cycle and memoises results, minimising render overhead.
+            10. **Strengths to Keep.** Cohesive messaging ties audit remediation directly to business outcomes, easing stakeholder buy-in.
+            11. **Weaknesses to Remove.** Add owner and timeline metadata to each metric in a future iteration for accountability.
+            12. **Palette.** Strategy sections use soft primary backgrounds to differentiate from operational urgency cues.
+            13. **Layout.** Pillar cards stack responsively within the notification panel so narratives remain legible on narrow viewports.
+            14. **Text.** Copy emphasises measurable outcomes (percentages, durations) as requested in `user_experience.md`.
+            15. **Spacing.** Balanced whitespace in handbook and panel keeps multi-line narratives readable.
+            16. **Shape.** Rounded cards echo other annex sections, reinforcing design coherence.
+            17. **Effects.** Focus-visible styling ensures keyboard users can explore metrics without losing context.
+            18. **Thumbs.** Narrative cards highlight community avatars/engagement goals, reinforcing trust and recognition themes.
+            19. **Media.** Metrics reference preview improvements and scheduling experiences, indicating where future visuals should be captured.
+            20. **Buttons.** Narrative sections avoid extra CTAs to keep stakeholder summaries concise and action-focused.
+            21. **Interact.** In-app narratives encourage cross-functional dialogue directly from the shell, reducing reliance on slide decks.
+            22. **Missing.** Future work should attach baseline data sources for audit trails (e.g., analytics dashboards) to each metric.
+            23. **Design.** Strategy doc emphasises tone aligned with `docs/operations/strategy.md`, keeping executive comms consistent.
+            24. **Clone.** Canonical annex eliminates bespoke stakeholder PDFs per team.
+            25. **Framework.** Metadata exports pave the way for generating quarterly OKR briefings programmatically.
+            26. **Checklist.** Strategic review now requires validating metric deltas, annex copy, and stakeholder briefing updates before release comms.
+            27. **Nav.** Handbook anchors match pillars, making it easy to reference specific narratives during leadership reviews.
+            28. **Release.** Communications plan now cites annex updates—pre-brief leadership, launch announcements referencing annex anchors, and follow-up metrics reviews post release.

@@ -13,6 +13,8 @@ Design tokens live in `frontend-reactjs/src/styles/tokens.css` and expose CSS cu
 
 Apply tokens via Tailwind utility composition or raw CSS (`background-color: var(--color-surface)`), and override them by setting `data-theme="dark"` or `data-contrast="high"` on the document root for explicit themes.
 
+For navigation remediation specifics, see [navigation-annex.md](navigation-annex.md) which tracks Annex A55 deliverables.
+
 ## Responsive grid utility
 
 The `.responsive-grid` class (defined in `frontend-reactjs/src/styles.css`) implements an auto-fit grid powered by token defaults. Components can customise the minimum column size or gap by setting CSS variables inline, e.g.
