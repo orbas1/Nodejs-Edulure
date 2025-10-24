@@ -709,7 +709,8 @@ export default function Ebooks() {
         id: checkoutEbook.id ?? checkoutEbook.slug ?? 'ebook',
         label: `${checkoutEbook.title} × ${quantity}`,
         amountCents: baseAmountCents,
-        currency
+        currency,
+        emphasis: 'highlight'
       }
     ];
 
@@ -724,16 +725,77 @@ export default function Ebooks() {
           }
         : null;
 
+    const adjustments = [];
+    if (couponValidation.validating) {
+      adjustments.push({ id: 'coupon-loading', label: 'Validating coupon…', value: null, type: 'warning' });
+    } else if (couponValidation.error) {
+      adjustments.push({
+        id: 'coupon-error',
+        label: 'Coupon issue',
+        value: couponValidation.error?.message ?? 'Unable to apply coupon right now.',
+        type: 'warning'
+      });
+    } else if (couponValidation.coupon) {
+      adjustments.push({
+        id: 'coupon-applied',
+        label: 'Coupon applied',
+        value: couponValidation.coupon.code,
+        type: 'success'
+      });
+    }
+
+    if (checkoutForm.taxCountry) {
+      adjustments.push({
+        id: 'tax-note',
+        label: 'Tax estimated',
+        value: checkoutForm.taxCountry,
+        type: 'warning'
+      });
+    }
+
+    const tax = checkoutForm.taxCountry
+      ? {
+          label: 'Estimated tax',
+          amountCents: Number(checkoutEbook.estimatedTaxCents ?? 0),
+          currency
+        }
+      : null;
+
     return (
       <CheckoutPriceSummary
         currency={currency}
         lineItems={lineItems}
         discount={discount}
-        totalCents={Math.max(0, baseAmountCents - discountCents)}
+        tax={tax}
+        totalCents={Math.max(0, baseAmountCents - discountCents + Number(tax?.amountCents ?? 0))}
+        adjustments={adjustments.filter(Boolean)}
         note="Taxes calculated at payment. Download links arrive after confirmation."
       />
     );
-  }, [checkoutEbook, checkoutForm.quantity, couponValidation.coupon]);
+  }, [checkoutEbook, checkoutForm.quantity, checkoutForm.taxCountry, couponValidation.coupon, couponValidation.error, couponValidation.validating]);
+
+  const checkoutBlockingIssues = useMemo(() => {
+    const issues = [];
+    if (!checkoutForm.provider) {
+      issues.push('Select a payment provider to continue.');
+    }
+    const quantity = Number(checkoutForm.quantity);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      issues.push('Quantity must be one or more.');
+    }
+    if (!checkoutForm.receiptEmail) {
+      issues.push('Provide a receipt email.');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(checkoutForm.receiptEmail)) {
+      issues.push('Enter a valid receipt email address.');
+    }
+    if (!checkoutForm.taxCountry) {
+      issues.push('Select a billing country.');
+    }
+    if (couponValidation.error) {
+      issues.push('Resolve coupon issues or remove the code.');
+    }
+    return issues;
+  }, [checkoutForm.provider, checkoutForm.quantity, checkoutForm.receiptEmail, checkoutForm.taxCountry, couponValidation.error]);
 
   const featuredEbook = useMemo(() => marketplace[0] ?? liveEbooks[0] ?? null, [marketplace, liveEbooks]);
   const ebookKeywords = useMemo(() => {
@@ -1396,8 +1458,9 @@ export default function Ebooks() {
         pending={checkoutPending}
         onSubmit={handleCheckoutSubmit}
         priceSummary={checkoutPriceSummary}
+        blockingIssues={checkoutBlockingIssues}
       >
-        {({ pending }) => (
+        {({ pending, blocking }) => (
           <>
             <div className="space-y-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Provider</span>
@@ -1544,7 +1607,7 @@ export default function Ebooks() {
 
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || (blocking?.length ?? 0) > 0}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark disabled:opacity-60"
             >
               {pending ? 'Creating checkout…' : 'Generate payment intent'}

@@ -1,5 +1,7 @@
 import PropTypes from 'prop-types';
 
+import { formatCurrencyFromCents, formatPercent } from '../../utils/commerceFormatting.js';
+
 const themeClasses = {
   light: 'bg-white text-slate-900 border-slate-200',
   dark: 'bg-slate-900 text-white border-slate-700',
@@ -42,11 +44,19 @@ export default function CampaignPreview({
   objective,
   disclosure,
   theme,
-  accent
+  accent,
+  pacing,
+  budgetSummary,
+  spendToDateCents
 }) {
   const themeClass = resolveThemeClass(theme);
   const accentClass = resolveAccentClass(accent);
   const hasImage = Boolean(asset?.publicUrl);
+  const projectedTotal = pacing?.projectedTotalCents;
+  const scheduleProgress =
+    pacing?.totalDurationDays && pacing?.daysElapsed
+      ? pacing.daysElapsed / pacing.totalDurationDays
+      : null;
 
   return (
     <article className={`w-full rounded-3xl border p-5 shadow-sm transition ${themeClass}`}>
@@ -79,6 +89,46 @@ export default function CampaignPreview({
               {advertiser ? `${advertiser} ·` : ''} {resolveHostname(url)}
             </span>
           </div>
+          {pacing && budgetSummary ? (
+            <dl className="mt-3 grid gap-2 rounded-2xl bg-slate-100/80 p-3 text-xs text-slate-600">
+              <div className="flex items-center justify-between">
+                <dt className="font-semibold text-slate-700">Daily budget</dt>
+                <dd className="font-semibold text-slate-900">{budgetSummary.daily}</dd>
+              </div>
+              {budgetSummary.total ? (
+                <div className="flex items-center justify-between">
+                  <dt className="font-semibold text-slate-700">Total cap</dt>
+                  <dd className="font-semibold text-slate-900">{budgetSummary.total}</dd>
+                </div>
+              ) : null}
+              {Number.isFinite(projectedTotal) ? (
+                <div className="flex items-center justify-between">
+                  <dt className="font-semibold text-slate-700">Projected spend</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {formatCurrencyFromCents(projectedTotal, {
+                      currency: pacing?.currency || 'USD'
+                    })}
+                  </dd>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between">
+                <dt className="font-semibold text-slate-700">Spend to date</dt>
+                <dd className="font-semibold text-slate-900">
+                  {formatCurrencyFromCents(spendToDateCents ?? 0, {
+                    currency: pacing?.currency || 'USD'
+                  })}
+                </dd>
+              </div>
+              {Number.isFinite(scheduleProgress) ? (
+                <div className="flex items-center justify-between">
+                  <dt className="font-semibold text-slate-700">Schedule progress</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {formatPercent(Math.min(Math.max(scheduleProgress, 0), 1))}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
         </div>
       </div>
     </article>
@@ -96,7 +146,18 @@ CampaignPreview.propTypes = {
   objective: PropTypes.string,
   disclosure: PropTypes.string,
   theme: PropTypes.string,
-  accent: PropTypes.string
+  accent: PropTypes.string,
+  pacing: PropTypes.shape({
+    projectedTotalCents: PropTypes.number,
+    totalDurationDays: PropTypes.number,
+    daysElapsed: PropTypes.number,
+    currency: PropTypes.string
+  }),
+  budgetSummary: PropTypes.shape({
+    daily: PropTypes.string,
+    total: PropTypes.string
+  }),
+  spendToDateCents: PropTypes.number
 };
 
 CampaignPreview.defaultProps = {
@@ -108,5 +169,8 @@ CampaignPreview.defaultProps = {
   objective: '',
   disclosure: 'Sponsored',
   theme: 'light',
-  accent: 'primary'
+  accent: 'primary',
+  pacing: null,
+  budgetSummary: null,
+  spendToDateCents: 0
 };

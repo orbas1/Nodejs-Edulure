@@ -1,6 +1,9 @@
 import PropTypes from 'prop-types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import useBudgetingControls from '../../hooks/useBudgetingControls.js';
+import { formatCurrencyFromCents } from '../../utils/commerceFormatting.js';
+
 import { useMediaUpload } from '../../hooks/useMediaUpload.js';
 import CampaignPreview from './CampaignPreview.jsx';
 
@@ -48,7 +51,14 @@ function formatList(value) {
   return Array.isArray(value) ? value.join(', ') : '';
 }
 
-function createInitialState(campaign, placementOptions) {
+function centsToAmount(value) {
+  if (!Number.isFinite(Number(value))) {
+    return '';
+  }
+  return (Number(value) / 100).toFixed(2);
+}
+
+function createInitialState(campaign, placementOptions, budgetPolicy) {
   const placementContexts = Array.isArray(campaign?.placements)
     ? campaign.placements
         .map((placement) => placement?.context)
@@ -57,12 +67,20 @@ function createInitialState(campaign, placementOptions) {
 
   const brandSafety = campaign?.brandSafety ?? { categories: ['standard'], excludedTopics: [], reviewNotes: null };
   const preview = campaign?.preview ?? { theme: 'light', accent: 'primary' };
+  const minimumDailyCents = budgetPolicy?.minimumDailyCents ?? 500;
+  const campaignDailyCents = Number.isFinite(Number(campaign?.budget?.dailyCents))
+    ? Number(campaign?.budget?.dailyCents)
+    : minimumDailyCents;
+  const campaignTotalCents = Number.isFinite(Number(campaign?.budget?.totalCents))
+    ? Number(campaign?.budget?.totalCents)
+    : null;
 
   return {
     name: campaign?.name ?? '',
     status: campaign?.status ?? 'draft',
     objective: campaign?.objective ?? 'traffic',
-    budgetDailyCents: campaign?.budget?.dailyCents ?? 5000,
+    budgetDailyAmount: centsToAmount(campaignDailyCents),
+    budgetTotalAmount: campaignTotalCents ? centsToAmount(campaignTotalCents) : '',
     budgetCurrency: campaign?.budget?.currency ?? 'USD',
     startAt: campaign?.schedule?.startAt ? campaign.schedule.startAt.slice(0, 10) : '',
     endAt: campaign?.schedule?.endAt ? campaign.schedule.endAt.slice(0, 10) : '',
@@ -83,7 +101,9 @@ function createInitialState(campaign, placementOptions) {
     brandSafetyExcludedTopics: formatList(brandSafety.excludedTopics ?? []),
     brandSafetyReviewNotes: brandSafety.reviewNotes ?? '',
     previewTheme: preview.theme ?? 'light',
-    previewAccent: preview.accent ?? 'primary'
+    previewAccent: preview.accent ?? 'primary',
+    simulatePacing: true,
+    autosaveDraft: true
   };
 }
 
@@ -104,23 +124,88 @@ export default function CampaignEditor({
   onCancel,
   submitting,
   token,
-  mode
+  mode,
+  budgetPolicy,
+  locale
 }) {
   const placementOptions = useMemo(() => mergePlacementOptions(availablePlacements), [availablePlacements]);
   const placementLookup = useMemo(
     () => new Map(placementOptions.map((placement) => [placement.context, placement])),
     [placementOptions]
   );
-  const [state, setState] = useState(() => createInitialState(initialCampaign, placementOptions));
+  const [state, setState] = useState(() => createInitialState(initialCampaign, placementOptions, budgetPolicy));
+  const [formErrors, setFormErrors] = useState([]);
+  const [draftRestored, setDraftRestored] = useState(false);
   const { upload, uploading, error: uploadError } = useMediaUpload({ token, kind: 'image', visibility: 'public' });
+  const draftStorageKey = useMemo(
+    () => (initialCampaign?.id ? `edulure-ads-campaign-${initialCampaign.id}` : 'edulure-ads-campaign-new'),
+    [initialCampaign?.id]
+  );
 
   useEffect(() => {
-    setState(createInitialState(initialCampaign, placementOptions));
-  }, [initialCampaign, placementOptions]);
+    setState(createInitialState(initialCampaign, placementOptions, budgetPolicy));
+  }, [budgetPolicy, initialCampaign, placementOptions]);
+
+  useEffect(() => {
+    if (draftRestored) {
+      return;
+    }
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (initialCampaign?.id) {
+      setDraftRestored(true);
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(draftStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setState((current) => {
+          const next = createInitialState(initialCampaign, placementOptions, budgetPolicy);
+          const placements = Array.isArray(parsed?.placements)
+            ? parsed.placements.filter((context) => placementLookup.has(context))
+            : next.placements;
+          return { ...next, ...parsed, placements };
+        });
+      }
+    } catch (error) {
+      console.warn('Unable to restore campaign draft', error);
+    } finally {
+      setDraftRestored(true);
+    }
+  }, [budgetPolicy, draftRestored, draftStorageKey, initialCampaign, placementLookup, placementOptions]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (!draftRestored) {
+      return;
+    }
+    if (!state.autosaveDraft) {
+      window.localStorage.removeItem(draftStorageKey);
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          ...state,
+          uploading: undefined
+        })
+      );
+    } catch (error) {
+      console.warn('Failed to persist campaign draft', error);
+    }
+  }, [draftRestored, draftStorageKey, state]);
 
   const handleFieldChange = useCallback((event) => {
-    const { name, value } = event.target;
-    setState((current) => ({ ...current, [name]: value }));
+    const { name, value, type, checked } = event.target;
+    setState((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
+    setFormErrors([]);
   }, []);
 
   const handlePlacementToggle = useCallback(
@@ -132,6 +217,7 @@ export default function CampaignEditor({
           : [...current.placements, context];
         return { ...current, placements: next };
       });
+      setFormErrors([]);
     },
     []
   );
@@ -144,7 +230,23 @@ export default function CampaignEditor({
         : [...current.brandSafetyCategories, value];
       return { ...current, brandSafetyCategories: next.length ? next : ['standard'] };
     });
+    setFormErrors([]);
   }, []);
+
+  const handleUndoChanges = useCallback(() => {
+    setState(createInitialState(initialCampaign, placementOptions, budgetPolicy));
+    setFormErrors([]);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(draftStorageKey);
+    }
+  }, [budgetPolicy, draftStorageKey, initialCampaign, placementOptions]);
+
+  const handleDiscardDraft = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(draftStorageKey);
+    }
+    setState((current) => ({ ...current, autosaveDraft: false }));
+  }, [draftStorageKey]);
 
   const handleAssetUpload = useCallback(
     async (event) => {
@@ -160,35 +262,75 @@ export default function CampaignEditor({
     [upload]
   );
 
+  const minimumDailyCents = budgetPolicy?.minimumDailyCents ?? 500;
+  const spendToDateCents = Number(initialCampaign?.metrics?.lifetime?.spendCents ?? 0);
+  const budgetControls = useBudgetingControls({
+    values: state,
+    onChange: (patch) => setState((current) => ({ ...current, ...patch })),
+    schedule: { startAt: state.startAt, endAt: state.endAt },
+    spendToDateCents,
+    minimumDailyCents,
+    currency: state.budgetCurrency,
+    locale
+  });
+
   const pacingInsight = useMemo(() => {
     const forecastDaily = initialCampaign?.metrics?.forecast?.expectedDailySpendCents ?? null;
     if (!forecastDaily) {
       return null;
     }
-    const planned = Number(state.budgetDailyCents ?? 0);
+    const planned = budgetControls.meta.sanitizedBudget.dailyCents;
     if (!Number.isFinite(planned)) return null;
     const delta = planned - forecastDaily;
     if (Math.abs(delta) < forecastDaily * 0.05) {
       return 'Budget pacing looks healthy based on the latest seven-day average.';
     }
     if (delta < 0) {
-      return `Increase the daily budget by ${Math.round(Math.abs(delta))}¢ to align with current delivery.`;
+      return `Increase the daily budget by ${formatCurrencyFromCents(Math.round(Math.abs(delta)), {
+        currency: budgetControls.meta.sanitizedBudget.currency,
+        locale
+      })} to align with current delivery.`;
     }
-    return `Reduce daily spend by ${Math.round(delta)}¢ to prevent pacing overages.`;
-  }, [initialCampaign?.metrics?.forecast?.expectedDailySpendCents, state.budgetDailyCents]);
+    return `Reduce daily spend by ${formatCurrencyFromCents(Math.round(delta), {
+      currency: budgetControls.meta.sanitizedBudget.currency,
+      locale
+    })} to prevent pacing overages.`;
+  }, [budgetControls.meta.sanitizedBudget.currency, budgetControls.meta.sanitizedBudget.dailyCents, initialCampaign?.metrics?.forecast?.expectedDailySpendCents, locale]);
 
   const handleSubmit = useCallback(
     async (event) => {
       event.preventDefault();
       if (!onSubmit) return;
 
+      const errors = [...budgetControls.meta.errors];
+      if (!state.name.trim()) {
+        errors.push('Provide a campaign name.');
+      }
+      if (!state.placements.length) {
+        errors.push('Select at least one placement.');
+      }
+      if (state.creativeUrl) {
+        try {
+          // eslint-disable-next-line no-new
+          new URL(state.creativeUrl);
+        } catch (_error) {
+          errors.push('Destination URL must be a valid URL.');
+        }
+      }
+      if (errors.length) {
+        setFormErrors(errors);
+        return;
+      }
+
       const payload = {
         name: state.name.trim(),
         status: state.status,
         objective: state.objective,
         budget: {
-          currency: state.budgetCurrency,
-          dailyCents: Number(state.budgetDailyCents ?? 0)
+          currency: budgetControls.meta.sanitizedBudget.currency,
+          dailyCents: budgetControls.meta.sanitizedBudget.dailyCents,
+          totalCents: budgetControls.meta.sanitizedBudget.totalCents,
+          minimumDailyCents
         },
         schedule: {
           startAt: state.startAt ? new Date(state.startAt).toISOString() : null,
@@ -215,12 +357,22 @@ export default function CampaignEditor({
         preview: {
           theme: state.previewTheme,
           accent: state.previewAccent
-        }
+        },
+        simulation: state.simulatePacing
+          ? {
+              pacing: budgetControls.meta.pacing,
+              formatted: budgetControls.meta.formatted
+            }
+          : null
       };
 
       await onSubmit(payload);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(draftStorageKey);
+      }
+      setFormErrors([]);
     },
-    [onSubmit, placementLookup, state]
+    [budgetControls.meta.errors, budgetControls.meta.formatted, budgetControls.meta.pacing, budgetControls.meta.sanitizedBudget.currency, budgetControls.meta.sanitizedBudget.dailyCents, budgetControls.meta.sanitizedBudget.totalCents, draftStorageKey, minimumDailyCents, onSubmit, placementLookup, state]
   );
 
   return (
@@ -233,6 +385,28 @@ export default function CampaignEditor({
             surfaces.
           </p>
         </header>
+
+        {formErrors.length ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <p className="font-semibold">Resolve these items before saving:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs">
+              {formErrors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {budgetControls.meta.warnings.length ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            <p className="font-semibold">Review before launch:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs">
+              {budgetControls.meta.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -262,7 +436,7 @@ export default function CampaignEditor({
           </label>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Objective
             <select
@@ -279,13 +453,26 @@ export default function CampaignEditor({
             </select>
           </label>
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Daily budget (¢)
+            Daily budget
             <input
-              name="budgetDailyCents"
+              name="budgetDailyAmount"
               type="number"
-              min="0"
-              value={state.budgetDailyCents}
-              onChange={handleFieldChange}
+              min={0}
+              step="0.01"
+              value={budgetControls.inputs.daily}
+              onChange={budgetControls.handlers.onDailyChange}
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Total budget (optional)
+            <input
+              name="budgetTotalAmount"
+              type="number"
+              min={0}
+              step="0.01"
+              value={budgetControls.inputs.total}
+              onChange={budgetControls.handlers.onTotalChange}
               className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </label>
@@ -293,11 +480,49 @@ export default function CampaignEditor({
             Currency
             <input
               name="budgetCurrency"
-              value={state.budgetCurrency}
-              onChange={handleFieldChange}
+              value={budgetControls.inputs.currency}
+              onChange={budgetControls.handlers.onCurrencyChange}
               className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </label>
+        </div>
+
+        <div className="mt-3 rounded-2xl bg-slate-50/80 p-4 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <p className="font-semibold text-slate-700">Budget summary</p>
+              <p>
+                Daily spend is locked above{' '}
+                {formatCurrencyFromCents(minimumDailyCents, {
+                  currency: budgetControls.meta.sanitizedBudget.currency,
+                  locale
+                })}{' '}
+                to respect billing policy guardrails.
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="font-semibold text-slate-700">{budgetControls.meta.formatted.daily}</p>
+              {budgetControls.meta.formatted.total ? (
+                <p className="text-slate-500">Capped at {budgetControls.meta.formatted.total}</p>
+              ) : (
+                <p className="text-slate-500">No total cap configured</p>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={budgetControls.handlers.onReset}
+              className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary/50 hover:text-primary"
+            >
+              Reset to policy minimum
+            </button>
+            <span className="rounded-full bg-slate-200/60 px-3 py-1 font-medium text-slate-600">
+              {budgetControls.meta.pacing.totalDurationDays
+                ? `${budgetControls.meta.pacing.totalDurationDays} day plan`
+                : 'Schedule pending'}
+            </span>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -490,6 +715,50 @@ export default function CampaignEditor({
             />
           </label>
         </fieldset>
+
+        <fieldset className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
+          <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Workflow preferences</legend>
+          <div className="mt-3 space-y-3 text-sm text-slate-600">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                name="autosaveDraft"
+                checked={state.autosaveDraft}
+                onChange={handleFieldChange}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-semibold text-slate-700">Autosave drafts locally</span>
+                <span className="text-xs text-slate-500">
+                  Store in-progress updates in the browser so you can step away without losing work.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                name="simulatePacing"
+                checked={state.simulatePacing}
+                onChange={handleFieldChange}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-semibold text-slate-700">Run pacing simulation</span>
+                <span className="text-xs text-slate-500">
+                  Preview forecasted spend and recommended budgets while editing.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3 text-xs">
+            <button type="button" onClick={handleUndoChanges} className="dashboard-pill px-4 py-2">
+              Undo changes
+            </button>
+            <button type="button" onClick={handleDiscardDraft} className="dashboard-pill px-4 py-2">
+              Clear saved draft
+            </button>
+          </div>
+        </fieldset>
       </section>
 
       <section className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -503,6 +772,13 @@ export default function CampaignEditor({
           disclosure="Sponsored"
           theme={state.previewTheme}
           accent={state.previewAccent}
+          pacing={
+            state.simulatePacing
+              ? { ...budgetControls.meta.pacing, currency: budgetControls.meta.sanitizedBudget.currency }
+              : null
+          }
+          budgetSummary={state.simulatePacing ? budgetControls.meta.formatted : null}
+          spendToDateCents={spendToDateCents}
         />
         <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/70 p-6 shadow-sm">
           <div>
@@ -542,6 +818,51 @@ export default function CampaignEditor({
             <p className="mt-1 text-xs text-slate-500">
               {pacingInsight ?? 'We will forecast pacing once this campaign records at least three days of spend.'}
             </p>
+            {state.simulatePacing && budgetControls.meta.pacing.projectedTotalCents ? (
+              <dl className="mt-3 grid gap-3 text-xs text-slate-600">
+                <div className="flex items-center justify-between rounded-2xl bg-white px-3 py-2">
+                  <dt className="font-semibold text-slate-700">Projected spend</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {formatCurrencyFromCents(budgetControls.meta.pacing.projectedTotalCents, {
+                      currency: budgetControls.meta.sanitizedBudget.currency,
+                      locale
+                    })}
+                  </dd>
+                </div>
+                {Number.isFinite(budgetControls.meta.pacing.recommendedDailyCents) ? (
+                  <div className="flex items-center justify-between rounded-2xl bg-white px-3 py-2">
+                    <dt className="font-semibold text-slate-700">Recommended daily</dt>
+                    <dd className="font-semibold text-slate-900">
+                      {formatCurrencyFromCents(Math.round(budgetControls.meta.pacing.recommendedDailyCents), {
+                        currency: budgetControls.meta.sanitizedBudget.currency,
+                        locale
+                      })}
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between rounded-2xl bg-white px-3 py-2">
+                  <dt className="font-semibold text-slate-700">Spend to date</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {formatCurrencyFromCents(spendToDateCents, {
+                      currency: budgetControls.meta.sanitizedBudget.currency,
+                      locale
+                    })}
+                  </dd>
+                </div>
+                {Number.isFinite(budgetControls.meta.pacing.burnRate) && budgetControls.meta.pacing.daysElapsed ? (
+                  <div className="flex items-center justify-between rounded-2xl bg-white px-3 py-2">
+                    <dt className="font-semibold text-slate-700">Observed burn</dt>
+                    <dd className="font-semibold text-slate-900">
+                      {formatCurrencyFromCents(Math.round(budgetControls.meta.pacing.burnRate), {
+                        currency: budgetControls.meta.sanitizedBudget.currency,
+                        locale
+                      })}{' '}
+                      <span className="text-slate-500">per day</span>
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null}
           </div>
           <div className="mt-auto flex flex-wrap gap-3">
             <button
@@ -568,7 +889,11 @@ CampaignEditor.propTypes = {
   onCancel: PropTypes.func.isRequired,
   submitting: PropTypes.bool,
   token: PropTypes.string,
-  mode: PropTypes.oneOf(['create', 'edit'])
+  mode: PropTypes.oneOf(['create', 'edit']),
+  budgetPolicy: PropTypes.shape({
+    minimumDailyCents: PropTypes.number
+  }),
+  locale: PropTypes.string
 };
 
 CampaignEditor.defaultProps = {
@@ -576,5 +901,7 @@ CampaignEditor.defaultProps = {
   availablePlacements: [],
   submitting: false,
   token: null,
-  mode: 'create'
+  mode: 'create',
+  budgetPolicy: null,
+  locale: 'en-US'
 };

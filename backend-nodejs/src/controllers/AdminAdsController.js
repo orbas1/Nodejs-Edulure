@@ -106,6 +106,23 @@ function buildCampaignPayload(payload, actorId) {
   return result;
 }
 
+function getSqlDialect() {
+  const client = db?.client;
+  const dialect = client?.config?.client ?? client?.dialect ?? '';
+  return typeof dialect === 'string' ? dialect.toLowerCase() : '';
+}
+
+function fourteenDayWindowStart() {
+  const dialect = getSqlDialect();
+  if (dialect.includes('sqlite')) {
+    return db.raw("DATE('now', '-14 day')");
+  }
+  if (dialect.includes('pg')) {
+    return db.raw("CURRENT_DATE - INTERVAL '14 days'");
+  }
+  return db.raw('DATE_SUB(CURRENT_DATE, INTERVAL 14 DAY)');
+}
+
 export default class AdminAdsController {
   static async listCampaigns(req, res, next) {
     try {
@@ -174,53 +191,50 @@ export default class AdminAdsController {
     try {
       const DAY = 24 * 60 * 60 * 1000;
       const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY);
+      const thirtyDaysAgoDate = new Date(now.getTime() - 30 * DAY);
+      thirtyDaysAgoDate.setUTCHours(0, 0, 0, 0);
+      const thirtyDaysAgo = thirtyDaysAgoDate.toISOString().slice(0, 10);
+      const fourteenDayWindow = fourteenDayWindowStart();
 
       const [campaignTotals, metricsRow, topCampaigns] = await Promise.all([
         db('ads_campaigns')
           .select({
             total: db.raw('COUNT(*)'),
-            active: db.raw("SUM(CASE WHEN status IN ('active') THEN 1 ELSE 0 END)")
+            active: db.raw("SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END)")
           })
           .first(),
         db('ads_campaign_metrics_daily')
           .select({
-            impressions: db.raw('SUM(impressions)::bigint'),
-            clicks: db.raw('SUM(clicks)::bigint'),
-            conversions: db.raw('SUM(conversions)::bigint'),
-            spendCents: db.raw('SUM(spend_cents)::bigint'),
-            revenueCents: db.raw('SUM(revenue_cents)::bigint')
+            impressions: db.raw('SUM(impressions)'),
+            clicks: db.raw('SUM(clicks)'),
+            conversions: db.raw('SUM(conversions)'),
+            spendCents: db.raw('SUM(spend_cents)'),
+            revenueCents: db.raw('SUM(revenue_cents)')
           })
           .where('metric_date', '>=', thirtyDaysAgo)
           .first(),
         db('ads_campaign_metrics_daily as m')
           .leftJoin('ads_campaigns as c', 'm.campaign_id', 'c.id')
-          .select({
-            campaignId: 'm.campaign_id',
-            name: 'c.name',
-            status: 'c.status',
-            impressions: db.raw('SUM(m.impressions)::bigint'),
-            clicks: db.raw('SUM(m.clicks)::bigint'),
-            conversions: db.raw('SUM(m.conversions)::bigint'),
-            spendCents: db.raw('SUM(m.spend_cents)::bigint'),
-            revenueCents: db.raw('SUM(m.revenue_cents)::bigint')
-          })
+          .select({ campaignId: 'm.campaign_id', name: 'c.name', status: 'c.status' })
+          .sum({ impressions: 'm.impressions' })
+          .sum({ clicks: 'm.clicks' })
+          .sum({ conversions: 'm.conversions' })
+          .sum({ spendCents: 'm.spend_cents' })
+          .sum({ revenueCents: 'm.revenue_cents' })
           .where('m.metric_date', '>=', thirtyDaysAgo)
           .groupBy('m.campaign_id', 'c.name', 'c.status')
-          .orderByRaw('SUM(m.revenue_cents) - SUM(m.spend_cents) DESC NULLS LAST')
+          .orderByRaw('(SUM(m.revenue_cents) - SUM(m.spend_cents)) DESC')
           .limit(5)
       ]);
 
       const recentWindow = await db('ads_campaign_metrics_daily as m')
-        .select({
-          metricDate: 'm.metric_date',
-          impressions: db.raw('SUM(m.impressions)::bigint'),
-          clicks: db.raw('SUM(m.clicks)::bigint'),
-          conversions: db.raw('SUM(m.conversions)::bigint'),
-          spendCents: db.raw('SUM(m.spend_cents)::bigint'),
-          revenueCents: db.raw('SUM(m.revenue_cents)::bigint')
-        })
-        .where('m.metric_date', '>=', db.raw("current_date - interval '14 days'"))
+        .select({ metricDate: 'm.metric_date' })
+        .sum({ impressions: 'm.impressions' })
+        .sum({ clicks: 'm.clicks' })
+        .sum({ conversions: 'm.conversions' })
+        .sum({ spendCents: 'm.spend_cents' })
+        .sum({ revenueCents: 'm.revenue_cents' })
+        .where('m.metric_date', '>=', fourteenDayWindow)
         .groupBy('m.metric_date')
         .orderBy('m.metric_date', 'asc');
 
@@ -258,7 +272,12 @@ export default class AdminAdsController {
             conversions: Number(row.conversions ?? 0),
             spendCents: Number(row.spendCents ?? 0),
             revenueCents: Number(row.revenueCents ?? 0)
-          }))
+          })),
+          budgetPolicy: {
+            minimumDailyCents: 500,
+            recommendedDailyCents: 2500,
+            reviewThresholdCents: 10000
+          }
         },
         message: 'Ad campaign metrics compiled'
       });

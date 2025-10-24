@@ -40,6 +40,73 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2
 });
 
+function coerceNumber(value) {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function getDailyBudgetCents(campaign) {
+  if (!campaign) return 0;
+  const candidates = [
+    campaign?.budget?.dailyCents,
+    campaign?.budgetDailyCents,
+    campaign?.dailyBudgetCents
+  ];
+  for (const value of candidates) {
+    if (value === undefined || value === null) continue;
+    const numeric = coerceNumber(value);
+    if (numeric > 0) {
+      return numeric;
+    }
+  }
+  return 0;
+}
+
+function getLifetimeMetrics(campaign) {
+  if (!campaign || typeof campaign !== 'object') {
+    return {};
+  }
+  if (campaign.metrics && typeof campaign.metrics === 'object') {
+    if (campaign.metrics.lifetime && typeof campaign.metrics.lifetime === 'object') {
+      return campaign.metrics.lifetime;
+    }
+    return campaign.metrics;
+  }
+  return {};
+}
+
+function getSchedule(campaign) {
+  if (!campaign || typeof campaign !== 'object') {
+    return {};
+  }
+  if (campaign.schedule && typeof campaign.schedule === 'object') {
+    return campaign.schedule;
+  }
+  return {
+    startAt: campaign.startAt ?? campaign.start_at ?? null,
+    endAt: campaign.endAt ?? campaign.end_at ?? null
+  };
+}
+
+function getLifetimeSpendCents(campaign) {
+  const lifetime = getLifetimeMetrics(campaign);
+  if (lifetime.spendCents !== undefined && lifetime.spendCents !== null) {
+    return coerceNumber(lifetime.spendCents);
+  }
+  if (campaign?.spend?.totalCents !== undefined && campaign?.spend?.totalCents !== null) {
+    return coerceNumber(campaign.spend.totalCents);
+  }
+  if (campaign?.totalSpendCents !== undefined && campaign?.totalSpendCents !== null) {
+    return coerceNumber(campaign.totalSpendCents);
+  }
+  return 0;
+}
+
+function getLifetimeValue(campaign, key) {
+  const lifetime = getLifetimeMetrics(campaign);
+  return coerceNumber(lifetime[key]);
+}
+
 function formatCompactNumber(value) {
   const numeric = Number(value ?? 0);
   if (!Number.isFinite(numeric) || Number.isNaN(numeric) || numeric <= 0) {
@@ -195,6 +262,41 @@ export default function EdulureAds() {
   const campaigns = ads?.campaigns ?? [];
   const summary = ads?.summary ?? {};
 
+  const campaignHealth = useMemo(
+    () =>
+      campaigns.map((campaign) => {
+        const issues = [];
+        if (!campaign.creative?.headline) {
+          issues.push('Missing headline copy');
+        }
+        const schedule = getSchedule(campaign);
+        if (campaign.status === 'active' && !schedule?.endAt) {
+          issues.push('Active flight has no scheduled end date');
+        }
+        const placements = Array.isArray(campaign?.placements) ? campaign.placements : [];
+        if (!placements.length) {
+          issues.push('No placements selected');
+        }
+        const dailyBudgetCents = getDailyBudgetCents(campaign);
+        const minimumDailyCents = summary?.budgetPolicy?.minimumDailyCents ?? 500;
+        if (dailyBudgetCents > 0 && dailyBudgetCents < minimumDailyCents) {
+          issues.push('Daily budget below policy minimum');
+        }
+        return {
+          id: campaign.id,
+          name: campaign.name ?? `Campaign ${campaign.id}`,
+          status: campaign.status,
+          issues
+        };
+      }),
+    [campaigns, summary?.budgetPolicy?.minimumDailyCents]
+  );
+
+  const flaggedCampaigns = useMemo(
+    () => campaignHealth.filter((item) => item.issues.length > 0),
+    [campaignHealth]
+  );
+
   if (role && !ALLOWED_ROLES.has(role)) {
     return (
       <DashboardStateMessage
@@ -229,35 +331,43 @@ export default function EdulureAds() {
     },
     {
       title: 'Lifetime spend',
-      value: summary.totalSpend ?? currencyFormatter.format(
-        campaigns.reduce((total, campaign) => total + Number(campaign.totalSpendCents ?? 0), 0) / 100
-      ),
+      value:
+        summary.totalSpend ??
+        currencyFormatter.format(
+          campaigns.reduce((total, campaign) => total + getLifetimeSpendCents(campaign), 0) / 100
+        ),
       hint: 'All placements'
     },
     {
       title: 'Average daily budget',
-      value: summary.averageDailyBudget ?? currencyFormatter.format(
-        campaigns.length
-          ? campaigns.reduce((total, campaign) => total + Number(campaign.dailyBudgetCents ?? 0), 0) /
-            (campaigns.length * 100)
-          : 0
-      ),
+      value:
+        summary.averageDailyBudget ??
+        currencyFormatter.format(
+          campaigns.length
+            ? campaigns.reduce((total, campaign) => total + getDailyBudgetCents(campaign), 0) /
+              (campaigns.length * 100)
+            : 0
+        ),
       hint: 'Current period'
     },
     {
       title: 'Total impressions',
-      value: formatCompactNumber(campaigns.reduce((total, campaign) => total + Number(campaign.metrics?.impressions ?? 0), 0)),
+      value: formatCompactNumber(
+        campaigns.reduce((total, campaign) => total + getLifetimeValue(campaign, 'impressions'), 0)
+      ),
       hint: 'Last sync'
     },
     {
       title: 'Total clicks',
-      value: formatCompactNumber(campaigns.reduce((total, campaign) => total + Number(campaign.metrics?.clicks ?? 0), 0)),
+      value: formatCompactNumber(
+        campaigns.reduce((total, campaign) => total + getLifetimeValue(campaign, 'clicks'), 0)
+      ),
       hint: 'Last sync'
     },
     {
       title: 'Conversions',
       value: formatCompactNumber(
-        campaigns.reduce((total, campaign) => total + Number(campaign.metrics?.conversions ?? 0), 0)
+        campaigns.reduce((total, campaign) => total + getLifetimeValue(campaign, 'conversions'), 0)
       ),
       hint: 'Attributed'
     }
@@ -474,6 +584,8 @@ export default function EdulureAds() {
             submitting={editorSubmitting}
             token={token}
             mode={editorMode}
+            budgetPolicy={ads?.policy?.budget ?? summary?.budgetPolicy ?? null}
+            locale={dashboard?.locale ?? 'en-US'}
           />
         ) : (
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white/70 p-6 text-sm text-slate-500">
@@ -517,6 +629,20 @@ export default function EdulureAds() {
           </div>
         </header>
 
+        {flaggedCampaigns.length ? (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="font-semibold">Campaign quality checks</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+              {flaggedCampaigns.map((item) => (
+                <li key={item.id}>
+                  <span className="font-semibold">{item.name}.</span>{' '}
+                  {item.issues.join('; ')}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/90 shadow-sm">
           <div className="hidden bg-slate-50 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[1.3fr_1fr_1fr_1fr_160px]">
             <span>Campaign</span>
@@ -526,83 +652,103 @@ export default function EdulureAds() {
             <span className="text-right">Actions</span>
           </div>
           <ul className="divide-y divide-slate-200">
-            {campaignsState.items.map((campaign) => (
-              <li key={campaign.id} className="grid gap-4 px-4 py-5 lg:grid-cols-[1.3fr_1fr_1fr_1fr_160px] lg:px-6">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-900">{campaign.name ?? 'Untitled campaign'}</p>
-                  <p className="text-xs text-slate-500">Status: {campaign.status ?? 'draft'}</p>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {(campaign.targeting?.keywords ?? []).slice(0, 3).map((keyword) => (
-                      <span key={`${campaign.id}-kw-${keyword}`} className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
-                        {keyword}
-                      </span>
-                    ))}
+            {campaignsState.items.map((campaign) => {
+              const lifetimeMetrics = getLifetimeMetrics(campaign);
+              const dailyBudgetCents = getDailyBudgetCents(campaign);
+              const lifetimeSpendCents = getLifetimeSpendCents(campaign);
+              const schedule = getSchedule(campaign);
+              const lastMetricsAt = lifetimeMetrics.lastRecordedAt ?? campaign.metrics?.lastSyncedAt ?? null;
+              const dailyBudgetLabel = dailyBudgetCents
+                ? currencyFormatter.format(dailyBudgetCents / 100)
+                : 'Budget not set';
+              const spendLabel = lifetimeSpendCents
+                ? currencyFormatter.format(lifetimeSpendCents / 100)
+                : 'No spend recorded yet';
+
+              return (
+                <li
+                  key={campaign.id}
+                  className="grid gap-4 px-4 py-5 lg:grid-cols-[1.3fr_1fr_1fr_1fr_160px] lg:px-6"
+                >
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900">{campaign.name ?? 'Untitled campaign'}</p>
+                    <p className="text-xs text-slate-500">Status: {campaign.status ?? 'draft'}</p>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {(campaign.targeting?.keywords ?? []).slice(0, 3).map((keyword) => (
+                        <span
+                          key={`${campaign.id}-kw-${keyword}`}
+                          className="rounded-full bg-primary/10 px-2 py-0.5 text-primary"
+                        >
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
+                      {(campaign.placements ?? []).map((placement) => (
+                        <span
+                          key={`${campaign.id}-placement-${placement.context}`}
+                          className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600"
+                        >
+                          {placement.label ?? placement.surface ?? placement.context}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Brand safety: {(campaign.brandSafety?.categories ?? ['standard']).join(', ')}
+                    </p>
                   </div>
-                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
-                    {(campaign.placements ?? []).map((placement) => (
-                      <span
-                        key={`${campaign.id}-placement-${placement.context}`}
-                        className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600"
-                      >
-                        {placement.label ?? placement.surface ?? placement.context}
-                      </span>
-                    ))}
+                  <div className="space-y-1 text-xs text-slate-500">
+                    <p className="text-sm font-semibold text-slate-900">{campaign.objective}</p>
+                    <p>{dailyBudgetLabel}</p>
+                    <p>{spendLabel}</p>
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Brand safety: {(campaign.brandSafety?.categories ?? ['standard']).join(', ')}
-                  </p>
-                </div>
-                <div className="space-y-1 text-xs text-slate-500">
-                  <p className="text-sm font-semibold text-slate-900">{campaign.objective}</p>
-                  <p>{campaign.dailyBudget?.label ?? 'Budget syncing'}</p>
-                  <p>{campaign.spend?.label ?? 'Lifetime spend syncing'}</p>
-                </div>
-                <div className="space-y-1 text-xs text-slate-500">
-                  <p>Impressions: {formatInteger(campaign.metrics?.impressions)}</p>
-                  <p>Clicks: {formatInteger(campaign.metrics?.clicks)}</p>
-                  <p>Conversions: {formatInteger(campaign.metrics?.conversions)}</p>
-                </div>
-                <div className="space-y-1 text-xs text-slate-500">
-                  <p>{campaign.startAtLabel ?? 'Start syncing'}</p>
-                  <p>{campaign.endAtLabel ?? 'End syncing'}</p>
-                  <p>Last metrics {formatDateLabel(campaign.metrics?.lastSyncedAt)}</p>
-                </div>
-                <div className="flex flex-col items-stretch gap-2 text-xs">
-                  <button
-                    type="button"
-                    className="dashboard-pill px-3 py-1"
-                    onClick={() => openEditor(campaign)}
-                  >
-                    Edit campaign
-                  </button>
-                  <select
-                    className="dashboard-input"
-                    value={campaign.status ?? 'draft'}
-                    onChange={(event) => handleStatusChange(campaign.id, event.target.value)}
-                  >
-                    {STATUS_CHOICES.map((choice) => (
-                      <option key={choice} value={choice}>
-                        {choice}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="dashboard-pill px-3 py-1"
-                    onClick={() => handlePauseCampaign(campaign.id)}
-                  >
-                    Pause
-                  </button>
-                  <button
-                    type="button"
-                    className="dashboard-primary-pill px-3 py-1"
-                    onClick={() => handleResumeCampaign(campaign.id)}
-                  >
-                    Resume
-                  </button>
-                </div>
-              </li>
-            ))}
+                  <div className="space-y-1 text-xs text-slate-500">
+                    <p>Impressions: {formatInteger(lifetimeMetrics.impressions)}</p>
+                    <p>Clicks: {formatInteger(lifetimeMetrics.clicks)}</p>
+                    <p>Conversions: {formatInteger(lifetimeMetrics.conversions)}</p>
+                  </div>
+                  <div className="space-y-1 text-xs text-slate-500">
+                    <p>{schedule.startAt ? formatDateLabel(schedule.startAt) : 'Start syncing'}</p>
+                    <p>{schedule.endAt ? formatDateLabel(schedule.endAt) : 'End syncing'}</p>
+                    <p>Last metrics {formatDateLabel(lastMetricsAt)}</p>
+                  </div>
+                  <div className="flex flex-col items-stretch gap-2 text-xs">
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => openEditor(campaign)}
+                    >
+                      Edit campaign
+                    </button>
+                    <select
+                      className="dashboard-input"
+                      value={campaign.status ?? 'draft'}
+                      onChange={(event) => handleStatusChange(campaign.id, event.target.value)}
+                    >
+                      {STATUS_CHOICES.map((choice) => (
+                        <option key={choice} value={choice}>
+                          {choice}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => handlePauseCampaign(campaign.id)}
+                    >
+                      Pause
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-primary-pill px-3 py-1"
+                      onClick={() => handleResumeCampaign(campaign.id)}
+                    >
+                      Resume
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
             {campaignsState.items.length === 0 ? (
               <li className="px-6 py-8">
                 <DashboardStateMessage
