@@ -1,0 +1,37 @@
+{
+  "environment": "dev",
+  "domain": "dev.edulure.com",
+  "aws": {
+    "accountAlias": "edulure-dev",
+    "region": "us-east-1",
+    "vpcId": "vpc-dev-edulure",
+    "privateSubnetTags": ["tier:nonprod", "app:edulure-api"],
+    "publicSubnetTags": ["tier:edge", "app:edulure-alb"]
+  },
+  "blueprint": {
+    "parameter": "/edulure/dev/api/environment-blueprint",
+    "runtimeEndpoint": "https://dev.edulure.com/ops/runtime-blueprint.json",
+    "service": "backend-service"
+  },
+  "terraformWorkspace": "infrastructure/terraform/envs/dev",
+  "dockerCompose": {
+    "file": "docker-compose.yml",
+    "command": "docker compose --profile dev up --build",
+    "profiles": ["dev"]
+  },
+  "observability": {
+    "dashboard": "infrastructure/observability/grafana/dashboards/environment-runtime.json",
+    "cloudwatchDashboard": "edulure-dev-api-observability"
+  },
+  "changeWindows": [
+    "Weekdays 14:00-22:00 UTC"
+  ],
+  "contacts": {
+    "primary": "platform@edulure.com",
+    "onCall": "platform-oncall@edulure.com"
+  },
+  "notes": [
+    "CI publishes ephemeral feature branches into dev for smoke testing.",
+    "Blueprint payload stored in SSM for parity with staging and production."
+  ]
+}

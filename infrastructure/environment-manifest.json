@@ -17,15 +17,33 @@
   "environments": {
     "dev": {
       "path": "infrastructure/terraform/envs/dev",
-      "hash": "56535a2195ec5ef93d89b41b29b140d9b8e1ee18dedb87a91495507fde4b2c92"
+      "hash": "56535a2195ec5ef93d89b41b29b140d9b8e1ee18dedb87a91495507fde4b2c92",
+      "descriptor": {
+        "path": "infrastructure/environments/dev.json",
+        "hash": "204b41157e69413d66acbc7677647f1216f93e3a89fe77c81a105fb9149268e7",
+        "blueprintParameter": "/edulure/dev/api/environment-blueprint",
+        "runtimeEndpoint": "https://dev.edulure.com/ops/runtime-blueprint.json"
+      }
     },
     "staging": {
       "path": "infrastructure/terraform/envs/staging",
-      "hash": "f789d17ebd2277197b928e96115c9a308c3f6a4b960565b6eb373c60a3751594"
+      "hash": "f789d17ebd2277197b928e96115c9a308c3f6a4b960565b6eb373c60a3751594",
+      "descriptor": {
+        "path": "infrastructure/environments/staging.json",
+        "hash": "05382a3467d20fb8d57c598d61bc6e805dfed17a5badc62864e5c478ead4f302",
+        "blueprintParameter": "/edulure/staging/api/environment-blueprint",
+        "runtimeEndpoint": "https://staging.edulure.com/ops/runtime-blueprint.json"
+      }
     },
     "prod": {
       "path": "infrastructure/terraform/envs/prod",
-      "hash": "0fafb6a506216823f68602eb71a8a4021e5dd88cc24587a635c7265251a575be"
+      "hash": "0fafb6a506216823f68602eb71a8a4021e5dd88cc24587a635c7265251a575be",
+      "descriptor": {
+        "path": "infrastructure/environments/prod.json",
+        "hash": "7037fce56b6ddfc72da6a5403378122c99711fcc15e681752b3097141f82e851",
+        "blueprintParameter": "/edulure/prod/api/environment-blueprint",
+        "runtimeEndpoint": "https://edulure.com/ops/runtime-blueprint.json"
+      }
     }
   },
   "docker": {
@@ -55,7 +73,12 @@
   "root": {
     "docker-compose.yml": {
       "path": "docker-compose.yml",
-      "hash": "edba92c386a5ced24c16c61d0373a5c0a4d28c78f573cd2808810742ba33f8cc"
+      "hash": "25ef5d1991ec9824da0eecdec5d105a114841b91dbbefe4e96dddb3f938153a7",
+      "profiles": [
+        "dev",
+        "staging",
+        "prod"
+      ]
     }
   },
   "blueprints": {

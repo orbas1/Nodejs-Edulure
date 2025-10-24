@@ -140,8 +140,8 @@
       - 5.F Marketing, Content & Enablement Schema (`models/BlogPostModel.js`, `models/BlogCategoryModel.js`, `models/EbookModel.js`, `models/AdsCampaignModel.js`, `models/EnablementGuideModel.js`, `models/IntegrationProviderModel.js`, `migrations/*marketing*`, `migrations/*integration*`)
       - 6.A Generated API Client & Runtime Configuration (`src/generated/`, `src/index.ts`, `src/runtime/configure.ts`, `src/runtime/base.ts`)
       - 6.B Authentication & Session Utilities (`src/runtime/auth.ts`, `src/runtime/tokenStore.ts`, `src/runtime/configure.ts`)
-      - 7.A Environment Provisioning & Infrastructure as Code (`infrastructure/terraform/`, `docker-compose.yml`, `infrastructure/environments/`)
-      - 7.B CI/CD Automation & Release Tooling (`scripts/`, `backend-nodejs/scripts/`, `update_template/`, `qa/`)
+      - ✓ 7.A Environment Provisioning & Infrastructure as Code (`infrastructure/terraform/`, `docker-compose.yml`, `infrastructure/environments/`)
+      - ✓ 7.B CI/CD Automation & Release Tooling (`scripts/`, `backend-nodejs/scripts/`, `update_template/`, `qa/`)
       - 7.C Observability Stack & Runtime Telemetry (`infrastructure/observability/`, `backend-nodejs/src/observability/`, `docs/operations/observability.md`)
       - 7.D Local Tooling & Developer Enablement (`file_list.md`, `EDULURE_GUIDE.md`, `backend-nodejs/README.md`, `frontend-reactjs/README.md`, `valuation/`, `scripts/setup-*`)
       - 8.A Automated Test Suites & Coverage

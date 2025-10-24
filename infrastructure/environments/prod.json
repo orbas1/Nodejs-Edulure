@@ -1,0 +1,38 @@
+{
+  "environment": "prod",
+  "domain": "edulure.com",
+  "aws": {
+    "accountAlias": "edulure-prod",
+    "region": "us-east-1",
+    "vpcId": "vpc-prod-edulure",
+    "privateSubnetTags": ["tier:production", "app:edulure-api"],
+    "publicSubnetTags": ["tier:edge", "app:edulure-alb"]
+  },
+  "blueprint": {
+    "parameter": "/edulure/prod/api/environment-blueprint",
+    "runtimeEndpoint": "https://edulure.com/ops/runtime-blueprint.json",
+    "service": "backend-service"
+  },
+  "terraformWorkspace": "infrastructure/terraform/envs/prod",
+  "dockerCompose": {
+    "file": "docker-compose.yml",
+    "command": "docker compose --profile prod up --build",
+    "profiles": ["prod"]
+  },
+  "observability": {
+    "dashboard": "infrastructure/observability/grafana/dashboards/environment-runtime.json",
+    "cloudwatchDashboard": "edulure-prod-api-observability"
+  },
+  "changeWindows": [
+    "Saturday 01:00-04:00 UTC (primary)",
+    "Wednesday 23:00-01:00 UTC (contingency)"
+  ],
+  "contacts": {
+    "primary": "operations@edulure.com",
+    "onCall": "sre-oncall@edulure.com"
+  },
+  "notes": [
+    "Production deploys require CAB approval and blueprint validation evidence.",
+    "Rollback plan references environment manifest module hashes for audit."
+  ]
+}
