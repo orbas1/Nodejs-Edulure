@@ -18,13 +18,15 @@ const confirmUploadSchema = Joi.object({
   metadata: Joi.object().default({})
 });
 
+const stringArrayOrScalar = (limit) =>
+  Joi.alternatives()
+    .try(Joi.array().items(Joi.string().trim().max(60)).max(limit), Joi.string().trim().max(60))
+    .optional();
+
 const marketingQuerySchema = Joi.object({
-  types: Joi.alternatives()
-    .try(
-      Joi.array().items(Joi.string().trim().max(60)).max(12),
-      Joi.string().trim().max(60)
-    )
-    .optional(),
+  types: stringArrayOrScalar(12),
+  surfaces: stringArrayOrScalar(12),
+  variants: stringArrayOrScalar(6),
   email: Joi.string().trim().email().optional()
 });
 
@@ -248,9 +250,13 @@ export default class ContentController {
         stripUnknown: true
       });
       const types = query.types === undefined ? [] : query.types;
+      const surfaces = query.surfaces === undefined ? [] : query.surfaces;
+      const variants = query.variants === undefined ? [] : query.variants;
       const content = await MarketingContentService.getLandingContent({
         types,
-        email: query.email ?? undefined
+        email: query.email ?? undefined,
+        surfaces,
+        variants
       });
       return success(res, { data: content, message: 'Marketing content fetched' });
     } catch (error) {

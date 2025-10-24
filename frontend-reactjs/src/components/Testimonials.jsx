@@ -1,34 +1,41 @@
+import { useMemo } from 'react';
+
 import HomeSection from './home/HomeSection.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
+import { mapTestimonialsToFallbacks } from '../data/marketing/testimonials.js';
+import useMarketingContent from '../hooks/useMarketingContent.js';
 
-const TESTIMONIALS = [
-  {
-    key: 'lena',
-    fallback: {
-      quote: 'We shipped our cohort in two weeks with the templates and live ops tools.',
-      name: 'Lena Ortiz',
-      role: 'Founder, CohortCraft'
-    }
-  },
-  {
-    key: 'noah',
-    fallback: {
-      quote: 'Billing, scheduling, and community rooms finally live in one workflow.',
-      name: 'Noah Winter',
-      role: 'Director, Global Learning Lab'
-    }
-  }
-];
+const FALLBACK_TESTIMONIALS = mapTestimonialsToFallbacks({ surfaces: ['home'] });
 
 export default function Testimonials() {
   const { t } = useLanguage();
+  const { data } = useMarketingContent({ surfaces: ['home'], variants: ['testimonial'] });
+
+  const testimonialEntries = useMemo(() => {
+    const remoteTestimonials = Array.isArray(data?.testimonials)
+      ? data.testimonials.filter((entry) => entry.variant === 'testimonial')
+      : [];
+
+    if (remoteTestimonials.length > 0) {
+      return remoteTestimonials.map((entry) => ({
+        key: entry.id ?? entry.slug,
+        fallback: {
+          quote: entry.quote,
+          name: entry.authorName ?? entry.attribution ?? t('home.testimonials.defaults.name', 'Edulure operator'),
+          role: entry.authorTitle ?? entry.attribution ?? ''
+        }
+      }));
+    }
+
+    return FALLBACK_TESTIMONIALS;
+  }, [data, t]);
 
   const heading = t(
     'home.testimonials.heading',
     'Trusted by ambitious learning operators'
   );
 
-  const testimonials = TESTIMONIALS.map((testimonial) => ({
+  const testimonials = testimonialEntries.map((testimonial) => ({
     key: testimonial.key,
     quote: t(
       `home.testimonials.items.${testimonial.key}.quote`,

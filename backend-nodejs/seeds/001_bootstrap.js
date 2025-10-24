@@ -150,6 +150,7 @@ export async function seed(knex) {
     await trx('content_assets').del();
     await trx('marketing_plan_features').del();
     await trx('marketing_plan_offers').del();
+    await trx('marketing_testimonials').del();
     await trx('marketing_blocks').del();
     await trx('marketing_leads').del();
     await trx('telemetry_lineage_runs').del();
@@ -870,6 +871,99 @@ export async function seed(knex) {
       cover_image_url: growthLabCover.url,
       metadata: JSON.stringify(growthLabMetadata)
     });
+
+    await trx('marketing_testimonials').insert([
+      {
+        slug: 'lena-ortiz',
+        variant: 'testimonial',
+        quote: 'We shipped our cohort in two weeks with the templates and live ops tools.',
+        author_name: 'Lena Ortiz',
+        author_title: 'Founder, CohortCraft',
+        persona: 'Cohort operations lead',
+        featured_product: 'Flow 5 Launch Kits',
+        surfaces: JSON.stringify(['home', 'learner-register']),
+        metadata: JSON.stringify({
+          localeKeys: {
+            quote: 'home.testimonials.items.lena.quote',
+            name: 'home.testimonials.items.lena.name',
+            role: 'home.testimonials.items.lena.role'
+          }
+        }),
+        position: 10
+      },
+      {
+        slug: 'noah-winter',
+        variant: 'testimonial',
+        quote: 'Billing, scheduling, and community rooms finally live in one workflow.',
+        author_name: 'Noah Winter',
+        author_title: 'Director, Global Learning Lab',
+        persona: 'Director of learning innovation',
+        featured_product: 'Unified campus workspace',
+        surfaces: JSON.stringify(['home']),
+        metadata: JSON.stringify({
+          localeKeys: {
+            quote: 'home.testimonials.items.noah.quote',
+            name: 'home.testimonials.items.noah.name',
+            role: 'home.testimonials.items.noah.role'
+          }
+        }),
+        position: 20
+      },
+      {
+        slug: 'ops-director-flow5',
+        variant: 'social_proof',
+        quote:
+          'Flow 5 onboarding kept our entire revenue pod aligned in the first week. We knew which communities to launch next.',
+        attribution: 'Operations Director · Flow 5',
+        persona: 'Revenue operations',
+        surfaces: JSON.stringify(['learner-register']),
+        metadata: JSON.stringify({ channel: 'learner', emphasis: 'onboarding' }),
+        position: 30
+      },
+      {
+        slug: 'creator-growth-lab',
+        variant: 'social_proof',
+        quote:
+          'The interest tags we submitted here now power our cohort roadmap. Edulure turned those signals into real launches.',
+        attribution: 'Program Lead · Creator Growth Lab',
+        persona: 'Program lead',
+        surfaces: JSON.stringify(['learner-register']),
+        metadata: JSON.stringify({ channel: 'learner', emphasis: 'signals' }),
+        position: 40
+      },
+      {
+        slug: 'global-campus-network',
+        variant: 'social_proof',
+        quote:
+          'International onboarding used to take days. Now the regional preferences we capture sync instantly across dashboards.',
+        attribution: 'Learning Ops Manager · Global Campus Network',
+        persona: 'Learning operations manager',
+        surfaces: JSON.stringify(['learner-register']),
+        metadata: JSON.stringify({ channel: 'learner', emphasis: 'international' }),
+        position: 50
+      },
+      {
+        slug: 'cohort-architect-guild',
+        variant: 'social_proof',
+        quote:
+          'The application captured everything we needed—portfolio links, cohort goals, even marketing campaigns—in one pass.',
+        attribution: 'Lead Instructor · Cohort Architect Guild',
+        persona: 'Instructor lead',
+        surfaces: JSON.stringify(['instructor-register']),
+        metadata: JSON.stringify({ channel: 'instructor', emphasis: 'application' }),
+        position: 60
+      },
+      {
+        slug: 'studio-growth-lab',
+        variant: 'social_proof',
+        quote: 'Edulure surfaced the right learners as soon as we submitted the form. Our waitlist converted within days.',
+        attribution: 'Founder · Studio Growth Lab',
+        persona: 'Studio founder',
+        surfaces: JSON.stringify(['instructor-register']),
+        metadata: JSON.stringify({ channel: 'instructor', emphasis: 'conversion' }),
+        position: 70
+      }
+    ]);
 
     await trx('marketing_blocks').insert([
       {

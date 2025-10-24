@@ -4,22 +4,11 @@ import AuthForm from '../components/auth/AuthForm.jsx';
 import { httpClient } from '../api/httpClient.js';
 import useOnboardingForm from '../hooks/useOnboardingForm.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import useMarketingContent from '../hooks/useMarketingContent.js';
+import { resolveSocialProofFallback } from '../data/marketing/socialProof.js';
 import { buildOnboardingDraftPayload, calculateOnboardingCompletion, validateOnboardingState } from '../utils/validation/onboarding.js';
 
 const AUTO_SAVE_DELAY_MS = 1200;
-
-const INSTRUCTOR_PROOF_ENTRIES = [
-  {
-    id: 'cohort-architect',
-    quote: '“The application captured everything we needed—portfolio links, cohort goals, even marketing campaigns—in one pass.”',
-    attribution: 'Lead Instructor · Cohort Architect Guild'
-  },
-  {
-    id: 'studio-growth',
-    quote: '“Edulure surfaced the right learners as soon as we submitted the form. Our waitlist converted within days.”',
-    attribution: 'Founder · Studio Growth Lab'
-  }
-];
 
 function buildInstructorMetadata(cleaned, existingMetadata) {
   return {
@@ -62,6 +51,10 @@ export default function InstructorRegister() {
 
   const overrides = useMemo(() => ({ role: 'instructor' }), []);
   const { formState, errors, setErrors, updateField } = useOnboardingForm('instructor', overrides);
+  const { data: marketingContent } = useMarketingContent({
+    surfaces: ['instructor-register'],
+    variants: ['social_proof']
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -73,6 +66,25 @@ export default function InstructorRegister() {
     () => calculateOnboardingCompletion('instructor', formState),
     [formState]
   );
+
+  const socialProofEntries = useMemo(() => {
+    const testimonials = Array.isArray(marketingContent?.testimonials)
+      ? marketingContent.testimonials.filter((entry) => entry.variant === 'social_proof')
+      : [];
+
+    if (testimonials.length > 0) {
+      return testimonials.map((entry) => ({
+        id: entry.id ?? entry.slug,
+        quote: entry.quote,
+        attribution:
+          entry.attribution ??
+          [entry.authorName, entry.authorTitle].filter(Boolean).join(' • ') ??
+          'Edulure operator'
+      }));
+    }
+
+    return resolveSocialProofFallback('instructor-register');
+  }, [marketingContent]);
 
   const clearFieldError = useCallback(
     (field) => {
@@ -192,7 +204,7 @@ export default function InstructorRegister() {
       busy={isSubmitting}
       error={error}
       success={success}
-      socialProof={INSTRUCTOR_PROOF_ENTRIES}
+      socialProof={socialProofEntries}
       progress={{
         progress: onboardingProgress.progress,
         label: `${onboardingProgress.completed} of ${onboardingProgress.total} sections complete`
