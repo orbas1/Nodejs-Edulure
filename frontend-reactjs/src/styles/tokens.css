@@ -89,6 +89,8 @@
   /* Grid system */
   --grid-min-column: 18rem;
   --grid-gap: var(--space-6);
+  --layout-max-width: 80rem;
+  --layout-dashboard-max-width: 88rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -168,6 +170,27 @@
   --gradient-cta-hover: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #4338ca 100%);
   --form-field-border: rgba(30, 64, 175, 0.55);
   --form-field-border-strong: rgba(17, 94, 89, 0.55);
+}
+
+[data-density='compact'] {
+  --space-3: 0.6rem;
+  --space-4: 0.85rem;
+  --space-5: 1.1rem;
+  --space-6: 1.25rem;
+  --space-8: 1.6rem;
+  --space-10: 2rem;
+  --space-12: 2.4rem;
+}
+
+[data-density='expanded'] {
+  --space-3: 0.9rem;
+  --space-4: 1.2rem;
+  --space-5: 1.5rem;
+  --space-6: 1.8rem;
+  --space-8: 2.4rem;
+  --space-10: 3rem;
+  --space-12: 3.6rem;
+  --space-16: 4.5rem;
 }
 
 :root {

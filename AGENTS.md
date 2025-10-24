@@ -113,8 +113,8 @@
       - A21. Analytics, Admin & Operations Dashboards (2.F)
       - A22. Commerce, Billing & Profile Management (2.G)
       - A23. Integrations, Enablement & Invitations (2.H)
-      - A24. Support, Knowledge & Feedback (2.I)
-      - A25. Shared Layout, Theming & Component Infrastructure (2.J)
+      - A24. Support, Knowledge & Feedback (2.I) ✓
+      - A25. Shared Layout, Theming & Component Infrastructure (2.J) ✓
       - A26. Flutter Authentication & Identity (3.A)
       - A27. Flutter Community Feed & Engagement (3.B)
       - A28. Flutter Lessons, Assessments & Offline Learning (3.C)

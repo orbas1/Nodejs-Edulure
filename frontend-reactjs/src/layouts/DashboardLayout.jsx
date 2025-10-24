@@ -22,6 +22,8 @@ import {
   trackNotificationOpen,
   trackNotificationPreferenceChange
 } from '../lib/analytics.js';
+import { LAYOUT_DASHBOARD_MAX_WIDTH } from '../config/layout.js';
+import useLayoutTelemetry from '../hooks/useLayoutTelemetry.js';
 
 function buildDashboardNotifications(session, dashboard) {
   const baseNotifications = buildShellNotifications(session);
@@ -66,6 +68,8 @@ export default function DashboardLayout() {
   const { roles, dashboards, activeRole, setActiveRole, loading, error, refresh } = useDashboard();
   const { getConfigValue } = useRuntimeConfig();
   const { connected: realtimeConnected } = useRealtime();
+
+  useLayoutTelemetry('dashboard-shell');
 
   const availableRoles = useMemo(
     () => roles.map((role) => role.id.toLowerCase()),
@@ -245,33 +249,38 @@ export default function DashboardLayout() {
           tabIndex={-1}
           className="flex-1 overflow-y-auto bg-slate-25 px-4 pb-16 pt-6 sm:px-6 lg:px-8"
         >
-          {loading ? (
-            <DashboardStateMessage
-              variant="loading"
-              title="Loading your workspace"
-              description="Aggregating dashboards, cohorts, and monetisation signals."
-            />
-          ) : error ? (
-            <DashboardStateMessage
-              variant="error"
-              title="Unable to load dashboard"
-              description={error.message ?? 'Something went wrong while loading your workspace.'}
-              actionLabel="Retry"
-              onAction={refresh}
-            />
-          ) : showEmptyState ? (
-            <DashboardStateMessage
-              variant="empty"
-              title="No dashboard data yet"
-              description="Start enrolling learners, launching communities, or scheduling sessions to populate this workspace."
-            />
-          ) : (
-            <Outlet />
-          )}
+          <div className="mx-auto w-full" style={{ maxWidth: LAYOUT_DASHBOARD_MAX_WIDTH }}>
+            {loading ? (
+              <DashboardStateMessage
+                variant="loading"
+                title="Loading your workspace"
+                description="Aggregating dashboards, cohorts, and monetisation signals."
+              />
+            ) : error ? (
+              <DashboardStateMessage
+                variant="error"
+                title="Unable to load dashboard"
+                description={error.message ?? 'Something went wrong while loading your workspace.'}
+                actionLabel="Retry"
+                onAction={refresh}
+              />
+            ) : showEmptyState ? (
+              <DashboardStateMessage
+                variant="empty"
+                title="No dashboard data yet"
+                description="Start enrolling learners, launching communities, or scheduling sessions to populate this workspace."
+              />
+            ) : (
+              <Outlet />
+            )}
+          </div>
         </main>
       </div>
       <footer className="border-t border-slate-200 bg-white/90 px-4 py-6 text-sm text-slate-500 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="mx-auto flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+          style={{ maxWidth: LAYOUT_DASHBOARD_MAX_WIDTH, width: '100%' }}
+        >
           <p>&copy; {new Date().getFullYear()} Edulure. Operated workspaces.</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <a className="transition hover:text-primary" href={`mailto:${supportEmail}`}>

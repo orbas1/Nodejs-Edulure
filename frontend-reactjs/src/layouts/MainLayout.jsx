@@ -9,6 +9,8 @@ import { deriveQuickActions, buildShellNotifications, derivePresence } from '../
 import { useAuth } from '../context/AuthContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import { useRealtime } from '../context/RealtimeContext.jsx';
+import { LAYOUT_CONTENT_MAX_WIDTH } from '../config/layout.js';
+import useLayoutTelemetry from '../hooks/useLayoutTelemetry.js';
 import {
   trackNavigationImpression,
   trackNavigationSelect,
@@ -21,6 +23,8 @@ export default function MainLayout() {
   const { session, isAuthenticated, logout } = useAuth();
   const { getConfigValue } = useRuntimeConfig();
   const { connected: realtimeConnected } = useRealtime();
+
+  useLayoutTelemetry('main-shell');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -145,12 +149,16 @@ export default function MainLayout() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8"
+        className="mx-auto flex w-full flex-1 flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8"
+        style={{ maxWidth: LAYOUT_CONTENT_MAX_WIDTH, width: '100%' }}
       >
         <Outlet />
       </main>
       <footer className="border-t border-slate-200 bg-white/90 px-4 py-6 text-sm text-slate-500 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="mx-auto flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+          style={{ maxWidth: LAYOUT_CONTENT_MAX_WIDTH, width: '100%' }}
+        >
           <p>&copy; {new Date().getFullYear()} Edulure. All rights reserved.</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <a className="transition hover:text-primary" href="/privacy">
