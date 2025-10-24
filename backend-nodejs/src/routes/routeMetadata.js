@@ -930,6 +930,31 @@ const ROUTE_DEFINITIONS = [
     statusPageComponent: 'api-governance'
   },
   {
+    name: 'operator',
+    capability: 'operator-support-console',
+    description:
+      'Support, trust-safety, and operations dashboard APIs powering Annex A21/C1/C2 experiences.',
+    basePath: '/operator',
+    flagKey: 'platform.api.v1.operator',
+    defaultState: 'enabled',
+    fallbackStatus: 403,
+    disabledMessage: 'Operator tooling is restricted to platform administrators.',
+    audience: 'ops',
+    owners: ['support-operations'],
+    serviceTier: 'core',
+    tags: ['api', 'v1', 'operator'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'admin',
+      allowedRoles: ['admin', 'staff'],
+      elevatedRoles: ['admin']
+    },
+    cors: {
+      allowedMethods: ['GET']
+    },
+    statusPageComponent: 'api-operator'
+  },
+  {
     name: 'release',
     capability: 'release-management-automation',
     description:

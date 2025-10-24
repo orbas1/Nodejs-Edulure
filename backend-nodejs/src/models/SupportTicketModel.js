@@ -265,6 +265,7 @@ function buildCreatePayload(userId, payload = {}) {
   const createdAt = payload.createdAt ? new Date(payload.createdAt) : new Date();
   const reference = payload.reference ?? generateReference();
   const followUpDueAt = toIso(payload.followUpDueAt) ?? calculateFollowUpDueAt(payload.priority);
+  const tenantId = payload.tenantId ?? payload.tenant_id ?? 'global';
   const breadcrumbs = normaliseBreadcrumbs(payload.escalationBreadcrumbs);
   const initialBreadcrumbs = breadcrumbs.length ? breadcrumbs : buildInitialBreadcrumbs({ subject, createdAt, category: payload.category });
 
@@ -279,6 +280,7 @@ function buildCreatePayload(userId, payload = {}) {
     priority: payload.priority ?? 'normal',
     status: payload.status ?? 'open',
     channel: payload.channel ?? 'Portal',
+    tenant_id: tenantId,
     satisfaction: payload.satisfaction ?? null,
     owner: payload.owner ?? null,
     last_agent: payload.lastAgent ?? payload.owner ?? null,
