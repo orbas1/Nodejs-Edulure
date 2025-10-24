@@ -15,7 +15,8 @@ export default function PresencePanel({
   formValue,
   onFormChange,
   onSubmit,
-  interactive
+  interactive,
+  summary
 }) {
   const errorMessage = error
     ? error instanceof Error
@@ -24,6 +25,8 @@ export default function PresencePanel({
       ? error
       : null
     : null;
+
+  const safeSummary = summary ?? {};
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
@@ -45,6 +48,21 @@ export default function PresencePanel({
       <p className="mt-2 text-xs text-slate-500">
         Track live facilitators and support staff. Update your status to broadcast availability to moderators and learners.
       </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
+          Followers: {safeSummary.followers ?? 0}
+        </span>
+        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
+          Following: {safeSummary.following ?? 0}
+        </span>
+        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
+          Mutual: {safeSummary.mutual ?? 0}
+        </span>
+        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-emerald-600">
+          Recommended: {safeSummary.recommended ?? 0}
+        </span>
+      </div>
 
       <div className="mt-4 space-y-3" aria-live="polite" aria-busy={loading}>
         {loading && presence.length === 0 ? (
@@ -165,9 +183,16 @@ PresencePanel.propTypes = {
   }).isRequired,
   onFormChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
-  interactive: PropTypes.bool.isRequired
+  interactive: PropTypes.bool.isRequired,
+  summary: PropTypes.shape({
+    followers: PropTypes.number,
+    following: PropTypes.number,
+    mutual: PropTypes.number,
+    recommended: PropTypes.number
+  })
 };
 
 PresencePanel.defaultProps = {
-  error: null
+  error: null,
+  summary: null
 };

@@ -20,6 +20,15 @@ import {
   listCommunityEvents,
   createCommunityEvent
 } from '../../../../api/communityApi.js';
+import {
+  fetchFollowers,
+  fetchFollowing,
+  fetchFollowRecommendations,
+  fetchSocialMutes,
+  fetchSocialBlocks,
+  followUser,
+  unfollowUser
+} from '../../../../api/socialGraphApi.js';
 
 const MESSAGE_PAGE_SIZE = 30;
 
@@ -44,6 +53,14 @@ const DEFAULT_ROLE_PERMISSIONS = {
   scheduleEvents: false,
   hostVoice: false
 };
+
+const createEmptySocialState = () => ({
+  followers: { ...emptyCollection, items: [] },
+  following: { ...emptyCollection, items: [] },
+  recommendations: { ...emptyCollection, items: [] },
+  mutes: { ...emptyCollection, items: [] },
+  blocks: { ...emptyCollection, items: [] }
+});
 
 function mergePermissions(base, override = {}) {
   return Object.keys({ ...base, ...override }).reduce((acc, key) => {
@@ -194,8 +211,16 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
   const [rolesState, setRolesState] = useState({ ...emptyCollection, assignments: [] });
   const [eventsState, setEventsState] = useState(emptyCollection);
   const [resourcesState, setResourcesState] = useState(emptyCollection);
+  const [socialGraphState, setSocialGraphState] = useState(() => createEmptySocialState());
   const [capabilities, setCapabilities] = useState(DEFAULT_CAPABILITIES);
   const [workspaceNotice, setWorkspaceNotice] = useState(null);
+
+  const updateSocialSegment = useCallback((segment, patch) => {
+    setSocialGraphState((previous) => ({
+      ...previous,
+      [segment]: { ...previous[segment], ...patch }
+    }));
+  }, []);
 
   useEffect(() => {
     if (communityId !== lastCommunityRef.current) {
@@ -208,6 +233,7 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       setRolesState({ ...emptyCollection, assignments: [] });
       setEventsState(emptyCollection);
       setResourcesState(emptyCollection);
+      setSocialGraphState(createEmptySocialState());
       setCapabilities(DEFAULT_CAPABILITIES);
       setWorkspaceNotice(null);
     }
@@ -403,6 +429,37 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
     [communityId, interactive, token, publishErrorNotice]
   );
 
+  const loadSocialGraph = useCallback(
+    async (signal) => {
+      if (!interactive) {
+        setSocialGraphState(createEmptySocialState());
+        return;
+      }
+      const tasks = [
+        { key: 'followers', loader: fetchFollowers },
+        { key: 'following', loader: fetchFollowing },
+        { key: 'recommendations', loader: fetchFollowRecommendations },
+        { key: 'mutes', loader: fetchSocialMutes },
+        { key: 'blocks', loader: fetchSocialBlocks }
+      ];
+      tasks.forEach(({ key }) => updateSocialSegment(key, { loading: true, error: null }));
+      await Promise.all(
+        tasks.map(async ({ key, loader }) => {
+          try {
+            const response = await loader({ token, signal, limit: 50 });
+            const items = Array.isArray(response?.data) ? response.data : [];
+            updateSocialSegment(key, { items, loading: false, error: null });
+          } catch (error) {
+            if (signal?.aborted) return;
+            updateSocialSegment(key, { loading: false, error });
+            publishErrorNotice(error, `Unable to load ${key.replace(/([A-Z])/g, ' $1').toLowerCase()}`);
+          }
+        })
+      );
+    },
+    [interactive, token, updateSocialSegment, publishErrorNotice]
+  );
+
   const refreshWorkspace = useCallback(() => {
     if (!interactive) return () => undefined;
     const controller = new AbortController();
@@ -411,8 +468,16 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
     loadRoles(controller.signal);
     loadEvents(controller.signal);
     loadResources(controller.signal);
+    loadSocialGraph(controller.signal);
     return () => controller.abort();
-  }, [interactive, loadChannels, loadEvents, loadPresence, loadResources, loadRoles]);
+  }, [interactive, loadChannels, loadEvents, loadPresence, loadResources, loadRoles, loadSocialGraph]);
+
+  const refreshSocialGraph = useCallback(() => {
+    if (!interactive) return () => undefined;
+    const controller = new AbortController();
+    loadSocialGraph(controller.signal);
+    return () => controller.abort();
+  }, [interactive, loadSocialGraph]);
 
   useEffect(() => {
     if (!interactive) return undefined;
@@ -724,6 +789,103 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
     [communityId, ensureCapability, interactive, publishErrorNotice, token]
   );
 
+  const followMember = useCallback(
+    async (userId) => {
+      if (!interactive || !userId) return null;
+      try {
+        await followUser({ token, userId });
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Follow request sent',
+          detail: 'Your social graph will refresh with the new connection.'
+        });
+        return true;
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to follow member');
+        throw error;
+      }
+    },
+    [interactive, publishErrorNotice, token]
+  );
+
+  const unfollowMember = useCallback(
+    async (userId) => {
+      if (!interactive || !userId) return null;
+      try {
+        await unfollowUser({ token, userId });
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Connection updated',
+          detail: 'We will sync your social graph shortly.'
+        });
+        return true;
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to update follow status');
+        throw error;
+      }
+    },
+    [interactive, publishErrorNotice, token]
+  );
+
+  const directChannels = useMemo(
+    () => channelsState.items.filter((entry) => entry.channel?.channelType === 'direct'),
+    [channelsState.items]
+  );
+
+  const channelGroups = useMemo(() => {
+    const groups = {};
+    channelsState.items.forEach((entry) => {
+      const type = entry.channel?.channelType ?? 'other';
+      if (!groups[type]) {
+        groups[type] = [];
+      }
+      groups[type].push(entry);
+    });
+    return groups;
+  }, [channelsState.items]);
+
+  const socialGraphSummary = useMemo(() => {
+    const followerItems = Array.isArray(socialGraphState.followers.items)
+      ? socialGraphState.followers.items
+      : [];
+    const followingItems = Array.isArray(socialGraphState.following.items)
+      ? socialGraphState.following.items
+      : [];
+    const recommendationItems = Array.isArray(socialGraphState.recommendations.items)
+      ? socialGraphState.recommendations.items
+      : [];
+    const followerIds = new Set(
+      followerItems
+        .map((item) => String(item.userId ?? item.id ?? item.followerId ?? ''))
+        .filter(Boolean)
+    );
+    const followingIds = new Set(
+      followingItems
+        .map((item) => String(item.userId ?? item.id ?? item.followingId ?? ''))
+        .filter(Boolean)
+    );
+    let mutual = 0;
+    followerIds.forEach((id) => {
+      if (followingIds.has(id)) {
+        mutual += 1;
+      }
+    });
+    const mutedCount = Array.isArray(socialGraphState.mutes.items)
+      ? socialGraphState.mutes.items.length
+      : 0;
+    const blockedCount = Array.isArray(socialGraphState.blocks.items)
+      ? socialGraphState.blocks.items.length
+      : 0;
+    return {
+      followers: followerItems.length,
+      following: followingItems.length,
+      mutual,
+      recommended: recommendationItems.length,
+      muted: mutedCount,
+      blocked: blockedCount
+    };
+  }, [socialGraphState]);
+
   const activeChannel = useMemo(
     () => channelsState.items.find((entry) => entry.id === activeChannelId) ?? null,
     [activeChannelId, channelsState.items]
@@ -763,6 +925,13 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
     resourcesState,
     loadResources,
     createResourceEntry,
+    directChannels,
+    channelGroups,
+    socialGraphState,
+    socialGraphSummary,
+    followMember,
+    unfollowMember,
+    refreshSocialGraph,
     sendMessage,
     reactToMessage,
     removeReaction,

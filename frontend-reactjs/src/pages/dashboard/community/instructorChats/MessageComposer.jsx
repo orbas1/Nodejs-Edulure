@@ -4,6 +4,7 @@ import { PaperAirplaneIcon, PhotoIcon, VideoCameraIcon } from '@heroicons/react/
 const MESSAGE_TYPES = [
   { value: 'text', label: 'Text update' },
   { value: 'system', label: 'Announcement' },
+  { value: 'direct', label: 'Direct message' },
   { value: 'event', label: 'Event highlight' },
   { value: 'file', label: 'File drop' },
   { value: 'live', label: 'Live session' }
@@ -13,6 +14,22 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
   const handleChange = (field, next) => {
     onChange({ ...value, [field]: next });
   };
+
+  const handleCheckboxChange = (field) => (event) => {
+    onChange({ ...value, [field]: event.target.checked });
+  };
+
+  const handleDirectRecipientsChange = (event) => {
+    const entries = event.target.value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    onChange({ ...value, directRecipients: entries });
+  };
+
+  const recipientsInputValue = Array.isArray(value.directRecipients)
+    ? value.directRecipients.join(', ')
+    : value.directRecipients || '';
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -93,6 +110,34 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
           </label>
         </div>
 
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Audience segment
+            <select
+              value={value.audienceSegment}
+              onChange={(event) => handleChange('audienceSegment', event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="all-members">All members</option>
+              <option value="moderators">Moderators</option>
+              <option value="instructors">Instructors</option>
+              <option value="followers">Followers</option>
+            </select>
+          </label>
+          <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Priority
+            <select
+              value={value.priority}
+              onChange={(event) => handleChange('priority', event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="standard">Standard</option>
+              <option value="priority">Priority</option>
+              <option value="silent">Silent</option>
+            </select>
+          </label>
+        </div>
+
         {value.messageType === 'live' ? (
           <div className="grid gap-4 md:grid-cols-2">
             <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -128,6 +173,40 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
             className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </label>
+
+        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+          <label className="inline-flex items-center gap-2 font-medium">
+            <input
+              type="checkbox"
+              checked={Boolean(value.notifyFollowers)}
+              onChange={handleCheckboxChange('notifyFollowers')}
+              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            />
+            Notify followers
+          </label>
+          <label className="inline-flex items-center gap-2 font-medium">
+            <input
+              type="checkbox"
+              checked={Boolean(value.notifyFollowing)}
+              onChange={handleCheckboxChange('notifyFollowing')}
+              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            />
+            Notify people you follow
+          </label>
+        </div>
+
+        {value.messageType === 'direct' ? (
+          <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Direct recipients (user IDs or emails)
+            <input
+              type="text"
+              value={recipientsInputValue}
+              onChange={handleDirectRecipientsChange}
+              placeholder="user_123, user_456"
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+        ) : null}
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
@@ -165,7 +244,15 @@ MessageComposer.propTypes = {
     attachmentLabel: PropTypes.string,
     liveTopic: PropTypes.string,
     meetingUrl: PropTypes.string,
-    metadataNote: PropTypes.string
+    metadataNote: PropTypes.string,
+    notifyFollowers: PropTypes.bool,
+    notifyFollowing: PropTypes.bool,
+    priority: PropTypes.string,
+    audienceSegment: PropTypes.string,
+    directRecipients: PropTypes.oneOfType([
+      PropTypes.arrayOf(PropTypes.string),
+      PropTypes.string
+    ])
   }).isRequired,
   onChange: PropTypes.func.isRequired,
   onSend: PropTypes.func.isRequired,

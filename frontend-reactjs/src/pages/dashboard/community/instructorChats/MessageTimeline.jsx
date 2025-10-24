@@ -145,13 +145,45 @@ export default function MessageTimeline({
           <p className="text-sm text-slate-500">No messages found yet. Kickstart the conversation with an announcement.</p>
         ) : (
           <ol className="space-y-5">
-            {messages.map((message) => (
-              <li key={message.id} className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-inner">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                      {(message.author?.displayName ?? 'Member').slice(0, 2).toUpperCase()}
-                    </span>
+              {messages.map((message) => (
+                <li key={message.id} className="rounded-2xl border border-slate-100 bg-white/80 p-4 shadow-inner">
+                  {(() => {
+                    const badges = [];
+                    if (message.metadata?.notifyFollowers) {
+                      badges.push({ id: 'followers', label: 'Followers pinged' });
+                    }
+                    if (message.metadata?.notifyFollowing) {
+                      badges.push({ id: 'following', label: 'Following notified' });
+                    }
+                    if (message.metadata?.priority) {
+                      badges.push({ id: `priority-${message.metadata.priority}`, label: `Priority: ${message.metadata.priority}` });
+                    }
+                    if (message.metadata?.audienceSegment) {
+                      badges.push({ id: `audience-${message.metadata.audienceSegment}`, label: `Audience: ${message.metadata.audienceSegment}` });
+                    }
+                    const directRecipients = Array.isArray(message.metadata?.directRecipients)
+                      ? message.metadata.directRecipients
+                      : [];
+                    return badges.length || directRecipients.length ? (
+                      <div className="mb-3 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-500">
+                        {badges.map((badge) => (
+                          <span key={badge.id} className="rounded-full bg-slate-100 px-2 py-0.5">
+                            {badge.label}
+                          </span>
+                        ))}
+                        {directRecipients.length ? (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                            Direct to {directRecipients.length} recipient{directRecipients.length > 1 ? 's' : ''}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null;
+                  })()}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                        {(message.author?.displayName ?? 'Member').slice(0, 2).toUpperCase()}
+                      </span>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{message.author?.displayName ?? 'Member'}</p>
                       <p className="text-[11px] uppercase tracking-wide text-slate-400">
