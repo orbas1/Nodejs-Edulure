@@ -5,6 +5,7 @@ import CommunityPostModel from '../src/models/CommunityPostModel.js';
 import CommunityResourceModel from '../src/models/CommunityResourceModel.js';
 import ContentAssetModel from '../src/models/ContentAssetModel.js';
 import ContentAssetEventModel from '../src/models/ContentAssetEventModel.js';
+import { createMockConnection } from './support/mockDb.js';
 
 describe('CommunityMessageModel', () => {
   it('sanitises list options with large limits', () => {
@@ -39,6 +40,25 @@ describe('CommunityMessageModel', () => {
     const message = CommunityMessageModel.toDomain(record);
     expect(message.attachments).toEqual(['file']);
     expect(message.metadata).toEqual({ foo: 'bar' });
+  });
+
+  it('normalises message types and statuses on create', async () => {
+    const connection = createMockConnection({ community_messages: [] });
+
+    const created = await CommunityMessageModel.create(
+      {
+        communityId: 99,
+        channelId: 42,
+        authorId: 7,
+        messageType: ' LIVE ',
+        status: 'VISIBLE!!',
+        body: 'Welcome to the stream'
+      },
+      connection
+    );
+
+    expect(created.messageType).toBe('live');
+    expect(created.status).toBe('visible');
   });
 });
 

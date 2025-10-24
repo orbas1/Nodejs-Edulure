@@ -1,4 +1,9 @@
 import db from '../config/database.js';
+import {
+  COMMUNITY_MESSAGE_STATUSES,
+  COMMUNITY_MESSAGE_TYPES,
+  normaliseEnum
+} from './shared/statusRegistry.js';
 
 const MESSAGE_COLUMNS = [
   'cm.id',
@@ -50,16 +55,24 @@ function normaliseArray(value) {
 
 function mapMessage(record) {
   if (!record) return null;
+  const messageType = normaliseEnum(record.messageType, COMMUNITY_MESSAGE_TYPES, {
+    defaultValue: 'text',
+    fieldName: 'messageType'
+  });
+  const status = normaliseEnum(record.status, COMMUNITY_MESSAGE_STATUSES, {
+    defaultValue: 'visible',
+    fieldName: 'status'
+  });
   return {
     id: record.id,
     communityId: record.communityId,
     channelId: record.channelId,
     authorId: record.authorId,
-    messageType: record.messageType,
+    messageType,
     body: record.body,
     attachments: normaliseArray(record.attachments),
     metadata: parseJson(record.metadata, {}),
-    status: record.status,
+    status,
     pinned: Boolean(record.pinned),
     threadRootId: record.threadRootId ?? null,
     replyToMessageId: record.replyToMessageId ?? null,
@@ -82,6 +95,20 @@ function sanitiseMetadata(metadata) {
     return {};
   }
   return metadata;
+}
+
+function normaliseMessageType(value) {
+  return normaliseEnum(value, COMMUNITY_MESSAGE_TYPES, {
+    defaultValue: 'text',
+    fieldName: 'messageType'
+  });
+}
+
+function normaliseStatus(value) {
+  return normaliseEnum(value, COMMUNITY_MESSAGE_STATUSES, {
+    defaultValue: 'visible',
+    fieldName: 'status'
+  });
 }
 
 function clampLimit(limit, defaultValue, max) {
@@ -109,11 +136,11 @@ export default class CommunityMessageModel {
       community_id: message.communityId,
       channel_id: message.channelId,
       author_id: message.authorId,
-      message_type: message.messageType ?? 'text',
+      message_type: normaliseMessageType(message.messageType),
       body: message.body,
       attachments: JSON.stringify(normaliseArray(message.attachments)),
       metadata: JSON.stringify(sanitiseMetadata(message.metadata)),
-      status: message.status ?? 'visible',
+      status: normaliseStatus(message.status),
       pinned: Boolean(message.pinned),
       thread_root_id: message.threadRootId ?? null,
       reply_to_message_id: message.replyToMessageId ?? null,
@@ -177,7 +204,7 @@ export default class CommunityMessageModel {
   static async updateStatus(messageId, status, connection = db) {
     await connection('community_messages')
       .where({ id: messageId })
-      .update({ status, updated_at: connection.fn.now() });
+      .update({ status: normaliseStatus(status), updated_at: connection.fn.now() });
     return this.findById(messageId, connection);
   }
 
@@ -191,7 +218,11 @@ export default class CommunityMessageModel {
   static async markDeleted(messageId, connection = db) {
     await connection('community_messages')
       .where({ id: messageId })
-      .update({ status: 'deleted', deleted_at: connection.fn.now(), updated_at: connection.fn.now() });
+      .update({
+        status: normaliseStatus('deleted'),
+        deleted_at: connection.fn.now(),
+        updated_at: connection.fn.now()
+      });
     return this.findById(messageId, connection);
   }
 

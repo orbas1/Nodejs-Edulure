@@ -1,4 +1,9 @@
 import db from '../config/database.js';
+import {
+  DIRECT_MESSAGE_STATUSES,
+  DIRECT_MESSAGE_TYPES,
+  normaliseEnum
+} from './shared/statusRegistry.js';
 
 const MESSAGE_COLUMNS = [
   'dm.id',
@@ -32,15 +37,23 @@ function parseJson(value, fallback) {
 
 function mapRecord(record) {
   if (!record) return null;
+  const messageType = normaliseEnum(record.messageType, DIRECT_MESSAGE_TYPES, {
+    defaultValue: 'text',
+    fieldName: 'messageType'
+  });
+  const status = normaliseEnum(record.status, DIRECT_MESSAGE_STATUSES, {
+    defaultValue: 'sent',
+    fieldName: 'status'
+  });
   return {
     id: record.id,
     threadId: record.threadId,
     senderId: record.senderId,
-    messageType: record.messageType,
+    messageType,
     body: record.body,
     attachments: parseJson(record.attachments, []),
     metadata: parseJson(record.metadata, {}),
-    status: record.status,
+    status,
     deliveredAt: record.deliveredAt,
     readAt: record.readAt,
     deletedAt: record.deletedAt,
@@ -56,16 +69,30 @@ function mapRecord(record) {
   };
 }
 
+function normaliseMessageType(value) {
+  return normaliseEnum(value, DIRECT_MESSAGE_TYPES, {
+    defaultValue: 'text',
+    fieldName: 'messageType'
+  });
+}
+
+function normaliseStatus(value) {
+  return normaliseEnum(value, DIRECT_MESSAGE_STATUSES, {
+    defaultValue: 'sent',
+    fieldName: 'status'
+  });
+}
+
 export default class DirectMessageModel {
   static async create(message, connection = db) {
     const payload = {
       thread_id: message.threadId,
       sender_id: message.senderId,
-      message_type: message.messageType ?? 'text',
+      message_type: normaliseMessageType(message.messageType),
       body: message.body,
       attachments: JSON.stringify(message.attachments ?? []),
       metadata: JSON.stringify(message.metadata ?? {}),
-      status: message.status ?? 'sent',
+      status: normaliseStatus(message.status),
       delivered_at: message.deliveredAt ?? null,
       read_at: message.readAt ?? null
     };
@@ -103,14 +130,22 @@ export default class DirectMessageModel {
   static async markDelivered(messageId, timestamp = new Date(), connection = db) {
     await connection('direct_messages')
       .where({ id: messageId })
-      .update({ delivered_at: timestamp, status: 'delivered', updated_at: connection.fn.now() });
+      .update({
+        delivered_at: timestamp,
+        status: normaliseStatus('delivered'),
+        updated_at: connection.fn.now()
+      });
     return this.findById(messageId, connection);
   }
 
   static async markRead(messageId, timestamp = new Date(), connection = db) {
     await connection('direct_messages')
       .where({ id: messageId })
-      .update({ read_at: timestamp, status: 'read', updated_at: connection.fn.now() });
+      .update({
+        read_at: timestamp,
+        status: normaliseStatus('read'),
+        updated_at: connection.fn.now()
+      });
     return this.findById(messageId, connection);
   }
 

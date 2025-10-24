@@ -715,40 +715,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Stage migrations, seed sample data, run regression on lesson player, update docs, and release.
 
 ### 5.C Community, Social & Messaging Schema (`models/CommunityModel.js`, `models/CommunityEventModel.js`, `models/PostModel.js`, `models/ReactionModel.js`, `models/DirectMessageThreadModel.js`, `models/SocialGraphModel.js`, `migrations/*community*`, `migrations/*social*`)
-1. **Appraisal:** Comprehensive schema covering communities, programming, posts, reactions, moderation, social graph, and direct messaging.
-2. **Functionality:** Supports feed ranking, event scheduling, chat threading, moderation workflows, and donor tracking for community monetisation.
-3. **Logic Usefulness:** Enables auditing, analytics, and personalisation features across social experiences.
-4. **Redundancies:** Reaction counts stored in multiple tables; ensure single source to prevent drift.
-5. **Placeholders Or non-working functions or stubs:** Geo fields exist but rely on TODO integrations; document fallback behaviour.
-6. **Duplicate Functions:** Soft delete flags differ between modules; standardise semantics.
-7. **Improvements need to make:** Adopt partitioning for high-volume posts, add indexes for trending queries, and integrate event recurrence tables.
-8. **Styling improvements:** Document schema diagrams for community dashboards with accessible colours.
-9. **Efficiency analysis and improvement:** Use partial indexes for moderation queries, add caching for membership lookups, and compress message payload columns.
-10. **Strengths to Keep:** Rich relational design, audit fields, and support for monetisation flows.
-11. **Weaknesses to remove:** Manual cleanup of orphaned attachments; add cascading rules or scheduled jobs.
-12. **Styling and Colour review changes:** Align schema visualisations with design tokens to differentiate entity categories.
-13. **CSS, orientation, placement and arrangement changes:** Provide UI layout hints for representing relationships (threads, events, leaderboards).
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify column descriptions, particularly for moderation statuses, and remove redundant language.
-15. **Change Checklist Tracker:** Update community schema change checklist, websocket contract review, and moderation QA before deployment.
-16. **Full Upgrade Plan & Release Steps:** Stage migrations, run load tests, update caching layers, coordinate with moderation team, and release with monitoring.
+1. **Appraisal:** Canonical enums now live in `backend-nodejs/src/models/shared/statusRegistry.js`, giving `CommunityMessageModel.js` and `DirectMessageModel.js` shared validation while keeping the schema’s event, programming, and social graph breadth intact.
+2. **Functionality:** `CommunityMessageModel.create` and `DirectMessageModel.create` normalise message types/statuses, and `CommunityPostReactionModel.toggle` automatically refreshes summaries through `CommunityPostModel.updateReactionSummary`, so chat and feed clients receive clean, deduplicated payloads.
+3. **Logic Usefulness:** Fresh unit coverage in `communityModels.test.js`, `directMessageModel.test.js`, and `communityPostReactionModel.test.js` locks in the new normalisation paths and verifies reaction aggregates stay in sync with `community_posts` records.
+4. **Redundancies:** Reaction totals no longer diverge—`CommunityPostReactionModel.refreshSummary` is the single writer for `reaction_summary`, replacing ad-hoc recalculations across services.
+5. **Placeholders Or non-working functions or stubs:** Status coercion falls back to safe defaults in `statusRegistry.js`, giving legacy payloads predictable behaviour until geo-enrichment and other deferred features land.
+6. **Duplicate Functions:** Shared helpers collapse previously repeated status/type constants across community chat and direct messaging models, removing drift between moderation pipelines.
+7. **Improvements need to make:** Next, introduce channel-activity materialised views and partial indexes for `community_messages` hot paths so trending queries and moderator tooling scale with growing throughput.
+8. **Styling improvements:** With deterministic reaction summaries, front-ends can render accessible pill badges and pinned-post highlights without recalculating totals, improving community dashboard consistency.
+9. **Efficiency analysis and improvement:** Centralised aggregation avoids duplicate reads, and the groundwork is ready to add covering indexes and caching for membership lookups once live profiling confirms hotspots.
+10. **Strengths to Keep:** Retain the rich relational joins, moderation audit hooks, and the new summarisation pipeline that now emits ready-to-render post metadata.
+11. **Weaknesses to remove:** Follow up by pruning dormant geo columns and wiring scheduled clean-up for orphaned attachments so storage stays lean.
+12. **Styling and Colour review changes:** Shared enum names let design tokens map one-to-one with status badges (visible/hidden/deleted, sent/delivered/read), simplifying colour governance in chat UIs.
+13. **CSS, orientation, placement and arrangement changes:** Summaries now expose `total` counts in `community_posts.reaction_summary`, letting UI grids align counts, avatars, and badges without bespoke transforms.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Document the new status vocabulary inside API contracts so moderation copy and webhook payloads stay concise and consistent.
+15. **Change Checklist Tracker:** Add regression checks ensuring `communityPostReactionModel.test.js` and `directMessageModel.test.js` run in release rehearsals whenever messaging migrations ship.
+16. **Full Upgrade Plan & Release Steps:** Migrate staging with the new status helpers, replay reaction toggles to confirm summaries, rerun the vitest suite, and coordinate moderation plus realtime teams before promoting to production.
 
 ### 5.D Commerce & Finance Schema (`models/InvoiceModel.js`, `models/SubscriptionModel.js`, `models/PaymentAttemptModel.js`, `models/EscrowPayoutModel.js`, `models/CommunityDonationModel.js`, `migrations/*billing*`, `migrations/*finance*`)
-1. **Appraisal:** Ledger tables covering invoices, subscriptions, payment attempts, escrow payouts, donation ledgers, and reconciliation metadata.
-2. **Functionality:** Supports monetisation services, finance dashboards, reconciliation jobs, and audit exports.
-3. **Logic Usefulness:** Provides traceability for revenue analytics, refunds, and payout flows.
-4. **Redundancies:** Status enums repeated across models; centralise to avoid mismatch.
-5. **Placeholders Or non-working functions or stubs:** Usage records table stubbed; annotate with roadmap.
-6. **Duplicate Functions:** Currency handling repeated in model hooks; consolidate.
-7. **Improvements need to make:** Add double-entry ledger tables, integrate with accounting exports, and include audit trails for manual adjustments.
-8. **Styling improvements:** Update ER diagrams with finance palette and include layout hints for invoice tables in UI.
-9. **Efficiency analysis and improvement:** Index invoice status/date fields, partition donation history, and optimise queries used by reconciliation job.
-10. **Strengths to Keep:** Detailed audit fields, reconciliation metadata, and integration with services.
-11. **Weaknesses to remove:** Manual ledger adjustments lacking metadata; add structured logging and approvals.
-12. **Styling and Colour review changes:** Align finance schema documentation colours with accessibility guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Provide UI layout guidance for finance reports and statements.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify column definitions, ensure consistent terminology (invoice vs receipt), and remove redundant notes.
-15. **Change Checklist Tracker:** Update finance migration checklist, reconciliation QA, and export validation before release.
-16. **Full Upgrade Plan & Release Steps:** Stage migrations, sync sandbox billing data, coordinate with finance, and deploy during agreed window.
+1. **Appraisal:** Beyond invoices and payouts, the finance layer now tracks intent life-cycle transitions; `backend-nodejs/migrations/20250405130000_payment_status_transitions.js` codifies the ledger trail while extending enums to include `requires_capture`.
+2. **Functionality:** `PaymentIntentModel.updateById` persists status changes and records audit rows through the new `PaymentIntentStatusTransitionModel.js`, while `PaymentRefundModel.js` shares the same enum registry so dashboards and jobs ingest consistent states.
+3. **Logic Usefulness:** Tests in `paymentIntentStatusTransitionModel.test.js` and `paymentIntentModel.test.js` verify transition logging, and the shared status registry keeps refund and intent serializers aligned for reconciliation jobs.
+4. **Redundancies:** Status constants are no longer scattered—`statusRegistry.js` feeds both payment intents and refunds, eliminating mismatched enums that previously caused reporting drift.
+5. **Placeholders Or non-working functions or stubs:** Status normalisation defaults to safe values, shielding legacy records until deferred usage-ledger tables arrive.
+6. **Duplicate Functions:** Transition recording consolidates what used to be scattered logging code; the new helper ensures every service path calls the same persistence layer.
+7. **Improvements need to make:** Layer on double-entry ledger posting against the new transition history and expose the audit feed via admin APIs for finance sign-off workflows.
+8. **Styling improvements:** Transition metadata (reason, changed_by) can now surface in finance dashboards, enabling colour-coded status badges without bespoke scraping.
+9. **Efficiency analysis and improvement:** The migration adds indexes on `(payment_intent_id, changed_at)` and `(to_status, changed_at)` so reconciliation sweeps and SLA monitors stay fast even as history grows.
+10. **Strengths to Keep:** Preserve encrypted sensitive fields, robust audit hashes, and now the deterministic status pipeline that ties refunds, intents, and ledger entries together.
+11. **Weaknesses to remove:** Follow up by wiring structured approvals for manual adjustments and by filling the still-planned usage record tables.
+12. **Styling and Colour review changes:** Shared enums let UI palettes map directly to statuses like `processing` or `partially_refunded`, reducing mismatched finance badge colours.
+13. **CSS, orientation, placement and arrangement changes:** Transition records expose `changed_at`, empowering statements and charts to align columns chronologically without extra joins.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Document the new status reason/metadata fields in API docs so operators describe adjustments succinctly and consistently.
+15. **Change Checklist Tracker:** Add vitest suites covering `paymentIntentModel.test.js` and migration smoke tests to the finance release checklist before toggling new audit feeds.
+16. **Full Upgrade Plan & Release Steps:** Run the status-transition migration, backfill historical events, execute targeted recon tests, brief finance stakeholders on the new audit feed, and then promote during the scheduled billing window.
 
 ### 5.E Analytics, Governance & Observability Schema (`models/AnalyticsAlertModel.js`, `models/TelemetryExportModel.js`, `models/RuntimeConfigModel.js`, `models/AuditEventModel.js`, `models/PlatformSettingModel.js`, `migrations/*analytics*`, `migrations/*governance*`)
 1. **Appraisal:** Schemas for telemetry exports, analytics alerts, runtime configuration, audit logs, and platform settings supporting governance and observability.
