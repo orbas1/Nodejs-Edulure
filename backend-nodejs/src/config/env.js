@@ -1035,6 +1035,19 @@ const envSchema = z
     COMMUNITY_REMINDER_TIMEZONE: z.string().default('Etc/UTC'),
     COMMUNITY_REMINDER_LOOKAHEAD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(30),
     COMMUNITY_REMINDER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(100),
+    COMMUNITY_REMINDER_IDEMPOTENCY_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(5)
+      .max(14 * 24 * 60)
+      .default(24 * 60),
+    COMMUNITY_REMINDER_STATE_RETENTION: z.coerce.number().int().min(50).max(5000).default(1000),
+    COMMUNITY_REMINDER_DISPATCH_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(60_000)
+      .default(0),
     MODERATION_FOLLOW_UP_ENABLED: z.coerce.boolean().default(true),
     MODERATION_FOLLOW_UP_CRON: z.string().default('*/10 * * * *'),
     MODERATION_FOLLOW_UP_TIMEZONE: z.string().default('Etc/UTC'),
@@ -1885,7 +1898,10 @@ export const env = {
       cronExpression: raw.COMMUNITY_REMINDER_CRON,
       timezone: raw.COMMUNITY_REMINDER_TIMEZONE,
       lookaheadMinutes: raw.COMMUNITY_REMINDER_LOOKAHEAD_MINUTES,
-      batchSize: raw.COMMUNITY_REMINDER_BATCH_SIZE
+      batchSize: raw.COMMUNITY_REMINDER_BATCH_SIZE,
+      idempotencyWindowMinutes: raw.COMMUNITY_REMINDER_IDEMPOTENCY_MINUTES,
+      stateRetentionLimit: raw.COMMUNITY_REMINDER_STATE_RETENTION,
+      dispatchIntervalMs: raw.COMMUNITY_REMINDER_DISPATCH_INTERVAL_MS
     }
   },
   moderation: {
