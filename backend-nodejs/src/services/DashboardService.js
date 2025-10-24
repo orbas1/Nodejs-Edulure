@@ -492,6 +492,218 @@ function sanitiseDashboardHref(url) {
   }
 }
 
+function normaliseResourceEntry(entry, fallbackLabel, index = 0) {
+  if (!entry) {
+    return null;
+  }
+
+  if (typeof entry === 'string') {
+    const url = sanitiseDashboardHref(entry);
+    if (!url) {
+      return null;
+    }
+    return {
+      label: fallbackLabel ?? `Resource ${index + 1}`,
+      url
+    };
+  }
+
+  if (typeof entry === 'object') {
+    if (Array.isArray(entry)) {
+      return entry
+        .map((item, nestedIndex) => normaliseResourceEntry(item, fallbackLabel, nestedIndex))
+        .filter(Boolean);
+    }
+
+    if (entry.items && Array.isArray(entry.items)) {
+      return entry.items
+        .map((item, nestedIndex) => normaliseResourceEntry(item, fallbackLabel, nestedIndex))
+        .filter(Boolean);
+    }
+
+    const urlCandidate = entry.url ?? entry.href ?? entry.link ?? entry.path ?? entry.to ?? null;
+    const url = sanitiseDashboardHref(urlCandidate);
+    if (!url) {
+      return null;
+    }
+
+    return {
+      label: entry.label ?? entry.title ?? entry.name ?? fallbackLabel ?? `Resource ${index + 1}`,
+      url
+    };
+  }
+
+  return null;
+}
+
+function normaliseResourceCollection(value, fallbackLabel) {
+  if (!value) {
+    return [];
+  }
+
+  const source = Array.isArray(value)
+    ? value
+    : typeof value === 'object'
+      ? Array.isArray(value.items)
+        ? value.items
+        : Object.values(value)
+      : [];
+
+  const result = [];
+  source.forEach((item, index) => {
+    const entry = normaliseResourceEntry(item, fallbackLabel, index);
+    if (Array.isArray(entry)) {
+      entry.forEach((nested) => {
+        if (nested && nested.url) {
+          result.push(nested);
+        }
+      });
+    } else if (entry && entry.url) {
+      result.push(entry);
+    }
+  });
+  return result;
+}
+
+function resolveSessionResources(metadata, joinHref, lobbyHref) {
+  const resourcesMeta = typeof metadata.resources === 'object' ? metadata.resources : {};
+  const prepSources = resourcesMeta.prep ?? metadata.prep ?? metadata.prepLinks ?? null;
+  const materialSources =
+    resourcesMeta.materials ??
+    resourcesMeta.library ??
+    metadata.materials ??
+    (Array.isArray(metadata.resources) ? metadata.resources : null);
+  const recordingSources = resourcesMeta.recordings ?? metadata.recordings ?? null;
+
+  return {
+    joinUrl: joinHref ?? sanitiseDashboardHref(resourcesMeta.joinUrl ?? metadata.joinUrl ?? null),
+    hostUrl: sanitiseDashboardHref(
+      resourcesMeta.hostUrl ?? metadata.hostUrl ?? metadata.facilitatorUrl ?? metadata.moderatorUrl ?? null
+    ),
+    prep: normaliseResourceCollection(prepSources, 'Prep resource'),
+    materials: normaliseResourceCollection(materialSources, 'Class material'),
+    recordings: normaliseResourceCollection(recordingSources, 'Recording replay')
+  };
+}
+
+function resolveSessionSupport(metadata, facilitators) {
+  const supportMeta = typeof metadata.support === 'object' ? metadata.support : {};
+  return {
+    moderator: supportMeta.moderator ?? metadata.moderator ?? facilitators[0] ?? null,
+    helpDesk: supportMeta.helpDesk ?? metadata.helpDesk ?? null,
+    escalation: supportMeta.escalation ?? metadata.escalation ?? null
+  };
+}
+
+function resolveSessionAlerts({ occupancyRate, metadata, security, now }) {
+  const alerts = [];
+  const metaAlerts = Array.isArray(metadata.alerts)
+    ? metadata.alerts
+    : metadata.alerts && typeof metadata.alerts === 'object'
+      ? Object.values(metadata.alerts)
+      : [];
+  metaAlerts.forEach((alert, index) => {
+    if (!alert) return;
+    if (typeof alert === 'string') {
+      alerts.push({ id: `session-alert-meta-${index}`, label: alert });
+      return;
+    }
+    alerts.push({
+      id: alert.id ?? `session-alert-meta-${index}`,
+      label: alert.label ?? alert.message ?? alert.text ?? null
+    });
+  });
+
+  if (occupancyRate !== null && occupancyRate >= 85) {
+    alerts.push({
+      id: 'session-alert-occupancy',
+      label: `High occupancy (${occupancyRate}% filled) — review waitlist readiness.`
+    });
+  }
+
+  if (!security.waitingRoom || !security.passcodeRequired) {
+    alerts.push({
+      id: 'session-alert-security',
+      label: 'Enable waiting room and passcode to meet security guardrails.'
+    });
+  }
+
+  const deadlineCandidate = metadata.goLiveBy ?? metadata.deadline ?? metadata.slaDeadline ?? null;
+  const deadlineLabel = deadlineCandidate ? formatRelativeDay(deadlineCandidate, now) : null;
+  if (deadlineLabel) {
+    alerts.push({ id: 'session-alert-sla', label: `SLA deadline ${deadlineLabel}` });
+  }
+
+  const seen = new Set();
+  return alerts
+    .filter((alert) => alert && alert.label)
+    .filter((alert) => {
+      const key = alert.id ?? alert.label;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+function resolveSessionPricing(session, metadata) {
+  const currency = session.priceCurrency ?? metadata.currency ?? 'USD';
+  const amount = Number.isFinite(Number(session.priceAmount))
+    ? Number(session.priceAmount)
+    : Number(metadata.priceAmount ?? 0);
+  const priceLabel =
+    metadata.pricing?.price ??
+    metadata.priceLabel ??
+    (amount > 0 ? formatCurrency(amount, currency) : 'Free session');
+
+  return {
+    price: priceLabel,
+    currency,
+    collectedLabel: metadata.pricing?.collectedLabel ?? metadata.collectedLabel ?? null,
+    payoutStatus: metadata.pricing?.payoutStatus ?? metadata.revenue?.payoutStatus ?? metadata.payoutStatus ?? null
+  };
+}
+
+function resolvePreferredSlot(metadata, now = new Date()) {
+  if (!metadata) {
+    return null;
+  }
+
+  const preferred = metadata.preferredSlot ?? metadata.preferred ?? metadata.preferredAt ?? null;
+  if (!preferred) {
+    return null;
+  }
+
+  if (typeof preferred === 'string') {
+    const date = normaliseDate(preferred);
+    if (date) {
+      return formatDateTime(date, { dateStyle: 'medium', timeStyle: 'short' });
+    }
+    return preferred;
+  }
+
+  if (typeof preferred === 'object') {
+    if (preferred.label) {
+      return preferred.label;
+    }
+    const start = normaliseDate(preferred.startAt ?? preferred.start ?? preferred.at ?? null);
+    if (start) {
+      const timeZone = preferred.timezone ?? preferred.timeZone ?? metadata.timezone ?? 'UTC';
+      return formatDateTime(start, { dateStyle: 'medium', timeStyle: 'short', timeZone });
+    }
+  }
+
+  return null;
+}
+
+function resolveBookingSegment(metadata) {
+  if (!metadata) {
+    return 'General';
+  }
+  return metadata.segment ?? metadata.cohort ?? metadata.track ?? metadata.program ?? 'General';
+}
+
 function parseTagsList(tags) {
   const parsed = safeJsonParse(tags, []);
   if (Array.isArray(parsed)) {
@@ -2127,7 +2339,10 @@ export function buildLearnerDashboard({
       summary: whiteboardMeta.summary ?? whiteboardMeta.description ?? null,
       lastUpdatedLabel: whiteboardMeta.updatedAt ? formatRelativeDay(whiteboardMeta.updatedAt, now) : null,
       ready: whiteboardMeta.ready !== false,
-      url: whiteboardMeta.url ?? null
+      url: whiteboardMeta.url ?? null,
+      notes: Array.isArray(whiteboardMeta.notes)
+        ? whiteboardMeta.notes.map((note) => String(note)).filter((note) => note.length > 0)
+        : []
     };
 
     const attendanceCheckpointsRaw = Array.isArray(metadata.attendanceCheckpoints)
@@ -2192,6 +2407,16 @@ export function buildLearnerDashboard({
       passcodeRequired: securityMeta.passcodeRequired !== false
     };
 
+    const resources = resolveSessionResources(metadata, joinHref, lobbyHref);
+    const support = resolveSessionSupport(metadata, facilitators);
+    const alerts = resolveSessionAlerts({ occupancyRate, metadata, security, now });
+    const pricing = resolveSessionPricing(session, metadata);
+    const links = {
+      join: joinHref ?? null,
+      checkIn: checkInHref ?? null,
+      lobby: lobbyHref ?? null
+    };
+
     const readinessStatuses = [
       {
         id: `${session.id ?? crypto.randomUUID()}-whiteboard`,
@@ -2227,6 +2452,11 @@ export function buildLearnerDashboard({
       facilitators,
       breakoutRooms,
       security,
+      resources,
+      support,
+      alerts,
+      pricing,
+      links,
       currency: metadata.currency ?? 'USD',
       eventId: metadata.eventId ?? session.publicId ?? session.id,
       startAt,
@@ -4072,30 +4302,60 @@ function buildCourseWorkspace({
 
 function buildTutorNotifications({ bookings = [], now }) {
   const notifications = [];
+
   bookings
     .filter((booking) => booking.status === 'requested')
     .forEach((booking) => {
+      const learnerName = resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner');
+      const topic = booking.metadata?.topic ?? 'Mentorship session';
+      const preferredLabel = resolvePreferredSlot(booking.metadata, now);
+      const slaCandidate =
+        booking.metadata?.slaDueAt ??
+        booking.metadata?.preferredSlot?.startAt ??
+        booking.metadata?.preferredAt ??
+        null;
+      const slaDate = normaliseDate(slaCandidate);
+
       notifications.push({
         id: `booking-request-${booking.id}`,
         type: 'request',
-        message: `New mentorship request from ${resolveName(
-          booking.learnerFirstName,
-          booking.learnerLastName,
-          'Learner'
-        )}`,
-        receivedAt: booking.requestedAt ? new Date(booking.requestedAt) : now
+        title: 'New mentorship request',
+        detail: `${learnerName} requested ${topic}`,
+        message: `${learnerName} requested ${topic}`,
+        receivedAt: booking.requestedAt ? new Date(booking.requestedAt) : now,
+        deadline: slaDate ? slaDate.toISOString() : null,
+        preferredSlot: preferredLabel,
+        tone: 'info',
+        ctaLabel: 'Review request',
+        ctaPath: '/dashboard/instructor/tutor-bookings'
       });
     });
+
   bookings
-    .filter((booking) => booking.status === 'confirmed' && booking.scheduledStart)
+    .filter((booking) => booking.status === 'confirmed')
     .forEach((booking) => {
+      const learnerName = resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner');
+      const topic = booking.metadata?.topic ?? 'Mentorship session';
+      const start = normaliseDate(
+        booking.scheduledStart ?? booking.metadata?.startAt ?? booking.metadata?.preferredSlot?.startAt ?? null
+      );
+      const deadlineIso = start ? start.toISOString() : null;
+      const tone = start && start.getTime() - now.getTime() <= 48 * 60 * 60 * 1000 ? 'warning' : 'success';
+
       notifications.push({
-        id: `booking-upcoming-${booking.id}`,
+        id: `booking-due-${booking.id}`,
         type: 'upcoming',
-        message: `Upcoming session · ${booking.metadata?.topic ?? 'Mentorship session'}`,
-        scheduledFor: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+        title: 'Upcoming session',
+        detail: `${topic} with ${learnerName}`,
+        message: `${topic} with ${learnerName}`,
+        scheduledFor: start ? formatDateTime(start, { dateStyle: 'medium', timeStyle: 'short' }) : null,
+        deadline: deadlineIso,
+        tone,
+        ctaLabel: 'Open calendar',
+        ctaPath: '/dashboard/instructor/tutor-bookings'
       });
     });
+
   return notifications;
 }
 
@@ -4201,15 +4461,81 @@ export function buildInstructorDashboard({
     }
   ];
 
-  const pipelineBookings = tutorBookings
+  const bookingsWithMetadata = tutorBookings.map((booking) => ({
+    ...booking,
+    metadata:
+      typeof booking.metadata === 'string' ? safeJsonParse(booking.metadata, {}) : booking.metadata ?? {}
+  }));
+
+  const pipelineBookings = bookingsWithMetadata
     .filter((booking) => booking.status === 'requested')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      status: 'Requested',
-      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
-      requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
-      topic: safeJsonParse(booking.metadata, {}).topic ?? 'Mentorship session'
-    }));
+    .map((booking) => {
+      const metadata = booking.metadata ?? {};
+      return {
+        id: `booking-${booking.id}`,
+        status: 'Requested',
+        learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
+        requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
+        topic: metadata.topic ?? 'Mentorship session',
+        segment: resolveBookingSegment(metadata),
+        preferred: resolvePreferredSlot(metadata, now),
+        risk: metadata.risk ?? metadata.routing?.risk ?? null
+      };
+    });
+
+  const confirmedBookings = bookingsWithMetadata
+    .filter((booking) => booking.status === 'confirmed')
+    .map((booking) => {
+      const metadata = booking.metadata ?? {};
+      const start = normaliseDate(
+        booking.scheduledStart ?? metadata.startAt ?? metadata.preferredSlot?.startAt ?? null
+      );
+      const end = normaliseDate(booking.scheduledEnd ?? metadata.endAt ?? null);
+      const durationMinutes = Number.isFinite(Number(booking.durationMinutes))
+        ? Number(booking.durationMinutes)
+        : Number(metadata.durationMinutes ?? 0);
+
+      return {
+        id: `booking-${booking.id}`,
+        status: 'Confirmed',
+        learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
+        topic: metadata.topic ?? 'Mentorship session',
+        segment: resolveBookingSegment(metadata),
+        startAt: start ? start.toISOString() : null,
+        endAt: end ? end.toISOString() : null,
+        durationMinutes: durationMinutes || null,
+        location: metadata.location ?? 'Virtual classroom',
+        joinUrl: sanitiseDashboardHref(metadata.joinUrl ?? booking.meetingUrl ?? metadata.meetingUrl ?? null),
+        meetingUrl: sanitiseDashboardHref(booking.meetingUrl ?? metadata.meetingUrl ?? null),
+        recordingUrl: sanitiseDashboardHref(metadata.recordingUrl ?? null),
+        notes: Array.isArray(metadata.notes) ? metadata.notes : [],
+        date: start ? formatDateTime(start, { dateStyle: 'medium', timeStyle: 'short' }) : null
+      };
+    });
+
+  const bookingStats = bookingsWithMetadata.reduce(
+    (acc, booking) => {
+      const status = String(booking.status ?? '').toLowerCase();
+      acc.total += 1;
+      if (status === 'requested') acc.pending += 1;
+      if (status === 'confirmed') acc.confirmed += 1;
+      if (status === 'completed') acc.completed += 1;
+      if (status === 'cancelled') acc.cancelled += 1;
+
+      if (status === 'confirmed' || status === 'completed') {
+        const durationMinutes = Number.isFinite(Number(booking.durationMinutes))
+          ? Number(booking.durationMinutes)
+          : Number(booking.metadata?.durationMinutes ?? 0);
+        const hourlyRate = Number(booking.hourlyRateAmount ?? booking.metadata?.hourlyRateAmount ?? 0);
+        const sessionValue = durationMinutes > 0 ? Math.round((hourlyRate * durationMinutes) / 60) : hourlyRate;
+        acc.revenueMinor += sessionValue;
+      }
+
+      return acc;
+    },
+    { total: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0, revenueMinor: 0 }
+  );
+  bookingStats.revenue = Number((bookingStats.revenueMinor / 100).toFixed(2));
 
   const roster = tutorProfiles.map((profile) => ({
     id: profile.id,
@@ -4223,22 +4549,13 @@ export function buildInstructorDashboard({
   const availabilitySummary = aggregateTutorAvailability({
     availability: tutorAvailability.map((entry) => ({
       ...entry,
-      metadata: safeJsonParse(entry.metadata, {})
+      metadata: typeof entry.metadata === 'string' ? safeJsonParse(entry.metadata, {}) : entry.metadata ?? {}
     })),
-    bookings: tutorBookings.map((booking) => ({
-      ...booking,
-      metadata: safeJsonParse(booking.metadata, {})
-    })),
+    bookings: bookingsWithMetadata,
     now
   });
 
-  const tutorNotifications = buildTutorNotifications({
-    bookings: tutorBookings.map((booking) => ({
-      ...booking,
-      metadata: safeJsonParse(booking.metadata, {})
-    })),
-    now
-  });
+  const tutorNotifications = buildTutorNotifications({ bookings: bookingsWithMetadata, now });
 
   const communityMap = new Map();
   communityMemberships.forEach((membership) => {
@@ -4445,7 +4762,9 @@ export function buildInstructorDashboard({
       metrics,
       courses: coursesWorkspace,
       bookings: {
-        pipeline: pipelineBookings
+        pipeline: pipelineBookings,
+        confirmed: confirmedBookings,
+        stats: bookingStats
       },
       tutors: {
         roster,

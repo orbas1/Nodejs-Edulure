@@ -3616,6 +3616,8 @@ export async function seed(knex) {
       metadata: JSON.stringify({ channel: 'ops-guild', durationMinutes: 60 })
     });
 
+    const bookingSlaDue = new Date(tutorSlotStart.getTime() - 24 * 60 * 60 * 1000);
+
     const [opsTutorBookingId] = await trx('tutor_bookings').insert({
       public_id: crypto.randomUUID(),
       tutor_id: opsTutorProfileId,
@@ -3639,13 +3641,36 @@ export async function seed(knex) {
         ctaLabel: 'Join mentor room',
         location: 'Virtual ops lounge',
         timezone: 'Etc/UTC',
-        notes: 'Review escalation runbooks and donation messaging before the live stream.',
-        resources: [
-          {
-            title: 'Automation rehearsal checklist',
-            url: 'https://docs.edulure.test/ops/automation-checklist'
-          }
-        ]
+        durationMinutes: 60,
+        segment: 'Operations guild pod',
+        cohort: 'Automation rehearsal',
+        preferredSlot: {
+          label: 'Friday · 17:00 UTC',
+          startAt: tutorSlotStart.toISOString(),
+          timezone: 'Etc/UTC'
+        },
+        slaDueAt: bookingSlaDue.toISOString(),
+        risk: 'high',
+        routing: { score: 0.82, ruleset: 'ops-pod-routing-v1' },
+        recordingUrl: 'https://live.edulure.test/ops/automation-command-simulation/recording',
+        notes: [
+          'Review escalation runbooks and donation messaging before the live stream.',
+          'Share facilitator prep deck 12 hours ahead.'
+        ],
+        resources: {
+          prep: [
+            {
+              label: 'Automation rehearsal checklist',
+              url: 'https://docs.edulure.test/ops/automation-checklist'
+            }
+          ],
+          materials: [
+            {
+              label: 'Mentor talking points',
+              url: 'https://docs.edulure.test/ops/mentor-talking-points'
+            }
+          ]
+        }
       })
     });
 
@@ -3690,6 +3715,7 @@ export async function seed(knex) {
         checkInUrl: 'https://live.edulure.test/ops/automation-command-simulation/check-in',
         lobbyUrl: 'https://live.edulure.test/ops/automation-command-simulation/lobby',
         meetingUrl: 'https://live.edulure.test/ops/automation-command-simulation',
+        hostUrl: 'https://ops.edulure.test/host/automation-command',
         timezone: 'Etc/UTC',
         facilitators: ['Kai Watanabe', 'Ops Control Desk'],
         security: { waitingRoom: true, passcodeRequired: true, owner: 'Ops Control Desk' },
@@ -3699,6 +3725,10 @@ export async function seed(knex) {
           updatedAt: liveWhiteboardUpdated.toISOString(),
           ready: true,
           url: 'https://whiteboard.edulure.test/ops/automation-command',
+          notes: [
+            'Moderation toolkit pinned to the whiteboard sidebar.',
+            'Confirm scoreboard overlay with streaming ops during dry run.'
+          ],
           snapshots: [
             {
               template: 'Automation ops board',
@@ -3746,12 +3776,49 @@ export async function seed(knex) {
           { name: 'Automation pod A', capacity: 24 },
           { name: 'Escalation drills', capacity: 18 }
         ],
-        resources: [
-          {
-            title: 'Automation command deck',
-            url: 'https://cdn.edulure.test/slides/automation-command.pdf'
-          }
+        resources: {
+          hostUrl: 'https://ops.edulure.test/host/automation-command',
+          prep: [
+            {
+              label: 'Facilitator standby checklist',
+              url: 'https://docs.edulure.test/ops/facilitator-standby'
+            },
+            {
+              label: 'Automation rehearsal briefing',
+              url: 'https://docs.edulure.test/ops/automation-briefing'
+            }
+          ],
+          materials: [
+            {
+              label: 'Automation command deck',
+              url: 'https://cdn.edulure.test/slides/automation-command.pdf'
+            },
+            {
+              label: 'Telemetry dashboard quickstart',
+              url: 'https://docs.edulure.test/ops/telemetry-dashboard'
+            }
+          ],
+          recordings: [
+            {
+              label: 'Prior cohort replay',
+              url: 'https://cdn.edulure.test/video/ops/automation-command-replay.mp4'
+            }
+          ]
+        },
+        support: {
+          moderator: 'Ops Control Desk',
+          helpDesk: 'ops-support@edulure.test',
+          escalation: 'https://ops.edulure.test/escalations'
+        },
+        alerts: [
+          { id: 'ops-capacity', label: '64 of 120 seats reserved — queue waitlist updates.' },
+          { id: 'ops-escalation', label: 'Escalation desk standby required 15 minutes prior.' }
         ],
+        pricing: {
+          collectedLabel: '64 tickets collected',
+          payoutStatus: 'scheduled'
+        },
+        goLiveBy: livePrepCheckpoint.toISOString(),
         donations: { enabled: true, suggestedAmountCents: 2500 },
         eventId: 'OPS-LIVE-001'
       })

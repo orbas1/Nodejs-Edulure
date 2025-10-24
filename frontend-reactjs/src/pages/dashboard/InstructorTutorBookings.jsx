@@ -35,9 +35,19 @@ export default function InstructorTutorBookings() {
   const availability = Array.isArray(dashboard?.tutors?.availability)
     ? dashboard.tutors.availability
     : [];
-  const notifications = Array.isArray(dashboard?.tutors?.notifications)
+  const notificationsRaw = Array.isArray(dashboard?.tutors?.notifications)
     ? dashboard.tutors.notifications
     : [];
+  const notifications = useMemo(
+    () =>
+      notificationsRaw.map((notification) => ({
+        ...notification,
+        title: notification.title ?? notification.message ?? 'Operational update',
+        detail: notification.detail ?? notification.message ?? null,
+        deadline: notification.deadline ?? notification.scheduledFor ?? notification.receivedAt ?? null
+      })),
+    [notificationsRaw]
+  );
   const [segmentFilter, setSegmentFilter] = useState('all');
 
   const capacityRisks = availability.filter(
@@ -58,8 +68,13 @@ export default function InstructorTutorBookings() {
         values.add(item.segment);
       }
     });
+    confirmed.forEach((item) => {
+      if (item.segment) {
+        values.add(item.segment);
+      }
+    });
     return Array.from(values);
-  }, [pipeline]);
+  }, [pipeline, confirmed]);
 
   const filteredPipeline = useMemo(() => {
     if (segmentFilter === 'all') {
