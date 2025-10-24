@@ -1,9 +1,12 @@
 import type { ApiRequestOptions } from '../generated/core/ApiRequestOptions';
 
 import { createTokenStore } from './tokenStore';
-import type { TokenSet, TokenStore, TokenStoreListener } from './tokenStore';
+import type { TokenSet, TokenStore, TokenStoreListener, TokenStoreOptions } from './tokenStore';
+
+import { MissingAccessTokenError, TokenRefreshFailedError } from './errors';
 
 const DEFAULT_REFRESH_MARGIN_MS = 30_000;
+const DEFAULT_BACKGROUND_INTERVAL_MS = 60_000;
 
 type Clock = () => number;
 
@@ -17,11 +20,18 @@ export type SessionManagerEvents = {
   onRefreshError?: (error: unknown) => void;
 };
 
+export type BackgroundRefreshOptions = {
+  intervalMs?: number;
+  autoStart?: boolean;
+};
+
 export type SessionManagerOptions = SessionManagerEvents & {
   store?: TokenStore;
+  tokenStoreOptions?: TokenStoreOptions;
   refresh?: TokenRefreshHandler;
   refreshMarginMs?: number;
   clock?: Clock;
+  backgroundRefresh?: boolean | BackgroundRefreshOptions;
 };
 
 export interface SessionManager {
@@ -35,6 +45,9 @@ export interface SessionManager {
   clear(): Promise<void>;
   subscribe(listener: TokenStoreListener): () => void;
   isExpired(graceMs?: number): Promise<boolean>;
+  startBackgroundRefresh(): void;
+  stopBackgroundRefresh(): void;
+  isBackgroundRefreshRunning(): boolean;
 }
 
 type AsyncHeaderResolver = (options: ApiRequestOptions) => Promise<HeaderMap> | HeaderMap;
@@ -52,17 +65,41 @@ function resolveClock(clock?: Clock): Clock {
 
 export function createSessionManager({
   store: providedStore,
+  tokenStoreOptions,
   refresh,
   refreshMarginMs = DEFAULT_REFRESH_MARGIN_MS,
   clock,
   onRefreshStart,
   onRefreshSuccess,
   onRefreshError,
+  backgroundRefresh,
 }: SessionManagerOptions = {}): SessionManager {
   const resolvedClock = resolveClock(clock);
-  const store = providedStore ?? createTokenStore({ clock: resolvedClock });
+  const store = providedStore ??
+    createTokenStore({
+      ...(tokenStoreOptions ?? {}),
+      clock: tokenStoreOptions?.clock ?? resolvedClock,
+    });
   const margin = Math.max(0, refreshMarginMs ?? DEFAULT_REFRESH_MARGIN_MS);
   let refreshPromise: Promise<TokenSet | null> | null = null;
+  let backgroundTimer: ReturnType<typeof setInterval> | null = null;
+
+  const backgroundConfig: BackgroundRefreshOptions | null = (() => {
+    if (!refresh) {
+      return null;
+    }
+    if (typeof backgroundRefresh === 'boolean') {
+      return backgroundRefresh ? {} : null;
+    }
+    if (backgroundRefresh && typeof backgroundRefresh === 'object') {
+      return backgroundRefresh;
+    }
+    return null;
+  })();
+
+  const backgroundInterval = backgroundConfig
+    ? Math.max(1_000, backgroundConfig.intervalMs ?? Math.max(margin, DEFAULT_BACKGROUND_INTERVAL_MS))
+    : null;
 
   const runRefresh = async (force: boolean): Promise<TokenSet | null> => {
     if (!refresh) {
@@ -93,8 +130,12 @@ export function createSessionManager({
         onRefreshSuccess?.(resolved ?? null);
         return resolved ?? null;
       } catch (error) {
-        onRefreshError?.(error);
-        throw error;
+        const wrapped =
+          error instanceof TokenRefreshFailedError
+            ? error
+            : new TokenRefreshFailedError('Failed to refresh access token', { cause: error });
+        onRefreshError?.(wrapped);
+        throw wrapped;
       } finally {
         refreshPromise = null;
       }
@@ -147,6 +188,10 @@ export function createSessionManager({
 
     async clear() {
       await store.clear();
+      if (backgroundTimer) {
+        clearInterval(backgroundTimer);
+        backgroundTimer = null;
+      }
     },
 
     subscribe(listener) {
@@ -156,7 +201,40 @@ export function createSessionManager({
     async isExpired(graceMs) {
       return store.isExpired(graceMs ?? margin);
     },
+
+    startBackgroundRefresh() {
+      if (!refresh || backgroundTimer || !backgroundInterval) {
+        return;
+      }
+      backgroundTimer = setInterval(() => {
+        void (async () => {
+          try {
+            const expired = await store.isExpired(margin);
+            if (expired) {
+              await runRefresh(false);
+            }
+          } catch (error) {
+            onRefreshError?.(error);
+          }
+        })();
+      }, backgroundInterval);
+    },
+
+    stopBackgroundRefresh() {
+      if (backgroundTimer) {
+        clearInterval(backgroundTimer);
+        backgroundTimer = null;
+      }
+    },
+
+    isBackgroundRefreshRunning() {
+      return Boolean(backgroundTimer);
+    },
   };
+
+  if (backgroundConfig && backgroundConfig.autoStart !== false) {
+    manager.startBackgroundRefresh();
+  }
 
   return manager;
 }
@@ -175,7 +253,10 @@ export function createAuthorizationHeaderResolver(
   return async () => {
     const token = refresh ? await session.ensureFreshToken() : await session.getAccessToken();
     if (!token) {
-      return allowEmpty ? { [header]: '' } : {};
+      if (allowEmpty) {
+        return { [header]: '' };
+      }
+      throw new MissingAccessTokenError('Access token is required to generate the authorization header.');
     }
     const value = scheme ? formatAuthorizationHeader(token, scheme) : token;
     return { [header]: value };

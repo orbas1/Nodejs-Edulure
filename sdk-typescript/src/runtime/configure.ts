@@ -3,11 +3,20 @@ import type { OpenAPIConfig } from '../generated/core/OpenAPI';
 import { OpenAPI } from '../generated/core/OpenAPI';
 
 import { createSessionManager, formatAuthorizationHeader } from './auth';
-import type { SessionManager, SessionManagerEvents, SessionManagerOptions, TokenRefreshHandler } from './auth';
+import type {
+  BackgroundRefreshOptions,
+  SessionManager,
+  SessionManagerEvents,
+  SessionManagerOptions,
+  TokenRefreshHandler,
+} from './auth';
 import { mergeHeaderProducers, normaliseHeaders } from './base';
 import type { HeaderDictionary, HeaderProducer } from './base';
 import { sdkManifest } from './manifest';
 import type { TokenStore } from './tokenStore';
+import type { TokenStoreOptions } from './tokenStore';
+import { MissingAccessTokenError } from './errors';
+import type { RequestHooks } from '../generated/core/OpenAPI';
 
 type TokenResolver = () => Promise<string | null | undefined> | string | null | undefined;
 
@@ -20,6 +29,7 @@ export type HeaderResolver = HeaderDictionary | HeaderResolverFunction;
 export type ConfigureAuthOptions = {
   sessionManager?: SessionManager;
   tokenStore?: TokenStore;
+  tokenStoreOptions?: TokenStoreOptions;
   refresh?: TokenRefreshHandler;
   refreshMarginMs?: number;
   autoRefresh?: boolean;
@@ -32,6 +42,7 @@ export type ConfigureAuthOptions = {
   onRefreshSuccess?: SessionManagerEvents['onRefreshSuccess'];
   onRefreshError?: SessionManagerEvents['onRefreshError'];
   clock?: SessionManagerOptions['clock'];
+  backgroundRefresh?: boolean | BackgroundRefreshOptions;
 };
 
 export type ConfigureSdkOptions = {
@@ -44,6 +55,8 @@ export type ConfigureSdkOptions = {
   userAgent?: string;
   onConfig?: (config: OpenAPIConfig) => void;
   auth?: ConfigureAuthOptions;
+  hooks?: RequestHooks;
+  errorDomain?: string;
 };
 
 function normaliseBaseUrl(baseUrl: string): string {
@@ -92,15 +105,27 @@ function buildSessionManager(auth?: ConfigureAuthOptions): SessionManager | unde
   if (auth.sessionManager) {
     return auth.sessionManager;
   }
-  const { tokenStore, refresh, refreshMarginMs, onRefreshError, onRefreshStart, onRefreshSuccess, clock } = auth;
-  const sessionOptions: SessionManagerOptions = {
-    store: tokenStore,
+  const {
+    tokenStore,
+    tokenStoreOptions,
     refresh,
     refreshMarginMs,
     onRefreshError,
     onRefreshStart,
     onRefreshSuccess,
     clock,
+    backgroundRefresh,
+  } = auth;
+  const sessionOptions: SessionManagerOptions = {
+    store: tokenStore,
+    tokenStoreOptions,
+    refresh,
+    refreshMarginMs,
+    onRefreshError,
+    onRefreshStart,
+    onRefreshSuccess,
+    clock,
+    backgroundRefresh,
   };
   return createSessionManager(sessionOptions);
 }
@@ -117,7 +142,7 @@ function createTokenHeaderProducer(
       if (allowAnonymous) {
         return {};
       }
-      throw new Error('Access token is required but none was resolved.');
+      throw new MissingAccessTokenError('Access token is required but none was resolved.');
     }
     const value = scheme ? formatAuthorizationHeader(token, scheme) : token;
     return { [headerName]: value };
@@ -134,10 +159,14 @@ export function configureSdk({
   userAgent,
   onConfig,
   auth,
+  hooks,
+  errorDomain,
 }: ConfigureSdkOptions): OpenAPIConfig {
   const normalisedBase = normaliseBaseUrl(baseUrl);
   OpenAPI.BASE = normalisedBase;
   OpenAPI.VERSION = version ?? sdkManifest.specVersion;
+  OpenAPI.REQUEST_HOOKS = hooks;
+  OpenAPI.ERROR_DOMAIN = errorDomain ?? undefined;
 
   const session = buildSessionManager(auth);
   if (session && auth?.onSession) {

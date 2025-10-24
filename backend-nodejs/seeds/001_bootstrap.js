@@ -5817,6 +5817,46 @@ export async function seed(knex) {
         exposure_level: 'internal',
         sensitive: false,
         metadata: JSON.stringify({ owner: 'Commerce' })
+      },
+      {
+        key: 'sdk.typescript.auth.scheme',
+        environment_scope: 'global',
+        value_type: 'string',
+        value: 'Bearer',
+        description: 'Default authorization scheme applied by the Edulure TypeScript SDK when composing headers.',
+        exposure_level: 'public',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Platform SDK', manifestKey: 'runtime.auth.scheme' })
+      },
+      {
+        key: 'sdk.typescript.auth.refresh-margin-ms',
+        environment_scope: 'global',
+        value_type: 'number',
+        value: '30000',
+        description: 'Default refresh margin (ms) leveraged by the SDK session manager before token expiry.',
+        exposure_level: 'internal',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Platform SDK', option: 'refreshMarginMs' })
+      },
+      {
+        key: 'sdk.typescript.session.storage-key',
+        environment_scope: 'global',
+        value_type: 'string',
+        value: 'edulure.sdk.session',
+        description: 'Storage key consumed by the SDK browser token store to coordinate cross-tab session updates.',
+        exposure_level: 'internal',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Platform SDK', sync: 'storage-event' })
+      },
+      {
+        key: 'sdk.typescript.error-domain',
+        environment_scope: 'global',
+        value_type: 'string',
+        value: 'sdk.typescript',
+        description: 'Error domain identifier appended to SDK transport errors for analytics and tracing.',
+        exposure_level: 'internal',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Platform SDK', tracing: true })
       }
     ]);
 

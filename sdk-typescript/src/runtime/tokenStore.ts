@@ -17,6 +17,7 @@ export type TokenStoreListener = (tokenSet: TokenSet | null) => void;
 export interface TokenStorageAdapter {
   load(): Promise<TokenSet | null | undefined>;
   save(tokenSet: TokenSet | null): Promise<void>;
+  readonly syncKey?: string;
 }
 
 export type TokenStoreOptions = {
@@ -24,6 +25,11 @@ export type TokenStoreOptions = {
   storageAdapter?: TokenStorageAdapter;
   clock?: () => number;
   autoHydrate?: boolean;
+  syncStorageKey?: string;
+  storageEventTarget?: {
+    addEventListener(type: 'storage', listener: (event: StorageEvent) => void): void;
+    removeEventListener(type: 'storage', listener: (event: StorageEvent) => void): void;
+  };
 };
 
 export interface TokenStore {
@@ -33,6 +39,7 @@ export interface TokenStore {
   clear(): Promise<void>;
   subscribe(listener: TokenStoreListener): () => void;
   isExpired(graceMs?: number): Promise<boolean>;
+  destroy?(): Promise<void>;
 }
 
 const DEFAULT_REFRESH_MARGIN = 0;
@@ -143,10 +150,16 @@ export function createTokenStore({
   storageAdapter,
   clock: providedClock,
   autoHydrate = true,
+  syncStorageKey,
+  storageEventTarget,
 }: TokenStoreOptions = {}): TokenStore {
   const clock: Clock = providedClock ?? (() => Date.now());
   let current: NormalisedTokenSet | null = normaliseTokenSet(initialTokenSet, clock);
   const listeners = new Set<TokenStoreListener>();
+  const resolvedEventTarget =
+    storageEventTarget ?? (typeof window !== 'undefined' ? (window as Window & typeof globalThis) : undefined);
+  const storageSyncKey = syncStorageKey ?? storageAdapter?.syncKey;
+  let storageEventHandler: ((event: StorageEvent) => void) | null = null;
 
   let hydrationPromise: Promise<void> | null = null;
   if (storageAdapter && autoHydrate) {
@@ -189,6 +202,27 @@ export function createTokenStore({
       }
     });
   };
+
+  if (storageAdapter && storageSyncKey && resolvedEventTarget?.addEventListener) {
+    storageEventHandler = (event: StorageEvent) => {
+      if (event.key !== storageSyncKey) {
+        return;
+      }
+      void ready()
+        .then(() => storageAdapter.load())
+        .then((loaded) => {
+          current = normaliseTokenSet(loaded ?? null, clock);
+          notify(current);
+        })
+        .catch((error) => {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('Failed to synchronise token store from storage event', error);
+          }
+        });
+    };
+
+    resolvedEventTarget.addEventListener('storage', storageEventHandler);
+  }
 
   const store: TokenStore = {
     async get() {
@@ -236,6 +270,13 @@ export function createTokenStore({
       const threshold = clock() + Math.max(0, graceMs);
       return current.expiresAt <= threshold;
     },
+    async destroy() {
+      if (storageEventHandler && resolvedEventTarget?.removeEventListener) {
+        resolvedEventTarget.removeEventListener('storage', storageEventHandler);
+        storageEventHandler = null;
+      }
+      listeners.clear();
+    },
   };
 
   return store;
@@ -245,6 +286,7 @@ export type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export function createBrowserStorageAdapter(storage: StorageLike, key: string): TokenStorageAdapter {
   return {
+    syncKey: key,
     async load() {
       try {
         const raw = storage.getItem(key);
