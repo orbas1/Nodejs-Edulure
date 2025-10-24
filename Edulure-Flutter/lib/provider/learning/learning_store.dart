@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/learning_persistence_service.dart';
+import '../../services/lesson_download_service.dart';
+import '../../services/progress_service.dart';
 import 'learning_models.dart';
 
 final _random = Random();
@@ -603,11 +605,22 @@ class LiveSessionStore extends PersistentLearningStore<LiveSession> {
 }
 
 class ProgressStore extends PersistentLearningStore<ModuleProgressLog> {
-  ProgressStore({LearningPersistence? persistence})
-      : _persistence = persistence ?? LearningPersistenceService(),
+  ProgressStore._({
+    required LearningPersistence persistence,
+    required ProgressSyncService syncService,
+  })  : _persistence = persistence,
+        _syncService = syncService,
         super(seed: _seedLogs());
 
+  factory ProgressStore({LearningPersistence? persistence, ProgressSyncService? syncService}) {
+    final resolvedPersistence = persistence ?? LearningPersistenceService();
+    final resolvedSyncService = syncService ?? ProgressSyncService(persistence: resolvedPersistence);
+    return ProgressStore._(persistence: resolvedPersistence, syncService: resolvedSyncService);
+  }
+
   final LearningPersistence _persistence;
+  final ProgressSyncService _syncService;
+  String? _cachedDeviceId;
 
   static List<ModuleProgressLog> _seedLogs() {
     return [
@@ -618,6 +631,11 @@ class ProgressStore extends PersistentLearningStore<ModuleProgressLog> {
         timestamp: DateTime.now().subtract(const Duration(days: 2, hours: 3)),
         notes: 'Completed persona interview synthesis. Ready for validation sprint.',
         completedLessons: 2,
+        syncState: ProgressSyncState.synced,
+        updatedAt: DateTime.now().subtract(const Duration(days: 2, hours: 2, minutes: 40)),
+        syncedAt: DateTime.now().subtract(const Duration(days: 2, hours: 2, minutes: 40)),
+        deviceId: 'seed-device',
+        revision: 1,
       ),
       ModuleProgressLog(
         id: 'log-2',
@@ -626,6 +644,11 @@ class ProgressStore extends PersistentLearningStore<ModuleProgressLog> {
         timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 4)),
         notes: 'Drafted messaging matrix and shared with tutor for review.',
         completedLessons: 1,
+        syncState: ProgressSyncState.synced,
+        updatedAt: DateTime.now().subtract(const Duration(days: 1, hours: 3, minutes: 10)),
+        syncedAt: DateTime.now().subtract(const Duration(days: 1, hours: 3, minutes: 10)),
+        deviceId: 'seed-device',
+        revision: 1,
       ),
     ];
   }
@@ -640,8 +663,17 @@ class ProgressStore extends PersistentLearningStore<ModuleProgressLog> {
     return _persistence.saveProgressLogs(value);
   }
 
-  void recordProgress(ModuleProgressLog log) {
-    state = [...state, log];
+  Future<void> recordProgress(ModuleProgressLog log) async {
+    final deviceId = await _ensureDeviceId();
+    final prepared = log.copyWith(
+      deviceId: deviceId,
+      updatedAt: DateTime.now(),
+      syncState: ProgressSyncState.pending,
+      remoteSuggestion: null,
+      conflictReason: null,
+      revision: log.revision + 1,
+    );
+    state = [...state, prepared];
   }
 
   void deleteProgress(String logId) {
@@ -663,7 +695,69 @@ class ProgressStore extends PersistentLearningStore<ModuleProgressLog> {
       timestamp: timestamp,
       notes: notes,
       completedLessons: completedLessons,
+      syncState: ProgressSyncState.pending,
+      updatedAt: timestamp,
+      deviceId: 'pending-device',
     );
+  }
+
+  Future<ProgressSyncResult> synchronise({List<ModuleProgressLog>? remoteOverride}) async {
+    final result = await _syncService.synchronise(state, remoteOverride: remoteOverride);
+    state = result.merged;
+    return result;
+  }
+
+  Future<void> resolveConflict(String logId, {bool keepLocal = true}) async {
+    final deviceId = await _ensureDeviceId();
+    state = [
+      for (final log in state)
+        if (log.id == logId)
+          _resolveLogConflict(log, keepLocal: keepLocal, deviceId: deviceId)
+        else
+          log,
+    ];
+  }
+
+  ModuleProgressLog _resolveLogConflict(
+    ModuleProgressLog log, {
+    required bool keepLocal,
+    required String deviceId,
+  }) {
+    if (!log.hasConflict) {
+      return log;
+    }
+
+    if (!keepLocal && log.remoteSuggestion != null) {
+      final remote = log.remoteSuggestion!;
+      return remote.copyWith(
+        id: log.id,
+        syncState: ProgressSyncState.synced,
+        syncedAt: DateTime.now(),
+        deviceId: remote.deviceId,
+        conflictReason: null,
+        remoteSuggestion: null,
+        revision: max(log.revision, remote.revision),
+      );
+    }
+
+    return log.copyWith(
+      syncState: ProgressSyncState.pending,
+      updatedAt: DateTime.now(),
+      deviceId: deviceId,
+      conflictReason: null,
+      remoteSuggestion: null,
+      revision: log.revision + 1,
+    );
+  }
+
+  Future<String> _ensureDeviceId() async {
+    final cached = _cachedDeviceId;
+    if (cached != null) {
+      return cached;
+    }
+    final generated = await _persistence.ensureDeviceId();
+    _cachedDeviceId = generated;
+    return generated;
   }
 }
 
@@ -693,5 +787,17 @@ final liveSessionStoreProvider = StateNotifierProvider<LiveSessionStore, List<Li
 
 final progressStoreProvider = StateNotifierProvider<ProgressStore, List<ModuleProgressLog>>((ref) {
   final persistence = ref.watch(learningPersistenceProvider);
-  return ProgressStore(persistence: persistence);
+  final syncService = ProgressSyncService(persistence: persistence);
+  return ProgressStore(persistence: persistence, syncService: syncService);
+});
+
+final lessonDownloadServiceProvider = Provider<LessonDownloadService>((ref) {
+  final service = LessonDownloadService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final lessonDownloadStateProvider = StreamProvider<Map<String, LessonDownloadTask>>((ref) {
+  final service = ref.watch(lessonDownloadServiceProvider);
+  return service.downloads;
 });

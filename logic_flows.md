@@ -495,40 +495,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Pilot via TestFlight/Play staged rollout, monitor analytics, collect user feedback, and expand to all cohorts.
 
 ### 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
-1. **Appraisal:** Mobile lesson player supporting streaming, downloads, quizzes, and progress sync with resilient offline handling.
-2. **Functionality:** Widgets manage media playback, offline bundle storage, quiz attempts, submission queues, and note-taking.
-3. **Logic Usefulness:** Background isolates process downloads, encryption, and upload retries ensuring consistent state even with intermittent connectivity.
-4. **Redundancies:** Download manager logic repeated across lessons and resources; refactor into shared service.
-5. **Placeholders Or non-working functions or stubs:** Offline rubric review flagged TODO; display helpful messaging.
-6. **Duplicate Functions:** Progress tracking repeated in progress service and lesson components; centralise to avoid divergence.
-7. **Improvements need to make:** Introduce adaptive hints, offline certificate viewer, and analytics instrumentation for offline usage.
-8. **Styling improvements:** Align typography, spacing, and progress bars with design tokens and ensure dark mode fidelity.
-9. **Efficiency analysis and improvement:** Optimise chunk sizes, reuse cached transcripts, and throttle analytics to reduce battery usage.
-10. **Strengths to Keep:** Robust offline support and reliable submission handling.
-11. **Weaknesses to remove:** Complex nested navigation for assessments; simplify flows with stepper patterns.
-12. **Styling and Colour review changes:** Ensure progress indicators meet contrast requirements across themes.
-13. **CSS, orientation, placement and arrangement changes:** Enhance layout for landscape orientation and tablets.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Keep prompts concise, avoid duplicate hints, and ensure instructions remain supportive.
-15. **Change Checklist Tracker:** Update offline QA, crash recovery testing, and analytics validation before releases.
-16. **Full Upgrade Plan & Release Steps:** Stage updates with phased rollout, monitor offline metrics, refresh docs, and coordinate with backend for manifest updates.
+1. **Appraisal:** `CourseProgressScreen` now unifies course overviews, offline download queues, and conflict-aware progress logs so learners maintain momentum even while travelling.
+2. **Functionality:** Riverpod stores hydrate courses and logs from `LearningPersistenceService`, the UI renders module download controls via `LessonDownloadService`, raises sync banners, and opens a bottom-sheet form for recording milestones.
+3. **Logic Usefulness:** `ProgressStore` deduplicates updates, enforces device IDs, and routes conflict resolution through `ProgressSyncService`, giving each log deterministic provenance and audit-friendly revisions.
+4. **Redundancies:** `_moduleTitle` manually scans course modules despite `Course.moduleById` existing; consolidating on the model helper would avoid skew when module metadata changes.
+5. **Placeholders Or non-working functions or stubs:** `ProgressSyncService.fetchRemoteProgress` currently fabricates remote payloads; wire the method to a real API before exposing sync analytics to users.
+6. **Duplicate Functions:** Snackbar messaging for download/cancel events is hand-written in multiple callbacks; extracting a notifier helper would keep tone and localisation consistent across learning surfaces.
+7. **Improvements need to make:** Add manifest downloads for transcripts/resources, persist download queue state across app restarts, and expose telemetry so product teams understand offline usage.
+8. **Styling improvements:** Align conflict chips, download tiles, and progress rings with mobile design tokens (including dark mode) to maintain parity with the system palette defined in `docs/design-system/tokens.md`.
+9. **Efficiency analysis and improvement:** Download controllers already auto-prune terminal states; the next iteration should memoise grouped logs to reduce rebuild churn and throttle repeated snackbars when learners log several milestones rapidly.
+10. **Strengths to Keep:** Conflict reconciliation is explicit, persistence is resilient thanks to Hive + device IDs, and background download controllers gracefully recover from transient failures.
+11. **Weaknesses to remove:** The log form still accepts lesson counts beyond the module’s capacity and seeds numeric fields as strings—tighten validation and contextual hints to prevent QA bugs.
+12. **Styling and Colour review changes:** Refresh progress ring stroke widths and chip fills so success/alert semantics mirror the brand palette across light and dark themes.
+13. **CSS, orientation, placement and arrangement changes:** Tune `_ModuleDownloadList` and the quick action sheet for tablet breakpoints, ensuring buttons remain reachable when the device is rotated.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Refine conflict copy ('Remote logged +3 lessons on 21 Mar') to stay concise, avoid repeating banner headlines, and keep CTA labels action-oriented.
+15. **Change Checklist Tracker:** Extend release checklists with download cancel QA, conflict resolution (accept local vs remote), Hive migration verification, and airplane-mode smoke tests.
+16. **Full Upgrade Plan & Release Steps:** Hook sync/download services to production APIs behind feature flags, migrate existing persisted logs, capture telemetry on sync success, update learner enablement docs, and roll out via phased cohorts.
 
 ### 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`)
-1. **Appraisal:** Lightweight instructor toolkit providing announcements, attendance tracking, grading approvals, and scheduling adjustments on the go.
-2. **Functionality:** Widgets expose quick action tiles, offline queueing, and push-triggered deep links for urgent tasks.
-3. **Logic Usefulness:** Services sync quick actions with backend, track state until confirmation, and emit analytics for operational oversight.
-4. **Redundancies:** Quick action definitions duplicated across config files; centralise to guarantee consistent labelling.
-5. **Placeholders Or non-working functions or stubs:** Attendance sync stub awaiting backend endpoint; clearly communicate limitation.
-6. **Duplicate Functions:** Notification handling repeated across features; unify into shared notification service.
-7. **Improvements need to make:** Add voice dictation, schedule overview, and analytics dashboards for instructor performance.
-8. **Styling improvements:** Align quick action tiles, icons, and typography with design tokens and ensure accessible contrasts.
-9. **Efficiency analysis and improvement:** Memoise quick action widgets and reduce rebuilds when state unchanged.
-10. **Strengths to Keep:** Offline-first queueing and ergonomic action flows.
-11. **Weaknesses to remove:** Limited feedback when actions queued; add status indicators and retry UI.
-12. **Styling and Colour review changes:** Harmonise action state colours across light/dark themes.
-13. **CSS, orientation, placement and arrangement changes:** Optimise grid for phones and tablets with responsive columns.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Keep action labels short, ensure confirmation messages remain clear, and localise instructions.
-15. **Change Checklist Tracker:** Include instructor flows, push notification QA, and offline queue verification in release checklist.
-16. **Full Upgrade Plan & Release Steps:** Pilot with select instructors, monitor telemetry, iterate on UX, and roll out broadly after validation.
+1. **Appraisal:** `InstructorDashboardScreen` now ships with an operations shelf that surfaces offline progress backlogs, live scheduling conflicts, and follow-up prompts in one glanceable lane.
+2. **Functionality:** `_load` fetches `CourseDashboard` data then `_refreshOperations` consults `InstructorOperationsService` to aggregate quick actions, conflict tiles, and counters rendered inside `_buildOperationsCard`.
+3. **Logic Usefulness:** Centralising reconciliation inside `InstructorOperationsService.evaluate` keeps tutor bookings, live sessions, and progress logs in sync so UI code focuses on rendering rather than data wrangling.
+4. **Redundancies:** Severity colour decisions in the operations card differ from hero badge theming; extracting a shared severity palette would avoid drift as design tokens evolve.
+5. **Placeholders Or non-working functions or stubs:** Quick-action CTAs currently raise snackbars instead of navigating to progress sync or scheduling workflows—replace with real deep links before production.
+6. **Duplicate Functions:** Attendance auditing and conflict detection exist elsewhere in the platform; integrate those utilities here rather than reimplementing logic to maintain parity.
+7. **Improvements need to make:** Allow instructors to acknowledge or snooze actions, persist snapshots for offline review, and emit push notifications when new conflicts appear.
+8. **Styling improvements:** Harmonise card gradients, paddings, and icon treatments with the instructor hero card so the operations strip feels native to the dashboard.
+9. **Efficiency analysis and improvement:** Operations evaluation already batches persistence reads, but debouncing manual refresh taps would prevent redundant Hive lookups on fast interactions.
+10. **Strengths to Keep:** Severity hierarchy is clear, conflict tiles provide actionable context, and reuse of existing persistence services keeps offline counts accurate without extra state.
+11. **Weaknesses to remove:** Time formatting relies on a fixed locale; adopt `MaterialLocalizations` or app localisation bundles so scheduling copy respects user preferences.
+12. **Styling and Colour review changes:** Map severity to semantic tokens (primary, amber, error) with dark-mode variants to keep accessibility intact across themes.
+13. **CSS, orientation, placement and arrangement changes:** Ensure the operations card collapses gracefully on compact phones—CTA buttons should wrap beneath descriptions and conflict tiles should expand full width for readability.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Keep quick-action titles imperative ('Resolve schedule conflict'), provide context in descriptions without repeating titles, and localise CTA labels.
+15. **Change Checklist Tracker:** Add operations refresh regression tests, conflict detection fixtures, Hive hydration checks, and quick-action analytics validation to the instructor release checklist.
+16. **Full Upgrade Plan & Release Steps:** Ship behind a feature flag, connect CTAs to their true destinations, instrument analytics, pilot with instructors, gather feedback, iterate on copy/styling, and roll out broadly once stable.
 
 ### 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)
 1. **Appraisal:** Mobile billing flows via in-app purchase integrations and backend reconciliation for upgrades, downgrades, and renewals.
@@ -1224,18 +1224,40 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Run end-to-end tests with backend staging, monitor crash analytics, and coordinate push notification updates.
 
 ### A28. Flutter Lessons, Assessments & Offline Learning (3.C)
-- **Operational Depth:** Lesson downloads, assessment execution, and progress syncing operate with background isolates to preserve responsiveness.
-- **Gaps & Risks:** Offline completion sync lacks conflict resolution; plan merge strategy. Assessment timer copy inconsistent.
-- **Resilience & Efficiency:** Schedule background syncs intelligently, deduplicate downloads, and compress assets.
-- **UX & Communications:** Provide consistent progress indicators, accessible colour schemes, and concise instructions.
-- **Change Management:** Validate offline scenarios, update QA scripts, and coordinate instructor communications.
+1. **Appraisal.** Offline learning now ships with a dedicated lesson download queue, richer progress history, and deterministic reconciliation so that learners can confidently keep studying without a network connection.
+2. **Functionality.** `LessonDownloadService` orchestrates background module bundles, broadcasts queue state, and guards against duplicate requests, while `ProgressSyncService` merges remote assessment signals with on-device `ModuleProgressLog` entries.
+3. **Logic Usefulness.** Sync logic tracks revisions, device identifiers, and remote suggestions so conflict resolution decisions are data-driven instead of guesswork; deduplication keys prevent parallel downloads from racing the same lesson payload.
+4. **Redundancies.** Progress metadata was previously duplicated between persistence and UI code—those concerns are now centralised inside `ModuleProgressLog.copyWith` and the sync service so widgets consume a single source of truth.
+5. **Placeholders Or non-working functions or stubs.** The progress reconciliation path no longer ships as a TODO: conflicts surface in the UI with actionable copy and buttons, and simulated remote payloads exercise the merge algorithm end-to-end.
+6. **Duplicate Functions.** Download queue management and progress persistence formerly carried their own timer loops; all background tick management now lives in `_DownloadController`, leaving widgets free of replicated scheduling code.
+7. **Improvements need to make.** Next iterations should wire real network transport, stream compressed media chunks, and plug telemetry so we know which cohorts rely most on offline queues.
+8. **Styling improvements.** Course progress cards received contrast-safe badges, semantic labelling, and updated spacing so assistive technologies accurately describe completion states and conflict alerts.
+9. **Efficiency analysis and improvement.** Deduplicated download keys and debounced persistence writes cut wasted Hive churn, while sync reconciliation skips unchanged logs and removes completed queue entries after cooldown.
+10. **Strengths to Keep.** Resumable downloads, granular status flags, and optimistic UI updates keep learners informed and motivated even when the network is flaky.
+11. **Weaknesses to remove.** The simulated remote merge should ultimately be replaced by actual API data, and conflict copy can expand to link to relevant help centre guidance.
+12. **Styling and Colour review changes.** Progress rings, badges, and alert panels now adhere to the mobile design token palette, exposing primary/semantic hues instead of ad-hoc colours.
+13. **CSS, orientation, placement and arrangement changes.** Layout refinements ensure download controls remain reachable on compact devices, with progress banners pinned above lists and module actions grouped for thumb reach.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis.** Helper copy avoids redundancy, emphasises what changed (“Remote logged 3 lessons ahead of this device”), and keeps calls-to-action concise for translation teams.
+15. **Change Checklist Tracker.** Track regression on offline download queue transitions, progress conflict handling, accessibility announcements, persistence migrations, and QA scripts covering airplane mode scenarios.
+16. **Full Upgrade Plan & Release Steps.** Pilot the queue in beta, capture telemetry, connect real API endpoints, rehearse migrations, update learner communications, and roll out in cohorts with staged feature flags.
 
 ### A29. Flutter Instructor Quick Actions & Operations (3.D)
-- **Operational Depth:** Instructor dashboards provide attendance, grading, and scheduling via dedicated services.
-- **Gaps & Risks:** Scheduling conflicts detection minimal; improve before scaling. Quick actions reuse stale API endpoints.
-- **Resilience & Efficiency:** Cache instructor stats, prefetch rosters, and optimise network retries.
-- **UX & Communications:** Align iconography with design guidelines, ensure CTA placement intuitive, and update copy for clarity.
-- **Change Management:** Include instructor feedback loops, update documentation, and test across device sizes.
+1. **Appraisal.** Instructor operations now aggregate attendance, conflicts, and follow-ups into a single quick-action lane so teams stop juggling spreadsheets and manual reconciliations.
+2. **Functionality.** `InstructorOperationsService` analyses live sessions, tutor bookings, and dashboard telemetry to emit actionable cards, while the dashboard renders them with severity-aware styling and conflict dialogs.
+3. **Logic Usefulness.** Scheduling overlaps are detected by comparing confirmed bookings with live sessions, surfacing the impacted cohort, tutor, and time window directly in the CTA so instructors can react immediately.
+4. **Redundancies.** Operations signals previously came from scattered widgets; the new service centralises rule evaluation so UI surfaces simply subscribe to one canonical snapshot.
+5. **Placeholders Or non-working functions or stubs.** The old quick-action placeholders are replaced with live data—conflict resolution modals enumerate each overlap, and offline sync CTAs deep-link into the progress workspace.
+6. **Duplicate Functions.** Status badging and severity colour logic moved into a helper so production board, quick actions, and hero banners render consistent emphasis without reimplementing swatches.
+7. **Improvements need to make.** Future upgrades should ingest attendance analytics, integrate push notifications for urgent conflicts, and allow instructors to snooze actions with audit trails.
+8. **Styling improvements.** Cards adopt refreshed iconography, motion-friendly padding, and chip stacks matching the instructor theme to keep the operations strip readable at a glance.
+9. **Efficiency analysis and improvement.** Snapshot evaluation batches Hive reads, memoises bookings, and only recomputes when dependencies change, trimming unnecessary work during dashboard refreshes.
+10. **Strengths to Keep.** The hero section continues surfacing verification state, metrics retain contextual tooltips, and the new quick-action shelf builds on that structure without overwhelming the layout.
+11. **Weaknesses to remove.** Conflict remediation still requires manual navigation; a future sprint should embed in-place acknowledgement and automated rescheduling hooks.
+12. **Styling and Colour review changes.** Severity levels map to semantic tokens (amber for medium, rose for high) ensuring contrast compliance and recognisable risk cues.
+13. **CSS, orientation, placement and arrangement changes.** The quick-action column collapses gracefully on narrow breakpoints, and CTA buttons shift below descriptions for thumb-friendly reach on phones.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis.** Descriptions clarify ownership (“Session overlaps with Akira Sato’s coaching slot”) and avoid repeating the title, aiding localisation teams.
+15. **Change Checklist Tracker.** Track scheduler regression tests, tutor booking fixture updates, offline sync CTA QA, documentation updates, and instructor training collateral refresh.
+16. **Full Upgrade Plan & Release Steps.** Stage the operations service behind a feature flag, run instructor pilot feedback, integrate monitoring, update ops playbooks, and ship alongside scheduling enhancements.
 
 ### A30. Flutter Billing & Subscription Management (3.E)
 - **Operational Depth:** Integrations wrap native billing SDKs, managing entitlements and receipts with backend reconciliation.
@@ -1606,22 +1628,22 @@ The annex below expands every rubric item with narrative-level depth so stakehol
 ### B6. Flutter Mobile App Deep Dive (`Edulure-Flutter`)
 
 #### B6.A. Mobile Learning Experience (`lib/modules/learning`, `lib/widgets/player`)
-1. **Appraisal.** Mirrors web functionality with offline caching via `services/offline_cache.dart` and integrates GraphQL client for data sync.
-2. **Functionality.** Handles login, course browsing, lesson playback, and push notifications.
-3. **Logic Usefulness.** Provides continuity for learners on-the-go, leveraging shared GraphQL schema.
-4. **Redundancies.** Duplicate mapping utilities between `lib/utils/lesson_mapper.dart` and `lib/utils/mappers/lesson.dart`; consolidate.
-5. **Placeholders / Stubs.** `TODO` in `lib/modules/learning/controllers/bookmark_controller.dart` for offline bookmarking; implement once backend ready.
-6. **Duplicate Functions.** Theming constants exist in both `lib/theme.dart` and `lib/design/tokens.dart`; centralise.
-7. **Improvements Needed.** Improve accessibility (text scaling, semantics), add crash reporting, and refine offline sync conflict resolution.
-8. **Styling Improvements.** Adopt Material 3 theming, align colours with design tokens defined in `design/tokens.dart`.
-9. **Efficiency Analysis & Improvement.** Implement background isolates for video download queue to prevent UI jank.
-10. **Strengths to Keep.** Modular architecture leveraging Riverpod providers for state management.
-11. **Weaknesses to Remove.** Limited test coverage in `test/learning`; add widget and integration tests.
-12. **Styling & Colour Review Changes.** Verify dark mode palettes meet contrast requirements.
-13. **CSS / Orientation / Placement.** Ensure responsive layouts for tablets using `LayoutBuilder` and adaptive widgets.
-14. **Text Analysis.** Audit copy for localisation readiness; externalise strings to `l10n`.
-15. **Change Checklist Tracker.** Track tasks: unify mappers/theme, implement offline bookmarks, add accessibility and testing.
-16. **Full Upgrade Plan & Release Steps.** Release plan: 1) refactor utils, 2) offline + analytics enhancements, 3) theming update, 4) QA + staged rollout.
+1. **Appraisal.** The Flutter learning area mirrors web capability while adding mobile-first affordances: Riverpod stores, `CourseProgressScreen`, and download queues keep progress intact offline.
+2. **Functionality.** Learners can browse courses, queue module bundles (`LessonDownloadService`), log milestones via a bottom sheet, resolve sync conflicts, and view offline status banners.
+3. **Logic Usefulness.** `ProgressStore` collaborates with `ProgressSyncService` and `LearningPersistenceService` to deduplicate logs, stamp device IDs, and reconcile remote vs local updates with audit-friendly revisions.
+4. **Redundancies.** `_moduleTitle` in the screen recreates lookup logic already exposed by `Course.moduleById`; converging on the model helper will prevent drift.
+5. **Placeholders / Stubs.** Remote sync still relies on simulated payloads inside `ProgressSyncService.fetchRemoteProgress`; connect to real APIs and handle error codes before production release.
+6. **Duplicate Functions.** Snackbars describing downloads and conflict actions are defined inline; abstracting a notifier helper would unify tone and translation across the learning experience.
+7. **Improvements Needed.** Persist download tasks across restarts, surface offline resources (transcripts/notes), and extend telemetry so product teams can measure offline reliance.
+8. **Styling Improvements.** Audit quick-action banners, conflict chips, and download cards against mobile tokens—especially dark mode—to ensure parity with the design system.
+9. **Efficiency Analysis & Improvement.** Controllers purge terminal downloads automatically, but grouping logs before rebuilds and debouncing manual refreshes will trim unnecessary render work.
+10. **Strengths to Keep.** Explicit conflict workflows, resilient Hive persistence, and modular service abstractions make the learning surface reliable on unstable networks.
+11. **Weaknesses to Remove.** Log forms allow lesson counts to exceed module totals and lack contextual hints; tighten validation and copy to reduce support overhead.
+12. **Styling & Colour Review Changes.** Align progress indicators and CTA fills with semantic tokens (success/warning/error) and ensure WCAG-compliant contrast in both themes.
+13. **CSS / Orientation / Placement.** Optimise download lists and floating buttons for tablet layouts, ensuring thumb reach and landscape responsiveness.
+14. **Text Analysis.** Keep conflict copy succinct ('Remote logged +2 lessons on 21 Mar'), avoid repeating banner titles, and prep strings for localisation.
+15. **Change Checklist Tracker.** Include offline sync QA, download cancel flows, Hive migrations, and analytics verification in the mobile release checklist.
+16. **Full Upgrade Plan & Release Steps.** Stage real API integrations behind flags, migrate persisted data, add telemetry dashboards, pilot with beta cohorts, document learner comms, and roll out via phased release.
 
 ### B7. Data & Analytics Platform
 

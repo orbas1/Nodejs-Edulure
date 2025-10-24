@@ -5,8 +5,9 @@ import 'package:intl/intl.dart';
 
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
+import '../services/lesson_download_service.dart';
 
-enum _ProgressAction { refresh, restoreSeed }
+enum _ProgressAction { refresh, restoreSeed, sync }
 
 class CourseProgressScreen extends ConsumerWidget {
   const CourseProgressScreen({super.key});
@@ -15,10 +16,15 @@ class CourseProgressScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final courses = ref.watch(courseStoreProvider);
     final logs = ref.watch(progressStoreProvider);
+    final downloadState = ref.watch(lessonDownloadStateProvider);
+    final downloads = downloadState.value ?? const <String, LessonDownloadTask>{};
+    final downloadService = ref.read(lessonDownloadServiceProvider);
     final grouped = <String, List<ModuleProgressLog>>{};
     for (final log in logs) {
       grouped.putIfAbsent(log.courseId, () => []).add(log);
     }
+    final pendingCount = logs.where((log) => log.syncState == ProgressSyncState.pending).length;
+    final conflictCount = logs.where((log) => log.syncState == ProgressSyncState.conflict).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -55,6 +61,17 @@ class CourseProgressScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              PopupMenuItem(
+                value: _ProgressAction.sync,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.cloud_sync_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Sync offline progress'),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -63,11 +80,55 @@ class CourseProgressScreen extends ConsumerWidget {
           ? const _EmptyProgressState()
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: courses.length,
+              itemCount: courses.length + (pendingCount > 0 || conflictCount > 0 ? 1 : 0),
               itemBuilder: (context, index) {
+                if (pendingCount > 0 || conflictCount > 0) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _ProgressSyncBanner(
+                        pending: pendingCount,
+                        conflicts: conflictCount,
+                        onSync: () => _synchronise(context, ref),
+                      ),
+                    );
+                  }
+                  index -= 1;
+                }
                 final course = courses[index];
                 final history = grouped[course.id] ?? [];
-                return _CourseProgressCard(course: course, logs: history, onRecord: () => _openProgressForm(context, ref, course: course));
+                return _CourseProgressCard(
+                  course: course,
+                  logs: history,
+                  downloads: downloads,
+                  onRecord: () => _openProgressForm(context, ref, course: course),
+                  onDownload: (module) {
+                    downloadService.enqueue(
+                      courseId: course.id,
+                      moduleId: module.id,
+                      lessonId: module.id,
+                      title: module.title,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Downloading ${module.title} for offline access...')),
+                    );
+                  },
+                  onCancelDownload: (module) {
+                    final cancelled = downloadService.cancel(
+                      courseId: course.id,
+                      moduleId: module.id,
+                      lessonId: module.id,
+                    );
+                    if (cancelled) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Cancelled download for ${module.title}.')),
+                      );
+                    }
+                  },
+                  onResolveConflict: (log, keepLocal) => ref
+                      .read(progressStoreProvider.notifier)
+                      .resolveConflict(log.id, keepLocal: keepLocal),
+                );
               },
             ),
       floatingActionButton: FloatingActionButton.extended(
@@ -98,7 +159,20 @@ class CourseProgressScreen extends ConsumerWidget {
         await progressNotifier.restoreSeedData();
         _showSnackBar(context, 'Restored demo logs and modules');
         break;
+      case _ProgressAction.sync:
+        await _synchronise(context, ref);
+        break;
     }
+  }
+
+  Future<void> _synchronise(BuildContext context, WidgetRef ref) async {
+    final notifier = ref.read(progressStoreProvider.notifier);
+    final result = await notifier.synchronise();
+    final conflicts = result.conflicts.length;
+    final message = conflicts > 0
+        ? 'Synced offline logs with $conflicts conflict${conflicts == 1 ? '' : 's'} to review.'
+        : 'Offline progress synced successfully.';
+    _showSnackBar(context, message);
   }
 
   void _showSnackBar(BuildContext context, String message) {
@@ -123,17 +197,28 @@ class _CourseProgressCard extends StatelessWidget {
   const _CourseProgressCard({
     required this.course,
     required this.logs,
+    required this.downloads,
     required this.onRecord,
+    required this.onDownload,
+    required this.onCancelDownload,
+    required this.onResolveConflict,
   });
 
   final Course course;
   final List<ModuleProgressLog> logs;
+  final Map<String, LessonDownloadTask> downloads;
   final VoidCallback onRecord;
+  final void Function(CourseModule module) onDownload;
+  final void Function(CourseModule module) onCancelDownload;
+  final void Function(ModuleProgressLog log, bool keepLocal) onResolveConflict;
 
   @override
   Widget build(BuildContext context) {
     final formatter = NumberFormat.percentPattern();
-    final completion = formatter.format(course.overallProgress);
+    final completionValue = course.overallProgress;
+    final completion = formatter.format(completionValue);
+    final pendingLogs = logs.where((log) => log.syncState == ProgressSyncState.pending).length;
+    final conflictLogs = logs.where((log) => log.syncState == ProgressSyncState.conflict).length;
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       margin: const EdgeInsets.only(bottom: 20),
@@ -160,24 +245,61 @@ class _CourseProgressCard extends StatelessWidget {
                 SizedBox(
                   width: 120,
                   height: 120,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        value: course.overallProgress,
-                        strokeWidth: 12,
-                      ),
-                      Text(completion, style: Theme.of(context).textTheme.titleMedium),
-                    ],
+                  child: Semantics(
+                    label: 'Overall course completion',
+                    value: completion,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: completionValue,
+                          strokeWidth: 12,
+                        ),
+                        Text(completion, style: Theme.of(context).textTheme.titleMedium),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
+            if (pendingLogs > 0 || conflictLogs > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if (pendingLogs > 0)
+                      Chip(
+                        avatar: const Icon(Icons.sync_problem_outlined, size: 18),
+                        backgroundColor: Colors.blue.shade50,
+                        label: Text('$pendingLogs update${pendingLogs == 1 ? '' : 's'} pending sync'),
+                      ),
+                    if (conflictLogs > 0)
+                      Chip(
+                        avatar: const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.white),
+                        backgroundColor: const Color(0xFFEF4444),
+                        label: Text(
+                          '$conflictLogs conflict${conflictLogs == 1 ? '' : 's'}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             FilledButton.tonalIcon(
               onPressed: onRecord,
               icon: const Icon(Icons.add_task_outlined),
               label: const Text('Record module milestone'),
+            ),
+            const SizedBox(height: 16),
+            _ModuleDownloadList(
+              courseId: course.id,
+              modules: course.modules,
+              downloads: downloads,
+              onDownload: onDownload,
+              onCancel: onCancelDownload,
             ),
             const SizedBox(height: 16),
             Text('Recent module updates', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
@@ -189,13 +311,13 @@ class _CourseProgressCard extends StatelessWidget {
                   .sorted((a, b) => b.timestamp.compareTo(a.timestamp))
                   .take(5)
                   .map(
-                    (log) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        child: Text('${log.completedLessons}'),
+                    (log) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ProgressLogTile(
+                        log: log,
+                        moduleTitle: _moduleTitle(course, log.moduleId),
+                        onResolve: onResolveConflict,
                       ),
-                      title: Text('${_moduleTitle(course, log.moduleId)} • completed lessons: ${log.completedLessons}'),
-                      subtitle: Text('${DateFormat.yMMMd().format(log.timestamp)} — ${log.notes}'),
                     ),
                   )
                   .toList(),
@@ -204,8 +326,233 @@ class _CourseProgressCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _moduleTitle(Course course, String moduleId) {
+class _ModuleDownloadList extends StatelessWidget {
+  const _ModuleDownloadList({
+    required this.courseId,
+    required this.modules,
+    required this.downloads,
+    required this.onDownload,
+    required this.onCancel,
+  });
+
+  final String courseId;
+  final List<CourseModule> modules;
+  final Map<String, LessonDownloadTask> downloads;
+  final void Function(CourseModule module) onDownload;
+  final void Function(CourseModule module) onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    if (modules.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Offline module bundles',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        ...modules.map(
+          (module) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _ModuleDownloadTile(
+              module: module,
+              task: downloads[_downloadKey(courseId, module.id)],
+              onDownload: () => onDownload(module),
+              onCancel: () => onCancel(module),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ModuleDownloadTile extends StatelessWidget {
+  const _ModuleDownloadTile({
+    required this.module,
+    required this.task,
+    required this.onDownload,
+    required this.onCancel,
+  });
+
+  final CourseModule module;
+  final LessonDownloadTask? task;
+  final VoidCallback onDownload;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = task?.status;
+    final isRunning = status == LessonDownloadStatus.running || status == LessonDownloadStatus.queued;
+    final isCompleted = status == LessonDownloadStatus.completed;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(module.title),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${module.lessonCount} lessons • ${module.durationMinutes} minutes'),
+          if (task != null) ...[
+            const SizedBox(height: 6),
+            LinearProgressIndicator(value: task!.progressFraction),
+            const SizedBox(height: 4),
+            Text(_downloadLabel(task!), style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ],
+      ),
+      trailing: isRunning
+          ? IconButton(
+              tooltip: 'Cancel download',
+              onPressed: onCancel,
+              icon: const Icon(Icons.stop_circle_outlined),
+            )
+          : FilledButton.tonalIcon(
+              icon: Icon(isCompleted ? Icons.check_circle_outlined : Icons.download_outlined),
+              label: Text(isCompleted ? 'Available offline' : 'Download'),
+              onPressed: isCompleted ? null : onDownload,
+            ),
+    );
+  }
+
+  String _downloadLabel(LessonDownloadTask task) {
+    switch (task.status) {
+      case LessonDownloadStatus.queued:
+        return 'Queued • ${task.progress}%';
+      case LessonDownloadStatus.running:
+        return 'Downloading • ${task.progress}%';
+      case LessonDownloadStatus.completed:
+        return 'Ready offline';
+      case LessonDownloadStatus.failed:
+        return task.error ?? 'Download failed';
+      case LessonDownloadStatus.cancelled:
+        return 'Download cancelled';
+    }
+  }
+}
+
+class _ProgressLogTile extends StatelessWidget {
+  const _ProgressLogTile({
+    required this.log,
+    required this.moduleTitle,
+    required this.onResolve,
+  });
+
+  final ModuleProgressLog log;
+  final String moduleTitle;
+  final void Function(ModuleProgressLog log, bool keepLocal) onResolve;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = '${DateFormat.yMMMd().format(log.timestamp)} — ${log.notes}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: CircleAvatar(child: Text('${log.completedLessons}')),
+          title: Text('$moduleTitle • completed lessons: ${log.completedLessons}'),
+          subtitle: Text(subtitle),
+          trailing: _syncChip(context),
+        ),
+        if (log.hasConflict && log.conflictReason != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 16, bottom: 4),
+            child: Text(log.conflictReason!, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        if (log.hasConflict)
+          ButtonBar(
+            alignment: MainAxisAlignment.start,
+            children: [
+              TextButton(
+                onPressed: () => onResolve(log, true),
+                child: const Text('Keep local'),
+              ),
+              FilledButton(
+                onPressed: () => onResolve(log, false),
+                child: const Text('Accept remote'),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _syncChip(BuildContext context) {
+    switch (log.syncState) {
+      case ProgressSyncState.synced:
+        return const Chip(label: Text('Synced'));
+      case ProgressSyncState.pending:
+        return const Chip(
+          label: Text('Pending'),
+          avatar: Icon(Icons.cloud_upload_outlined, size: 18),
+        );
+      case ProgressSyncState.syncing:
+        return const Chip(
+          label: Text('Syncing'),
+          avatar: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+        );
+      case ProgressSyncState.conflict:
+        return const Chip(
+          label: Text('Conflict', style: TextStyle(color: Colors.white)),
+          avatar: Icon(Icons.warning_amber_rounded, size: 18, color: Colors.white),
+          backgroundColor: Color(0xFFEF4444),
+        );
+    }
+  }
+}
+
+class _ProgressSyncBanner extends StatelessWidget {
+  const _ProgressSyncBanner({
+    required this.pending,
+    required this.conflicts,
+    required this.onSync,
+  });
+
+  final int pending;
+  final int conflicts;
+  final VoidCallback onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      color: theme.colorScheme.primaryContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Offline progress sync',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              conflicts > 0
+                  ? '$pending update${pending == 1 ? '' : 's'} ready. $conflicts conflict${conflicts == 1 ? '' : 's'} need attention.'
+                  : '$pending update${pending == 1 ? '' : 's'} ready to sync.',
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: onSync,
+              icon: const Icon(Icons.cloud_sync_outlined),
+              label: const Text('Sync now'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _downloadKey(String courseId, String moduleId) => '$courseId::$moduleId::$moduleId';
+String _moduleTitle(Course course, String moduleId) {
     return course.modules.firstWhere((module) => module.id == moduleId, orElse: () => course.modules.first).title;
   }
 }
@@ -245,7 +592,7 @@ class _ProgressLogFormSheetState extends ConsumerState<_ProgressLogFormSheet> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || _selectedCourse == null || _selectedModule == null) return;
     final notifier = ref.read(progressStoreProvider.notifier);
     final log = notifier.buildLogFromForm(
@@ -255,7 +602,7 @@ class _ProgressLogFormSheetState extends ConsumerState<_ProgressLogFormSheet> {
       notes: _notesController.text.trim(),
       completedLessons: int.tryParse(_lessonsController.text) ?? 0,
     );
-    notifier.recordProgress(log);
+    await notifier.recordProgress(log);
     ref.read(courseStoreProvider.notifier).updateModuleProgress(
           courseId: _selectedCourse!.id,
           moduleId: _selectedModule!.id,
@@ -355,7 +702,7 @@ class _ProgressLogFormSheetState extends ConsumerState<_ProgressLogFormSheet> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton(
-                      onPressed: _submit,
+                      onPressed: () => _submit(),
                       child: const Text('Save log'),
                     ),
                   ),

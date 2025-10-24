@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -24,6 +25,8 @@ abstract class LearningPersistence {
   Future<List<ModuleProgressLog>?> loadProgressLogs();
   Future<void> saveProgressLogs(List<ModuleProgressLog> logs);
 
+  Future<String> ensureDeviceId();
+
   Future<void> reset();
 }
 
@@ -38,9 +41,11 @@ class LearningPersistenceService implements LearningPersistence {
   static const _tutorsKey = 'tutors';
   static const _sessionsKey = 'sessions';
   static const _progressKey = 'progress';
+  static const _deviceIdKey = 'device.id';
 
   final String _boxName;
   Box<String>? _cachedBox;
+  final Random _random = Random();
 
   Future<Box<String>> _box() async {
     final cached = _cachedBox;
@@ -50,6 +55,18 @@ class LearningPersistenceService implements LearningPersistence {
     final box = await Hive.openBox<String>(_boxName);
     _cachedBox = box;
     return box;
+  }
+
+  @override
+  Future<String> ensureDeviceId() async {
+    final box = await _box();
+    final existing = box.get(_deviceIdKey);
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+    final generated = _generateDeviceId();
+    await box.put(_deviceIdKey, generated);
+    return generated;
   }
 
   @override
@@ -148,5 +165,13 @@ class LearningPersistenceService implements LearningPersistence {
       debugPrint('Failed to persist $key: $error');
       debugPrint('$stackTrace');
     }
+  }
+
+  String _generateDeviceId() {
+    final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    final randomPart = List.generate(6, (_) => _random.nextInt(36))
+        .map((value) => value.toRadixString(36))
+        .join();
+    return 'device-$timestamp$randomPart';
   }
 }

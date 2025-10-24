@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../services/course_service.dart';
 import '../services/dashboard_service.dart';
+import '../services/instructor_operations_service.dart';
 import '../services/session_manager.dart';
 
 class InstructorDashboardScreen extends StatefulWidget {
@@ -13,9 +15,13 @@ class InstructorDashboardScreen extends StatefulWidget {
 
 class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
   final CourseService _service = CourseService();
+  final InstructorOperationsService _operationsService = InstructorOperationsService();
   CourseDashboard? _dashboard;
   bool _loading = true;
   String? _error;
+  InstructorOperationsSnapshot? _operationsSnapshot;
+  bool _operationsLoading = true;
+  String? _operationsError;
 
   Map<String, dynamic>? get _session => SessionManager.getSession();
 
@@ -498,6 +504,9 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
         _loading = false;
         _dashboard = null;
         _error = null;
+        _operationsSnapshot = null;
+        _operationsLoading = false;
+        _operationsError = null;
       });
       return;
     }
@@ -513,15 +522,49 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
       setState(() {
         _dashboard = dashboard;
       });
+      await _refreshOperations(dashboard: dashboard);
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _error = error.toString();
       });
+      await _refreshOperations();
     } finally {
       if (!mounted) return;
       setState(() {
         _loading = false;
+      });
+    }
+  }
+
+  Future<void> _refreshOperations({CourseDashboard? dashboard}) async {
+    if (!_hasInstructorAccess) {
+      return;
+    }
+
+    setState(() {
+      _operationsLoading = true;
+      _operationsError = null;
+    });
+
+    try {
+      final snapshot = await _operationsService.evaluate(
+        dashboard: dashboard ?? _dashboard,
+      );
+      if (!mounted) return;
+      setState(() {
+        _operationsSnapshot = snapshot;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _operationsSnapshot = null;
+        _operationsError = error.toString();
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _operationsLoading = false;
       });
     }
   }
@@ -569,53 +612,32 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: const [
-                          SizedBox(height: 240, child: Center(child: CircularProgressIndicator())),
+                          SizedBox(
+                            height: 240,
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
                         ],
                       )
                     : ListView(
                         padding: const EdgeInsets.all(20),
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
-                          if (_error != null)
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.red.shade200),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('We could not load the latest data',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(fontWeight: FontWeight.w600, color: Colors.red.shade700)),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _error!,
-                                    style: TextStyle(color: Colors.red.shade700),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  FilledButton.icon(
-                                    onPressed: _load,
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('Retry'),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          if (_error != null) _buildErrorCard(context),
                           _buildHeroCard(context),
+                          const SizedBox(height: 20),
+                          _buildOperationsCard(context),
                           const SizedBox(height: 20),
                           _buildServiceSuiteBanner(context),
                           const SizedBox(height: 20),
                           _buildMetricHighlights(context),
                           const SizedBox(height: 20),
+                          _buildLiveClassroomsSection(context),
+                          const SizedBox(height: 20),
                           _buildPipelineSection(context),
                           const SizedBox(height: 20),
                           _buildProductionSection(context),
+                          const SizedBox(height: 20),
+                          _buildAdsSuite(context),
                           const SizedBox(height: 20),
                           _buildRevenueSection(context),
                           const SizedBox(height: 20),
@@ -623,48 +645,43 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                         ],
                       ),
               ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('We could not load the latest data',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w600, color: Colors.red.shade700)),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _error!,
-                                  style: TextStyle(color: Colors.red.shade700),
-                                ),
-                                const SizedBox(height: 12),
-                                FilledButton.icon(
-                                  onPressed: _load,
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('Retry'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        _buildHeroCard(context),
-                        const SizedBox(height: 20),
-                        _buildServiceSuiteBanner(context),
-                        const SizedBox(height: 20),
-                        _buildMetricHighlights(context),
-                        const SizedBox(height: 20),
-                        _buildLiveClassroomsSection(context),
-                        const SizedBox(height: 20),
-                        _buildPipelineSection(context),
-                        const SizedBox(height: 20),
-                        _buildProductionSection(context),
-                        const SizedBox(height: 20),
-                        _buildAdsSuite(context),
-                        const SizedBox(height: 20),
-                        _buildRevenueSection(context),
-                        const SizedBox(height: 20),
-                        _buildInsightsSection(context),
-                      ],
-                    ),
             ),
+    );
+  }
+
+  Widget _buildErrorCard(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'We could not load the latest data',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600, color: Colors.red.shade700),
+          ),
+          const SizedBox(height: 8),
+          if (_error != null)
+            Text(
+              _error!,
+              style: TextStyle(color: Colors.red.shade700),
+            ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _load,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -769,6 +786,225 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildOperationsCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final snapshot = _operationsSnapshot;
+    final generatedLabel = snapshot != null
+        ? DateFormat('MMM d • HH:mm').format(snapshot.generatedAt.toLocal())
+        : null;
+
+    final statsChips = <Widget>[];
+    if (snapshot != null && snapshot.pendingLogs > 0) {
+      statsChips.add(
+        Chip(
+          avatar: const Icon(Icons.cloud_upload_outlined, size: 18),
+          label: Text('${snapshot.pendingLogs} pending sync'),
+        ),
+      );
+    }
+    if (snapshot != null && snapshot.conflictLogs > 0) {
+      statsChips.add(
+        Chip(
+          avatar: const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.white),
+          backgroundColor: const Color(0xFFEF4444),
+          label: Text(
+            '${snapshot.conflictLogs} conflict${snapshot.conflictLogs == 1 ? '' : 's'} to review',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
+
+    final actions = snapshot?.actions ?? const <InstructorQuickAction>[];
+    final conflicts = snapshot?.conflicts ?? const <InstructorSchedulingConflict>[];
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFF2D62FF).withOpacity(0.12)),
+        color: const Color(0xFFF1F5FF),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Operations snapshot',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    if (generatedLabel != null)
+                      Text(
+                        'Updated $generatedLabel',
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+                      ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _operationsLoading ? null : () => _refreshOperations(),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_operationsLoading)
+            const LinearProgressIndicator()
+          else if (_operationsError != null) ...[
+            Text(
+              _operationsError!,
+              style: TextStyle(color: Colors.red.shade700),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => _refreshOperations(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry operations check'),
+            ),
+          ] else ...[
+            if (statsChips.isNotEmpty) ...[
+              Wrap(spacing: 8, runSpacing: 6, children: statsChips),
+              const SizedBox(height: 16),
+            ],
+            if (actions.isNotEmpty) ...[
+              Text('Quick actions', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              ...actions.map((action) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildActionTile(context, action),
+                  )),
+              if (conflicts.isNotEmpty) const SizedBox(height: 8),
+            ],
+            if (conflicts.isNotEmpty) ...[
+              Text('Schedule conflicts', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              ...conflicts.map((conflict) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildConflictTile(context, conflict),
+                  )),
+            ],
+            if (actions.isEmpty && statsChips.isEmpty && conflicts.isEmpty)
+              Text(
+                'No urgent actions detected. Offline progress and bookings look steady — we will continue monitoring.',
+                style: theme.textTheme.bodyMedium,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionTile(BuildContext context, InstructorQuickAction action) {
+    final theme = Theme.of(context);
+    final severityColor = _severityColor(action.severity, theme);
+    final icon = _actionIcon(action.type);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: severityColor.withOpacity(0.25)),
+        color: severityColor.withOpacity(0.1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                backgroundColor: severityColor.withOpacity(0.2),
+                foregroundColor: severityColor,
+                child: Icon(icon),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      action.title,
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(action.description),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Opening ${action.ctaLabel.toLowerCase()}...')),
+              );
+            },
+            child: Text(action.ctaLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConflictTile(BuildContext context, InstructorSchedulingConflict conflict) {
+    final theme = Theme.of(context);
+    final sessionWindow = '${DateFormat('MMM d • HH:mm').format(conflict.sessionStart.toLocal())} – '
+        '${DateFormat('HH:mm').format(conflict.sessionEnd.toLocal())}';
+    final bookingWindow = '${DateFormat('MMM d • HH:mm').format(conflict.bookingStart.toLocal())} – '
+        '${DateFormat('HH:mm').format(conflict.bookingEnd.toLocal())}';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.blueGrey.shade100),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            conflict.sessionTitle,
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text('Session window: $sessionWindow', style: theme.textTheme.bodySmall),
+          Text('Booking: ${conflict.bookingLearner} • $bookingWindow', style: theme.textTheme.bodySmall),
+          if (conflict.tutorName != null)
+            Text('Tutor: ${conflict.tutorName}', style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+
+  Color _severityColor(InstructorActionSeverity severity, ThemeData theme) {
+    switch (severity) {
+      case InstructorActionSeverity.high:
+        return const Color(0xFFEF4444);
+      case InstructorActionSeverity.medium:
+        return const Color(0xFFF59E0B);
+      case InstructorActionSeverity.low:
+      default:
+        return theme.colorScheme.primary;
+    }
+  }
+
+  IconData _actionIcon(InstructorActionType type) {
+    switch (type) {
+      case InstructorActionType.schedulingConflict:
+        return Icons.event_busy_outlined;
+      case InstructorActionType.offlineSync:
+        return Icons.cloud_sync_outlined;
+      case InstructorActionType.sessionFollowUp:
+        return Icons.assignment_turned_in_outlined;
+    }
   }
 
   Widget _buildServiceSuiteBanner(BuildContext context) {
