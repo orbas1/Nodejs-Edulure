@@ -5,6 +5,7 @@ import {
   CalendarIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
+  LinkIcon,
   TagIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
@@ -12,6 +13,12 @@ import {
 import { fetchBlogCategories, fetchBlogPosts, fetchBlogTags } from '../../api/blogApi.js';
 
 const STORAGE_KEY = 'edulure.blog-search.views';
+const PAGE_SIZE = 6;
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'popular', label: 'Most popular' },
+  { value: 'curated', label: 'Editorial picks' }
+];
 
 function persistViews(views) {
   try {
@@ -103,6 +110,8 @@ export default function BlogSearchSection() {
   const [viewError, setViewError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [sort, setSort] = useState('newest');
+  const [shareFeedback, setShareFeedback] = useState({ id: null, status: 'idle' });
 
   useEffect(() => {
     fetchBlogCategories().then(setCategories).catch(() => setCategories([]));
@@ -116,11 +125,36 @@ export default function BlogSearchSection() {
 
   const appliedTags = useMemo(() => new Set(filters.tags ?? []), [filters.tags]);
 
+  const resultSummary = useMemo(() => {
+    if (loading && !posts.length) {
+      return 'Loading stories…';
+    }
+    if (!posts.length) {
+      return 'No stories match the current view';
+    }
+    const start = (pagination.page - 1) * PAGE_SIZE + 1;
+    const end = start + posts.length - 1;
+    return `Showing ${start}-${end} of ${pagination.total} stories`;
+  }, [loading, pagination.page, pagination.total, posts.length]);
+
+  const sortLabel = useMemo(() => SORT_OPTIONS.find((option) => option.value === sort)?.label ?? 'Custom sort', [sort]);
+
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, [sort]);
+
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchBlogPosts({ page: pagination.page, pageSize: 6, category: filters.category || undefined, search: query || undefined, tags: filters.tags })
+    fetchBlogPosts({
+      page: pagination.page,
+      pageSize: PAGE_SIZE,
+      category: filters.category || undefined,
+      search: query || undefined,
+      tags: filters.tags,
+      sort
+    })
       .then((response) => {
         if (!active) return;
         setPosts(response.posts ?? []);
@@ -144,7 +178,7 @@ export default function BlogSearchSection() {
     return () => {
       active = false;
     };
-  }, [filters.category, filters.tags, pagination.page, query]);
+  }, [filters.category, filters.tags, pagination.page, query, sort]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -174,7 +208,8 @@ export default function BlogSearchSection() {
       id: `${Date.now()}`,
       name: newViewName.trim(),
       query,
-      filters
+      filters,
+      sort
     };
     setSavedViews((prev) => [nextView, ...prev]);
     setNewViewName('');
@@ -185,6 +220,7 @@ export default function BlogSearchSection() {
     setQuery(view.query ?? '');
     setQueryDraft(view.query ?? '');
     setFilters(view.filters ?? { category: '', tags: [] });
+    setSort(view.sort ?? 'newest');
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
@@ -201,6 +237,36 @@ export default function BlogSearchSection() {
     setEditingName('');
   };
 
+  const handleShareView = async (view) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      if (view.query) {
+        url.searchParams.set('q', view.query);
+      } else {
+        url.searchParams.delete('q');
+      }
+      const categoryValue = view.filters?.category ?? '';
+      if (categoryValue) {
+        url.searchParams.set('category', categoryValue);
+      } else {
+        url.searchParams.delete('category');
+      }
+      if (view.filters?.tags?.length) {
+        url.searchParams.set('tags', view.filters.tags.join(','));
+      } else {
+        url.searchParams.delete('tags');
+      }
+      url.searchParams.set('sort', view.sort ?? 'newest');
+      await navigator.clipboard.writeText(url.toString());
+      setShareFeedback({ id: view.id, status: 'copied' });
+      setTimeout(() => setShareFeedback({ id: null, status: 'idle' }), 3000);
+    } catch (err) {
+      console.warn('Unable to share saved blog search', err);
+      setShareFeedback({ id: view.id, status: 'error' });
+    }
+  };
+
   return (
     <section className="rounded-4xl border border-slate-200 bg-slate-50/80 p-8 shadow-xl">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -210,20 +276,39 @@ export default function BlogSearchSection() {
             Discover the latest activation playbooks, product releases and monetisation tactics from the Edulure publishing team.
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            type="search"
-            value={queryDraft}
-            onChange={(event) => setQueryDraft(event.target.value)}
-            placeholder="Search by keyword, campaign or author"
-            className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
-          >
-            <MagnifyingGlassIcon className="h-5 w-5" /> Search
-          </button>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="search"
+              value={queryDraft}
+              onChange={(event) => setQueryDraft(event.target.value)}
+              placeholder="Search by keyword, campaign or author"
+              className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:flex-1"
+            />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <label className="sr-only" htmlFor="blog-sort">
+                Sort results
+              </label>
+              <select
+                id="blog-sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value)}
+                className="w-full rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-48"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+              >
+                <MagnifyingGlassIcon className="h-5 w-5" /> Search
+              </button>
+            </div>
+          </div>
         </form>
       </header>
 
@@ -269,14 +354,19 @@ export default function BlogSearchSection() {
                   })}
                 </div>
               </div>
-            </div>
           </div>
+        </div>
 
-          {error ? (
-            <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-600" role="alert">
-              {error}
-            </div>
-          ) : null}
+        <div className="flex flex-col gap-1 rounded-full border border-slate-200 bg-white px-5 py-3 text-xs font-semibold text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <span>{resultSummary}</span>
+          <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{`Sorted by ${sortLabel.toLowerCase()}`}</span>
+        </div>
+
+        {error ? (
+          <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-600" role="alert">
+            {error}
+          </div>
+        ) : null}
 
           {loading && !posts.length ? (
             <div className="space-y-4">
@@ -376,9 +466,17 @@ export default function BlogSearchSection() {
                         {view.name}
                       </button>
                       <p className="mt-1 text-xs text-slate-500">
-                        {view.query ? `“${view.query}”` : 'All posts'} · {view.filters.tags?.length ?? 0} tags
+                        {view.query ? `“${view.query}”` : 'All posts'} · {view.filters.tags?.length ?? 0} tags ·{' '}
+                        {SORT_OPTIONS.find((option) => option.value === (view.sort ?? 'newest'))?.label ?? 'Newest first'}
                       </p>
-                      <div className="mt-3 flex items-center gap-2">
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleShareView(view)}
+                          className="inline-flex items-center gap-2 rounded-full border border-primary/30 px-3 py-1 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
+                        >
+                          <LinkIcon className="h-4 w-4" /> Share link
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
@@ -396,6 +494,15 @@ export default function BlogSearchSection() {
                         >
                           <TrashIcon className="h-4 w-4" /> Delete
                         </button>
+                        {shareFeedback.id === view.id ? (
+                          <span
+                            className={`text-[11px] font-semibold uppercase tracking-wide ${
+                              shareFeedback.status === 'copied' ? 'text-emerald-500' : 'text-rose-500'
+                            }`}
+                          >
+                            {shareFeedback.status === 'copied' ? 'Link copied' : 'Copy failed'}
+                          </span>
+                        ) : null}
                       </div>
                     </>
                   )}

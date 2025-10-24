@@ -12,6 +12,13 @@ function getOptionLabel(definition, rawValue) {
   return match ? match.label : rawValue;
 }
 
+function appendUnit(value, unit) {
+  if (!unit || value === null || value === undefined) {
+    return value;
+  }
+  return `${value} ${unit}`;
+}
+
 function formatRangeValue(rawValue) {
   if (!rawValue || (rawValue.min == null && rawValue.max == null)) {
     return null;
@@ -45,7 +52,7 @@ export function buildFilterChips(filters = {}, definitions = []) {
         .filter((value) => value !== null && value !== undefined && value !== '')
         .slice(0, 12)
         .forEach((value) => {
-          const displayValue = getOptionLabel(definition, value);
+          const displayValue = appendUnit(getOptionLabel(definition, value), definition.unit);
           chips.push({
             id: `${key}:${value}`,
             key,
@@ -59,7 +66,7 @@ export function buildFilterChips(filters = {}, definitions = []) {
     }
 
     if (definition.type === 'range') {
-      const displayValue = formatRangeValue(rawValue);
+      const displayValue = appendUnit(formatRangeValue(rawValue), definition.unit);
       if (displayValue) {
         chips.push({
           id: `${key}:range`,
@@ -88,7 +95,7 @@ export function buildFilterChips(filters = {}, definitions = []) {
     }
 
     if (rawValue !== null && rawValue !== undefined && rawValue !== '') {
-      const displayValue = getOptionLabel(definition, rawValue) ?? rawValue;
+      const displayValue = appendUnit(getOptionLabel(definition, rawValue) ?? rawValue, definition.unit);
       chips.push({
         id: `${key}:${displayValue}`,
         key,
@@ -120,10 +127,17 @@ export default function FilterChips({ filters, definitions, chips, onRemove }) {
           key={chip.id}
           type="button"
           onClick={() => onRemove(chip)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onRemove(chip);
+            }
+          }}
           className={classNames(
             'group inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
             'border-primary/30 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10'
           )}
+          aria-label={`Remove ${chip.label} filter ${chip.displayValue}`}
         >
           <span className="truncate">
             {chip.label}: {chip.displayValue}
@@ -143,7 +157,8 @@ FilterChips.propTypes = {
       key: PropTypes.string.isRequired,
       label: PropTypes.string.isRequired,
       type: PropTypes.string.isRequired,
-      options: PropTypes.array
+      options: PropTypes.array,
+      unit: PropTypes.string
     })
   ),
   chips: PropTypes.arrayOf(

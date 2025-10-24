@@ -101,6 +101,13 @@ export default function GlobalSearchBar({
     [suggestions, suggestionsLimit]
   );
 
+  const suggestionCountMessage = useMemo(() => {
+    if (!isOpen) return '';
+    if (combinedLoading) return 'Loading suggestions';
+    if (!displayedSuggestions.length) return 'No suggestions available';
+    return `${displayedSuggestions.length} suggestions available`;
+  }, [combinedLoading, displayedSuggestions.length, isOpen]);
+
   useEffect(() => {
     if (value !== undefined) {
       setInternalValue(value);
@@ -118,6 +125,25 @@ export default function GlobalSearchBar({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, []);
+
+  useEffect(() => {
+    const handleShortcut = (event) => {
+      if (event.key !== '/' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      const composedPath = event.composedPath?.() ?? [];
+      const focusedInInput = composedPath.some((node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        return node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.isContentEditable;
+      });
+      if (focusedInInput) return;
+      event.preventDefault();
+      const inputElement = containerRef.current?.querySelector('input[name="search"]');
+      inputElement?.focus();
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
   }, []);
 
   const handleFocus = () => {
@@ -196,10 +222,15 @@ export default function GlobalSearchBar({
         }}
         allowClear
         onFocus={handleFocus}
+        ariaLabel="Global search input (press slash to focus)"
       />
+      <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300">Press / to focus search</p>
       {isOpen ? (
         <div className="absolute left-0 right-0 z-40 mt-2">
           <div className="rounded-3xl border border-slate-200 bg-white/95 p-2 shadow-2xl backdrop-blur">
+            <span className="sr-only" aria-live="polite">
+              {suggestionCountMessage}
+            </span>
             {combinedLoading && !displayedSuggestions.length ? (
               <ul className="space-y-2" role="listbox">
                 {[...Array(3)].map((_, index) => (

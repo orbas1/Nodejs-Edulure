@@ -420,10 +420,66 @@
          - 9.A.2 Courses (frontend-reactjs/src/pages/Courses.jsx)
          - 9.A.3 Explorer (frontend-reactjs/src/pages/Explorer.jsx)
          - 9.A.4 LiveClassrooms (frontend-reactjs/src/pages/LiveClassrooms.jsx)
-      - 9.D Scheduling, Calendar & Classroom Utilities
+      - ✅ 9.D Scheduling, Calendar & Classroom Utilities
+         1. **Appraisal.** Scheduling flows now balance instructor tooling and learner clarity by layering timezone defaults, reminder presets, and attendee summaries directly into `CalendarEventDialog.jsx` while `ScheduleGrid.jsx` surfaces relative timing for each event.
+         2. **Functionality.** The dialog exports ICS calendar files, copies classroom links, and normalises reminders; the grid maps occupancy and attendance while adapting to viewer timezones via new props.
+         3. **Usefulness.** Learners receive precise start times, join links, and duration previews, and operators can rely on memoised data for conflict-free scheduling decisions.
+         4. **Redundancies.** Shared helpers now derive ICS payloads and relative labels eliminating the string duplication previously scattered across scheduling surfaces.
+         5. **Placeholders or Stubs.** Reminder presets intentionally cap at one day; extend if downstream analytics requests longer lead times.
+         6. **Duplicate Functions.** Timezone handling lives in a single `formatRange` helper, removing the need for each consumer to reimplement conversions.
+         7. **Improvements Needed.** Future iterations should sync reminders with notification preferences and expose drag-and-drop reordering for power users.
+         8. **Styling Improvements.** Pills communicate timezone and reminder context, and new emerald insight badges create accessible status contrast.
+         9. **Efficiency Analysis.** Memoised duration math and relative formatters prevent recalculation across renders, keeping calendar updates light.
+         10. **Strengths to Keep.** Conflict detection, attendance summaries, and reusable layout primitives continue to anchor the classroom experience.
+         11. **Weaknesses to Remove.** Offline handling remains minimal; queue join-link copies for degraded networks.
+         12. **Styling & Colour Review.** Reminder and insight pills adhere to the scheduling palette, ensuring parity between modal and grid.
+         13. **CSS, Orientation & Placement.** Responsive stacks ensure fields collapse cleanly on mobile while summaries occupy dedicated cards.
+         14. **Text Analysis.** Microcopy now clarifies “Share quick link,” “Download calendar invite,” and contextualises reminders in plain language.
+         15. **Change Checklist Tracker.** Validate ICS downloads, clipboard copies, timezone fallbacks, and relative badges before shipping.
+         16. **Full Upgrade Plan & Release Steps.** Roll out to staging with timezone smoke tests, observe telemetry on copy/download usage, then graduate to production behind a feature flag.
+         17. **Governance & Audit.** Capture join-link copy events so trust & safety can trace access when escalations arise.
+         18. **Accessibility.** Aria labels on grid wrappers and live regions on copy status keep screen-reader users aligned.
+         19. **Localization.** Formatter helpers rely on `Intl` APIs, enabling locale-aware times without bespoke translation files.
+         20. **Performance Guardrails.** Clipboard and blob utilities short-circuit when unsupported, avoiding runtime crashes on legacy browsers.
+         21. **Observability.** Emit analytics events for reminder selection and ICS downloads to monitor adoption.
+         22. **Testing Hooks.** Deterministic helper functions (`formatRange`, `buildIcsContent`) simplify unit coverage.
+         23. **Security Review.** Clipboard copy sanitises inputs by reusing submitted URLs; avoid injecting raw HTML.
+         24. **Documentation.** Update scheduling playbooks with new reminder presets and timezone prop guidance for grid consumers.
+         25. **Change Management.** Announce to instructors that reminders default to 15 minutes and can be tuned per session.
+         26. **Analytics Alignment.** Duration preview plus occupancy labels deliver downstream metrics for capacity planning.
+         27. **User Delight.** Quick summary cards reduce uncertainty and align with learner expectations for session prep.
+         28. **Release.** Merge once QA verifies timezone parity, ICS validity, and accessibility hooks, then monitor for clipboard errors post-launch.
          - 9.D.1 CalendarEventDialog (frontend-reactjs/src/components/calendar/CalendarEventDialog.jsx)
          - 9.D.2 ScheduleGrid (frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx)
-      - 9.E Search & Discovery Components
+      - ✅ 9.E Search & Discovery Components
+         1. **Appraisal.** Search surfaces integrate editorial workflows, explorer insights, and global shortcuts so teams pivot between curated content and live indices without friction.
+         2. **Functionality.** Blog search adds sort ordering, saved view sharing, and result summaries; explorer previews copy deep links; global search recognises the `/` shortcut; filter chips expose range units; result cards surface relative freshness.
+         3. **Usefulness.** Editors can persist and distribute newsroom filters, operators capture explorer insights instantly, and learners gain consistent quick actions across discovery touchpoints.
+         4. **Redundancies.** Shared helper logic now generates filter chip labels with units and facet highlights, removing bespoke string assembly across panels.
+         5. **Placeholders or Stubs.** Saved view share links piggyback on current sort—extend payloads when backend exposes canonical share tokens.
+         6. **Duplicate Functions.** Suggestion announcements and shortcut listeners centralise around a single container effect preventing repeated DOM queries.
+         7. **Improvements Needed.** Layer debounce for heavy explorer queries and wire server-driven highlights for blog excerpts.
+         8. **Styling Improvements.** Primary/emerald summary blocks highlight insights and share actions using accessible contrast tokens.
+         9. **Efficiency Analysis.** Persisted views leverage local storage; memoised suggestion subsets avoid re-slicing arrays on each keystroke.
+         10. **Strengths to Keep.** Rich preview drawers, facet analytics, and modular cards remain the backbone of discovery experiences.
+         11. **Weaknesses to Remove.** Address missing `@eslint/js` dependency in CI so linting covers the new shortcuts reliably.
+         12. **Styling & Colour Review.** Share buttons use primary outlines while insights lean on emerald accents for visual hierarchy.
+         13. **CSS, Orientation & Placement.** Adaptive form stacks keep blog controls responsive; explorer insight cards slot after filters without disrupting flow.
+         14. **Text Analysis.** Microcopy clarifies “Share link,” “Press / to focus search,” and “Discovery insight,” guiding non-technical users.
+         15. **Change Checklist Tracker.** Test sort persistence, clipboard sharing, slash shortcut focus, and facet insight rendering across browsers.
+         16. **Full Upgrade Plan & Release Steps.** Ship behind discovery flag, monitor search telemetry for adoption, then document slash shortcut in help centre.
+         17. **Governance & Audit.** Saved view exports respect existing local-storage footprint—document that shares do not transmit private tokens.
+         18. **Accessibility.** Aria-live regions announce suggestion counts and share statuses; filter chips support keyboard removal.
+         19. **Localization.** Relative freshness leverages `Intl.RelativeTimeFormat`, easing translation burdens.
+         20. **Performance Guardrails.** Clipboard operations short-circuit when unsupported; skeletons bridge loading states.
+         21. **Observability.** Hook analytics into share and sort events to measure editorial workflows.
+         22. **Testing Hooks.** Deterministic helper exports (`buildFilterChips`) remain easy to unit test with new unit suffixes.
+         23. **Security Review.** URL builders sanitise query parameters before copying; no raw HTML injection occurs.
+         24. **Documentation.** Update discovery guides with sort option semantics, slash shortcut usage, and insight cards.
+         25. **Change Management.** Brief marketing on new sharing workflows so they can onboard stakeholders quickly.
+         26. **Analytics Alignment.** Blog summaries and explorer insights provide quantifiable signals for KPI dashboards.
+         27. **User Delight.** Real-time suggestion counts, relative freshness badges, and share confirmations create polished experiences.
+         28. **Release.** Promote once QA signs off on cross-browser clipboard, slash shortcut, and facet rendering—monitor search latency post deploy.
          - 9.E.1 BlogSearchSection (frontend-reactjs/src/components/search/BlogSearchSection.jsx)
          - 9.E.2 ExplorerPreviewDrawer (frontend-reactjs/src/components/search/ExplorerPreviewDrawer.jsx)
          - 9.E.3 ExplorerSearchSection (frontend-reactjs/src/components/search/ExplorerSearchSection.jsx)

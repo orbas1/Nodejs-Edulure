@@ -10,6 +10,7 @@ import {
 import CourseCard from '../course/CourseCard.jsx';
 
 const { CurrencyDollarIcon, StarIcon, SparklesIcon, GlobeAltIcon } = ICONS;
+const relativeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
 export default function SearchResultCard({ entityType, hit, onPreview }) {
   const Icon = getEntityIcon(entityType);
@@ -20,6 +21,24 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
     hit.freshness?.refreshedAt ? new Date(hit.freshness.refreshedAt) : null;
   const refreshedAtLabel =
     refreshedAtDate && !Number.isNaN(refreshedAtDate.valueOf()) ? refreshedAtDate.toLocaleString() : null;
+  let relativeFreshness = null;
+  if (refreshedAtDate && !Number.isNaN(refreshedAtDate.valueOf())) {
+    const diffMs = refreshedAtDate.getTime() - Date.now();
+    const abs = Math.abs(diffMs);
+    let unit = 'day';
+    let value = Math.round(diffMs / 86400000);
+    if (abs < 3600000) {
+      unit = 'minute';
+      value = Math.round(diffMs / 60000);
+    } else if (abs < 86400000) {
+      unit = 'hour';
+      value = Math.round(diffMs / 3600000);
+    }
+    if (value === 0) {
+      value = diffMs > 0 ? 1 : -1;
+    }
+    relativeFreshness = relativeFormatter.format(value, unit);
+  }
 
   if (entityType === 'courses') {
     const actions = Array.isArray(hit.actions) ? hit.actions : [];
@@ -61,7 +80,10 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
   }
 
   return (
-    <article className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition-transform transition-colors hover:-translate-y-0.5 hover:shadow-xl focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20">
+    <article
+      className="group flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm transition-transform transition-colors hover:-translate-y-0.5 hover:shadow-xl focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20"
+      aria-label={`${hit.title ?? hit.name ?? 'Search result'} card`}
+    >
       <div className="grid gap-6 lg:grid-cols-[320px,1fr] lg:items-start">
         <div className="relative overflow-hidden rounded-3xl border border-slate-100 bg-slate-100/80 shadow-inner">
           {imageUrl ? (
@@ -116,6 +138,9 @@ export default function SearchResultCard({ entityType, hit, onPreview }) {
                     >
                       {refreshedAtLabel}
                     </time>
+                  ) : null}
+                  {relativeFreshness ? (
+                    <span className="ml-2 text-[10px] font-semibold text-emerald-500">{relativeFreshness}</span>
                   ) : null}
                 </p>
               ) : null}
