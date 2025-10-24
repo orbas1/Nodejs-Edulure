@@ -2,29 +2,39 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listQueueMock = vi.fn();
 const getStatusBreakdownMock = vi.fn();
+const upsertForUserMock = vi.fn();
+const updateVerificationMock = vi.fn();
+const findVerificationByIdMock = vi.fn();
+
+const listDocumentsMock = vi.fn();
+const upsertDocumentMock = vi.fn();
+const countDocumentsByStatusMock = vi.fn();
+
+const recordAuditLogMock = vi.fn();
+const listAuditLogsMock = vi.fn();
 
 vi.mock('../src/models/KycVerificationModel.js', () => ({
   default: {
     listQueue: listQueueMock,
     getStatusBreakdown: getStatusBreakdownMock,
-    upsertForUser: vi.fn(),
-    update: vi.fn(),
-    findById: vi.fn()
+    upsertForUser: upsertForUserMock,
+    update: updateVerificationMock,
+    findById: findVerificationByIdMock
   }
 }));
 
 vi.mock('../src/models/KycDocumentModel.js', () => ({
   default: {
-    listForVerification: vi.fn(),
-    upsertDocument: vi.fn(),
-    countByStatus: vi.fn()
+    listForVerification: listDocumentsMock,
+    upsertDocument: upsertDocumentMock,
+    countByStatus: countDocumentsByStatusMock
   }
 }));
 
 vi.mock('../src/models/KycAuditLogModel.js', () => ({
   default: {
-    record: vi.fn(),
-    listForVerification: vi.fn()
+    record: recordAuditLogMock,
+    listForVerification: listAuditLogsMock
   }
 }));
 
@@ -43,10 +53,14 @@ vi.mock('../src/services/StorageService.js', () => ({
 
 const { default: IdentityVerificationService } = await import('../src/services/IdentityVerificationService.js');
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  listDocumentsMock.mockResolvedValue([]);
+  listAuditLogsMock.mockResolvedValue([]);
+  upsertForUserMock.mockResolvedValue(null);
+});
+
 describe('IdentityVerificationService.getAdminOverview', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
 
   it('aggregates compliance metrics and flags SLA breaches', async () => {
     const now = new Date('2024-11-07T12:00:00Z');
@@ -133,5 +147,114 @@ describe('IdentityVerificationService.getAdminOverview', () => {
       registrationNumber: 'ZB765432',
       status: 'Active'
     });
+  });
+});
+
+describe('IdentityVerificationService.getVerificationSummaryForUser', () => {
+  it('maps documents, outstanding requirements, and audit timeline events', async () => {
+    const verificationRecord = {
+      id: 9,
+      reference: 'kyc_1234567890',
+      userId: 55,
+      status: 'pending_review',
+      documentsRequired: 3,
+      documentsSubmitted: 2,
+      riskScore: 7.5,
+      needsManualReview: true,
+      escalationLevel: 't1',
+      lastSubmittedAt: new Date('2024-05-01T10:00:00Z'),
+      lastReviewedAt: null,
+      reviewedBy: null,
+      rejectionReason: null,
+      policyReferences: JSON.stringify(['AML-2024']),
+      sensitiveNotesCiphertext: null,
+      sensitiveNotesHash: null,
+      sensitiveNotesClassification: null,
+      encryptionKeyVersion: 'v1',
+      createdAt: new Date('2024-04-30T08:00:00Z'),
+      updatedAt: new Date('2024-05-01T10:00:00Z')
+    };
+
+    upsertForUserMock.mockResolvedValueOnce(verificationRecord);
+    listDocumentsMock.mockResolvedValueOnce([
+      {
+        id: 1,
+        verificationId: verificationRecord.id,
+        documentType: 'government-id-front',
+        status: 'accepted',
+        fileNameMask: 'id-front.png',
+        mimeTypeMask: 'image/png',
+        sizeBytes: 2048,
+        submittedAt: new Date('2024-04-30T09:15:00Z'),
+        reviewedAt: new Date('2024-04-30T12:00:00Z'),
+        documentPayloadCiphertext: null,
+        documentEncryptionKeyVersion: 'v1'
+      },
+      {
+        id: 2,
+        verificationId: verificationRecord.id,
+        documentType: 'identity-selfie',
+        status: 'pending',
+        fileNameMask: 'selfie.png',
+        mimeTypeMask: 'image/png',
+        sizeBytes: 1024,
+        submittedAt: new Date('2024-04-30T09:30:00Z'),
+        reviewedAt: null,
+        documentPayloadCiphertext: null,
+        documentEncryptionKeyVersion: 'v1'
+      }
+    ]);
+    listAuditLogsMock.mockResolvedValueOnce([
+      {
+        id: 90,
+        verificationId: verificationRecord.id,
+        actorId: 77,
+        action: 'document_attached',
+        notes: null,
+        metadata: JSON.stringify({ documentType: 'identity-selfie' }),
+        createdAt: new Date('2024-04-30T09:30:00Z'),
+        actorFirstName: 'Kai',
+        actorLastName: 'Watanabe',
+        actorEmail: 'kai@example.com'
+      },
+      {
+        id: 91,
+        verificationId: verificationRecord.id,
+        actorId: 88,
+        action: 'submitted_for_review',
+        notes: null,
+        metadata: JSON.stringify({ documentsSubmitted: 2 }),
+        createdAt: new Date('2024-05-01T10:00:00Z'),
+        actorFirstName: 'Mira',
+        actorLastName: 'Patel',
+        actorEmail: 'mira@example.com'
+      }
+    ]);
+
+    const summary = await IdentityVerificationService.getVerificationSummaryForUser(55);
+
+    expect(upsertForUserMock.mock.calls[0][0]).toBe(55);
+    expect(listDocumentsMock.mock.calls[0][0]).toBe(verificationRecord.id);
+    expect(listAuditLogsMock.mock.calls[0][0]).toBe(verificationRecord.id);
+    expect(summary.reference).toBe('kyc_1234567890');
+    expect(summary.requiredDocuments).toHaveLength(3);
+    expect(summary.documents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'government-id-front', label: 'Government ID (front)' }),
+        expect.objectContaining({ type: 'identity-selfie', status: 'pending' })
+      ])
+    );
+    expect(summary.outstandingDocuments.map((doc) => doc.type)).toContain('government-id-back');
+    expect(summary.timeline.length).toBeGreaterThanOrEqual(4);
+    expect(summary.timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'audit', action: 'submitted_for_review' }),
+        expect.objectContaining({ type: 'document', metadata: expect.objectContaining({ type: 'identity-selfie' }) }),
+        expect.objectContaining({ type: 'status', status: 'pending_review' })
+      ])
+    );
+    const timestamps = summary.timeline.map((event) => event.occurredAt).filter(Boolean);
+    expect(timestamps).toEqual([...timestamps].sort());
+    expect(summary.history).toEqual(summary.timeline);
   });
 });

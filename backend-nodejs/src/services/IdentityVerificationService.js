@@ -27,6 +27,8 @@ const REQUIRED_DOCUMENT_TYPES = [
   }
 ];
 
+const REQUIRED_DOCUMENT_LOOKUP = new Map(REQUIRED_DOCUMENT_TYPES.map((entry) => [entry.type, entry]));
+
 const REVIEWABLE_STATUSES = new Set(['submitted', 'pending_review', 'resubmission_required']);
 const FINAL_STATUSES = new Set(['approved', 'rejected']);
 
@@ -303,6 +305,7 @@ function mapDocument(row) {
   const decrypted = row.documentPayloadCiphertext
     ? DataEncryptionService.decryptStructured(row.documentPayloadCiphertext, row.documentEncryptionKeyVersion)
     : null;
+  const requirement = REQUIRED_DOCUMENT_LOOKUP.get(row.documentType ?? row.type ?? '');
   return {
     id: row.id,
     type: row.documentType,
@@ -314,7 +317,9 @@ function mapDocument(row) {
     reviewedAt: row.reviewedAt,
     storageBucket: decrypted?.storageBucket ?? null,
     storageKey: decrypted?.storageKey ?? null,
-    checksumSha256: decrypted?.checksumSha256 ?? row.checksumMask ?? null
+    checksumSha256: decrypted?.checksumSha256 ?? row.checksumMask ?? null,
+    label: requirement?.label ?? formatStatusLabel(row.documentType ?? row.type ?? 'Document'),
+    helper: requirement?.description ?? null
   };
 }
 
@@ -382,6 +387,160 @@ function determineNextStatus(currentStatus, hasAllDocuments) {
   return 'collecting';
 }
 
+function formatStatusLabel(status) {
+  if (!status) {
+    return null;
+  }
+  return status
+    .toString()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function coerceTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function mapAuditLogEvent(row) {
+  if (!row) {
+    return null;
+  }
+
+  const normalizedMetadata = (() => {
+    if (!row.metadata) {
+      return {};
+    }
+    if (typeof row.metadata === 'object') {
+      return row.metadata;
+    }
+    try {
+      return JSON.parse(row.metadata);
+    } catch (error) {
+      logger.warn({ err: error }, 'Failed to parse audit log metadata');
+      return {};
+    }
+  })();
+
+  const action = row.action ?? 'update';
+  const statusMap = {
+    document_attached: 'submitted',
+    submitted_for_review: 'pending_review',
+    review_pending: 'pending_review',
+    review_approved: 'approved',
+    review_rejected: 'rejected',
+    review_resubmission_required: 'resubmission_required',
+    reminder_sent: 'collecting'
+  };
+  const status = statusMap[action] ?? null;
+
+  return {
+    id: row.id ?? `audit-${action}`,
+    type: 'audit',
+    action,
+    title: formatStatusLabel(action) ?? 'Verification update',
+    description: row.notes ?? normalizedMetadata.note ?? null,
+    occurredAt: coerceTimestamp(row.createdAt),
+    status,
+    statusLabel: formatStatusLabel(status),
+    actor: row.actorId
+      ? {
+          id: row.actorId,
+          name: [row.actorFirstName, row.actorLastName].filter(Boolean).join(' ') || null,
+          email: row.actorEmail ?? null
+        }
+      : null,
+    metadata: normalizedMetadata
+  };
+}
+
+function buildDocumentTimelineEvent(document) {
+  const requirement = REQUIRED_DOCUMENT_LOOKUP.get(document.type ?? document.documentType ?? '');
+  const status = document.status ?? null;
+  const label = document.label ?? requirement?.label ?? formatStatusLabel(document.type ?? 'Document');
+  const timestamp = document.reviewedAt ?? document.updatedAt ?? document.submittedAt ?? document.createdAt ?? null;
+
+  return {
+    id: document.id ? `document-${document.id}` : `document-${document.type ?? 'unknown'}`,
+    type: 'document',
+    status,
+    statusLabel: formatStatusLabel(status),
+    title: `${label}${status ? ` · ${formatStatusLabel(status)}` : ''}`.trim(),
+    description: document.reviewerComment ?? document.note ?? requirement?.description ?? null,
+    occurredAt: coerceTimestamp(timestamp),
+    metadata: {
+      type: document.type ?? null,
+      fileName: document.fileName ?? null,
+      mimeType: document.mimeType ?? null,
+      sizeBytes: document.sizeBytes ?? null
+    }
+  };
+}
+
+function buildStatusTimelineEvent(verification) {
+  if (!verification?.status) {
+    return null;
+  }
+  const timestamp = verification.lastReviewedAt ?? verification.lastSubmittedAt ?? verification.updatedAt ?? null;
+
+  return {
+    id: `status-${verification.id}`,
+    type: 'status',
+    status: verification.status,
+    statusLabel: formatStatusLabel(verification.status),
+    title: `Status · ${formatStatusLabel(verification.status)}`,
+    description: verification.rejectionReason ?? null,
+    occurredAt: coerceTimestamp(timestamp),
+    metadata: {
+      escalationLevel: verification.escalationLevel ?? null,
+      policyReferences: verification.policyReferences ?? []
+    }
+  };
+}
+
+function sortTimeline(events) {
+  return events
+    .filter(Boolean)
+    .map((event) => ({
+      ...event,
+      occurredAt: coerceTimestamp(event.occurredAt)
+    }))
+    .sort((a, b) => {
+      const aTime = a.occurredAt ? new Date(a.occurredAt).getTime() : Number.POSITIVE_INFINITY;
+      const bTime = b.occurredAt ? new Date(b.occurredAt).getTime() : Number.POSITIVE_INFINITY;
+      if (aTime === bTime) {
+        return String(a.id ?? '').localeCompare(String(b.id ?? ''));
+      }
+      return aTime - bTime;
+    });
+}
+
+function buildTimeline({ verification, documents = [], auditLogs = [] }) {
+  const auditEvents = auditLogs.map(mapAuditLogEvent).filter(Boolean);
+  const documentEvents = documents.map(buildDocumentTimelineEvent);
+  const statusEvent = buildStatusTimelineEvent(verification);
+
+  return sortTimeline([...auditEvents, ...documentEvents, statusEvent]);
+}
+
+function composeVerificationSummary(verification, documents = [], auditLogs = []) {
+  const mappedDocuments = normaliseDocuments(documents);
+  const summary = mapVerification(verification, mappedDocuments);
+  const outstanding = getOutstandingDocuments(mappedDocuments);
+  const timeline = buildTimeline({ verification: summary, documents: mappedDocuments, auditLogs });
+
+  return {
+    ...summary,
+    requiredDocuments: REQUIRED_DOCUMENT_TYPES,
+    outstandingDocuments: outstanding,
+    timeline,
+    history: timeline
+  };
+}
+
 export default class IdentityVerificationService {
   static getRequiredDocuments() {
     return REQUIRED_DOCUMENT_TYPES;
@@ -394,13 +553,9 @@ export default class IdentityVerificationService {
   static async getVerificationSummaryForUser(userId, options = {}) {
     const verification = await this.ensureVerification(userId, options.connection);
     const documents = await KycDocumentModel.listForVerification(verification.id, options.connection);
-    const mappedDocuments = documents.map(mapDocument);
+    const auditLogs = await KycAuditLogModel.listForVerification(verification.id, options.connection);
 
-    return {
-      ...mapVerification(verification, mappedDocuments),
-      requiredDocuments: REQUIRED_DOCUMENT_TYPES,
-      outstandingDocuments: getOutstandingDocuments(mappedDocuments)
-    };
+    return composeVerificationSummary(verification, documents, auditLogs);
   }
 
   static async requestUpload(userId, payload) {
@@ -506,8 +661,10 @@ export default class IdentityVerificationService {
         trx
       );
 
+      const auditLogs = await KycAuditLogModel.listForVerification(verification.id, trx);
+
       return {
-        verification: mapVerification(updatedVerification, documents),
+        verification: composeVerificationSummary(updatedVerification, documents, auditLogs),
         document: mapDocument(document)
       };
     });
@@ -548,7 +705,9 @@ export default class IdentityVerificationService {
         trx
       );
 
-      return mapVerification(updatedVerification, documents);
+      const auditLogs = await KycAuditLogModel.listForVerification(verification.id, trx);
+
+      return composeVerificationSummary(updatedVerification, documents, auditLogs);
     });
   }
 
@@ -642,8 +801,9 @@ export default class IdentityVerificationService {
       );
 
       const documents = await KycDocumentModel.listForVerification(verificationId, trx);
+      const auditLogs = await KycAuditLogModel.listForVerification(verificationId, trx);
 
-      return mapVerification(updated, documents);
+      return composeVerificationSummary(updated, documents, auditLogs);
     });
   }
 
