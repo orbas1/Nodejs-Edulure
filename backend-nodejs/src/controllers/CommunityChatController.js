@@ -373,6 +373,19 @@ export default class CommunityChatController {
         req.params.messageId,
         payload
       );
+      realtimeService.broadcastCommunityMessage(
+        req.params.communityId,
+        req.params.channelId,
+        result.message,
+        {
+          actorId: req.user.id,
+          moderation: {
+            action: payload.action,
+            reason: payload.reason ?? null,
+            metadata: payload.metadata ?? {}
+          }
+        }
+      );
       return success(res, {
         data: result,
         message: 'Message moderation applied'

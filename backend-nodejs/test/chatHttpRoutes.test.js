@@ -21,6 +21,12 @@ const directMessageServiceMock = {
   markRead: vi.fn()
 };
 
+const realtimeServiceMock = {
+  broadcastCommunityMessage: vi.fn(),
+  broadcastCommunityReaction: vi.fn(),
+  broadcastCommunityPresence: vi.fn()
+};
+
 vi.mock('../src/middleware/auth.js', () => ({
   default: () => (req, _res, next) => {
     req.user = { id: 42, role: 'user', sessionId: 'sess-001' };
@@ -36,6 +42,10 @@ vi.mock('../src/services/DirectMessageService.js', () => ({
   default: directMessageServiceMock
 }));
 
+vi.mock('../src/services/RealtimeService.js', () => ({
+  default: realtimeServiceMock
+}));
+
 let app;
 
 beforeAll(async () => {
@@ -45,6 +55,7 @@ beforeAll(async () => {
 beforeEach(() => {
   Object.values(communityChatServiceMock).forEach((fn) => fn.mockReset());
   Object.values(directMessageServiceMock).forEach((fn) => fn.mockReset());
+  Object.values(realtimeServiceMock).forEach((fn) => fn.mockReset());
 });
 
 describe('Community chat HTTP routes', () => {
@@ -148,6 +159,12 @@ describe('Community chat HTTP routes', () => {
         metadata: {}
       })
     );
+    expect(realtimeServiceMock.broadcastCommunityMessage).toHaveBeenCalledWith(
+      '7',
+      '11',
+      expect.objectContaining({ id: 777 }),
+      expect.objectContaining({ actorId: 42 })
+    );
   });
 
   it('returns a validation error when message body is missing', async () => {
@@ -184,6 +201,12 @@ describe('Community chat HTTP routes', () => {
       .send({ emoji: '🚀' });
     expect(reactResponse.status).toBe(200);
     expect(communityChatServiceMock.reactToMessage).toHaveBeenCalledWith('7', '11', 42, '901', '🚀');
+    expect(realtimeServiceMock.broadcastCommunityReaction).toHaveBeenNthCalledWith(
+      1,
+      '7',
+      '11',
+      expect.objectContaining({ messageId: 901, emoji: '🚀', actorId: 42 })
+    );
 
     const removeResponse = await request(app)
       .delete('/api/v1/communities/7/chat/channels/11/messages/901/reactions')
@@ -191,6 +214,12 @@ describe('Community chat HTTP routes', () => {
       .send({ emoji: '🚀' });
     expect(removeResponse.status).toBe(200);
     expect(communityChatServiceMock.removeReaction).toHaveBeenCalledWith('7', '11', 42, '901', '🚀');
+    expect(realtimeServiceMock.broadcastCommunityReaction).toHaveBeenNthCalledWith(
+      2,
+      '7',
+      '11',
+      expect.objectContaining({ messageId: 901, emoji: '🚀', actorId: 42, removed: true })
+    );
 
     const moderateResponse = await request(app)
       .post('/api/v1/communities/7/chat/channels/11/messages/901/moderate')
@@ -203,6 +232,15 @@ describe('Community chat HTTP routes', () => {
       42,
       '901',
       expect.objectContaining({ action: 'hide', reason: 'Off-topic' })
+    );
+    expect(realtimeServiceMock.broadcastCommunityMessage).toHaveBeenCalledWith(
+      '7',
+      '11',
+      expect.objectContaining({ id: 901, status: 'hidden' }),
+      expect.objectContaining({
+        actorId: 42,
+        moderation: expect.objectContaining({ action: 'hide', reason: 'Off-topic' })
+      })
     );
   });
 
@@ -232,7 +270,16 @@ describe('Community chat HTTP routes', () => {
     expect(communityChatServiceMock.updatePresence).toHaveBeenCalledWith(
       42,
       'sess-001',
-      expect.objectContaining({ status: 'away', metadata: { tab: 'chat' }, ttlMinutes: 5, client: 'web' })
+      expect.objectContaining({
+        status: 'away',
+        metadata: expect.objectContaining({ tab: 'chat', communityId: 7 }),
+        ttlMinutes: 5,
+        client: 'web'
+      })
+    );
+    expect(realtimeServiceMock.broadcastCommunityPresence).toHaveBeenCalledWith(
+      '7',
+      expect.arrayContaining([expect.objectContaining({ userId: 42 })])
     );
   });
 });
