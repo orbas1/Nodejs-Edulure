@@ -436,16 +436,81 @@
          - 10.A.3 CheckoutDialog (frontend-reactjs/src/components/commerce/CheckoutDialog.jsx)
          - 10.A.4 CheckoutPriceSummary (frontend-reactjs/src/components/commerce/CheckoutPriceSummary.jsx)
          - 10.A.5 EdulureAds (frontend-reactjs/src/pages/dashboard/EdulureAds.jsx)
-      - 11.A Profile & Account Surfaces
-         - 11.A.1 Profile (frontend-reactjs/src/pages/Profile.jsx)
-      - 11.B Support & Success Workflows
-         - 11.B.1 TicketForm (frontend-reactjs/src/components/support/TicketForm.jsx)
+      - ✓ 11.A Profile & Account Surfaces — Annex A22 (Profile & Billing Management)
+         1. **Appraisal.** `IdentityVerificationService.js` now composes the same verification summary that fuels `pages/Profile.jsx`, so Annex A22 shows inline validation, audit chronology, and billing cross-links sourced from the production KYC tables instead of mock placeholders.
+         2. **Functionality.** `composeVerificationSummary` joins `KycVerificationModel`, `KycDocumentModel`, and `KycAuditLogModel` rows into a payload with decrypted document metadata, required/outstanding document arrays, and a timestamped timeline rendered by the React verification card.
+         3. **Usefulness.** Learners see backend-confirmed audit events (“submitted_for_review”, “review_approved”) beside local upload states, reducing reconciliation pings because the profile accurately mirrors compliance status.
+         4. **Redundancies.** Timeline construction moved from the client into the service, eliminating duplicate logic across `fetchVerificationSummary`, `attachVerificationDocument`, and `submitVerificationPackage` while giving the UI a single canonical feed.
+         5. **Placeholders.** When a tenant lacks audit rows the service falls back to deterministic “verification ready” messaging, keeping Annex copy stable until reviewers create history.
+         6. **Duplicates.** Document labels now come directly from `REQUIRED_DOCUMENT_TYPES`, preventing diverging helper text between backend policy and the profile upload checklist.
+         7. **Improvements Needed.** Next sprint should hydrate reviewer avatars and SLA countdowns in the timeline once compliance exposes enriched metadata through `KycAuditLogModel`.
+         8. **Styling.** Profile verification badges reuse Annex accent tokens while server responses supply label/description text so the React component no longer hardcodes design copy.
+         9. **Efficiency.** Timeline generation runs in SQL once per summary request and returns memo-friendly arrays, avoiding repeated client recomputation on every render.
+         10. **Strengths.** Backend-verified outstanding document lists, audit-fed timelines, and persisted upload metadata keep account owners, finance, and compliance reviewing the same state snapshot.
+         11. **Weaknesses.** Profile editing still lacks backend-driven localisation for validation strings; introduce translation scaffolding before rolling out to multilingual tenants.
+         12. **Styling & Colour Review.** Server-provided labels respect Annex typography hierarchy, and the UI continues to apply focus/hover states that match billing cards and consent ledgers.
+         13. **CSS, Orientation & Placement.** The verification pane preserves two-column balance on desktop while stacking timeline events beneath alerts on mobile without reflow glitches.
+         14. **Text Analysis.** Backend summaries surface concise, action-focused copy (“Upload the back of your government ID”) derived from compliance descriptions, keeping tooltips consistent across channels.
+         15. **Change Checklist Tracker.** QA now verifies audit ingestion, outstanding document gating, and failure messaging against seeded KYC data before approving Annex A22 shipments.
+         16. **Release.** Roll Annex A22 alongside compliance migrations: run `20250211104500_secure_kyc_financial_payloads.js`, backfill audit logs, brief support on new timeline semantics, and monitor submission completion rates.
+      - ✓ 11.B Support & Success Workflows — Annex C1 (Learner Support Workspace)
+         1. **Appraisal.** `LearnerSupportRepository.js` and `SupportTicketModel.js` now align with migrations/seeds so Annex C1’s workspace displays knowledge suggestions, breadcrumbs, and AI summaries backed by live database fields.
+         2. **Functionality.** `createSupportTicket`, `updateSupportTicket`, and message APIs persist escalation breadcrumbs, notification metadata, and AI context while `TicketForm.jsx` reads/writes the same structures surfaced in the learner dashboard.
+         3. **Usefulness.** Learners review suggestion chips and SLA breadcrumbs that match backend records, letting success agents continue cases without reconciling local-only state.
+         4. **Redundancies.** Shared option builders and repository helpers normalise categories, priorities, and breadcrumbs so both backend and modal reuse the same serialisation rules.
+         5. **Placeholders.** Notification preferences stay in local storage until the preference API lands, but schema columns (`knowledge_suggestions`, `follow_up_due_at`) keep production parity for when the server begins storing them.
+         6. **Duplicates.** Support migrations (`20250321120000_learner_support_enhancements.js`) and `database/install.sql` enforce identical columns across fresh installs, seeds, and runtime queries, avoiding drift between environments.
+         7. **Improvements Needed.** Wire analytics events for preference toggles and hydrate SMS availability from tenant configuration before widening Annex rollout.
+         8. **Styling.** Chips, focus traps, and toast semantics continue to match Annex colour tokens, and backend-driven suggestion text removes redundant hard-coded copy in the modal.
+         9. **Efficiency.** Repository helpers batch message inserts and breadcrumb updates, while the modal mutates shallow clones so React renders remain lightweight even with persisted metadata.
+         10. **Strengths.** Accessible modal patterns, persisted AI summaries, and knowledge suggestions sourced from `support_articles` keep success workflows observable end-to-end.
+         11. **Weaknesses.** Local-only notification storage prevents cross-device preference sync; a follow-up should store channel/digest choices server-side through the learner preferences service.
+         12. **Styling & Colour Review.** Error, warning, and success states reuse Annex palettes so toast colours, chips, and banners stay consistent across dashboard and modal surfaces.
+         13. **CSS, Orientation & Placement.** Grid utilities ensure preference toggles collapse into single-column stacks on small screens while preserving accessible hit targets.
+         14. **Text Analysis.** Support microcopy now references seeded articles (“Resolve recurring billing declines”) and AI summary blurbs kept under 140 characters for clarity.
+         15. **Change Checklist Tracker.** Regression passes now include repository timeline hydration, breadcrumb updates, and notification toggle persistence before C1 deployments.
+         16. **Release.** Sequence Annex C1 with the learner support migration bundle, reseed knowledge articles via `001_bootstrap.js`, publish enablement notes, and monitor case resolution SLAs post-launch.
       - 11.C Settings, Preferences & Profile Components
          - 11.C.1 ProfileIdentityEditor (frontend-reactjs/src/components/profile/ProfileIdentityEditor.jsx)
          - 11.C.2 SettingsAccordion (frontend-reactjs/src/components/settings/SettingsAccordion.jsx)
          - 11.C.3 SettingsLayout (frontend-reactjs/src/components/settings/SettingsLayout.jsx)
          - 11.C.4 SettingsToggleField (frontend-reactjs/src/components/settings/SettingsToggleField.jsx)
          - 11.C.5 SystemPreferencesPanel (frontend-reactjs/src/components/settings/SystemPreferencesPanel.jsx)
+      - ✓ 12.A Bootstrap & Runtime Wiring (`backend-nodejs/src/bootstrap/bootstrap.js`, `backend-nodejs/src/config/env.js`, `backend-nodejs/src/graphql/gatewayBootstrap.js`, `backend-nodejs/src/graphql/persistedQueryStore.js`, `backend-nodejs/src/graphql/router.js`, `backend-nodejs/src/servers/webServer.js`, `backend-nodejs/src/servers/workerService.js`)
+        1. **Appraisal.** GraphQL readiness is now part of the default bootstrap contract: `bootstrap/bootstrap.js` wires `warmGraphQLGateway` alongside database, feature flag, and search cluster lifecycles while `env.graphql` formalises persisted query locations, refresh cadence, and depth/operation limits for every runtime.
+        2. **Functionality.** `graphql/gatewayBootstrap.js` warms schema introspection, hydrates JSON and `.graphql` manifests into the shared in-memory store, and schedules safe refreshes via `persistedQueryStore.replaceAll`; readiness emitters in `webServer.js`/`workerService.js` treat the gateway as a first-class dependency and stop handles clear timers deterministically. Vitest coverage in `test/graphql/gatewayBootstrap.test.js` and `test/graphql/persistedQueryStore.test.js` locks in manifest parsing, TTL behaviour, and cache hydration.
+        3. **Logic Usefulness.** The bootstrapper downgrades readiness rather than crashing when manifests are missing, emits snapshots with entry counts plus refresh intervals, and feeds env-sourced guard rails straight into `graphql/router.js`, keeping persisted-query policy centralised and reproducible across nodes.
+        4. **Redundancies.** Prior duplicated stop semantics in `startCoreInfrastructure` remain eliminated by funnelling descriptors through a single `stopHandler`, ensuring bootstrap helpers (including GraphQL cache timers) tear down without bespoke wiring.
+        5. **Placeholders or Stubs.** Persisted query manifests remain optional; when absent, the gateway marks itself degraded so operations can stage manifests independently of code deploys while still exposing meaningful readiness context.
+        6. **Duplicate Functions.** The `persistedQueryStore` centralises TTL-aware cache mutation via `set`, `clear`, and `replaceAll`, removing bespoke map resets and allowing manifest refreshes/tests to share the same primitives.
+        7. **Improvements Needed.** Surface refresh metrics (success/failure counters, last refresh timestamp) through Prometheus once the observability stack exposes GraphQL-specific gauges, and consider wiring `env.graphql.persistedQueriesPath` into configuration management for environment overrides.
+        8. **Styling Improvements.** N/A for runtime wiring; logging already uses structured payloads—ensure follow-up stories keep the `graphql-gateway` logger child consistent with existing naming conventions.
+        9. **Efficiency Analysis.** Cached manifests prevent recomputation on every GraphQL call, while readiness retries reuse the generic exponential backoff in `executeWithRetry`; the store prunes expired entries on access so manifests and runtime traffic remain lightweight.
+        10. **Strengths to Keep.** Centralised bootstrap orchestration, bounded retry logic, readiness snapshots with manifest health, and dedicated documentation in `backend-nodejs/README.md` give SRE and platform operations a predictable control plane for GraphQL availability.
+        11. **Weaknesses to Remove.** Future iterations should prune stale persisted queries by reconciling manifest hashes against live traffic; at present, `replaceAll` overwrites the in-memory cache but lacks differential metrics for removed entries.
+        12. **Styling & Colour Review.** Not applicable—ensure Grafana dashboards adopt the new readiness component name when visualising GraphQL status.
+        13. **CSS, Orientation & Placement.** Not applicable to backend bootstrapping; document the new readiness component placement in service topology diagrams instead.
+        14. **Text Analysis.** Bootstrap log messages highlight manifest paths and entry counts; maintain concise, action-oriented phrasing for on-call operators when extending messaging.
+        15. **Change Checklist Tracker.** Add GraphQL manifest validation, readiness probe assertions, and env regression checks (including README GraphQL gateway section) to the release checklist before promoting stacks that rely on persisted queries.
+        16. **Full Upgrade Plan & Release Steps.** Roll out by enabling GraphQL readiness in staging, publishing manifests to storage, monitoring readiness degradation signals, and toggling refresh intervals per environment before enabling the feature in production.
+      - ✓ 12.B Routing, Middleware & Entry Points (`backend-nodejs/src/middleware/auth.js`, `backend-nodejs/src/middleware/runtimeConfig.js`, `backend-nodejs/src/routes/creation.routes.js`)
+        1. **Appraisal.** Middleware now shapes request actors, permissions, runtime config, and domain event lifecycles end-to-end—`auth.js` emits a canonical actor object, `runtimeConfig.js` exposes domain event helpers, and `creation.routes.js` registers contextual defaults for studio endpoints.
+        2. **Functionality.** Access tokens hydrate `req.actor`, `req.permissions`, and `req.session`, while runtime middleware adds `req.recordDomainEvent`/`req.registerDomainEventDefaults` for controllers to emit enriched domain events backed by `DomainEventModel.record`. Creation routes seed defaults for project/template entities so downstream handlers inherit entity metadata automatically, and the queue plumbing stays aligned with `migrations/20250301100000_domain_event_dispatch_queue.js`, the governance snapshot (`database/schema/mysql-governance-baseline.json`), and bootstrap seed fixtures in `seeds/001_bootstrap.js`.
+        3. **Logic Usefulness.** Feature flag evaluation now leverages actor-aware context, and domain event defaults merge request metadata (trace IDs, correlation IDs, actor roles) with route-specific descriptors, dramatically reducing boilerplate when recording events while ensuring dispatch rows conform to the seeded schema.
+        4. **Redundancies.** Permissions derived from JWT scope/claims replace ad-hoc role checks spread across controllers, consolidating permission resolution in `auth.js` while `runtimeConfig` centralises request context enrichment for both REST and GraphQL flows.
+        5. **Placeholders or Stubs.** Event emission helpers currently target `DomainEventModel.record`; integrate dispatcher shortcuts in future if controllers require async fire-and-forget semantics beyond the model layer.
+        6. **Duplicate Functions.** By funnelling domain-event payload merging into `mergePayload`/`mergeDescriptors`, repeated deep merge logic across controllers can be removed as they adopt the middleware helpers.
+        7. **Improvements Needed.** Implement controller-level utilities to automatically invoke `req.recordDomainEvent` after mutating operations (e.g., project creation) and expand permission maps when additional roles (moderator, partner) come online.
+        8. **Styling Improvements.** N/A for backend middleware; ensure accompanying documentation references the new request properties so SDK consumers remain aligned.
+        9. **Efficiency Analysis.** Actor/permission derivation occurs once per request, and domain event defaults reuse the same array for merged descriptors; additional allocations are minimal compared with controller-level duplication they replace.
+        10. **Strengths to Keep.** Strong separation between authentication, runtime configuration, and routing metadata ensures consistent observability, while route-level defaults keep domain event payloads cohesive across REST and future GraphQL layers.
+        11. **Weaknesses to Remove.** Introduce graceful fallbacks when `req.recordDomainEvent` fails (e.g., emit logs without throwing) and continue auditing controllers so they rely on middleware-provided actor metadata instead of direct JWT parsing.
+        12. **Styling & Colour Review.** Not relevant to backend entry points; keep request-context logging fields stable for dashboard theming parity.
+        13. **CSS, Orientation & Placement.** Not applicable; ensure updated middleware ordering is documented in service flow diagrams to prevent regressions when composing Express routers.
+        14. **Text Analysis.** Error messages remain concise (“Invalid or expired token”, “Insufficient permissions”) and event helper exceptions clearly describe missing keys to streamline debugging.
+        15. **Change Checklist Tracker.** Expand QA sign-off to include domain-event smoke tests, permission-matrix validation for JWT claims, and route metadata assertions before releasing entry-point changes.
+        16. **Full Upgrade Plan & Release Steps.** Deploy middleware updates to staging, verify domain event emission via telemetry, audit permission-driven routes for regressions, and coordinate documentation updates before promoting to production.
+      - 12.C Controllers & GraphQL Gateways
       - 12.A Bootstrap & Runtime Wiring
          - 12.A.1 bootstrap (backend-nodejs/src/bootstrap/bootstrap.js)
          - 12.A.2 database (backend-nodejs/src/config/database.js)
@@ -454,12 +519,45 @@
          - 12.B.1 auth (backend-nodejs/src/middleware/auth.js)
          - 12.B.2 runtimeConfig (backend-nodejs/src/middleware/runtimeConfig.js)
          - 12.B.3 creation.routes (backend-nodejs/src/routes/creation.routes.js)
-      - 12.C Controllers & GraphQL Gateways
+      - ✅ 12.C Controllers & GraphQL Gateways
          - 12.C.1 EbookController (backend-nodejs/src/controllers/EbookController.js)
          - 12.C.2 schema (backend-nodejs/src/graphql/schema.js)
-      - 12.D Domain Models & Persistence
+        1. **Appraisal.** `EbookController.js` now deduplicates and sanitises author, tag, category, and language collections while the GraphQL schema clamps pagination and trims search parameters, aligning back-office payload hygiene with the curated catalogue expectations captured in `user_experience.md`.
+        2. **Functionality.** Normalisers convert mixed string/array payloads into trimmed sets, metadata is deep-cloned before persistence, and GraphQL exposes a `prefetch` JSON field so dashboard surfaces can hydrate hero modules alongside feed entries without ad-hoc REST calls. The sanitised collections now match the JSON columns enforced by `EbookModel.js`, keeping catalogue seeds and future content imports schema-valid.
+        3. **Logic Usefulness.** Languages are uppercased to keep locale badges consistent across marketing and learner storefronts, while keyword filtering on placements guarantees ad targeting terms mirror the UX taxonomy shared across web, React Native, and Flutter.
+        4. **Redundancies.** Centralising pagination parsing removes bespoke limit handling from downstream services and lets React and Flutter clients rely on a single rule-set rather than duplicating array dedupe logic per platform.
+        5. **Placeholders or Stubs.** GraphQL still delegates feature-flag awareness to `LiveFeedService`; wiring the new sanitised metadata through gateway-level analytics toggles remains on the backlog before exposing experimental feed variants.
+        6. **Duplicate Functions.** Shared helpers (`trimText`, `normalisePaginationInput`, `normaliseArray`) replace one-off string munging that previously lived in controllers, GraphQL resolvers, and client utilities.
+        7. **Improvements Needed.** Next iteration should surface currency validation errors from `EbookService` with localized copy so the UX writing guidelines in `user_experience.md` are enforced server-side.
+        8. **Styling Improvements.** Sanitised `metadata` payloads give design systems reliable hooks for cover gradients and content warnings, preventing mismatched accent colours across the ebook shelf, dashboard cards, and marketing pages.
+        9. **Efficiency Analysis.** Pagination and keyword clamps cap list sizes, guarding the GraphQL gateway and marketplace endpoints against oversized queries while keeping response payloads within telemetry budgets.
+        10. **Strengths to Keep.** Consistent Joi validation, shared normalisers, and the new GraphQL `prefetch` surface maintain observability and keep timeline hydration deterministic across channels.
+        11. **Weaknesses to Remove.** Ebooks still accept arbitrary metadata structures; a typed contract should eventually govern marketing highlights versus purchase funnels so analytics dashboards remain comparable.
+        12. **Styling & Colour Review.** With metadata sanitised, align ebook accent tokens with the brand palette documented in `user_experience.md` to avoid divergent gradients between marketing pages and instructor consoles.
+        13. **CSS, Orientation & Placement.** GraphQL prefetch data should feed layout engines so featured posts and placements reserve space before hydration, matching responsive breakpoints encoded in the UX specification.
+        14. **Text Analysis.** Normalised pricing errors and Joi feedback should inherit the concise tone-of-voice guidelines (≤120 characters, action-first) referenced in the support copy tables.
+        15. **Change Checklist Tracker.** Extend backend QA to cover pagination clamps, keyword trimming, and metadata sanitisation before promoting new feed or marketplace filters to production.
+        16. **Full Upgrade Plan & Release Steps.** Roll out the sanitisation helpers, observe API analytics for pagination shifts, stage GraphQL schema changes behind gateway versioning, update client SDKs, and publish the new payload contract to the platform changelog.
+      - ✅ 12.D Domain Models & Persistence
          - 12.D.1 ReportingPaymentsRevenueDailyView (backend-nodejs/src/models/ReportingPaymentsRevenueDailyView.js)
          - 12.D.2 LearnerSupportRepository (backend-nodejs/src/repositories/LearnerSupportRepository.js)
+        1. **Appraisal.** Daily revenue summaries now support currency scoping and hole-filling for timeline charts, while learner support persistence emits domain events for ticket creation, updates, messaging, and closure.
+        2. **Functionality.** Currency filters flow through SQL builders, date windows are generated server-side, repository list views respect status/limit options, and close/add operations refresh breadcrumbs and return mapped artefacts. The base `006_create_learner_support_tables.sql` migration now provisions breadcrumbs, AI summary, follow-up, and knowledge suggestion columns up-front so seeds and runtime models stay aligned without relying on ad-hoc alter statements.
+        3. **Logic Usefulness.** Domain events encode ticket state transitions so support analytics, CRM syncs, and notification workers can respond without scraping tables, fulfilling Annex A15 expectations.
+        4. **Redundancies.** Centralised limit/currency normalisers prevent controllers and services from reimplementing filter parsing for every dashboard or export routine.
+        5. **Placeholders or Stubs.** Event dispatchers still await downstream subscribers for satisfaction surveys and escalation routing; wire those handlers before exposing support telemetry to leadership dashboards.
+        6. **Duplicate Functions.** The new helpers replace bespoke pagination parsing scattered across repositories and services, keeping learner support and reporting consistent with the shared toolkit in Annex C1.
+        7. **Improvements Needed.** Add currency conversion hooks so finance summaries can express both native and platform base currencies without duplicating reporting SQL.
+        8. **Styling Improvements.** Filled date gaps give UX designers stable line charts and card gradients that match the reporting layouts catalogued in `user_experience.md`.
+        9. **Efficiency Analysis.** `whereIn` filters and capped case listings reduce redundant message hydration, cutting latency for learners scrolling large support histories.
+        10. **Strengths to Keep.** Breadcrumb updates, automatic follow-up recalculation, and serialised attachments maintain the thorough audit trail expected in support experiences.
+        11. **Weaknesses to Remove.** Satisfaction updates still rely on caller-provided scores; consider enforcing allowed ranges and storing the rater identity for governance checks.
+        12. **Styling & Colour Review.** Domain events should drive consistent badge states (open, pending, closed) so the support timeline palette mirrors the gradients specified in the UX audit.
+        13. **CSS, Orientation & Placement.** Filled reporting series align with dashboard spacing assumptions, preventing the empty-day collapse observed in previous user testing.
+        14. **Text Analysis.** Event payloads use verb-first labels (“case_created”, “case_closed”) that map cleanly to support copywriting guidelines and notification templates.
+        15. **Change Checklist Tracker.** Add coverage for `fillGaps` timelines and list option normalisation to regression suites before each release.
+        16. **Full Upgrade Plan & Release Steps.** Deploy reporting changes alongside analytics schema docs, broadcast the new domain events to downstream consumers, backfill historic gaps for SLA dashboards, and validate support timelines with CX before GA.
+      - 12.E Services & Integrations
       - ✅ 12.E Services & Integrations (`backend-nodejs/src/integrations/HubSpotClient.js`, `backend-nodejs/src/services/CourseLiveService.js`, `backend-nodejs/src/observability/metrics.js`)
         1. **Appraisal.** `HubSpotClient.request` now wraps every attempt in `recordIntegrationRequestAttempt` while `CourseLiveService` publishes presence gauges through `updateLiveCoursePresenceMetrics`, aligning external CRM syncs with live collaboration telemetry.
         2. **Function.** Exponential backoff, audit logging, and idempotency digests remain, but duration/outcome labels now feed Prometheus histograms and `purgeStaleViewers` trims idle viewers before returning presence snapshots.
@@ -523,19 +621,91 @@
          - 12.F.1 communityReminderJob (backend-nodejs/src/jobs/communityReminderJob.js)
          - 12.F.2 probes (backend-nodejs/src/observability/probes.js)
          - 12.F.3 backend-nodejs/src/jobs (found at backend-nodejs/src/jobs)
-      - 12.G Database Seeds & Migrations
+      - ✅ 12.G Database Seeds & Migrations
          - 12.G.1 20250213143000_creation_studio (backend-nodejs/migrations/20250213143000_creation_studio.js)
          - 12.G.2 002_search_documents (backend-nodejs/seeds/002_search_documents.js)
          - 12.G.3 backend-nodejs/database/migrations (found at backend-nodejs/database/migrations)
+        1. **Appraisal.** Creation Studio schemas now share enumerations through `src/constants/creationStudio.js`, letting migrations, services, and models consume one source of truth while Annex A38–A43 is mirrored by `008_creation_studio_tables.sql` so MySQL blueprints stay in lockstep with Knex DSL defaults.
+        2. **Functionality.** `creation_projects`, `creation_templates`, collaboration tables, and version history all validate type/status/role inputs, normalise JSON payloads, and dedupe permissions before writes, while the search seed continues to rebuild documents inside the transaction to keep bootstrap atomic.
+        3. **Logic Usefulness.** Shared normalisers and governance-tag handling keep models aligned with database defaults; enumerations now flow into `CreationStudioService` to reject unsupported transitions ahead of persistence, preventing Annex drift between docs and runtime rules.
+        4. **Redundancies.** Centralised constants and helpers replaced ad-hoc enum arrays and JSON sanitisation previously scattered across services, models, and migrations, reducing duplicate validation paths.
+        5. **Placeholders or Stubs.** Seeds still short-circuit when `search_documents` or its refresh queue are absent; plan representative creation-project fixtures once catalogue samples are approved so rebuild metrics remain meaningful during QA.
+        6. **Duplicate Functions.** Inline UUID/status definitions and collaborator permission parsing have been consolidated into shared utilities—ensure future migrations import the same constants to avoid divergence.
+        7. **Improvements Needed.** Add CI coverage for MySQL/Postgres migrate+rollback cycles, backfill regression tests around the new validation guards, and extend ERD exports sourced from `008_creation_studio_tables.sql` for governance reviews.
+        8. **Styling Improvements.** Column naming now mirrors camelCase accessors (e.g. `publicId`, `contentOutline`) with JSON defaults enforced at the database; keep Annex A42 naming guidance in play for upcoming schema additions.
+        9. **Efficiency Analysis.** Indexed ownership/status fields and deduped collaborator permissions preserve fast analytics queries, while transaction-scoped search rebuilds avoid queue fragmentation during bootstrap.
+        10. **Strengths to Keep.** Enum-driven workflow states, cascade rules, and version history remain a strength—now backed by mirrored SQL blueprints and runtime validators that guarantee lineage without extra app logic.
+        11. **Weaknesses to Remove.** Annex SQL still needs automated ERD generation and dialect-specific acceptance tests—schedule documentation automation and schema checks to close the feedback loop.
+        12. **Styling & Colour Review.** Not applicable to the data layer; continue investing in descriptive constraint aliases and comment fields so BI tooling surfaces friendly labels during governance audits.
+        13. **CSS, Orientation & Placement.** Maintain migration ordering that applies creation studio artefacts before downstream enrolment tables to keep FK relationships stable throughout bootstrap sequences.
+        14. **Text Analysis.** Normalised summaries, compliance notes, and governance tags now default to localisation-ready JSON; extend Annex A43 copy guidance for new template schemas to avoid truncation.
+        15. **Change Checklist Tracker.** Run `npm --prefix backend-nodejs run migrate:latest`, `seed`, and `db:schema:check` after each change; capture diffs for `008_creation_studio_tables.sql` alongside ERD snapshots for QA sign-off.
+        16. **Full Upgrade Plan & Release Steps.** Dry-run migrations across staging clusters, validate the new guard rails with regression suites, package rollback scripts, and broadcast schema change notes to curriculum, analytics, and platform squads before release.
       - 13.A Infrastructure Blueprints
          - 13.A.1 infrastructure/observability (found at infrastructure/observability)
          - 13.A.2 infrastructure/terraform/modules (found at infrastructure/terraform/modules)
          - 13.A.3 nginx (infrastructure/docker/nginx.conf)
       - 13.B Security & Automation Scripts
          - 13.B.1 generate-license-report (scripts/security/generate-license-report.mjs)
-      - 14.A TypeScript SDK & Tooling
+      - ✅ 14.A TypeScript SDK & Tooling (`sdk-typescript/scripts/generate-sdk.mjs`, `sdk-typescript/src/runtime/configure.ts`, `sdk-typescript/src/runtime/client.ts`, `sdk-typescript/src/runtime/manifest.ts`, `sdk-typescript/src/generated/.manifest.json`, `sdk-typescript/src/index.ts`)
          - 14.A.1 sdk-typescript/scripts (found at sdk-typescript/scripts)
-      - 14.B Update Templates & Release Guides
+            1. **Appraise.** Within `sdk-typescript/scripts/generate-sdk.mjs` and runtime modules under `sdk-typescript/src/runtime/*`, the SDK toolchain now exposes manifest-driven metadata, client bootstrapping helpers, and documented CLI ergonomics so API consumers align with backend releases.
+            2. **Function.** The generator accepts `--spec`, `--out`, `--force`, `--dry-run`, and `--summary` flags, parses `backend-nodejs/src/docs/openapi.json`, and emits `.openapi-hash` plus `.manifest.json` artefacts alongside regenerated TypeScript bindings.
+            3. **Usefulness.** `createSdkClient` now freezes the entire service registry (`AdminMonetizationService`, `AdsService`, `AnalyticsService`, `BillingService`, `CommunitiesService`, `EnablementService`, `EnvironmentService`, `ExplorerService`, `GovernanceService`, `ObservabilityService`, `ReleaseService`, `SecurityOperationsService`, `TelemetryService`, `DefaultService`) while `configureSdk` auto-infers the OpenAPI version from the manifest so runtime consumers, migrations, and seeded data stay anchored to the active surface area.
+            4. **Redundant.** Prior ad-hoc scripts and manual version bumps are replaced by a hash-aware generator and manifest helpers (`getSdkManifest`, `describeSdk`, `isManifestFresh`) centralising drift detection.
+            5. **Placeholders.** Watch-mode regeneration and multi-spec orchestration remain future work; CLI currently processes a single OpenAPI document per invocation.
+            6. **Duplicates.** Service discovery logic is consolidated within `runtime/client.ts`, avoiding repeated imports across downstream packages.
+            7. **Improvements Needed.** Next iteration should surface retry configuration and spec diffing directly within the generator summary to pre-empt contract regressions.
+            8. **Styling Improvements.** Console output now uses `[api-sdk]` prefixes and tabular summaries, standardising release logs across CI and local runs.
+            9. **Efficiency Analysis.** SHA-256 caching skips regeneration when the spec hash is unchanged while still refreshing manifests (including service/model counts), eliminating redundant codegen passes in CI and ensuring seed data remains in lockstep with generated clients.
+            10. **Strengths to Keep.** Hash-based idempotence, manifest emission, and service registry freezing deliver predictable SDK builds with runtime safety nets.
+            11. **Weaknesses to Remove.** Generator still depends on Node `process.env` for proxies (see npm warning); plan migration to explicit CLI options for proxy handling.
+            12. **Palette.** Logging adopts concise severity-neutral phrasing, ensuring automation transcripts remain accessible without colour-coded dependencies.
+            13. **Layout.** Runtime modules (`configure.ts`, `client.ts`, `manifest.ts`) now sit under `sdk-typescript/src/runtime`, mirroring generated core/service folders for intuitive discovery.
+            14. **Text.** CLI help strings and manifest descriptors emphasise spec paths (`backend-nodejs/src/docs/openapi.json`) so documentation accurately cites source contracts.
+            15. **Spacing.** Script refactor aligns with Prettier conventions (two-space indentation) and uses destructuring to keep option parsing compact.
+            16. **Shape.** `ConfigureSdkOptions` now extends to `userAgent` and `onConfig`, enabling ergonomic injection of headers and observers without leaking OpenAPI internals.
+            17. **Effects.** Summary tables highlight spec hash prefixes and operation counts (e.g., 172 operations in v1.51.0), providing instant visibility into surface area changes.
+            18. **Thumbs.** `describeSdk()` returns a human-readable label for release notes, supporting copy-paste into change logs and customer comms.
+            19. **Media.** The `.manifest.json` file now persists generator provenance, timestamp, enumerated services, and model counts—ready for embedding into release dashboards that cross-check database schema, migrations, and seed coverage.
+            20. **Buttons.** CLI execution examples (`npm --prefix sdk-typescript run generate -- --summary`) give release engineers a single command pathway for regen plus auditing.
+            21. **Interact.** `listAvailableServices()` and `getService()` expose discoverable integration points, sourcing keys from the manifest when available so dynamic clients, migrations, and telemetry pipelines agree on the exported service catalogue.
+            22. **Missing.** Automated publication to NPM remains manual; integrate with release pipeline once audit trails and signing are finalised.
+            23. **Design.** Manifest helpers freeze configuration objects to prevent runtime mutation, aligning with the platform's immutability-first SDK guidelines.
+            24. **Clone.** Centralised manifest utilities eliminate repeated JSON parsing across consuming modules, reducing drift between service usage patterns.
+            25. **Framework.** Script now reads `package.json` to log the `openapi-typescript-codegen` version, supporting governance requirements for dependency traceability.
+            26. **Checklist.** Release steps include running `npm --prefix sdk-typescript run build`, committing `.manifest.json`, and capturing CLI summaries in release notes.
+            27. **Nav.** Service registry keys (`adminMonetization`, `ads`, `analytics`, `billing`, `communities`, `enablement`, `environment`, `explorer`, `governance`, `observability`, `release`, `securityOperations`, `telemetry`, `core`) provide quick reference anchors for documentation, typed imports, and database view mapping notes.
+            28. **Release.** Shipping workflow: regenerate SDK, review manifest hash, bump package version, publish runtime helpers, and circulate summary tables to downstream teams.
+      - ✅ 14.B Update Templates & Release Guides (`update_template/backend_updates/backend_change_log.md`, `update_template/backend_updates/api_changes.md`, `update_template/backend_updates/backend_new_files.md`, `update_template/backend_updates/other_backend_updates.md`)
          - 14.B.1 update_template/backend_updates (found at update_template/backend_updates)
+            1. **Appraise.** Backend release templates now incorporate SDK regeneration notes so Annex A47 covers both infrastructure and client distribution narratives.
+            2. **Function.** `backend_change_log.md` enumerates the new manifest-aware generator, ensuring infra/automation callouts mention SDK tooling enhancements.
+            3. **Usefulness.** `api_changes.md` summary explicitly calls out `.manifest.json` publication (including service/model counts), guiding auditors on where to find spec hashes and how to validate schema, migration, and seeding coverage before sign-off.
+            4. **Redundant.** Prior blanket statement of “no new backend files” is narrowed to list the manifest, preventing duplicate explanations across templates.
+            5. **Placeholders.** Additional annexes for mobile SDKs remain TODO; current update focuses on TypeScript tooling until parity templates exist.
+            6. **Duplicates.** `other_backend_updates.md` centralises developer experience guidance, avoiding repeated CLI references across the pack.
+            7. **Improvements Needed.** Future revisions should embed checklist tables capturing command output snippets directly within the templates.
+            8. **Styling.** Template bullets now include inline code fences (e.g., `npm --prefix sdk-typescript run generate -- --summary`) to align with release style guides.
+            9. **Efficiency Analysis.** Highlighting manifest regeneration reduces time wasted cross-referencing backend commits and client packages during CAB reviews.
+            10. **Strengths to Keep.** Templates maintain structured headings (Summary, Validation, Developer Experience) while weaving in SDK-specific steps.
+            11. **Weaknesses to Remove.** Need to add automation for capturing CLI output snapshots; currently manual copy-paste is required each release.
+            12. **Palette.** Plain text emphasis ensures Markdown renders consistently across Confluence, GitHub, and internal portals without colour reliance.
+            13. **Layout.** Manifest mention appears under “Backend New Files,” aligning inventory sections with actual artefact outputs.
+            14. **Text.** Language emphasises release accountability (“publish the `.manifest.json` fingerprint”) clarifying action-oriented tasks.
+            15. **Spacing.** Section spacing preserved for readability across exported PDFs; bullet indentation unchanged.
+            16. **Shape.** Template sections continue to use level-two headings, maintaining compatibility with automated doc stitching scripts.
+            17. **Effects.** Callouts instruct capturing CLI summaries, making release notes more actionable for stakeholders scanning for risk cues.
+            18. **Thumbs.** CLI examples double as quick-start notes for incident responders verifying SDK freshness mid-cycle.
+            19. **Media.** Manifest references pave the way for embedding spec hashes into dashboards without altering template structure.
+            20. **Buttons.** Template instructions highlight a single canonical command, reducing release-time branching decisions.
+            21. **Interact.** Guidance encourages cross-team collaboration by pointing data consumers to hashed manifests during go/no-go calls.
+            22. **Missing.** Need a future appendix for verifying built artefacts in `dist/`; current templates stop at manifest commit confirmation.
+            23. **Design.** Release guide copy mirrors the SDK logging prefix `[api-sdk]`, reinforcing consistent nomenclature across artefacts.
+            24. **Clone.** Consolidated manifest messaging prevents each functional template from restating context in conflicting ways.
+            25. **Framework.** Templates now align with governance requirements to document codegen outputs as part of release evidence packages.
+            26. **Checklist.** Action items now include regenerating SDK, capturing CLI summary, listing manifest in new-files inventory, and reconciling manifest service totals against database migrations and seed snapshots.
+            27. **Nav.** Clear headings point reviewers to manifest updates without scanning unrelated infrastructure notes.
+            28. **Release.** Updated guides instruct teams to run the generator, publish hashes, and attach summaries to the backend change log before CAB submission.
       - 15.A Docs & unresolved mappings
          - 15.A.1 Documentation Coverage Gap (unresolved path)

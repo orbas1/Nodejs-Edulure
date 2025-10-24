@@ -1,0 +1,1 @@
+{"version":3,"file":"SecurityAssessmentList.d.ts","sourceRoot":"","sources":["../../../src/generated/models/SecurityAssessmentList.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,kBAAkB,EAAE,MAAM,sBAAsB,CAAC;AAC/D,MAAM,MAAM,sBAAsB,GAAG;IACjC,OAAO,CAAC,EAAE,KAAK,CAAC,kBAAkB,CAAC,CAAC;IACpC,KAAK,CAAC,EAAE,MAAM,CAAC;CAClB,CAAC"}

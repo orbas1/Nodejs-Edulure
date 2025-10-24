@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import { CREATION_PROJECT_STATUSES, CREATION_PROJECT_TYPES } from '../constants/creationStudio.js';
 
 const TABLE = 'creation_projects';
 
@@ -25,6 +26,71 @@ const BASE_COLUMNS = [
   'updated_at as updatedAt'
 ];
 
+const PROJECT_TYPE_SET = new Set(CREATION_PROJECT_TYPES);
+const PROJECT_STATUS_SET = new Set(CREATION_PROJECT_STATUSES);
+
+function ensureValidType(type) {
+  if (!PROJECT_TYPE_SET.has(type)) {
+    throw new Error('Invalid creation project type');
+  }
+}
+
+function ensureValidStatus(status) {
+  if (!PROJECT_STATUS_SET.has(status)) {
+    throw new Error('Invalid creation project status');
+  }
+}
+
+function ensureOwnerId(ownerId) {
+  if (!Number.isInteger(Number(ownerId))) {
+    throw new Error('Invalid owner id for creation project');
+  }
+}
+
+function ensureTitle(title) {
+  if (!title || String(title).trim().length === 0) {
+    throw new Error('Creation project title is required');
+  }
+}
+
+function normaliseObject(value, fallback = {}) {
+  if (value === null || value === undefined) {
+    return structuredClone(fallback);
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed
+        : structuredClone(fallback);
+    } catch (_error) {
+      return structuredClone(fallback);
+    }
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value;
+  }
+  return structuredClone(fallback);
+}
+
+function normaliseArray(value, fallback = []) {
+  if (value === null || value === undefined) {
+    return structuredClone(fallback);
+  }
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : structuredClone(fallback);
+    } catch (_error) {
+      return structuredClone(fallback);
+    }
+  }
+  return structuredClone(fallback);
+}
+
 function parseJsonField(value, fallback) {
   if (!value) return structuredClone(fallback);
   if (typeof value === 'string') {
@@ -45,18 +111,29 @@ function parseJsonField(value, fallback) {
 }
 
 function serialise(project) {
+  ensureOwnerId(project.ownerId);
+  ensureTitle(project.title);
+  ensureValidType(project.type);
+  const status = project.status ?? 'draft';
+  ensureValidStatus(status);
+  const metadata = normaliseObject(project.metadata);
+  const contentOutline = normaliseArray(project.contentOutline);
+  const complianceNotes = normaliseArray(project.complianceNotes);
+  const analyticsTargets = normaliseObject(project.analyticsTargets);
+  const publishingChannels = normaliseArray(project.publishingChannels);
+
   return {
     public_id: project.publicId ?? randomUUID(),
     owner_id: project.ownerId,
     type: project.type,
-    status: project.status ?? 'draft',
+    status,
     title: project.title,
     summary: project.summary ?? null,
-    metadata: JSON.stringify(project.metadata ?? {}),
-    content_outline: JSON.stringify(project.contentOutline ?? []),
-    compliance_notes: JSON.stringify(project.complianceNotes ?? []),
-    analytics_targets: JSON.stringify(project.analyticsTargets ?? {}),
-    publishing_channels: JSON.stringify(project.publishingChannels ?? []),
+    metadata: JSON.stringify(metadata),
+    content_outline: JSON.stringify(contentOutline),
+    compliance_notes: JSON.stringify(complianceNotes),
+    analytics_targets: JSON.stringify(analyticsTargets),
+    publishing_channels: JSON.stringify(publishingChannels),
     review_requested_at: project.reviewRequestedAt ?? null,
     approved_at: project.approvedAt ?? null,
     published_at: project.publishedAt ?? null,
@@ -83,15 +160,34 @@ export default class CreationProjectModel {
 
   static async updateById(id, updates, connection = db) {
     const payload = {};
-    if (updates.title !== undefined) payload.title = updates.title;
+    if (updates.title !== undefined) {
+      ensureTitle(updates.title);
+      payload.title = updates.title;
+    }
     if (updates.summary !== undefined) payload.summary = updates.summary;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.type !== undefined) payload.type = updates.type;
-    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata);
-    if (updates.contentOutline !== undefined) payload.content_outline = JSON.stringify(updates.contentOutline);
-    if (updates.complianceNotes !== undefined) payload.compliance_notes = JSON.stringify(updates.complianceNotes);
-    if (updates.analyticsTargets !== undefined) payload.analytics_targets = JSON.stringify(updates.analyticsTargets);
-    if (updates.publishingChannels !== undefined) payload.publishing_channels = JSON.stringify(updates.publishingChannels);
+    if (updates.status !== undefined) {
+      ensureValidStatus(updates.status);
+      payload.status = updates.status;
+    }
+    if (updates.type !== undefined) {
+      ensureValidType(updates.type);
+      payload.type = updates.type;
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = JSON.stringify(normaliseObject(updates.metadata));
+    }
+    if (updates.contentOutline !== undefined) {
+      payload.content_outline = JSON.stringify(normaliseArray(updates.contentOutline));
+    }
+    if (updates.complianceNotes !== undefined) {
+      payload.compliance_notes = JSON.stringify(normaliseArray(updates.complianceNotes));
+    }
+    if (updates.analyticsTargets !== undefined) {
+      payload.analytics_targets = JSON.stringify(normaliseObject(updates.analyticsTargets));
+    }
+    if (updates.publishingChannels !== undefined) {
+      payload.publishing_channels = JSON.stringify(normaliseArray(updates.publishingChannels));
+    }
     if (updates.reviewRequestedAt !== undefined) payload.review_requested_at = updates.reviewRequestedAt;
     if (updates.approvedAt !== undefined) payload.approved_at = updates.approvedAt;
     if (updates.publishedAt !== undefined) payload.published_at = updates.publishedAt;
@@ -137,13 +233,19 @@ export default class CreationProjectModel {
     }
 
     if (status && status.length) {
-      const statuses = Array.isArray(status) ? status : [status];
-      query.whereIn('status', statuses);
+      const statuses = (Array.isArray(status) ? status : [status]).filter((value) =>
+        PROJECT_STATUS_SET.has(value)
+      );
+      if (statuses.length) {
+        query.whereIn('status', statuses);
+      }
     }
 
     if (type && type.length) {
-      const types = Array.isArray(type) ? type : [type];
-      query.whereIn('type', types);
+      const types = (Array.isArray(type) ? type : [type]).filter((value) => PROJECT_TYPE_SET.has(value));
+      if (types.length) {
+        query.whereIn('type', types);
+      }
     }
 
     if (search) {
@@ -172,13 +274,19 @@ export default class CreationProjectModel {
     }
 
     if (status && status.length) {
-      const statuses = Array.isArray(status) ? status : [status];
-      query.whereIn('status', statuses);
+      const statuses = (Array.isArray(status) ? status : [status]).filter((value) =>
+        PROJECT_STATUS_SET.has(value)
+      );
+      if (statuses.length) {
+        query.whereIn('status', statuses);
+      }
     }
 
     if (type && type.length) {
-      const types = Array.isArray(type) ? type : [type];
-      query.whereIn('type', types);
+      const types = (Array.isArray(type) ? type : [type]).filter((value) => PROJECT_TYPE_SET.has(value));
+      if (types.length) {
+        query.whereIn('type', types);
+      }
     }
 
     if (search) {
@@ -192,18 +300,26 @@ export default class CreationProjectModel {
   }
 
   static async insertVersion({ projectId, versionNumber, snapshot, changeSummary, createdBy }, connection = db) {
+    const normalisedSnapshot = snapshot && typeof snapshot === 'object' ? snapshot : {};
+    const normalisedSummary = normaliseObject(changeSummary ?? {});
     await connection('creation_project_versions').insert({
       project_id: projectId,
       version_number: versionNumber,
-      snapshot: JSON.stringify(snapshot ?? {}),
-      change_summary: JSON.stringify(changeSummary ?? {}),
+      snapshot: JSON.stringify(normalisedSnapshot),
+      change_summary: JSON.stringify(normalisedSummary),
       created_by: createdBy
     });
   }
 
   static async latestVersion(projectId, connection = db) {
     const row = await connection('creation_project_versions')
-      .select(['version_number as versionNumber', 'snapshot', 'change_summary as changeSummary', 'created_at as createdAt'])
+      .select([
+        'version_number as versionNumber',
+        'snapshot',
+        'change_summary as changeSummary',
+        'created_by as createdBy',
+        'created_at as createdAt'
+      ])
       .where({ project_id: projectId })
       .orderBy('version_number', 'desc')
       .first();

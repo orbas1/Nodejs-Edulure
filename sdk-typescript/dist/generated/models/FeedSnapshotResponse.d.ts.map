@@ -1,0 +1,1 @@
+{"version":3,"file":"FeedSnapshotResponse.d.ts","sourceRoot":"","sources":["../../../src/generated/models/FeedSnapshotResponse.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,gBAAgB,CAAC;AACnD,OAAO,KAAK,EAAE,gBAAgB,EAAE,MAAM,oBAAoB,CAAC;AAC3D,MAAM,MAAM,oBAAoB,GAAG,CAAC,gBAAgB,GAAG;IACnD,IAAI,CAAC,EAAE,YAAY,CAAC;CACvB,CAAC,CAAC"}

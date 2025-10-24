@@ -434,6 +434,200 @@ function formatCompactNumber(value) {
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
 
+const PROFILE_VALIDATION_FIELDS = new Set(['displayName', 'tagline', 'location', 'firstName', 'lastName', 'bio']);
+
+function validateProfileFieldValue(field, value) {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+
+  switch (field) {
+    case 'displayName':
+      if (!trimmed) {
+        return 'Add a display name that learners will recognise.';
+      }
+      if (trimmed.length < 3) {
+        return 'Display name must be at least 3 characters long.';
+      }
+      if (trimmed.length > 80) {
+        return 'Display name must be under 80 characters.';
+      }
+      return null;
+    case 'tagline':
+      if (!trimmed) {
+        return 'Share a short tagline describing your focus area.';
+      }
+      if (trimmed.length < 10) {
+        return 'Tagline should include at least 10 characters of context.';
+      }
+      if (trimmed.length > 160) {
+        return 'Keep your tagline under 160 characters for consistency.';
+      }
+      return null;
+    case 'location':
+      if (!trimmed) {
+        return 'Provide a location so learners know your operating region.';
+      }
+      if (trimmed.length > 120) {
+        return 'Location must be under 120 characters.';
+      }
+      return null;
+    case 'firstName':
+    case 'lastName':
+      if (!trimmed) {
+        return `Enter your ${field === 'firstName' ? 'first' : 'last'} name.`;
+      }
+      if (trimmed.length > 60) {
+        return 'Names must be 60 characters or fewer.';
+      }
+      return null;
+    case 'bio':
+      if (!trimmed) {
+        return 'Add a short bio to help learners understand your expertise.';
+      }
+      if (trimmed.length < 40) {
+        return 'Bio should include at least 40 characters of detail.';
+      }
+      if (trimmed.length > 800) {
+        return 'Keep your bio under 800 characters for readability.';
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+function validateProfileFormState(formState) {
+  const errors = {};
+  PROFILE_VALIDATION_FIELDS.forEach((field) => {
+    const message = validateProfileFieldValue(field, formState?.[field]);
+    if (message) {
+      errors[field] = message;
+    }
+  });
+  return errors;
+}
+
+function formatTimelineTimestamp(timestamp) {
+  if (!timestamp) {
+    return null;
+  }
+
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) {
+    return typeof timestamp === 'string' ? timestamp : null;
+  }
+
+  return parsed.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function normaliseVerificationTimeline({
+  summary,
+  profileVerification,
+  documentRequirements,
+  documentStates
+}) {
+  const events = [];
+  const sourceTimeline = Array.isArray(summary?.timeline)
+    ? summary.timeline
+    : Array.isArray(summary?.history)
+      ? summary.history
+      : [];
+
+  sourceTimeline.forEach((event, index) => {
+    if (!event) {
+      return;
+    }
+    const id = event.id ?? `timeline-event-${index}`;
+    const status = event.status ?? event.stage ?? null;
+    events.push({
+      id,
+      title: event.title ?? formatStatusLabel(status ?? event.type ?? 'update'),
+      description: event.description ?? event.note ?? '',
+      timestamp: formatTimelineTimestamp(event.timestamp ?? event.occurredAt ?? event.createdAt),
+      status,
+      statusLabel: status ? formatStatusLabel(status) : null
+    });
+  });
+
+  const documents = Array.isArray(summary?.documents) ? summary.documents : [];
+  documents.forEach((document, index) => {
+    const status = document.status ?? null;
+    const timestamp = document.updatedAt ?? document.reviewedAt ?? document.submittedAt ?? document.uploadedAt;
+    events.push({
+      id: document.id ?? `document-${document.type ?? index}`,
+      title: `${document.label ?? document.type ?? 'Document'} ${status ? formatStatusLabel(status) : ''}`.trim(),
+      description: document.reviewerComment ?? document.note ?? '',
+      timestamp: formatTimelineTimestamp(timestamp),
+      status,
+      statusLabel: status ? formatStatusLabel(status) : null
+    });
+  });
+
+  Object.entries(documentStates ?? {}).forEach(([type, state]) => {
+    if (!state || (state.status !== 'attached' && state.status !== 'uploaded')) {
+      return;
+    }
+    const requirement = (documentRequirements ?? []).find((item) => item.type === type);
+    const title = requirement?.label ?? type;
+    events.push({
+      id: `local-${type}`,
+      title: `${title} ready for submission`,
+      description: 'Document cached locally. Submit to trigger review.',
+      timestamp: state.completedAt ? formatTimelineTimestamp(state.completedAt) : null,
+      status: 'pending_review',
+      statusLabel: 'Pending review'
+    });
+  });
+
+  if (summary?.status) {
+    events.push({
+      id: 'verification-status',
+      title: `Status: ${formatStatusLabel(summary.status)}`,
+      description: summary.reason ?? summary.nextStep ?? profileVerification?.nextStep ?? '',
+      timestamp: formatTimelineTimestamp(summary.lastReviewedAt ?? profileVerification?.lastReviewed ?? null),
+      status: summary.status,
+      statusLabel: formatStatusLabel(summary.status)
+    });
+  } else if (profileVerification?.nextStep) {
+    events.push({
+      id: 'verification-next-step',
+      title: 'Next step required',
+      description: profileVerification.nextStep,
+      timestamp: profileVerification.lastReviewed ?? null,
+      status: 'pending_review',
+      statusLabel: 'Pending review'
+    });
+  }
+
+  if (!events.length) {
+    events.push({
+      id: 'verification-start',
+      title: 'Verification ready',
+      description: 'Upload your documents to begin the verification review.',
+      timestamp: profileVerification?.lastReviewed ?? null,
+      status: 'pending_review',
+      statusLabel: 'Pending review'
+    });
+  }
+
+  const deduped = [];
+  const seen = new Set();
+  events.forEach((event) => {
+    if (seen.has(event.id)) {
+      return;
+    }
+    seen.add(event.id);
+    deduped.push(event);
+  });
+
+  return deduped;
+}
+
 export default function Profile() {
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
@@ -441,6 +635,9 @@ export default function Profile() {
 
   const [profile, setProfile] = useState(defaultProfile);
   const [profileForm, setProfileForm] = useState(() => createProfileFormState(defaultProfile));
+  const [profileFormErrors, setProfileFormErrors] = useState(() =>
+    validateProfileFormState(createProfileFormState(defaultProfile))
+  );
   const [profileFormDirty, setProfileFormDirty] = useState(false);
   const [profileSaveError, setProfileSaveError] = useState(null);
   const [profileSaveSuccess, setProfileSaveSuccess] = useState(null);
@@ -654,6 +851,18 @@ export default function Profile() {
 
   const handleProfileFieldChange = useCallback((field, value) => {
     setProfileForm((prev) => ({ ...prev, [field]: value }));
+    if (PROFILE_VALIDATION_FIELDS.has(field)) {
+      const message = validateProfileFieldValue(field, value);
+      setProfileFormErrors((prev) => {
+        const next = { ...prev };
+        if (message) {
+          next[field] = message;
+        } else {
+          delete next[field];
+        }
+        return next;
+      });
+    }
     setProfileFormDirty(true);
     resetProfileMessages();
   }, [resetProfileMessages]);
@@ -729,6 +938,13 @@ export default function Profile() {
   const profileOwnerId = profile?.id ?? userId ?? null;
 
   const handleProfileSubmit = useCallback(async () => {
+    const validationResult = validateProfileFormState(profileForm);
+    setProfileFormErrors(validationResult);
+    if (Object.keys(validationResult).length) {
+      setProfileSaveError('Fix the highlighted fields before saving.');
+      setProfileSaveSuccess(null);
+      return;
+    }
     if (!token) {
       setProfileSaveError('You need to be signed in to update your profile.');
       return;
@@ -768,6 +984,7 @@ export default function Profile() {
         const nextProfile = buildProfileStateFromUser(updated);
         setProfile(nextProfile);
         setProfileForm(createProfileFormState(nextProfile));
+        setProfileFormErrors(validateProfileFormState(createProfileFormState(nextProfile)));
         setProfileFormDirty(false);
         setProfileSaveSuccess('Profile updated successfully.');
       }
@@ -788,6 +1005,7 @@ export default function Profile() {
     if (!token) {
       setProfile(defaultProfile);
       setProfileForm(createProfileFormState(defaultProfile));
+      setProfileFormErrors(validateProfileFormState(createProfileFormState(defaultProfile)));
       setProfileFormDirty(false);
       resetProfileMessages();
       setProfileError(null);
@@ -802,6 +1020,7 @@ export default function Profile() {
         const nextProfile = buildProfileStateFromUser(user);
         setProfile(nextProfile);
         setProfileForm(createProfileFormState(nextProfile));
+        setProfileFormErrors(validateProfileFormState(createProfileFormState(nextProfile)));
         setProfileFormDirty(false);
         resetProfileMessages();
       }
@@ -1007,7 +1226,11 @@ export default function Profile() {
   const profileSettingsHref = session?.user?.role
     ? `/dashboard/${session.user.role}/settings`
     : '/dashboard/user/settings';
-  const canSubmitProfile = profileFormDirty && !isSavingProfile;
+  const hasProfileErrors = useMemo(
+    () => Object.values(profileFormErrors).some((message) => Boolean(message)),
+    [profileFormErrors]
+  );
+  const canSubmitProfile = profileFormDirty && !isSavingProfile && !hasProfileErrors;
 
   const updateFollowActionState = useCallback((targetId, updates) => {
     if (!targetId) {
@@ -1207,6 +1430,27 @@ export default function Profile() {
   const documentsRequired = verificationSummary?.documentsRequired ?? documentRequirements.length;
   const documentsSubmitted = verificationSummary?.documentsSubmitted ?? localCompleted;
   const outstandingDocuments = verificationSummary?.outstandingDocuments ?? [];
+  const outstandingDocumentLabels = useMemo(() => {
+    if (!outstandingDocuments.length) {
+      return [];
+    }
+    return outstandingDocuments
+      .map((document) => {
+        if (typeof document === 'string') {
+          const requirement = documentRequirements.find((item) => item.type === document);
+          return requirement?.label ?? document;
+        }
+        if (document?.label) {
+          return document.label;
+        }
+        if (document?.type) {
+          const requirement = documentRequirements.find((item) => item.type === document.type);
+          return requirement?.label ?? document.type;
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }, [documentRequirements, outstandingDocuments]);
 
   const verificationProgress = useMemo(() => {
     if (!documentsRequired) {
@@ -1214,6 +1458,17 @@ export default function Profile() {
     }
     return Math.min(100, Math.round((documentsSubmitted / documentsRequired) * 100));
   }, [documentsRequired, documentsSubmitted]);
+
+  const verificationTimeline = useMemo(
+    () =>
+      normaliseVerificationTimeline({
+        summary: verificationSummary,
+        profileVerification: profile.verification,
+        documentRequirements,
+        documentStates
+      }),
+    [documentRequirements, documentStates, profile.verification, verificationSummary]
+  );
 
   const canSubmitVerification = useMemo(() => {
     if (!documentsRequired) {
@@ -1870,6 +2125,45 @@ export default function Profile() {
                   <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${verificationProgress}%` }} />
                 </div>
                 <p className="mt-2 text-xs text-slate-500">{progressCaption}</p>
+              </div>
+              {outstandingDocumentLabels.length ? (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-700">
+                  <p className="font-semibold">Documents pending</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4">
+                    {outstandingDocumentLabels.map((label) => (
+                      <li key={label}>{label}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-slate-700">Verification timeline</h3>
+                <ol className="mt-3 space-y-4">
+                  {verificationTimeline.map((event, index) => (
+                    <li key={event.id} className="flex items-start gap-3">
+                      <span
+                        className={`mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full ${
+                          index === verificationTimeline.length - 1
+                            ? 'bg-primary shadow-[0_0_0_4px_rgba(59,130,246,0.15)]'
+                            : 'bg-slate-300'
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-900">{event.title}</p>
+                          {event.timestamp ? <span className="text-xs text-slate-500">{event.timestamp}</span> : null}
+                        </div>
+                        {event.description ? <p className="text-xs text-slate-600">{event.description}</p> : null}
+                        {event.statusLabel ? (
+                          <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${resolveStatusColour(event.status)}`}>
+                            {event.statusLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
               </div>
               <form className="mt-5 space-y-4" onSubmit={handleVerificationSubmit}>
                 <label className="block text-sm font-semibold text-slate-600">

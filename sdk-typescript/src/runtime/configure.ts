@@ -2,6 +2,8 @@ import type { ApiRequestOptions } from '../generated/core/ApiRequestOptions';
 import type { OpenAPIConfig } from '../generated/core/OpenAPI';
 import { OpenAPI } from '../generated/core/OpenAPI';
 
+import { sdkManifest } from './manifest';
+
 type TokenResolver = () => Promise<string | null | undefined> | string | null | undefined;
 
 export type HeaderResolver =
@@ -15,6 +17,8 @@ export type ConfigureSdkOptions = {
   defaultHeaders?: HeaderResolver;
   withCredentials?: boolean;
   credentials?: OpenAPIConfig['CREDENTIALS'];
+  userAgent?: string;
+  onConfig?: (config: OpenAPIConfig) => void;
 };
 
 function normaliseBaseUrl(baseUrl: string): string {
@@ -51,13 +55,13 @@ export function configureSdk({
   getAccessToken,
   defaultHeaders,
   withCredentials,
-  credentials
+  credentials,
+  userAgent,
+  onConfig
 }: ConfigureSdkOptions): OpenAPIConfig {
   const normalisedBase = normaliseBaseUrl(baseUrl);
   OpenAPI.BASE = normalisedBase;
-  if (version) {
-    OpenAPI.VERSION = version;
-  }
+  OpenAPI.VERSION = version ?? sdkManifest.specVersion;
 
   if (typeof getAccessToken === 'function') {
     OpenAPI.TOKEN = async () => {
@@ -70,10 +74,15 @@ export function configureSdk({
     OpenAPI.TOKEN = undefined;
   }
 
-  if (defaultHeaders) {
+  const staticUserAgent = userAgent ?? undefined;
+  if (defaultHeaders || staticUserAgent) {
     OpenAPI.HEADERS = async (options) => {
       const resolved = await resolveHeaders(defaultHeaders, options);
-      return resolved ?? {};
+      const headers: Record<string, string> = resolved ? { ...resolved } : {};
+      if (staticUserAgent && !headers['User-Agent'] && !headers['user-agent']) {
+        headers['User-Agent'] = staticUserAgent;
+      }
+      return headers;
     };
   } else {
     OpenAPI.HEADERS = undefined;
@@ -84,6 +93,10 @@ export function configureSdk({
     OpenAPI.CREDENTIALS = credentials ?? (withCredentials ? 'include' : 'same-origin');
   } else if (credentials) {
     OpenAPI.CREDENTIALS = credentials;
+  }
+
+  if (onConfig) {
+    onConfig(OpenAPI);
   }
 
   return OpenAPI;

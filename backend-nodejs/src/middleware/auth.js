@@ -10,6 +10,14 @@ const rolePriority = {
   service: 4
 };
 
+const defaultPermissionsByRole = {
+  user: ['feed:read', 'creation:read'],
+  instructor: ['feed:read', 'creation:read', 'creation:write'],
+  staff: ['feed:read', 'creation:read', 'creation:write', 'governance:review'],
+  admin: ['*'],
+  service: ['*']
+};
+
 function resolveRequiredRoles(input) {
   if (!input) {
     return [];
@@ -29,6 +37,39 @@ function getRolePriority(role) {
   }
   const normalised = String(role).toLowerCase();
   return rolePriority[normalised] ?? 0;
+}
+
+function normalisePermissions(permissions) {
+  if (!permissions) {
+    return [];
+  }
+
+  const unique = new Set();
+  const sources = Array.isArray(permissions) ? permissions : String(permissions).split(/[\s,]+/);
+  for (const permission of sources) {
+    if (typeof permission !== 'string') {
+      continue;
+    }
+    const trimmed = permission.trim();
+    if (trimmed) {
+      unique.add(trimmed);
+    }
+  }
+
+  return Array.from(unique);
+}
+
+function resolvePermissions({ payload, role }) {
+  const defaults = defaultPermissionsByRole[role] ?? [];
+  const claimPermissions = normalisePermissions(payload?.permissions ?? payload?.perms);
+  const scopePermissions = normalisePermissions(payload?.scope);
+
+  const unique = new Set();
+  for (const permission of [...defaults, ...claimPermissions, ...scopePermissions]) {
+    unique.add(permission);
+  }
+
+  return Array.from(unique);
 }
 
 export default function auth(requiredRole) {
@@ -51,7 +92,19 @@ export default function auth(requiredRole) {
 
       const session = await sessionRegistry.ensureActive(payload.sid);
       const userRole = payload.role ?? payload.roles?.[0] ?? null;
+      const permissions = resolvePermissions({ payload, role: userRole });
+      const actor = {
+        id: payload.sub,
+        role: userRole,
+        sessionId: session.id,
+        tenantId: payload.tenantId ?? payload.tid ?? null,
+        permissions
+      };
+
+      req.session = session;
       req.user = { ...payload, id: payload.sub, role: userRole, sessionId: session.id };
+      req.actor = actor;
+      req.permissions = permissions;
       updateRequestContext({ userId: payload.sub, userRole, sessionId: session.id });
 
       const requiredRoles = resolveRequiredRoles(requiredRole);

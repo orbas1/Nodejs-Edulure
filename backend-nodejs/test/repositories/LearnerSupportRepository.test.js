@@ -5,6 +5,7 @@ import { __testables } from '../../src/repositories/LearnerSupportRepository.js'
 const {
   parseJson,
   normaliseAttachmentInput,
+  normaliseListOptions,
   serialiseAttachments,
   serialiseMetadata,
   mapMessage,
@@ -131,5 +132,11 @@ describe('LearnerSupportRepository helpers', () => {
     expect(parseJson('{"ok":true}', {})).toEqual({ ok: true });
     expect(parseJson('invalid', {})).toEqual({});
     expect(parseJson('', [])).toEqual([]);
+  });
+
+  it('normalises list options safely', () => {
+    expect(normaliseListOptions({ limit: '999', status: ' Open ' })).toEqual({ limit: 200, status: 'open' });
+    expect(normaliseListOptions({ limit: 'NaN' })).toEqual({ limit: 50, status: undefined });
+    expect(normaliseListOptions({ limit: 10, status: '' })).toEqual({ limit: 10, status: undefined });
   });
 });
