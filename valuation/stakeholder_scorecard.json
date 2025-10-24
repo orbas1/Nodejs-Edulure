@@ -1,0 +1,166 @@
+{
+  "version": "2025-05-26",
+  "reportingWindow": "Q3 FY25",
+  "pillars": [
+    {
+      "id": "activation",
+      "title": "Activation & Onboarding",
+      "narrative": "Reduce drop-off between sign-up and first value moment by pairing cross-surface onboarding flows with personalised streak nudges.",
+      "metrics": [
+        {
+          "slug": "trial-to-paid-conversion",
+          "label": "Trial → paid conversion",
+          "baseline": 0.12,
+          "target": 0.20,
+          "unit": "ratio",
+          "owner": "Growth PM",
+          "cadence": "Bi-weekly",
+          "source": "analytics.dashboard.activation"
+        },
+        {
+          "slug": "multi-surface-onboarding",
+          "label": "Multi-surface onboarding completion",
+          "baseline": 0.58,
+          "target": 0.75,
+          "unit": "ratio",
+          "owner": "Design Systems",
+          "cadence": "Weekly",
+          "source": "telemetry.onboarding-funnel"
+        },
+        {
+          "slug": "first-class-time",
+          "label": "Median time to first live class",
+          "baseline": 3.4,
+          "target": 2.1,
+          "unit": "days",
+          "owner": "Community Ops",
+          "cadence": "Weekly",
+          "source": "analytics.session-tracker"
+        }
+      ]
+    },
+    {
+      "id": "retention",
+      "title": "Retention & Engagement",
+      "narrative": "Stabilise streak health and session attendance by surfacing proactive reminders, better content recommendations, and Annex-backed readiness states.",
+      "metrics": [
+        {
+          "slug": "streak-health",
+          "label": "Weekly streak health index",
+          "baseline": 0.64,
+          "target": 0.78,
+          "unit": "index",
+          "owner": "Product Analytics",
+          "cadence": "Weekly",
+          "source": "telemetry.streak-monitor"
+        },
+        {
+          "slug": "live-class-attendance",
+          "label": "Live class attendance rate",
+          "baseline": 0.46,
+          "target": 0.62,
+          "unit": "ratio",
+          "owner": "Instructional Design",
+          "cadence": "Weekly",
+          "source": "analytics.live-class"
+        },
+        {
+          "slug": "nps-core-learners",
+          "label": "NPS – core learner cohort",
+          "baseline": 34,
+          "target": 48,
+          "unit": "score",
+          "owner": "Research",
+          "cadence": "Monthly",
+          "source": "research.panel.surveys"
+        }
+      ]
+    },
+    {
+      "id": "efficiency",
+      "title": "Efficiency & Monetisation",
+      "narrative": "Increase margin by automating governance, reducing manual support load, and accelerating conversion of high-intent cohorts.",
+      "metrics": [
+        {
+          "slug": "support-minutes-per-ticket",
+          "label": "Support minutes per ticket",
+          "baseline": 11.2,
+          "target": 6.5,
+          "unit": "minutes",
+          "owner": "Support Ops",
+          "cadence": "Monthly",
+          "source": "ops.helpdesk-metrics"
+        },
+        {
+          "slug": "upload-readiness-pass",
+          "label": "Upload readiness checklist pass rate",
+          "baseline": 0.44,
+          "target": 0.68,
+          "unit": "ratio",
+          "owner": "Content Operations",
+          "cadence": "Bi-weekly",
+          "source": "annex.navigation.operations"
+        },
+        {
+          "slug": "arpu-premium",
+          "label": "Premium ARPU",
+          "baseline": 18.4,
+          "target": 26.0,
+          "unit": "gbp",
+          "owner": "Finance",
+          "cadence": "Monthly",
+          "source": "finance.revenue-projections"
+        }
+      ]
+    }
+  ],
+  "milestones": [
+    {
+      "id": "telemetry-rollout",
+      "label": "Telemetry guardrails live in production",
+      "eta": "2025-06-14",
+      "stakeholders": ["Engineering", "Product Analytics"],
+      "notes": "Enable automated alerts when Annex metrics breach thresholds."
+    },
+    {
+      "id": "valuation-refresh",
+      "label": "Valuation model refresh with Q3 inputs",
+      "eta": "2025-07-05",
+      "stakeholders": ["Finance", "Founder"],
+      "notes": "Incorporate updated ARPU, retention, and CAC assumptions."
+    },
+    {
+      "id": "board-briefing",
+      "label": "Board-ready strategic briefing",
+      "eta": "2025-07-18",
+      "stakeholders": ["Founder", "Advisors"],
+      "notes": "Bundle narrative deck, Annex exports, and KPI scorecard."
+    }
+  ],
+  "communication": {
+    "cadence": [
+      {
+        "channel": "Founder update",
+        "frequency": "Bi-weekly",
+        "audience": "Investors, Advisors",
+        "focus": "Top-line KPI shifts, milestone confidence, blocker escalations"
+      },
+      {
+        "channel": "Ops stand-up",
+        "frequency": "Weekly",
+        "audience": "Ops, Product, Support",
+        "focus": "Annex readiness, checklist deltas, quality flags"
+      },
+      {
+        "channel": "Design research read-out",
+        "frequency": "Monthly",
+        "audience": "Design, Product, Marketing",
+        "focus": "UX synthesis, persona signals, prototype testing outcomes"
+      }
+    ],
+    "templates": {
+      "board": "templates/board-brief-outline.md",
+      "investor": "templates/investor-update-outline.md"
+    }
+  }
+}

@@ -993,40 +993,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 16. **Full Upgrade Plan & Release Steps:** Seed new tasks, reseed staging, validate annex API responses by role, rehearse the playbook via the notification panel and handbook, then publish drill notes with annex evidence.
 
 ### 9.C Design System Assets & UX Research (`docs/design-system/`, `user experience.md`, `frontend-reactjs/src/styles/`, `Edulure-Flutter/lib/theme/`)
-1. **Appraisal:** Design system tokens, component guidelines, UX research summaries, and cross-platform theming references.
-2. **Functionality:** Defines colour palettes, typography scales, spacing tokens, component anatomy, and UX heuristics consumed across apps.
-3. **Logic Usefulness:** Ensures consistent user experience, accessible interfaces, and efficient design-to-code workflows.
-4. **Redundancies:** Token definitions repeated across CSS and docs; centralise in single source exported to platforms.
-5. **Placeholders Or non-working functions or stubs:** Some research sections note pending synthesis; prioritise completion.
-6. **Duplicate Functions:** Component usage guidelines duplicated across docs; consolidate with deep links.
-7. **Improvements need to make:** Add interactive token playground, accessibility checklists, and usage analytics for components.
-8. **Styling improvements:** Ensure docs reflect most recent palette and component illustrations.
-9. **Efficiency analysis and improvement:** Automate token distribution to codebases via pipelines.
-10. **Strengths to Keep:** Comprehensive tokens, cross-platform coverage, and research-backed guidance.
-11. **Weaknesses to remove:** Outdated screenshots; refresh to avoid confusion.
-12. **Styling and Colour review changes:** Verify token contrast ratios and update as design evolves.
-13. **CSS, orientation, placement and arrangement changes:** Provide responsive layout guidelines for documentation and sample components.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Ensure copy remains concise, remove redundant descriptions, and maintain consistent voice.
-15. **Change Checklist Tracker:** Track design system updates, downstream dependency notifications, and research publication cadence.
-16. **Full Upgrade Plan & Release Steps:** Publish token updates, notify engineering teams, update component libraries, and monitor adoption.
+1. **Appraisal:** The design system now revolves around a single source of truth (`docs/design-system/design_tokens.json`) that feeds both web (`frontend-reactjs/src/styles/tokens.css`) and Flutter (`Edulure-Flutter/lib/core/design_tokens.dart`) themes via `scripts/sync-design-tokens.cjs`.
+2. **Functionality:** Running `npm run sync:design-tokens` regenerates CSS variables, Dart constants, and the `DesignTokens.lightTheme/darkTheme/highContrastTheme` helpers used in `Edulure-Flutter/lib/main.dart`, guaranteeing palette, spacing, and focus rings remain consistent across surfaces.
+3. **Logic Usefulness:** Designers and engineers can audit tokens once in JSON, preview generated outputs, and rely on `docs/design-system/README.md` plus the refreshed `user experience.md` ledger to coordinate research findings with implementation changes.
+4. **Redundancies:** The manual Flutter `ThemeData` scaffold has been replaced—`main.dart` now imports `DesignTokens`, eliminating duplicate colour literals and reducing the chance of drift between mobile and web builds.
+5. **Placeholders Or non-working functions or stubs:** JSON currently enumerates colours, spacing, motion, and high-contrast overrides; component-level tokens (e.g., typography scales per molecule) remain TODOs for the next iteration and should append to the same file.
+6. **Duplicate Functions:** With `DesignTokens` acting as the single entry point, high-contrast, dark-mode, and light-mode theme generation no longer require bespoke helpers—React still consumes CSS variables while Flutter reuses the generated class.
+7. **Improvements need to make:** Extend the sync script to emit test fixtures or Storybook previews and wire automated screenshot capture so QA can diff token changes alongside research evidence automatically logged in `user experience.md`.
+8. **Styling improvements:** Flutter and web forms now inherit shared padding, border, and focus radii from the regenerated constants, and design documentation calls out the runbook for keeping screenshots updated after each sync.
+9. **Efficiency analysis and improvement:** Token sync avoids manual edits across clients; Node scripts emit deterministic files, and high-contrast overrides cascade correctly under both media queries and `[data-*]` attributes without redundant declarations.
+10. **Strengths to Keep:** Retain JSON-driven governance, the multi-mode coverage (light/dark/high contrast), and the research ledger workflow that ties synthesis back to measurable design updates.
+11. **Weaknesses to remove:** Future work should translate shadow strings into structured Flutter BoxShadow constants and add automated contrast regression tests to avoid manual verification overhead.
+12. **Styling and Colour review changes:** Palette updates now propagate from JSON through the generator; Flutter automatically respects WCAG AA ratios, mirroring the CSS declarations and the research backlog’s accessibility audit focus.
+13. **CSS, orientation, placement and arrangement changes:** Tokens maintain responsive grid defaults (`--grid-min-column`, `--grid-gap`), and Flutter inherits spacing for button padding and border radii, keeping component layout parity across clients.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Documentation clarifies workflow steps, emphasises evidence capture in `user experience.md`, and removes redundant prose about manual token editing.
+15. **Change Checklist Tracker:** When altering tokens, update `design_tokens.json`, run the sync script, verify `frontend-reactjs/src/styles/tokens.css`, `Edulure-Flutter/lib/core/design_tokens.dart`, and `Edulure-Flutter/lib/main.dart`, then log research outcomes in `user experience.md`.
+16. **Full Upgrade Plan & Release Steps:** Coordinate updates by editing JSON, executing the sync, validating Flutter and web builds, refreshing screenshots, and notifying design/research stakeholders through the ledger before shipping.
 
 ### 9.D Strategy, Valuation & Stakeholder Communication (`valuation/`, `docs/operations/strategy.md`, `user experience.md`)
-1. **Appraisal:** Business strategy, valuation models, and stakeholder communications aligning product roadmap with financial goals.
-2. **Functionality:** Provides valuation assumptions, KPI definitions, roadmap priorities, and stakeholder messaging frameworks.
-3. **Logic Usefulness:** Aligns leadership, informs prioritisation, and supports fundraising or board updates.
-4. **Redundancies:** KPI descriptions repeated across documents; consolidate into single reference.
-5. **Placeholders Or non-working functions or stubs:** Some valuation cells flagged TBD; ensure updates follow finance cadence.
-6. **Duplicate Functions:** Messaging templates overlap; centralise to maintain consistent tone.
-7. **Improvements need to make:** Automate data refresh, embed dashboards, and create executive summaries tied to telemetry.
-8. **Styling improvements:** Align valuation decks with brand typography and palette for professionalism.
-9. **Efficiency analysis and improvement:** Link spreadsheets to live data sources to reduce manual updates.
-10. **Strengths to Keep:** Clear articulation of strategy, KPIs, and stakeholder communication guidelines.
-11. **Weaknesses to remove:** Manual reconciliation of metrics; automate through analytics exports.
-12. **Styling and Colour review changes:** Ensure reports use accessible colours and consistent visuals.
-13. **CSS, orientation, placement and arrangement changes:** Provide templates for executive dashboards and memos.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Streamline narrative, remove redundant jargon, and maintain clarity.
-15. **Change Checklist Tracker:** Track valuation updates, stakeholder briefings, and KPI revisions.
-16. **Full Upgrade Plan & Release Steps:** Refresh valuation inputs, review with leadership, update messaging, and distribute through official channels.
+1. **Appraisal:** Strategic metrics now live in `valuation/stakeholder_scorecard.json`, powering both `docs/operations/strategy.md` and valuation artefacts through `scripts/generate-strategy-brief.cjs` for a single source of KPI truth.
+2. **Functionality:** `npm run generate:strategy-brief` produces a Markdown briefing (`docs/operations/strategy.md`) and a reusable scorecard fragment (`valuation/generated-scorecard.md`) that finance and comms teams can embed in decks or diligence packets.
+3. **Logic Usefulness:** The pipeline ties valuation assumptions in `valuation/edulure-prelaunch-valuation.md` to real metrics, while communication templates (`docs/operations/templates/*.md`) provide ready-to-fill frameworks referencing the generated data.
+4. **Redundancies:** KPI definitions are no longer duplicated across valuation narratives and ad-hoc memos—the generator consumes the JSON and renders consistent tables and narratives, reducing copy drift.
+5. **Placeholders Or non-working functions or stubs:** Some scorecard fields (e.g., revenue experiments) can expand with additional metrics; maintainers should append new entries to `stakeholder_scorecard.json` to keep automation intact.
+6. **Duplicate Functions:** Narrative text is centralised—templates link back to the generated briefing rather than restating cadence, owners, or sources, trimming manual editing loops during investor prep.
+7. **Improvements need to make:** Next steps include wiring live telemetry ingestion (rather than static JSON) and emitting PDF/CSV artefacts for rapid stakeholder distribution.
+8. **Styling improvements:** Strategy docs and templates adopt consistent Markdown layouts, ensuring tables, headlines, and focus areas align with brand tone outlined in `user experience.md`.
+9. **Efficiency analysis and improvement:** Scripted generation removes repetitive formatting, and the scorecard fragment can be referenced anywhere without recomputing KPI tables, accelerating update cycles before board meetings.
+10. **Strengths to Keep:** Preserve the JSON-first workflow, the automated doc generation, and the linkage between valuation commentary and actionable KPI owners/cadences.
+11. **Weaknesses to remove:** Integrate automated validation so the JSON fails fast when required fields (owners, cadence, units) are missing, and plan for high-contrast accessible charts in future reporting.
+12. **Styling and Colour review changes:** Communication templates instruct authors to reference design research outputs, keeping typography and colour usage in downstream decks consistent with Annex guidance.
+13. **CSS, orientation, placement and arrangement changes:** Markdown tables remain width-friendly for docs and PDF export; templates emphasise ordered sections so board/investor updates stay scannable.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Generated narratives emphasise outcome-first phrasing, remove jargon, and tie metrics back to strategic intent to keep stakeholder messaging sharp.
+15. **Change Checklist Tracker:** Update `stakeholder_scorecard.json`, rerun the generator, review `docs/operations/strategy.md`, propagate changes into valuation docs, and refresh board/investor templates before sharing externally.
+16. **Full Upgrade Plan & Release Steps:** Maintain cadence by editing JSON alongside valuation updates, regenerating artefacts, circulating the new briefing to leadership, and logging UX/strategy insights within `user experience.md` for cross-team alignment.
 
 ---
 
