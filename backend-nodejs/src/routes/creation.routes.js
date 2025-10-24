@@ -4,6 +4,46 @@ import { createApiRouter } from './routerFactory.js';
 
 const router = createApiRouter();
 
+router.use((req, _res, next) => {
+  req.registerDomainEventDefaults?.({
+    entityType: 'creation-studio-route',
+    payload: {
+      route: {
+        namespace: 'creation-studio',
+        baseUrl: req.baseUrl ?? null,
+        method: req.method
+      }
+    }
+  });
+  next();
+});
+
+router.param('projectId', (req, _res, next, projectId) => {
+  req.registerDomainEventDefaults?.(() => ({
+    entityType: 'creation-project',
+    entityId: projectId,
+    payload: {
+      route: {
+        projectId
+      }
+    }
+  }));
+  next();
+});
+
+router.param('templateId', (req, _res, next, templateId) => {
+  req.registerDomainEventDefaults?.(() => ({
+    entityType: 'creation-template',
+    entityId: templateId,
+    payload: {
+      route: {
+        templateId
+      }
+    }
+  }));
+  next();
+});
+
 router.get('/projects', auth('user'), CreationStudioController.listProjects);
 router.get('/analytics/summary', auth('user'), CreationStudioController.analyticsSummary);
 router.get('/recommendations', auth('user'), CreationStudioController.recommendations);
