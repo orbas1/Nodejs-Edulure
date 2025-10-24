@@ -56,8 +56,40 @@
       - 2.H Integrations, Enablement & Invitations (`src/pages/IntegrationCredentialInvite.jsx`, `src/components/integrations/`, `src/hooks/useIntegrationInvite.js`)
       - 2.I Support, Knowledge & Feedback (`src/features/support/`, `src/components/support/`, `src/pages/support/*`, `src/hooks/useSupportLauncher.js`)
       - 2.J Shared Layout, Theming & Component Infrastructure (`src/App.jsx`, `src/layouts/`, `src/styles/`, `src/components/common/`, `src/providers/ThemeProvider.jsx`)
-      - 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
-      - 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
+      - ✓ 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
+        1. **Appraisal.** `AuthService` now funnels password, refresh-token, and WebAuthn assertions through shared helpers before persisting state with `SessionManager`, and every branch emits an `AuthAuditEvent` so governance can replay authentication history.
+        2. **Functionality.** Login, registration, refresh, logout, and passkey flows call the same validator catalogue, redact sensitive metadata, and trim payloads before hitting `/auth/*` endpoints while `SessionManager.saveSession` secures tokens in Hive + secure storage.
+        3. **Logic Usefulness.** `AuthFieldValidators` provides reusable email/password/OTP/name sanitisation plus audit helpers (`summarizeProfileSnapshot`, `redactSensitiveMetadata`), keeping session append + UI copy in sync across login and register screens.
+        4. **Redundancies.** Inline regex checks were removed from `LoginScreen`/`RegisterScreen`, delegating to the validator catalogue to avoid divergent copy and validation thresholds.
+        5. **Placeholders or Stubs.** Passkey APIs still depend on backend `/auth/passkeys/*` routes and the audit log lacks a first-party viewer; surface feature flags until backend support and UI viewers land.
+        6. **Duplicate Functions.** Error translation, audit logging, and token persistence now sit in `AuthService`/`SessionManager`, eliminating bespoke SnackBar logic and duplicate session writes.
+        7. **Improvements Needed.** Add an account settings viewer for `SessionManager.recentAuthEvents`, pipe analytics for validator failures, and define offline refresh behaviour.
+        8. **Styling Improvements.** Validator-provided helper text keeps Material input copy consistent (“Enter the email you use with Edulure.”) while respecting theme spacing and typography.
+        9. **Efficiency Analysis.** Sanitised payloads prevent duplicate retries, audit retention trims Hive to 50 events, and secure storage avoids fetching tokens on every request.
+        10. **Strengths to Keep.** Biometric hooks, offline token caching, two-factor prompts, and resilient `AuthException` mapping continue to provide clear recovery paths.
+        11. **Weaknesses to Remove.** Missing audit viewer, absent offline login policy, and dependency on backend passkey availability should be tracked for future sprints.
+        12. **Styling & Colour Review.** Validation, success, and error copy aligns with existing palette tokens defined in `theme.dart`, keeping security messaging on brand.
+        13. **CSS, Orientation & Placement.** Login/register screens preserve safe-area padding and consistent spacing when toggling passkey or MFA hints.
+        14. **Text Analysis.** Shared validators keep warnings under 90 characters, differentiate optional vs enforced MFA, and avoid duplicated phrasing to ease localisation.
+        15. **Change Checklist Tracker.** Validate passkey endpoints, confirm `SessionManager.init()` opens `auth_audit`, install Dart tooling to run widget/unit suites, and rehearse MFA/passkey happy + failure paths before release.
+        16. **Full Upgrade Plan & Release Steps.** Ship behind feature flags, coordinate backend credential provisioning, surface audit telemetry, execute device-matrix tests once tooling installs, and publish updated security onboarding docs prior to store submission.
+      - ✓ 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
+        1. **Appraisal.** `LiveFeedController` hydrates Hive snapshots, dedupes posts/ads, and orchestrates refresh/pagination/moderation flows while keeping placements and highlights in sync across offline and online states.
+        2. **Functionality.** Bootstrap pulls cached payloads via `CommunityEngagementStorage`, `refresh` merges network results, `_cacheSnapshot` serialises DTOs back to Hive, and placements fall back to ads summaries when the placements endpoint is empty.
+        3. **Logic Usefulness.** DTOs in `live_feed_service.dart` expose `toJson` so analytics, highlights, moderation, and offline widgets all consume the same canonical snapshot format.
+        4. **Redundancies.** `_dedupeEntries` consolidates previously duplicated reconciliation logic for pagination, optimistic updates, and moderation, preventing manual list surgery per caller.
+        5. **Placeholders or Stubs.** TTL/eviction policies and websocket hydration remain TODO; cached placements may drift until real-time updates arrive.
+        6. **Duplicate Functions.** `CommunityEngagementStorage` namespacing (`feed::`) eliminates the need for separate feed-specific Hive boxes across features.
+        7. **Improvements Needed.** Introduce cache expiry controls, surface audit metadata (filters, scope) in developer tooling, and wire websocket hydration for mid-session updates.
+        8. **Styling Improvements.** Cached highlights and placements render in identical order/tone as live responses, preventing layout jumps when offline.
+        9. **Efficiency Analysis.** Snapshot caching reduces cold-start API calls, dedupe maps prevent rebuild churn, and placement fallbacks reuse summary data without extra network hits.
+        10. **Strengths to Keep.** Optimistic post CRUD, moderation flows, and analytics hooks continue to operate on unified DTOs shared with the web stack.
+        11. **Weaknesses to Remove.** Lack of TTL means heavy users may retain stale placements; add manual purge controls and eviction heuristics.
+        12. **Styling & Colour Review.** Offline renders reuse the same badge colours and typography defined in DTO metadata, preserving Annex-aligned visuals.
+        13. **CSS, Orientation & Placement.** Deduped ordering keeps “newest first” lists stable across device orientations and prevents duplicate ads in landscape/tablet layouts.
+        14. **Text Analysis.** Cached CTA/headline copy originates from the same DTOs as live calls, keeping truncation and moderation messaging consistent.
+        15. **Change Checklist Tracker.** QA offline hydration, pagination dedupe, cached moderation updates, and Hive box initialisation before release.
+        16. **Full Upgrade Plan & Release Steps.** Warm caches during bootstrap, monitor Hive growth on beta devices, schedule websocket hydration follow-ups, and document support runbooks for purging stale feed caches.
       - 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
       - 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`)
       - ✅ 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)

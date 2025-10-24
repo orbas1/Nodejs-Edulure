@@ -9,6 +9,7 @@ class CommunityEngagementStorage {
         _boxName = boxName;
 
   static const String _defaultBoxName = 'community_engagement';
+  static const String _feedPrefix = 'feed::';
 
   final HiveInterface _hive;
   final String _boxName;
@@ -45,5 +46,17 @@ class CommunityEngagementStorage {
   Future<void> clear() async {
     final box = await _ensureBox();
     await box.clear();
+  }
+
+  Future<Map<String, dynamic>?> readFeedSnapshot(String cacheKey) {
+    return readSnapshot('$_feedPrefix$cacheKey');
+  }
+
+  Future<void> writeFeedSnapshot(String cacheKey, Map<String, dynamic> snapshot) {
+    return writeSnapshot('$_feedPrefix$cacheKey', snapshot);
+  }
+
+  Future<void> deleteFeedSnapshot(String cacheKey) {
+    return deleteSnapshot('$_feedPrefix$cacheKey');
   }
 }

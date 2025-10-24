@@ -459,40 +459,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 ## 3. Flutter Mobile Shell (`Edulure-Flutter/`)
 
 ### 3.A Authentication & Identity Management (`lib/features/auth/`, `lib/services/authentication_service.dart`, `lib/services/secure_storage_service.dart`)
-1. **Appraisal:** Mobile onboarding flows mirroring web login, registration, MFA, and secure token handling with offline resilience.
-2. **Functionality:** Widgets cover registration forms, OTP verification, password resets, deep links, and biometric unlock tied to secure storage service.
-3. **Logic Usefulness:** Authentication service coordinates API calls, local storage, and analytics events so mobile sessions stay in sync with backend expectations.
-4. **Redundancies:** Validation logic appears in multiple forms; extract to shared validators for consistent error messaging.
-5. **Placeholders Or non-working functions or stubs:** Magic-link deep link handler flagged TODO; ensure fallback messaging guides users appropriately.
-6. **Duplicate Functions:** Secure storage wrappers repeated; consolidate to avoid inconsistent key naming.
-7. **Improvements need to make:** Add progressive profiling, support passkeys, and embed analytics instrumentation for drop-off tracking.
-8. **Styling improvements:** Align theming via `theme.dart` to mirror web tokens and ensure dark mode parity.
-9. **Efficiency analysis and improvement:** Optimise provider rebuilds, reuse Hive boxes, and debounce network calls to reduce battery impact.
-10. **Strengths to Keep:** Offline-aware login, biometric unlock, and thorough error handling.
-11. **Weaknesses to remove:** Fragmented navigation between onboarding steps; streamline using declarative routers.
-12. **Styling and Colour review changes:** Ensure security prompts use accessible colours consistent with brand guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Adjust layout for keyboard overlays and safe areas on various devices.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Polish helper copy, keep instructions concise, and localise security warnings.
-15. **Change Checklist Tracker:** Update mobile QA scenarios for MFA, biometric unlock, and offline login flows before releases.
-16. **Full Upgrade Plan & Release Steps:** Release behind staged rollout, monitor crashlytics and analytics, coordinate backend deep link support, and update store metadata.
+1. **Appraisal:** Password, MFA, and emerging passkey flows now share a single orchestration layer in `AuthService`, with password, refresh-token, and passkey assertions funnelling through `login`, `refreshSession`, and the new `loginWithPasskey` helpers before `SessionManager` snapshots the session payloads.
+2. **Functionality:** `AuthFieldValidators` centralises email/password/OTP checks for `LoginScreen` and `RegisterScreen`, while `AuthService.beginPasskeyRegistration` and `completePasskeyRegistration` drive WebAuthn-style handshakes and emit structured audit breadcrumbs through `SessionManager.appendAuthEvent` and the persisted `AuthAuditEvent` Hive log.
+3. **Logic Usefulness:** Every success or failure path records a redacted envelope (method, role, MFA state, error copy) into the new auth audit feed so mobile triage and governance tooling can replay account activity directly from persisted Hive state without combing analytics traces.
+4. **Redundancies:** Form-level regex blocks in `RegisterScreen`/`LoginScreen` were removed in favour of the shared validator catalogue, eliminating inconsistent copy and ensuring both screens normalise email addresses and optional OTPs before dispatch.
+5. **Placeholders Or non-working functions or stubs:** Passkey enrolment still depends on `/auth/passkeys/*` endpoints being enabled server-side; until device biometrics bridge is shipped the UI surfaces only validation and audit hooks, so feature flags should continue to gate visibility.
+6. **Duplicate Functions:** Error translation and audit recording now live solely inside `AuthService`, replacing duplicated SnackBar/error copy and preventing future flows from skipping analytics logging.
+7. **Improvements need to make:** Layer biometric unlock on top of the passkey handshake, expose a lightweight viewer for `SessionManager.recentAuthEvents`, and wire analytics around validator failures to spot friction in multi-factor and passkey enrolment.
+8. **Styling improvements:** Consistent helper copy flows from the validator catalogue (“Enter the email you use with Edulure”, “Security codes are six digits”) giving designers a single source for tone while keeping the existing theming from `theme.dart` intact.
+9. **Efficiency analysis and improvement:** Sanitised inputs prevent duplicate network calls, and the audit log limits to 50 events per device with overflow trimming so Hive writes stay bounded even on long-lived installs.
+10. **Strengths to Keep:** Offline token caching, biometric unlock hooks in `SessionManager`, and the resilient `AuthException` mapping continue to guard against network failure while ensuring users see actionable messaging.
+11. **Weaknesses to remove:** Audit data is local-only today; surface a compact viewer inside account settings and consider exporting `AuthAuditEvent` snapshots for support escalations so passkey issues can be debugged remotely.
+12. **Styling and Colour review changes:** Validation feedback retains Material defaults but now guarantees consistent tone and length, aligning security copy with the colours already defined in `theme.dart` and the compliance palette.
+13. **CSS, orientation, placement and arrangement changes:** Login and register continue to honour safe-area insets; future work should add context-aware spacing around the new audit log surfaces so smaller devices avoid scroll jumps when errors render.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Validator-driven copy keeps warnings under 90 characters, differentiates required vs optional MFA, and trims redundant phrases so localisation teams translate each prompt only once.
+15. **Change Checklist Tracker:** Validate passkey endpoints, confirm Hive `auth_audit` box opens on cold start, run regression flows for OTP-required roles, and verify audit retention trimming before each release train.
+16. **Full Upgrade Plan & Release Steps:** Stage passkey UI behind a feature flag, coordinate backend credential issuance, surface audit viewer telemetry, run end-to-end smoke tests (password, MFA, passkey, logout), and publish updated security onboarding docs prior to App Store roll-out.
 
 ### 3.B Community Feed & Engagement (`lib/features/feed/`, `lib/features/community_spaces/`, `lib/services/feed_service.dart`, `lib/services/community_service.dart`)
-1. **Appraisal:** Gesture-friendly community feed with offline caching, reactions, moderation, event reminders, and donation prompts tailored for mobile use.
-2. **Functionality:** Widgets render feed cards, support infinite scroll, manage optimistic updates, and integrate with community APIs for membership and programming data.
-3. **Logic Usefulness:** Services handle websocket subscription, fallback polling, and offline queueing to keep feed updates consistent across connectivity states.
-4. **Redundancies:** Feed card widgets duplicated between feed and community spaces; centralise to reduce maintenance overhead.
-5. **Placeholders Or non-working functions or stubs:** Member map tab marked TODO pending map SDK integration; display placeholder copy to manage expectations.
-6. **Duplicate Functions:** Reaction handling logic mirrored from web; extract to shared Dart mixin to maintain parity.
-7. **Improvements need to make:** Add haptic feedback, advanced filters, and summarised thread previews for long posts.
-8. **Styling improvements:** Harmonise card spacing, icon sizing, and badge styling with design tokens.
-9. **Efficiency analysis and improvement:** Implement pagination caching, background sync for notifications, and compress websocket payloads where possible.
-10. **Strengths to Keep:** Offline-first design, robust moderation tooling, and consistent analytics instrumentation.
-11. **Weaknesses to remove:** Rebuild-heavy architecture on feed updates; adopt list diffing to reduce UI churn.
-12. **Styling and Colour review changes:** Align badge colours with brand palette across light/dark modes.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout adjustments for large text accessibility and landscape orientation.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Ensure truncated text indicates expand affordances and keep CTA copy concise.
-15. **Change Checklist Tracker:** Include feed regression, offline sync QA, and websocket throughput tests in mobile release checklist.
-16. **Full Upgrade Plan & Release Steps:** Pilot via TestFlight/Play staged rollout, monitor analytics, collect user feedback, and expand to all cohorts.
+1. **Appraisal:** `LiveFeedController` now hydrates cached snapshots from `CommunityEngagementStorage` before touching the network, so the feed, highlights, analytics, and placements survive app relaunches and instantly render even when offline.
+2. **Functionality:** Refresh, bootstrap, and pagination all run through a deduping merge that normalises posts against existing state, persists the canonical `FeedSnapshot` via `toJson`, and writes placement metadata back through the new `writeFeedSnapshot` helpers for reuse by moderation and analytics surfaces.
+3. **Logic Usefulness:** Every feed response (including pass-through ads and engagement metrics) serialises through the new `toJson` methods on `FeedSnapshot`, `FeedEntry`, `FeedAd`, `FeedHighlight`, `CommunityPost`, and related DTOs, making the cached payload authoritative and ready for export to future offline-first widgets.
+4. **Redundancies:** Duplicate item reconciliation logic was removed from pagination and mutation flows—the `_dedupeEntries` helper reuses prior post shells, keeping optimistic updates, moderation actions, and API responses in sync without manual list surgery in each caller.
+5. **Placeholders Or non-working functions or stubs:** Cached placements fall back to summary data when live ad calls fail; TODOs remain for websocket hydration and map tabs, so stale placement payloads should still render headline placeholders until live inventory returns.
+6. **Duplicate Functions:** Feed snapshot caching no longer leans on bespoke Hive boxes per feature; the storage wrapper now namespaces feed snapshots with the `feed::` prefix so community engagement state and feed state coexist without extra wrappers.
+7. **Improvements need to make:** Push cached audit metadata (filters, community scope) into developer tooling, add eviction/TTL policies for feed cache keys, and wire realtime sockets so snapshots update mid-session without forcing a manual refresh.
+8. **Styling improvements:** Cached payloads preserve highlight order and placement context, ensuring the feed renders with identical spacing and badge ordering regardless of whether data came from the network or Hive.
+9. **Efficiency analysis and improvement:** Snapshot caching trims redundant API calls on cold start, deduped merges prevent rebuild churn when posts reappear in later pages, and the audit log avoids uncontrolled Hive growth by trimming to the latest keys.
+10. **Strengths to Keep:** Optimistic mutations (`createPost`, `moderatePost`, `removePost`) still update UI immediately while the controller backfills caches, and existing moderation and analytics hooks continue to operate on the same DTOs.
+11. **Weaknesses to remove:** Cached feed payloads never expire; follow-up work should add range-aware cache invalidation and user-triggered purge controls so heavy users do not retain outdated placements indefinitely.
+12. **Styling and Colour review changes:** Offline renders reuse identical post/ad JSON envelopes, so card theming, badge colours, and highlight typography remain consistent with live API responses across light and dark themes.
+13. **CSS, orientation, placement and arrangement changes:** Deduped ordering maintains “newest first” even when cached, and layout helpers should be extended to account for cached placements so landscape/tablet variants avoid duplicate ads.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Cached CTA/headline copy originates from the same DTOs as live responses, keeping truncation rules and moderation messages consistent across refresh cycles.
+15. **Change Checklist Tracker:** QA must validate cache hydration when offline, confirm `CommunityEngagementStorage` serialises the new feed keys, exercise pagination dedupe, and ensure moderation actions update cached snapshots before release sign-off.
+16. **Full Upgrade Plan & Release Steps:** Warm caches during bootstrap, monitor Hive growth in real devices, roll out staged builds that stress pagination, follow with websocket hydration, and update documentation so support teams know how to flush feed caches when debugging.
 
 ### 3.C Lessons, Assessments & Offline Learning (`lib/features/lessons/`, `lib/features/assessments/`, `lib/services/lesson_download_service.dart`, `lib/services/progress_service.dart`)
 1. **Appraisal:** Mobile lesson player supporting streaming, downloads, quizzes, and progress sync with resilient offline handling.
@@ -1265,18 +1265,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Update theme tokens with changelog, run visual regression, and coordinate design reviews.
 
 ### A26. Flutter Authentication & Identity (3.A)
-- **Operational Depth:** Dart services manage secure storage, token refresh, and biometric unlocks. Auth flows sync with backend MFA requirements and store tokens encrypted on device.
-- **Gaps & Risks:** Offline login fallback missing; define behaviour for expired tokens without network. Error handling duplicates strings.
-- **Resilience & Efficiency:** Cache discovery documents, batch network calls, and monitor secure storage failures.
-- **UX & Communications:** Align copy with web, ensure biometrics onboarding accessible, and use consistent colour tokens.
-- **Change Management:** Run device matrix tests, update localisation, and coordinate release notes in app stores.
+- **Operational Depth:** `AuthService.login`, `register`, `refreshSession`, and the passkey helpers (`beginPasskeyRegistration`, `completePasskeyRegistration`, `loginWithPasskey`) orchestrate password, MFA, and WebAuthn assertions before persisting sessions through `SessionManager.saveSession`. Shared validators in `core/validation/auth_validators.dart` normalise email/password/OTP inputs, trim profile data, and emit audit-safe metadata for `SessionManager.appendAuthEvent`.
+- **Gaps & Risks:** Passkey flows still depend on `/auth/passkeys/*` endpoints being enabled server-side and there is no in-app viewer for the persisted `AuthAuditEvent` feed, leaving governance teams without a first-party log review surface. Offline login fallback behaviour remains undefined for expired refresh tokens when the network is unavailable.
+- **Resilience & Efficiency:** Sanitised payloads collapse whitespace, redact secrets in audit trails, and cap the Hive-backed audit log at 50 events to bound storage. Tokens persist via `SecureStorageService`, while shared validators eliminate duplicate regex checks on the login and register screens and reduce repeated network retries triggered by malformed input.
+- **UX & Communications:** Validator-driven helper copy keeps warnings under 90 characters (“Enter the email you use with Edulure.”, “Security codes are six digits.”) and both login/register screens present the same tone, safe-area spacing, and MFA hints. Two-factor prompts surface delivered-state hints so users understand whether to expect a new code.
+- **Change Management:** Ship behind existing feature flags, confirm `SessionManager.init()` opens the `auth_audit` Hive box, run widget/unit coverage for validators and passkey happy/negative paths once Dart tooling is installed, and document release steps that coordinate backend credential issuance plus updated App Store copy.
 
 ### A27. Flutter Community Feed & Engagement (3.B)
-- **Operational Depth:** Feed modules leverage paginated APIs, websocket streams, and caching to present community content.
-- **Gaps & Risks:** Presence indicators built separately from web; consolidate logic. Event RSVP placeholders remain unimplemented.
-- **Resilience & Efficiency:** Implement background fetch for notifications, optimise list rendering, and compress image assets.
-- **UX & Communications:** Match badge theming to design tokens, provide offline indicators, and ensure chat copy consistent.
-- **Change Management:** Run end-to-end tests with backend staging, monitor crash analytics, and coordinate push notification updates.
+- **Operational Depth:** `LiveFeedController.bootstrap` hydrates cached payloads from `CommunityEngagementStorage` before calling `LiveFeedService.fetchFeed`, while pagination, optimistic updates, moderation actions, and placement lookups reuse the controller’s `_dedupeEntries` and `_cacheSnapshot` helpers. DTOs in `live_feed_service.dart` (`FeedSnapshot`, `FeedEntry`, `CommunityPost`, `FeedAd`, analytics/highlight models) expose `toJson` methods so snapshots can be serialised back into Hive without losing structure.
+- **Gaps & Risks:** Cached feed payloads never expire and websocket hydration remains TODO, so users may retain stale placements until manual refresh. Presence indicators and map tabs still rely on separate implementations and will need consolidation once real-time channels land.
+- **Resilience & Efficiency:** Feed cache keys namespace entries with the `feed::` prefix, dedupe posts/ads across refreshes and pagination, and trim optimistic merges against existing state. Placements fall back to ads summaries when the placement API is empty, preventing gaps while avoiding redundant network traffic on relaunch.
+- **UX & Communications:** Highlights render in consistent order whether loaded live or from cache, badge theming and ad copy reuse identical DTOs, and cached timestamps (`lastSyncedAt`) let clients show friendly “Updated x minutes ago” messaging even offline.
+- **Change Management:** QA must verify offline hydration, pagination dedupe, moderation flows updating cached snapshots, and Hive initialisation for `community_engagement`. Follow-up work includes wiring websocket hydration, defining TTL/eviction policies, and capturing release runbooks that explain how to purge stale caches during support escalations.
 
 ### A28. Flutter Lessons, Assessments & Offline Learning (3.C)
 - **Operational Depth:** Lesson downloads, assessment execution, and progress syncing operate with background isolates to preserve responsiveness.

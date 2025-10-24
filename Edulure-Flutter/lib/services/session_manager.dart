@@ -22,6 +22,8 @@ class SessionManager {
   static const _billingOutboxBox = 'billing_outbox';
   static const _communicationOutboxBox = 'communication_outbox';
   static const _communicationMetadataBox = 'communication_metadata';
+  static const _authAuditBox = 'auth_audit';
+  static const int _authAuditRetention = 50;
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
   static const _secureAccessTokenKey = 'session.accessToken';
@@ -51,6 +53,7 @@ class SessionManager {
     await _openBox(_billingOutboxBox, optional: true);
     await _openBox(_communicationOutboxBox, optional: true);
     await _openBox(_communicationMetadataBox, optional: true);
+    await _openBox(_authAuditBox, optional: true);
     _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
     _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
   }
@@ -75,6 +78,7 @@ class SessionManager {
   static Box get billingOutbox => Hive.box(_billingOutboxBox);
   static Box get communicationOutbox => Hive.box(_communicationOutboxBox);
   static Box get communicationMetadata => Hive.box(_communicationMetadataBox);
+  static Box? get _authAudit => Hive.isBoxOpen(_authAuditBox) ? Hive.box(_authAuditBox) : null;
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     final sanitized = Map<String, dynamic>.from(session);
@@ -170,6 +174,7 @@ class SessionManager {
     await _clearIfAvailable(_billingOutboxBox);
     await _clearIfAvailable(_communicationOutboxBox);
     await _clearIfAvailable(_communicationMetadataBox);
+    await _clearIfAvailable(_authAuditBox);
     await SecureStorageService.instance.deleteAll(
       keys: const {
         _secureAccessTokenKey,
@@ -209,6 +214,62 @@ class SessionManager {
     }
   }
 
+  static Future<void> appendAuthEvent(AuthAuditEvent event) async {
+    if (_disabledCaches.contains(_authAuditBox)) {
+      return;
+    }
+    Box<dynamic> box;
+    if (Hive.isBoxOpen(_authAuditBox)) {
+      box = Hive.box<dynamic>(_authAuditBox);
+    } else {
+      try {
+        box = await Hive.openBox<dynamic>(_authAuditBox);
+      } catch (error, stackTrace) {
+        debugPrint('Auth audit trail unavailable: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        _disabledCaches.add(_authAuditBox);
+        return;
+      }
+    }
+
+    try {
+      await box.add(event.toJson());
+      if (box.length > _authAuditRetention) {
+        final overflow = box.length - _authAuditRetention;
+        final keys = box.keys.take(overflow).toList();
+        await box.deleteAll(keys);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Failed to append auth audit event: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  static List<AuthAuditEvent> recentAuthEvents({int limit = 20}) {
+    final box = _authAudit;
+    if (box == null || box.isEmpty) {
+      return const <AuthAuditEvent>[];
+    }
+    final events = <AuthAuditEvent>[];
+    for (final entry in box.values) {
+      if (entry is Map<String, dynamic>) {
+        events.add(AuthAuditEvent.fromJson(entry));
+      } else if (entry is Map) {
+        events.add(AuthAuditEvent.fromJson(Map<String, dynamic>.from(entry as Map)));
+      }
+    }
+    events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    if (events.length <= limit) {
+      return events;
+    }
+    return events.sublist(0, limit);
+  }
+
+  static ValueListenable<Box<dynamic>>? authAuditListenable() {
+    final box = _authAudit;
+    return box?.listenable();
+  }
+
   static Future<void> _openBox(String name, {bool optional = false}) async {
     try {
       await Hive.openBox(name);
@@ -226,5 +287,41 @@ class SessionManager {
     if (Hive.isBoxOpen(name)) {
       await Hive.box(name).clear();
     }
+  }
+}
+
+class AuthAuditEvent {
+  const AuthAuditEvent({
+    required this.type,
+    required this.status,
+    required this.timestamp,
+    this.metadata = const <String, dynamic>{},
+  });
+
+  final String type;
+  final String status;
+  final DateTime timestamp;
+  final Map<String, dynamic> metadata;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'type': type,
+      'status': status,
+      'timestamp': timestamp.toIso8601String(),
+      if (metadata.isNotEmpty) 'metadata': metadata,
+    };
+  }
+
+  factory AuthAuditEvent.fromJson(Map<String, dynamic> json) {
+    return AuthAuditEvent(
+      type: json['type']?.toString() ?? 'event',
+      status: json['status']?.toString() ?? 'unknown',
+      timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ?? DateTime.now(),
+      metadata: json['metadata'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(json['metadata'] as Map<String, dynamic>)
+          : json['metadata'] is Map
+              ? Map<String, dynamic>.from(json['metadata'] as Map)
+              : const <String, dynamic>{},
+    );
   }
 }

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/community_service.dart';
 import '../../services/live_feed_service.dart';
+import '../../services/community_engagement_storage.dart';
 
 final liveFeedServiceProvider = Provider<LiveFeedService>((ref) {
   return LiveFeedService();
@@ -13,10 +16,15 @@ final communityServiceProvider = Provider<CommunityService>((ref) {
   return CommunityService();
 });
 
+final communityEngagementStorageProvider = Provider<CommunityEngagementStorage>((ref) {
+  return CommunityEngagementStorage();
+});
+
 final liveFeedControllerProvider = StateNotifierProvider<LiveFeedController, LiveFeedState>((ref) {
   return LiveFeedController(
     feedService: ref.watch(liveFeedServiceProvider),
     communityService: ref.watch(communityServiceProvider),
+    engagementStorage: ref.watch(communityEngagementStorageProvider),
   );
 });
 
@@ -111,35 +119,62 @@ class LiveFeedFilters {
       range: range ?? this.range,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (search != null) 'search': search,
+      if (postType != null) 'postType': postType,
+      'range': range,
+    };
+  }
 }
 
 class LiveFeedController extends StateNotifier<LiveFeedState> {
-  LiveFeedController({required LiveFeedService feedService, required CommunityService communityService})
-      : _feedService = feedService,
+  LiveFeedController({
+    required LiveFeedService feedService,
+    required CommunityService communityService,
+    required CommunityEngagementStorage engagementStorage,
+  })  : _feedService = feedService,
         _communityService = communityService,
+        _engagementStorage = engagementStorage,
         super(const LiveFeedState(context: FeedContext.global));
 
   final LiveFeedService _feedService;
   final CommunityService _communityService;
+  final CommunityEngagementStorage _engagementStorage;
 
   Future<void> bootstrap({FeedContext? context, CommunitySummary? community}) async {
+    final nextContext = context ?? state.context;
+    final resolvedCommunity = nextContext == FeedContext.community ? community ?? state.community : null;
+    await _hydrateFromCache(nextContext, resolvedCommunity, state.filters);
     await refresh(
-      context: context ?? state.context,
-      community: community ?? state.community,
+      context: nextContext,
+      community: resolvedCommunity,
+      hydrateFromCache: false,
     );
   }
 
-  Future<void> refresh({FeedContext? context, CommunitySummary? community, LiveFeedFilters? filters}) async {
+  Future<void> refresh({
+    FeedContext? context,
+    CommunitySummary? community,
+    LiveFeedFilters? filters,
+    bool hydrateFromCache = true,
+  }) async {
     final nextContext = context ?? state.context;
     final resolvedCommunity = nextContext == FeedContext.community ? community ?? state.community : null;
+    final effectiveFilters = filters ?? state.filters;
     state = state.copyWith(
       context: nextContext,
       community: resolvedCommunity,
-      filters: filters ?? state.filters,
+      filters: effectiveFilters,
       loading: true,
       page: 1,
       clearError: true,
     );
+
+    if (hydrateFromCache) {
+      await _hydrateFromCache(nextContext, resolvedCommunity, effectiveFilters);
+    }
 
     try {
       final snapshot = await _feedService.fetchFeed(
@@ -147,25 +182,34 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
         community: resolvedCommunity?.id,
         page: 1,
         perPage: state.perPage,
-        range: state.filters.range,
-        search: state.filters.search,
-        postType: state.filters.postType,
+        range: effectiveFilters.range,
+        search: effectiveFilters.search,
+        postType: effectiveFilters.postType,
       );
-      final placements = await _resolvePlacements(snapshot);
+      final dedupedItems = _dedupeEntries(snapshot.items);
+      final normalizedSnapshot = snapshot.copyWith(items: dedupedItems);
+      final placements = await _resolvePlacements(normalizedSnapshot);
       state = state.copyWith(
         loading: false,
-        snapshot: snapshot,
-        entries: snapshot.items,
-        page: snapshot.pagination.page,
-        perPage: snapshot.pagination.perPage,
-        canLoadMore: snapshot.pagination.hasMore,
-        highlights: snapshot.highlights,
-        analytics: snapshot.analytics,
+        snapshot: normalizedSnapshot,
+        entries: dedupedItems,
+        page: normalizedSnapshot.pagination.page,
+        perPage: normalizedSnapshot.pagination.perPage,
+        canLoadMore: normalizedSnapshot.pagination.hasMore,
+        highlights: normalizedSnapshot.highlights,
+        analytics: normalizedSnapshot.analytics,
         placements: placements,
         lastSyncedAt: DateTime.now(),
         clearError: true,
       );
-      if (snapshot.analytics == null) {
+      unawaited(_cacheSnapshot(
+        normalizedSnapshot,
+        placements,
+        nextContext,
+        resolvedCommunity,
+        effectiveFilters,
+      ));
+      if (normalizedSnapshot.analytics == null) {
         await reloadAnalytics();
       }
     } catch (error, stackTrace) {
@@ -214,19 +258,27 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
         search: state.filters.search,
         postType: state.filters.postType,
       );
-      final combined = <FeedEntry>[...state.entries, ...snapshot.items];
+      final combined = _dedupeEntries(<FeedEntry>[...state.entries, ...snapshot.items]);
+      final normalizedSnapshot = (state.snapshot ?? snapshot).copyWith(
+        pagination: snapshot.pagination,
+        items: combined,
+        analytics: state.analytics,
+        highlights: state.highlights,
+      );
       state = state.copyWith(
         entries: combined,
         page: snapshot.pagination.page,
         canLoadMore: snapshot.pagination.hasMore,
         loadingMore: false,
-        snapshot: state.snapshot?.copyWith(
-          pagination: snapshot.pagination,
-          items: combined,
-          highlights: state.highlights,
-          analytics: state.analytics,
-        ),
+        snapshot: normalizedSnapshot,
       );
+      unawaited(_cacheSnapshot(
+        normalizedSnapshot,
+        state.placements,
+        state.context,
+        state.community,
+        state.filters,
+      ));
     } catch (error, stackTrace) {
       debugPrint('Failed to load more feed entries: $error\n$stackTrace');
       state = state.copyWith(
@@ -258,6 +310,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
     if (state.context == FeedContext.community && state.community?.id != community.id) {
       await selectContext(FeedContext.community, community: community);
     }
+    _persistCache();
     return post;
   }
 
@@ -307,6 +360,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
       snapshot: state.snapshot?.copyWith(items: updatedEntries),
       lastSyncedAt: DateTime.now(),
     );
+    _persistCache();
   }
 
   void _removePost({required String postId}) {
@@ -316,6 +370,7 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
       snapshot: state.snapshot?.copyWith(items: filtered),
       lastSyncedAt: DateTime.now(),
     );
+    _persistCache();
   }
 
   Future<List<FeedPlacement>> _resolvePlacements(FeedSnapshot snapshot) async {
@@ -368,5 +423,168 @@ class LiveFeedController extends StateNotifier<LiveFeedState> {
       return error.message ?? 'Network error';
     }
     return error.toString();
+  }
+
+  Future<void> _hydrateFromCache(
+    FeedContext context,
+    CommunitySummary? community,
+    LiveFeedFilters filters,
+  ) async {
+    final cacheKey = _cacheKey(context, community, filters);
+    try {
+      final cached = await _engagementStorage.readFeedSnapshot(cacheKey);
+      if (cached == null) {
+        return;
+      }
+      final snapshotJson = cached['snapshot'];
+      if (snapshotJson is! Map) {
+        return;
+      }
+      final snapshot = FeedSnapshot.fromJson(Map<String, dynamic>.from(snapshotJson as Map));
+      final dedupedItems = _dedupeEntries(snapshot.items);
+      final normalizedSnapshot = snapshot.copyWith(items: dedupedItems);
+      final placements = _parseCachedPlacements(cached['placements']);
+      final cachedSyncedAt = cached['lastSyncedAt'] is String
+          ? DateTime.tryParse(cached['lastSyncedAt'] as String)
+          : null;
+      state = state.copyWith(
+        snapshot: normalizedSnapshot,
+        entries: dedupedItems,
+        page: normalizedSnapshot.pagination.page,
+        perPage: normalizedSnapshot.pagination.perPage,
+        canLoadMore: normalizedSnapshot.pagination.hasMore,
+        highlights: normalizedSnapshot.highlights,
+        analytics: normalizedSnapshot.analytics ?? state.analytics,
+        placements: placements.isNotEmpty ? placements : state.placements,
+        lastSyncedAt: cachedSyncedAt ?? state.lastSyncedAt,
+        clearError: true,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Failed to hydrate feed cache: $error\n$stackTrace');
+    }
+  }
+
+  Future<void> _cacheSnapshot(
+    FeedSnapshot snapshot,
+    List<FeedPlacement> placements,
+    FeedContext context,
+    CommunitySummary? community,
+    LiveFeedFilters filters,
+  ) async {
+    final payload = <String, dynamic>{
+      'snapshot': snapshot.toJson(),
+      'lastSyncedAt': DateTime.now().toIso8601String(),
+      'filters': filters.toJson(),
+      if (placements.isNotEmpty) 'placements': placements.map((placement) => placement.toJson()).toList(),
+    };
+    final cacheKey = _cacheKey(context, community, filters);
+    try {
+      await _engagementStorage.writeFeedSnapshot(cacheKey, payload);
+    } catch (error, stackTrace) {
+      debugPrint('Failed to cache feed snapshot: $error\n$stackTrace');
+    }
+  }
+
+  List<FeedPlacement> _parseCachedPlacements(dynamic raw) {
+    if (raw is! List) {
+      return const <FeedPlacement>[];
+    }
+    final placements = <FeedPlacement>[];
+    for (final entry in raw) {
+      if (entry is Map<String, dynamic>) {
+        placements.add(FeedPlacement.fromJson(entry));
+      } else if (entry is Map) {
+        placements.add(FeedPlacement.fromJson(Map<String, dynamic>.from(entry as Map)));
+      }
+    }
+    return placements;
+  }
+
+  List<FeedEntry> _dedupeEntries(List<FeedEntry> entries) {
+    final result = <FeedEntry>[];
+    final postIndex = <String, int>{};
+    final adIndex = <String, int>{};
+
+    for (final entry in entries) {
+      if (entry.kind == FeedEntryKind.post) {
+        final normalized = _normalizePostEntry(entry);
+        final postId = normalized.post?.id;
+        if (postId == null || postId.isEmpty) {
+          result.add(normalized);
+          continue;
+        }
+        final existingIndex = postIndex[postId];
+        if (existingIndex != null) {
+          result[existingIndex] = normalized;
+        } else {
+          postIndex[postId] = result.length;
+          result.add(normalized);
+        }
+      } else if (entry.kind == FeedEntryKind.ad) {
+        final key = _adCacheKey(entry.ad);
+        if (key == null) {
+          result.add(entry);
+          continue;
+        }
+        final existingIndex = adIndex[key];
+        if (existingIndex != null) {
+          result[existingIndex] = entry;
+        } else {
+          adIndex[key] = result.length;
+          result.add(entry);
+        }
+      } else {
+        result.add(entry);
+      }
+    }
+    return result;
+  }
+
+  FeedEntry _normalizePostEntry(FeedEntry entry) {
+    final postId = entry.post?.id;
+    if (postId == null || postId.isEmpty) {
+      return entry;
+    }
+    final existing = _findExistingPostEntry(postId);
+    if (existing == null) {
+      return entry;
+    }
+    if (identical(existing.post, entry.post)) {
+      return existing;
+    }
+    return existing.copyWith(post: entry.post);
+  }
+
+  FeedEntry? _findExistingPostEntry(String postId) {
+    for (final entry in state.entries) {
+      if (entry.kind == FeedEntryKind.post && entry.post?.id == postId) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  String? _adCacheKey(FeedAd? ad) {
+    if (ad == null) {
+      return null;
+    }
+    return '${ad.placementId}:${ad.campaignId}:${ad.slot}';
+  }
+
+  String _cacheKey(FeedContext context, CommunitySummary? community, LiveFeedFilters filters) {
+    final contextKey = describeEnum(context);
+    final communityKey = context == FeedContext.community ? (community?.id ?? 'none') : 'global';
+    final searchKey = (filters.search ?? '').trim().toLowerCase();
+    final postTypeKey = (filters.postType ?? '').trim().toLowerCase();
+    final rangeKey = filters.range.trim().toLowerCase();
+    return '$contextKey::$communityKey::$rangeKey::$searchKey::$postTypeKey';
+  }
+
+  void _persistCache() {
+    final snapshot = state.snapshot;
+    if (snapshot == null) {
+      return;
+    }
+    unawaited(_cacheSnapshot(snapshot, state.placements, state.context, state.community, state.filters));
   }
 }

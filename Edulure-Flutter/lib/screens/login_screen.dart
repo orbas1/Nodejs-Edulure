@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
+import '../core/validation/auth_validators.dart';
 import '../services/auth_service.dart';
 import '../services/session_manager.dart';
 
@@ -26,6 +27,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _showTwoFactorField = false;
 
   static const _otpTtlMinutes = 5;
+
+  String? _validateInputs() {
+    final emailError = AuthFieldValidators.validateEmail(_emailController.text);
+    if (emailError != null) {
+      return emailError;
+    }
+    final passwordError = AuthFieldValidators.validateExistingPassword(_passwordController.text);
+    if (passwordError != null) {
+      return passwordError;
+    }
+    if (_showTwoFactorField || _twoFactorRequired) {
+      final otpError = AuthFieldValidators.validateOtp(
+        _twoFactorController.text,
+        optional: !_twoFactorRequired,
+      );
+      if (otpError != null) {
+        return otpError;
+      }
+    }
+    return null;
+  }
 
   String _resolveErrorMessage(Object error) {
     if (error is DioException) {
@@ -49,6 +71,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    final validationError = _validateInputs();
+    if (validationError != null) {
+      setState(() {
+        _error = validationError;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
