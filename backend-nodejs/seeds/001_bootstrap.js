@@ -2807,6 +2807,18 @@ export async function seed(knex) {
       badge: 'Automation Masterclass',
       colors: ['#4338ca', '#6366f1']
     });
+    const analyticsCourseArtwork = await ensureSeedImage('course-analytics-accelerator', {
+      title: 'Data Storytelling Accelerator',
+      subtitle: 'Transform dashboards into executive narratives',
+      badge: 'Analytics studio',
+      colors: ['#22d3ee', '#0ea5e9']
+    });
+    const communityCourseArtwork = await ensureSeedImage('course-community-builder', {
+      title: 'Community Builder Bootcamp',
+      subtitle: 'Design thriving member programming',
+      badge: 'Community playbook',
+      colors: ['#f97316', '#fb923c']
+    });
 
     const [opsAutomationCourseId] = await trx('courses').insert({
       public_id: crypto.randomUUID(),
@@ -2991,6 +3003,111 @@ export async function seed(knex) {
       })
     });
 
+    const [analyticsStoryCourseId] = await trx('courses').insert({
+      public_id: crypto.randomUUID(),
+      instructor_id: instructorId,
+      title: 'Data Storytelling Accelerator',
+      slug: 'data-storytelling-accelerator',
+      summary: 'Build narrative-driven dashboards and executive-ready insight briefings.',
+      description:
+        'A six-week accelerator that coaches revenue and product analysts to package telemetry into concise stories. Learners practice narrative arcs, design punchy visuals, and rehearse stakeholder readouts across async and live channels.',
+      level: 'intermediate',
+      category: 'analytics',
+      skills: JSON.stringify(['data storytelling', 'visualisation', 'executive communication']),
+      tags: JSON.stringify(['Analytics', 'Narrative', 'Insights']),
+      languages: JSON.stringify(['en', 'fr']),
+      delivery_format: 'self_paced',
+      thumbnail_url: analyticsCourseArtwork.url,
+      hero_image_url: analyticsCourseArtwork.url,
+      price_currency: 'USD',
+      price_amount: 89000,
+      rating_average: 4.6,
+      rating_count: 142,
+      enrolment_count: 512,
+      is_published: true,
+      release_at: trx.fn.now(),
+      status: 'published',
+      metadata: JSON.stringify({
+        defaultCategory: 'analytics',
+        defaultLevel: 'intermediate',
+        defaultDeliveryFormat: 'self_paced',
+        highlights: [
+          'Executive-ready narrative frameworks',
+          'Template gallery for dashboards and briefs',
+          'Peer review loops with async critique'
+        ],
+        catalogueListings: [
+          {
+            id: 'marketplace-analytics',
+            channel: 'Marketplace',
+            status: 'Published',
+            impressions: 12894,
+            conversions: 214,
+            conversionRate: 0.166,
+            price: 89000,
+            currency: 'USD',
+            lastSyncedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ],
+        upsellCatalogItems: ['growth-insiders-annual'],
+        personaNotes: {
+          primary: 'Analytics managers',
+          secondary: 'RevOps analysts'
+        }
+      })
+    });
+
+    const [communityBuilderCourseId] = await trx('courses').insert({
+      public_id: crypto.randomUUID(),
+      instructor_id: instructorId,
+      title: 'Community Builder Bootcamp',
+      slug: 'community-builder-bootcamp',
+      summary: 'Live cohort mastering programming cadences and member journeys.',
+      description:
+        'Operators learn to design programming roadmaps, facilitate flagship events, and align monetisation tracks while keeping moderation and member health front-and-centre. The bootcamp mixes live studios with async drills.',
+      level: 'beginner',
+      category: 'community',
+      skills: JSON.stringify(['community strategy', 'programming design', 'member engagement']),
+      tags: JSON.stringify(['Community', 'Programming', 'Engagement']),
+      languages: JSON.stringify(['en', 'es']),
+      delivery_format: 'live',
+      thumbnail_url: communityCourseArtwork.url,
+      hero_image_url: communityCourseArtwork.url,
+      price_currency: 'USD',
+      price_amount: 74000,
+      rating_average: 4.7,
+      rating_count: 98,
+      enrolment_count: 286,
+      is_published: true,
+      release_at: trx.fn.now(),
+      status: 'published',
+      metadata: JSON.stringify({
+        defaultCategory: 'community',
+        defaultLevel: 'beginner',
+        defaultDeliveryFormat: 'live',
+        highlights: [
+          'Weekly live design studios',
+          'Programming cadence templates',
+          'Member health instrumentation checklists'
+        ],
+        catalogueListings: [
+          {
+            id: 'community-pro',
+            channel: 'Enterprise network',
+            status: 'Pilot',
+            impressions: 6400,
+            conversions: 76,
+            conversionRate: 0.118,
+            price: 74000,
+            currency: 'USD',
+            lastSyncedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ],
+        upsellCatalogItems: ['ops-masterclass-community-bundle'],
+        programmingTracks: ['Welcome journeys', 'Flagship events', 'Member success rituals']
+      })
+    });
+
     const [opsModuleKickoffId] = await trx('course_modules').insert({
       course_id: opsAutomationCourseId,
       title: 'Launch Command Center',
@@ -3120,6 +3237,119 @@ export async function seed(knex) {
         metadata: JSON.stringify({ lastLocation: 'section-2', note: 'Review telemetry thresholds' })
       }
     ]);
+
+    const [analyticsStoryModuleId] = await trx('course_modules').insert({
+      course_id: analyticsStoryCourseId,
+      title: 'Narrative Foundations',
+      slug: 'narrative-foundations',
+      position: 1,
+      release_offset_days: 0,
+      metadata: JSON.stringify({
+        templatePack: 'executive-briefs',
+        recommendedDurationMinutes: 45,
+        reviewChecklist: ['Narrative arc', 'Audience framing', 'Call-to-action']
+      })
+    });
+
+    const [analyticsStoryLessonId] = await trx('course_lessons').insert({
+      course_id: analyticsStoryCourseId,
+      module_id: analyticsStoryModuleId,
+      asset_id: growthPlaybookEbookAssetId,
+      title: 'Storyboarding Executive Readouts',
+      slug: 'storyboarding-executive-readouts',
+      position: 1,
+      duration_minutes: 35,
+      release_at: trx.fn.now(),
+      metadata: JSON.stringify({
+        format: 'workshop',
+        worksheet: 'storyboard-template',
+        thumbnailUrl: 'https://cdn.edulure.test/lessons/storyboarding-executive-readouts.jpg',
+        resources: [
+          {
+            label: 'Executive narrative storyboard',
+            href: 'https://cdn.edulure.test/resources/executive-narrative-storyboard.pdf'
+          }
+        ]
+      })
+    });
+
+    const [analyticsEnrollmentId] = await trx('course_enrollments').insert({
+      public_id: crypto.randomUUID(),
+      course_id: analyticsStoryCourseId,
+      user_id: learnerId,
+      status: 'active',
+      progress_percent: 32.5,
+      started_at: trx.fn.now(),
+      metadata: JSON.stringify({ cohort: '2025-Q1', enrollmentSource: 'seed' })
+    });
+
+    await trx('course_progress').insert({
+      enrollment_id: analyticsEnrollmentId,
+      lesson_id: analyticsStoryLessonId,
+      completed: false,
+      progress_percent: 50,
+      metadata: JSON.stringify({
+        lastLocation: 'section-3',
+        note: 'Tighten stakeholder framing',
+        reviewer: 'Analytics mentor'
+      })
+    });
+
+    const [communityProgrammingModuleId] = await trx('course_modules').insert({
+      course_id: communityBuilderCourseId,
+      title: 'Programming Blueprint Studio',
+      slug: 'programming-blueprint-studio',
+      position: 1,
+      release_offset_days: 0,
+      metadata: JSON.stringify({
+        includesLiveLab: true,
+        facilitator: 'Community Ops Guild',
+        labResources: ['Cadence canvas', 'Member signal tracker']
+      })
+    });
+
+    const [communityProgrammingLessonId] = await trx('course_lessons').insert({
+      course_id: communityBuilderCourseId,
+      module_id: communityProgrammingModuleId,
+      asset_id: opsPlaybookAssetId,
+      title: 'Designing Signature Programming',
+      slug: 'designing-signature-programming',
+      position: 1,
+      duration_minutes: 55,
+      release_at: trx.fn.now(),
+      metadata: JSON.stringify({
+        format: 'live-studio',
+        sessionCode: 'CB-INTRO-LIVE',
+        thumbnailUrl: 'https://cdn.edulure.test/lessons/designing-signature-programming.jpg',
+        resources: [
+          {
+            label: 'Programming cadence canvas',
+            href: 'https://cdn.edulure.test/resources/programming-cadence-canvas.pdf'
+          }
+        ]
+      })
+    });
+
+    const [communityEnrollmentId] = await trx('course_enrollments').insert({
+      public_id: crypto.randomUUID(),
+      course_id: communityBuilderCourseId,
+      user_id: learnerId,
+      status: 'active',
+      progress_percent: 18.75,
+      started_at: trx.fn.now(),
+      metadata: JSON.stringify({ cohort: '2025-Spring', enrollmentSource: 'seed' })
+    });
+
+    await trx('course_progress').insert({
+      enrollment_id: communityEnrollmentId,
+      lesson_id: communityProgrammingLessonId,
+      completed: false,
+      progress_percent: 20,
+      metadata: JSON.stringify({
+        lastLocation: 'segment-1',
+        participation: 'Live session RSVP confirmed'
+      })
+    });
 
     const automationGoalDueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     await trx('learner_course_goals').insert({

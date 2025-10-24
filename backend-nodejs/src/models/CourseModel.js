@@ -140,6 +140,45 @@ function toSortedCountList(map, { limit } = {}) {
   return sliced.map(([value, count]) => ({ value, count }));
 }
 
+export function buildCatalogueFilterSnapshot(rows, { tagLimit = 60 } = {}) {
+  const categoryCounts = new Map();
+  const levelCounts = new Map();
+  const languageCounts = new Map();
+  const deliveryCounts = new Map();
+  const tagCounts = new Map();
+  const skillCounts = new Map();
+
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const metadata = parseJson(row?.metadata, {});
+    const defaultCategory = metadata.defaultCategory ?? metadata.category ?? null;
+    const defaultLevel = metadata.defaultLevel ?? metadata.level ?? null;
+    const defaultDelivery = metadata.defaultDeliveryFormat ?? metadata.deliveryFormat ?? null;
+
+    incrementCount(categoryCounts, row?.category ?? defaultCategory);
+    incrementCount(levelCounts, row?.level ?? defaultLevel);
+    incrementCount(deliveryCounts, row?.deliveryFormat ?? defaultDelivery);
+
+    incrementFromArray(languageCounts, parseStringArray(row?.languages));
+    incrementFromArray(tagCounts, parseStringArray(row?.tags));
+    incrementFromArray(skillCounts, parseStringArray(row?.skills));
+  });
+
+  const now = new Date();
+
+  return {
+    generatedAt: now.toISOString(),
+    totals: {
+      coursesEvaluated: Array.isArray(rows) ? rows.length : 0
+    },
+    categories: toSortedCountList(categoryCounts),
+    levels: toSortedCountList(levelCounts),
+    deliveryFormats: toSortedCountList(deliveryCounts),
+    languages: toSortedCountList(languageCounts),
+    tags: toSortedCountList(tagCounts, { limit: tagLimit }),
+    skills: toSortedCountList(skillCounts, { limit: tagLimit })
+  };
+}
+
 export default class CourseModel {
   static normaliseSlug(value, fallback) {
     const base = value || fallback;
@@ -262,6 +301,7 @@ export default class CourseModel {
       'level',
       'languages',
       'tags',
+      'skills',
       'delivery_format as deliveryFormat',
       'metadata'
     );
@@ -271,34 +311,7 @@ export default class CourseModel {
     }
 
     const rows = await query;
-    const categoryCounts = new Map();
-    const levelCounts = new Map();
-    const languageCounts = new Map();
-    const deliveryCounts = new Map();
-    const tagCounts = new Map();
-
-    rows.forEach((row) => {
-      incrementCount(categoryCounts, row.category ?? parseJson(row.metadata, {}).defaultCategory);
-      incrementCount(levelCounts, row.level ?? parseJson(row.metadata, {}).defaultLevel);
-      incrementCount(deliveryCounts, row.deliveryFormat);
-
-      incrementFromArray(languageCounts, parseStringArray(row.languages));
-      incrementFromArray(tagCounts, parseStringArray(row.tags));
-    });
-
-    const now = new Date();
-
-    return {
-      generatedAt: now.toISOString(),
-      totals: {
-        coursesEvaluated: rows.length
-      },
-      categories: toSortedCountList(categoryCounts),
-      levels: toSortedCountList(levelCounts),
-      languages: toSortedCountList(languageCounts),
-      deliveryFormats: toSortedCountList(deliveryCounts),
-      tags: toSortedCountList(tagCounts, { limit: tagLimit })
-    };
+    return buildCatalogueFilterSnapshot(rows, { tagLimit });
   }
 
   static async create(course, connection = db) {
