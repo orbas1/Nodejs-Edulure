@@ -282,7 +282,13 @@ export default class CreationStudioController {
         stripUnknown: true
       });
       const actor = { id: req.user.id, role: req.user.role };
-      const project = await CreationStudioService.updateProject(req.params.projectId, actor, payload);
+      const expectedUpdatedAt = req.headers['if-unmodified-since'] ?? req.headers['x-creation-updated-at'] ?? null;
+      const project = await CreationStudioService.updateProject(
+        req.params.projectId,
+        actor,
+        payload,
+        { expectedUpdatedAt }
+      );
       return success(res, {
         data: project,
         message: 'Project updated'

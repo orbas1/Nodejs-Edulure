@@ -10,6 +10,7 @@ import ContentAuditLogModel from '../models/ContentAuditLogModel.js';
 import EbookProgressModel from '../models/EbookProgressModel.js';
 import antivirusService from './AntivirusService.js';
 import storageService from './StorageService.js';
+import { mergeAssetMetadata, withAntivirusMetadata, withIngestionStage } from '../utils/assetMetadataSerializer.js';
 
 const DRM_SIGNATURE_SECRET = env.security.drmSignatureSecret;
 
@@ -193,20 +194,18 @@ export default class AssetService {
 
         await storageService.deleteObject({ bucket: asset.storageBucket, key: asset.storageKey });
 
-        const quarantinedMetadata = {
-          ...(asset.metadata ?? {}),
-          ingestion: {
-            stage: 'quarantined',
+        const quarantinedMetadata = withAntivirusMetadata(
+          withIngestionStage(asset.metadata, 'quarantined', {
             quarantinedAt: new Date().toISOString()
-          },
-          antivirus: {
+          }),
+          {
             ...antivirusMetadata,
             quarantineLocation: {
               bucket: quarantinedBucket,
               key: quarantinedKey
             }
           }
-        };
+        );
 
         await ContentAssetModel.patchById(
           asset.id,
@@ -265,6 +264,15 @@ export default class AssetService {
 
       await storageService.deleteObject({ bucket: asset.storageBucket, key: asset.storageKey });
 
+      const baseMetadata = mergeAssetMetadata(asset.metadata, {
+        uploadConfirmedAt: new Date().toISOString(),
+        custom: metadata ?? {}
+      });
+      const metadataWithIngestion = withIngestionStage(baseMetadata, 'queued', {
+        queuedAt: new Date().toISOString()
+      });
+      const finalMetadata = withAntivirusMetadata(metadataWithIngestion, antivirusMetadata);
+
       const updatedAsset = await ContentAssetModel.patchById(
         asset.id,
         {
@@ -272,16 +280,7 @@ export default class AssetService {
           storageBucket: destinationBucket,
           storageKey: destinationKey,
           checksum: checksum ?? asset.checksum,
-          metadata: {
-            ...(asset.metadata ?? {}),
-            uploadConfirmedAt: new Date().toISOString(),
-            ingestion: {
-              stage: 'queued',
-              queuedAt: new Date().toISOString()
-            },
-            antivirus: antivirusMetadata,
-            custom: metadata ?? {}
-          }
+          metadata: finalMetadata
         },
         trx
       );

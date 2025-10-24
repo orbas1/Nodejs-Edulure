@@ -82,28 +82,39 @@ export default class CreationProjectModel {
   }
 
   static async updateById(id, updates, connection = db) {
+    const { expectedUpdatedAt, ...changes } = updates ?? {};
     const payload = {};
-    if (updates.title !== undefined) payload.title = updates.title;
-    if (updates.summary !== undefined) payload.summary = updates.summary;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.type !== undefined) payload.type = updates.type;
-    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata);
-    if (updates.contentOutline !== undefined) payload.content_outline = JSON.stringify(updates.contentOutline);
-    if (updates.complianceNotes !== undefined) payload.compliance_notes = JSON.stringify(updates.complianceNotes);
-    if (updates.analyticsTargets !== undefined) payload.analytics_targets = JSON.stringify(updates.analyticsTargets);
-    if (updates.publishingChannels !== undefined) payload.publishing_channels = JSON.stringify(updates.publishingChannels);
-    if (updates.reviewRequestedAt !== undefined) payload.review_requested_at = updates.reviewRequestedAt;
-    if (updates.approvedAt !== undefined) payload.approved_at = updates.approvedAt;
-    if (updates.publishedAt !== undefined) payload.published_at = updates.publishedAt;
-    if (updates.archivedAt !== undefined) payload.archived_at = updates.archivedAt;
+    if (changes.title !== undefined) payload.title = changes.title;
+    if (changes.summary !== undefined) payload.summary = changes.summary;
+    if (changes.status !== undefined) payload.status = changes.status;
+    if (changes.type !== undefined) payload.type = changes.type;
+    if (changes.metadata !== undefined) payload.metadata = JSON.stringify(changes.metadata);
+    if (changes.contentOutline !== undefined) payload.content_outline = JSON.stringify(changes.contentOutline);
+    if (changes.complianceNotes !== undefined) payload.compliance_notes = JSON.stringify(changes.complianceNotes);
+    if (changes.analyticsTargets !== undefined) payload.analytics_targets = JSON.stringify(changes.analyticsTargets);
+    if (changes.publishingChannels !== undefined) payload.publishing_channels = JSON.stringify(changes.publishingChannels);
+    if (changes.reviewRequestedAt !== undefined) payload.review_requested_at = changes.reviewRequestedAt;
+    if (changes.approvedAt !== undefined) payload.approved_at = changes.approvedAt;
+    if (changes.publishedAt !== undefined) payload.published_at = changes.publishedAt;
+    if (changes.archivedAt !== undefined) payload.archived_at = changes.archivedAt;
 
     if (Object.keys(payload).length === 0) {
       return this.findById(id, connection);
     }
 
-    await connection(TABLE)
-      .where({ id })
-      .update({ ...payload, updated_at: connection.fn.now() });
+    const query = connection(TABLE).where({ id });
+    if (expectedUpdatedAt) {
+      query.andWhere('updated_at', expectedUpdatedAt);
+    }
+
+    const updated = await query.update({ ...payload, updated_at: connection.fn.now() });
+
+    if (expectedUpdatedAt && Number(updated) === 0) {
+      const error = new Error('Project was updated by another collaborator. Please refresh and try again.');
+      error.status = 409;
+      throw error;
+    }
+
     return this.findById(id, connection);
   }
 

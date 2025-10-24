@@ -406,7 +406,7 @@ export default class CreationStudioService {
     });
   }
 
-  static async updateProject(publicId, actor, updates) {
+  static async updateProject(publicId, actor, updates, options = {}) {
     ensureRole(actor, 'instructor');
     const project = await CreationProjectModel.findByPublicId(publicId);
     if (!project) {
@@ -441,6 +441,14 @@ export default class CreationStudioService {
       validateProjectType(updates.type);
     }
 
+    let expectedUpdatedAt;
+    if (options.expectedUpdatedAt) {
+      const parsed = new Date(options.expectedUpdatedAt);
+      if (!Number.isNaN(parsed.getTime())) {
+        expectedUpdatedAt = parsed.toISOString();
+      }
+    }
+
     return db.transaction(async (trx) => {
       const updated = await CreationProjectModel.updateById(
         project.id,
@@ -461,7 +469,8 @@ export default class CreationStudioService {
             nextStatus === 'approved' && !project.approvedAt ? new Date().toISOString() : updates.approvedAt,
           publishedAt:
             nextStatus === 'published' && !project.publishedAt ? new Date().toISOString() : updates.publishedAt,
-          archivedAt: nextStatus === 'archived' ? new Date().toISOString() : updates.archivedAt
+          archivedAt: nextStatus === 'archived' ? new Date().toISOString() : updates.archivedAt,
+          expectedUpdatedAt
         },
         trx
       );

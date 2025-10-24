@@ -11,6 +11,7 @@ import ContentAssetModel from '../models/ContentAssetModel.js';
 import ContentAuditLogModel from '../models/ContentAuditLogModel.js';
 import storageService from './StorageService.js';
 import IntegrationProviderService from './IntegrationProviderService.js';
+import { mergeAssetMetadata, withIngestionStage } from '../utils/assetMetadataSerializer.js';
 
 const POLL_INTERVAL_MS = 15000;
 
@@ -165,19 +166,22 @@ class AssetIngestionService {
       }
     }
 
-    await ContentAssetModel.patchById(asset.id, {
-      metadata: {
-        ...(asset.metadata ?? {}),
+    const updatedMetadata = withIngestionStage(
+      mergeAssetMetadata(asset.metadata, {
         powerpoint: {
           pageCount: pdfTask.result.files.length,
           thumbnail: previewMetadata
-        },
-        ingestion: {
-          stage: 'completed',
-          completedAt: new Date().toISOString(),
-          jobId: job.id
         }
+      }),
+      'completed',
+      {
+        completedAt: new Date().toISOString(),
+        jobId: job.id
       }
+    );
+
+    await ContentAssetModel.patchById(asset.id, {
+      metadata: updatedMetadata
     });
 
     await ContentAuditLogModel.record({
@@ -285,22 +289,25 @@ class AssetIngestionService {
       }
     }
 
-    await ContentAssetModel.patchById(asset.id, {
-      metadata: {
-        ...(asset.metadata ?? {}),
+    const ebookMetadata = withIngestionStage(
+      mergeAssetMetadata(asset.metadata, {
         ebook: {
           title: metadata['dc:title'] ?? asset.originalFilename,
           author: metadata['dc:creator'] ?? null,
           language: metadata['dc:language'] ?? null,
           chapterCount: readingOrder.length,
           manifestKey
-        },
-        ingestion: {
-          stage: 'completed',
-          completedAt: new Date().toISOString(),
-          jobId: job.id
         }
+      }),
+      'completed',
+      {
+        completedAt: new Date().toISOString(),
+        jobId: job.id
       }
+    );
+
+    await ContentAssetModel.patchById(asset.id, {
+      metadata: ebookMetadata
     });
 
     await ContentAuditLogModel.record({

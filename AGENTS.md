@@ -58,8 +58,8 @@
    - Annex A: Expanded Analysis Narratives
       - A1. Identity, Sessions & Profile Security (1.A)
       - A2. Learner Onboarding, Dashboard & Feedback (1.B)
-      - A3. Courses, Catalogue & Creation Studio (1.C)
-      - A4. Community, Events & Programming (1.D)
+      - A3. Courses, Catalogue & Creation Studio (1.C) ✓
+      - A4. Community, Events & Programming (1.D) ✓
       - A5. Feed, Social Graph & Direct Messaging (1.E)
       - A6. Explorer, Search & Discovery (1.F)
       - A7. Commerce, Billing & Monetisation (1.G)
@@ -116,11 +116,11 @@
          - B1.A. Authentication & Session Flow (`backend-nodejs/src/controllers/auth`, `services/auth`, `middleware/sessionGuard.js`)
          - B1.B. Authorization & Role Management (`backend-nodejs/src/services/authorization`, `database/migrations/*roles*`)
       - B2. Backend Learning Delivery Cluster
-         - B2.A. Course Authoring & Lesson Orchestration (`backend-nodejs/src/controllers/lessons`, `services/lessons`, `models/Lesson.ts`)
-         - B2.B. Assessment Engine (`backend-nodejs/src/services/assessments`, `routes/assessments.js`, `frontend-reactjs/src/pages/assessments`)
+         - B2.A. Course Authoring & Lesson Orchestration (`backend-nodejs/src/controllers/lessons`, `services/lessons`, `models/Lesson.ts`) ✓
+         - B2.B. Assessment Engine (`backend-nodejs/src/services/assessments`, `routes/assessments.js`, `frontend-reactjs/src/pages/assessments`) ✓
       - B3. Backend Community & Engagement Cluster
-         - B3.A. Community Feed & Posts (`backend-nodejs/src/controllers/feed`, `services/feed`, `frontend-reactjs/src/pages/community/Feed.jsx`)
-         - B3.B. Leaderboards & Recognition (`backend-nodejs/src/services/leaderboard`, `frontend-reactjs/src/pages/community/Leaderboard.jsx`)
+         - B3.A. Community Feed & Posts (`backend-nodejs/src/controllers/feed`, `services/feed`, `frontend-reactjs/src/pages/community/Feed.jsx`) ✓
+         - B3.B. Leaderboards & Recognition (`backend-nodejs/src/services/leaderboard`, `frontend-reactjs/src/pages/community/Leaderboard.jsx`) ✓
       - B4. Backend Monetisation & Commerce Cluster
          - B4.A. Subscription Billing (`backend-nodejs/src/services/billing`, `integrations/stripe`, `frontend-reactjs/src/pages/billing`)
       - B5. Frontend Web Experience Deep Dive

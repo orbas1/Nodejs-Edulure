@@ -18,46 +18,16 @@ import UserModel from '../models/UserModel.js';
 import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
 import UserProfileModel from '../models/UserProfileModel.js';
 import AdsPlacementService from './AdsPlacementService.js';
+import {
+  isActiveMembership,
+  canModerateMembership,
+  canManageCommunity,
+  canManageResources,
+  canManageSponsorships,
+  permissionDenied
+} from './CommunityPolicyService.js';
 
-const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
-const RESOURCE_MANAGER_ROLES = new Set(['owner', 'admin', 'moderator']);
 const POST_AUTHOR_ROLES = new Set(['owner', 'admin', 'moderator']);
-const COMMUNITY_MANAGER_ROLES = new Set(['owner', 'admin']);
-
-function isActiveMembership(membership) {
-  return membership?.status === 'active';
-}
-
-function canModerateMembership(membership, actorRole) {
-  if (actorRole === 'admin') {
-    return true;
-  }
-  return isActiveMembership(membership) && MODERATOR_ROLES.has(membership?.role);
-}
-
-function canManageSponsorships(membership, actorRole) {
-  if (actorRole === 'admin') {
-    return true;
-  }
-  return (
-    isActiveMembership(membership) &&
-    (membership?.role === 'owner' || membership?.role === 'admin' || membership?.role === 'moderator')
-  );
-}
-
-function canManageResources(membership, actorRole) {
-  if (actorRole === 'admin') {
-    return true;
-  }
-  return isActiveMembership(membership) && RESOURCE_MANAGER_ROLES.has(membership?.role);
-}
-
-function canManageCommunity(membership, actorRole) {
-  if (actorRole === 'admin') {
-    return true;
-  }
-  return isActiveMembership(membership) && COMMUNITY_MANAGER_ROLES.has(membership?.role);
-}
 
 function normalisePlacementIds(value) {
   if (!Array.isArray(value)) {
@@ -731,9 +701,7 @@ export default class CommunityService {
 
     const membership = await CommunityMemberModel.findMembership(community.id, actorId);
     if (!canManageCommunity(membership, options.actorRole)) {
-      const error = new Error('You do not have permission to manage this community');
-      error.status = membership ? 403 : 404;
-      throw error;
+      throw permissionDenied('You do not have permission to manage this community', membership, 403);
     }
 
     const updates = {};
@@ -805,9 +773,7 @@ export default class CommunityService {
     }
 
     if (!POST_AUTHOR_ROLES.has(membership.role)) {
-      const error = new Error('You do not have permission to post in this community');
-      error.status = 403;
-      throw error;
+      throw permissionDenied('You do not have permission to post in this community', membership, 403);
     }
 
     const channelId = payload.channelId ?? (await this.resolveDefaultChannelId(community.id));
@@ -898,9 +864,7 @@ export default class CommunityService {
     const canModerate = canModerateMembership(membership, options.actorRole);
     const isAuthor = Number(post.authorId) === Number(userId);
     if (!isAuthor && !canModerate) {
-      const error = new Error('You do not have permission to update this post');
-      error.status = 403;
-      throw error;
+      throw permissionDenied('You do not have permission to update this post', membership, 403);
     }
 
     const updates = {};
@@ -1045,9 +1009,11 @@ export default class CommunityService {
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
     if (!canManageResources(membership, undefined)) {
-      const error = new Error('You do not have permission to manage resources in this community');
-      error.status = isActiveMembership(membership) ? 403 : 404;
-      throw error;
+      throw permissionDenied(
+        'You do not have permission to manage resources in this community',
+        membership,
+        isActiveMembership(membership) ? 403 : 404
+      );
     }
 
     const publishedAt = payload.status === 'published' ? payload.publishedAt ?? new Date() : payload.publishedAt ?? null;
@@ -1112,9 +1078,11 @@ export default class CommunityService {
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
     if (!canManageResources(membership, undefined)) {
-      const error = new Error('You do not have permission to manage resources in this community');
-      error.status = isActiveMembership(membership) ? 403 : 404;
-      throw error;
+      throw permissionDenied(
+        'You do not have permission to manage resources in this community',
+        membership,
+        isActiveMembership(membership) ? 403 : 404
+      );
     }
 
     const existing = await CommunityResourceModel.findById(resourceId);
@@ -1228,9 +1196,11 @@ export default class CommunityService {
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
     if (!canManageResources(membership, undefined)) {
-      const error = new Error('You do not have permission to manage resources in this community');
-      error.status = isActiveMembership(membership) ? 403 : 404;
-      throw error;
+      throw permissionDenied(
+        'You do not have permission to manage resources in this community',
+        membership,
+        isActiveMembership(membership) ? 403 : 404
+      );
     }
 
     const existing = await CommunityResourceModel.findById(resourceId);
@@ -1346,9 +1316,7 @@ export default class CommunityService {
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
     if (!canModerateMembership(membership, options.actorRole)) {
-      const error = new Error('You do not have permission to moderate posts in this community');
-      error.status = 403;
-      throw error;
+      throw permissionDenied('You do not have permission to moderate posts in this community', membership, 403);
     }
 
     return db.transaction(async (trx) => {
@@ -1425,9 +1393,7 @@ export default class CommunityService {
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
     if (!canModerateMembership(membership, options.actorRole)) {
-      const error = new Error('You do not have permission to remove posts in this community');
-      error.status = 403;
-      throw error;
+      throw permissionDenied('You do not have permission to remove posts in this community', membership, 403);
     }
 
     return db.transaction(async (trx) => {
@@ -1484,9 +1450,7 @@ export default class CommunityService {
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
     if (!canManageSponsorships(membership, options.actorRole)) {
-      const error = new Error('You do not have permission to manage sponsorships in this community');
-      error.status = 403;
-      throw error;
+      throw permissionDenied('You do not have permission to manage sponsorships in this community', membership, 403);
     }
 
     const metadata = parseJsonColumn(community.metadata, {});
@@ -1507,9 +1471,7 @@ export default class CommunityService {
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
     if (!canManageSponsorships(membership, options.actorRole)) {
-      const error = new Error('You do not have permission to manage sponsorships in this community');
-      error.status = 403;
-      throw error;
+      throw permissionDenied('You do not have permission to manage sponsorships in this community', membership, 403);
     }
 
     const blockedPlacementIds = normalisePlacementIds(payload.blockedPlacementIds);

@@ -3,19 +3,7 @@ import CommunityModel from '../models/CommunityModel.js';
 import CommunityMemberModel from '../models/CommunityMemberModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import UserModel from '../models/UserModel.js';
-
-const MANAGER_ROLES = new Set(['owner', 'admin']);
-
-function isActiveMembership(membership) {
-  return membership?.status === 'active';
-}
-
-function canManageMembers(membership, actorRole) {
-  if (actorRole === 'admin') {
-    return true;
-  }
-  return isActiveMembership(membership) && MANAGER_ROLES.has(membership?.role);
-}
+import { canManageMembers, permissionDenied } from './CommunityPolicyService.js';
 
 function normaliseTags(tags) {
   if (!tags) return [];
@@ -65,9 +53,7 @@ async function resolveCommunityForActor(communityIdentifier, actorId, actorRole)
   }
   const membership = await CommunityMemberModel.findMembership(community.id, actorId);
   if (!canManageMembers(membership, actorRole)) {
-    const error = new Error('You do not have permission to manage members in this community');
-    error.status = membership ? 403 : 404;
-    throw error;
+    throw permissionDenied('You do not have permission to manage members in this community', membership, 403);
   }
   return { community, membership };
 }
