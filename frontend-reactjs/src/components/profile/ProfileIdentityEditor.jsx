@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 
 import AvatarCropper from '../media/AvatarCropper.jsx';
@@ -85,6 +86,41 @@ export default function ProfileIdentityEditor({
   const socialLinks = Array.isArray(form.socialLinks) && form.socialLinks.length > 0 ? form.socialLinks : [{ label: '', url: '' }];
   const validationErrors = errors ?? {};
 
+  const completionSummary = useMemo(() => {
+    const checks = [
+      Boolean(form.displayName?.trim()),
+      Boolean(form.tagline?.trim()),
+      Boolean(form.location?.trim()),
+      Boolean(form.bio?.trim()),
+      Boolean(form.avatarUrl?.trim()),
+      Boolean(form.bannerUrl?.trim()),
+      Boolean(form.address?.city?.trim()),
+      Boolean(form.address?.country?.trim()),
+      Boolean(Array.isArray(form.socialLinks) && form.socialLinks.some((link) => Boolean(link?.url?.trim())))
+    ];
+    const total = checks.length;
+    const completed = checks.filter(Boolean).length;
+    const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
+    let tone = 'border-slate-200 bg-slate-100 text-slate-600';
+    if (percentage === 100) {
+      tone = 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    } else if (percentage >= 60) {
+      tone = 'border-primary/30 bg-primary/10 text-primary';
+    } else {
+      tone = 'border-amber-200 bg-amber-50 text-amber-700';
+    }
+    return {
+      percentage,
+      badgeClassName: `inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${tone}`,
+      label: percentage === 100 ? 'Ready for publishing' : `${percentage}% complete`
+    };
+  }, [form.address, form.avatarUrl, form.bannerUrl, form.bio, form.displayName, form.location, form.socialLinks, form.tagline]);
+
+  const taglineLength = form.tagline?.trim().length ?? 0;
+  const bioLength = form.bio?.trim().length ?? 0;
+  const TAGLINE_MAX = 80;
+  const BIO_MAX = 240;
+
   const inputClassName = (hasError) =>
     `mt-1 w-full rounded-xl border px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 ${
       hasError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-200/70' : 'border-slate-200 focus:border-primary focus:ring-primary/40'
@@ -107,8 +143,8 @@ export default function ProfileIdentityEditor({
               Update the details surfaced across your profile, live feed, and community experiences.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-            Ready for publishing
+          <div className={completionSummary.badgeClassName} aria-live="polite">
+            {completionSummary.label}
           </div>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -133,12 +169,18 @@ export default function ProfileIdentityEditor({
               value={form.tagline ?? ''}
               onChange={(event) => onFieldChange('tagline', event.target.value)}
               placeholder="Your positioning in a sentence"
+              maxLength={TAGLINE_MAX}
+              aria-describedby="profile-tagline-helper"
               className={inputClassName(Boolean(validationErrors.tagline))}
               aria-invalid={Boolean(validationErrors.tagline)}
             />
             {validationErrors.tagline ? (
               <p className="mt-1 text-xs text-rose-600">{validationErrors.tagline}</p>
-            ) : null}
+            ) : (
+              <p id="profile-tagline-helper" className="mt-1 text-xs text-slate-500">
+                {taglineLength}/{TAGLINE_MAX} characters
+              </p>
+            )}
           </label>
           <label className="flex flex-col text-sm font-medium text-slate-700">
             Location headline
@@ -188,12 +230,18 @@ export default function ProfileIdentityEditor({
               onChange={(event) => onFieldChange('bio', event.target.value)}
               rows={4}
               placeholder="Share what you teach, build, or mentor."
+              maxLength={BIO_MAX}
+              aria-describedby="profile-bio-helper"
               className={inputClassName(Boolean(validationErrors.bio))}
               aria-invalid={Boolean(validationErrors.bio)}
             />
             {validationErrors.bio ? (
               <p className="mt-1 text-xs text-rose-600">{validationErrors.bio}</p>
-            ) : null}
+            ) : (
+              <p id="profile-bio-helper" className="mt-1 text-xs text-slate-500">
+                {bioLength}/{BIO_MAX} characters
+              </p>
+            )}
           </label>
         </div>
         <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -289,6 +337,8 @@ export default function ProfileIdentityEditor({
               ? 'border-rose-200 bg-rose-50 text-rose-700'
               : 'border-emerald-200 bg-emerald-50 text-emerald-700'
           }`}
+          role={error ? 'alert' : 'status'}
+          aria-live={error ? 'assertive' : 'polite'}
         >
           {error ?? success}
         </div>

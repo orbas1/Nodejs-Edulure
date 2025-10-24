@@ -62,8 +62,8 @@
       - 3.D Instructor Quick Actions & Operations (`lib/features/instructor/`, `lib/services/instructor_service.dart`, `lib/services/scheduling_service.dart`)
       - 3.E Billing & Subscription Management (`lib/integrations/billing.dart`, `lib/features/billing/`, `lib/services/billing_service.dart`)
       - 3.F Notifications, Messaging & Support (`lib/features/notifications/`, `lib/features/support/`, `lib/services/push_service.dart`, `lib/services/inbox_service.dart`)
-      - 4.A Community Reminder Job (`communityReminderJob.js`)
-      - 4.B Data Partition Job (`dataPartitionJob.js`)
+      - ✓ 4.A Community Reminder Job (`communityReminderJob.js`)
+      - ✓ 4.B Data Partition Job (`dataPartitionJob.js`)
       - 4.C Data Retention Job (`dataRetentionJob.js`)
       - 4.D Moderation Follow-Up Job (`moderationFollowUpJob.js`)
       - 4.E Monetization Reconciliation Job (`monetizationReconciliationJob.js`)
@@ -121,8 +121,8 @@
       - A29. Flutter Instructor Quick Actions & Operations (3.D)
       - A30. Flutter Billing & Subscription Management (3.E)
       - A31. Flutter Notifications, Messaging & Support (3.F)
-      - A32. Community Reminder Job (4.A)
-      - A33. Data Partition Job (4.B)
+      - ✓ A32. Community Reminder Job (4.A)
+      - ✓ A33. Data Partition Job (4.B)
       - A34. Data Retention Job (4.C) ✓
          - A34.1 backend-nodejs/src/jobs/dataRetentionJob.js & config/env integration
             1. **Operational depth.** The scheduler now orchestrates retention enforcement, verification, and reporting in a single run loop, mirroring Annex A34’s mandate to purge PII, issue audit trails, and brief compliance stakeholders.
@@ -366,7 +366,7 @@
          - 4.B.8 VerificationStatusCard (frontend-reactjs/src/components/dashboard/VerificationStatusCard.jsx)
          - 4.B.9 SkeletonPanel (frontend-reactjs/src/components/loaders/SkeletonPanel.jsx)
          - 4.B.10 ServiceHealthBanner (frontend-reactjs/src/components/status/ServiceHealthBanner.jsx)
-      - 5.A Learner Dashboard Pages
+      - ✓ 5.A Learner Dashboard Pages — Annex A18 (Learner Dashboard), Annex C1 (Learner Support Workspace)
          - 5.A.1 LearnerBookings (frontend-reactjs/src/pages/dashboard/LearnerBookings.jsx)
          - 5.A.2 LearnerCommunities (frontend-reactjs/src/pages/dashboard/LearnerCommunities.jsx)
          - 5.A.3 LearnerCommunityChats (frontend-reactjs/src/pages/dashboard/LearnerCommunityChats.jsx)
@@ -377,9 +377,65 @@
          - 5.A.8 LearnerSettings (frontend-reactjs/src/pages/dashboard/LearnerSettings.jsx)
          - 5.A.9 LearnerSocial (frontend-reactjs/src/pages/dashboard/LearnerSocial.jsx)
          - 5.A.10 LearnerSupport (frontend-reactjs/src/pages/dashboard/LearnerSupport.jsx)
-      - 5.B Learner Deep-dive Modules
+            1. **Appraise.** `LearnerSupport.jsx` now elevates SLA visibility with semantic badges while `useLearnerSupportCases.js` deduplicates conversation messages and attachments, aligning Annex C1’s learner workspace with the Annex A18 dashboard expectations.
+            2. **Function.** `getSlaBadgeDescriptor`, `formatSlaDeadline`, and the enriched hook fields (`slaStatus`, `assignmentLabel`, `slaMinutesRemaining`) power list chips, stats grids, and SLA checkpoint summaries while the composer pipes payloads through `createSupportTicket`, `replyToSupportTicket`, and `closeSupportTicket` APIs.
+            3. **Usefulness.** Knowledge suggestions render inline cards sourced from `knowledgeSuggestions` while `DashboardService.getDashboardForUser` now hydrates the `knowledgeBase` array with top-ranked `support_articles` via `SupportKnowledgeBaseService.searchArticles`, ensuring the annex playbooks reflect live data alongside escalation breadcrumbs and tooltips.
+            4. **Redundant.** Message normalisation now merges duplicate IDs and attachments, eliminating the prior UI jitter when optimistic updates appended the same payload twice.
+            5. **Placeholders.** Contact fallbacks still reference placeholder `href="#"` channels when the API omits live links, and voice-call scheduling remains disabled until telephony integrations land.
+            6. **Duplicates.** SLA formatting logic lives solely in `LearnerSupport.jsx`; future work should move the badge descriptor into the shared dashboard formatting utilities to avoid duplicating countdown text across widgets.
+            7. **Improvements Needed.** Wire SLA status to live websocket push events, expose agent avatars beside `assignmentLabel`, and allow learners to acknowledge knowledge suggestions so analytics can log deflection rates.
+            8. **Styling Improvements.** Case cards, SLA chips, and the escalation timeline now reuse dashboard pill tokens (`rounded-3xl`, semantic badge palettes) so the workspace matches the broader learner shell.
+            9. **Efficiency Analysis.** Message deduplication, attachment merging, and memoised case enrichments reduce render thrash when large transcripts stream in, keeping the timeline performant even for legacy tickets.
+            10. **Strengths to Keep.** Dual-column layout with sticky metadata, inline composer, and knowledge guidance retains the single-pane-of-glass experience Annex C1 champions.
+            11. **Weaknesses to Remove.** Offline replies still queue locally without surfacing retry state per message; exposing retry chips in `MessageTimeline` would prevent silent failures.
+            12. **Palette.** SLA and priority badges now adopt the same semantic colours (`bg-emerald-100`, `bg-rose-100`) used across the dashboard, ensuring brand and accessibility parity.
+            13. **Layout.** The detail grid adds a sixth cell for SLA checkpoints and the escalation panel stacks beneath the timeline, balancing information density without forcing horizontal scroll.
+            14. **Text.** Badge tooltips (“SLA on track”, “Breached …”), timeline copy, and knowledge card excerpts sharpen copywriting so learners see action-first phrasing.
+            15. **Spacing.** `space-y` utilities and the refreshed 3-column knowledge list maintain comfortable rhythm between panels while keeping the reply composer within reach.
+            16. **Shape.** Rounded-3xl shells, dashed borders on empty states, and subtle timeline markers keep the support hub visually consistent with other learner modules.
+            17. **Effects.** Badge hover/focus states inherit dashboard focus outlines, and the escalation feed avoids animations, respecting reduced-motion preferences baked into the layout.
+            18. **Thumbs.** Suggested playbooks now highlight read-time chips so learners can quickly judge effort before opening a guide.
+            19. **Media.** Attachment metadata merges duplicates and retains names/sizes, preserving context when learners upload logs or transcripts.
+            20. **Buttons.** Pill buttons (`dashboard-primary-pill`, focus-visible outlines) now complement SLA chips, while archive/reopen controls remain accessible and keyboard friendly.
+            21. **Interact.** `data-sla-status` attributes on list badges and detail chips open the door for automated filtering, and tooltip strings keep screen readers informed without extra markup.
+            22. **Missing.** Auto-refresh on SLA countdowns still relies on manual refresh; consider `setInterval` or React Query subscriptions to avoid stale timers.
+            23. **Design.** `getSlaBadgeDescriptor` centralises badge labelling, keeping copy cohesive as new SLA states emerge.
+            24. **Clone.** Merge logic prevents duplicate message rendering, replacing the previous per-component dedupe implementations with a single hook-level source of truth.
+            25. **Framework.** Enhancements lean on existing persistent storage (`usePersistentCollection`) and context boundaries, so no new architectural primitives were required.
+            26. **Checklist.** Regression suite should cover badge rendering, knowledge suggestion linking, escalation timeline ordering, and message dedupe, alongside running `npm --prefix frontend-reactjs run lint`.
+            27. **Nav.** SLA chips, escalation breadcrumbs, and knowledge cards extend Annex A18 navigation cues by labelling contexts (“Case detail”, “Suggested playbooks”) for quick scanning.
+            28. **Release.** Roll out behind the support workspace feature flag, capture telemetry on SLA badge engagement, and document the changes in Annex C1 plus the learner dashboard release notes.
+      - ✓ 5.B Learner Deep-dive Modules — Annex C1 (Learner Support)
          - 5.B.1 LearnerUpcomingSection (frontend-reactjs/src/pages/dashboard/learner/sections/LearnerUpcomingSection.jsx)
-      - 6.A Instructor Dashboard Pages
+            1. **Appraise.** `LearnerUpcomingSection.jsx` now adds urgency descriptors, semantic badges, and action-aware styling so the Annex C1 commitments rail mirrors Annex A18 priorities.
+            2. **Function.** `resolveActionVariant`, `resolveLinkTarget`, and urgency data attributes drive tailored CTA treatments, external link handling, and analytics-friendly tagging.
+            3. **Usefulness.** Learners see contextual copy (“Upcoming soon”, “Scheduled and on track”) alongside host, date, relative labels, and urgency descriptors with analytics-friendly `data-urgency` attributes driven by `normaliseUpcoming` in `LearnerOverview.jsx`.
+            4. **Redundant.** Button rendering no longer duplicates target/rel logic—the helper centralises external link decisions while preserving mailto/self navigation.
+            5. **Placeholders.** Disabled CTAs still render greyed buttons when no actionable `href` exists; future revisions could hide them entirely or surface alternative prompts.
+            6. **Duplicates.** Urgency text aligns with the shared dashboard urgency vocabulary; remaining duplication inside `LearnerOverview.normaliseUpcoming` can move to a reusable formatter later.
+            7. **Improvements Needed.** Pipe through locations or delivery modes, extend badge variants for assessment deadlines, and offer iCal exports when schedules include calendar links.
+            8. **Styling Improvements.** Focus-visible outlines, variant-specific colours, and consistent rounded-full buttons bring the module in step with the dashboard shell.
+            9. **Efficiency Analysis.** External link resolution pre-parses URLs once per render, preventing runtime errors from malformed links while keeping the component lightweight.
+            10. **Strengths to Keep.** Compact cards with urgency chips and relative timestamps maintain scannability while layering richer context.
+            11. **Weaknesses to Remove.** The component still lacks inline actions for rescheduling or joining waitlists—hooks to bookings/live-class APIs would complete the experience.
+            12. **Palette.** Action variants use emerald/indigo/primary shades consistent with learner CTAs, and urgency badges keep rose/amber/emerald semantics for accessibility.
+            13. **Layout.** Card spacing remains vertical for clarity, and the new descriptor line avoids crowding by using subdued slate tones.
+            14. **Text.** CTA aria-labels mention the event title, supporting assistive tech, while urgency descriptors avoid jargon and stay action-focused.
+            15. **Spacing.** Extra `mt-1` spacing between host and urgency copy keeps the hierarchy readable even on small screens.
+            16. **Shape.** Rounded-2xl shells and pill badges continue the learner dashboard motif, reinforcing familiarity across modules.
+            17. **Effects.** Hover elevation (`hover:-translate-y-0.5`, `hover:shadow-md`) and focus outlines echo the rest of the dashboard without introducing new motion patterns.
+            18. **Thumbs.** Cards remain thumb-friendly on touch devices thanks to generous padding and full-width button targets.
+            19. **Media.** While still text-first, structured descriptors ensure upcoming live sessions can later embed icons without layout shifts.
+            20. **Buttons.** Variant-aware CTAs adjust colour and outline tokens to match action types, and disabled states now render with neutral greys to signal inactivity.
+            21. **Interact.** `data-urgency` attributes and descriptive aria labels give analytics and accessibility layers hooks for filtering and narration.
+            22. **Missing.** Countdown timers remain static per render; consider injecting live countdown hooks for high-priority sessions.
+            23. **Design.** Helper functions encapsulate variant logic, letting designers extend CTA palettes without touching JSX internals.
+            24. **Clone.** Shared functions avoid repeating external-link guards across other learner widgets, reducing drift when rules evolve.
+            25. **Framework.** Enhancements stay within the existing component boundary—no new dependencies beyond `clsx` were required.
+            26. **Checklist.** Regression checks: verify urgency badges render across statuses, ensure external links respect targets, and confirm disabled CTAs show grey styling.
+            27. **Nav.** Urgency descriptors plus aria-labelled buttons tie into Annex A18 navigation heuristics, making commitments easy to skim by keyboard or screen reader.
+            28. **Release.** Bundle with learner dashboard refresh, announce urgency badge upgrades in Annex C1 notes, and monitor click-through on join/review CTA variants post-launch.
+      - ✓ 6.A Instructor Dashboard Pages — Annex A19 (Courses & Library), Annex C4 (Live Classes & Tutoring Operations)
          - 6.A.1 InstructorCommunityChats (frontend-reactjs/src/pages/dashboard/InstructorCommunityChats.jsx)
          - 6.A.2 InstructorCommunityCreate (frontend-reactjs/src/pages/dashboard/InstructorCommunityCreate.jsx)
          - 6.A.3 InstructorCommunityManage (frontend-reactjs/src/pages/dashboard/InstructorCommunityManage.jsx)
@@ -395,6 +451,27 @@
          - 6.A.13 InstructorTutorBookings (frontend-reactjs/src/pages/dashboard/InstructorTutorBookings.jsx)
          - 6.A.14 InstructorTutorManagement (frontend-reactjs/src/pages/dashboard/InstructorTutorManagement.jsx)
          - 6.A.15 InstructorTutorSchedule (frontend-reactjs/src/pages/dashboard/InstructorTutorSchedule.jsx)
+        1. **Appraisal.** Instructor live operations now surface timezone-aware schedules, resource runbooks, and calendar exports (`pages/dashboard/InstructorLiveClasses.jsx`, `pages/dashboard/InstructorTutorBookings.jsx`) so Annex A19’s course orchestration narrative and Annex C4’s tutoring control room describe real workflows rather than placeholders.
+        2. **Functionality.** The live classroom console introduces a scheduling preference banner with timezone selector, session cards render dynamic prep/resource links, alerts, and readiness summaries, while tutor bookings add segment filters, CSV exports, and .ics calendar generation built from `utils/calendar.js` helpers.
+        3. **Logic Usefulness.** `resolveRelativeTime` and `formatDateTime` ensure countdowns, SLA deadlines, and mentor hand-offs reference the same clocks, giving instructors and coordinators reliable go-live windows and reducing manual reconciliation during high-volume cohorts.
+        4. **Redundancies.** Shared calendar utilities eliminate bespoke ICS builders inside dashboard pages and reuse a single filename normaliser for both tutoring and live class exports, cutting duplicated DOM download logic and aligning Annex documentation with the new helper.
+        5. **Placeholders.** Static “Schedule TBC” and generic escalation copy are replaced by real alerts (`data.escalations`) and enriched prep links sourced from session payloads, so Annex callouts can cite working join, recording, and material links instead of TODO notes.
+        6. **Duplicate Functions.** Pipeline segmentation, CSV quoting, and relative time formatting moved into memoised helpers, removing repeated map/filter logic throughout the bookings workspace and aligning with the reusable `downloadCalendarEvents` workflow.
+        7. **Improvements Needed.** Next iteration should stream export feedback through a toast service, hydrate booking analytics cards with backend SLA deltas, and thread timezone selection through `ScheduleGrid`’s event filters to keep grid/tooling parity.
+        8. **Styling Improvements.** New rounded-pill controls, amber escalation banners, and prep/resource stacks re-use dashboard typography/spacing tokens, matching the user_experience.md palette guidance for Annex A19 hero modules and Annex C4 risk panels.
+        9. **Efficiency Analysis.** `useMemo` caches for filtered pipeline/confirmed lists avoid recomputation across renders, while export handlers short-circuit when no records exist, keeping dashboard interactions smooth even as routing queues grow.
+        10. **Strengths to Keep.** Keep the action feedback pattern, shared scheduling grid, and modular session cards—they now support richer data without sacrificing readability, fulfilling Annex expectations for cross-surface consistency.
+        11. **Weaknesses to Remove.** Tutor routing still depends on manual refresh after CSV/ICS exports; wire server-triggered rehydration and consider batching notifications to curb duplicate SLA alerts across channels.
+        12. **Styling & Colour Review.** Accessibility-checked badge palettes (emerald/amber/rose) extend to alerts, support routing, and escalations, ensuring Annex references to readiness states stay in sync with live colour tokens.
+        13. **CSS, Orientation & Placement.** Responsive stacking for pipeline controls and live hand-off cards keeps key operations above the fold on tablet while preserving the two-column analytics grid on desktop.
+        14. **Text Analysis.** Inline copy now emphasises action-first phrasing (“Export pipeline CSV”, “Live classroom hand-off”) mirroring user_experience.md tone guidance, and prep tooltips stay under 140 characters for quick scanning.
+        15. **Change Checklist Tracker.** Add regression checks for timezone selector persistence, export success/failure messaging, CSV header integrity, and ICS start/end validation before shipping future instructor dashboard updates.
+        16. **Full Upgrade Plan & Release Steps.** Phase 1 rolls the shared calendar utility + timezone selector, Phase 2 expands pipeline analytics and tutoring telemetry, Phase 3 integrates backend-driven alerts/escalations, and Phase 4 publishes Annex A19/C4 documentation updates alongside release comms.
+        17. **Data Integration.** `DashboardService.buildInstructorDashboard` now emits richer tutor booking objects (pipeline, confirmed, stats) sourced from `TutorBookingModel`, reconciling SLA deadlines, segment metadata, and revenue minor units with the seed dataset so Annex C4 references live production-like payloads.
+        18. **Live Session Surface.** Instructor live classroom records expose structured `resources`, `support`, `alerts`, `pricing`, and sanitized join/check-in links, mirroring the reinforced metadata stored in `live_classrooms` and `live_classroom_registrations` migrations for Annex A19 documentation.
+        19. **Notification Fidelity.** Tutor alerts include titles, details, deadlines, and CTA routing directly from backend orchestration, matching the scheduler UI requirements and ensuring tutoring SLAs align with operational runbooks.
+        20. **Seed Synchronisation.** `backend-nodejs/seeds/001_bootstrap.js` seeds tutor bookings and live classrooms with expanded metadata (segments, preferred slots, whiteboard notes, support contacts, pricing) to guarantee demo environments reflect the new dashboard schema.
+        21. **Future Proofing.** Revenue roll-ups and waitlist risk alerts derive from model metadata so future Annex updates can plug into the same pipeline without duplicating frontend heuristics.
       - 6.B Instructor Deep-dive Modules
          - 6.B.1 CourseLifecyclePlanner (frontend-reactjs/src/pages/dashboard/instructor/courseCreation/CourseLifecyclePlanner.jsx)
          - 6.B.2 CourseLibraryTable (frontend-reactjs/src/pages/dashboard/instructor/courseLibrary/CourseLibraryTable.jsx)
@@ -422,9 +499,38 @@
          - 7.B.3 ModerationChecklistForm (frontend-reactjs/src/components/moderation/ModerationChecklistForm.jsx)
          - 7.B.4 ModerationMediaPreview (frontend-reactjs/src/components/moderation/ModerationMediaPreview.jsx)
          - 7.B.5 ModerationQueue (frontend-reactjs/src/components/moderation/ModerationQueue.jsx)
-      - 8.A Public Community & Social Pages
+      - ✓ 8.A Public Community & Social Pages — Annex A20 (Community & Events)
+        1. **Appraise.** `pages/Communities.jsx` and `pages/Feed.jsx` now expose persona-aligned directories, analytics, and community health scorecards driven by real component logic instead of placeholder copy, matching the Annex A20 expectations captured in `user_experience.md`.
+        2. **Function.** Persona extraction, momentum scoring, and last-activity signals are centralised in `frontend-reactjs/src/utils/communityPersona.js` and mirrored by `backend-nodejs/src/utils/communityPersona.js`; `CommunityService.serializeCommunity` now emits persona summaries and momentum scores that `Communities.jsx` consumes in the discovery grid while `Feed.jsx` renders a complementary “Community health” panel beside the live feed.
+        3. **Usefulness.** Operators can slice communities by persona, access model, and momentum, see counts for open vs. NDA-gated cohorts, and jump directly into high-momentum chapters from both the discovery grid and the feed leaderboard with backend-aligned stats (`CommunityModel.listByUserWithStats`, `CommunityModel.getStats`).
+        4. **Redundancies.** Prior hard-coded persona badges, repetitive list filters, and bespoke activity heuristics were replaced with shared helpers (`extractCommunityPersonas`, `computeCommunityEngagementScore`, `resolveLastActivity`) and backend normalisers so both pages, APIs, and seeds stay in sync.
+        5. **Placeholders.** Community APIs now surface personas, access models, and NDA flags sourced from `backend-nodejs/seeds/001_bootstrap.js`; remaining work tracks publishing analytics events and feature-flag toggles before exposing public directory presets.
+        6. **Duplicates.** Directory filtering and momentum ranking now reuse the same helper module, eliminating duplicated `toLowerCase`/`includes` checks that previously lived in multiple components.
+        7. **Improvements Needed.** Wire analytics events for persona filter usage, expose pagination for the discovery grid, and replace heuristic monetisation labels with canonical pricing tier data when the billing API publishes it.
+        8. **Styling Improvements.** Filter controls, persona pills, and scorecards inherit the community palette tokens (`bg-primary/10`, `rounded-3xl`), aligning with the typography and spacing prescribed in the UX audit while remaining Tailwind-compatible.
+        9. **Efficiency Analysis.** `useMemo` caches filtered directories, persona summaries, and momentum rankings, ensuring the expanded directory does not recompute on every keystroke and keeping the feed sidebar reactive without extra renders.
+        10. **Strengths to Keep.** The rich hero content, classroom tabs, and moderation tooling introduced previously remain untouched while gaining persona-aware discovery wrappers and cross-page consistency.
+        11. **Weaknesses to Remove.** Momentum metrics currently derive from aggregate counts; elevate to rolling-window analytics exports and expose billing tier metadata once monetisation services publish canonical payloads.
+        12. **Palette.** New chips and summary cards reuse slate neutrals and primary accents, preventing a separate colour system from emerging around persona filters and analytics callouts.
+        13. **Layout.** Responsive grids (`sm:grid-cols-2`, `xl:grid-cols-3`) keep cards evenly distributed on desktop while stacking gracefully on mobile, matching the directory layout guidelines in `user_experience.md`.
+        14. **Text.** Microcopy now explains why filters exist (“Use these lenses to scope live programming…”) and provides actionable empty states, improving comprehension without duplicating marketing language.
+        15. **Spacing.** Directory and sidebar cards follow the 8px rhythm (p-4/p-5 gaps) and maintain consistent pill spacing, resolving the cramped alignment noted in the audit.
+        16. **Shape.** All cards adopt `rounded-3xl`/`rounded-2xl` radii so the persona layer mirrors existing community hero treatments, avoiding mismatched silhouettes.
+        17. **Effects.** Hover/focus transitions (lift on hover, focus-visible outlines) signal interactivity for the new directory buttons and leaderboard rows, supporting accessibility and keyboard navigation.
+        18. **Thumbs.** Persona summary chips surface top personas at a glance, giving community managers screenshot-ready highlights for release notes and stakeholder reviews.
+        19. **Media.** Discovery cards reference resource counts and live signals, preparing the ground for future thumbnail previews without altering current asset pipelines.
+        20. **Buttons.** Selecting a community now routes through consistent pill buttons (directory grid, health leaderboard, TopBar switcher) that all share focus states and analytics context.
+        21. **Interact.** Directory filters update in real time, search debounces through `useMemo`, and leaderboard buttons call `setSelectedCommunity`, letting power users pivot between personas and specific hubs without page reloads.
+        22. **Missing.** Pending work includes wiring analytics events for persona filter usage, adding saved filter presets per persona, and exposing aggregate charts for trend deltas beyond the top four personas.
+        23. **Design.** `communityPersona.js` captures the persona taxonomy defined in Annex A20 so future components (moderation, onboarding) can consume the same normalised vocabulary.
+        24. **Clone.** Shared helpers prevent feed, dashboard, and marketing surfaces from reinventing persona parsing or momentum scoring, containing future duplication risks.
+        25. **Framework.** Document the persona heuristics and scoring formula in the community enablement playbook so backend and analytics teams can align when shipping official metrics.
+        26. **Checklist.** QA should cover persona filter combinations, NDA gating, momentum ordering, and leaderboard navigation before regression sign-off, plus verify empty states when APIs return zero communities.
+        27. **Nav.** Discovery cards and leaderboard buttons feed directly into `setSelectedCommunity`, preserving the canonical routing path so breadcrumbs, CRUD panels, and metadata headers stay in sync.
+        28. **Release.** Ship alongside backend persona metadata, update Annex A20 narratives, capture screenshots of the new discovery grid and health sidebar for stakeholder decks, and brief community ops on the new filters.
          - 8.A.1 Communities (frontend-reactjs/src/pages/Communities.jsx)
          - 8.A.2 Feed (frontend-reactjs/src/pages/Feed.jsx)
+         - 8.A.3 communityPersona (frontend-reactjs/src/utils/communityPersona.js)
       - 8.B Dashboard Community & Messaging Suites
          - 8.B.1 CommunitySafety (frontend-reactjs/src/pages/dashboard/community/CommunitySafety.jsx)
          - 8.B.2 ChannelSidebar (frontend-reactjs/src/pages/dashboard/community/instructorChats/ChannelSidebar.jsx)
@@ -506,12 +612,30 @@
          14. **Text Analysis.** Support microcopy now references seeded articles (“Resolve recurring billing declines”) and AI summary blurbs kept under 140 characters for clarity.
          15. **Change Checklist Tracker.** Regression passes now include repository timeline hydration, breadcrumb updates, and notification toggle persistence before C1 deployments.
          16. **Release.** Sequence Annex C1 with the learner support migration bundle, reseed knowledge articles via `001_bootstrap.js`, publish enablement notes, and monitor case resolution SLAs post-launch.
-      - 11.C Settings, Preferences & Profile Components
+      - ✓ 11.C Settings, Preferences & Profile Components — Annex A22 (Profile Management)
          - 11.C.1 ProfileIdentityEditor (frontend-reactjs/src/components/profile/ProfileIdentityEditor.jsx)
          - 11.C.2 SettingsAccordion (frontend-reactjs/src/components/settings/SettingsAccordion.jsx)
          - 11.C.3 SettingsLayout (frontend-reactjs/src/components/settings/SettingsLayout.jsx)
          - 11.C.4 SettingsToggleField (frontend-reactjs/src/components/settings/SettingsToggleField.jsx)
          - 11.C.5 SystemPreferencesPanel (frontend-reactjs/src/components/settings/SystemPreferencesPanel.jsx)
+         1. **Appraisal.** Profile identity editing now calculates a completion percentage badge and exposes live tagline/bio character budgets in `ProfileIdentityEditor.jsx`, replacing the static “Ready for publishing” label so Annex A22 can reference exact readiness metrics tied to the learner’s form payload.
+         2. **Functionality.** `SettingsAccordion.jsx` persists open state via `persistenceKey`, emits `onToggle` notifications, and wires `aria-controls`/`id` pairs while `SystemPreferencesPanel.jsx` normalises form submission with an internal `handleSystemSubmit`, preventing double submissions across dashboard and profile surfaces.
+         3. **Usefulness.** `SettingsLayout.jsx` now renders breadcrumb trails plus a locale-aware “Last saved” stamp, and the panel surfaces reset hooks (`onResetSystem`, `onResetPersonalisation`) so operators can mirror Annex workflows that call for restoring defaults or clearing sponsor signals before re-saving.
+         4. **Redundancies.** Toggle meta badges and supporting actions in `SettingsToggleField.jsx` centralise status chips, removing bespoke “Paused/Active” markup from both preferences panel instances while `SystemPreferencesPanel.jsx` funnels sync copy through a single `syncStatus` prop.
+         5. **Placeholders.** Sync messaging currently reuses `useSystemPreferencesForm` status strings; future Annex revisions should swap in tenant-localised phrasing once the preferences API returns translated copies.
+         6. **Duplicates.** Reset handlers lean on `setSystemPreferencesForm` with `DEFAULT_SYSTEM_FORM` seeds, eliminating repeated manual resets that previously diverged between the dashboard view and profile drawer.
+         7. **Improvements Needed.** Follow-up work should add optimistic diffing before invoking `refreshSystemPreferences()` so the new `lastSavedAt` metadata can highlight unsaved local edits instead of always assuming the server source of truth.
+         8. **Styling.** Completion, status, and reset affordances share Annex tokens: `border-primary/40`, `text-rose-500`, and `dashboard-pill` classes align notification, digest, and sponsor toggles with the Annex palette regardless of container.
+         9. **Efficiency.** Memoised completion summaries and `Intl.DateTimeFormat` formatting avoid recalculating badge labels on every render, while accordion persistence skips extra layout reflows by reading localStorage once during initialisation.
+         10. **Strengths.** Learners can now audit when preferences last synced, restore defaults with one click, and review contextual helper text (e.g., digest dependencies) without leaving Annex A22 flows, keeping dashboard and profile behaviour consistent.
+         11. **Weaknesses.** Preferences still rely on sequential `refreshSystemPreferences()` calls; adding concurrency guards and explicit loading banners would ensure the persisted open-state UX stays informative during slow network hops.
+         12. **Styling & Colour Review.** Toggle cards retain soft white surfaces while new meta badges lean on uppercase slate typography, ensuring accessibility even when supporting actions render inline buttons.
+         13. **CSS, Orientation & Placement.** `SystemPreferencesPanel.jsx` keeps `md:grid-cols-3` layouts for dense toggles, guaranteeing the added meta labels and helper text don’t break Annex spacing on tablet breakpoints.
+         14. **Text Analysis.** Copy updates (“Restoring preferences from your last sync…”, “Enable email notifications to activate the digest.”) satisfy Annex guidance for action-led microcopy while clearly signalling dependencies between controls.
+         15. **Change Checklist Tracker.** QA must now verify badge percentages, breadcrumb links, accordion persistence keys, reset flows, and last-saved timestamps across both dashboard and profile entry points before signing off Annex A22.
+         16. **Release.** Ship alongside the preferences API schema update: migrate documentation to include new reset hooks, update automated smoke tests to cover `syncStatus`, and brief support teams on the restored-from-cloud messaging introduced in this pass.
+         17. **Database Alignment.** `database/migrations/007_identity_onboarding_dashboard.sql`, `database/install.sql`, and the governance snapshot now enumerate learner system preferences, finance profiles, payment methods, billing contacts, and finance purchases so Annex A22 data flows stay in lockstep with production DDL across bootstrap, migrations, and manual installs.
+         18. **Seed Cohesion.** SQL seeders mirror the Node bootstrap fixtures by inserting learner preferences, billing contacts, payment methods, and finance purchase exemplars for `noemi.carvalho@edulure.test`, ensuring Annex walkthroughs surface identical data whether environments are hydrated via Knex seeds or raw SQL.
       - ✓ 12.A Bootstrap & Runtime Wiring (`backend-nodejs/src/bootstrap/bootstrap.js`, `backend-nodejs/src/config/env.js`, `backend-nodejs/src/graphql/gatewayBootstrap.js`, `backend-nodejs/src/graphql/persistedQueryStore.js`, `backend-nodejs/src/graphql/router.js`, `backend-nodejs/src/servers/webServer.js`, `backend-nodejs/src/servers/workerService.js`)
         1. **Appraisal.** GraphQL readiness is now part of the default bootstrap contract: `bootstrap/bootstrap.js` wires `warmGraphQLGateway` alongside database, feature flag, and search cluster lifecycles while `env.graphql` formalises persisted query locations, refresh cadence, and depth/operation limits for every runtime.
         2. **Functionality.** `graphql/gatewayBootstrap.js` warms schema introspection, hydrates JSON and `.graphql` manifests into the shared in-memory store, and schedules safe refreshes via `persistedQueryStore.replaceAll`; readiness emitters in `webServer.js`/`workerService.js` treat the gateway as a first-class dependency and stop handles clear timers deterministically. Vitest coverage in `test/graphql/gatewayBootstrap.test.js` and `test/graphql/persistedQueryStore.test.js` locks in manifest parsing, TTL behaviour, and cache hydration.

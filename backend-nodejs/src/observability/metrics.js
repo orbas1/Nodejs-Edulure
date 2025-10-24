@@ -261,6 +261,24 @@ const backgroundJobProcessedItemsTotal = new promClient.Counter({
   labelNames: ['job', 'item_status']
 });
 
+const dataPartitionEnsuredTotal = new promClient.Counter({
+  name: 'edulure_data_partition_ensured_total',
+  help: 'Count of ensured data partitions grouped by table and status',
+  labelNames: ['table', 'status']
+});
+
+const dataPartitionArchivedTotal = new promClient.Counter({
+  name: 'edulure_data_partition_archived_total',
+  help: 'Count of archived partitions grouped by table and status',
+  labelNames: ['table', 'status']
+});
+
+const dataPartitionLastRunTimestamp = new promClient.Gauge({
+  name: 'edulure_data_partition_last_run_timestamp',
+  help: 'Unix timestamp for the most recent data partition job grouped by outcome',
+  labelNames: ['outcome']
+});
+
 const liveCourseActiveSessionsGauge = new promClient.Gauge({
   name: 'edulure_live_course_active_sessions',
   help: 'Number of active in-memory live course sessions',
@@ -407,6 +425,9 @@ registry.registerMetric(integrationRequestRetryTotal);
 registry.registerMetric(backgroundJobRunsTotal);
 registry.registerMetric(backgroundJobDurationSeconds);
 registry.registerMetric(backgroundJobProcessedItemsTotal);
+registry.registerMetric(dataPartitionEnsuredTotal);
+registry.registerMetric(dataPartitionArchivedTotal);
+registry.registerMetric(dataPartitionLastRunTimestamp);
 registry.registerMetric(liveCourseActiveSessionsGauge);
 registry.registerMetric(liveCourseActiveViewersGauge);
 registry.registerMetric(liveCourseMessagesTotal);
@@ -825,6 +846,37 @@ export function recordBackgroundJobRun({
   }
   if (Number.isFinite(failed) && failed > 0) {
     backgroundJobProcessedItemsTotal.inc({ job: safeJob, item_status: 'failed' }, failed);
+  }
+}
+
+export function recordDataPartitionSummary({ summary, outcome } = {}) {
+  if (!env.observability.metrics.enabled || !summary) {
+    return;
+  }
+
+  const results = Array.isArray(summary.results) ? summary.results : [];
+  for (const result of results) {
+    const table = result?.tableName ?? 'unknown';
+    const ensured = Array.isArray(result?.ensured) ? result.ensured : [];
+    const archived = Array.isArray(result?.archived) ? result.archived : [];
+
+    for (const item of ensured) {
+      const status = item?.status ?? 'unknown';
+      dataPartitionEnsuredTotal.inc({ table, status });
+    }
+
+    for (const item of archived) {
+      const status = item?.status ?? 'unknown';
+      dataPartitionArchivedTotal.inc({ table, status });
+    }
+  }
+
+  const executedAt = summary.executedAt ? new Date(summary.executedAt) : new Date();
+  if (!Number.isNaN(executedAt.getTime())) {
+    dataPartitionLastRunTimestamp.set(
+      { outcome: outcome ?? 'unknown' },
+      Math.floor(executedAt.getTime() / 1000)
+    );
   }
 }
 

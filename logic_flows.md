@@ -569,40 +569,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 ## 4. Background Jobs & Workers (`backend-nodejs/src/jobs/`)
 
 ### 4.A Community Reminder Job (`communityReminderJob.js`)
-1. **Appraisal:** Cron-driven job dispatching community event reminders across SMS, email, and integrations with detailed audit logging.
-2. **Functionality:** Schedules reminders via `node-cron`, fetches events, validates destinations, sends through provider service (Twilio/email), and marks outcomes with success/failure metadata.
-3. **Logic Usefulness:** Keeps event attendance high and ensures audit records reflect reminder history across channels.
-4. **Redundancies:** Reminder formatting logic duplicated with notification fan-out responses; unify to guarantee consistent copy.
-5. **Placeholders Or non-working functions or stubs:** Some channels (e.g., push) flagged TODO; ensure scheduling gracefully skips unsupported destinations.
-6. **Duplicate Functions:** Manage URL derivation repeated across modules; centralise to avoid mismatched CTA links.
-7. **Improvements need to make:** Add rate limiting, support multi-language templates, and integrate RSVP analytics.
-8. **Styling improvements:** Provide template metadata (colours, typography) so emails and SMS align with brand.
-9. **Efficiency analysis and improvement:** Batch reminder retrieval, reuse event caches, and parallelise sending with configurable concurrency.
-10. **Strengths to Keep:** Detailed logging, graceful failure handling, and integration with provider configuration.
-11. **Weaknesses to remove:** Manual retry process; add automated retry with exponential backoff.
-12. **Styling and Colour review changes:** Align reminder template colours with event branding and accessibility guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Supply layout hints for UI rendering of reminder outcomes in admin dashboards.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Review reminder copy for clarity and concision, removing redundant phrases.
-15. **Change Checklist Tracker:** Include reminder job dry run, template QA, and provider credential verification in release tracker.
-16. **Full Upgrade Plan & Release Steps:** Stage job with test data, monitor logs, coordinate with community managers, update docs, and release gradually.
+1. **Appraisal:** `CommunityReminderJob` orchestrates cron-triggered cycles that hydrate due reminders via `CommunityEventReminderModel.listDue`, deduplicates using `JobStateModel` records stored in `background_job_states` (see migration `20250320120000_background_job_state_and_notification_queue.js` and seeds `backend-nodejs/seeds/001_bootstrap.js`), and fans out delivery through SMTP, Twilio SMS, and the `NotificationDispatchModel` queue while emitting telemetry with `recordBackgroundJobRun`.
+2. **Functionality:** Each run calls `runCycle`, marks reminders as processing, and pipes them through `processReminder`, which derives persona data, builds copy with `buildMessage`, evaluates role filters, dispatches per channel, records domain events, and persists channel-specific state (`sent`, `queued`, `failed`) back to the reminder model.
+3. **Logic Usefulness:** Persisted job-state versions (`reminder:${id}`) guard against duplicate sends, aggregated audience summaries quantify persona/channel outcomes for dashboards, and domain-event payloads plus integration metrics provide auditability and SLA monitoring.
+4. **Redundancies:** Shared helpers (`determinePersona`, `normaliseAllowedRoles`, `buildManageUrl`, `buildMessage`) eliminate earlier duplication with feed notifications and controller-formatters, consolidating reminder-specific copy, persona derivation, and RSVP URLs in a single module.
+5. **Placeholders Or non-working functions or stubs:** Internationalisation hooks (locale metadata, greeting overrides) exist but default to English templates; template packs for additional locales, richer role copy, and SMS-safe variants remain TODO.
+6. **Duplicate Functions:** Dedupe enforcement now lives solely in `JobStateModel.save/get`, replacing ad-hoc in-service checks; membership lookups and persona rules are centralised here so engagement services no longer repeat this mapping.
+7. **Improvements need to make:** Introduce concurrency guards/rate limiting to avoid Twilio throttling, surface RSVP analytics in delivery payloads for richer `DomainEventModel` records, and expose aggregator output to observability dashboards via dedicated metrics.
+8. **Styling improvements:** Extend the unified formatter to emit palette tokens (`X-Edulure-Template`, CTA hints) for every channel, add SMS-shortlink guidelines, and align push payload titles/badges with design tokens described in `docs/design-system`.
+9. **Efficiency analysis and improvement:** Configurable `lookaheadMinutes` and `batchSize` focus work on near-term events, background metrics capture processing latency, and job-state dedupe means retries only rehydrate failed channels; explore adaptive batching per community volume next.
+10. **Strengths to Keep:** Strong idempotence via job state, persona-aware targeting, structured error handling per provider, and consistent domain events/notification queue payloads make the pipeline reliable for ops and analytics.
+11. **Weaknesses to remove:** Push/in-app queueing assumes downstream workers drain immediately; add enqueue retry/backoff semantics, queue depth telemetry, and alerting so lag or worker outages surface quickly.
+12. **Styling and Colour review changes:** Document channel template tokens (button, link, accent colours) and accessible palette variants to ensure HTML email, SMS copy, and push payloads remain brand-aligned across light/dark modes.
+13. **CSS, orientation, placement and arrangement changes:** Provide admin dashboard layouts for persona/channel breakdown chips, highlight deduped vs. failed counts, and define grid structures for upcoming reminder monitoring views.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Review persona-specific greetings, tighten SMS body length under 160 characters, ensure CTA phrasing stays action-oriented, and dedupe repeated event titles in multi-channel messaging.
+15. **Change Checklist Tracker:** Per release, confirm reminder templates, Twilio credentials, SMTP connectivity, job-state retention (`background_job_states`), seeded queue fixtures (`notification_dispatch_queue`), aggregator outputs, and background metrics (processed/succeeded/failed) before enabling the cron expression.
+16. **Full Upgrade Plan & Release Steps:** Run staging dry-runs with synthetic cohorts, validate domain events and queue entries, verify seed/state alignment (`backend-nodejs/seeds/001_bootstrap.js`), update Annex A32/logic docs, coordinate enablement with community managers, and ramp channel availability progressively while monitoring telemetry.
 
 ### 4.B Data Partition Job (`dataPartitionJob.js`)
-1. **Appraisal:** Scheduled task partitioning large datasets for performance and governance requirements.
-2. **Functionality:** Iterates over configured tables, creates or verifies partitions, tracks status via job state models, and logs outcomes for auditing.
-3. **Logic Usefulness:** Maintains database health, reduces query latency, and keeps compliance teams confident in data lifecycle management.
-4. **Redundancies:** Partition configuration defined both in job and settings service; centralise to avoid mismatched schedules.
-5. **Placeholders Or non-working functions or stubs:** Some table definitions flagged TODO; mark with backlog links.
-6. **Duplicate Functions:** Logging scaffolding repeats across jobs; extract to shared job logger.
-7. **Improvements need to make:** Add alerting when partitions fail, support auto-tuning of retention windows, and surface metrics to observability stack.
-8. **Styling improvements:** Provide structured output consumed by admin dashboards showing partition health.
-9. **Efficiency analysis and improvement:** Batch operations, run off-peak, and parallelise for large table sets while respecting DB load.
-10. **Strengths to Keep:** Configurable design, strong logging, and integration with governance services.
-11. **Weaknesses to remove:** Manual configuration updates; tie to platform settings for single-source truth.
-12. **Styling and Colour review changes:** Align dashboard palette for partition statuses with compliance colour tokens.
-13. **CSS, orientation, placement and arrangement changes:** Offer layout guidance for partition status tables in admin UI.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Ensure status summaries remain concise and actionable.
-15. **Change Checklist Tracker:** Include partition rehearsal, DBA approval, and monitoring updates before releases.
-16. **Full Upgrade Plan & Release Steps:** Dry run in staging, validate metrics, update runbooks, coordinate DBA schedule, and deploy with alerting.
+1. **Appraisal:** `DataPartitionJob` schedules governance rotations via cron, executing `dataPartitionService.rotate`, persisting outcomes with `JobStateModel` on the shared `background_job_states` table (seeded in `backend-nodejs/seeds/001_bootstrap.js`), and emitting Prometheus counters through `recordBackgroundJobRun`/`recordDataPartitionSummary` alongside automatic pause windows after repeated failures.
+2. **Functionality:** `runCycle` validates enablement/pauses, times executions, calls the rotation executor with `{ dryRun }`, computes archived/planned counts, logs summary stats, persists latest run metadata (`last_summary`) and pause windows, and updates in-memory failure counters for backoff enforcement.
+3. **Logic Usefulness:** Persisted summaries capture results array, dry-run flag, and execution timestamp for governance review; background metrics track processed vs. failed tables; pause state saves `resumeAt` for ops handoff and ensures repeated failures stop hammering the database.
+4. **Redundancies:** Retention policy config still spans env vars and `DataPartitionService`; continue converging onto service-level policy descriptors so job overrides (`maxConsecutiveFailures`, `failureBackoffMinutes`) stay aligned with canonical policies.
+5. **Placeholders Or non-working functions or stubs:** Automatic retention tuning, checksum verification, and partition health scoring are documented future work; dry-run toggles exist but lack per-tenant overrides pending runtime configuration integration.
+6. **Duplicate Functions:** Failure pause/backoff logic is now encapsulated here, replacing duplicated scheduler guard code in worker bootstrap scripts and ensuring a single place manages `consecutiveFailures` and persistence of pause metadata.
+7. **Improvements need to make:** Add alerting thresholds for sustained `outcome: 'paused'`, persist execution histograms for trend dashboards, and expose partition-level Prometheus gauges per table to monitor drift against retention SLAs.
+8. **Styling improvements:** Define governance dashboard schemas summarising ensured vs. archived partitions, include palette tokens for compliance-approved status colours, and add annotations for pause/backoff states.
+9. **Efficiency analysis and improvement:** Metrics reveal duration and success mix while persisted summaries capture per-table results; next step is adaptive batching or sharding based on historical runtimes and partition sizes.
+10. **Strengths to Keep:** Clear layering between scheduler, executor service, logging, and metrics plus automatic pause windows create a resilient, observable retention pipeline.
+11. **Weaknesses to remove:** Reliance on global env toggles for dry-run/thresholds limits multi-tenant flexibility; integrate with `RuntimeConfigModel` or platform settings for dynamic overrides.
+12. **Styling and Colour review changes:** Future dashboards should use governance palette tokens to distinguish archived/planned/failed states and highlight pause banners with accessible contrast ratios.
+13. **CSS, orientation, placement and arrangement changes:** Provide responsive layouts for run-history cards, include spark lines for archived counts, and align mobile/desktop breakpoint behaviour for compliance operations tooling.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Keep rotation summaries succinct but include retention window context and dry-run indicators so DBA reviews stay fast without losing compliance nuance.
+15. **Change Checklist Tracker:** Before releases, validate Prometheus scrapes, inspect `background_job_states` entries (`last_summary`, `pause_window`), rehearse failure backoff reset, and notify governance stakeholders of config changes (including seeded partition summaries).
+16. **Full Upgrade Plan & Release Steps:** Stage rotations with anonymised data, confirm metrics ingestion, refresh Annex A33/docs, secure DBA approval, configure alerts for pause scenarios, ensure bootstrap summaries remain representative, and deploy with monitoring of duration and outcome trends.
 
 ### 4.C Data Retention Job (`backend-nodejs/src/jobs/dataRetentionJob.js`, `backend-nodejs/src/services/dataRetentionService.js`)
 1. **Appraisal:** The scheduler now orchestrates Annex A34 end-to-end—hydrating `data_retention_policies`, enforcing transactional strategies through `enforceRetentionPolicies`, persisting `data_retention_audit_logs`, and surfacing governance artefacts without manual intervention.
@@ -1307,18 +1307,18 @@ This expanded logic flows compendium should be revisited each release cycle to e
 - **Change Management:** Update Firebase/APNS credentials, run push notification QA, and align support macros.
 
 ### A32. Community Reminder Job (4.A)
-- **Operational Depth:** Job aggregates upcoming events, segments by role, and sends notifications via email and push queues.
-- **Gaps & Risks:** Currently lacks idempotency; reruns can double-send notifications. Add job-state tracking.
-- **Resilience & Efficiency:** Batch events per community, reuse templates, and throttle outbound requests.
-- **UX & Communications:** Ensure reminder copy tailored per persona, with clear action links.
-- **Change Management:** Include job monitoring alerts, dry-run in staging, and document rollback.
+- **Operational Depth:** `runCycle` coordinates due reminder hydration, dedupe snapshots in `job_state`, persona-aware copy generation, multi-channel fan-out (SMTP, Twilio, notification queue), and `DomainEventModel` telemetry for every dispatch.
+- **Gaps & Risks:** Queue enqueue success assumes downstream consumers drain instantly and localisation defaults to English; prioritise queue depth monitoring, retry/backoff logic, and additional locale template packs.
+- **Resilience & Efficiency:** Aggregated persona/channel stats plus `recordBackgroundJobRun`/Twilio metrics expose throughput and failure hotspots; adaptive batching and provider rate-limit handling are the next resilience milestones.
+- **UX & Communications:** The unified formatter delivers consistent greeting/CTA/palette metadata; build role-specific variants, shorten SMS bodies, and align push badge/titles with design tokens to maintain cross-channel cohesion.
+- **Change Management:** Checklist now includes validating job-state snapshots, confirming SMTP/Twilio credentials, rehearsing staging runs, updating Annex A32, and monitoring queue/metric dashboards during rollout.
 
 ### A33. Data Partition Job (4.B)
-- **Operational Depth:** Partitions historical data into cold storage based on retention policies.
-- **Gaps & Risks:** Reporting lacks transparency—operations must infer success from logs. Publish metrics to observability stack.
-- **Resilience & Efficiency:** Stream partitions incrementally, validate checksums, and throttle to avoid IO spikes.
-- **UX & Communications:** Provide admin dashboards summarising archived volumes.
-- **Change Management:** Document legal approvals, rehearse restores, and update retention policy docs.
+- **Operational Depth:** `runCycle` invokes `dataPartitionService.rotate`, records success/partial/failure metrics, persists latest summaries (`results`, `executedAt`, dry-run flags) to `job_state`, and enforces pause windows via persisted `pause_window` entries.
+- **Gaps & Risks:** Partition checksum validation, adaptive retention tuning, and per-table health scoring remain backlog items; alert when `outcome: paused` persists and document manual resume procedures.
+- **Resilience & Efficiency:** Background metrics plus stored summaries surface duration, processed/failed counts, and archived volumes; capture execution histograms and retention window metadata to inform batching strategies.
+- **UX & Communications:** Governance dashboards should surface persisted summary data, archive/ensure totals, and pause/resume timelines with compliance-approved palette cues for quick stakeholder comprehension.
+- **Change Management:** Release runbooks cover Prometheus scrape validation, snapshot review in `job_state`, DBA/governance approval, Annex A33 updates, and failure pause drills prior to production rollout.
 
 ### A34. Data Retention Job (4.C)
 - **Operational Depth:** Purges PII past retention window, coordinating with governance settings.

@@ -135,6 +135,7 @@ export async function seed(knex) {
     await trx('community_message_reactions').del();
     await trx('community_channel_members').del();
     await trx('community_messages').del();
+    await trx('notification_dispatch_queue').del();
     await trx('direct_message_participants').del();
     await trx('direct_messages').del();
     await trx('direct_message_threads').del();
@@ -146,6 +147,7 @@ export async function seed(knex) {
     await trx('user_follows').del();
     await trx('user_privacy_settings').del();
     await trx('community_posts').del();
+    await trx('community_event_reminders').del();
     await trx('community_channels').del();
     await trx('community_members').del();
     await trx('asset_conversion_outputs').del();
@@ -173,6 +175,7 @@ export async function seed(knex) {
     await trx('setup_runs').del();
     await trx('release_checklist_items').del();
     await trx('domain_event_dispatch_queue').del();
+    await trx('background_job_states').del();
     await trx('domain_events').del();
     await trx('security_incidents').del();
     await trx('dsr_requests').del();
@@ -639,6 +642,39 @@ export async function seed(knex) {
       country: 'US',
       languages: ['en'],
       analyticsKey: 'OPS-HQ',
+      primaryPersona: 'operators',
+      personas: ['operators', 'instructors'],
+      personaSignals: {
+        operators: {
+          focus: 'Launch control, incident readiness, automation runbooks',
+          membershipShare: 0.62,
+          trending: true,
+          highlights: ['Weekly incident drills', 'Automation guild office hours'],
+          sampleMembers: ['Amina Diallo', 'Kai Watanabe', 'Noemi Carvalho']
+        },
+        instructors: {
+          focus: 'Live classroom facilitation & async curriculum enablement',
+          membershipShare: 0.38,
+          trending: false,
+          highlights: ['Instructor studio rotations', 'Peer review pods'],
+          sampleMembers: ['Leo Okafor', 'Maya Patel']
+        }
+      },
+      momentum: {
+        lastActivityAt: nowIso,
+        boost: 12,
+        recencyWindowDays: 35,
+        trailing30Days: {
+          posts: 42,
+          resources: 18,
+          events: 4
+        }
+      },
+      access: {
+        model: 'open',
+        ndaRequired: false,
+        joinUrl: 'https://app.edulure.test/communities/learning-ops-guild/join'
+      },
       ratings: {
         average: 4.94,
         totalReviews: 212,
@@ -790,6 +826,46 @@ export async function seed(knex) {
       country: 'GB',
       languages: ['en'],
       analyticsKey: 'GROWTH-LAB',
+      primaryPersona: 'operators',
+      personas: ['operators', 'partners', 'sponsors'],
+      personaSignals: {
+        operators: {
+          focus: 'Lifecycle monetisation, revenue experimentation',
+          membershipShare: 0.54,
+          trending: true,
+          highlights: ['Bi-weekly revenue retros', 'Lifecycle monetisation benchmarks'],
+          sampleMembers: ['Sofia Martínez', 'Linh Tran']
+        },
+        partners: {
+          focus: 'Agency collaborators & ecosystem advisors',
+          membershipShare: 0.28,
+          trending: false,
+          highlights: ['Agency deal room', 'Co-marketing canvases'],
+          sampleMembers: ['Elias Noor', 'Grace Osei']
+        },
+        sponsors: {
+          focus: 'Brand activations & sponsorship readiness',
+          membershipShare: 0.18,
+          trending: true,
+          highlights: ['Sponsorship pitch lab', 'Brand asset showcase'],
+          sampleMembers: ['Anika Bose']
+        }
+      },
+      momentum: {
+        lastActivityAt: nowIso,
+        boost: 18,
+        recencyWindowDays: 30,
+        trailing30Days: {
+          posts: 58,
+          resources: 21,
+          events: 6
+        }
+      },
+      access: {
+        model: 'invite',
+        ndaRequired: true,
+        joinUrl: 'https://app.edulure.test/communities/creator-growth-lab/request'
+      },
       ratings: {
         average: 4.88,
         totalReviews: 168,
@@ -2580,15 +2656,21 @@ export async function seed(knex) {
     const emailChannel = COMMUNITY_EVENT_REMINDER_CHANNELS.includes('email')
       ? 'email'
       : COMMUNITY_EVENT_REMINDER_CHANNELS[0];
+    const pushChannel = COMMUNITY_EVENT_REMINDER_CHANNELS.includes('push')
+      ? 'push'
+      : COMMUNITY_EVENT_REMINDER_CHANNELS[0];
 
     if (opsSummitEvent?.id) {
+      const opsEmailReminderAt = new Date(opsCommunitySummitStart.getTime() - 30 * 60 * 1000);
+      const opsSmsReminderAt = new Date(opsCommunitySummitStart.getTime() - 45 * 60 * 1000);
+      const opsPushReminderAt = new Date(opsCommunitySummitStart.getTime() - 50 * 60 * 1000);
       await trx('community_event_reminders').insert([
         {
           event_id: opsSummitEvent.id,
           user_id: instructorId,
           status: reminderStatusPending,
           channel: emailChannel,
-          remind_at: new Date(opsCommunitySummitStart.getTime() - 30 * 60 * 1000),
+          remind_at: opsEmailReminderAt,
           metadata: JSON.stringify({ message: 'Automation Summit starts soon. Bring the incident workbook.' })
         },
         {
@@ -2596,16 +2678,29 @@ export async function seed(knex) {
           user_id: adminId,
           status: reminderStatusPending,
           channel: smsChannel,
-          remind_at: new Date(opsCommunitySummitStart.getTime() - 45 * 60 * 1000),
+          remind_at: opsSmsReminderAt,
           metadata: JSON.stringify({
             phoneNumber: '+15550001111',
             manageUrl: 'https://events.edulure.test/ops-summit/manage'
+          })
+        },
+        {
+          event_id: opsSummitEvent.id,
+          user_id: adminId,
+          status: reminderStatusPending,
+          channel: pushChannel,
+          remind_at: opsPushReminderAt,
+          metadata: JSON.stringify({
+            title: 'Summit kickoff reminder',
+            persona: 'ops-leads',
+            templateId: 'community-event-reminder'
           })
         }
       ]);
     }
 
     if (growthRoundtableEvent?.id) {
+      const adminSentReminderAt = new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000);
       await trx('community_event_reminders').insert([
         {
           event_id: growthRoundtableEvent.id,
@@ -2622,13 +2717,135 @@ export async function seed(knex) {
           user_id: adminId,
           status: reminderStatusSent,
           channel: emailChannel,
-          remind_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
-          sent_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
-          last_attempt_at: new Date(growthSummitStart.getTime() - 24 * 60 * 60 * 1000),
+          remind_at: adminSentReminderAt,
+          sent_at: adminSentReminderAt,
+          last_attempt_at: adminSentReminderAt,
           attempt_count: 1,
           metadata: JSON.stringify({ message: 'Roundtable reminder sent 24h ahead.' })
         }
       ]);
+    }
+
+    const seededReminderRows = await trx('community_event_reminders')
+      .select(
+        'id',
+        'event_id as eventId',
+        'user_id as userId',
+        'channel',
+        'remind_at as remindAt',
+        'status',
+        'metadata',
+        'sent_at as sentAt'
+      )
+      .orderBy('id', 'asc');
+
+    const notificationQueueInserts = [];
+    const jobStateInserts = [];
+    const nowIso = new Date().toISOString();
+
+    for (const row of seededReminderRows) {
+      let reminderMetadata = {};
+      if (row.metadata) {
+        try {
+          if (typeof row.metadata === 'string') {
+            reminderMetadata = JSON.parse(row.metadata);
+          } else if (typeof row.metadata === 'object') {
+            reminderMetadata = row.metadata;
+          }
+        } catch (_error) {
+          reminderMetadata = {};
+        }
+      }
+
+      if (row.status === reminderStatusSent) {
+        const personaLabel = reminderMetadata.persona ?? reminderMetadata.audienceLabel ?? 'member';
+        jobStateInserts.push({
+          job_key: 'community_reminder',
+          state_key: `reminder:${row.id}`,
+          version: row.remindAt ? new Date(row.remindAt).toISOString() : nowIso,
+          state_value: JSON.stringify({
+            status: 'sent',
+            channel: row.channel,
+            persona: personaLabel,
+            sentAt: row.sentAt ? new Date(row.sentAt).toISOString() : nowIso,
+            delivery: { provider: 'seed', channel: row.channel }
+          }),
+          metadata: JSON.stringify({ seeded: true, source: '001_bootstrap' })
+        });
+      }
+
+      if (row.channel === pushChannel || row.channel === 'in_app') {
+        const personaLabel = reminderMetadata.persona ?? reminderMetadata.audienceLabel ?? 'member';
+        const remindIso = row.remindAt ? new Date(row.remindAt).toISOString() : nowIso;
+        notificationQueueInserts.push({
+          user_id: row.userId,
+          channel: row.channel,
+          status: 'pending',
+          dedupe_key: `community:${row.eventId}:user:${row.userId}:remind:${remindIso}:${row.channel}`,
+          template_id: reminderMetadata.templateId ?? 'community-event-reminder',
+          title: reminderMetadata.title ?? 'Community event reminder',
+          body:
+            reminderMetadata.message ??
+            reminderMetadata.body ??
+            `Reminder seeded for ${personaLabel}.`,
+          payload: JSON.stringify({
+            eventId: row.eventId,
+            remindAt: remindIso,
+            persona: personaLabel
+          }),
+          metadata: JSON.stringify({
+            seeded: true,
+            channel: row.channel,
+            runId: 'seed-bootstrap'
+          }),
+          scheduled_at: new Date(),
+          available_at: new Date()
+        });
+      }
+    }
+
+    if (seededReminderRows.length > 0) {
+      const succeededCount = seededReminderRows.filter((row) => row.status !== 'failed').length;
+      const failedCount = seededReminderRows.length - succeededCount;
+      jobStateInserts.push({
+        job_key: 'community_reminder',
+        state_key: 'last_run',
+        version: nowIso,
+        state_value: JSON.stringify({
+          runId: 'seed-bootstrap',
+          processed: seededReminderRows.length,
+          succeeded: succeededCount,
+          failed: failedCount
+        }),
+        metadata: JSON.stringify({ seeded: true, source: '001_bootstrap' })
+      });
+    }
+
+    jobStateInserts.push({
+      job_key: 'data_partition',
+      state_key: 'last_summary',
+      version: nowIso,
+      state_value: JSON.stringify({
+        outcome: 'success',
+        executedAt: nowIso,
+        dryRun: false,
+        results: [
+          {
+            tableName: 'domain_events',
+            ensured: [{ status: 'ensured', partition: 'p202503' }],
+            archived: []
+          }
+        ]
+      }),
+      metadata: JSON.stringify({ seeded: true, source: '001_bootstrap' })
+    });
+
+    if (notificationQueueInserts.length > 0) {
+      await trx('notification_dispatch_queue').insert(notificationQueueInserts);
+    }
+
+    if (jobStateInserts.length > 0) {
+      await trx('background_job_states').insert(jobStateInserts);
     }
 
     const primaryPodcastReleaseOn = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -3616,6 +3833,8 @@ export async function seed(knex) {
       metadata: JSON.stringify({ channel: 'ops-guild', durationMinutes: 60 })
     });
 
+    const bookingSlaDue = new Date(tutorSlotStart.getTime() - 24 * 60 * 60 * 1000);
+
     const [opsTutorBookingId] = await trx('tutor_bookings').insert({
       public_id: crypto.randomUUID(),
       tutor_id: opsTutorProfileId,
@@ -3639,13 +3858,36 @@ export async function seed(knex) {
         ctaLabel: 'Join mentor room',
         location: 'Virtual ops lounge',
         timezone: 'Etc/UTC',
-        notes: 'Review escalation runbooks and donation messaging before the live stream.',
-        resources: [
-          {
-            title: 'Automation rehearsal checklist',
-            url: 'https://docs.edulure.test/ops/automation-checklist'
-          }
-        ]
+        durationMinutes: 60,
+        segment: 'Operations guild pod',
+        cohort: 'Automation rehearsal',
+        preferredSlot: {
+          label: 'Friday · 17:00 UTC',
+          startAt: tutorSlotStart.toISOString(),
+          timezone: 'Etc/UTC'
+        },
+        slaDueAt: bookingSlaDue.toISOString(),
+        risk: 'high',
+        routing: { score: 0.82, ruleset: 'ops-pod-routing-v1' },
+        recordingUrl: 'https://live.edulure.test/ops/automation-command-simulation/recording',
+        notes: [
+          'Review escalation runbooks and donation messaging before the live stream.',
+          'Share facilitator prep deck 12 hours ahead.'
+        ],
+        resources: {
+          prep: [
+            {
+              label: 'Automation rehearsal checklist',
+              url: 'https://docs.edulure.test/ops/automation-checklist'
+            }
+          ],
+          materials: [
+            {
+              label: 'Mentor talking points',
+              url: 'https://docs.edulure.test/ops/mentor-talking-points'
+            }
+          ]
+        }
       })
     });
 
@@ -3690,6 +3932,7 @@ export async function seed(knex) {
         checkInUrl: 'https://live.edulure.test/ops/automation-command-simulation/check-in',
         lobbyUrl: 'https://live.edulure.test/ops/automation-command-simulation/lobby',
         meetingUrl: 'https://live.edulure.test/ops/automation-command-simulation',
+        hostUrl: 'https://ops.edulure.test/host/automation-command',
         timezone: 'Etc/UTC',
         facilitators: ['Kai Watanabe', 'Ops Control Desk'],
         security: { waitingRoom: true, passcodeRequired: true, owner: 'Ops Control Desk' },
@@ -3699,6 +3942,10 @@ export async function seed(knex) {
           updatedAt: liveWhiteboardUpdated.toISOString(),
           ready: true,
           url: 'https://whiteboard.edulure.test/ops/automation-command',
+          notes: [
+            'Moderation toolkit pinned to the whiteboard sidebar.',
+            'Confirm scoreboard overlay with streaming ops during dry run.'
+          ],
           snapshots: [
             {
               template: 'Automation ops board',
@@ -3746,12 +3993,49 @@ export async function seed(knex) {
           { name: 'Automation pod A', capacity: 24 },
           { name: 'Escalation drills', capacity: 18 }
         ],
-        resources: [
-          {
-            title: 'Automation command deck',
-            url: 'https://cdn.edulure.test/slides/automation-command.pdf'
-          }
+        resources: {
+          hostUrl: 'https://ops.edulure.test/host/automation-command',
+          prep: [
+            {
+              label: 'Facilitator standby checklist',
+              url: 'https://docs.edulure.test/ops/facilitator-standby'
+            },
+            {
+              label: 'Automation rehearsal briefing',
+              url: 'https://docs.edulure.test/ops/automation-briefing'
+            }
+          ],
+          materials: [
+            {
+              label: 'Automation command deck',
+              url: 'https://cdn.edulure.test/slides/automation-command.pdf'
+            },
+            {
+              label: 'Telemetry dashboard quickstart',
+              url: 'https://docs.edulure.test/ops/telemetry-dashboard'
+            }
+          ],
+          recordings: [
+            {
+              label: 'Prior cohort replay',
+              url: 'https://cdn.edulure.test/video/ops/automation-command-replay.mp4'
+            }
+          ]
+        },
+        support: {
+          moderator: 'Ops Control Desk',
+          helpDesk: 'ops-support@edulure.test',
+          escalation: 'https://ops.edulure.test/escalations'
+        },
+        alerts: [
+          { id: 'ops-capacity', label: '64 of 120 seats reserved — queue waitlist updates.' },
+          { id: 'ops-escalation', label: 'Escalation desk standby required 15 minutes prior.' }
         ],
+        pricing: {
+          collectedLabel: '64 tickets collected',
+          payoutStatus: 'scheduled'
+        },
+        goLiveBy: livePrepCheckpoint.toISOString(),
         donations: { enabled: true, suggestedAmountCents: 2500 },
         eventId: 'OPS-LIVE-001'
       })

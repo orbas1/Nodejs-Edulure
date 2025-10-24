@@ -2,7 +2,9 @@ import cron from 'node-cron';
 
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
+import JobStateModel from '../models/JobStateModel.js';
 import dataPartitionService from '../services/DataPartitionService.js';
+import { recordBackgroundJobRun, recordDataPartitionSummary } from '../observability/metrics.js';
 
 function ensurePositiveInteger(value, fallback) {
   const parsed = Number.isFinite(value) ? value : Number(value);
@@ -23,7 +25,8 @@ export class DataPartitionJob {
     failureBackoffMinutes = 30,
     executor = (options) => dataPartitionService.rotate(options),
     scheduler = cron,
-    loggerInstance = logger.child({ module: 'data-partition-job' })
+    loggerInstance = logger.child({ module: 'data-partition-job' }),
+    jobStateModel = JobStateModel
   } = {}) {
     if (!schedule || typeof schedule !== 'string') {
       throw new Error('DataPartitionJob requires a cron schedule string.');
@@ -51,6 +54,8 @@ export class DataPartitionJob {
     this.consecutiveFailures = 0;
     this.pausedUntil = null;
     this.lastSummary = null;
+    this.jobStateModel = jobStateModel;
+    this.jobKey = 'data_partition';
   }
 
   start() {
@@ -97,6 +102,15 @@ export class DataPartitionJob {
   async runCycle(trigger = 'manual') {
     if (!this.enabled) {
       this.logger.warn({ trigger }, 'Data partition job invoked while disabled');
+      recordBackgroundJobRun({
+        job: this.jobKey,
+        trigger,
+        outcome: 'skipped',
+        durationMs: 0,
+        processed: 0,
+        succeeded: 0,
+        failed: 0
+      });
       return null;
     }
 
@@ -105,10 +119,20 @@ export class DataPartitionJob {
         { trigger, resumeAt: this.pausedUntil.toISOString() },
         'Data partition job paused after repeated failures'
       );
+      recordBackgroundJobRun({
+        job: this.jobKey,
+        trigger,
+        outcome: 'paused',
+        durationMs: 0,
+        processed: 0,
+        succeeded: 0,
+        failed: 0
+      });
       return null;
     }
 
     try {
+      const startedAt = process.hrtime.bigint();
       const summary = await this.executor({ dryRun: this.dryRun });
       this.lastSummary = summary;
       this.consecutiveFailures = 0;
@@ -129,6 +153,36 @@ export class DataPartitionJob {
         'Data partition job completed'
       );
 
+      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+      const processed = Array.isArray(summary?.results) ? summary.results.length : 0;
+      const failed = summary?.results?.filter?.((result) => result.status === 'failed').length ?? 0;
+      const succeeded = processed - failed;
+      const outcome = failed > 0 ? 'partial' : 'success';
+
+      recordBackgroundJobRun({
+        job: this.jobKey,
+        trigger,
+        outcome,
+        durationMs,
+        processed,
+        succeeded,
+        failed
+      });
+
+      if (summary) {
+        recordDataPartitionSummary({ summary, outcome });
+        const version = summary.runId ?? new Date().toISOString();
+        await this.jobStateModel.save(this.jobKey, 'last_summary', {
+          version,
+          state: {
+            outcome,
+            executedAt: summary.executedAt ?? new Date().toISOString(),
+            dryRun: summary.dryRun,
+            results: summary.results ?? []
+          }
+        });
+      }
+
       return summary;
     } catch (error) {
       this.consecutiveFailures += 1;
@@ -136,6 +190,16 @@ export class DataPartitionJob {
         { err: error, trigger, consecutiveFailures: this.consecutiveFailures },
         'Data partition execution failed'
       );
+
+      recordBackgroundJobRun({
+        job: this.jobKey,
+        trigger,
+        outcome: 'failure',
+        durationMs: 0,
+        processed: 0,
+        succeeded: 0,
+        failed: 1
+      });
 
       if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
         const pauseMs = this.failureBackoffMinutes * 60 * 1000;
@@ -145,6 +209,17 @@ export class DataPartitionJob {
           { trigger, resumeAt: this.pausedUntil.toISOString(), failureBackoffMinutes: this.failureBackoffMinutes },
           'Pausing data partition job after repeated failures'
         );
+
+        if (this.pausedUntil) {
+          await this.jobStateModel.save(this.jobKey, 'pause_window', {
+            version: this.pausedUntil.toISOString(),
+            state: {
+              resumeAt: this.pausedUntil.toISOString(),
+              failureBackoffMinutes: this.failureBackoffMinutes,
+              trigger
+            }
+          });
+        }
       }
 
       throw error;

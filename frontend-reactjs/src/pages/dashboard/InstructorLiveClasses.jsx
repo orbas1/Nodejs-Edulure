@@ -1,3 +1,4 @@
+import { useCallback, useMemo, useState } from 'react';
 import {
   BanknotesIcon,
   CheckCircleIcon,
@@ -10,8 +11,15 @@ import {
 } from '@heroicons/react/24/outline';
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import ScheduleGrid from '../../components/scheduling/ScheduleGrid.jsx';
+import {
+  downloadCalendarEvents,
+  ensureFilename,
+  formatDateTime,
+  resolveRelativeTime
+} from '../../utils/calendar.js';
 import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
 function ReadinessBadge({ status }) {
@@ -25,7 +33,7 @@ function ReadinessBadge({ status }) {
   return <span className={`${base} bg-rose-100 text-rose-700`}>Action</span>;
 }
 
-function SessionCard({ session }) {
+function SessionCard({ session, timezoneLabel, onDownload }) {
   const occupancy = session.occupancy ?? {};
   const pricing = session.pricing ?? {};
   const action = session.callToAction ?? null;
@@ -33,6 +41,17 @@ function SessionCard({ session }) {
   const whiteboard = session.whiteboard ?? null;
   const support = session.support ?? {};
   const attendance = session.attendance ?? {};
+  const resources = session.resources ?? {};
+  const alerts = Array.isArray(session.alerts) ? session.alerts : [];
+  const scheduleStart =
+    formatDateTime(session.startAt, { timeZone: timezoneLabel }) ?? session.startLabel ?? 'Schedule TBC';
+  const scheduleEnd =
+    formatDateTime(session.endAt, { timeZone: timezoneLabel }) ?? session.endLabel ?? null;
+  const relativeStart = resolveRelativeTime(session.startAt);
+  const joinUrl =
+    resources.joinUrl || resources.hostUrl || session.links?.join || action?.href || action?.url || null;
+  const prepLinks = Array.isArray(resources.prep) ? resources.prep : [];
+  const materialLinks = Array.isArray(resources.materials) ? resources.materials : [];
 
   const capacityLabel = occupancy.capacity
     ? `${occupancy.reserved ?? 0}/${occupancy.capacity} seats`
@@ -47,10 +66,14 @@ function SessionCard({ session }) {
           <p className="dashboard-kicker">{session.stage}</p>
           <h3 className="text-lg font-semibold text-slate-900">{session.title}</h3>
           <p className="mt-1 text-sm text-slate-600">
-            {session.startLabel}
-            {session.timezone ? ` • ${session.timezone}` : ''}
+            {scheduleStart}
+            {scheduleEnd ? ` → ${scheduleEnd}` : ''}
+            {timezoneLabel && timezoneLabel !== 'local' ? ` • ${timezoneLabel}` : ''}
             {session.community ? ` • ${session.community}` : ''}
           </p>
+          {relativeStart && (
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-primary">{relativeStart}</p>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
               <UsersIcon className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -85,6 +108,15 @@ function SessionCard({ session }) {
             {action.label}
           </button>
         )}
+        {onDownload && (
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            onClick={() => onDownload(session)}
+          >
+            Add to calendar
+          </button>
+        )}
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -116,6 +148,65 @@ function SessionCard({ session }) {
           </div>
         </div>
       </div>
+
+      {(joinUrl || prepLinks.length > 0 || materialLinks.length > 0) && (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Access &amp; prep</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-primary">
+              {joinUrl && (
+                <a
+                  href={joinUrl}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 font-semibold text-white shadow-sm transition hover:bg-primary-dark"
+                >
+                  Join room
+                </a>
+              )}
+              {Array.isArray(resources.recordings) && resources.recordings.length > 0 && (
+                <a
+                  href={resources.recordings[0]}
+                  className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-3 py-1 font-semibold text-white shadow-sm transition hover:bg-slate-700"
+                >
+                  View recording
+                </a>
+              )}
+            </div>
+            {(prepLinks.length > 0 || materialLinks.length > 0) && (
+              <ul className="mt-3 space-y-2 text-xs text-slate-600">
+                {prepLinks.map((item) => (
+                  <li key={item.url ?? item} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-primary" />
+                    <a href={item.url ?? item} className="hover:text-primary">
+                      {item.label ?? 'Prep resource'}
+                    </a>
+                  </li>
+                ))}
+                {materialLinks.map((item) => (
+                  <li key={item.url ?? item} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-primary/60" />
+                    <a href={item.url ?? item} className="hover:text-primary">
+                      {item.label ?? 'Class material'}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {alerts.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Operational alerts</p>
+              <ul className="mt-2 space-y-1 text-xs text-amber-700">
+                {alerts.map((alert) => (
+                  <li key={alert.id ?? alert} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-amber-500" />
+                    <span>{alert.label ?? alert}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {whiteboard && (whiteboard.template || whiteboard.url) && (
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
@@ -156,6 +247,14 @@ function SessionCard({ session }) {
 function InstructorLiveClasses() {
   const { dashboard, refresh } = useOutletContext();
   const data = dashboard?.liveClassrooms;
+  const [timezoneFilter, setTimezoneFilter] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'local';
+    } catch (_error) {
+      return 'local';
+    }
+  });
+  const [exportFeedback, setExportFeedback] = useState(null);
 
   if (!data) {
     return (
@@ -175,20 +274,101 @@ function InstructorLiveClasses() {
   const groups = Array.isArray(data.groups) ? data.groups : [];
   const whiteboardSnapshots = Array.isArray(data.whiteboard?.snapshots) ? data.whiteboard.snapshots : [];
   const readiness = Array.isArray(data.whiteboard?.readiness) ? data.whiteboard.readiness : [];
-  const scheduleEvents = [...active, ...upcoming].map((session) => ({
-    id: session.id,
-    title: session.title,
-    stage: session.stage,
-    status: session.status,
-    startAt: session.startAt,
-    endAt: session.endAt,
-    timezone: session.timezone,
-    occupancy: session.occupancy,
-    attendance: session.attendance
-  }));
+  const localTimezone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+    } catch (_error) {
+      return null;
+    }
+  }, []);
+
+  const timezoneLabel = timezoneFilter === 'local' ? localTimezone ?? 'local' : timezoneFilter;
+
+  const enrichSession = useCallback(
+    (session) => ({
+      ...session,
+      timezone: timezoneLabel,
+      startLabel: formatDateTime(session.startAt, { timeZone: timezoneLabel }) ?? session.startLabel,
+      endLabel: formatDateTime(session.endAt, { timeZone: timezoneLabel }) ?? session.endLabel,
+      relativeStart: resolveRelativeTime(session.startAt)
+    }),
+    [timezoneLabel]
+  );
+
+  const scheduleEvents = useMemo(
+    () =>
+      [...active, ...upcoming].map((session) => ({
+        id: session.id,
+        title: session.title,
+        stage: session.stage,
+        status: session.status,
+        startAt: session.startAt,
+        endAt: session.endAt,
+        timezone: timezoneLabel,
+        occupancy: session.occupancy,
+        attendance: session.attendance
+      })),
+    [active, upcoming, timezoneLabel]
+  );
+
+  const timezoneOptions = useMemo(() => {
+    const set = new Set();
+    if (localTimezone) {
+      set.add(localTimezone);
+    }
+    set.add('local');
+    [...active, ...upcoming, ...completed].forEach((session) => {
+      if (session.timezone) {
+        set.add(session.timezone);
+      }
+    });
+    return Array.from(set);
+  }, [active, upcoming, completed, localTimezone]);
+
+  const handleDownloadSession = useCallback(
+    (session) => {
+      const event = {
+        id: session.id,
+        title: session.title,
+        startAt: session.startAt,
+        endAt: session.endAt ?? session.startAt,
+        description:
+          session.description ?? session.support?.helpDesk ?? 'Edulure live classroom session with moderator coverage.',
+        location: session.location ?? session.community ?? 'Virtual classroom',
+        url: session.callToAction?.href ?? session.callToAction?.url ?? session.links?.join ?? null,
+        categories: ['Edulure Live Classroom', session.stage].filter(Boolean)
+      };
+
+      const filename = ensureFilename(`${session.title ?? 'live-class'}-${session.startAt ?? Date.now()}`, 'ics');
+      const success = downloadCalendarEvents([event], {
+        filename,
+        prodId: '-//Edulure//InstructorLiveClass//EN'
+      });
+
+      setExportFeedback(
+        success
+          ? {
+              tone: 'success',
+              message: 'Calendar invite generated.',
+              detail: 'Import the .ics file into your calendar to share host details with facilitators.'
+            }
+          : {
+              tone: 'error',
+              message: 'Unable to create calendar file.',
+              detail: 'Check the session schedule and try again once start/end times are available.'
+            }
+      );
+    },
+    []
+  );
+
+  const enrichedActive = useMemo(() => active.map(enrichSession), [active, enrichSession]);
+  const enrichedUpcoming = useMemo(() => upcoming.map(enrichSession), [enrichSession, upcoming]);
+  const enrichedCompleted = useMemo(() => completed.map(enrichSession), [completed, enrichSession]);
 
   return (
     <div className="space-y-8">
+      <DashboardActionFeedback feedback={exportFeedback} onDismiss={() => setExportFeedback(null)} />
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="dashboard-title">Live classrooms control</h1>
@@ -200,6 +380,32 @@ function InstructorLiveClasses() {
           Sync latest data
         </button>
       </header>
+
+      <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scheduling preferences</p>
+          <p className="text-sm text-slate-600">
+            View classroom schedules in your preferred timezone and export host-ready invites for facilitators.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="live-classes-timezone">
+            Time zone
+          </label>
+          <select
+            id="live-classes-timezone"
+            value={timezoneFilter}
+            onChange={(event) => setTimezoneFilter(event.target.value)}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm focus:border-primary focus:outline-none"
+          >
+            {timezoneOptions.map((option) => (
+              <option key={option} value={option}>
+                {option === 'local' ? 'Local device time' : option}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
 
       <section className="dashboard-section">
         <h2 className="text-lg font-semibold text-slate-900">Operational metrics</h2>
@@ -245,8 +451,8 @@ function InstructorLiveClasses() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-slate-900">Live sessions in progress</h2>
           <div className="grid gap-4 lg:grid-cols-2">
-            {active.map((session) => (
-              <SessionCard key={session.id} session={session} />
+            {enrichedActive.map((session) => (
+              <SessionCard key={session.id} session={session} timezoneLabel={timezoneLabel} onDownload={handleDownloadSession} />
             ))}
           </div>
         </section>
@@ -260,8 +466,15 @@ function InstructorLiveClasses() {
           </div>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          {upcoming.length > 0 ? (
-            upcoming.map((session) => <SessionCard key={session.id} session={session} />)
+          {enrichedUpcoming.length > 0 ? (
+            enrichedUpcoming.map((session) => (
+              <SessionCard
+                key={session.id}
+                session={session}
+                timezoneLabel={timezoneLabel}
+                onDownload={handleDownloadSession}
+              />
+            ))
           ) : (
             <div className="dashboard-card p-6 text-sm text-slate-500">
               Schedule a live classroom to populate the upcoming pipeline.
@@ -269,6 +482,32 @@ function InstructorLiveClasses() {
           )}
         </div>
       </section>
+
+      {data.escalations && (
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">Session escalations</p>
+              <p className="text-sm text-rose-700">
+                {data.escalations.summary ?? 'Escalations flagged by the scheduling service require action before go-live.'}
+              </p>
+            </div>
+            {Array.isArray(data.escalations.actions) && data.escalations.actions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {data.escalations.actions.map((action) => (
+                  <a
+                    key={action.url ?? action.label}
+                    href={action.url}
+                    className="rounded-full border border-rose-400 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-500 hover:text-rose-700"
+                  >
+                    {action.label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {groups.length > 0 && (
         <section className="dashboard-section">
@@ -371,7 +610,7 @@ function InstructorLiveClasses() {
         <section className="dashboard-section">
           <h2 className="text-lg font-semibold text-slate-900">Recently completed sessions</h2>
           <div className="mt-4 space-y-3">
-            {completed.map((session) => (
+            {enrichedCompleted.map((session) => (
               <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{session.title}</p>
