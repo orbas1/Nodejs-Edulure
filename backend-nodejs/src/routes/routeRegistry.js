@@ -18,6 +18,7 @@ import explorerRoutes from './explorer.routes.js';
 import feedRoutes from './feed.routes.js';
 import paymentRoutes from './payment.routes.js';
 import integrationInviteRoutes from './integrationInvite.routes.js';
+import accountBillingRoutes from './accountBilling.routes.js';
 import runtimeConfigRoutes from './runtimeConfig.routes.js';
 import socialRoutes from './social.routes.js';
 import userRoutes from './user.routes.js';
@@ -44,6 +45,7 @@ const routerMap = {
   creation: creationRoutes,
   'runtime-config': runtimeConfigRoutes,
   payments: paymentRoutes,
+  'account-billing': accountBillingRoutes,
   'integration-invites': integrationInviteRoutes,
   compliance: complianceRoutes,
   security: securityRoutes,

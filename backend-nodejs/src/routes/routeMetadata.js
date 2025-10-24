@@ -619,6 +619,32 @@ const ROUTE_DEFINITIONS = [
     runbookUrl: 'https://runbooks.edulure.internal/payments-service-outage'
   },
   {
+    name: 'account-billing',
+    capability: 'account-billing-workspace',
+    description: 'Authenticated billing overview, invoice history, and portal session endpoints for learners and instructors.',
+    basePath: '/account/billing',
+    flagKey: 'platform.api.v1.accountBilling',
+    defaultState: 'enabled',
+    fallbackStatus: 503,
+    disabledMessage: 'Account billing APIs are temporarily unavailable. Please try again or contact support.',
+    audience: 'user',
+    owners: ['payments-platform', 'account-experience'],
+    serviceTier: 'core',
+    tags: ['api', 'v1', 'billing'],
+    rbac: {
+      strategy: 'role-based',
+      defaultRole: 'user',
+      allowedRoles: ['user', 'admin', 'finance'],
+      elevatedRoles: ['finance', 'admin'],
+      notes: 'Finance users can access cross-tenant invoices while learners receive scoped results.'
+    },
+    cors: {
+      allowedMethods: ['GET', 'POST']
+    },
+    statusPageComponent: 'api-account-billing',
+    runbookUrl: 'https://runbooks.edulure.internal/account-billing-workspace'
+  },
+  {
     name: 'compliance',
     capability: 'data-governance',
     description: 'GDPR, consent management, and incident governance endpoints.',

@@ -100,6 +100,7 @@ export async function seed(knex) {
     await trx('payment_ledger_entries').del();
     await trx('payment_refunds').del();
     await trx('payment_intents').del();
+    await trx('billing_portal_sessions').del();
     await trx('learner_finance_purchases').del();
     await trx('learner_financial_profiles').del();
     await trx('learner_payment_methods').del();
@@ -385,6 +386,12 @@ export async function seed(knex) {
         invoiceDelivery: 'email',
         payoutSchedule: 'monthly',
         expensePolicyUrl: 'https://cdn.edulure.test/docs/expense-policy.pdf',
+        collectionMethod: 'Automatic card collection',
+        supportTier: 'Priority success desk',
+        supportNotes: 'Finance desk available via dedicated Slack channel with four-hour SLA.',
+        renewalTerm: 'Annual membership · Net 30 invoicing cadence',
+        renewalNotes: 'Renews automatically each January unless cancelled 30 days prior.',
+        seatUsage: { used: 18, total: 25 },
         alerts: {
           sendEmail: true,
           sendSms: false,

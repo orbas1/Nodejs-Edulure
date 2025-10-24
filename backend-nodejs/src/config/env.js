@@ -865,6 +865,10 @@ const envSchema = z
     PAYMENTS_TAX_INCLUSIVE: z.coerce.boolean().default(false),
     PAYMENTS_MINIMUM_TAX_RATE: z.coerce.number().min(0).max(1).default(0),
     PAYMENTS_MAX_COUPON_PERCENTAGE: z.coerce.number().min(0).max(100).default(80),
+    BILLING_PORTAL_ENABLED: z.coerce.boolean().default(true),
+    BILLING_PORTAL_BASE_URL: z.string().url().optional(),
+    BILLING_PORTAL_ALLOWED_RETURN_ORIGINS: z.string().optional(),
+    BILLING_PORTAL_SESSION_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(600),
     PAYMENTS_REPORTING_TIMEZONE: z.string().default('Etc/UTC'),
     MONETIZATION_RECONCILIATION_ENABLED: z.coerce.boolean().default(true),
     MONETIZATION_RECONCILIATION_CRON: z.string().default('5 * * * *'),
@@ -1262,6 +1266,12 @@ const jwtKeyset = normalizeJwtKeyset(raw.JWT_KEYSET, raw.JWT_SECRET, raw.JWT_ACT
 const activeJwtKey = jwtKeyset.keys.find((key) => key.kid === jwtKeyset.activeKeyId);
 
 const corsOrigins = parseOriginList(raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL);
+const appOrigins = parseOriginList(raw.APP_URL);
+const primaryAppUrl = appOrigins[0] ?? null;
+const billingPortalAllowedOrigins = parseOriginList(
+  raw.BILLING_PORTAL_ALLOWED_RETURN_ORIGINS ?? raw.APP_URL
+);
+const billingPortalBaseUrl = raw.BILLING_PORTAL_BASE_URL?.trim() || null;
 
 const metricsAllowedIps = parseCsv(raw.METRICS_ALLOWED_IPS ?? '');
 const redactedFields = parseCsv(raw.LOG_REDACTED_FIELDS ?? '');
@@ -1433,7 +1443,8 @@ export const env = {
     name: raw.APP_NAME,
     port: webPort,
     probePort: webProbePort,
-    corsOrigins
+    corsOrigins,
+    baseUrl: primaryAppUrl
   },
   services: {
     web: {
@@ -1717,6 +1728,12 @@ export const env = {
     },
     coupons: {
       maxPercentageDiscount: raw.PAYMENTS_MAX_COUPON_PERCENTAGE
+    },
+    billingPortal: {
+      enabled: raw.BILLING_PORTAL_ENABLED,
+      baseUrl: billingPortalBaseUrl,
+      allowedReturnOrigins: billingPortalAllowedOrigins,
+      sessionTtlSeconds: raw.BILLING_PORTAL_SESSION_TTL_SECONDS
     }
   },
   drm: {

@@ -366,6 +366,27 @@
         { "name": "data_partition_policies_table_name_unique", "columns": ["table_name"], "unique": true }
       ]
     },
+    "billing_portal_sessions": {
+      "columns": {
+        "id": { "dataType": "char", "columnType": "char(36)", "isNullable": false, "columnDefault": null },
+        "user_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
+        "session_token_hash": { "dataType": "varchar", "columnType": "varchar(128)", "isNullable": false, "columnDefault": null },
+        "portal_url": { "dataType": "varchar", "columnType": "varchar(512)", "isNullable": false, "columnDefault": null },
+        "return_url": { "dataType": "varchar", "columnType": "varchar(512)", "isNullable": true, "columnDefault": null },
+        "status": { "dataType": "enum", "columnType": "enum('active','consumed','expired')", "isNullable": false, "columnDefault": "active" },
+        "expires_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": null },
+        "consumed_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP", "extra": "on update CURRENT_TIMESTAMP" }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "billing_portal_sessions_session_token_hash_unique", "columns": ["session_token_hash"], "unique": true },
+        { "name": "billing_portal_sessions_user_status_idx", "columns": ["user_id", "status"], "unique": false },
+        { "name": "billing_portal_sessions_expiry_idx", "columns": ["expires_at"], "unique": false }
+      ]
+    },
     "payment_intents": {
       "columns": {
         "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },

@@ -111,8 +111,8 @@
       - A19. Courses, Library & Live Sessions (2.D)
       - A20. Community, Events & Messaging (2.E)
       - A21. Analytics, Admin & Operations Dashboards (2.F)
-      - A22. Commerce, Billing & Profile Management (2.G)
-      - A23. Integrations, Enablement & Invitations (2.H)
+      - A22. Commerce, Billing & Profile Management (2.G) ✓
+      - A23. Integrations, Enablement & Invitations (2.H) ✓
       - A24. Support, Knowledge & Feedback (2.I)
       - A25. Shared Layout, Theming & Component Infrastructure (2.J)
       - A26. Flutter Authentication & Identity (3.A)

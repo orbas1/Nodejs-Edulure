@@ -11474,6 +11474,225 @@
           "success",
           "data"
         ]
+      },
+      "BillingSeatUsage": {
+        "type": "object",
+        "properties": {
+          "used": {
+            "type": "integer",
+            "description": "Number of seats currently used"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total seats available"
+          }
+        },
+        "required": [
+          "used",
+          "total"
+        ]
+      },
+      "BillingOverview": {
+        "type": "object",
+        "properties": {
+          "planName": {
+            "type": "string",
+            "description": "Label for the active subscription plan"
+          },
+          "planAmount": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Recurring amount in cents for the plan"
+          },
+          "amountDueCents": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Outstanding balance due in cents"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code for the plan and invoices"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "description": "Raw provider status"
+          },
+          "statusLabel": {
+            "type": "string",
+            "description": "Human readable status label"
+          },
+          "billingIntervalLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human readable billing interval"
+          },
+          "nextPaymentDueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Next payment or invoice due date"
+          },
+          "collectionMethodLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Indicates manual invoicing vs automatic collection"
+          },
+          "supportTier": {
+            "type": "string",
+            "nullable": true
+          },
+          "supportNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "renewalTerm": {
+            "type": "string",
+            "nullable": true
+          },
+          "renewalNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "seatUsage": {
+            "$ref": "#/components/schemas/BillingSeatUsage",
+            "nullable": true
+          },
+          "lastSyncedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the latest data refresh"
+          }
+        },
+        "required": [
+          "planName",
+          "currency",
+          "statusLabel",
+          "lastSyncedAt"
+        ]
+      },
+      "BillingPaymentMethod": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "last4": {
+            "type": "string",
+            "nullable": true
+          },
+          "expMonth": {
+            "type": "integer",
+            "nullable": true
+          },
+          "expYear": {
+            "type": "integer",
+            "nullable": true
+          },
+          "default": {
+            "type": "boolean",
+            "description": "Indicates whether this is the default payment instrument"
+          },
+          "statusLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayLabel": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "default"
+        ]
+      },
+      "BillingInvoice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "amountDueCents": {
+            "type": "integer",
+            "description": "Invoice total in cents"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Invoice currency (ISO code)"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "statusLabel": {
+            "type": "string",
+            "description": "Human readable invoice status label"
+          },
+          "downloadUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "amountDueCents",
+          "currency",
+          "statusLabel"
+        ]
+      },
+      "BillingPortalSession": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Portal URL clients should redirect the user to"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO timestamp when the session expires"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
+        ]
+      },
+      "BillingPortalSessionRequest": {
+        "type": "object",
+        "properties": {
+          "returnUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Optional URL to return to after leaving the billing portal",
+            "nullable": true
+          }
+        }
       }
     }
   },
@@ -23164,6 +23383,197 @@
           },
           "403": {
             "description": "Release APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/account/billing/overview": {
+      "get": {
+        "summary": "Retrieve billing overview",
+        "tags": [
+          "Billing"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Billing overview retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/BillingOverview"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "503": {
+            "description": "Billing capability temporarily disabled"
+          }
+        }
+      }
+    },
+    "/account/billing/payment-methods": {
+      "get": {
+        "summary": "List stored payment methods",
+        "tags": [
+          "Billing"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment methods fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/BillingPaymentMethod"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "503": {
+            "description": "Billing capability temporarily disabled"
+          }
+        }
+      }
+    },
+    "/account/billing/invoices": {
+      "get": {
+        "summary": "List recent invoices",
+        "tags": [
+          "Billing"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoices fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/BillingInvoice"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "503": {
+            "description": "Billing capability temporarily disabled"
+          }
+        }
+      }
+    },
+    "/account/billing/portal-sessions": {
+      "post": {
+        "summary": "Create a billing portal session",
+        "tags": [
+          "Billing"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingPortalSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Billing portal session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/BillingPortalSession"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "422": {
+            "description": "Invalid return URL supplied"
+          },
+          "503": {
+            "description": "Billing portal disabled or unavailable"
           }
         }
       }

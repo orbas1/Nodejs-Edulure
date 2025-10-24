@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
+import { formatCurrency, formatCurrencyFromMinorUnits } from '../utils/currency.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'tutors',
@@ -103,30 +104,24 @@ function parseMetadata(value) {
   }
 }
 
-function formatRate(amount, currency = 'USD') {
-  if (amount === null || amount === undefined || amount === '') {
-    return 'Contact for pricing';
-  }
-  const numeric = Number(amount);
-  if (!Number.isFinite(numeric)) {
-    return `${currency} ${amount}`;
-  }
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(numeric);
-  } catch (_error) {
-    return `${currency} ${numeric}`;
-  }
+function formatHourlyRate(amount, currency = 'USD') {
+  const formatted = formatCurrency(amount, currency);
+  return formatted ?? 'Contact for pricing';
 }
 
-function formatCurrencyFromCents(amountCents, currency = 'USD') {
-  if (!Number.isFinite(Number(amountCents))) {
-    return `${currency} 0.00`;
+function formatAmountFromCents(amountCents, currency = 'USD') {
+  const formatted = formatCurrencyFromMinorUnits(amountCents, currency);
+  if (formatted) {
+    return formatted;
   }
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(Number(amountCents) / 100);
-  } catch (_error) {
-    return `${currency} ${(Number(amountCents) / 100).toFixed(2)}`;
+
+  const numeric = Number(amountCents);
+  if (Number.isFinite(numeric)) {
+    const fallback = formatCurrency(numeric / 100, currency);
+    return fallback ?? `${currency} ${(numeric / 100).toFixed(2)}`;
   }
+
+  return `${currency} 0.00`;
 }
 
 function toDateTimeLocal(value) {
@@ -214,7 +209,7 @@ function mapCatalogueTutor(tutor) {
     languages: Array.isArray(tutor.languages) ? tutor.languages : ['en'],
     country: tutor.country ?? null,
     timezones: Array.isArray(tutor.timezones) ? tutor.timezones : ['Etc/UTC'],
-    hourlyRate: formatRate(tutor.hourlyRateAmount, tutor.hourlyRateCurrency ?? 'USD'),
+    hourlyRate: formatHourlyRate(tutor.hourlyRateAmount, tutor.hourlyRateCurrency ?? 'USD'),
     isVerified: Boolean(tutor.isVerified)
   };
 }
@@ -1035,11 +1030,11 @@ export default function TutorProfile() {
     const tutorName = booking.tutorProfile?.displayName ?? booking.tutorProfile?.user?.name ?? 'Tutor';
     const scheduledAt = formatDateTime(booking.scheduledStart);
     const durationMinutes = booking.durationMinutes ?? 60;
-    const hourlyRate = formatCurrencyFromCents(booking.hourlyRateAmount ?? 0, booking.hourlyRateCurrency ?? 'USD');
+    const hourlyRate = formatAmountFromCents(booking.hourlyRateAmount ?? 0, booking.hourlyRateCurrency ?? 'USD');
     const totalCents = Number.isFinite(Number(booking.hourlyRateAmount))
       ? Math.max(0, Math.round((Number(booking.hourlyRateAmount) * durationMinutes) / 60))
       : 0;
-    const totalLabel = formatCurrencyFromCents(totalCents, booking.hourlyRateCurrency ?? 'USD');
+    const totalLabel = formatAmountFromCents(totalCents, booking.hourlyRateCurrency ?? 'USD');
 
     return (
       <div
@@ -1419,7 +1414,7 @@ export default function TutorProfile() {
                         {new Date(payment.createdAt).toLocaleString()}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs">{formatCurrencyFromCents(payment.amountCents, payment.currency)} · {payment.provider}</p>
+                    <p className="mt-1 text-xs">{formatAmountFromCents(payment.amountCents, payment.currency)} · {payment.provider}</p>
                     {payment.approvalUrl ? (
                       <p className="mt-1">
                         <a

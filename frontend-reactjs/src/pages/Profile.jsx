@@ -26,10 +26,14 @@ import {
 import { useAuth } from '../context/AuthContext.jsx';
 import useConsentRecords from '../hooks/useConsentRecords.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
+import BillingInvoiceTable from '../components/billing/BillingInvoiceTable.jsx';
+import BillingPaymentMethods from '../components/billing/BillingPaymentMethods.jsx';
+import BillingSummaryCard from '../components/billing/BillingSummaryCard.jsx';
 import ProfileIdentityEditor from '../components/profile/ProfileIdentityEditor.jsx';
 import SettingsLayout from '../components/settings/SettingsLayout.jsx';
 import SystemPreferencesPanel from '../components/settings/SystemPreferencesPanel.jsx';
 import useSystemPreferencesForm from '../hooks/useSystemPreferencesForm.js';
+import useBillingPortal from '../hooks/useBillingPortal.js';
 import {
   mapFollowerItem,
   mapRecommendationItem,
@@ -493,6 +497,10 @@ export default function Profile() {
   const affiliateComplianceSettings = affiliate.compliance;
   const affiliateRecentReferrals = affiliate.recentReferrals;
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
+  const billingOverviewWithSync = useMemo(
+    () => (billingOverview ? { ...billingOverview, lastSyncedAt: billingOverview.lastSyncedAt ?? billingLastLoadedAt } : null),
+    [billingOverview, billingLastLoadedAt]
+  );
   const activeConsents = useMemo(
     () => consents.filter((consent) => consent.status === 'granted' && consent.active),
     [consents]
@@ -516,6 +524,19 @@ export default function Profile() {
     token,
     onStatus: setSystemStatusMessage
   });
+  const {
+    overview: billingOverview,
+    paymentMethods: billingPaymentMethods,
+    invoices: billingInvoices,
+    loading: billingLoading,
+    error: billingError,
+    portalStatus: billingPortalStatus,
+    portalError: billingPortalError,
+    lastLoadedAt: billingLastLoadedAt,
+    refresh: refreshBilling,
+    launchPortal,
+    resetPortalStatus
+  } = useBillingPortal({ autoLoad: false });
 
   const systemStatusBanner = useMemo(() => {
     if (!systemStatusMessage) return undefined;
@@ -756,6 +777,12 @@ export default function Profile() {
       setIsSavingProfile(false);
     }
   }, [profileForm, token]);
+  const handleManageBilling = useCallback(async () => {
+    const portalUrl = await launchPortal({});
+    if (portalUrl && typeof window !== 'undefined') {
+      window.open(portalUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, [launchPortal]);
 
   const loadProfile = useCallback(async () => {
     if (!token) {
@@ -965,6 +992,18 @@ export default function Profile() {
     () => Boolean(token && profileOwnerId && userId && Number(profileOwnerId) === Number(userId)),
     [token, profileOwnerId, userId]
   );
+  useEffect(() => {
+    if (isOwnProfile) {
+      refreshBilling({ force: true });
+    }
+  }, [isOwnProfile, refreshBilling]);
+  useEffect(() => {
+    if (billingPortalStatus === 'success' || billingPortalStatus === 'error') {
+      const timeout = setTimeout(() => resetPortalStatus(), 6_000);
+      return () => clearTimeout(timeout);
+    }
+    return undefined;
+  }, [billingPortalStatus, resetPortalStatus]);
   const profileSettingsHref = session?.user?.role
     ? `/dashboard/${session.user.role}/settings`
     : '/dashboard/user/settings';
@@ -1535,6 +1574,28 @@ export default function Profile() {
               </SettingsLayout>
             </div>
           </section>
+        ) : null}
+
+        {isOwnProfile ? (
+          <div className="space-y-6">
+            <BillingSummaryCard
+              overview={billingOverviewWithSync}
+              loading={billingLoading}
+              error={billingError}
+              onRefresh={() => refreshBilling({ force: true })}
+              onManageBilling={handleManageBilling}
+              manageStatus={billingPortalStatus}
+              manageError={billingPortalError}
+            />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <BillingPaymentMethods
+                paymentMethods={billingPaymentMethods}
+                loading={billingLoading}
+                onManageBilling={handleManageBilling}
+              />
+              <BillingInvoiceTable invoices={billingInvoices} loading={billingLoading} />
+            </div>
+          </div>
         ) : null}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
