@@ -2,7 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CommunityReminderJob } from '../src/jobs/communityReminderJob.js';
 
-const logger = vi.hoisted(() => {
+const metrics = {
+  recordBackgroundJobRun: vi.fn(),
+  recordIntegrationRequestAttempt: vi.fn()
+};
+
+vi.mock('../src/observability/metrics.js', () => metrics);
+
+const scheduler = {
+  validate: vi.fn().mockReturnValue(true),
+  schedule: vi.fn()
+};
+
+function createLogger() {
   const instance = {
     info: vi.fn(),
     warn: vi.fn(),
@@ -12,74 +24,63 @@ const logger = vi.hoisted(() => {
   };
   instance.child.mockReturnValue(instance);
   return instance;
-});
-
-const reminderModel = vi.hoisted(() => ({ listDue: vi.fn(), markProcessing: vi.fn(), markOutcome: vi.fn() }));
-const eventModel = vi.hoisted(() => ({ findById: vi.fn() }));
-const domainEventModel = vi.hoisted(() => ({ record: vi.fn() }));
-const integrationProviderService = vi.hoisted(() => ({ getTwilioClient: vi.fn() }));
-const metrics = vi.hoisted(() => ({
-  recordBackgroundJobRun: vi.fn(),
-  recordIntegrationRequestAttempt: vi.fn()
-}));
-
-vi.mock('../src/config/logger.js', () => ({
-  default: logger
-}));
-vi.mock('../src/models/CommunityEventReminderModel.js', () => ({
-  default: reminderModel
-}));
-vi.mock('../src/models/CommunityEventModel.js', () => ({
-  default: eventModel
-}));
-vi.mock('../src/models/DomainEventModel.js', () => ({
-  default: domainEventModel
-}));
-vi.mock('../src/services/IntegrationProviderService.js', () => ({
-  default: integrationProviderService
-}));
-vi.mock('../src/observability/metrics.js', () => metrics);
-
-const scheduler = {
-  validate: vi.fn().mockReturnValue(true),
-  schedule: vi.fn()
-};
-
-function createJob(options = {}) {
-  return new CommunityReminderJob({
-    enabled: true,
-    schedule: '*/5 * * * *',
-    timezone: 'Etc/UTC',
-    lookaheadMinutes: 30,
-    batchSize: 10,
-    scheduler,
-    nowProvider: () => new Date('2024-11-20T12:00:00Z'),
-    loggerInstance: logger,
-    ...options
-  });
 }
 
-const resetMocks = () => {
-  logger.info.mockClear();
-  logger.warn.mockClear();
-  logger.error.mockClear();
-  logger.debug.mockClear();
-  scheduler.validate.mockClear();
-  scheduler.schedule.mockClear();
-  reminderModel.listDue.mockReset();
-  reminderModel.markProcessing.mockReset();
-  reminderModel.markOutcome.mockReset();
-  eventModel.findById.mockReset();
-  domainEventModel.record.mockReset();
-  integrationProviderService.getTwilioClient.mockReset();
-  metrics.recordBackgroundJobRun.mockClear();
-  metrics.recordIntegrationRequestAttempt.mockClear();
-  integrationProviderService.getTwilioClient.mockReturnValue(null);
-};
-
 describe('CommunityReminderJob', () => {
+  let logger;
+  let reminderModel;
+  let eventModel;
+  let memberModel;
+  let userModel;
+  let domainEventModel;
+  let integrationProviderService;
+  let notificationModel;
+  let jobStateModel;
+  let mailer;
+
+  function buildJob(overrides = {}) {
+    return new CommunityReminderJob({
+      enabled: true,
+      schedule: '*/5 * * * *',
+      timezone: 'Etc/UTC',
+      lookaheadMinutes: 30,
+      batchSize: 10,
+      scheduler,
+      nowProvider: () => new Date('2024-11-20T12:00:00Z'),
+      loggerInstance: logger,
+      reminderModel,
+      eventModel,
+      memberModel,
+      userModel,
+      domainEventModel,
+      integrationProviderService,
+      notificationModel,
+      jobStateModel,
+      mailer,
+      ...overrides
+    });
+  }
+
   beforeEach(() => {
-    resetMocks();
+    logger = createLogger();
+    reminderModel = {
+      listDue: vi.fn(),
+      markProcessing: vi.fn(),
+      markOutcome: vi.fn()
+    };
+    eventModel = { findById: vi.fn() };
+    memberModel = { findMembership: vi.fn().mockResolvedValue({ role: 'member', metadata: {} }) };
+    userModel = { findById: vi.fn().mockResolvedValue({ id: 77, email: 'user@example.com' }) };
+    domainEventModel = { record: vi.fn() };
+    integrationProviderService = { getTwilioClient: vi.fn(() => null) };
+    notificationModel = { enqueue: vi.fn().mockResolvedValue({ id: 501 }) };
+    jobStateModel = { get: vi.fn().mockResolvedValue(null), save: vi.fn().mockResolvedValue(null) };
+    mailer = { sendMail: vi.fn().mockResolvedValue({ messageId: 'msg-1' }) };
+
+    scheduler.validate.mockClear();
+    scheduler.schedule.mockClear();
+    metrics.recordBackgroundJobRun.mockClear();
+    metrics.recordIntegrationRequestAttempt.mockClear();
   });
 
   it('dispatches due reminders and records outcomes', async () => {
@@ -89,7 +90,8 @@ describe('CommunityReminderJob', () => {
         eventId: 33,
         userId: 77,
         channel: 'email',
-        remindAt: '2024-11-20T11:55:00Z'
+        remindAt: '2024-11-20T11:55:00Z',
+        metadata: {}
       },
       {
         id: 2,
@@ -102,10 +104,10 @@ describe('CommunityReminderJob', () => {
     reminderModel.listDue.mockResolvedValue(reminders);
     reminderModel.markProcessing.mockResolvedValue(2);
     eventModel.findById
-      .mockResolvedValueOnce({ id: 33, communityId: 5 })
+      .mockResolvedValueOnce({ id: 33, communityId: 5, title: 'Town Hall' })
       .mockResolvedValueOnce(null);
 
-    const job = createJob();
+    const job = buildJob();
     const result = await job.runCycle('manual');
 
     expect(reminderModel.markProcessing).toHaveBeenCalledWith([1, 2]);
@@ -123,8 +125,10 @@ describe('CommunityReminderJob', () => {
       2,
       expect.objectContaining({ status: 'failed' })
     );
+    expect(notificationModel.enqueue).not.toHaveBeenCalled();
+    expect(jobStateModel.save).toHaveBeenCalled();
     expect(result).toEqual(
-      expect.objectContaining({ processed: 2, dispatched: expect.any(Array) })
+      expect.objectContaining({ processed: 2, dispatched: expect.any(Array), audience: expect.any(Array) })
     );
     expect(metrics.recordBackgroundJobRun).toHaveBeenCalledWith(
       expect.objectContaining({ job: 'community_reminder', outcome: 'partial', processed: 2 })
@@ -133,15 +137,18 @@ describe('CommunityReminderJob', () => {
   });
 
   it('skips work when disabled', async () => {
-    const job = createJob({ enabled: false });
+    const job = buildJob({ enabled: false });
     const summary = await job.runCycle('manual');
-    expect(summary).toEqual({ processed: 0, dispatched: [] });
+    expect(summary).toEqual({ processed: 0, dispatched: [], audience: [] });
     expect(reminderModel.listDue).not.toHaveBeenCalled();
+    expect(metrics.recordBackgroundJobRun).toHaveBeenCalledWith(
+      expect.objectContaining({ job: 'community_reminder', outcome: 'skipped' })
+    );
   });
 
   it('starts scheduler when enabled', () => {
     scheduler.schedule.mockReturnValue({ start: vi.fn(), stop: vi.fn(), destroy: vi.fn() });
-    const job = createJob();
+    const job = buildJob();
     job.start();
     expect(scheduler.validate).toHaveBeenCalledWith('*/5 * * * *');
     expect(scheduler.schedule).toHaveBeenCalledTimes(1);
@@ -163,7 +170,7 @@ describe('CommunityReminderJob', () => {
     eventModel.findById.mockResolvedValue({ id: 99, communityId: 5, startAt: '2024-11-20T12:30:00Z' });
     integrationProviderService.getTwilioClient.mockReturnValue({ isConfigured: () => false });
 
-    const job = createJob();
+    const job = buildJob();
     const summary = await job.runCycle('manual');
 
     expect(reminderModel.markOutcome).toHaveBeenCalledWith(
