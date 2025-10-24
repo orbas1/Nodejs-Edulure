@@ -1,8 +1,8 @@
 import PropTypes from 'prop-types';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 
-function NavigationGroup({ group }) {
+function NavigationGroup({ group, activeId, onActivate }) {
   if (!group || !group.items?.length) {
     return null;
   }
@@ -15,7 +15,13 @@ function NavigationGroup({ group }) {
           <li key={item.id}>
             <a
               href={`#${item.id}`}
-              className="flex flex-col rounded-2xl px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-primary/10 hover:text-primary"
+              className={clsx(
+                'flex flex-col rounded-2xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
+                activeId === item.id ? 'bg-primary/10 text-primary shadow-sm' : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
+              )}
+              aria-current={activeId === item.id ? 'true' : undefined}
+              onClick={() => onActivate?.(item.id)}
+              onFocus={() => onActivate?.(item.id)}
             >
               <span>{item.label}</span>
               {item.helper ? <span className="text-xs font-normal text-slate-400">{item.helper}</span> : null}
@@ -38,11 +44,15 @@ NavigationGroup.propTypes = {
         helper: PropTypes.string
       })
     )
-  })
+  }),
+  activeId: PropTypes.string,
+  onActivate: PropTypes.func
 };
 
 NavigationGroup.defaultProps = {
-  group: null
+  group: null,
+  activeId: null,
+  onActivate: null
 };
 
 function TaskList({ tasks }) {
@@ -175,6 +185,7 @@ export default function AdminShell({
   helperLinks,
   children
 }) {
+  const [activeSection, setActiveSection] = useState(null);
   const mobileNavItems = useMemo(
     () =>
       navigationGroups
@@ -183,9 +194,56 @@ export default function AdminShell({
     [navigationGroups]
   );
 
+  const sectionIds = useMemo(() => mobileNavItems.map((item) => item.id), [mobileNavItems]);
+
+  useEffect(() => {
+    if (!sectionIds.length) {
+      setActiveSection(null);
+      return undefined;
+    }
+    setActiveSection((current) => (current && sectionIds.includes(current) ? current : sectionIds[0]));
+
+    if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = [...entries]
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        const fallback = [...entries].sort((a, b) => a.target.offsetTop - b.target.offsetTop)[0];
+        const topEntry = visible[0] ?? fallback;
+        if (topEntry?.target?.id) {
+          setActiveSection(topEntry.target.id);
+        }
+      },
+      {
+        rootMargin: '-40% 0px -40% 0px',
+        threshold: [0.2, 0.33, 0.5, 0.66, 0.8]
+      }
+    );
+
+    sectionIds.forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) {
+        observer.observe(element);
+      }
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [sectionIds]);
+
+  const handleActivate = useCallback((id) => {
+    if (!id) return;
+    setActiveSection(id);
+  }, []);
+
   return (
     <div className="flex min-h-screen bg-slate-50/70">
-      <aside className="hidden w-80 flex-col gap-6 border-r border-slate-200 bg-white/80 px-6 py-8 backdrop-blur lg:flex">
+      <aside className="hidden w-80 flex-col gap-6 border-r border-slate-200 bg-white/80 px-6 py-8 backdrop-blur lg:sticky lg:top-6 lg:flex lg:self-start">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Edulure</p>
           <h2 className="text-2xl font-semibold text-slate-900">{title}</h2>
@@ -195,19 +253,38 @@ export default function AdminShell({
             <p className="text-[11px] uppercase tracking-wide text-slate-400">Refreshed {meta.generatedAt}</p>
           ) : null}
         </div>
-        <div className="space-y-6 overflow-y-auto pr-2">
+        <nav className="space-y-6 overflow-y-auto pr-2" aria-label="Documentation sections">
           {navigationGroups?.map((group) => (
-            <NavigationGroup key={group.id ?? group.title} group={group} />
+            <NavigationGroup
+              key={group.id ?? group.title}
+              group={group}
+              activeId={activeSection}
+              onActivate={handleActivate}
+            />
           ))}
-        </div>
+        </nav>
         <TaskList tasks={tasks} />
         <HelperLinks links={helperLinks} />
       </aside>
       <section className="flex-1 py-16">
         <div className="mx-auto w-full max-w-6xl px-6">
-          <nav className="mb-6 flex gap-2 overflow-x-auto rounded-full border border-slate-200 bg-white/90 p-2 text-xs font-semibold uppercase tracking-wide text-slate-500 shadow-sm lg:hidden">
+          <nav
+            className="mb-6 flex gap-2 overflow-x-auto rounded-full border border-slate-200 bg-white/90 p-2 text-xs font-semibold uppercase tracking-wide text-slate-500 shadow-sm lg:hidden"
+            aria-label="Mobile documentation sections"
+          >
             {mobileNavItems.map((item) => (
-              <a key={item.id} href={`#${item.id}`} className="rounded-full px-4 py-2 text-slate-600 transition hover:bg-primary/10 hover:text-primary">
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                className={clsx(
+                  'rounded-full px-4 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
+                  activeSection === item.id
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
+                )}
+                aria-current={activeSection === item.id ? 'true' : undefined}
+                onClick={() => handleActivate(item.id)}
+              >
                 {item.label}
               </a>
             ))}

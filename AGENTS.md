@@ -320,12 +320,12 @@
       - C6. Admin Approvals, Operations & Setup Governance (`frontend-reactjs/src/pages/admin/sections/AdminApprovalsSection.jsx`, `frontend-reactjs/src/pages/admin/sections/AdminOperationsSection.jsx`, `frontend-reactjs/src/hooks/useSetupProgress.js`, `frontend-reactjs/src/pages/Admin.jsx`, `backend-nodejs/src/controllers/AdminSettingsController.js`, `backend-nodejs/src/services/PlatformSettingsService.js`, `backend-nodejs/src/services/ReleaseOrchestrationService.js`)
       - ✅ C7. Legal, Privacy & Compliance Centre (`frontend-reactjs/src/pages/Terms.jsx`, `frontend-reactjs/src/pages/Privacy.jsx`, `frontend-reactjs/src/pages/LegalContact.jsx`, `backend-nodejs/src/controllers/ComplianceController.js`, `backend-nodejs/src/models/DataSubjectRequestModel.js`, `docs/compliance/policies/*`, `docs/legal/content`)
 2. Part 2 — User Experience Audit & Component Breakdown
-      - 1.A Entrypoints & Layout Containers
+      - ✓ 1.A Entrypoints & Layout Containers
          - 1.A.1 AdminShell (frontend-reactjs/src/layouts/AdminShell.jsx)
          - 1.A.2 DashboardLayout (frontend-reactjs/src/layouts/DashboardLayout.jsx)
          - 1.A.3 MainLayout (frontend-reactjs/src/layouts/MainLayout.jsx)
          - 1.A.4 styles (frontend-reactjs/src/styles.css)
-      - 1.B Global Navigation & Shell Chrome
+      - ✓ 1.B Global Navigation & Shell Chrome
          - 1.B.1 TopBar (frontend-reactjs/src/components/TopBar.jsx)
          - 1.B.2 AppNotificationPanel (frontend-reactjs/src/components/navigation/AppNotificationPanel.jsx)
          - 1.B.3 AppSidebar (frontend-reactjs/src/components/navigation/AppSidebar.jsx)

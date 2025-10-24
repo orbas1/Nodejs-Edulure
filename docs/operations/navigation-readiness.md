@@ -23,6 +23,10 @@ checklist.
 ## Quick action validation {#quick-action-validation}
 - Follow `ops-quick-action-verify-route` to ensure the quick action still routes to `/dashboard/instructor/courses/create`.
   Capture the console log that confirms the navigation annex API returns the matching quick action metadata.
+- Run `ops-quick-compose-audit` to confirm the TopBar quick action opens the community composer with analytics context and
+  role-scoped targeting. Capture a screenshot of the CTA and include the annex API payload in the release evidence.
+- Execute `ops-quick-live-session-audit` to verify the scheduler opens with readiness flags when the live session quick action
+  is used. Record the scheduler URL and attach the console trace that shows the annex payload powering the CTA.
 
 ## Course upload readiness {#course-upload-readiness}
 - Execute `ops-upload-readiness-snapshot` to archive the upload readiness indicator from the instructor builder. Store the

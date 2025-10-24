@@ -52,6 +52,40 @@ const backlogItems = [
       'frontend-reactjs/src/pages/dashboard/InstructorCourseCreate.jsx'
     ],
     priority: 3,
+    display_order: 2
+  },
+  {
+    nav_item_id: 'create-post',
+    nav_item_label: 'Publish community update',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/learner/communities',
+    role_scope: ['user', 'instructor'],
+    epic_id: 'OPS-220',
+    summary: 'Ensure quick composer flows emit analytics context and respect Annex feed readiness.',
+    backlog_ref: '/handbook/navigation-annex#quick-compose',
+    impacted_files: [
+      'frontend-reactjs/src/components/TopBar.jsx',
+      'frontend-reactjs/src/navigation/utils.js',
+      'frontend-reactjs/src/pages/Feed.jsx'
+    ],
+    priority: 2,
+    display_order: 0
+  },
+  {
+    nav_item_id: 'launch-session',
+    nav_item_label: 'Schedule live session',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/instructor/live-classes',
+    role_scope: ['instructor', 'admin'],
+    epic_id: 'OPS-221',
+    summary: 'Route the live-session quick action through the updated scheduler with readiness gating.',
+    backlog_ref: '/handbook/navigation-annex#quick-live-session',
+    impacted_files: [
+      'frontend-reactjs/src/components/navigation/AppTopBar.jsx',
+      'frontend-reactjs/src/layouts/DashboardLayout.jsx',
+      'frontend-reactjs/src/navigation/utils.js'
+    ],
+    priority: 1,
     display_order: 1
   },
   {
@@ -138,6 +172,38 @@ const operationTasks = [
     include_in_checklist: true
   },
   {
+    nav_item_id: 'create-post',
+    nav_item_label: 'Publish community update',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/learner/communities',
+    role_scope: ['user', 'instructor'],
+    task_key: 'ops-quick-compose-audit',
+    label: 'Confirm the quick composer opens with role-scoped targeting and analytics context.',
+    cadence: 'pre-release',
+    runbook_section: 'quick-action-validation',
+    href: '/docs/operations/navigation-readiness#quick-compose',
+    owner: 'Community Operations',
+    priority: 2,
+    display_order: 2,
+    include_in_checklist: true
+  },
+  {
+    nav_item_id: 'launch-session',
+    nav_item_label: 'Schedule live session',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/instructor/live-classes',
+    role_scope: ['instructor', 'admin'],
+    task_key: 'ops-quick-live-session-audit',
+    label: 'Verify live-session quick action routes to the scheduler with readiness flags intact.',
+    cadence: 'pre-release',
+    runbook_section: 'quick-action-validation',
+    href: '/docs/operations/navigation-readiness#quick-live-session',
+    owner: 'Learning Operations',
+    priority: 1,
+    display_order: 2,
+    include_in_checklist: true
+  },
+  {
     nav_item_id: 'instructor-course-create',
     nav_item_label: 'Build course',
     nav_item_category: 'dashboard',
@@ -191,6 +257,54 @@ const designDependencies = [
     value: 'frontend-reactjs/src/components/navigation/AppTopBar.jsx',
     notes: null,
     display_order: 3
+  },
+  {
+    nav_item_id: 'create-post',
+    nav_item_label: 'Publish community update',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/learner/communities',
+    role_scope: ['user', 'instructor'],
+    dependency_key: 'quick-compose-focus-outline',
+    dependency_type: 'qa',
+    value: 'Confirm the TopBar quick action exposes the focus-visible ring token.',
+    notes: null,
+    display_order: 1
+  },
+  {
+    nav_item_id: 'create-post',
+    nav_item_label: 'Publish community update',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/learner/communities',
+    role_scope: ['user', 'instructor'],
+    dependency_key: 'quick-compose-reference-topbar',
+    dependency_type: 'reference',
+    value: 'frontend-reactjs/src/components/TopBar.jsx',
+    notes: null,
+    display_order: 2
+  },
+  {
+    nav_item_id: 'launch-session',
+    nav_item_label: 'Schedule live session',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/instructor/live-classes',
+    role_scope: ['instructor', 'admin'],
+    dependency_key: 'quick-live-session-token',
+    dependency_type: 'token',
+    value: '--radius-2xl',
+    notes: 'Quick action CTA keeps consistent rounded treatment across shells.',
+    display_order: 1
+  },
+  {
+    nav_item_id: 'launch-session',
+    nav_item_label: 'Schedule live session',
+    nav_item_category: 'quick_action',
+    nav_item_route: '/dashboard/instructor/live-classes',
+    role_scope: ['instructor', 'admin'],
+    dependency_key: 'quick-live-session-reference-topbar',
+    dependency_type: 'reference',
+    value: 'frontend-reactjs/src/components/navigation/AppTopBar.jsx',
+    notes: null,
+    display_order: 2
   },
   {
     nav_item_id: 'courses',
