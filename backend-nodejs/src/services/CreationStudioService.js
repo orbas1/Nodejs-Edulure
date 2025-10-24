@@ -7,6 +7,7 @@ import CreationCollaborationSessionModel from '../models/CreationCollaborationSe
 import DomainEventModel from '../models/DomainEventModel.js';
 import AdsCampaignModel from '../models/AdsCampaignModel.js';
 import deepMerge from '../utils/deepMerge.js';
+import { normaliseCreationMetadata } from './serializers/creationAssetSerializer.js';
 
 const log = logger.child({ service: 'CreationStudioService' });
 
@@ -175,6 +176,8 @@ function enrichProjectDraft(projectPayload = {}) {
   if (metadataDefaults) {
     draft.metadata = deepMerge(metadataDefaults, draft.metadata ?? {});
   }
+
+  draft.metadata = normaliseCreationMetadata(draft.metadata ?? {}, { type: draft.type });
 
   if (analyticsDefaults) {
     draft.analyticsTargets = deepMerge(analyticsDefaults, draft.analyticsTargets ?? {});
@@ -442,12 +445,17 @@ export default class CreationStudioService {
     }
 
     return db.transaction(async (trx) => {
+      const normalisedMetadata =
+        updates.metadata !== undefined
+          ? normaliseCreationMetadata(updates.metadata ?? {}, { type: updates.type ?? project.type })
+          : undefined;
+
       const updated = await CreationProjectModel.updateById(
         project.id,
         {
           title: updates.title,
           summary: updates.summary,
-          metadata: updates.metadata,
+          metadata: normalisedMetadata,
           contentOutline: updates.contentOutline,
           analyticsTargets: updates.analyticsTargets,
           publishingChannels: updates.publishingChannels,

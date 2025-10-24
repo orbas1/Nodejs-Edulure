@@ -80,6 +80,14 @@ const growthMutationSchema = Joi.object({
   return next;
 });
 
+const conflictQuerySchema = Joi.object({
+  from: Joi.date().iso().optional(),
+  to: Joi.date().iso().optional(),
+  windowStart: Joi.date().iso().optional(),
+  windowEnd: Joi.date().iso().optional(),
+  minimumOverlapMinutes: Joi.number().integer().min(5).max(720).default(30)
+});
+
 function actorFromRequest(req) {
   return { id: req.user?.id ?? null, role: req.user?.role ?? null };
 }
@@ -107,6 +115,24 @@ export default class CommunityProgrammingController {
         },
         message: 'Webinars retrieved'
       });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async detectScheduleConflicts(req, res, next) {
+    try {
+      const query = await conflictQuerySchema.validateAsync(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const actor = actorFromRequest(req);
+      const result = await CommunityProgrammingService.detectScheduleConflicts(req.params.communityId, actor, query);
+      return success(res, { data: result, message: 'Schedule conflicts analysed' });
     } catch (error) {
       if (error.isJoi) {
         error.status = 422;
