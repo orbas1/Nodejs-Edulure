@@ -317,6 +317,43 @@ const consentMutationErrorRate = new promClient.Gauge({
   labelNames: ['operation', 'tenant_id']
 });
 
+const backgroundJobRunsTotal = new promClient.Counter({
+  name: 'edulure_background_job_runs_total',
+  help: 'Count of background job cycles grouped by job, trigger, and status',
+  labelNames: ['job_name', 'trigger', 'status']
+});
+
+const backgroundJobDurationSeconds = new promClient.Histogram({
+  name: 'edulure_background_job_duration_seconds',
+  help: 'Duration histogram for background job cycles grouped by job and status',
+  labelNames: ['job_name', 'status'],
+  buckets: [0.05, 0.1, 0.5, 1, 2, 5, 10, 30, 60, 120]
+});
+
+const backgroundJobItemsProcessedTotal = new promClient.Counter({
+  name: 'edulure_background_job_items_total',
+  help: 'Items processed by background jobs grouped by job and status',
+  labelNames: ['job_name', 'status']
+});
+
+const communityReminderDispatchTotal = new promClient.Counter({
+  name: 'edulure_community_reminder_dispatch_total',
+  help: 'Community reminders dispatched grouped by channel, persona, and status',
+  labelNames: ['channel', 'persona', 'status']
+});
+
+const dataPartitionOutcomesTotal = new promClient.Counter({
+  name: 'edulure_data_partition_outcomes_total',
+  help: 'Partitions processed by the data partition job grouped by table and outcome',
+  labelNames: ['table', 'outcome']
+});
+
+const dataPartitionArchivedBytesTotal = new promClient.Counter({
+  name: 'edulure_data_partition_archived_bytes_total',
+  help: 'Bytes archived by the data partition job grouped by table and outcome',
+  labelNames: ['table', 'outcome']
+});
+
 const consentMutationOutcomes = new Map();
 
 registry.registerMetric(httpRequestsTotal);
@@ -367,6 +404,12 @@ registry.registerMetric(explorerSearchInteractionsTotal);
 registry.registerMetric(consentMutationAttemptsTotal);
 registry.registerMetric(consentMutationErrorsTotal);
 registry.registerMetric(consentMutationErrorRate);
+registry.registerMetric(backgroundJobRunsTotal);
+registry.registerMetric(backgroundJobDurationSeconds);
+registry.registerMetric(backgroundJobItemsProcessedTotal);
+registry.registerMetric(communityReminderDispatchTotal);
+registry.registerMetric(dataPartitionOutcomesTotal);
+registry.registerMetric(dataPartitionArchivedBytesTotal);
 
 const originalResetMetrics =
   typeof registry.resetMetrics === 'function' ? registry.resetMetrics.bind(registry) : null;
@@ -953,6 +996,62 @@ export function recordConsentMutationOutcome({ operation, tenantId, success, rea
       tenant_id: normalizedTenant,
       reason: normalizedReason
     });
+  }
+}
+
+export function recordBackgroundJobRun({
+  jobName,
+  trigger = 'manual',
+  status = 'completed',
+  durationSeconds = 0,
+  processed = 0
+} = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const safeJobName = jobName ? String(jobName) : 'unknown';
+  const safeStatus = status ? String(status) : 'completed';
+  const safeTrigger = trigger ? String(trigger) : 'manual';
+
+  backgroundJobRunsTotal.inc({ job_name: safeJobName, trigger: safeTrigger, status: safeStatus });
+
+  if (Number.isFinite(durationSeconds) && durationSeconds >= 0) {
+    backgroundJobDurationSeconds.observe({ job_name: safeJobName, status: safeStatus }, durationSeconds);
+  }
+
+  if (Number.isFinite(processed) && processed > 0) {
+    backgroundJobItemsProcessedTotal.inc({ job_name: safeJobName, status: safeStatus }, processed);
+  }
+}
+
+export function recordCommunityReminderDispatch({ channel, persona, status } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const safeChannel = channel ? String(channel).toLowerCase() : 'unknown';
+  const safePersona = persona ? String(persona).toLowerCase() : 'unspecified';
+  const safeStatus = status ? String(status).toLowerCase() : 'sent';
+
+  communityReminderDispatchTotal.inc({ channel: safeChannel, persona: safePersona, status: safeStatus });
+}
+
+export function recordDataPartitionOutcome({ table, outcome, count = 0, bytes = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const safeTable = table ? String(table) : 'unknown';
+  const safeOutcome = outcome ? String(outcome) : 'unknown';
+  const labels = { table: safeTable, outcome: safeOutcome };
+
+  if (Number.isFinite(count) && count > 0) {
+    dataPartitionOutcomesTotal.inc(labels, count);
+  }
+
+  if (Number.isFinite(bytes) && bytes > 0) {
+    dataPartitionArchivedBytesTotal.inc(labels, bytes);
   }
 }
 
