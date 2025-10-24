@@ -146,6 +146,42 @@ async function readSpecMetadata(specPath) {
   };
 }
 
+async function listGeneratedArtifacts(outputDir) {
+  const servicesDir = path.join(outputDir, 'services');
+  const modelsDir = path.join(outputDir, 'models');
+
+  async function listEntries(dir, extensions) {
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      return entries
+        .filter((entry) => entry.isFile())
+        .map((entry) => entry.name)
+        .filter((name) => extensions.some((ext) => name.endsWith(ext)))
+        .map((name) => {
+          for (const ext of extensions) {
+            if (name.endsWith(ext)) {
+              return name.slice(0, -ext.length);
+            }
+          }
+          return name;
+        })
+        .sort((a, b) => a.localeCompare(b));
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  const services = await listEntries(servicesDir, ['.ts', '.js', '.d.ts']);
+  const models = await listEntries(modelsDir, ['.ts', '.js', '.d.ts']);
+
+  return {
+    services,
+    serviceCount: services.length,
+    models,
+    modelCount: models.length
+  };
+}
+
 async function writeManifest({
   manifestPath,
   metadata,
@@ -153,6 +189,7 @@ async function writeManifest({
   outputDir,
   specPath
 }) {
+  const artifacts = await listGeneratedArtifacts(outputDir);
   const manifest = {
     generatedAt: new Date().toISOString(),
     specHash: metadata.hash,
@@ -161,7 +198,10 @@ async function writeManifest({
     operationCount: metadata.operationCount,
     generatorVersion,
     specPath: path.relative(repoRoot, specPath),
-    outputDir: path.relative(repoRoot, outputDir)
+    outputDir: path.relative(repoRoot, outputDir),
+    services: artifacts.services,
+    serviceCount: artifacts.serviceCount,
+    modelCount: artifacts.modelCount
   };
 
   await fs.mkdir(path.dirname(manifestPath), { recursive: true });

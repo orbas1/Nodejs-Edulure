@@ -9,6 +9,9 @@ export type SdkManifest = {
   generatorVersion: string;
   specPath: string;
   outputDir: string;
+  services: string[];
+  serviceCount: number;
+  modelCount: number;
 };
 
 const manifest: SdkManifest = manifestJson as SdkManifest;
@@ -20,7 +23,10 @@ export function getSdkManifest(): SdkManifest {
 }
 
 export function describeSdk(): string {
-  return `${sdkManifest.specTitle} v${sdkManifest.specVersion} (operations: ${sdkManifest.operationCount})`;
+  const servicesSummary = sdkManifest.serviceCount
+    ? `, services: ${sdkManifest.serviceCount}`
+    : '';
+  return `${sdkManifest.specTitle} v${sdkManifest.specVersion} (operations: ${sdkManifest.operationCount}${servicesSummary})`;
 }
 
 export function isManifestFresh(specHash: string | null | undefined): boolean {

@@ -7,6 +7,9 @@ export type SdkManifest = {
     generatorVersion: string;
     specPath: string;
     outputDir: string;
+    services: string[];
+    serviceCount: number;
+    modelCount: number;
 };
 export declare const sdkManifest: SdkManifest;
 export declare function getSdkManifest(): SdkManifest;

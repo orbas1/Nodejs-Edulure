@@ -5,6 +5,7 @@
 - Refactored the environment bootstrap script to validate prerequisites, enforce remote state variables, and support Docker Compose readiness checks.
 - Enhanced the release readiness runner with CLI filtering, per-check timeouts, and dual-format reporting for JSON and Markdown consumers.
 - Rolled out the OpenAPI SDK generator with hash-aware caching, manifest emission, and `--summary` reporting so release managers can audit client runtime drift alongside backend changes.
+- Extended the SDK manifest and runtime client to enumerate every generated service, publish service/model counts, and cross-check those totals against database migrations and seed fixtures before release.
 
 ## Security Tooling
 - Upgraded the license report generator to honour optional policy files, detect missing license metadata, and optionally exclude development dependencies.

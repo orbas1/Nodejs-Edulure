@@ -3,7 +3,8 @@
 ## Summary
 - No REST, WebSocket, or GraphQL contract changes were introduced in this release cycle.
 - Existing endpoints for release automation, RBAC, and telemetry remain backward compatible.
-- Regenerated the TypeScript SDK against the `backend-nodejs/src/docs/openapi.json` contract and published the `.manifest.json` fingerprint for downstream tooling.
+- Regenerated the TypeScript SDK against the `backend-nodejs/src/docs/openapi.json` contract and published the `.manifest.json` fingerprint (with service/model counts) for downstream tooling.
+- Verified the expanded SDK service registry aligns with active controllers, migrations, and seeded reporting views before release.
 
 ## Validation
 - Confirmed the automated readiness suite exercises the public health and telemetry endpoints without regression.

@@ -5,7 +5,10 @@ export function getSdkManifest() {
     return sdkManifest;
 }
 export function describeSdk() {
-    return `${sdkManifest.specTitle} v${sdkManifest.specVersion} (operations: ${sdkManifest.operationCount})`;
+    const servicesSummary = sdkManifest.serviceCount
+        ? `, services: ${sdkManifest.serviceCount}`
+        : '';
+    return `${sdkManifest.specTitle} v${sdkManifest.specVersion} (operations: ${sdkManifest.operationCount}${servicesSummary})`;
 }
 export function isManifestFresh(specHash) {
     if (!specHash) {
