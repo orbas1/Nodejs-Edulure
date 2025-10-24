@@ -1,7 +1,11 @@
 import { jsonDefault } from './_helpers/utils.js';
+import {
+  COMMUNITY_EVENT_PARTICIPANT_STATUSES,
+  COMMUNITY_EVENT_REMINDER_STATUSES
+} from '../src/models/communityEventConstants.js';
 
-const PARTICIPANT_STATUSES = ['going', 'interested', 'waitlisted', 'declined', 'checked_in'];
-const REMINDER_STATUSES = ['pending', 'processing', 'sent', 'failed', 'cancelled'];
+const PARTICIPANT_STATUSES = [...COMMUNITY_EVENT_PARTICIPANT_STATUSES];
+const REMINDER_STATUSES = [...COMMUNITY_EVENT_REMINDER_STATUSES];
 
 export async function up(knex) {
   const hasMemberPoints = await knex.schema.hasTable('community_member_points');

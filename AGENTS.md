@@ -492,10 +492,10 @@
          - 12.E.1 HubSpotClient (backend-nodejs/src/integrations/HubSpotClient.js)
          - 12.E.2 CourseLiveService (backend-nodejs/src/services/CourseLiveService.js)
       - ✅ 12.F Async Jobs & Observability (`backend-nodejs/src/jobs/communityReminderJob.js`, `backend-nodejs/src/observability/probes.js`, `backend-nodejs/src/observability/metrics.js`)
-        1. **Appraisal.** `CommunityReminderJob` now emits background job counters while the probe server gained a summary endpoint, marrying async execution with real-time observability.
-        2. **Function.** Each run classifies outcomes (success, partial, idle, skipped, failure) with duration histograms, and `/` plus `/status` aggregate readiness and liveness checks.
-        3. **Usefulness.** Operators can read job throughput and failure counts from `/metrics` and confirm stack health via a single JSON payload instead of juggling multiple endpoints.
-        4. **Redundancies.** The shared `recordBackgroundJobRun` eliminates bespoke logging math, and Twilio sends reuse the integration metrics helper introduced for HubSpot.
+        1. **Appraisal.** `CommunityReminderJob` now emits background job counters while `communityEventConstants.js` freezes the shared status/channel enums so migrations, models, and seeds describe reminders and participants with the same taxonomy.
+        2. **Function.** Each run classifies outcomes (success, partial, idle, skipped, failure) with duration histograms, Twilio configuration short-circuits emit `outcome=skipped` metrics, and `/` plus `/status` aggregate readiness and liveness checks.
+        3. **Usefulness.** Operators can read job throughput and failure counts from `/metrics`, confirm stack health via a single JSON payload, and rely on the bootstrap seed data to exercise pending/sent reminders during local smoke tests.
+        4. **Redundancies.** The shared `recordBackgroundJobRun` eliminates bespoke logging math, Twilio sends reuse the integration metrics helper introduced for HubSpot, and the new constants module prevents duplicate status arrays in migrations, models, and seeds.
         5. **Placeholders or Stubs.** Remaining Annex A32 jobs still lack wrappers but can now reuse the exported recorder without additional scaffolding.
         6. **Duplicate Functions.** Twilio delivery and CRM metrics rely on the same helper, removing duplicate timer code for outbound integrations.
         7. **Improvements Needed.** Add alerts keyed off `outcome=partial` and instrument the other queue workers with the same recorder.
@@ -513,7 +513,7 @@
         19. **Media.** Incorporate the summary response schema into observability diagrams to explain how readiness cascades across services.
         20. **Buttons.** The job still respects the `enabled` flag; consider surfacing that state through `/status` so operators see toggles at a glance.
         21. **Interact.** `/status` supports HEAD for lightweight probes while returning the same aggregated story as GET.
-        22. **Missing.** Backfill Prometheus alerts for `outcome=failure` and add smoke tests mocking Twilio to validate metrics.
+        22. **Missing.** Backfill Prometheus alerts for `outcome=failure` and expand probe contract tests to cover HEAD semantics and degraded states; Twilio metric stubs are now verified in unit tests.
         23. **Design.** Observability helpers consolidate instrumentation so future queue workers and probes align without bespoke code.
         24. **Clone.** Exported recorders prevent new jobs from rewriting the same instrumentation loops.
         25. **Framework.** Document the background job metric schema (`edulure_background_job_runs_total`, etc.) for the platform governance pack.

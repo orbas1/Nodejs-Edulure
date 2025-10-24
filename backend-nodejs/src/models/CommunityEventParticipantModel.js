@@ -1,12 +1,15 @@
 import db from '../config/database.js';
 import {
+  COMMUNITY_EVENT_PARTICIPANT_STATUSES
+} from './communityEventConstants.js';
+import {
   ensureIntegerInRange,
   readJsonColumn,
   writeJsonColumn
 } from '../utils/modelUtils.js';
 
 const TABLE = 'community_event_participants';
-const STATUS_OPTIONS = new Set(['going', 'interested', 'waitlisted', 'declined', 'checked_in']);
+const STATUS_OPTIONS = new Set(COMMUNITY_EVENT_PARTICIPANT_STATUSES);
 
 function normalisePrimaryId(value, fieldName) {
   if (value === undefined || value === null || value === '') {

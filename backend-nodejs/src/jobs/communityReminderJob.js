@@ -30,7 +30,17 @@ async function dispatchReminder(reminder, log) {
 
   if (reminder.channel === 'sms') {
     const twilioClient = IntegrationProviderService.getTwilioClient();
+    const twilioAttemptStartedAt = Date.now();
+    const recordTwilioAttempt = (overrides = {}) => {
+      recordIntegrationRequestAttempt({
+        provider: 'twilio',
+        operation: 'send_message',
+        durationMs: Date.now() - twilioAttemptStartedAt,
+        ...overrides
+      });
+    };
     if (!twilioClient || !twilioClient.isConfigured()) {
+      recordTwilioAttempt({ outcome: 'skipped', statusCode: 'config_missing' });
       await CommunityEventReminderModel.markOutcome(reminder.id, {
         status: 'failed',
         failureReason: 'sms_not_configured'
@@ -46,6 +56,7 @@ async function dispatchReminder(reminder, log) {
       null;
 
     if (!destination) {
+      recordTwilioAttempt({ outcome: 'failure', statusCode: 'invalid_destination' });
       await CommunityEventReminderModel.markOutcome(reminder.id, {
         status: 'failed',
         failureReason: 'sms_destination_missing'
@@ -76,21 +87,13 @@ async function dispatchReminder(reminder, log) {
         messageBody += ` Manage your RSVP: ${manageUrl}`;
       }
     }
-
-    const twilioStartedAt = Date.now();
     try {
       const message = await twilioClient.sendMessage({
         to: destination,
         body: messageBody,
         statusCallback: reminder.metadata?.statusCallbackUrl ?? null
       });
-      recordIntegrationRequestAttempt({
-        provider: 'twilio',
-        operation: 'send_message',
-        outcome: 'success',
-        statusCode: message?.status ?? 'accepted',
-        durationMs: Date.now() - twilioStartedAt
-      });
+      recordTwilioAttempt({ outcome: 'success', statusCode: message?.status ?? 'accepted' });
       deliveryMetadata = {
         provider: 'twilio',
         channel: 'sms',
@@ -98,13 +101,7 @@ async function dispatchReminder(reminder, log) {
         messageSid: message.sid
       };
     } catch (error) {
-      recordIntegrationRequestAttempt({
-        provider: 'twilio',
-        operation: 'send_message',
-        outcome: 'failure',
-        statusCode: error?.status ?? error?.code ?? 'error',
-        durationMs: Date.now() - twilioStartedAt
-      });
+      recordTwilioAttempt({ outcome: 'failure', statusCode: error?.status ?? error?.code ?? 'error' });
       log.error({ err: error, reminderId: reminder.id }, 'Failed to deliver SMS reminder');
       await CommunityEventReminderModel.markOutcome(reminder.id, {
         status: 'failed',
