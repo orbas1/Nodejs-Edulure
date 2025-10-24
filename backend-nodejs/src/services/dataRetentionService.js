@@ -374,8 +374,6 @@ export async function enforceRetentionPolicies({
           });
         }
 
-        policyLogger.info({ affectedRows, sampleIds, dryRun: runDry, action: policy.action }, 'Retention policy enforced');
-
         return {
           affectedRows,
           sampleIds,
@@ -385,11 +383,10 @@ export async function enforceRetentionPolicies({
         };
       });
 
-      const outcome = {
+      const baseOutcome = {
         policyId: policy.id,
         entityName: policy.entityName,
         action: policy.action,
-        status: 'executed',
         affectedRows: result.affectedRows,
         sampleIds: result.sampleIds,
         dryRun: runDry,
@@ -399,16 +396,49 @@ export async function enforceRetentionPolicies({
         preRunCount: result.preRunCount
       };
 
-      if (verificationOptions.enabled && outcome.verification?.status === 'residual') {
+      const residualDetected =
+        verificationOptions.enabled && baseOutcome.verification?.status === 'residual';
+
+      if (residualDetected) {
         policyLogger.warn(
           {
-            remainingRows: outcome.verification.remainingRows,
+            remainingRows: baseOutcome.verification.remainingRows,
             policyId: policy.id,
             action: policy.action
           },
           'Data retention verification detected residual rows'
         );
       }
+
+      if (residualDetected && verificationOptions.failOnResidual) {
+        const failure = {
+          ...baseOutcome,
+          status: 'failed',
+          error: `Residual rows remain (${baseOutcome.verification.remainingRows}) after enforcement`
+        };
+
+        executionResults.push(failure);
+
+        await publishRetentionEvent({
+          runId,
+          policy,
+          status: 'failed',
+          details: failure,
+          dryRun: runDry
+        });
+
+        continue;
+      }
+
+      const outcome = {
+        ...baseOutcome,
+        status: 'executed'
+      };
+
+      policyLogger.info(
+        { affectedRows: outcome.affectedRows, sampleIds: outcome.sampleIds, dryRun: runDry, action: policy.action },
+        'Retention policy enforced'
+      );
 
       executionResults.push(outcome);
 

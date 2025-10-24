@@ -1,5 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+vi.mock('../src/config/database.js', () => ({
+  __esModule: true,
+  default: {}
+}));
+
+vi.mock('../src/config/logger.js', () => {
+  const mockLogger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn()
+  };
+  mockLogger.child = vi.fn(() => mockLogger);
+  return {
+    __esModule: true,
+    default: mockLogger
+  };
+});
+
 import {
   enforceRetentionPolicies,
   registerRetentionStrategy,
@@ -141,7 +160,7 @@ describe('dataRetentionService', () => {
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
-  it('reports residual rows when verification detects remaining records', async () => {
+  it('reports residual rows when verification detects remaining records without failing when configured', async () => {
     const { builders } = registerTestStrategy({ sampleIds: [7, 8], affectedRows: 1, remainingAfter: 1 });
 
     const policy = {
@@ -153,10 +172,44 @@ describe('dataRetentionService', () => {
       description: 'Residual verification test'
     };
 
-    const summary = await enforceRetentionPolicies({ policies: [policy], dbClient: fakeDb });
+    const summary = await enforceRetentionPolicies({
+      policies: [policy],
+      dbClient: fakeDb,
+      verification: { failOnResidual: false }
+    });
 
+    expect(summary.results[0]).toMatchObject({ status: 'executed' });
     expect(summary.results[0].verification).toMatchObject({ status: 'residual', remainingRows: 1 });
     expect(builders.some((builder) => builder.del.mock.calls.length === 1)).toBe(true);
+  });
+
+  it('fails policy when residual rows remain and failOnResidual is enabled', async () => {
+    const { builders } = registerTestStrategy({ sampleIds: [9, 10], affectedRows: 1, remainingAfter: 1 });
+
+    const policy = {
+      id: 55,
+      entityName: ENTITY,
+      action: 'hard-delete',
+      retentionPeriodDays: 30,
+      active: true,
+      description: 'Residual failure test'
+    };
+
+    const summary = await enforceRetentionPolicies({ policies: [policy], dbClient: fakeDb });
+
+    expect(summary.results[0]).toMatchObject({
+      status: 'failed',
+      error: expect.stringContaining('Residual rows remain'),
+      verification: { status: 'residual', remainingRows: 1 }
+    });
+    expect(builders.some((builder) => builder.del.mock.calls.length === 1)).toBe(true);
+    expect(auditInsert).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(auditInsert.mock.calls[0][0].details).verification).toMatchObject({
+      status: 'residual',
+      remainingRows: 1
+    });
+    const cdcEvent = changeDataCaptureService.recordEvent.mock.calls.at(-1)[0];
+    expect(cdcEvent.operation).toBe('RETENTION_FAILED');
   });
 
   it('skips policies without registered strategies', async () => {

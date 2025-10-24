@@ -94,7 +94,11 @@ function formatPolicyLine(entry) {
 }
 
 function formatFailureLine(entry) {
-  return `• ${entry.entityName ?? entry.policyId}: ${entry.error ?? 'unknown error'}`;
+  const residualNote =
+    entry.verification?.status === 'residual'
+      ? ` (residual rows: ${Number(entry.verification.remainingRows ?? 0)})`
+      : '';
+  return `• ${entry.entityName ?? entry.policyId}: ${entry.error ?? 'unknown error'}${residualNote}`;
 }
 
 function computeAuditSeverity({ executed, failed, dryRun }) {
@@ -319,7 +323,8 @@ export class DataRetentionJob {
       failures: failed.map((entry) => ({
         policyId: entry.policyId,
         entityName: entry.entityName,
-        error: entry.error
+        error: entry.error,
+        verification: entry.verification ?? null
       }))
     };
 
@@ -419,7 +424,7 @@ export class DataRetentionJob {
       status: 'scheduled',
       scheduleAt: new Date().toISOString(),
       metrics: {
-        targetAudience: this.reporting.audience,
+        targetAudience: this.reporting.audience.length,
         expectedRecipients: this.reporting.audience.length,
         delivered: 0,
         engagementRate: 0
