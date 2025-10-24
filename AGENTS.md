@@ -467,10 +467,26 @@
          - 12.F.1 communityReminderJob (backend-nodejs/src/jobs/communityReminderJob.js)
          - 12.F.2 probes (backend-nodejs/src/observability/probes.js)
          - 12.F.3 backend-nodejs/src/jobs (found at backend-nodejs/src/jobs)
-      - 12.G Database Seeds & Migrations
+      - ✅ 12.G Database Seeds & Migrations
          - 12.G.1 20250213143000_creation_studio (backend-nodejs/migrations/20250213143000_creation_studio.js)
          - 12.G.2 002_search_documents (backend-nodejs/seeds/002_search_documents.js)
          - 12.G.3 backend-nodejs/database/migrations (found at backend-nodejs/database/migrations)
+        1. **Appraisal.** Creation Studio schemas now share enumerations through `src/constants/creationStudio.js`, letting migrations, services, and models consume one source of truth while Annex A38–A43 is mirrored by `008_creation_studio_tables.sql` so MySQL blueprints stay in lockstep with Knex DSL defaults.
+        2. **Functionality.** `creation_projects`, `creation_templates`, collaboration tables, and version history all validate type/status/role inputs, normalise JSON payloads, and dedupe permissions before writes, while the search seed continues to rebuild documents inside the transaction to keep bootstrap atomic.
+        3. **Logic Usefulness.** Shared normalisers and governance-tag handling keep models aligned with database defaults; enumerations now flow into `CreationStudioService` to reject unsupported transitions ahead of persistence, preventing Annex drift between docs and runtime rules.
+        4. **Redundancies.** Centralised constants and helpers replaced ad-hoc enum arrays and JSON sanitisation previously scattered across services, models, and migrations, reducing duplicate validation paths.
+        5. **Placeholders or Stubs.** Seeds still short-circuit when `search_documents` or its refresh queue are absent; plan representative creation-project fixtures once catalogue samples are approved so rebuild metrics remain meaningful during QA.
+        6. **Duplicate Functions.** Inline UUID/status definitions and collaborator permission parsing have been consolidated into shared utilities—ensure future migrations import the same constants to avoid divergence.
+        7. **Improvements Needed.** Add CI coverage for MySQL/Postgres migrate+rollback cycles, backfill regression tests around the new validation guards, and extend ERD exports sourced from `008_creation_studio_tables.sql` for governance reviews.
+        8. **Styling Improvements.** Column naming now mirrors camelCase accessors (e.g. `publicId`, `contentOutline`) with JSON defaults enforced at the database; keep Annex A42 naming guidance in play for upcoming schema additions.
+        9. **Efficiency Analysis.** Indexed ownership/status fields and deduped collaborator permissions preserve fast analytics queries, while transaction-scoped search rebuilds avoid queue fragmentation during bootstrap.
+        10. **Strengths to Keep.** Enum-driven workflow states, cascade rules, and version history remain a strength—now backed by mirrored SQL blueprints and runtime validators that guarantee lineage without extra app logic.
+        11. **Weaknesses to Remove.** Annex SQL still needs automated ERD generation and dialect-specific acceptance tests—schedule documentation automation and schema checks to close the feedback loop.
+        12. **Styling & Colour Review.** Not applicable to the data layer; continue investing in descriptive constraint aliases and comment fields so BI tooling surfaces friendly labels during governance audits.
+        13. **CSS, Orientation & Placement.** Maintain migration ordering that applies creation studio artefacts before downstream enrolment tables to keep FK relationships stable throughout bootstrap sequences.
+        14. **Text Analysis.** Normalised summaries, compliance notes, and governance tags now default to localisation-ready JSON; extend Annex A43 copy guidance for new template schemas to avoid truncation.
+        15. **Change Checklist Tracker.** Run `npm --prefix backend-nodejs run migrate:latest`, `seed`, and `db:schema:check` after each change; capture diffs for `008_creation_studio_tables.sql` alongside ERD snapshots for QA sign-off.
+        16. **Full Upgrade Plan & Release Steps.** Dry-run migrations across staging clusters, validate the new guard rails with regression suites, package rollback scripts, and broadcast schema change notes to curriculum, analytics, and platform squads before release.
       - 13.A Infrastructure Blueprints
          - 13.A.1 infrastructure/observability (found at infrastructure/observability)
          - 13.A.2 infrastructure/terraform/modules (found at infrastructure/terraform/modules)

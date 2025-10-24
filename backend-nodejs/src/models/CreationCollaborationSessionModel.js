@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import { CREATION_SESSION_ROLES } from '../constants/creationStudio.js';
 
 const TABLE = 'creation_collaboration_sessions';
 
@@ -17,6 +18,8 @@ const BASE_COLUMNS = [
   'left_at as leftAt',
   'was_terminated as wasTerminated'
 ];
+
+const ROLE_SET = new Set(CREATION_SESSION_ROLES);
 
 function parseList(value) {
   if (!value) return [];
@@ -42,8 +45,15 @@ function parseObject(value) {
   return value ?? {};
 }
 
+function ensureValidRole(role) {
+  if (!ROLE_SET.has(role)) {
+    throw new Error('Invalid collaboration session role');
+  }
+}
+
 export default class CreationCollaborationSessionModel {
   static async create(session, connection = db) {
+    ensureValidRole(session.role);
     const [id] = await connection(TABLE).insert({
       public_id: session.publicId ?? randomUUID(),
       project_id: session.projectId,
