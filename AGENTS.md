@@ -96,8 +96,8 @@
       - A4. Community, Events & Programming (1.D)
       - [x] A5. Feed, Social Graph & Direct Messaging (1.E)
       - [x] A6. Explorer, Search & Discovery (1.F)
-      - A7. Commerce, Billing & Monetisation (1.G)
-      - A8. Ads, Growth & Content Marketing (1.H)
+      - ✅ A7. Commerce, Billing & Monetisation (1.G)
+      - ✅ A8. Ads, Growth & Content Marketing (1.H)
       - ✅ A9. Analytics, Intelligence & Telemetry (1.I)
       - ✅ A10. Governance, Compliance & Runtime Control (1.J)
       - A11. Integrations, Enablement & Environment Parity (1.K) ✓
@@ -430,7 +430,35 @@
          - 9.E.4 FilterChips (frontend-reactjs/src/components/search/FilterChips.jsx)
          - 9.E.5 GlobalSearchBar (frontend-reactjs/src/components/search/GlobalSearchBar.jsx)
          - 9.E.6 SearchResultCard (frontend-reactjs/src/components/search/SearchResultCard.jsx)
-      - 10.A Commerce, Checkout & Pricing Components
+      - ✅ 10.A Commerce, Checkout & Pricing Components
+        1. **Appraisal.** Annex A7 surfaces that `CheckoutDialog`, `CheckoutPriceSummary`, and the associated pricing dashboards form the transactional spine, while Annex A8 highlights how `CampaignEditor`, `CampaignPreview`, and `EdulureAds` orchestrate acquisition spend; collectively they cover offer configuration, funnel instrumentation, and instructor monetisation journeys but require deeper lifecycle coverage.
+        2. **Functionality.** Checkout flows already assemble line items, payment options, tutor availability, and promotion codes, whereas the ads suite captures audiences, creatives, and placements; both pillars need hardened validation for budgets, taxes, and billing contacts plus scheduling and pacing knobs sourced from Annex A7 control tables.
+        3. **Logic Usefulness.** Pricing intelligence produced by `CheckoutPriceSummary` feeds scenario planning in `InstructorPricing.jsx`, and campaign projections in `CampaignEditor` inform cross-channel ROI dashboards; wiring these outputs into shared monetisation services keeps finance, growth, and instructor personas aligned on projected revenue.
+        4. **Redundancies.** Coupon, upsell, and add-on widgets exist in both checkout and ads previews—centralise them into shared commerce primitives to avoid diverging copy and button styles, referencing the Annex A7 guidance on reusable deal modules.
+        5. **Placeholders or Stubs.** Ads analytics cards, billing provider adapters, and payment intent orchestration are currently mocked; replace them with real API calls to `PaymentService`, attribution exports, and ledger events per Annex A7/A8 implementation notes.
+        6. **Duplicate Functions.** Budget sliders, spend breakdown tables, and localisation helpers are reinvented across `CampaignEditor`, `EdulureAds`, and `CheckoutDialog`; extract them into shared hooks such as `useBudgetingControls` and typography token helpers to shrink surface area.
+        7. **Improvements Needed.** Layer compliance checks (tax, KYC), multi-currency pricing, contract renewals, and cohort pricing experiments; marketing surfaces should expose creative approval queues, pacing alerts, and channel benchmarks informed by Annex A8's KPI definitions.
+        8. **Styling Improvements.** Align typography scale, grid spacing, and semantic colour tokens across checkout and ads states so status badges, KPI pills, and CTAs mirror Annex A8 brand standards and the shared design tokens in `frontend-reactjs/src/styles/tokens.css`.
+        9. **Efficiency Analysis.** Prefetch payment methods, cached price books, and campaign templates, and stream large analytics payloads to avoid blocking the dialog; use suspense boundaries so `CampaignPreview` and `CheckoutPriceSummary` remain responsive during reconciliation fetches.
+        10. **Strengths to Keep.** Maintain the clear split between configuration (forms) and feedback (previews), the modular summary panels, and the analytics-first storytelling already embedded within the components.
+        11. **Weaknesses to Remove.** Eliminate silent validation failures, placeholder insights, and manual reconciliation exports; enforce typed responses, inline error surfaces, and automated ledger postings before enabling launch toggles.
+        12. **Styling & Colour Review.** Map success, neutral, and danger states to finance-approved palette tokens, ensuring checkout totals, promotion savings, and campaign pacing indicators meet WCAG contrast targets.
+        13. **CSS, Orientation & Placement.** Standardise the responsive layout to a two-column shell with sticky summaries on desktop, collapsible accordions on mobile, and consistent gutter spacing derived from the 8px baseline grid noted in Annex A7.
+        14. **Text Analysis.** Audit CTA copy, promotion messaging, and compliance disclosures so they remain concise (under 140 characters), localised, and legally reviewed; embed contextual tooltips for VAT, platform fees, and targeting heuristics.
+        15. **Spacing & Rhythm.** Enforce vertical rhythm via utility classes (`space-y-*`) and tighten card padding so dense KPI blocks stay readable without scrolling fatigue.
+        16. **Shape Language.** Use consistent 8px radius for cards and pill controls, aligning checkout receipts and ad flight badges with broader design system standards.
+        17. **Effects & Motion.** Respect reduced-motion preferences, apply focus-visible outlines to all actionable elements, and reuse elevation tokens for hover states to signal interactive vs. static summaries.
+        18. **Thumbnails & Media.** Ensure creative previews include aspect-ratio safe containers, fallback art, and alt text while checkout receipts render product thumbnails for bundles and add-ons.
+        19. **Media & Asset Handling.** Optimise uploaded creative assets with background processing hooks, and lazy-load payment method logos or trust badges to preserve initial render speed.
+        20. **Buttons & CTAs.** Consolidate launch, schedule, pay, and save actions into shared CTA primitives with consistent sizing, disabled states, and analytics instrumentation hooks.
+        21. **Interaction Patterns.** Add autosave, undo, and simulation toggles; support keyboard navigation across stepper sequences, and provide inline validation summarising blockers before launch or checkout completion.
+        22. **Missing Capabilities.** Build campaign lifecycle lists, approval workflows, tax invoicing exports, refund initiation, and experiment lab views to satisfy Annex A7 billing requirements and Annex A8 growth analytics.
+        23. **Design System Alignment.** Document component blueprints in `docs/design-system/components/commerce.md`, including state diagrams, data contracts, and accessibility checklists for both checkout and ads flows.
+        24. **Clone & Reuse Strategy.** Publish a commerce primitives library (forms, tables, chips) so React, Flutter, and SDK clients share identical logic, preventing future divergence.
+        25. **Framework & Architecture.** Register all commerce routes behind feature flags, guard them with runtime config policies, and emit domain events for every price or campaign mutation for downstream analytics integrity.
+        26. **Change Checklist Tracker.** Update `qa/commerce-readiness-checklist.md` with payment gateway regression tests, currency conversion snapshots, campaign pacing assertions, and accessibility audits before each release.
+        27. **Navigation & Wayfinding.** Surface breadcrumbs and deep links between pricing, checkout, campaigns, and billing history so instructors can pivot without losing context; expose quick jumps to Annex A7 financial reports.
+        28. **Release Plan.** Roll out enhancements in phases: integrate live billing APIs in staging, pilot campaign analytics with selected instructors, capture telemetry on conversion uplift, train support teams, and finalise documentation before general availability.
          - 10.A.1 CampaignEditor (frontend-reactjs/src/components/ads/CampaignEditor.jsx)
          - 10.A.2 CampaignPreview (frontend-reactjs/src/components/ads/CampaignPreview.jsx)
          - 10.A.3 CheckoutDialog (frontend-reactjs/src/components/commerce/CheckoutDialog.jsx)
