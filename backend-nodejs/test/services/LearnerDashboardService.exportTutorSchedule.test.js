@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const listByLearnerIdMock = vi.fn();
-const listForLearnerMock = vi.fn();
+const listByLearnerIdMock = vi.hoisted(() => vi.fn());
+const listForLearnerMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/models/TutorBookingModel.js', () => ({
   default: {
@@ -26,6 +26,8 @@ import LearnerDashboardService from '../../src/services/LearnerDashboardService.
 describe('LearnerDashboardService.exportTutorSchedule', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-04-30T12:00:00Z'));
     listByLearnerIdMock.mockResolvedValue([
       {
         id: 1,
@@ -59,6 +61,10 @@ describe('LearnerDashboardService.exportTutorSchedule', () => {
         metadata: { host: 'Revenue Guild', joinUrl: 'https://example.test/live', prepMaterials: ['Checklist'] }
       }
     ]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('generates an ICS payload combining bookings and classrooms', async () => {

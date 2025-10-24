@@ -420,10 +420,10 @@
          - 9.A.2 Courses (frontend-reactjs/src/pages/Courses.jsx)
          - 9.A.3 Explorer (frontend-reactjs/src/pages/Explorer.jsx)
          - 9.A.4 LiveClassrooms (frontend-reactjs/src/pages/LiveClassrooms.jsx)
-      - 9.D Scheduling, Calendar & Classroom Utilities
+      - ✓ 9.D Scheduling, Calendar & Classroom Utilities
          - 9.D.1 CalendarEventDialog (frontend-reactjs/src/components/calendar/CalendarEventDialog.jsx)
          - 9.D.2 ScheduleGrid (frontend-reactjs/src/components/scheduling/ScheduleGrid.jsx)
-      - 9.E Search & Discovery Components
+      - ✓ 9.E Search & Discovery Components
          - 9.E.1 BlogSearchSection (frontend-reactjs/src/components/search/BlogSearchSection.jsx)
          - 9.E.2 ExplorerPreviewDrawer (frontend-reactjs/src/components/search/ExplorerPreviewDrawer.jsx)
          - 9.E.3 ExplorerSearchSection (frontend-reactjs/src/components/search/ExplorerSearchSection.jsx)
