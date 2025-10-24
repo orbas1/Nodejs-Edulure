@@ -386,9 +386,38 @@
          - 7.B.3 ModerationChecklistForm (frontend-reactjs/src/components/moderation/ModerationChecklistForm.jsx)
          - 7.B.4 ModerationMediaPreview (frontend-reactjs/src/components/moderation/ModerationMediaPreview.jsx)
          - 7.B.5 ModerationQueue (frontend-reactjs/src/components/moderation/ModerationQueue.jsx)
-      - 8.A Public Community & Social Pages
+      - ✓ 8.A Public Community & Social Pages — Annex A20 (Community & Events)
+        1. **Appraise.** `pages/Communities.jsx` and `pages/Feed.jsx` now expose persona-aligned directories, analytics, and community health scorecards driven by real component logic instead of placeholder copy, matching the Annex A20 expectations captured in `user_experience.md`.
+        2. **Function.** Persona extraction, momentum scoring, and last-activity signals are centralised in `frontend-reactjs/src/utils/communityPersona.js` and mirrored by `backend-nodejs/src/utils/communityPersona.js`; `CommunityService.serializeCommunity` now emits persona summaries and momentum scores that `Communities.jsx` consumes in the discovery grid while `Feed.jsx` renders a complementary “Community health” panel beside the live feed.
+        3. **Usefulness.** Operators can slice communities by persona, access model, and momentum, see counts for open vs. NDA-gated cohorts, and jump directly into high-momentum chapters from both the discovery grid and the feed leaderboard with backend-aligned stats (`CommunityModel.listByUserWithStats`, `CommunityModel.getStats`).
+        4. **Redundancies.** Prior hard-coded persona badges, repetitive list filters, and bespoke activity heuristics were replaced with shared helpers (`extractCommunityPersonas`, `computeCommunityEngagementScore`, `resolveLastActivity`) and backend normalisers so both pages, APIs, and seeds stay in sync.
+        5. **Placeholders.** Community APIs now surface personas, access models, and NDA flags sourced from `backend-nodejs/seeds/001_bootstrap.js`; remaining work tracks publishing analytics events and feature-flag toggles before exposing public directory presets.
+        6. **Duplicates.** Directory filtering and momentum ranking now reuse the same helper module, eliminating duplicated `toLowerCase`/`includes` checks that previously lived in multiple components.
+        7. **Improvements Needed.** Wire analytics events for persona filter usage, expose pagination for the discovery grid, and replace heuristic monetisation labels with canonical pricing tier data when the billing API publishes it.
+        8. **Styling Improvements.** Filter controls, persona pills, and scorecards inherit the community palette tokens (`bg-primary/10`, `rounded-3xl`), aligning with the typography and spacing prescribed in the UX audit while remaining Tailwind-compatible.
+        9. **Efficiency Analysis.** `useMemo` caches filtered directories, persona summaries, and momentum rankings, ensuring the expanded directory does not recompute on every keystroke and keeping the feed sidebar reactive without extra renders.
+        10. **Strengths to Keep.** The rich hero content, classroom tabs, and moderation tooling introduced previously remain untouched while gaining persona-aware discovery wrappers and cross-page consistency.
+        11. **Weaknesses to Remove.** Momentum metrics currently derive from aggregate counts; elevate to rolling-window analytics exports and expose billing tier metadata once monetisation services publish canonical payloads.
+        12. **Palette.** New chips and summary cards reuse slate neutrals and primary accents, preventing a separate colour system from emerging around persona filters and analytics callouts.
+        13. **Layout.** Responsive grids (`sm:grid-cols-2`, `xl:grid-cols-3`) keep cards evenly distributed on desktop while stacking gracefully on mobile, matching the directory layout guidelines in `user_experience.md`.
+        14. **Text.** Microcopy now explains why filters exist (“Use these lenses to scope live programming…”) and provides actionable empty states, improving comprehension without duplicating marketing language.
+        15. **Spacing.** Directory and sidebar cards follow the 8px rhythm (p-4/p-5 gaps) and maintain consistent pill spacing, resolving the cramped alignment noted in the audit.
+        16. **Shape.** All cards adopt `rounded-3xl`/`rounded-2xl` radii so the persona layer mirrors existing community hero treatments, avoiding mismatched silhouettes.
+        17. **Effects.** Hover/focus transitions (lift on hover, focus-visible outlines) signal interactivity for the new directory buttons and leaderboard rows, supporting accessibility and keyboard navigation.
+        18. **Thumbs.** Persona summary chips surface top personas at a glance, giving community managers screenshot-ready highlights for release notes and stakeholder reviews.
+        19. **Media.** Discovery cards reference resource counts and live signals, preparing the ground for future thumbnail previews without altering current asset pipelines.
+        20. **Buttons.** Selecting a community now routes through consistent pill buttons (directory grid, health leaderboard, TopBar switcher) that all share focus states and analytics context.
+        21. **Interact.** Directory filters update in real time, search debounces through `useMemo`, and leaderboard buttons call `setSelectedCommunity`, letting power users pivot between personas and specific hubs without page reloads.
+        22. **Missing.** Pending work includes wiring analytics events for persona filter usage, adding saved filter presets per persona, and exposing aggregate charts for trend deltas beyond the top four personas.
+        23. **Design.** `communityPersona.js` captures the persona taxonomy defined in Annex A20 so future components (moderation, onboarding) can consume the same normalised vocabulary.
+        24. **Clone.** Shared helpers prevent feed, dashboard, and marketing surfaces from reinventing persona parsing or momentum scoring, containing future duplication risks.
+        25. **Framework.** Document the persona heuristics and scoring formula in the community enablement playbook so backend and analytics teams can align when shipping official metrics.
+        26. **Checklist.** QA should cover persona filter combinations, NDA gating, momentum ordering, and leaderboard navigation before regression sign-off, plus verify empty states when APIs return zero communities.
+        27. **Nav.** Discovery cards and leaderboard buttons feed directly into `setSelectedCommunity`, preserving the canonical routing path so breadcrumbs, CRUD panels, and metadata headers stay in sync.
+        28. **Release.** Ship alongside backend persona metadata, update Annex A20 narratives, capture screenshots of the new discovery grid and health sidebar for stakeholder decks, and brief community ops on the new filters.
          - 8.A.1 Communities (frontend-reactjs/src/pages/Communities.jsx)
          - 8.A.2 Feed (frontend-reactjs/src/pages/Feed.jsx)
+         - 8.A.3 communityPersona (frontend-reactjs/src/utils/communityPersona.js)
       - 8.B Dashboard Community & Messaging Suites
          - 8.B.1 CommunitySafety (frontend-reactjs/src/pages/dashboard/community/CommunitySafety.jsx)
          - 8.B.2 ChannelSidebar (frontend-reactjs/src/pages/dashboard/community/instructorChats/ChannelSidebar.jsx)

@@ -19,6 +19,7 @@ import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
 import UserProfileModel from '../models/UserProfileModel.js';
 import AdsPlacementService from './AdsPlacementService.js';
 import { summariseReactions } from '../services/ReactionAggregationService.js';
+import { buildCommunityPersonaSummary } from '../utils/communityPersona.js';
 
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 const RESOURCE_MANAGER_ROLES = new Set(['owner', 'admin', 'moderator']);
@@ -1573,11 +1574,18 @@ export default class CommunityService {
 
   static serializeCommunity(community) {
     const metadata = parseJsonColumn(community.metadata, {});
+    const rawEventCount =
+      community.eventCount ??
+      community.eventsCount ??
+      (Array.isArray(community.events) ? community.events.length : null) ??
+      (Array.isArray(metadata.events) ? metadata.events.length : null);
+    const eventCount = Number(rawEventCount ?? 0);
     const stats = {
       members: Number(community.memberCount ?? 0),
       resources: Number(community.resourceCount ?? 0),
       posts: Number(community.postCount ?? 0),
       channels: Number(community.channelCount ?? 0),
+      events: eventCount,
       lastActivityAt: community.lastActivityAt ?? community.updatedAt
     };
 
@@ -1591,6 +1599,18 @@ export default class CommunityService {
       canLeave: isActiveMembership(membershipInfo) && community.memberRole !== 'owner'
     };
 
+    const personaSnapshot = buildCommunityPersonaSummary(
+      {
+        ...community,
+        metadata
+      },
+      stats
+    );
+    const personaSummary = personaSnapshot.summary;
+    const personas = personaSnapshot.personas;
+    const resolvedLastActivity = personaSummary.lastActivityAt ?? stats.lastActivityAt;
+    const momentumScore = personaSummary.engagementScore;
+
     return {
       id: community.id,
       name: community.name,
@@ -1599,8 +1619,18 @@ export default class CommunityService {
       coverImageUrl: community.coverImageUrl,
       visibility: community.visibility,
       ownerId: community.ownerId,
-      metadata,
-      stats,
+      metadata: {
+        ...metadata,
+        personas,
+        personaSummary
+      },
+      personas,
+      personaSummary,
+      stats: {
+        ...stats,
+        lastActivityAt: resolvedLastActivity,
+        momentumScore
+      },
       membership: community.memberRole
         ? {
             role: community.memberRole,
@@ -1614,9 +1644,27 @@ export default class CommunityService {
   }
 
   static serializeCommunityDetail(community, membership, stats, channels, context = {}) {
+    const statsSnapshot = stats
+      ? {
+          memberCount: Number(stats.memberCount ?? 0),
+          resourceCount: Number(stats.resourceCount ?? 0),
+          postCount: Number(stats.postCount ?? 0),
+          channelCount: Number(stats.channelCount ?? 0),
+          eventCount: Number(stats.eventCount ?? 0),
+          lastActivityAt: stats.lastActivityAt ?? community.updatedAt
+        }
+      : {
+          memberCount: 0,
+          resourceCount: 0,
+          postCount: 0,
+          channelCount: 0,
+          eventCount: 0,
+          lastActivityAt: community.updatedAt ?? null
+        };
+
     const summary = this.serializeCommunity({
       ...community,
-      ...stats,
+      ...statsSnapshot,
       memberRole: membership?.role,
       memberStatus: membership?.status
     });
