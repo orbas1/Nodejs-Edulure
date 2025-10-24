@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 
+import useLandingValueProposition from '../hooks/useLandingValueProposition.js';
+
 const DEFAULT_STATS = [
   { label: 'Communities thriving', value: '168+' },
   { label: 'Creators monetising', value: '12k+' },
@@ -8,8 +10,16 @@ const DEFAULT_STATS = [
   { label: 'Daily knowledge exchanges', value: '54k' }
 ];
 
-export default function StatsBar({ stats = DEFAULT_STATS, className, eyebrow, headline }) {
-  const resolvedStats = Array.isArray(stats) && stats.length ? stats : DEFAULT_STATS;
+export default function StatsBar({ stats, className, eyebrow, headline, marketingContent }) {
+  const { stats: valuePropStats } = useLandingValueProposition({ prefetchedData: marketingContent });
+  const resolvedStats = Array.isArray(stats) && stats.length
+    ? stats
+    : valuePropStats.length
+      ? valuePropStats
+      : DEFAULT_STATS;
+
+  const resolvedEyebrow = eyebrow ?? 'Proof points';
+  const resolvedHeadline = headline ?? 'Operators trust Flow 5 to hit their numbers';
 
   return (
     <section
@@ -17,13 +27,13 @@ export default function StatsBar({ stats = DEFAULT_STATS, className, eyebrow, he
       aria-label="Edulure impact metrics"
     >
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-12">
-        {(eyebrow || headline) && (
+        {(resolvedEyebrow || resolvedHeadline) && (
           <header className="max-w-3xl space-y-1">
-            {eyebrow ? (
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">{eyebrow}</p>
+            {resolvedEyebrow ? (
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">{resolvedEyebrow}</p>
             ) : null}
-            {headline ? (
-              <h2 className="text-2xl font-semibold text-slate-900">{headline}</h2>
+            {resolvedHeadline ? (
+              <h2 className="text-2xl font-semibold text-slate-900">{resolvedHeadline}</h2>
             ) : null}
           </header>
         )}
@@ -53,5 +63,19 @@ StatsBar.propTypes = {
   ),
   className: PropTypes.string,
   eyebrow: PropTypes.string,
-  headline: PropTypes.string
+  headline: PropTypes.string,
+  marketingContent: PropTypes.shape({
+    blocks: PropTypes.array,
+    plans: PropTypes.array,
+    invites: PropTypes.array,
+    testimonials: PropTypes.array
+  })
+};
+
+StatsBar.defaultProps = {
+  stats: undefined,
+  className: undefined,
+  eyebrow: undefined,
+  headline: undefined,
+  marketingContent: null
 };

@@ -1093,7 +1093,172 @@ export async function seed(knex) {
         primary_cta: JSON.stringify({ label: 'Start free trial', to: '/register' }),
         secondary_cta: JSON.stringify({ label: 'View pricing', to: '/pricing' }),
         tertiary_cta: JSON.stringify({ label: 'See how Flow 5 works', href: 'https://marketing.edulure.test/flow-5-demo' }),
-        metadata: JSON.stringify({ analyticsKey: 'flow5-hero', layout: 'split-right' })
+        metadata: JSON.stringify({ analyticsKey: 'flow5-hero', layout: 'split-right' }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({ surface: 'home-hero' })
+      },
+      {
+        slug: 'flow-five-value-pillars',
+        block_type: 'value-prop',
+        eyebrow: 'Annex A16 launch system',
+        title: 'Flow 5 pillars for marketing, onboarding, and monetisation',
+        subtitle:
+          'Pair product tours, rituals, and revenue guardrails so teams can demo, launch, and expand without chasing assets.',
+        status_label: null,
+        chips: JSON.stringify(['Pillar blueprints', 'Telemetry aware', 'Annex ready']),
+        media: JSON.stringify({}),
+        primary_cta: JSON.stringify({}),
+        secondary_cta: JSON.stringify({}),
+        tertiary_cta: JSON.stringify({}),
+        metadata: JSON.stringify({ analyticsKey: 'flow5-value-pillars' }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({
+          items: [
+            {
+              key: 'programs',
+              title: 'Program blueprints on day one',
+              helper: 'Launch cohorts without detours',
+              description:
+                'Assemble Flow 5 templates for curriculum, onboarding, and sponsor funnels the moment you sign in.',
+              analyticsId: 'pillar-programs',
+              actions: [
+                {
+                  key: 'workspace',
+                  label: 'Start a free workspace',
+                  description: 'Spin up a Flow 5 launch workspace in three minutes.',
+                  to: '/register',
+                  badge: 'New',
+                  analyticsId: 'start-workspace'
+                },
+                {
+                  key: 'templates',
+                  label: 'Browse cohort templates',
+                  description: '150+ outlines for accelerators, bootcamps, and micro-courses.',
+                  to: '/courses',
+                  analyticsId: 'browse-templates'
+                },
+                {
+                  key: 'community',
+                  label: 'Tour live communities',
+                  description: 'See how rituals, prompts, and feedback loops keep cohorts warm.',
+                  to: '/communities',
+                  analyticsId: 'tour-communities'
+                }
+              ]
+            },
+            {
+              key: 'engagement',
+              title: 'Engagement rituals that stick',
+              helper: 'Orchestrate live energy',
+              description: 'Route live classrooms, async prompts, and nudges with playbooks drawn straight from Annex A16.',
+              analyticsId: 'pillar-engagement',
+              actions: [
+                {
+                  key: 'live',
+                  label: 'Host live classrooms',
+                  description: 'Agenda templates, green-room checklists, and live overlays.',
+                  to: '/live-classrooms',
+                  analyticsId: 'host-live'
+                },
+                {
+                  key: 'automations',
+                  label: 'Automate ritual nudges',
+                  description: 'Keep members on track with moment-based playbooks.',
+                  to: '/explorer',
+                  analyticsId: 'automate-rituals'
+                },
+                {
+                  key: 'analytics',
+                  label: 'Review engagement analytics',
+                  description: 'See sentiment, attendance, and completion trends in one place.',
+                  to: '/analytics',
+                  analyticsId: 'review-analytics'
+                }
+              ]
+            },
+            {
+              key: 'revenue',
+              title: 'Revenue moments without spreadsheets',
+              helper: 'Keep payouts transparent',
+              description: 'Affiliate, sponsorship, and tutor revenue pipelines roll up under one commission model.',
+              analyticsId: 'pillar-revenue',
+              actions: [
+                {
+                  key: 'pricing',
+                  label: 'Review pricing',
+                  description: 'Flat rates with payout-ready reporting baked in.',
+                  to: '/pricing',
+                  analyticsId: 'review-pricing'
+                },
+                {
+                  key: 'sponsors',
+                  label: 'Activate sponsors',
+                  description: 'Bundle sponsor perks into every onboarding flow.',
+                  href: 'https://docs.edulure.test/flow5/sponsorships',
+                  analyticsId: 'activate-sponsors'
+                },
+                {
+                  key: 'payouts',
+                  label: 'Open payout dashboard',
+                  description: 'Monitor revenue, affiliates, and tutor commissions live.',
+                  to: '/dashboard/instructor/payouts',
+                  analyticsId: 'open-payouts'
+                }
+              ]
+            }
+          ]
+        })
+      },
+      {
+        slug: 'flow-five-value-stats',
+        block_type: 'stat',
+        eyebrow: 'Flow 5 in production',
+        title: 'Proof every cohort, community, and revenue pod moves faster',
+        subtitle: null,
+        status_label: null,
+        chips: JSON.stringify([]),
+        media: JSON.stringify({}),
+        primary_cta: JSON.stringify({}),
+        secondary_cta: JSON.stringify({}),
+        tertiary_cta: JSON.stringify({}),
+        metadata: JSON.stringify({ analyticsKey: 'flow5-value-stats' }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({
+          metrics: [
+            {
+              key: 'communities',
+              value: '168+',
+              label: 'Communities launched',
+              helper: 'Across 41 countries and six segments',
+              labelKey: 'home.stats.communities.label',
+              helperKey: 'home.stats.communities.helper'
+            },
+            {
+              key: 'creators',
+              value: '12k+',
+              label: 'Creators monetising',
+              helper: 'Flow 5 operators shipping new offers monthly',
+              labelKey: 'home.stats.creators.label',
+              helperKey: 'home.stats.creators.helper'
+            },
+            {
+              key: 'retention',
+              value: '38%',
+              label: 'Average retention lift',
+              helper: 'Comparing Flow 5 cohorts to pre-launch baselines',
+              labelKey: 'home.stats.retention.label',
+              helperKey: 'home.stats.retention.helper'
+            },
+            {
+              key: 'knowledge',
+              value: '54k',
+              label: 'Daily knowledge exchanges',
+              helper: 'Across lessons, rituals, and office hours',
+              labelKey: 'home.stats.knowledge.label',
+              helperKey: 'home.stats.knowledge.helper'
+            }
+          ]
+        })
       },
       {
         slug: 'flow-five-proof',
@@ -1115,7 +1280,15 @@ export async function seed(knex) {
         primary_cta: JSON.stringify({ label: 'Read the story', href: 'https://stories.edulure.test/flow5-ops-guild' }),
         secondary_cta: JSON.stringify({ label: 'Download checklist', href: 'https://docs.edulure.test/flow5/checklist.pdf' }),
         tertiary_cta: JSON.stringify({}),
-        metadata: JSON.stringify({ analyticsKey: 'flow5-proof', theme: 'slate' })
+        metadata: JSON.stringify({ analyticsKey: 'flow5-proof', theme: 'slate' }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({
+          metrics: [
+            { key: 'conversion-lift', value: '+28%', label: 'Marketing → enrolment', helper: null },
+            { key: 'setup-time', value: '2 weeks', label: 'Flow setup time', helper: null },
+            { key: 'nps', value: '64', label: 'NPS after onboarding', helper: null }
+          ]
+        })
       },
       {
         slug: 'flow-five-case-studies',
@@ -1181,7 +1354,9 @@ export async function seed(knex) {
               }
             }
           ]
-        })
+        }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({ items: [] })
       },
       {
         slug: 'flow-five-monetisation-ribbon',
@@ -1202,7 +1377,9 @@ export async function seed(knex) {
             'Tutor pods synced with payouts and attendance',
             'Affiliate revenue reconciled nightly'
           ]
-        })
+        }),
+        surfaces: JSON.stringify(['home', 'marketing']),
+        payload: JSON.stringify({})
       }
     ]);
 

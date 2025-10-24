@@ -409,7 +409,7 @@
          - 1.F.8 uploads (frontend-reactjs/src/utils/uploads.js)
          - 1.F.9 auth (frontend-reactjs/src/utils/validation/auth.js)
          - 1.F.10 onboarding (frontend-reactjs/src/utils/validation/onboarding.js)
-      - 2.A Landing & Value Proposition Surfaces
+      - ✓ 2.A Landing & Value Proposition Surfaces
          - 2.A.1 FeatureGrid (frontend-reactjs/src/components/FeatureGrid.jsx)
          - 2.A.2 PageHero (frontend-reactjs/src/components/PageHero.jsx)
          - 2.A.3 StatsBar (frontend-reactjs/src/components/StatsBar.jsx)
@@ -426,6 +426,34 @@
          - 2.A.14 ConversionPanel (frontend-reactjs/src/components/marketing/ConversionPanel.jsx)
          - 2.A.15 HeroMediaPanel (frontend-reactjs/src/components/marketing/HeroMediaPanel.jsx)
          - 2.A.16 MarketingHero (frontend-reactjs/src/components/marketing/MarketingHero.jsx)
+            1. **Appraisal.** `useLandingValueProposition.js` now hydrates hero, stat, and pillar CTAs from the live `marketing_blocks` table—backed by the new `payload`/`surfaces` columns in `20250404120000_marketing_blocks_surfaces.js`—so Annex A16 copy flows straight from seeded data instead of local mocks.
+            2. **Functionality.** `MarketingContentService.listMarketingBlocks` merges `types`, `variants`, and `surfaces`, filters through the expanded `MarketingBlockModel`, and delivers structured `items`/`metrics` arrays that the hook normalises via `data/marketing/valueProposition.js` before wiring analytics handlers in `MarketingHero`, `FeatureGrid`, and `StatsBar`.
+            3. **Usefulness.** Home, campaign, and future landing surfaces can pass prefetched API payloads into these components to guarantee the same hero chips, proof metrics, and CTA routing that go-to-market teams track in Annex dashboards.
+            4. **Redundancies.** Inline hero/stat constants were deleted in favour of the shared `VALUE_PROPOSITION_*` fallbacks plus the seeded blocks, eliminating divergent copy or analytics IDs between components.
+            5. **Placeholders or Stubs.** Flow 5 imagery, Annex captions, and doc CTAs remain as fallback translations; dynamic CMS overrides will slot into the `marketing_blocks.payload` structure without rewriting component logic.
+            6. **Duplicates.** `normaliseAction` now prefers backend-provided analytics identifiers and de-duplicates CTA tracking, keeping hero buttons, grid links, and stats actions in one telemetry vocabulary.
+            7. **Improvements Needed.** Next pass should extend the same hook-driven hydration to `PageHero`, `Testimonials`, and `ConversionPanel`, and expose marketing plan CTA analytics to close the Annex instrumentation loop.
+            8. **Styling.** Feature pillars keep Annex-compliant `rounded-3xl` cards, descriptive intros, and hover/focus states while drawing copy from seeds so design and marketing reviews match the documented mocks.
+            9. **Efficiency Analysis.** Backend surface filtering trims unused blocks, memoised hero/pillar builders avoid recomputation, and `useMarketingContent` still accepts prefetched data to skip duplicate network calls.
+            10. **Strengths to Keep.** `PrimaryHero`, `HeroMediaPanel`, and `HomeSection` composition remains intact; they simply receive hydrated props so responsive gradients and layouts stay battle-tested.
+            11. **Weaknesses to Remove.** Pricing and monetisation ribbons still rely on legacy analytics wiring—flagged for follow-up once Annex A16 secondary CTA instrumentation lands.
+            12. **Palette.** Chips, stats, and CTA badges continue using the established primary/emerald/slate token set to align with the Annex colour audit.
+            13. **Layout.** Semantic `<article>` wrappers, intro copy, and 8/12/16 spacing enforce Annex density targets across breakpoints while the data now originates from the CMS-backed payload.
+            14. **Text.** Seeded pillars and metrics preserve translation keys (e.g., `home.stats.*`) so localisation keeps working even though copy is hydrated from the database.
+            15. **Spacing.** CTA clusters, stat helpers, and hero chip rows remain on the Annex rhythm, ensuring the new backend-fed content does not regress vertical density.
+            16. **Shape.** Hero, stat, and pillar shells keep `rounded-3xl`/`rounded-2xl` treatments consistent with Annex silhouette guidance.
+            17. **Effects.** Shared hover/focus-visible animations were untouched, so accessibility affordances persist while content now streams from the marketing dataset.
+            18. **Thumbs.** Hero chips, stats, and helper copy still surface screenshot-ready proof points for Annex QA and stakeholder decks.
+            19. **Media.** `ensureMedia` retains Flow 5 fallback video/image sets while respecting block-specific captions/alt text and the new `payload.surface` identifier used for analytics.
+            20. **Buttons.** CTA normalisation enforces safe routing for `/register`, `/courses`, `/communities`, pricing docs, and sponsor briefs with analytics IDs seeded in the database for telemetry parity.
+            21. **Interact.** Hero and pillar CTAs emit `marketing:hero_cta`/`marketing:value_prop_action` events tagged with slug- or payload-defined surfaces so dashboards can reconcile Annex funnel performance.
+            22. **Missing.** Bring `Testimonials`, `ConversionPanel`, and pricing CTA components onto the shared hook, and extend backend analytics exports so Annex dashboards ingest conversion events automatically.
+            23. **Design.** `valueProposition.js` now mirrors the seeded `marketing_blocks` payload schema, giving design ops and analytics a single Annex source of truth for hero, pillar, and stat content.
+            24. **Clone.** Centralised hydration prevents future landing variants from cloning fallback arrays or instrumentation, keeping Annex updates maintainable even as new surfaces subscribe to the payload.
+            25. **Framework.** The hook packages translation helpers, analytics context, and payload parsing so partner pages or locale variants can opt in with minimal wiring.
+            26. **Checklist.** Apply the migration, reseed marketing data, verify `/content/marketing/blocks?surfaces=home` returns hero/pillar/stat payloads, confirm CTA analytics fire, and run `npm --prefix frontend-reactjs run lint` (requires `@eslint/js`).
+            27. **Nav.** Hero analytics lean on seeded slugs/`payload.surface` IDs so go-to-market reporting maps CTA performance back to exact Annex A16 surfaces.
+            28. **Release.** Deploy the migration, run `npm --workspace backend-nodejs run migrate && npm --workspace backend-nodejs run seed`, validate marketing APIs plus frontend hydration, and brief GTM teams with updated Annex screenshots and telemetry notes.
          - 2.A.17 MonetizationRibbon (frontend-reactjs/src/components/marketing/MonetizationRibbon.jsx)
          - 2.A.18 PlanHighlights (frontend-reactjs/src/components/marketing/PlanHighlights.jsx)
          - 2.A.19 PrimaryHero (frontend-reactjs/src/components/marketing/PrimaryHero.jsx)

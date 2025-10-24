@@ -14,10 +14,26 @@ function parseJson(value, fallback) {
   }
 }
 
+function normaliseArray(value, fallback = []) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return fallback;
+}
+
 function mapRecord(record) {
   if (!record) {
     return null;
   }
+
+  const metadata = parseJson(record.metadata, {});
+  const payload = parseJson(record.payload, {});
+  const fallbackSurfaces = Array.isArray(metadata.surfaces) ? metadata.surfaces : [];
+  const surfaces = parseJson(record.surfaces, fallbackSurfaces);
+  const payloadItems = normaliseArray(payload.items, metadata.items ?? metadata.pillars ?? metadata.cards ?? []);
+  const payloadMetrics = normaliseArray(payload.metrics, metadata.metrics ?? metadata.stats ?? []);
+  const payloadActions = normaliseArray(payload.actions, metadata.actions ?? []);
+
   return {
     id: record.id,
     slug: record.slug,
@@ -31,7 +47,12 @@ function mapRecord(record) {
     primaryCta: parseJson(record.primary_cta, {}),
     secondaryCta: parseJson(record.secondary_cta, {}),
     tertiaryCta: parseJson(record.tertiary_cta, {}),
-    metadata: parseJson(record.metadata, {}),
+    metadata,
+    payload,
+    surfaces,
+    items: payloadItems,
+    metrics: payloadMetrics,
+    actions: payloadActions,
     createdAt: record.created_at,
     updatedAt: record.updated_at
   };
@@ -59,6 +80,20 @@ export default class MarketingBlockModel {
     if (!block?.slug) {
       throw new Error('Marketing block slug is required for upsert');
     }
+    const surfacesInput = Array.isArray(block.surfaces)
+      ? block.surfaces
+      : Array.isArray(block.metadata?.surfaces)
+        ? block.metadata.surfaces
+        : [];
+    const rawPayload = block.payload ?? null;
+    const derivedPayload =
+      rawPayload ?? (block.items || block.metrics
+        ? {
+            ...(block.items ? { items: block.items } : {}),
+            ...(block.metrics ? { metrics: block.metrics } : {})
+          }
+        : {});
+
     const payload = {
       block_type: block.blockType ?? block.block_type ?? 'generic',
       eyebrow: block.eyebrow ?? null,
@@ -70,7 +105,9 @@ export default class MarketingBlockModel {
       primary_cta: JSON.stringify(block.primaryCta ?? block.primary_cta ?? {}),
       secondary_cta: JSON.stringify(block.secondaryCta ?? block.secondary_cta ?? {}),
       tertiary_cta: JSON.stringify(block.tertiaryCta ?? block.tertiary_cta ?? {}),
-      metadata: JSON.stringify(block.metadata ?? {})
+      metadata: JSON.stringify(block.metadata ?? {}),
+      payload: JSON.stringify(derivedPayload ?? {}),
+      surfaces: JSON.stringify(surfacesInput)
     };
     const existing = await this.findBySlug(block.slug, connection);
     if (existing) {

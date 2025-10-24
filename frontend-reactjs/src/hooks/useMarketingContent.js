@@ -25,7 +25,22 @@ const serialiseForMemo = (value) => {
   return value;
 };
 
+const normaliseData = (payload) => {
+  if (!payload) {
+    return { blocks: [], plans: [], invites: [], testimonials: [] };
+  }
+  return {
+    blocks: Array.isArray(payload.blocks) ? payload.blocks : [],
+    plans: Array.isArray(payload.plans) ? payload.plans : [],
+    invites: Array.isArray(payload.invites) ? payload.invites : [],
+    testimonials: Array.isArray(payload.testimonials) ? payload.testimonials : []
+  };
+};
+
 export default function useMarketingContent(options = {}) {
+  const disabled = Boolean(options.disabled);
+  const initialData = normaliseData(options.initialData);
+
   const query = useMemo(() => {
     const payload = {};
     if (options.types) {
@@ -48,23 +63,26 @@ export default function useMarketingContent(options = {}) {
     serialiseForMemo(options.variants)
   ]);
 
-  const [data, setData] = useState({ blocks: [], plans: [], invites: [], testimonials: [] });
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(() => (disabled ? initialData : normaliseData(options.initialData)));
+  const [loading, setLoading] = useState(!disabled);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (disabled) {
+      setData(initialData);
+      setLoading(false);
+      setError(null);
+      return () => {
+        cancelled = true;
+      };
+    }
     setLoading(true);
     setError(null);
     fetchMarketingLandingContent(query)
       .then((payload) => {
         if (!cancelled) {
-          setData({
-            blocks: Array.isArray(payload.blocks) ? payload.blocks : [],
-            plans: Array.isArray(payload.plans) ? payload.plans : [],
-            invites: Array.isArray(payload.invites) ? payload.invites : [],
-            testimonials: Array.isArray(payload.testimonials) ? payload.testimonials : []
-          });
+          setData(normaliseData(payload));
           setLoading(false);
         }
       })
@@ -77,7 +95,7 @@ export default function useMarketingContent(options = {}) {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, disabled, initialData]);
 
   return { data, loading, error };
 }
