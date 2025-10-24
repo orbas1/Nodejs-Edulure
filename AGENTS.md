@@ -375,9 +375,65 @@
          - 3.A.2 IntegrationCredentialInvite (frontend-reactjs/src/pages/IntegrationCredentialInvite.jsx)
          - 3.A.3 Login (frontend-reactjs/src/pages/Login.jsx)
          - 3.A.4 Register (frontend-reactjs/src/pages/Register.jsx)
-      - 3.B Setup & Pre-launch Handoffs
+      - ✓ 3.B Setup & Pre-launch Handoffs — Annex A2 (Learner Onboarding & Feedback)
+        1. **Appraisal.** `SetupOrchestratorService` now blends environment templating with learner onboarding telemetry, so Annex A2 prep covers infrastructure inputs, invitation handoffs, and feedback loops in a single control room.
+        2. **Functionality.** `SetupController.buildSnapshot()` awaits `LearnerOnboardingInsightsService.summarise()` alongside `describeDefaults()`, pushing readiness metrics, task catalogues, history, and preset data through both REST and the SSE stream.
+        3. **Usefulness.** `frontend-reactjs/src/pages/Setup.jsx` renders a “Learner onboarding & feedback” card summarising total responses, thirty-day trends, invite acceptance, persona leaders, and survey cadence, giving operators a launch checklist without leaving the installer.
+        4. **Redundancies.** Hard-coded `DEFAULT_*` env placeholders now defer to `.env.example` values via `readEnvTemplate`, eliminating drift between documentation, installer defaults, and committed templates.
+        5. **Placeholders.** When telemetry tables are empty the insights service returns zeroed counts and null timestamps, keeping Annex messaging honest until production data flows.
+        6. **Duplicates.** Cached defaults prevent repeated file reads during SSE polling, and persona breakdowns are computed once per summary to avoid redundant array allocations.
+        7. **Improvements Needed.** Extend the insights service with configurable windows, rolling averages, and cohort slices so Annex A2 can compare pilot tenants or highlight funnel drop-offs automatically.
+        8. **Styling.** The readiness card adopts the same `rounded-3xl` shell, slate neutrals, and uppercase kickers as the rest of the setup aside, keeping Annex visuals consistent with user_experience.md spacing rules.
+        9. **Efficiency.** SQL counts and a capped 200-row survey sample keep `LearnerOnboardingInsightsService` lightweight while caching env defaults avoids re-reading template files on every heartbeat.
+        10. **Strengths.** SSE listeners now receive merged state snapshots, so live installer runs broadcast task progress and onboarding deltas without manual refreshes.
+        11. **Weaknesses.** Insights currently assume a 30-day lookback; expose configuration hooks or auto-tune the window when installers run in long-lived staging environments.
+        12. **Palette.** Metrics rely on existing primary, emerald, and slate tokens—no new colour primitives were introduced, respecting Annex palette governance.
+        13. **Layout.** The card’s `sm:grid-cols-2` metric grid and stacked persona/survey panels follow the 8px/16px rhythm, keeping dense analytics scannable on narrow viewports.
+        14. **Text.** Microcopy (“Track sign-up momentum…”, “Finalise community pairings…”) speaks directly to Annex A2 goals, aligning tone with the onboarding handbook.
+        15. **Spacing.** Utility classes (`gap-4`, `mt-4`, `space-y-1`) maintain the documented breathing room between metrics, badges, and helper copy.
+        16. **Shape.** Metrics, persona chips, and action buttons continue using `rounded-full` and `rounded-2xl` geometry so the installer mirrors other dashboard shells.
+        17. **Effects.** Buttons, toggles, and preset pills retain focus-visible rings and hover treatments, ensuring accessibility cues remain intact after the insights injection.
+        18. **Thumbs.** The existing `WrenchScrewdriverIcon` header tag and hero badges stay in place, reinforcing the “guided installation” motif alongside the new analytics.
+        19. **Media.** Readiness metrics remain typographic—no new charts or imagery were added, preserving the lightweight nature of the aside until richer telemetry ships.
+        20. **Buttons.** `Run installer`, preset selectors, and task toggles now coexist with the insights card without overlap, and new data does not introduce conflicting CTAs.
+        21. **Interact.** Task checkboxes, preset pills, and status controls remain keyboard accessible while the readiness card exposes static summaries that respect screen-reader order.
+        22. **Missing.** Future revisions should expose alert thresholds (e.g., “<5 survey responses”) so Annex A2 can flag readiness blockers proactively.
+        23. **Design.** Insights reuse Annex A2 vocabulary (responses, invites, persona focus) and derive directly from `LearnerOnboardingResponseModel` + telemetry tables, keeping UI copy and backend schema aligned.
+        24. **Clone.** A single summariser powers both REST and SSE responses, preventing each consumer from reimplementing onboarding analytics logic.
+        25. **Framework.** `LearnerOnboardingInsightsService` lives alongside other backend services, making it trivial for dashboards or docs generators to consume the same readiness snapshot.
+        26. **Checklist.** QA should validate env defaults hydrate from `.env.example`, confirm invite/response counts against seed data, and observe SSE updates when survey events are ingested.
+        27. **Nav.** Positioning the readiness card at the top of the installer sidebar keeps onboarding KPIs visible before operators trigger tasks or inspect logs.
+        28. **Release.** Ship by reseeding onboarding/survey tables, running `npm --prefix backend-nodejs run db:install` where needed, validating `/api/v1/setup/status`, and updating Annex A2 docs with the new readiness snapshot.
          - 3.B.1 Setup (frontend-reactjs/src/pages/Setup.jsx)
-      - 3.C Identity Forms & Auth Components
+      - ✓ 3.C Identity Forms & Auth Components — Annex A17 (Authentication & Setup)
+        1. **Appraisal.** Identity primitives now foreground accessible progress indicators, provider context, and gated steppers so Annex A17 flows stay trustworthy across learner and instructor journeys.
+        2. **Functionality.** `AuthForm.jsx` adopts `useId`-driven aria wiring, `SocialSignOn.jsx` emits provider metadata with descriptions/badges, and `FormStepper.jsx` recognises disabled steps while labelling each button with a status attribute.
+        3. **Usefulness.** Social sign-on rows expose badges, helper copy, and disabled reasons, guiding operators when SSO is unavailable or restricted to specific pilots.
+        4. **Redundancies.** Progress maths (`Math.round`) is centralised via `progressPercent`, preventing duplicate calculations and ensuring width + text stay in sync.
+        5. **Placeholders.** Provider lists still fall back to the baked-in Google/Apple/Facebook/LinkedIn definitions until CMS-managed metadata lands.
+        6. **Duplicates.** Step status reporting lives in `data-step-status`, letting analytics or CSS consumers share the same semantics instead of bespoke switch statements per form.
+        7. **Improvements Needed.** Wire marketing CMS content into provider descriptions and badges so Annex A17 can localise security messaging without code edits.
+        8. **Styling.** Social buttons keep branded colour tokens while shifting to a column layout for copy, matching the marketing/auth aesthetic documented in user_experience.md.
+        9. **Efficiency.** Disabled handlers short-circuit `onSelect`, `aria` IDs are generated once, and steppers avoid redundant clicks on locked steps.
+        10. **Strengths.** `aria-live` banners, progressbars, and disabled metadata ensure assistive tech announces validation errors, successes, and onboarding progress immediately.
+        11. **Weaknesses.** Social icons remain static SVGs; future Annex iterations could request dynamic assets from configuration to reflect tenant branding.
+        12. **Palette.** Buttons continue using provider brand hues plus shared slate/primary neutrals, keeping authentication visuals on-brand.
+        13. **Layout.** The multi-line label/description stack inside social buttons ensures long helper copy wraps gracefully without breaking alignment.
+        14. **Text.** Disabled reason strings (“Sign in disabled by your administrator”) and onboarding copy stay concise and action-oriented per Annex tone guidance.
+        15. **Spacing.** Updated components rely on `gap-3`, `mt-1`, and `space-y-6` to maintain comfortable spacing between progress meters, alerts, and form fields.
+        16. **Shape.** Authentication CTAs preserve their `rounded-full` silhouette, matching the rest of the Annex A17 design system.
+        17. **Effects.** Focus-visible rings, hover transitions, and pressed states remain intact even with the richer metadata layout.
+        18. **Thumbs.** Provider SVGs continue to sit within consistent `h-10 w-10` frames, delivering recognisable identity anchors for users scanning options.
+        19. **Media.** No new imagery is introduced; textual and icon treatments cover all messaging to keep forms lightweight.
+        20. **Buttons.** `onSelect` now passes the provider object alongside the ID so analytics and routing layers can access badges or disablement reasons without additional lookups.
+        21. **Interact.** Stepper buttons respect `disabled` props and surface `aria-disabled` while forms broadcast error/success via `aria-live` regions for screen readers.
+        22. **Missing.** Pending work includes mapping provider copy to localisation bundles and emitting analytics events when stepper statuses change.
+        23. **Design.** Copy and semantics mirror Annex A17’s “secure, supportive” voice, with progress labels (“Onboarding progress”) and support footers referencing legal copy.
+        24. **Clone.** Centralised ID generation and status attributes avoid bespoke aria wiring in each auth surface, reducing future duplication risk.
+        25. **Framework.** Additional provider fields (badge/description/disabledReason) keep the API extensible for enterprise tenants without touching downstream components.
+        26. **Checklist.** QA should confirm progress bars announce values, error banners read aloud, disabled sign-on buttons resist clicks, and stepper analytics register state transitions.
+        27. **Nav.** `data-step-status` primes instrumentation and styling so navigation breadcrumbs, analytics, and Annex documentation stay in sync.
+        28. **Release.** Coordinate with marketing to populate provider metadata, run accessibility smoke tests, and document new props in Annex A17 handbooks before deployment.
          - 3.C.1 AuthCard (frontend-reactjs/src/components/AuthCard.jsx)
          - 3.C.2 SocialSignOn (frontend-reactjs/src/components/SocialSignOn.jsx)
          - 3.C.3 AuthForm (frontend-reactjs/src/components/auth/AuthForm.jsx)

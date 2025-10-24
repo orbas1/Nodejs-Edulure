@@ -11,6 +11,8 @@ import { startWorkerService } from '../servers/workerService.js';
 import { startRealtimeServer } from '../servers/realtimeServer.js';
 
 const projectRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..');
+const backendEnvExamplePath = path.resolve(projectRoot, 'backend-nodejs', '.env.example');
+const frontendEnvExamplePath = path.resolve(projectRoot, 'frontend-reactjs', '.env.example');
 const DEFAULT_PRESET_ID = 'lite';
 const HEARTBEAT_INTERVAL_MS = 5_000;
 
@@ -20,6 +22,50 @@ const clone = (value) => {
   }
   return JSON.parse(JSON.stringify(value));
 };
+
+function parseEnvTemplate(content) {
+  if (!content) {
+    return {};
+  }
+
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .reduce((acc, line) => {
+      const delimiterIndex = line.indexOf('=');
+      if (delimiterIndex <= 0) {
+        return acc;
+      }
+      const key = line.slice(0, delimiterIndex).trim();
+      if (!key) {
+        return acc;
+      }
+      let value = line.slice(delimiterIndex + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      } else {
+        const commentIndex = value.indexOf('#');
+        if (commentIndex >= 0) {
+          value = value.slice(0, commentIndex).trim();
+        }
+      }
+      acc[key] = value;
+      return acc;
+    }, {});
+}
+
+async function readEnvTemplate(filePath) {
+  try {
+    const contents = await fs.readFile(filePath, 'utf8');
+    return { values: parseEnvTemplate(contents), source: path.relative(projectRoot, filePath) };
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      logger.warn({ err: error, filePath }, 'Failed to read environment template');
+    }
+    return { values: {}, source: null };
+  }
+}
 const TASK_DEFINITIONS = new Map([
   [
     'environment',
@@ -229,6 +275,7 @@ async function writeEnvironmentFiles(envConfig = {}) {
 class SetupOrchestratorService extends EventEmitter {
   constructor() {
     super();
+    this.cachedDefaults = null;
     this.reset();
     setImmediate(() => {
       this.restoreFromHistory().catch((error) => {
@@ -313,11 +360,28 @@ class SetupOrchestratorService extends EventEmitter {
     };
   }
 
-  describeDefaults() {
-    return {
-      sequence: [...DEFAULT_SETUP_TASK_SEQUENCE],
-      preset: DEFAULT_PRESET_ID
-    };
+  async describeDefaults() {
+    if (!this.cachedDefaults) {
+      const [backendTemplate, frontendTemplate] = await Promise.all([
+        readEnvTemplate(backendEnvExamplePath),
+        readEnvTemplate(frontendEnvExamplePath)
+      ]);
+
+      this.cachedDefaults = {
+        sequence: [...DEFAULT_SETUP_TASK_SEQUENCE],
+        preset: DEFAULT_PRESET_ID,
+        env: {
+          backend: backendTemplate.values,
+          frontend: frontendTemplate.values
+        },
+        sources: {
+          backendEnv: backendTemplate.source,
+          frontendEnv: frontendTemplate.source
+        }
+      };
+    }
+
+    return clone(this.cachedDefaults);
   }
 
   async restoreFromHistory() {
