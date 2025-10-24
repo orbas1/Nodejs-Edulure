@@ -204,8 +204,8 @@
          14. **Text Analysis, Text Placement, Text Length, Text Redundancy & Quality.** Ensure error strings (“Access token is required...”, storage warning copy) remain precise, avoid repeated jargon, and clarify when tokens are cleared versus refreshed. 
          15. **Change Checklist Tracker.** Exercise token store persistence, concurrent refresh guards, cross-tab synchronisation, header resolver outputs, and SDK build checks before tagging releases aligned with Annex A45.
          16. **Full Upgrade Plan & Release Steps.** Roll out by updating consumer apps to use the shared session manager, validate storage adapters per platform, coordinate Annex documentation refresh, and publish the SDK once integration smoke tests pass. 
-      - 7.A Environment Provisioning & Infrastructure as Code (`infrastructure/terraform/`, `docker-compose.yml`, `infrastructure/environments/`)
-      - 7.B CI/CD Automation & Release Tooling (`scripts/`, `backend-nodejs/scripts/`, `update_template/`, `qa/`)
+      - ✓ 7.A Environment Provisioning & Infrastructure as Code (`infrastructure/terraform/`, `docker-compose.yml`, `infrastructure/environments/`)
+      - ✓ 7.B CI/CD Automation & Release Tooling (`scripts/`, `backend-nodejs/scripts/`, `update_template/`, `qa/`)
       - 7.C Observability Stack & Runtime Telemetry (`infrastructure/observability/`, `backend-nodejs/src/observability/`, `docs/operations/observability.md`)
       - 7.D Local Tooling & Developer Enablement (`file_list.md`, `EDULURE_GUIDE.md`, `backend-nodejs/README.md`, `frontend-reactjs/README.md`, `valuation/`, `scripts/setup-*`)
       - 8.A Automated Test Suites & Coverage

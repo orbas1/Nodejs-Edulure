@@ -2,6 +2,10 @@ version: "3.9"
 services:
   postgres:
     image: postgres:15.4
+    profiles:
+      - dev
+      - staging
+      - prod
     environment:
       POSTGRES_USER: edulure
       POSTGRES_PASSWORD: edulure
@@ -20,6 +24,10 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.backend
+    profiles:
+      - dev
+      - staging
+      - prod
     environment:
       NODE_ENV: development
       DATABASE_URL: postgres://edulure:edulure@postgres:5432/edulure
@@ -35,6 +43,10 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.frontend
+    profiles:
+      - dev
+      - staging
+      - prod
     depends_on:
       backend:
         condition: service_started

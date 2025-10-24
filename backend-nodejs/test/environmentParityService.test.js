@@ -55,6 +55,111 @@ const blueprintRegistryMock = [
   }
 ];
 
+const descriptorRegistryMock = [
+  {
+    environmentName: 'dev',
+    domain: 'dev.edulure.com',
+    awsAccountAlias: 'edulure-dev',
+    awsRegion: 'us-east-1',
+    awsVpcId: 'vpc-dev-edulure',
+    awsPrivateSubnetTags: ['tier:nonprod', 'app:edulure-api'],
+    awsPublicSubnetTags: ['tier:edge', 'app:edulure-alb'],
+    blueprintParameter: '/edulure/dev/api/environment-blueprint',
+    blueprintRuntimeEndpoint: 'https://dev.edulure.com/ops/runtime-blueprint.json',
+    blueprintServiceName: 'backend-service',
+    terraformWorkspace: 'infrastructure/terraform/envs/dev',
+    dockerComposeFile: 'docker-compose.yml',
+    dockerComposeCommand: 'docker compose --profile dev up --build',
+    dockerComposeProfiles: ['dev'],
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityCloudwatchDashboard: 'edulure-dev-api-observability',
+    contactsPrimary: 'platform@edulure.com',
+    contactsOnCall: 'platform-oncall@edulure.com',
+    contactsAdditional: [],
+    changeWindows: ['Weekdays 14:00-22:00 UTC'],
+    notes: [
+      'CI publishes ephemeral feature branches into dev for smoke testing.',
+      'Blueprint payload stored in SSM for parity with staging and production.'
+    ],
+    metadata: {
+      manifestVersion: 1,
+      manifestEnvironmentPath: 'infrastructure/terraform/envs/dev',
+      descriptorFile: 'infrastructure/environments/dev.json',
+      descriptorHash: '204b41157e69413d66acbc7677647f1216f93e3a89fe77c81a105fb9149268e7',
+      manifestEnvironmentHash: '56535a2195ec5ef93d89b41b29b140d9b8e1ee18dedb87a91495507fde4b2c92'
+    }
+  },
+  {
+    environmentName: 'staging',
+    domain: 'staging.edulure.com',
+    awsAccountAlias: 'edulure-staging',
+    awsRegion: 'us-east-1',
+    awsVpcId: 'vpc-staging-edulure',
+    awsPrivateSubnetTags: ['tier:preprod', 'app:edulure-api'],
+    awsPublicSubnetTags: ['tier:edge', 'app:edulure-alb'],
+    blueprintParameter: '/edulure/staging/api/environment-blueprint',
+    blueprintRuntimeEndpoint: 'https://staging.edulure.com/ops/runtime-blueprint.json',
+    blueprintServiceName: 'backend-service',
+    terraformWorkspace: 'infrastructure/terraform/envs/staging',
+    dockerComposeFile: 'docker-compose.yml',
+    dockerComposeCommand: 'docker compose --profile staging up --build',
+    dockerComposeProfiles: ['staging'],
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityCloudwatchDashboard: 'edulure-staging-api-observability',
+    contactsPrimary: 'release@edulure.com',
+    contactsOnCall: 'release-oncall@edulure.com',
+    contactsAdditional: [],
+    changeWindows: ['Tuesday & Thursday 16:00-20:00 UTC'],
+    notes: [
+      'Release rehearsals reference this environment for CAB approvals.',
+      'Smoke tests must validate blueprint endpoint prior to change freeze.'
+    ],
+    metadata: {
+      manifestVersion: 1,
+      manifestEnvironmentPath: 'infrastructure/terraform/envs/staging',
+      descriptorFile: 'infrastructure/environments/staging.json',
+      descriptorHash: '05382a3467d20fb8d57c598d61bc6e805dfed17a5badc62864e5c478ead4f302',
+      manifestEnvironmentHash: 'f789d17ebd2277197b928e96115c9a308c3f6a4b960565b6eb373c60a3751594'
+    }
+  },
+  {
+    environmentName: 'prod',
+    domain: 'edulure.com',
+    awsAccountAlias: 'edulure-prod',
+    awsRegion: 'us-east-1',
+    awsVpcId: 'vpc-prod-edulure',
+    awsPrivateSubnetTags: ['tier:production', 'app:edulure-api'],
+    awsPublicSubnetTags: ['tier:edge', 'app:edulure-alb'],
+    blueprintParameter: '/edulure/prod/api/environment-blueprint',
+    blueprintRuntimeEndpoint: 'https://edulure.com/ops/runtime-blueprint.json',
+    blueprintServiceName: 'backend-service',
+    terraformWorkspace: 'infrastructure/terraform/envs/prod',
+    dockerComposeFile: 'docker-compose.yml',
+    dockerComposeCommand: 'docker compose --profile prod up --build',
+    dockerComposeProfiles: ['prod'],
+    observabilityDashboardPath: 'infrastructure/observability/grafana/dashboards/environment-runtime.json',
+    observabilityCloudwatchDashboard: 'edulure-prod-api-observability',
+    contactsPrimary: 'operations@edulure.com',
+    contactsOnCall: 'sre-oncall@edulure.com',
+    contactsAdditional: [],
+    changeWindows: [
+      'Saturday 01:00-04:00 UTC (primary)',
+      'Wednesday 23:00-01:00 UTC (contingency)'
+    ],
+    notes: [
+      'Production deploys require CAB approval and blueprint validation evidence.',
+      'Rollback plan references environment manifest module hashes for audit.'
+    ],
+    metadata: {
+      manifestVersion: 1,
+      manifestEnvironmentPath: 'infrastructure/terraform/envs/prod',
+      descriptorFile: 'infrastructure/environments/prod.json',
+      descriptorHash: '7037fce56b6ddfc72da6a5403378122c99711fcc15e681752b3097141f82e851',
+      manifestEnvironmentHash: '0fafb6a506216823f68602eb71a8a4021e5dd88cc24587a635c7265251a575be'
+    }
+  }
+];
+
 vi.mock('../src/config/env.js', () => ({
   env: {
     nodeEnv: 'test',
@@ -201,13 +306,21 @@ vi.mock('../src/models/EnvironmentBlueprintModel.js', () => ({
   }
 }));
 
+vi.mock('../src/models/EnvironmentDescriptorModel.js', () => ({
+  default: {
+    listAll: vi.fn().mockResolvedValue(descriptorRegistryMock)
+  }
+}));
+
 let EnvironmentParityService;
 let defaultService;
+let EnvironmentDescriptorModelMock;
 
 beforeAll(async () => {
   const module = await import('../src/services/EnvironmentParityService.js');
   EnvironmentParityService = module.EnvironmentParityService;
   defaultService = module.default;
+  EnvironmentDescriptorModelMock = (await import('../src/models/EnvironmentDescriptorModel.js')).default;
 });
 
 describe('EnvironmentParityService', () => {
@@ -215,6 +328,13 @@ describe('EnvironmentParityService', () => {
     const report = await defaultService.generateReport();
     expect(report.status).toBe('healthy');
     expect(report.mismatches).toHaveLength(0);
+    expect(report.manifest.descriptors).toEqual(
+      expect.objectContaining({
+        dev: expect.objectContaining({ domain: 'dev.edulure.com' }),
+        staging: expect.objectContaining({ domain: 'staging.edulure.com' }),
+        prod: expect.objectContaining({ domain: 'edulure.com' })
+      })
+    );
     expect(report.dependencies).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ component: 'database', status: 'healthy' }),
@@ -236,6 +356,32 @@ describe('EnvironmentParityService', () => {
     expect(report.mismatches).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ component: 'modules.backendService', status: 'drifted' })
+      ])
+    );
+  });
+
+  it('detects descriptor registry mismatches', async () => {
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+    const mutatedDescriptors = descriptorRegistryMock.map((record) =>
+      record.environmentName === 'staging'
+        ? { ...record, contactsPrimary: 'someone-else@edulure.com' }
+        : record
+    );
+
+    EnvironmentDescriptorModelMock.listAll.mockResolvedValueOnce(mutatedDescriptors);
+
+    const service = new EnvironmentParityService({
+      manifestResolver: async () => manifest
+    });
+
+    const report = await service.generateReport({ forceRefresh: true });
+    expect(report.status).toBe('drifted');
+    expect(report.mismatches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          component: 'descriptors.staging',
+          status: 'mismatch'
+        })
       ])
     );
   });

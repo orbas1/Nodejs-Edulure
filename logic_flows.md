@@ -827,40 +827,40 @@ This compendium maps the execution paths, responsibilities, and release consider
 ## 7. Infrastructure & DevOps (`infrastructure/`, `docker-compose.yml`, `scripts/`, `backend-nodejs/scripts/`)
 
 ### 7.A Environment Provisioning & Infrastructure as Code (`infrastructure/terraform/`, `docker-compose.yml`, `infrastructure/environments/`)
-1. **Appraisal:** Terraform modules and Docker Compose definitions provision databases, caches, storage, queues, and supporting infrastructure across environments.
-2. **Functionality:** Modules configure networks, secrets, observability stacks, and runtime services while Docker Compose supports local development.
-3. **Logic Usefulness:** Provides repeatable deployments, onboarding consistency, and parity between development, staging, and production environments.
-4. **Redundancies:** Variable defaults duplicated across modules; centralise to avoid drift.
-5. **Placeholders Or non-working functions or stubs:** Some Terraform outputs flagged TODO; annotate with timelines or backlog references.
-6. **Duplicate Functions:** Environment validation scripts repeat in multiple directories; consolidate.
-7. **Improvements need to make:** Adopt Terragrunt or reusable modules, integrate policy-as-code, and automate drift detection.
-8. **Styling improvements:** Update architecture diagrams in docs with accessible palettes and consistent typography.
-9. **Efficiency analysis and improvement:** Optimise resource sizing, enable auto-scaling policies, and schedule cost monitoring alerts.
-10. **Strengths to Keep:** Comprehensive coverage, modular design, and environment parity tooling.
-11. **Weaknesses to remove:** Manual secret injection; integrate with managed secrets services and rotation automation.
-12. **Styling and Colour review changes:** Align infra documentation visuals with brand guidelines.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout templates for infrastructure runbooks and dashboards.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Clarify provisioning steps and remove redundant instructions.
-15. **Change Checklist Tracker:** Update infrastructure change checklist with terraform plan reviews, security sign-off, and rollback rehearsals.
-16. **Full Upgrade Plan & Release Steps:** Run terraform plan in staging, peer review, apply to lower env, schedule production window, and monitor health checks.
+1. **Appraisal:** Environment topology now spans Terraform workspaces, manifest metadata, and the new `environment_descriptors` registry—`infrastructure/environment-manifest.json` links each tier to descriptor JSON, Docker artefacts, Grafana dashboards, and the blueprint registry while the seed/migration pipeline persists the same payloads into MySQL.
+2. **Functionality:** `scripts/infrastructure/describe-environment.mjs` exports Markdown/JSON briefs that name the descriptor file, registry table, contacts, change windows, and docker profiles, while the `20250405110000_environment_descriptors_registry.js` migration plus `005_environment_descriptors.js` seed hydrate the database so parity checks, APIs, and runbooks resolve the exact same contract.
+3. **Logic Usefulness:** Descriptor JSON (`infrastructure/environments/*.json`) captures domains, AWS account aliases, subnet tag selectors, change windows, CAB notes, and contact routing; the seed pushes the normalised values into `EnvironmentDescriptorModel`, enabling EnvironmentParityService to diff runtime state, manifest hashes, and database truth in one pass.
+4. **Redundancies:** Manually curated wikis and spreadsheet inventories are retired—the manifest, descriptor files, database registry, and Terraform module hashes are all sourced from the same JSON payloads, and the seed removes orphaned rows so environments never linger after being deleted from Git.
+5. **Placeholders Or non-working functions or stubs:** Descriptor notes still flag CAB evidence upload automation and TODO subnet inventories; metadata currently stores descriptor hashes and manifest workspace paths pending integration with Secrets Manager ownership policies.
+6. **Duplicate Functions:** Descriptor parsing, normalisation, and Markdown rendering share the same helpers across `describe-environment.mjs`, the deployment pipeline script, and `EnvironmentDescriptorModel`, preventing divergent handling of contacts, change windows, or docker profiles.
+7. **Improvements need to make:** Future work should ingest canonical AWS account IDs, mirror subnet inventories via CMDB exports, surface CAB ticket URLs in descriptor metadata, and extend parity checks to compare stored change windows with the release schedule API.
+8. **Styling improvements:** CLI output now highlights the registry table, headings, and bullet lists using the same Markdown grammar as Annex A46, ensuring descriptor, blueprint, and Terraform sections render identically in Confluence, Slack, or GitHub artefacts.
+9. **Efficiency analysis and improvement:** Seeds reuse cached manifest/descriptor reads, EnvironmentParityService caches descriptor expectations between requests, and descriptors avoid recomputing hashes unless the JSON changes—keeping parity reports cheap even when invoked repeatedly in CI.
+10. **Strengths to Keep:** Terraform modules, Docker Compose profiles, blueprint hashes, and Grafana dashboards remain the authoritative infrastructure definition; the descriptor registry simply mirrors the data for API access, runbooks, and governance without altering provisioning flows.
+11. **Weaknesses to remove:** Secrets rotation is still manual and descriptor metadata does not yet enforce owner verification; integrate registry metadata with Secrets Manager policies and extend parity reporting to flag missing owner emails before provisioning.
+12. **Styling and Colour review changes:** Descriptor outputs reuse infrastructure doc typography, emphasise change windows and contacts with standard bullet spacing, and inherit Annex A46 palettes for Markdown tables and callouts.
+13. **CSS, orientation, placement and arrangement changes:** Docker Compose profiles for dev/staging/prod remain explicit in `docker-compose.yml`, with descriptor metadata clarifying command lines so ephemeral stacks mirror production topology without guesswork.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Descriptor exports keep contact, change-window, and note bullets succinct, reference the registry table once, and eliminate prior duplication across runbooks, pipelines, and QA notes.
+15. **Change Checklist Tracker:** `qa/release/core_release_checklist.json` now tracks both `environment-blueprint-validated` and the new `environment-descriptor-synchronised` gate—teams must export descriptors, seed the registry, and attach database query evidence before sign-off.
+16. **Full Upgrade Plan & Release Steps:** Apply migrations, run `npm --workspace backend-nodejs run migrate` and `... run seed`, export the descriptor via CLI, execute `node scripts/release/deployment-pipeline.mjs --env <env>`, verify the parity report (`/api/v1/environment/health`), and archive blueprint plus descriptor evidence alongside the release hand-off.
 
 ### 7.B CI/CD Automation & Release Tooling (`scripts/`, `backend-nodejs/scripts/`, `update_template/`, `qa/`)
-1. **Appraisal:** Scripts orchestrate linting, testing, builds, and release governance, integrating with checklists and runbooks.
-2. **Functionality:** Provides npm scripts, node scripts for seeding, release note templates, and QA checklists ensuring consistent delivery.
-3. **Logic Usefulness:** Automates repetitive tasks, standardises release gates, and surfaces readiness across teams.
-4. **Redundancies:** Environment bootstrap scripts repeated across repositories; centralise to single shared tool.
-5. **Placeholders Or non-working functions or stubs:** Some scripts flagged TODO for GitHub Actions migration; track progress.
-6. **Duplicate Functions:** Checklist generation logic appears in multiple scripts; consolidate to avoid divergence.
-7. **Improvements need to make:** Integrate pipeline caching, parallelise checks, and add canary deployment automation.
-8. **Styling improvements:** Harmonise CLI output styling and release template formatting with design guidelines.
-9. **Efficiency analysis and improvement:** Cache dependencies, reuse build artifacts, and adopt incremental testing strategies.
-10. **Strengths to Keep:** Strong governance integration, comprehensive checklists, and modular scripts.
-11. **Weaknesses to remove:** Manual steps in release process; automate with CI triggers and approvals.
-12. **Styling and Colour review changes:** Align release document palette with brand for readability.
-13. **CSS, orientation, placement and arrangement changes:** Provide layout guidance for digital checklist interfaces.
-14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Simplify instructions, remove repetitive warnings, and clarify prerequisites.
-15. **Change Checklist Tracker:** Maintain release tracker with pipeline validation, manual QA sign-offs, and documentation updates.
-16. **Full Upgrade Plan & Release Steps:** Implement pipeline updates in staging, run dry run, roll out to production, and monitor for regressions.
+1. **Appraisal:** Annex A47 automation now covers descriptor registries, blueprint hashes, and CI evidence—`scripts/release/deployment-pipeline.mjs` renders per-environment tables that cite both `environment_blueprints` and `environment_descriptors`, ensuring CAB briefings, CI dashboards, and auditors see identical metadata.
+2. **Functionality:** `npm run describe:environment` emits descriptor snapshots with registry table references, the deployment pipeline ingests those descriptors plus manifest data, and EnvironmentParityService feeds `/api/v1/environment/health` so release tooling, QA checklists, and on-call runbooks share a single source of truth.
+3. **Logic Usefulness:** Build, security, infrastructure, deployment, and verification phases are bundled with explicit commands, descriptor file hashes, registry tables, and blueprint curl checks—CI parses JSON output, Slack posts reuse Markdown, and QA templates embed the same steps without retyping instructions.
+4. **Redundancies:** Blueprint and descriptor validation no longer require parallel documentation; CLI helpers, pipeline scripts, and QA templates all invoke the same exports and curl checks, eliminating bespoke runbook snippets and spreadsheet trackers.
+5. **Placeholders Or non-working functions or stubs:** GitHub Actions ingestion of the JSON output and automatic evidence uploads remain TODO; current automation prints to stdout for downstream collection, with future work earmarked to persist attachments directly to the QA tracker.
+6. **Duplicate Functions:** Descriptor and blueprint normalisers live in shared utilities; deployment pipeline, descriptor CLI, and EnvironmentParityService consume the same modules so runtime endpoints, alarm outputs, and contact metadata are never reimplemented.
+7. **Improvements need to make:** Automate attaching descriptor exports, parity diffs, and database query snippets to the QA checklist, incorporate npm audit severity scoring, and publish health summaries to release notes or Confluence automatically.
+8. **Styling improvements:** Markdown output mirrors the Annex formatting (headings, tables, fenced commands) and references registry tables inline, keeping release artefacts visually aligned with handbook templates in `update_template/`.
+9. **Efficiency analysis and improvement:** Descriptor expectations are cached during parity runs, pipeline scripts short-circuit file reads when hashes match, and JSON output avoids Markdown rendering when CI needs machine-readable plans—shortening pipeline runtime.
+10. **Strengths to Keep:** Existing build/test automation, license manifest generation, and release readiness suites remain intact; descriptor/blueprint awareness simply layers onto trusted workflows without regressing proven steps.
+11. **Weaknesses to remove:** Manual upload of pipeline summaries and descriptor evidence persists; next steps include streaming Markdown into Confluence exports, pushing parity results to Slack, and storing artefacts in release storage automatically.
+12. **Styling and Colour review changes:** CLI output retains plain-text emphasis but now explicitly labels registry tables and descriptor hashes, keeping transcripts brand-neutral while surfacing the additional governance context Annex A47 expects.
+13. **CSS, orientation, placement and arrangement changes:** Pipeline tables stay sorted (modules, phases, evidence) so dashboards embed the same predictable layout; descriptor sections now include registry and contact columns that align with QA templates.
+14. **Text analysis, text placement, text length, text redundancy and quality of text analysis:** Descriptor and blueprint metadata appear once per report; parity deltas summarise introduced/resolved drift, and QA prompts reference checklist IDs to avoid repeated prose across docs.
+15. **Change Checklist Tracker:** `qa/release/core_release_checklist.json` lists `environment-blueprint-validated` and `environment-descriptor-synchronised` so both registry tables are audited before promotion, alongside CAB approvals and SLO calibration.
+16. **Full Upgrade Plan & Release Steps:** Generate the deployment plan (`node scripts/release/deployment-pipeline.mjs --env <env>`), run readiness suites, execute descriptor export + blueprint curl checks, query the descriptor registry for evidence, attach artefacts to the QA checklist, and only then promote the release with parity health verified.
 
 ### 7.C Observability Stack & Runtime Telemetry (`infrastructure/observability/`, `backend-nodejs/src/observability/`, `docs/operations/observability.md`)
 1. **Appraisal:** Comprehensive observability stack configuring metrics, logs, tracing, dashboards, and alerting policies.
