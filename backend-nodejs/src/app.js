@@ -93,6 +93,12 @@ app.use(
     logger,
     genReqId: (req) => req.id ?? randomUUID(),
     customLogLevel: (res, err) => {
+      const requestPath = res?.req?.originalUrl ?? res?.req?.url ?? '';
+      const normalisedPath = typeof requestPath === 'string' ? requestPath.split('?')[0] : '';
+      if (normalisedPath === '/health') {
+        return 'silent';
+      }
+
       if (err || res.statusCode >= 500) {
         return 'error';
       }
