@@ -279,10 +279,9 @@ export default class ContentController {
         stripUnknown: true
       });
       const lead = await MarketingContentService.createMarketingLead(payload);
-      return success(res, {
+      return res.status(201).json({
         data: lead,
-        message: 'Lead captured',
-        status: 201
+        message: 'Lead captured'
       });
     } catch (error) {
       if (error.isJoi) {
