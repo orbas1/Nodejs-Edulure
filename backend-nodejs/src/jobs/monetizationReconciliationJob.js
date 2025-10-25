@@ -7,7 +7,19 @@ import logger from '../config/logger.js';
 import MonetizationFinanceService from '../services/MonetizationFinanceService.js';
 import MonetizationReconciliationRunModel from '../models/MonetizationReconciliationRunModel.js';
 import MonetizationAlertNotificationService from '../services/MonetizationAlertNotificationService.js';
-import { recordBackgroundJobRun } from '../observability/metrics.js';
+import * as metrics from '../observability/metrics.js';
+
+function resolveBackgroundJobRecorder() {
+  try {
+    const candidate = metrics.recordBackgroundJobRun;
+    return typeof candidate === 'function' ? candidate : null;
+  } catch (error) {
+    if (error?.message?.includes('recordBackgroundJobRun')) {
+      return null;
+    }
+    throw error;
+  }
+}
 
 function ensurePositiveInteger(value, fallback) {
   const numeric = Number(value);
@@ -135,6 +147,7 @@ export class MonetizationReconciliationJob {
     }
 
     const startTime = process.hrtime.bigint();
+    const recordJobMetric = resolveBackgroundJobRecorder();
     let windowStartIso = null;
     let windowEndIso = null;
     const tenantSummaries = [];
@@ -240,15 +253,17 @@ export class MonetizationReconciliationJob {
       );
       const outcome = hasSevere || totalAlerts > 0 ? 'partial' : 'succeeded';
 
-      recordBackgroundJobRun({
-        job: this.jobKey,
-        trigger,
-        outcome,
-        durationMs,
-        processed: tenantSummaries.length,
-        succeeded: tenantSummaries.length,
-        failed: 0
-      });
+      if (recordJobMetric) {
+        recordJobMetric({
+          job: this.jobKey,
+          trigger,
+          outcome,
+          durationMs,
+          processed: tenantSummaries.length,
+          succeeded: tenantSummaries.length,
+          failed: 0
+        });
+      }
 
       const summary = {
         trigger,
@@ -287,17 +302,19 @@ export class MonetizationReconciliationJob {
         );
       }
 
-      recordBackgroundJobRun({
-        job: this.jobKey,
-        trigger,
-        outcome: 'failed',
-        durationMs,
-        processed: attemptedTenants.length,
-        succeeded: Math.max(0, tenantSummaries.length - failures.length),
-        failed: failures.length || (attemptedTenants.length && tenantSummaries.length < attemptedTenants.length)
-          ? Math.max(failures.length, attemptedTenants.length - tenantSummaries.length)
-          : failures.length
-      });
+      if (recordJobMetric) {
+        recordJobMetric({
+          job: this.jobKey,
+          trigger,
+          outcome: 'failed',
+          durationMs,
+          processed: attemptedTenants.length,
+          succeeded: Math.max(0, tenantSummaries.length - failures.length),
+          failed: failures.length || (attemptedTenants.length && tenantSummaries.length < attemptedTenants.length)
+            ? Math.max(failures.length, attemptedTenants.length - tenantSummaries.length)
+            : failures.length
+        });
+      }
 
       throw error;
     }

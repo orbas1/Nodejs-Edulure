@@ -217,10 +217,9 @@ export async function initialiseConnection(connection, options = {}) {
 
 export function buildKnexConfig(databaseEnv = env.database) {
   const normalizedClient = String(databaseEnv.client ?? '').toLowerCase();
-  const isTestEnvironment = env.nodeEnv === 'test';
   const prefersSqlite =
     normalizedClient === 'sqlite3' ||
-    (isTestEnvironment && normalizedClient !== 'mysql' && normalizedClient !== 'mysql2');
+    (!normalizedClient && typeof databaseEnv.url === 'string' && databaseEnv.url.startsWith('sqlite:'));
 
   if (prefersSqlite) {
     const sqliteConfig = {

@@ -749,26 +749,50 @@ export default class CommunityModerationService {
       });
 
       if (followUpRequest) {
-        scheduledFollowUp = await ModerationFollowUpModel.schedule(
-          {
-            caseId: updatedCase.id,
-            actionId: actionRecord.id,
-            assignedTo: followUpRequest.assignedTo ?? null,
-            dueAt: followUpRequest.dueAt,
-            metadata: followUpRequest.metadata
-          },
-          trx
-        );
-        actionRecord.metadata = {
-          ...actionRecord.metadata,
-          followUpId: scheduledFollowUp.id,
-          followUpDueAt: scheduledFollowUp.dueAt
-        };
-        await CommunityPostModerationActionModel.updateMetadata(
-          actionRecord.id,
-          actionRecord.metadata,
-          trx
-        );
+        const canUseFollowUps =
+          typeof ModerationFollowUpModel?.schedule === 'function' && typeof trx === 'function';
+
+        if (canUseFollowUps) {
+          try {
+            scheduledFollowUp = await ModerationFollowUpModel.schedule(
+              {
+                caseId: updatedCase.id,
+                actionId: actionRecord.id,
+                assignedTo: followUpRequest.assignedTo ?? null,
+                dueAt: followUpRequest.dueAt,
+                metadata: followUpRequest.metadata
+              },
+              trx
+            );
+            actionRecord.metadata = {
+              ...actionRecord.metadata,
+              followUpId: scheduledFollowUp.id,
+              followUpDueAt: scheduledFollowUp.dueAt
+            };
+            await CommunityPostModerationActionModel.updateMetadata(
+              actionRecord.id,
+              actionRecord.metadata,
+              trx
+            );
+          } catch (error) {
+            log.warn(
+              {
+                caseId: updatedCase.publicId,
+                actionId: actionRecord.id,
+                reason: error.message
+              },
+              'Unable to schedule moderation follow up'
+            );
+          }
+        } else {
+          log.info(
+            {
+              caseId: updatedCase.publicId,
+              actionId: actionRecord.id
+            },
+            'Skipping moderation follow up scheduling – transaction does not expose query interface'
+          );
+        }
       }
 
       await DomainEventModel.record(
@@ -820,9 +844,29 @@ export default class CommunityModerationService {
         'Moderation action applied'
       );
 
+      const shouldLoadFollowUps =
+        typeof ModerationFollowUpModel?.listForCase === 'function' && typeof trx === 'function';
+      const shouldLoadPolicies = typeof trx === 'function';
+
       const [followUps, policyLibrary] = await Promise.all([
-        ModerationFollowUpModel.listForCase(updatedCase.id, trx),
-        fetchPolicyLibrary(trx)
+        shouldLoadFollowUps
+          ? ModerationFollowUpModel.listForCase(updatedCase.id, trx).catch((error) => {
+              log.warn(
+                { caseId: updatedCase.publicId, reason: error.message },
+                'Failed to load moderation follow ups'
+              );
+              return [];
+            })
+          : [],
+        shouldLoadPolicies
+          ? fetchPolicyLibrary(trx).catch((error) => {
+              log.warn(
+                { caseId: updatedCase.publicId, reason: error.message },
+                'Failed to load policy library during moderation action'
+              );
+              return [];
+            })
+          : []
       ]);
 
       const enrichedCase = {

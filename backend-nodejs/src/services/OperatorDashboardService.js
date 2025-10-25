@@ -175,6 +175,43 @@ function formatBytes(value) {
   return `${sized.toFixed(exponent === 0 ? 0 : 1)} ${units[exponent]}`;
 }
 
+function normaliseObligations(obligations) {
+  if (!Array.isArray(obligations) || obligations.length === 0) {
+    return [];
+  }
+
+  return obligations
+    .map((obligation) => {
+      if (!obligation) {
+        return null;
+      }
+      if (typeof obligation === 'string') {
+        const trimmed = obligation.trim();
+        return trimmed.length ? trimmed : null;
+      }
+      if (typeof obligation.description === 'string') {
+        const trimmed = obligation.description.trim();
+        if (trimmed.length) {
+          return trimmed;
+        }
+      }
+      if (typeof obligation.title === 'string') {
+        const trimmed = obligation.title.trim();
+        if (trimmed.length) {
+          return trimmed;
+        }
+      }
+      if (typeof obligation.name === 'string') {
+        const trimmed = obligation.name.trim();
+        if (trimmed.length) {
+          return trimmed;
+        }
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
 export function buildComplianceRiskHeatmap(incidents = []) {
   const categoryBuckets = new Map();
 
@@ -1037,9 +1074,7 @@ export default class OperatorDashboardService {
                 riskTier: contract.riskTier,
                 renewalDate: contract.renewalDate,
                 ownerEmail: contract.ownerEmail,
-                obligations: Array.isArray(contract.obligations)
-                  ? contract.obligations.slice(0, 5)
-                  : [],
+                obligations: normaliseObligations(contract.obligations).slice(0, 5),
                 runbookUrl:
                   contract.metadata?.runbookUrl ??
                   contract.metadata?.runbook ??
