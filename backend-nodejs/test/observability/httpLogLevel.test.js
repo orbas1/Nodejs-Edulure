@@ -17,6 +17,25 @@ describe('resolveHttpLogLevel', () => {
     expect(level).toBe('warn');
   });
 
+  it('silences successful health check requests', () => {
+    const level = resolveHttpLogLevel({
+      statusCode: createResponse(200).statusCode,
+      req: { originalUrl: '/health', method: 'GET' }
+    });
+
+    expect(level).toBe('silent');
+  });
+
+  it('continues logging health checks when they fail', () => {
+    const level = resolveHttpLogLevel({
+      statusCode: createResponse(503).statusCode,
+      req: { originalUrl: '/health', method: 'GET' },
+      error: Object.assign(new Error('unhealthy'), { statusCode: 503 })
+    });
+
+    expect(level).toBe('error');
+  });
+
   it('returns error for server error responses', () => {
     const level = resolveHttpLogLevel({ statusCode: createResponse(503).statusCode });
 

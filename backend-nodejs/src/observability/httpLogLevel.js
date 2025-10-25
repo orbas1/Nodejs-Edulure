@@ -15,6 +15,25 @@ function normaliseStatusCode(value) {
   return undefined;
 }
 
+function isHealthCheckRoute(request) {
+  if (!request || typeof request !== 'object') {
+    return false;
+  }
+
+  const url =
+    typeof request.originalUrl === 'string'
+      ? request.originalUrl
+      : typeof request.url === 'string'
+        ? request.url
+        : null;
+
+  if (!url) {
+    return false;
+  }
+
+  return url === '/health' || url.startsWith('/health?');
+}
+
 function extractErrorStatusCode(error) {
   if (!error || typeof error !== 'object') {
     return undefined;
@@ -32,9 +51,15 @@ function extractErrorStatusCode(error) {
   return undefined;
 }
 
-export function resolveHttpLogLevel({ statusCode = DEFAULT_SUCCESS_STATUS, error } = {}) {
+export function resolveHttpLogLevel({ req, statusCode = DEFAULT_SUCCESS_STATUS, error } = {}) {
+  const normalisedStatusCode = normaliseStatusCode(statusCode);
   const errorStatusCode = extractErrorStatusCode(error);
-  const finalStatusCode = errorStatusCode ?? statusCode ?? DEFAULT_SUCCESS_STATUS;
+  const finalStatusCode =
+    errorStatusCode ?? normalisedStatusCode ?? DEFAULT_SUCCESS_STATUS;
+
+  if (!error && finalStatusCode < 500 && isHealthCheckRoute(req)) {
+    return 'silent';
+  }
 
   if (finalStatusCode >= 500) {
     return 'error';

@@ -93,17 +93,14 @@ app.use(
   pinoHttp({
     logger,
     genReqId: (req) => req.id ?? randomUUID(),
-    customLogLevel: (_req, res, err) =>
-      resolveHttpLogLevel({ statusCode: res?.statusCode, error: err }),
+    customLogLevel: (req, res, err) =>
+      resolveHttpLogLevel({ req, statusCode: res?.statusCode, error: err }),
     customProps: (req) => {
       annotateLogContextFromRequest(req);
       return {
         traceId: req.traceId,
         spanId: req.spanId
       };
-    },
-    autoLogging: {
-      ignorePaths: ['/health']
     }
   })
 );
