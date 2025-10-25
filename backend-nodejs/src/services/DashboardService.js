@@ -580,6 +580,9 @@ function resolveSessionResources(metadata, joinHref, lobbyHref) {
 
   return {
     joinUrl: joinHref ?? sanitiseDashboardHref(resourcesMeta.joinUrl ?? metadata.joinUrl ?? null),
+    lobbyUrl: sanitiseDashboardHref(
+      lobbyHref ?? resourcesMeta.lobbyUrl ?? metadata.lobbyUrl ?? null
+    ),
     hostUrl: sanitiseDashboardHref(
       resourcesMeta.hostUrl ?? metadata.hostUrl ?? metadata.facilitatorUrl ?? metadata.moderatorUrl ?? null
     ),
@@ -668,7 +671,7 @@ function resolveSessionPricing(session, metadata) {
   };
 }
 
-function resolvePreferredSlot(metadata, now = new Date()) {
+function resolvePreferredSlot(metadata, _now = new Date()) {
   if (!metadata) {
     return null;
   }
@@ -2687,28 +2690,28 @@ export function buildLearnerDashboard({
 
   const quickActions = [];
 
-  const primaryCourse = activeCourses[0] ?? null;
-  if (primaryCourse) {
-    const resumeCourseId = primaryCourse.courseId ?? primaryCourse.id ?? 'primary';
+  const resumeCourse = activeCourses[0] ?? null;
+  if (resumeCourse) {
+    const resumeCourseId = resumeCourse.courseId ?? resumeCourse.id ?? 'primary';
     const defaultCourseHref = `/dashboard/learner/courses?courseId=${encodeURIComponent(resumeCourseId)}`;
     const candidateHref =
-      primaryCourse.goal?.metadata?.resumeUrl ??
-      primaryCourse.goal?.metadata?.resumeHref ??
-      primaryCourse.goal?.metadata?.actionHref ??
-      primaryCourse.goal?.metadata?.ctaHref ??
-      primaryCourse.goal?.primaryAction?.href ??
-      primaryCourse.goal?.actionHref ??
-      primaryCourse.goal?.cta?.href ??
+      resumeCourse.goal?.metadata?.resumeUrl ??
+      resumeCourse.goal?.metadata?.resumeHref ??
+      resumeCourse.goal?.metadata?.actionHref ??
+      resumeCourse.goal?.metadata?.ctaHref ??
+      resumeCourse.goal?.primaryAction?.href ??
+      resumeCourse.goal?.actionHref ??
+      resumeCourse.goal?.cta?.href ??
       null;
     const resumeHref = sanitiseDashboardHref(candidateHref) ?? defaultCourseHref;
     const resumeDescriptionParts = [];
-    if (primaryCourse.goal?.nextStep) {
-      resumeDescriptionParts.push(primaryCourse.goal.nextStep);
-    } else if (primaryCourse.title) {
-      resumeDescriptionParts.push(`Continue ${primaryCourse.title}`);
+    if (resumeCourse.goal?.nextStep) {
+      resumeDescriptionParts.push(resumeCourse.goal.nextStep);
+    } else if (resumeCourse.title) {
+      resumeDescriptionParts.push(`Continue ${resumeCourse.title}`);
     }
-    if (primaryCourse.goal?.dueLabel) {
-      resumeDescriptionParts.push(primaryCourse.goal.dueLabel);
+    if (resumeCourse.goal?.dueLabel) {
+      resumeDescriptionParts.push(resumeCourse.goal.dueLabel);
     }
     const resumeDescription =
       resumeDescriptionParts.filter(Boolean).join(' · ') || 'Pick up where you left off.';
@@ -2718,7 +2721,7 @@ export function buildLearnerDashboard({
       label: 'Resume course',
       description: resumeDescription,
       href: resumeHref,
-      ctaLabel: primaryCourse.goal?.metadata?.ctaLabel ?? 'Resume'
+      ctaLabel: resumeCourse.goal?.metadata?.ctaLabel ?? 'Resume'
     });
   }
 

@@ -216,16 +216,11 @@ function buildPolicySnippetsForCase(library, moderationCase, limit = 3) {
 
   const ranked = library
     .map((contract) => {
-      const summary =
-        contract.metadata?.summary ??
-        (Array.isArray(contract.obligations) && contract.obligations.length
-          ? contract.obligations[0]?.summary ?? null
-          : null);
-      const summary =
-        contract.metadata?.summary ??
-        (Array.isArray(contract.obligations) && contract.obligations.length
-          ? contract.obligations[0]?.summary ?? null
-          : null);
+        const summary =
+          contract.metadata?.summary ??
+          (Array.isArray(contract.obligations) && contract.obligations.length
+            ? contract.obligations[0]?.summary ?? null
+            : null);
 
       return {
         id: contract.publicId,

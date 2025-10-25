@@ -293,6 +293,7 @@ export default class SupportOperationsService {
       open: openCases.length,
       breached: breachedCases.length,
       awaitingAssignment: unassignedCases.length,
+      closed: closedCases.length,
       firstResponseMinutes: average(firstResponseSamples),
       resolutionMinutes: average(resolutionSamples),
       slaAttainment:
