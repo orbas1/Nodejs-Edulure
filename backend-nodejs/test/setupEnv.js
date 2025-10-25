@@ -38,6 +38,7 @@ process.env.DB_POOL_MIN = process.env.DB_POOL_MIN ?? '1';
 process.env.DB_POOL_MAX = process.env.DB_POOL_MAX ?? '2';
 process.env.RATE_LIMIT_WINDOW_MINUTES = process.env.RATE_LIMIT_WINDOW_MINUTES ?? '15';
 process.env.RATE_LIMIT_MAX = process.env.RATE_LIMIT_MAX ?? '300';
+process.env.ASSET_STORAGE_DRIVER = process.env.ASSET_STORAGE_DRIVER ?? 'r2';
 process.env.R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID ?? 'test-account';
 process.env.R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID ?? 'test-access-key';
 process.env.R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY ?? 'test-secret-key';
