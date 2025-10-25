@@ -6,38 +6,40 @@ import fs from 'node:fs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 
-const makeWorkspaceTask = (workspace, script, label, extraArgs = []) => ({
+const makeWorkspaceTask = (workspace, script, label, extraArgs = [], timeoutMs = 0) => ({
   id: `${workspace}-${script}`,
   label,
   command: 'npm',
   args: ['--workspace', workspace, 'run', script, ...extraArgs],
-  cwd: repoRoot
+  cwd: repoRoot,
+  timeoutMs
 });
 
-const makeRootTask = (script, label, extraArgs = []) => ({
+const makeRootTask = (script, label, extraArgs = [], timeoutMs = 0) => ({
   id: `root-${script}`,
   label,
   command: 'npm',
   args: ['run', script, ...extraArgs],
-  cwd: repoRoot
+  cwd: repoRoot,
+  timeoutMs
 });
 
 const tasks = [
-  makeRootTask('bootstrap', 'Workspace bootstrap install'),
-  makeWorkspaceTask('backend-nodejs', 'lint', 'Backend lint'),
-  makeWorkspaceTask('backend-nodejs', 'test', 'Backend unit tests'),
-  makeWorkspaceTask('backend-nodejs', 'test:release', 'Backend release tests'),
-  makeWorkspaceTask('backend-nodejs', 'migrate:latest', 'Database migrations'),
-  makeWorkspaceTask('backend-nodejs', 'seed', 'Database seeders'),
-  makeWorkspaceTask('backend-nodejs', 'runtime:config', 'Backend runtime configuration (.env)', ['--', '--strict', '--json']),
-  makeWorkspaceTask('frontend-reactjs', 'lint', 'Frontend lint'),
-  makeWorkspaceTask('frontend-reactjs', 'test', 'Frontend unit tests'),
-  makeWorkspaceTask('frontend-reactjs', 'test:release', 'Frontend release tests'),
-  makeWorkspaceTask('frontend-reactjs', 'test:accessibility', 'Frontend accessibility tests'),
-  makeWorkspaceTask('frontend-reactjs', 'build', 'Frontend production build'),
-  makeWorkspaceTask('sdk-typescript', 'check', 'SDK type checks'),
-  makeWorkspaceTask('sdk-typescript', 'build', 'SDK build'),
-  makeRootTask('test:repo', 'Repository vitest suite')
+  makeRootTask('bootstrap', 'Workspace bootstrap install', [], 15 * 60 * 1000),
+  makeWorkspaceTask('backend-nodejs', 'lint', 'Backend lint', [], 2 * 60 * 1000),
+  makeWorkspaceTask('backend-nodejs', 'test', 'Backend unit tests', [], 3 * 60 * 1000),
+  makeWorkspaceTask('backend-nodejs', 'test:release', 'Backend release tests', [], 3 * 60 * 1000),
+  makeWorkspaceTask('backend-nodejs', 'migrate:latest', 'Database migrations', [], 2 * 60 * 1000),
+  makeWorkspaceTask('backend-nodejs', 'seed', 'Database seeders', [], 2 * 60 * 1000),
+  makeWorkspaceTask('backend-nodejs', 'runtime:config', 'Backend runtime configuration (.env)', ['--', '--strict', '--json'], 90 * 1000),
+  makeWorkspaceTask('frontend-reactjs', 'lint', 'Frontend lint', [], 2 * 60 * 1000),
+  makeWorkspaceTask('frontend-reactjs', 'test', 'Frontend unit tests', [], 3 * 60 * 1000),
+  makeWorkspaceTask('frontend-reactjs', 'test:release', 'Frontend release tests', [], 3 * 60 * 1000),
+  makeWorkspaceTask('frontend-reactjs', 'test:accessibility', 'Frontend accessibility tests', [], 3 * 60 * 1000),
+  makeWorkspaceTask('frontend-reactjs', 'build', 'Frontend production build', [], 3 * 60 * 1000),
+  makeWorkspaceTask('sdk-typescript', 'check', 'SDK type checks', [], 2 * 60 * 1000),
+  makeWorkspaceTask('sdk-typescript', 'build', 'SDK build', [], 2 * 60 * 1000),
+  makeRootTask('test:repo', 'Repository vitest suite', [], 3 * 60 * 1000)
 ];
 
 const interestingPatterns = [
@@ -63,6 +65,7 @@ for (const task of tasks) {
   const result = spawnSync(task.command, task.args, {
     cwd: task.cwd,
     encoding: 'utf-8',
+    timeout: task.timeoutMs > 0 ? task.timeoutMs : undefined,
     env: {
       ...process.env,
       FORCE_COLOR: '0',
@@ -104,8 +107,14 @@ for (const task of tasks) {
   }
 
   if (result.error) {
-    const systemMessage = `${task.label} could not start: ${result.error.message}`;
-    errors.add(systemMessage);
+    if (result.error.code === 'ETIMEDOUT') {
+      const timeoutSeconds = Math.round((task.timeoutMs ?? 0) / 1000);
+      const timeoutMessage = `${task.label} timed out after ${timeoutSeconds}s`;
+      errors.add(timeoutMessage);
+    } else {
+      const systemMessage = `${task.label} could not start: ${result.error.message}`;
+      errors.add(systemMessage);
+    }
   }
 
   for (const message of errors) {
