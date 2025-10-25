@@ -1,5 +1,3 @@
-import { ZodIssue } from 'zod';
-
 function isPlainObject(value) {
   if (!value || typeof value !== 'object') {
     return false;
@@ -48,10 +46,11 @@ export function formatZodIssues(issues = []) {
   if (!Array.isArray(issues)) {
     return [];
   }
+
   return issues.map((issue) => ({
-    path: Array.isArray(issue.path) && issue.path.length ? issue.path.join('.') : '',
-    message: issue.message,
-    code: issue.code ?? (issue instanceof ZodIssue ? issue.code : undefined)
+    path: Array.isArray(issue?.path) && issue.path.length ? issue.path.join('.') : '',
+    message: issue?.message,
+    code: issue?.code ?? undefined
   }));
 }
 

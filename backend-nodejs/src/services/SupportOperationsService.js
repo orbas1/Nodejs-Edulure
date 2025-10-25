@@ -291,6 +291,7 @@ export default class SupportOperationsService {
 
     const queueStats = {
       open: openCases.length,
+      closed: closedCases.length,
       breached: breachedCases.length,
       awaitingAssignment: unassignedCases.length,
       firstResponseMinutes: average(firstResponseSamples),
