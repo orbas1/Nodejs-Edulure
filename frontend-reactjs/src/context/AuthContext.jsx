@@ -13,7 +13,7 @@ import { httpClient } from '../api/httpClient.js';
 
 const TOKEN_STORAGE_KEY = 'edulure.session';
 
-const defaultAuthContext = {
+export const defaultAuthContext = {
   session: null,
   isAuthenticated: false,
   isLoading: false,
@@ -331,5 +331,5 @@ export function useAuth() {
   if (!context) {
     return defaultAuthContext;
   }
-  return context;
+  return { ...defaultAuthContext, ...context };
 }
