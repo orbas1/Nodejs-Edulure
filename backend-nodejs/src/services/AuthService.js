@@ -106,6 +106,24 @@ export default class AuthService {
         throw error;
       }
 
+      if (payload.dateOfBirth) {
+        const birthDate = new Date(payload.dateOfBirth);
+        if (Number.isNaN(birthDate.getTime())) {
+          const error = new Error('Invalid date of birth');
+          error.status = 422;
+          throw error;
+        }
+        const now = new Date();
+        const minimumBirthDate = new Date(
+          Date.UTC(now.getUTCFullYear() - 16, now.getUTCMonth(), now.getUTCDate())
+        );
+        if (birthDate > minimumBirthDate) {
+          const error = new Error('You must be at least 16 years old to register.');
+          error.status = 422;
+          throw error;
+        }
+      }
+
       const enforceTwoFactor = TwoFactorService.shouldEnforceForRole(payload.role);
       const wantsTwoFactor = payload.twoFactor?.enabled === true;
       const enableTwoFactor = enforceTwoFactor || wantsTwoFactor;
@@ -121,8 +139,7 @@ export default class AuthService {
           email: payload.email,
           passwordHash,
           role: payload.role,
-          age: payload.age,
-          address: payload.address,
+          dateOfBirth: payload.dateOfBirth ?? null,
           twoFactorEnabled: enableTwoFactor,
           twoFactorSecret: null,
           twoFactorEnrolledAt: enableTwoFactor ? new Date() : null,

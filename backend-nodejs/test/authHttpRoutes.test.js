@@ -70,12 +70,7 @@ describe('Auth HTTP routes', () => {
         email: 'ops-lead@example.com',
         password: 'SecurePass!234',
         role: 'instructor',
-        age: 28,
-        address: {
-          streetAddress: ' 10 Market Street ',
-          city: '  London  ',
-          postcode: '   '
-        },
+        dateOfBirth: '1994-11-08',
         twoFactor: { enabled: true }
       });
 
@@ -90,11 +85,7 @@ describe('Auth HTTP routes', () => {
         email: 'ops-lead@example.com',
         password: 'SecurePass!234',
         role: 'instructor',
-        age: 28,
-        address: {
-          streetAddress: '10 Market Street',
-          city: 'London'
-        },
+        dateOfBirth: expect.any(Date),
         twoFactor: { enabled: true }
       },
       expect.objectContaining({

@@ -234,6 +234,17 @@ export function serializeUser(user, options = {}) {
     return null;
   }
 
+  const rawDateOfBirth = user.dateOfBirth ?? user.date_of_birth ?? null;
+  let dateOfBirth = null;
+  if (rawDateOfBirth instanceof Date) {
+    dateOfBirth = rawDateOfBirth.toISOString();
+  } else if (typeof rawDateOfBirth === 'string' && rawDateOfBirth) {
+    const parsed = new Date(rawDateOfBirth);
+    if (!Number.isNaN(parsed.getTime())) {
+      dateOfBirth = parsed.toISOString();
+    }
+  }
+
   const dashboardPreferences = parseDashboardPreferences(
     user.dashboardPreferences ?? user.dashboard_preferences ?? {}
   );
@@ -256,6 +267,7 @@ export function serializeUser(user, options = {}) {
     firstName: user.firstName ?? user.first_name ?? null,
     lastName: user.lastName ?? user.last_name ?? null,
     email: user.email ?? null,
+    dateOfBirth,
     role: user.role ?? null,
     age: user.age ?? null,
     address: parseStoredAddress(user.address),

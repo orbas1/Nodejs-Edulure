@@ -9,21 +9,13 @@ import {
 import { DEFAULT_PASSWORD_POLICY } from '../auth.js';
 
 describe('onboarding validation helpers', () => {
-  it('builds onboarding drafts with normalised metadata and deduplicated invites', () => {
+  it('builds learner onboarding drafts with trimmed fields and ISO date of birth', () => {
     const state = {
       ...createOnboardingState('learner'),
       firstName: ' Jordan ',
       lastName: '  Ops  ',
       email: 'operator@example.com ',
-      persona: 'Community Operator',
-      goalsInput: 'Launch Flow 5, Grow revenue, launch flow 5',
-      inviteCodes: 'FLOW5-OPS, flow5-ops, ',
-      marketingSource: '  Conference ',
-      marketingCampaign: ' Flow5 Beta ',
-      marketingOptIn: true,
-      interestsInput: 'Analytics, analytics, community',
-      timeCommitment: ' 5h/week ',
-      onboardingPath: 'Community-first',
+      dateOfBirth: '1995-03-12',
       termsAccepted: true
     };
 
@@ -32,21 +24,17 @@ describe('onboarding validation helpers', () => {
     expect(draft).toMatchObject({
       email: 'operator@example.com',
       firstName: 'Jordan',
-      persona: 'Community Operator',
-      metadata: { source: 'Conference', campaign: 'Flow5 Beta' },
-      preferences: expect.objectContaining({ marketingOptIn: true })
+      lastName: 'Ops',
+      dateOfBirth: '1995-03-12T00:00:00.000Z',
+      termsAccepted: true
     });
-    expect(draft.invites).toEqual([{ code: 'FLOW5-OPS' }]);
   });
 
-  it('calculates onboarding completion checkpoints based on provided data', () => {
+  it('calculates learner onboarding completion based on essential checkpoints', () => {
     const state = {
       ...createOnboardingState('learner'),
       firstName: 'Jordan',
       email: 'jordan@example.com',
-      persona: 'Ops',
-      goalsInput: 'Launch Flow 5',
-      interestsInput: 'Analytics',
       password: 'SecurePass!234',
       confirmPassword: 'SecurePass!234',
       termsAccepted: true
@@ -54,9 +42,9 @@ describe('onboarding validation helpers', () => {
 
     const progress = calculateOnboardingCompletion('learner', state, { passwordPolicy: DEFAULT_PASSWORD_POLICY });
 
-    expect(progress.completed).toBeGreaterThanOrEqual(6);
-    expect(progress.total).toBe(8);
-    expect(progress.progress).toBeGreaterThan(0.6);
+    expect(progress.completed).toBe(5);
+    expect(progress.total).toBe(5);
+    expect(progress.progress).toBe(1);
   });
 
   it('validates learner onboarding state and reports missing requirements', () => {
@@ -67,7 +55,8 @@ describe('onboarding validation helpers', () => {
       password: 'short',
       confirmPassword: 'different',
       role: 'guest',
-      termsAccepted: false
+      termsAccepted: false,
+      dateOfBirth: '2050-01-01'
     };
 
     const validation = validateOnboardingState('learner', state, { passwordPolicy: DEFAULT_PASSWORD_POLICY });
@@ -77,7 +66,8 @@ describe('onboarding validation helpers', () => {
       password: expect.any(String),
       confirmPassword: expect.any(String),
       role: expect.any(String),
-      termsAccepted: expect.any(String)
+      termsAccepted: expect.any(String),
+      dateOfBirth: expect.any(String)
     });
   });
 

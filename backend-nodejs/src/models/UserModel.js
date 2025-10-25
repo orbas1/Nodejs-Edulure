@@ -58,6 +58,7 @@ const BASE_COLUMNS = [
   'first_name as firstName',
   'last_name as lastName',
   'email',
+  'date_of_birth as dateOfBirth',
   'role',
   'age',
   'address',
@@ -91,6 +92,7 @@ export default class UserModel {
       password_hash: user.passwordHash,
       role: user.role ?? 'user',
       age: user.age ?? null,
+      date_of_birth: user.dateOfBirth ? new Date(user.dateOfBirth) : null,
       address:
         user.address && typeof user.address === 'object'
           ? JSON.stringify(user.address)
@@ -133,6 +135,9 @@ export default class UserModel {
     }
     if (updates.age !== undefined) {
       payload.age = updates.age ?? null;
+    }
+    if (updates.dateOfBirth !== undefined) {
+      payload.date_of_birth = updates.dateOfBirth ? new Date(updates.dateOfBirth) : null;
     }
     if (updates.address !== undefined) {
       payload.address =
