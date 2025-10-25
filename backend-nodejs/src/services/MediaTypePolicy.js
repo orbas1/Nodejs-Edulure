@@ -55,7 +55,7 @@ const MEDIA_TYPE_POLICY = {
   }
 };
 
-function normaliseKind(kind) {
+function normaliseMediaKind(kind) {
   if (typeof kind !== 'string') {
     return null;
   }
@@ -63,13 +63,13 @@ function normaliseKind(kind) {
   return MEDIA_TYPE_POLICY[lower] ? lower : null;
 }
 
-function getPolicy(kind) {
-  const normalised = normaliseKind(kind);
+function getMediaTypePolicy(kind) {
+  const normalised = normaliseMediaKind(kind);
   return normalised ? { kind: normalised, ...MEDIA_TYPE_POLICY[normalised] } : null;
 }
 
 function assertMediaTypeCompliance({ kind, mimeType, size }) {
-  const policy = getPolicy(kind);
+  const policy = getMediaTypePolicy(kind);
   if (!policy) {
     throw Object.assign(new Error(`Unsupported media kind: ${kind}`), { status: 422 });
   }
@@ -103,15 +103,15 @@ function assertMediaTypeCompliance({ kind, mimeType, size }) {
 }
 
 function listAllowedMimeTypes(kind) {
-  const policy = getPolicy(kind);
+  const policy = getMediaTypePolicy(kind);
   return policy ? policy.allowedMimeTypes.slice() : [];
 }
 
 export {
   assertMediaTypeCompliance,
-  getPolicy as getMediaTypePolicy,
+  getMediaTypePolicy,
   listAllowedMimeTypes,
-  normaliseKind as normaliseMediaKind
+  normaliseMediaKind
 };
 
 export default {

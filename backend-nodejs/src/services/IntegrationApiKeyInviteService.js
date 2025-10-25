@@ -737,7 +737,7 @@ export default class IntegrationApiKeyInviteService {
 
   async submitInvitation(token, { key, rotationIntervalDays, keyExpiresAt, actorEmail, actorName, reason }, context = {}) {
     const invite = await this.loadInviteByToken(token);
-    const sanitizedKey = validateKeyStrength(key, { provider: invite.provider });
+    const sanitizedKeyValue = validateKeyStrength(key, { provider: invite.provider });
     const rotationDays = clampRotationInterval(rotationIntervalDays ?? invite.rotationIntervalDays, invite.provider);
     const expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : invite.keyExpiresAt;
     if (expiresAt && Number.isNaN(expiresAt.getTime())) {
@@ -767,7 +767,7 @@ export default class IntegrationApiKeyInviteService {
         result = await this.apiKeyService.rotateKey(
           invite.apiKeyId,
           {
-            keyValue: sanitizedKey,
+            keyValue: sanitizedKeyValue,
             rotationIntervalDays: rotationDays,
             expiresAt: expiresAt ? expiresAt.toISOString() : null,
             rotatedBy: actor,
@@ -783,7 +783,7 @@ export default class IntegrationApiKeyInviteService {
             environment: invite.environment,
             alias: invite.alias,
             ownerEmail: invite.ownerEmail,
-            keyValue: sanitizedKey,
+            keyValue: sanitizedKeyValue,
             rotationIntervalDays: rotationDays,
             expiresAt: expiresAt ? expiresAt.toISOString() : null,
             createdBy: actor,
@@ -808,12 +808,12 @@ export default class IntegrationApiKeyInviteService {
 
     const completedInvite = await this.inviteModel.findById(invite.id);
     const sanitizedInvite = sanitizeInvite(completedInvite);
-    const sanitizedKey = this.apiKeyService.sanitize(result);
+    const sanitizedApiKey = this.apiKeyService.sanitize(result);
 
     this.logger.info(
       {
         inviteId: invite.id,
-        apiKeyId: sanitizedKey.id,
+        apiKeyId: sanitizedApiKey.id,
         actor,
         tokenFingerprint: context.tokenFingerprint ?? null,
         ...fulfilmentContext
@@ -844,7 +844,7 @@ export default class IntegrationApiKeyInviteService {
         ownerEmail: sanitizedInvite.ownerEmail,
         rotationIntervalDays: rotationDays,
         keyExpiresAt: sanitizedInvite.keyExpiresAt,
-        apiKeyId: sanitizedKey.id,
+        apiKeyId: sanitizedApiKey.id,
         documentationUrl: sanitizedInvite.documentationUrl,
         requestOrigin: context.origin ?? null,
         tokenFingerprint: context.tokenFingerprint ?? null,
@@ -856,7 +856,7 @@ export default class IntegrationApiKeyInviteService {
 
     return {
       invite: completedInvite,
-      apiKey: sanitizedKey
+      apiKey: sanitizedApiKey
     };
   }
 
