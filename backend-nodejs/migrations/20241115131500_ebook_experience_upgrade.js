@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 export async function up(knex) {
   const hasEbooks = await knex.schema.hasTable('ebooks');
@@ -38,7 +39,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.index(['status']);
       table.index(['release_at']);
     });
@@ -64,7 +65,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['ebook_id', 'slug']);
       table.index(['ebook_id', 'position']);
     });

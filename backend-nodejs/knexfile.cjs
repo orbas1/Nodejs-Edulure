@@ -54,6 +54,20 @@ const toBool = (value, fallback = false) => {
   return fallback;
 };
 
+const requiredMysqlEnvKeys = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+const missingMysqlEnvKeys = requiredMysqlEnvKeys.filter((key) => !process.env[key]);
+const hasMysqlConfiguration = Boolean(process.env.DATABASE_URL) || missingMysqlEnvKeys.length === 0;
+const requestedClient = (process.env.DB_CLIENT ?? '').trim().toLowerCase();
+const explicitSqliteRequest = requestedClient === 'sqlite' || requestedClient === 'sqlite3';
+const explicitMysqlRequest = requestedClient === 'mysql' || requestedClient === 'mysql2';
+const allowSqliteFallback = toBool(process.env.DB_ALLOW_SQLITE_FALLBACK, true);
+const forceMysql = toBool(process.env.DB_FORCE_MYSQL, false);
+const shouldUseSqliteFallback =
+  explicitSqliteRequest ||
+  (!explicitMysqlRequest &&
+    allowSqliteFallback &&
+    (!hasMysqlConfiguration || (!forceMysql && nodeEnv !== 'production')));
+
 const buildConnectionFromUrl = (databaseUrl) => {
   const url = new URL(databaseUrl);
   return {
@@ -70,10 +84,8 @@ const resolveConnection = () => {
     return buildConnectionFromUrl(process.env.DATABASE_URL);
   }
 
-  const required = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
-  const missing = required.filter((key) => !process.env[key]);
-  if (missing.length) {
-    throw new Error(`Missing required database environment variables: ${missing.join(', ')}`);
+  if (missingMysqlEnvKeys.length) {
+    throw new Error(`Missing required database environment variables: ${missingMysqlEnvKeys.join(', ')}`);
   }
 
   return {
@@ -119,36 +131,90 @@ const enrichConnection = (connection) => {
   return enriched;
 };
 
-const connection = enrichConnection(resolveConnection());
-
 const poolMin = toInt(process.env.DB_POOL_MIN, 2);
 const poolMax = toInt(process.env.DB_POOL_MAX, 10);
 
-module.exports = {
-  client: 'mysql2',
-  connection,
-  pool: {
-    min: Math.min(poolMin, poolMax),
-    max: Math.max(poolMax, poolMin),
-    idleTimeoutMillis: toInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 30000),
-    createTimeoutMillis: toInt(process.env.DB_POOL_CREATE_TIMEOUT_MS, 3000),
-    acquireTimeoutMillis: toInt(process.env.DB_POOL_ACQUIRE_TIMEOUT_MS, 60000)
-  },
-  migrations: {
-    directory: path.resolve(__dirname, 'migrations'),
-    tableName: 'schema_migrations',
-    loadExtensions: ['.js']
-  },
-  seeds: {
-    directory: path.resolve(__dirname, 'seeds')
-  },
-  log: {
-    warn(message) {
-      if (typeof message === 'string' && message.includes('FS_EVENT')) {
-        return;
-      }
+const migrations = {
+  directory: path.resolve(__dirname, 'migrations'),
+  tableName: 'schema_migrations',
+  loadExtensions: ['.js']
+};
 
-      console.warn(message);
+const seeds = {
+  directory: path.resolve(__dirname, 'seeds')
+};
+
+const log = {
+  warn(message) {
+    if (typeof message === 'string' && message.includes('FS_EVENT')) {
+      return;
     }
+
+    console.warn(message);
   }
 };
+
+const buildSqliteFilename = () => {
+  const configured = (process.env.DB_SQLITE_FILENAME ?? '').trim();
+  if (!configured) {
+    return path.resolve(
+      __dirname,
+      'database',
+      nodeEnv === 'test' ? 'test.sqlite3' : 'development.sqlite3'
+    );
+  }
+
+  if (configured === ':memory:') {
+    return ':memory:';
+  }
+
+  return path.isAbsolute(configured) ? configured : path.resolve(__dirname, configured);
+};
+
+let configuration;
+
+if (shouldUseSqliteFallback) {
+  const sqliteFilename = buildSqliteFilename();
+  if (!process.env.CI && !explicitSqliteRequest) {
+    console.warn(
+      `[knexfile] Falling back to SQLite database at ${sqliteFilename} because MySQL configuration is missing.`
+    );
+  }
+
+  configuration = {
+    client: 'sqlite3',
+    connection: {
+      filename: sqliteFilename
+    },
+    useNullAsDefault: true,
+    pool: {
+      min: 1,
+      max: 1,
+      idleTimeoutMillis: toInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 30000),
+      createTimeoutMillis: toInt(process.env.DB_POOL_CREATE_TIMEOUT_MS, 3000),
+      acquireTimeoutMillis: toInt(process.env.DB_POOL_ACQUIRE_TIMEOUT_MS, 60000)
+    },
+    migrations,
+    seeds,
+    log
+  };
+} else {
+  const connection = enrichConnection(resolveConnection());
+
+  configuration = {
+    client: 'mysql2',
+    connection,
+    pool: {
+      min: Math.min(poolMin, poolMax),
+      max: Math.max(poolMax, poolMin),
+      idleTimeoutMillis: toInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 30000),
+      createTimeoutMillis: toInt(process.env.DB_POOL_CREATE_TIMEOUT_MS, 3000),
+      acquireTimeoutMillis: toInt(process.env.DB_POOL_ACQUIRE_TIMEOUT_MS, 60000)
+    },
+    migrations,
+    seeds,
+    log
+  };
+}
+
+module.exports = configuration;

@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 
 export async function up(knex) {
@@ -32,7 +33,7 @@ export async function up(knex) {
     table
       .timestamp('updated_at')
       .notNullable()
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      .defaultTo(updatedAtDefault(knex));
 
     table.index(['provider', 'environment'], 'integration_api_key_invites_provider_environment_idx');
     table.index(['owner_email'], 'integration_api_key_invites_owner_idx');

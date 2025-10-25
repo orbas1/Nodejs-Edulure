@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 const JSON_EMPTY_ARRAY = (knex) => jsonDefault(knex, []);
 
@@ -25,7 +26,7 @@ export async function up(knex) {
     table
       .timestamp('updated_at')
       .notNullable()
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      .defaultTo(updatedAtDefault(knex));
 
     table.unique(['integration', 'correlation_id'], 'integration_runs_correlation_unique');
     table.index(['integration', 'status', 'created_at'], 'integration_runs_status_created_idx');

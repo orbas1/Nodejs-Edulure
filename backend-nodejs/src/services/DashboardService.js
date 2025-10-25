@@ -2687,7 +2687,6 @@ export function buildLearnerDashboard({
 
   const quickActions = [];
 
-  const primaryCourse = activeCourses[0] ?? null;
   if (primaryCourse) {
     const resumeCourseId = primaryCourse.courseId ?? primaryCourse.id ?? 'primary';
     const defaultCourseHref = `/dashboard/learner/courses?courseId=${encodeURIComponent(resumeCourseId)}`;

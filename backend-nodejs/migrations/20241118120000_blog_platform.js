@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 export async function up(knex) {
   const hasCategories = await knex.schema.hasTable('blog_categories');
@@ -13,7 +14,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
     });
   }
 
@@ -27,7 +28,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
     });
   }
 
@@ -62,7 +63,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.index(['status', 'published_at']);
       table.index(['category_id']);
       table.index(['author_id']);

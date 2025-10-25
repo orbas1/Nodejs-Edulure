@@ -16,7 +16,7 @@ export async function up(knex) {
   const rows = await knex('integration_api_key_invites')
     .select('id', 'metadata')
     .whereNull(COLUMN_NAME)
-    .andWhereNotNull('metadata');
+    .whereNotNull('metadata');
 
   if (!Array.isArray(rows) || rows.length === 0) {
     return;

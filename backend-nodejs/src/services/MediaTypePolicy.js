@@ -116,7 +116,7 @@ export {
 
 export default {
   assertMediaTypeCompliance,
-  getMediaTypePolicy,
+  getMediaTypePolicy: getPolicy,
   listAllowedMimeTypes,
-  normaliseMediaKind
+  normaliseMediaKind: normaliseKind
 };

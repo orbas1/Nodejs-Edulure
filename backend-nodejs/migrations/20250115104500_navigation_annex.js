@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 const BACKLOG_TABLE = 'navigation_annex_backlog_items';
 const OPERATIONS_TABLE = 'navigation_annex_operation_tasks';
@@ -11,7 +12,7 @@ function addTimestamps(table, knex) {
   table
     .timestamp('updated_at')
     .notNullable()
-    .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+    .defaultTo(updatedAtDefault(knex));
 }
 
 export async function up(knex) {

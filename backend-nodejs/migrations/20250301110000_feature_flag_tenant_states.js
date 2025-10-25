@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 const TABLE_NAME = 'feature_flag_tenant_states';
 
 const STATE_ENUM = ['enabled', 'disabled', 'conditional'];
@@ -39,7 +40,7 @@ export async function up(knex) {
     table
       .timestamp('updated_at')
       .notNullable()
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      .defaultTo(updatedAtDefault(knex));
 
     table.unique(['tenant_id', 'feature_flag_id', 'environment'], 'tenant_flag_env_unique');
     table.index(['state', 'environment'], 'tenant_flag_state_env_idx');

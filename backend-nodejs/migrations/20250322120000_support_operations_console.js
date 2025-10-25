@@ -1,3 +1,4 @@
+import { applyTableDefaults, updatedAtDefault } from './_helpers/tableDefaults.js';
 import { jsonDefault } from './_helpers/utils.js';
 
 const TABLES = {
@@ -9,18 +10,6 @@ const TABLES = {
   onboardingChecklists: 'support_onboarding_checklists',
   onboardingPlaybooks: 'support_onboarding_playbooks'
 };
-
-function applyTableDefaults(table) {
-  if (typeof table.engine === 'function') {
-    table.engine('InnoDB');
-  }
-  if (typeof table.charset === 'function') {
-    table.charset('utf8mb4');
-  }
-  if (typeof table.collate === 'function') {
-    table.collate('utf8mb4_unicode_ci');
-  }
-}
 
 export async function up(knex) {
   const hasTenants = await knex.schema.hasTable(TABLES.tenants);
@@ -35,10 +24,7 @@ export async function up(knex) {
       table.boolean('is_primary').notNullable().defaultTo(false);
       table.integer('display_order').notNullable().defaultTo(0);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       applyTableDefaults(table);
     });
   }
@@ -54,10 +40,7 @@ export async function up(knex) {
       table.integer('audience_size').unsigned().nullable();
       table.timestamp('scheduled_at').nullable();
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.string('author', 160).nullable();
       table.foreign('tenant_id').references('tenant_id').inTable(TABLES.tenants).onDelete('CASCADE');
       table.index(['tenant_id', 'status'], 'idx_support_comms_tenant_status');
@@ -76,10 +59,7 @@ export async function up(knex) {
       table.string('description', 500).nullable();
       table.string('link', 512).nullable();
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.foreign('tenant_id').references('tenant_id').inTable(TABLES.tenants).onDelete('CASCADE');
       table.index(['tenant_id', 'category'], 'idx_support_playbooks_category');
       applyTableDefaults(table);
@@ -97,10 +77,7 @@ export async function up(knex) {
       table.timestamp('last_run_at').nullable();
       table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.foreign('tenant_id').references('tenant_id').inTable(TABLES.tenants).onDelete('CASCADE');
       table.index(['tenant_id', 'status'], 'idx_support_workflows_status');
       applyTableDefaults(table);
@@ -117,11 +94,8 @@ export async function up(knex) {
       table.integer('sla_minutes').unsigned().nullable();
       table.json('channels').notNullable().defaultTo(jsonDefault(knex, {}));
       table.json('escalation_targets').notNullable().defaultTo(jsonDefault(knex, []));
-      table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('created_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table.foreign('tenant_id').references('tenant_id').inTable(TABLES.tenants).onDelete('CASCADE');
       table.index(['tenant_id'], 'idx_support_notification_policies_tenant');
       applyTableDefaults(table);
@@ -136,7 +110,7 @@ export async function up(knex) {
       table.string('name', 160).notNullable();
       table.decimal('progress', 5, 2).notNullable().defaultTo(0);
       table.string('owner', 160).nullable();
-      table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table.foreign('tenant_id').references('tenant_id').inTable(TABLES.tenants).onDelete('CASCADE');
       table.index(['tenant_id'], 'idx_support_onboarding_checklists_tenant');
@@ -152,54 +126,63 @@ export async function up(knex) {
       table.string('name', 160).notNullable();
       table.string('link', 512).nullable();
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.foreign('tenant_id').references('tenant_id').inTable(TABLES.tenants).onDelete('CASCADE');
       table.index(['tenant_id'], 'idx_support_onboarding_playbooks_tenant');
       applyTableDefaults(table);
     });
   }
 
-  const hasTenantColumn = await knex.schema.hasColumn('learner_support_cases', 'tenant_id');
-  if (!hasTenantColumn) {
-    await knex.schema.alterTable('learner_support_cases', (table) => {
-      table.string('tenant_id', 64).notNullable().defaultTo('global');
-      table.index(['tenant_id', 'status'], 'idx_learner_support_tenant_status');
-    });
-    await knex('learner_support_cases').update({ tenant_id: 'global' });
+  const hasLearnerSupportCases = await knex.schema.hasTable('learner_support_cases');
+  if (hasLearnerSupportCases) {
+    const hasTenantColumn = await knex.schema.hasColumn('learner_support_cases', 'tenant_id');
+    if (!hasTenantColumn) {
+      await knex.schema.alterTable('learner_support_cases', (table) => {
+        table.string('tenant_id', 64).notNullable().defaultTo('global');
+        table.index(['tenant_id', 'status'], 'idx_learner_support_tenant_status');
+      });
+      await knex('learner_support_cases').update({ tenant_id: 'global' });
+    }
   }
 
-  const hasPendingReviewColumn = await knex.schema.hasColumn('support_articles', 'pending_review');
-  if (!hasPendingReviewColumn) {
-    await knex.schema.alterTable('support_articles', (table) => {
-      table.boolean('pending_review').notNullable().defaultTo(false);
-      table.boolean('is_draft').notNullable().defaultTo(false);
-    });
+  const hasSupportArticlesTable = await knex.schema.hasTable('support_articles');
+  if (hasSupportArticlesTable) {
+    const hasPendingReviewColumn = await knex.schema.hasColumn('support_articles', 'pending_review');
+    if (!hasPendingReviewColumn) {
+      await knex.schema.alterTable('support_articles', (table) => {
+        table.boolean('pending_review').notNullable().defaultTo(false);
+        table.boolean('is_draft').notNullable().defaultTo(false);
+      });
+    }
   }
 }
 
 export async function down(knex) {
-  const hasPendingReviewColumn = await knex.schema.hasColumn('support_articles', 'pending_review');
-  const hasDraftColumn = await knex.schema.hasColumn('support_articles', 'is_draft');
-  if (hasPendingReviewColumn || hasDraftColumn) {
-    await knex.schema.alterTable('support_articles', (table) => {
-      if (hasPendingReviewColumn) {
-        table.dropColumn('pending_review');
-      }
-      if (hasDraftColumn) {
-        table.dropColumn('is_draft');
-      }
-    });
+  const hasSupportArticlesTable = await knex.schema.hasTable('support_articles');
+  if (hasSupportArticlesTable) {
+    const hasPendingReviewColumn = await knex.schema.hasColumn('support_articles', 'pending_review');
+    const hasDraftColumn = await knex.schema.hasColumn('support_articles', 'is_draft');
+    if (hasPendingReviewColumn || hasDraftColumn) {
+      await knex.schema.alterTable('support_articles', (table) => {
+        if (hasPendingReviewColumn) {
+          table.dropColumn('pending_review');
+        }
+        if (hasDraftColumn) {
+          table.dropColumn('is_draft');
+        }
+      });
+    }
   }
 
-  const hasTenantColumn = await knex.schema.hasColumn('learner_support_cases', 'tenant_id');
-  if (hasTenantColumn) {
-    await knex.schema.alterTable('learner_support_cases', (table) => {
-      table.dropIndex(['tenant_id', 'status'], 'idx_learner_support_tenant_status');
-      table.dropColumn('tenant_id');
-    });
+  const hasLearnerSupportCases = await knex.schema.hasTable('learner_support_cases');
+  if (hasLearnerSupportCases) {
+    const hasTenantColumn = await knex.schema.hasColumn('learner_support_cases', 'tenant_id');
+    if (hasTenantColumn) {
+      await knex.schema.alterTable('learner_support_cases', (table) => {
+        table.dropIndex(['tenant_id', 'status'], 'idx_learner_support_tenant_status');
+        table.dropColumn('tenant_id');
+      });
+    }
   }
 
   await knex.schema.dropTableIfExists(TABLES.onboardingPlaybooks);

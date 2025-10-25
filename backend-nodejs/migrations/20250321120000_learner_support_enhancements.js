@@ -1,28 +1,37 @@
 export async function up(knex) {
-  const hasEscalationBreadcrumbs = await knex.schema.hasColumn('learner_support_cases', 'escalation_breadcrumbs');
-  const hasKnowledgeSuggestions = await knex.schema.hasColumn('learner_support_cases', 'knowledge_suggestions');
-  const hasAiSummary = await knex.schema.hasColumn('learner_support_cases', 'ai_summary');
-  const hasFollowUpDueAt = await knex.schema.hasColumn('learner_support_cases', 'follow_up_due_at');
-  const hasAiSummaryGeneratedAt = await knex.schema.hasColumn('learner_support_cases', 'ai_summary_generated_at');
+  const hasCasesTable = await knex.schema.hasTable('learner_support_cases');
+  if (hasCasesTable) {
+    const hasEscalationBreadcrumbs = await knex.schema.hasColumn('learner_support_cases', 'escalation_breadcrumbs');
+    const hasKnowledgeSuggestions = await knex.schema.hasColumn('learner_support_cases', 'knowledge_suggestions');
+    const hasAiSummary = await knex.schema.hasColumn('learner_support_cases', 'ai_summary');
+    const hasFollowUpDueAt = await knex.schema.hasColumn('learner_support_cases', 'follow_up_due_at');
+    const hasAiSummaryGeneratedAt = await knex.schema.hasColumn('learner_support_cases', 'ai_summary_generated_at');
 
-  if (!hasEscalationBreadcrumbs || !hasKnowledgeSuggestions || !hasAiSummary || !hasFollowUpDueAt || !hasAiSummaryGeneratedAt) {
-    await knex.schema.alterTable('learner_support_cases', (table) => {
-      if (!hasEscalationBreadcrumbs) {
-        table.json('escalation_breadcrumbs').nullable();
-      }
-      if (!hasKnowledgeSuggestions) {
-        table.json('knowledge_suggestions').nullable();
-      }
-      if (!hasAiSummary) {
-        table.text('ai_summary').nullable();
-      }
-      if (!hasFollowUpDueAt) {
-        table.datetime('follow_up_due_at').nullable();
-      }
-      if (!hasAiSummaryGeneratedAt) {
-        table.datetime('ai_summary_generated_at').nullable();
-      }
-    });
+    if (
+      !hasEscalationBreadcrumbs ||
+      !hasKnowledgeSuggestions ||
+      !hasAiSummary ||
+      !hasFollowUpDueAt ||
+      !hasAiSummaryGeneratedAt
+    ) {
+      await knex.schema.alterTable('learner_support_cases', (table) => {
+        if (!hasEscalationBreadcrumbs) {
+          table.json('escalation_breadcrumbs').nullable();
+        }
+        if (!hasKnowledgeSuggestions) {
+          table.json('knowledge_suggestions').nullable();
+        }
+        if (!hasAiSummary) {
+          table.text('ai_summary').nullable();
+        }
+        if (!hasFollowUpDueAt) {
+          table.datetime('follow_up_due_at').nullable();
+        }
+        if (!hasAiSummaryGeneratedAt) {
+          table.datetime('ai_summary_generated_at').nullable();
+        }
+      });
+    }
   }
 
   const hasSupportArticles = await knex.schema.hasTable('support_articles');
@@ -48,29 +57,32 @@ export async function up(knex) {
 }
 
 export async function down(knex) {
-  const hasEscalationBreadcrumbs = await knex.schema.hasColumn('learner_support_cases', 'escalation_breadcrumbs');
-  const hasKnowledgeSuggestions = await knex.schema.hasColumn('learner_support_cases', 'knowledge_suggestions');
-  const hasAiSummary = await knex.schema.hasColumn('learner_support_cases', 'ai_summary');
-  const hasFollowUpDueAt = await knex.schema.hasColumn('learner_support_cases', 'follow_up_due_at');
-  const hasAiSummaryGeneratedAt = await knex.schema.hasColumn('learner_support_cases', 'ai_summary_generated_at');
+  const hasCasesTable = await knex.schema.hasTable('learner_support_cases');
+  if (hasCasesTable) {
+    const hasEscalationBreadcrumbs = await knex.schema.hasColumn('learner_support_cases', 'escalation_breadcrumbs');
+    const hasKnowledgeSuggestions = await knex.schema.hasColumn('learner_support_cases', 'knowledge_suggestions');
+    const hasAiSummary = await knex.schema.hasColumn('learner_support_cases', 'ai_summary');
+    const hasFollowUpDueAt = await knex.schema.hasColumn('learner_support_cases', 'follow_up_due_at');
+    const hasAiSummaryGeneratedAt = await knex.schema.hasColumn('learner_support_cases', 'ai_summary_generated_at');
 
-  await knex.schema.alterTable('learner_support_cases', (table) => {
-    if (hasEscalationBreadcrumbs) {
-      table.dropColumn('escalation_breadcrumbs');
-    }
-    if (hasKnowledgeSuggestions) {
-      table.dropColumn('knowledge_suggestions');
-    }
-    if (hasAiSummary) {
-      table.dropColumn('ai_summary');
-    }
-    if (hasFollowUpDueAt) {
-      table.dropColumn('follow_up_due_at');
-    }
-    if (hasAiSummaryGeneratedAt) {
-      table.dropColumn('ai_summary_generated_at');
-    }
-  });
+    await knex.schema.alterTable('learner_support_cases', (table) => {
+      if (hasEscalationBreadcrumbs) {
+        table.dropColumn('escalation_breadcrumbs');
+      }
+      if (hasKnowledgeSuggestions) {
+        table.dropColumn('knowledge_suggestions');
+      }
+      if (hasAiSummary) {
+        table.dropColumn('ai_summary');
+      }
+      if (hasFollowUpDueAt) {
+        table.dropColumn('follow_up_due_at');
+      }
+      if (hasAiSummaryGeneratedAt) {
+        table.dropColumn('ai_summary_generated_at');
+      }
+    });
+  }
 
   await knex.schema.dropTableIfExists('support_articles');
 }

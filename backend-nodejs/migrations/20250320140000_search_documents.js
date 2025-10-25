@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 export async function up(knex) {
   const hasDocumentsTable = await knex.schema.hasTable('search_documents');
@@ -39,7 +40,7 @@ export async function up(knex) {
       table
         .timestamp('updated_at')
         .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['entity_type', 'entity_id'], 'search_documents_entity_unique');
       table.index(['entity_type', 'is_active'], 'idx_search_documents_type_active');
       table.index(['entity_type', 'category'], 'idx_search_documents_category');
@@ -73,7 +74,7 @@ export async function up(knex) {
       table
         .timestamp('updated_at')
         .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['entity_type', 'entity_id'], 'search_document_refresh_unique');
       table.index(['priority', 'run_at'], 'idx_search_document_refresh_priority');
       table.index(['processed_at'], 'idx_search_document_refresh_processed');

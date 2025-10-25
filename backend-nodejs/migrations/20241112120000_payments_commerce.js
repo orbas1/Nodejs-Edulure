@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 export async function up(knex) {
   const hasCoupons = await knex.schema.hasTable('payment_coupons');
@@ -31,7 +32,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.timestamp('archived_at');
       table.index(['status']);
       table.index(['valid_from', 'valid_until']);
@@ -101,7 +102,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['provider', 'provider_intent_id']);
       table.index(['status']);
       table.index(['currency']);
@@ -172,7 +173,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['payment_intent_id', 'provider_refund_id']);
       table.index(['status']);
     });

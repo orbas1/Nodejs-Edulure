@@ -62,7 +62,7 @@ const courseCreateSchema = Joi.object({
 
 const courseUpdateSchema = courseCreateSchema
   .fork(['title', 'instructorId'], (schema) => schema.optional())
-  .fork(['clusterKey'], (schema) => schema.optional().default(undefined));
+  .fork(['clusterKey'], (schema) => schema.optional().default(() => undefined));
 
 const tutorCreateSchema = Joi.object({
   userId: Joi.number().integer().positive().required(),
@@ -130,7 +130,7 @@ const liveStreamCreateSchema = Joi.object({
 
 const liveStreamUpdateSchema = liveStreamCreateSchema
   .fork(['title', 'startAt', 'endAt'], (schema) => schema.optional())
-  .fork(['clusterKey'], (schema) => schema.optional().default(undefined));
+  .fork(['clusterKey'], (schema) => schema.optional().default(() => undefined));
 
 const podcastShowCreateSchema = Joi.object({
   communityId: Joi.number().integer().positive().allow(null).optional(),

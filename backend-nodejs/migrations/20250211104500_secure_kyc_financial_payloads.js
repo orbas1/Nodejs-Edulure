@@ -1,5 +1,34 @@
+const DUPLICATE_PATTERNS = [
+  'duplicate column name',
+  'already exists',
+  'duplicate key name',
+  'er_dup_fieldname',
+  'er_dup_keyname',
+  'er_dup_key'
+];
+
+const isDuplicateError = (error) => {
+  const message = String(error?.message ?? '').toLowerCase();
+  const code = String(error?.code ?? '').toLowerCase();
+  return (
+    DUPLICATE_PATTERNS.some((pattern) => message.includes(pattern)) ||
+    DUPLICATE_PATTERNS.some((pattern) => code.includes(pattern))
+  );
+};
+
+async function safeAlterTable(knex, tableName, alterFn) {
+  try {
+    await knex.schema.alterTable(tableName, alterFn);
+  } catch (error) {
+    if (isDuplicateError(error)) {
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function up(knex) {
-  await knex.schema.alterTable('kyc_verifications', (table) => {
+  await safeAlterTable(knex, 'kyc_verifications', (table) => {
     table.specificType('sensitive_notes_ciphertext', 'VARBINARY(4096)').nullable();
     table.string('sensitive_notes_hash', 128).nullable();
     table
@@ -10,7 +39,7 @@ export async function up(knex) {
     table.index(['sensitive_notes_hash'], 'kyc_verifications_notes_hash_idx');
   });
 
-  await knex.schema.alterTable('kyc_documents', (table) => {
+  await safeAlterTable(knex, 'kyc_documents', (table) => {
     table.specificType('document_payload_ciphertext', 'VARBINARY(4096)').nullable();
     table.string('document_payload_hash', 128).nullable();
     table.string('classification_tag', 64).notNullable().defaultTo('kyc.document');
@@ -19,7 +48,7 @@ export async function up(knex) {
     table.index(['classification_tag', 'status'], 'kyc_documents_classification_status_idx');
   });
 
-  await knex.schema.alterTable('payment_intents', (table) => {
+  await safeAlterTable(knex, 'payment_intents', (table) => {
     table.specificType('sensitive_details_ciphertext', 'VARBINARY(4096)').nullable();
     table.string('sensitive_details_hash', 128).nullable();
     table.string('classification_tag', 64).notNullable().defaultTo('payment.intent');
@@ -28,7 +57,7 @@ export async function up(knex) {
     table.index(['classification_tag', 'status'], 'payment_intents_classification_status_idx');
   });
 
-  await knex.schema.alterTable('payment_refunds', (table) => {
+  await safeAlterTable(knex, 'payment_refunds', (table) => {
     table.specificType('sensitive_details_ciphertext', 'VARBINARY(2048)').nullable();
     table.string('sensitive_details_hash', 128).nullable();
     table.string('classification_tag', 64).notNullable().defaultTo('payment.refund');
@@ -37,7 +66,7 @@ export async function up(knex) {
     table.index(['classification_tag', 'status'], 'payment_refunds_classification_status_idx');
   });
 
-  await knex.schema.alterTable('community_affiliate_payouts', (table) => {
+  await safeAlterTable(knex, 'community_affiliate_payouts', (table) => {
     table.specificType('disbursement_payload_ciphertext', 'VARBINARY(2048)').nullable();
     table.string('disbursement_payload_hash', 128).nullable();
     table.string('classification_tag', 64).notNullable().defaultTo('payout.affiliate');
@@ -46,32 +75,32 @@ export async function up(knex) {
     table.index(['classification_tag', 'status'], 'affiliate_payouts_classification_status_idx');
   });
 
-  await knex.schema.alterTable('explorer_search_events', (table) => {
+  await safeAlterTable(knex, 'explorer_search_events', (table) => {
     table.index(['created_at', 'is_zero_result'], 'explorer_search_events_created_zero_idx');
     table.index(['session_id', 'created_at'], 'explorer_search_events_session_created_idx');
     table.index(['user_id', 'created_at'], 'explorer_search_events_user_created_idx');
   });
 
-  await knex.schema.alterTable('explorer_search_event_entities', (table) => {
+  await safeAlterTable(knex, 'explorer_search_event_entities', (table) => {
     table.index(['entity_type', 'created_at'], 'explorer_search_entities_type_created_idx');
     table.index(['event_id', 'is_zero_result'], 'explorer_search_entities_event_zero_idx');
   });
 
-  await knex.schema.alterTable('explorer_search_event_interactions', (table) => {
+  await safeAlterTable(knex, 'explorer_search_event_interactions', (table) => {
     table.index(['event_id', 'interaction_type'], 'explorer_search_interactions_event_type_idx');
     table.index(['entity_type', 'created_at'], 'explorer_search_interactions_type_created_idx');
   });
 
-  await knex.schema.alterTable('explorer_search_daily_metrics', (table) => {
+  await safeAlterTable(knex, 'explorer_search_daily_metrics', (table) => {
     table.index(['entity_type', 'metric_date'], 'explorer_daily_entity_date_idx');
     table.index(['metric_date', 'zero_results'], 'explorer_daily_zero_results_idx');
   });
 
-  await knex.schema.alterTable('analytics_alerts', (table) => {
+  await safeAlterTable(knex, 'analytics_alerts', (table) => {
     table.index(['alert_code', 'severity'], 'analytics_alerts_code_severity_idx');
   });
 
-  await knex.schema.alterTable('analytics_forecasts', (table) => {
+  await safeAlterTable(knex, 'analytics_forecasts', (table) => {
     table.index(['forecast_code', 'target_date'], 'analytics_forecasts_code_date_idx');
   });
 }

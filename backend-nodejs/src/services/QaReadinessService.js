@@ -1,6 +1,7 @@
 import createHttpError from 'http-errors';
 
 import db from '../config/database.js';
+import logger from '../config/logger.js';
 import QaFixtureSetModel from '../models/QaFixtureSetModel.js';
 import QaManualChecklistModel from '../models/QaManualChecklistModel.js';
 import QaSandboxEnvironmentModel from '../models/QaSandboxEnvironmentModel.js';
@@ -184,6 +185,23 @@ function toDecimalRatio(value) {
   return Number((number / 100).toFixed(4));
 }
 
+const qaLogger = logger.child({ module: 'qa-readiness-service' });
+
+function buildEmptySummary() {
+  return {
+    generatedAt: new Date().toISOString(),
+    surfaces: [],
+    aggregate: {
+      coverage: null,
+      failureRate: null,
+      totals: { pass: 0, fail: 0, in_progress: 0, missing: 0 }
+    },
+    evidence: []
+  };
+}
+
+let coverageSummaryFallbackLogged = false;
+
 export default class QaReadinessService {
   static async listSurfaces({ includeSuites = true, includeLatestRun = true, activeOnly = true } = {}) {
     const surfaces = await QaTestSurfaceModel.list({ active: activeOnly });
@@ -231,8 +249,23 @@ export default class QaReadinessService {
   }
 
   static async getCoverageSummary({ surfaces } = {}) {
-    const resolved = surfaces ?? (await this.listSurfaces({ includeSuites: true, includeLatestRun: true }));
-    return summariseSurfaces(resolved);
+    try {
+      const resolved =
+        surfaces ?? (await this.listSurfaces({ includeSuites: true, includeLatestRun: true }));
+      return summariseSurfaces(resolved);
+    } catch (error) {
+      if (!coverageSummaryFallbackLogged) {
+        qaLogger.warn(
+          { err: error },
+          'Failed to build QA coverage summary. Falling back to empty summary.'
+        );
+        coverageSummaryFallbackLogged = true;
+      } else {
+        qaLogger.debug({ err: error }, 'QA coverage summary fallback reused after failure');
+      }
+
+      return buildEmptySummary();
+    }
   }
 
   static async listSurfacesWithSummary(options = {}) {
@@ -347,14 +380,23 @@ export default class QaReadinessService {
   }
 
   static async resolveQualityGateMetrics() {
-    const summary = await this.getCoverageSummary();
-    const aggregateCoverage = summary.aggregate.coverage;
-    const aggregateFailureRate = summary.aggregate.failureRate;
-    return {
-      coverage: aggregateCoverage,
-      testFailureRate: aggregateFailureRate,
-      evidence: summary.evidence
-    };
+    try {
+      const summary = await this.getCoverageSummary();
+      const aggregateCoverage = summary.aggregate.coverage;
+      const aggregateFailureRate = summary.aggregate.failureRate;
+      return {
+        coverage: aggregateCoverage,
+        testFailureRate: aggregateFailureRate,
+        evidence: summary.evidence
+      };
+    } catch (error) {
+      qaLogger.warn({ err: error }, 'Falling back to empty QA metrics after fatal error');
+      return {
+        coverage: null,
+        testFailureRate: null,
+        evidence: []
+      };
+    }
   }
 
   static async closeConnections() {

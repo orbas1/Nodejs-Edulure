@@ -1,15 +1,28 @@
+import { applyTableDefaults, updatedAtDefault } from './_helpers/tableDefaults.js';
+
+const MYSQL_REGEX = /mysql/i;
+
+const isMySqlClient = (knex) => MYSQL_REGEX.test(knex?.client?.config?.client ?? '');
+
 export async function up(knex) {
+  const mysqlClient = isMySqlClient(knex);
   const hasUserDeletedAt = await knex.schema.hasColumn('users', 'deleted_at');
   if (!hasUserDeletedAt) {
     await knex.schema.alterTable('users', (table) => {
-      table.timestamp('deleted_at').nullable().after('updated_at');
+      const column = table.timestamp('deleted_at').nullable();
+      if (mysqlClient && typeof column.after === 'function') {
+        column.after('updated_at');
+      }
     });
   }
 
   const hasSessionDeletedAt = await knex.schema.hasColumn('user_sessions', 'deleted_at');
   if (!hasSessionDeletedAt) {
     await knex.schema.alterTable('user_sessions', (table) => {
-      table.timestamp('deleted_at').nullable().after('revoked_reason');
+      const column = table.timestamp('deleted_at').nullable();
+      if (mysqlClient && typeof column.after === 'function') {
+        column.after('revoked_reason');
+      }
     });
   }
 
@@ -29,12 +42,11 @@ export async function up(knex) {
       table.boolean('active').notNullable().defaultTo(true);
       table.json('criteria').notNullable();
       table.string('description', 255).notNullable();
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.index(['active']);
       table.index(['entity_name']);
+      applyTableDefaults(table);
     });
   }
 
@@ -127,30 +139,13 @@ export async function up(knex) {
     }
   }
 
-  await knex.raw('DROP TRIGGER IF EXISTS trg_community_owner_membership_after_insert');
-  await knex.raw(`
-    CREATE TRIGGER trg_community_owner_membership_after_insert
-    AFTER INSERT ON communities
-    FOR EACH ROW
-    BEGIN
-      INSERT INTO community_members (community_id, user_id, role, status, joined_at, left_at)
-      VALUES (NEW.id, NEW.owner_id, 'owner', 'active', NOW(), NULL)
-      ON DUPLICATE KEY UPDATE
-        role = 'owner',
-        status = 'active',
-        joined_at = IFNULL(community_members.joined_at, NOW()),
-        left_at = NULL,
-        updated_at = NOW();
-    END
-  `);
-
-  await knex.raw('DROP TRIGGER IF EXISTS trg_community_owner_membership_after_update');
-  await knex.raw(`
-    CREATE TRIGGER trg_community_owner_membership_after_update
-    AFTER UPDATE ON communities
-    FOR EACH ROW
-    BEGIN
-      IF NEW.owner_id <> OLD.owner_id THEN
+  if (mysqlClient) {
+    await knex.raw('DROP TRIGGER IF EXISTS trg_community_owner_membership_after_insert');
+    await knex.raw(`
+      CREATE TRIGGER trg_community_owner_membership_after_insert
+      AFTER INSERT ON communities
+      FOR EACH ROW
+      BEGIN
         INSERT INTO community_members (community_id, user_id, role, status, joined_at, left_at)
         VALUES (NEW.id, NEW.owner_id, 'owner', 'active', NOW(), NULL)
         ON DUPLICATE KEY UPDATE
@@ -159,21 +154,42 @@ export async function up(knex) {
           joined_at = IFNULL(community_members.joined_at, NOW()),
           left_at = NULL,
           updated_at = NOW();
+      END
+    `);
 
-        UPDATE community_members
-        SET role = 'admin',
+    await knex.raw('DROP TRIGGER IF EXISTS trg_community_owner_membership_after_update');
+    await knex.raw(`
+      CREATE TRIGGER trg_community_owner_membership_after_update
+      AFTER UPDATE ON communities
+      FOR EACH ROW
+      BEGIN
+        IF NEW.owner_id <> OLD.owner_id THEN
+          INSERT INTO community_members (community_id, user_id, role, status, joined_at, left_at)
+          VALUES (NEW.id, NEW.owner_id, 'owner', 'active', NOW(), NULL)
+          ON DUPLICATE KEY UPDATE
+            role = 'owner',
             status = 'active',
+            joined_at = IFNULL(community_members.joined_at, NOW()),
             left_at = NULL,
-            updated_at = NOW()
-        WHERE community_id = NEW.id AND user_id = OLD.owner_id;
-      END IF;
-    END
-  `);
+            updated_at = NOW();
+
+          UPDATE community_members
+          SET role = 'admin',
+              status = 'active',
+              left_at = NULL,
+              updated_at = NOW()
+          WHERE community_id = NEW.id AND user_id = OLD.owner_id;
+        END IF;
+      END
+    `);
+  }
 }
 
 export async function down(knex) {
-  await knex.raw('DROP TRIGGER IF EXISTS trg_community_owner_membership_after_update');
-  await knex.raw('DROP TRIGGER IF EXISTS trg_community_owner_membership_after_insert');
+  if (isMySqlClient(knex)) {
+    await knex.raw('DROP TRIGGER IF EXISTS trg_community_owner_membership_after_update');
+    await knex.raw('DROP TRIGGER IF EXISTS trg_community_owner_membership_after_insert');
+  }
 
   const hasAuditTable = await knex.schema.hasTable('data_retention_audit_logs');
   if (hasAuditTable) {

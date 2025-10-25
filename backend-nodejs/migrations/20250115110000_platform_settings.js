@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 
 export async function up(knex) {
@@ -11,7 +12,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
     });
   }
 }

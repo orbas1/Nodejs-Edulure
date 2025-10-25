@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 export async function up(knex) {
   const hasTutorProfiles = await knex.schema.hasTable('tutor_profiles');
@@ -31,7 +32,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['user_id']);
       table.index(['country']);
       table.index(['rating_average']);
@@ -145,7 +146,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.index(['status']);
       table.index(['start_at']);
       table.index(['community_id']);

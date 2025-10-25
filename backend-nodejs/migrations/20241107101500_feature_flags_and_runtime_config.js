@@ -1,3 +1,4 @@
+import { applyTableDefaults, updatedAtDefault } from './_helpers/tableDefaults.js';
 import { isPostgres, jsonDefault } from './_helpers/utils.js';
 
 export async function up(knex) {
@@ -25,11 +26,10 @@ export async function up(knex) {
         .notNullable()
         .defaultTo(jsonDefault(knex, ['development', 'staging', 'production']));
       table.json('metadata');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.index(['enabled', 'kill_switch']);
+      applyTableDefaults(table);
     });
   }
 
@@ -47,8 +47,9 @@ export async function up(knex) {
       table.string('change_type', 80).notNullable();
       table.string('changed_by', 120);
       table.json('payload').notNullable();
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table.index(['flag_id', 'created_at']);
+      applyTableDefaults(table);
     });
   }
 
@@ -82,12 +83,11 @@ export async function up(knex) {
         .defaultTo('internal');
       table.boolean('sensitive').notNullable().defaultTo(false);
       table.json('metadata');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.unique(['key', 'environment_scope']);
       table.index(['environment_scope', 'exposure_level']);
+      applyTableDefaults(table);
     });
   }
 

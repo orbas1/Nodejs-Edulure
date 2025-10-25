@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 const RISK_TABLE = 'security_risk_register';
 const REVIEW_TABLE = 'security_risk_reviews';
@@ -10,7 +11,7 @@ function timestampWithAutoUpdate(knex, table, column = 'updated_at') {
   table
     .timestamp(column)
     .notNullable()
-    .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+    .defaultTo(updatedAtDefault(knex));
 }
 
 export async function up(knex) {

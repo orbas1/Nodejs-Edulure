@@ -16,12 +16,14 @@ export function isPostgres(knex) {
 }
 
 export function jsonDefault(knex, fallback = '{}') {
+  const serialised = typeof fallback === 'string' ? fallback : JSON.stringify(fallback);
+
   if (isPostgres(knex)) {
-    return knex.raw('?::jsonb', [fallback]);
+    return knex.raw('?::jsonb', [serialised]);
   }
 
   if (isMysql(knex)) {
-    const raw = knex.raw('(CAST(? AS JSON))', [fallback]);
+    const raw = knex.raw('(CAST(? AS JSON))', [serialised]);
     const wrapper = () => raw.toQuery();
     Object.assign(wrapper, raw, {
       isRawInstance: true,
@@ -31,7 +33,7 @@ export function jsonDefault(knex, fallback = '{}') {
     return wrapper;
   }
 
-  return knex.raw('?', [fallback]);
+  return serialised;
 }
 
 export async function ensureUuidExtension(knex) {
@@ -150,6 +152,10 @@ export async function addCheckConstraint(knex, tableName, constraintName, expres
     return;
   }
 
+  if (!isMysql(knex) && !isPostgres(knex)) {
+    return;
+  }
+
   await knex.raw(`ALTER TABLE ?? ADD CONSTRAINT ?? CHECK (${expression})`, [tableName, constraintName]);
 }
 
@@ -160,6 +166,10 @@ export async function dropCheckConstraint(knex, tableName, constraintName) {
 
   if (isMysql(knex)) {
     await knex.raw('ALTER TABLE ?? DROP CHECK ??', [tableName, constraintName]);
+    return;
+  }
+
+  if (!isPostgres(knex)) {
     return;
   }
 

@@ -25,6 +25,7 @@ const incidentEncryptionKey = process.env.SECURITY_INCIDENT_ENCRYPTION_KEY
   : crypto.createHash('sha256').update('edulure-security-seed-key').digest();
 const seedEnvironment = getEnvironmentDescriptor();
 const createEnvironmentColumns = () => ({ ...buildEnvironmentColumns(seedEnvironment) });
+const seedRunTimestampIso = new Date().toISOString();
 
 const sealSensitive = (value) => {
   if (!value) {
@@ -762,7 +763,7 @@ export async function seed(knex) {
         }
       },
       momentum: {
-        lastActivityAt: nowIso,
+        lastActivityAt: seedRunTimestampIso,
         boost: 12,
         recencyWindowDays: 35,
         trailing30Days: {
@@ -789,7 +790,7 @@ export async function seed(knex) {
           role: 'VP Learning Ops, Aurora',
           rating: 5,
           comment: 'Runbooks, escalation drills, and monetisation guardrails in one place.',
-          publishedAt: nowIso
+          publishedAt: seedRunTimestampIso
         },
         {
           id: 'ops-review-2',
@@ -797,12 +798,12 @@ export async function seed(knex) {
           role: 'Director of Enablement, Alloy',
           rating: 5,
           comment: 'The automation labs and weekly war room keep launches resilient.',
-          publishedAt: nowIso
+          publishedAt: seedRunTimestampIso
         }
       ],
       membershipMap: {
         totalCountries: 18,
-        lastUpdatedAt: nowIso,
+        lastUpdatedAt: seedRunTimestampIso,
         clusters: [
           { region: 'North America', percentage: 0.38, change: '+3.8%' },
           { region: 'EMEA', percentage: 0.31, change: '+2.1%' },
@@ -953,7 +954,7 @@ export async function seed(knex) {
         }
       },
       momentum: {
-        lastActivityAt: nowIso,
+        lastActivityAt: seedRunTimestampIso,
         boost: 18,
         recencyWindowDays: 30,
         trailing30Days: {
@@ -980,12 +981,12 @@ export async function seed(knex) {
           role: 'Growth Lead, Nova',
           rating: 5,
           comment: 'Campaign retros and benchmark dashboards make optimisation effortless.',
-          publishedAt: nowIso
+          publishedAt: seedRunTimestampIso
         }
       ],
       membershipMap: {
         totalCountries: 22,
-        lastUpdatedAt: nowIso,
+        lastUpdatedAt: seedRunTimestampIso,
         clusters: [
           { region: 'North America', percentage: 0.34, change: '+4.1%' },
           { region: 'EMEA', percentage: 0.27, change: '+1.9%' },
@@ -1771,7 +1772,7 @@ export async function seed(knex) {
       contactEmail: 'amina.diallo@edulure.test',
       tags: ['Automation', 'Playbooks', 'Escalations'],
       recommended: true,
-      lastActiveAt: nowIso,
+      lastActiveAt: seedRunTimestampIso,
       avatarUrl: adminAvatar.url
     };
     const opsLearnerMemberMetadata = {
@@ -1781,7 +1782,7 @@ export async function seed(knex) {
       contactEmail: 'noemi.carvalho@edulure.test',
       tags: ['QA', 'Telemetry'],
       recommended: true,
-      lastActiveAt: nowIso,
+      lastActiveAt: seedRunTimestampIso,
       avatarUrl: learnerAvatar.url
     };
     const growthModeratorMetadata = {
@@ -1791,7 +1792,7 @@ export async function seed(knex) {
       contactEmail: 'kai.watanabe@edulure.test',
       tags: ['Attribution', 'Paid media'],
       recommended: true,
-      lastActiveAt: nowIso,
+      lastActiveAt: seedRunTimestampIso,
       avatarUrl: instructorAvatar.url
     };
     const growthMemberMetadata = {
@@ -1801,7 +1802,7 @@ export async function seed(knex) {
       contactEmail: 'noemi.carvalho@edulure.test',
       tags: ['Benchmarks', 'Affiliates'],
       recommended: false,
-      lastActiveAt: nowIso,
+      lastActiveAt: seedRunTimestampIso,
       avatarUrl: learnerAvatar.url
     };
 
@@ -3399,7 +3400,6 @@ export async function seed(knex) {
 
     const notificationQueueInserts = [];
     const jobStateInserts = [];
-    const nowIso = new Date().toISOString();
 
     for (const row of seededReminderRows) {
       let reminderMetadata = {};
@@ -6133,7 +6133,7 @@ export async function seed(knex) {
       }
     ]);
 
-    const previewDigestUpdatedAt = nowIso;
+    const previewDigestUpdatedAt = seedRunTimestampIso;
     const previewDigestCourses = [
       {
         id: String(opsAutomationCourseId),

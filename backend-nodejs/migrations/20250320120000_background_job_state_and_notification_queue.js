@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 const JOB_STATE_TABLE = 'background_job_states';
 const NOTIFICATION_QUEUE_TABLE = 'notification_dispatch_queue';
@@ -17,7 +18,7 @@ export async function up(knex) {
       table
         .timestamp('updated_at')
         .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
 
       table.unique(['job_key', 'state_key'], 'background_job_states_unique_key');
       table.index(['job_key'], 'background_job_states_job_key_idx');
@@ -62,7 +63,7 @@ export async function up(knex) {
       table
         .timestamp('updated_at')
         .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
 
       table.unique(['dedupe_key'], 'notification_dispatch_queue_dedupe_idx');
       table.index(['status', 'available_at'], 'notification_dispatch_queue_status_available_idx');

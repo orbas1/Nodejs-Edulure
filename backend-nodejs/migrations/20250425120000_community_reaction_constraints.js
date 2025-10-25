@@ -19,9 +19,21 @@ async function ensureUnique(trx, tableName, columns, constraintName) {
   if (await constraintExists(trx, tableName, constraintName)) {
     return;
   }
-  await trx.schema.alterTable(tableName, (table) => {
-    table.unique(columns, constraintName);
-  });
+  try {
+    await trx.schema.alterTable(tableName, (table) => {
+      table.unique(columns, constraintName);
+    });
+  } catch (error) {
+    const message = String(error?.message ?? '').toLowerCase();
+    const code = String(error?.code ?? '').toLowerCase();
+    if (
+      !message.includes('already exists') &&
+      !message.includes('duplicate') &&
+      !code.includes('er_dup_key')
+    ) {
+      throw error;
+    }
+  }
 }
 
 export async function up(knex) {

@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 
 const BILLING_INTERVALS = ['monthly', 'quarterly', 'annual', 'lifetime'];
 const SUBSCRIPTION_STATUSES = ['incomplete', 'trialing', 'active', 'past_due', 'canceled', 'expired'];
@@ -36,7 +37,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['community_id', 'user_id']);
       table.unique(['referral_code']);
       table.index(['community_id', 'status']);
@@ -68,7 +69,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['community_id', 'role_key']);
       table.index(['community_id', 'is_default_assignable'], 'community_role_assignable_idx');
     });
@@ -100,7 +101,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['community_id', 'slug']);
       table.index(['community_id', 'is_active']);
     });
@@ -159,7 +160,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['public_id']);
       table.index(['community_id', 'status']);
       table.index(['user_id', 'status']);
@@ -187,7 +188,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.index(['affiliate_id', 'status']);
     });
   }

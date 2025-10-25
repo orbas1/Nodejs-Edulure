@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 const JSON_EMPTY_OBJECT = (knex) => jsonDefault(knex, {});
 const JSON_EMPTY_ARRAY = (knex) => jsonDefault(knex, []);
 
@@ -32,7 +33,7 @@ export async function up(knex) {
     table
       .timestamp('updated_at')
       .notNullable()
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      .defaultTo(updatedAtDefault(knex));
 
     table.unique(['public_id']);
     table.index(
@@ -62,7 +63,7 @@ export async function up(knex) {
     table
       .timestamp('updated_at')
       .notNullable()
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      .defaultTo(updatedAtDefault(knex));
 
     table.unique(['event_uuid']);
     table.index(['event_type', 'status'], 'integration_webhook_events_type_status_idx');
@@ -106,7 +107,7 @@ export async function up(knex) {
     table
       .timestamp('updated_at')
       .notNullable()
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      .defaultTo(updatedAtDefault(knex));
 
     table.unique(['delivery_uuid']);
     table.index(['status', 'next_attempt_at'], 'integration_webhook_deliveries_status_next_idx');

@@ -1,21 +1,5 @@
+import { applyTableDefaults, updatedAtDefault } from './_helpers/tableDefaults.js';
 import { jsonDefault } from './_helpers/utils.js';
-
-const DEFAULT_CHARSET = 'utf8mb4';
-const DEFAULT_COLLATION = 'utf8mb4_unicode_ci';
-
-const applyTableDefaults = (table) => {
-  if (typeof table.engine === 'function') {
-    table.engine('InnoDB');
-  }
-
-  if (typeof table.charset === 'function') {
-    table.charset(DEFAULT_CHARSET);
-  }
-
-  if (typeof table.collate === 'function') {
-    table.collate(DEFAULT_COLLATION);
-  }
-};
 
 const ensureJsonColumn = (table, columnName, knex, { nullable = false, defaultValue = {} } = {}) => {
   const column = table.specificType(columnName, 'json');
@@ -62,10 +46,7 @@ export async function up(knex) {
     ensureJsonColumn(table, 'metadata', knex, { defaultValue: {} });
     table.timestamp('recorded_at').notNullable().defaultTo(knex.fn.now());
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-    table
-      .timestamp('updated_at')
-      .notNullable()
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+    table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
 
     table.unique(['environment_name'], 'environment_descriptors_unique');
     table.index(['aws_region'], 'environment_descriptors_region_idx');

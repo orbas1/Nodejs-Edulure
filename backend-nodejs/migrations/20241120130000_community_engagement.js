@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 import {
   COMMUNITY_EVENT_PARTICIPANT_STATUSES,
   COMMUNITY_EVENT_REMINDER_STATUSES
@@ -35,7 +36,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['community_id', 'user_id']);
       table.index(['community_id', 'points']);
       table.index(['community_id', 'tier']);
@@ -105,7 +106,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['community_id', 'user_id']);
       table.index(['community_id', 'current_streak_days']);
     });
@@ -154,7 +155,7 @@ export async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        .defaultTo(updatedAtDefault(knex));
       table.unique(['community_id', 'slug']);
       table.index(['community_id', 'start_at']);
       table.index(['community_id', 'status']);

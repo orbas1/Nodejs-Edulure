@@ -1,4 +1,5 @@
 import { jsonDefault } from './_helpers/utils.js';
+import { updatedAtDefault } from './_helpers/tableDefaults.js';
 const TABLE_NAME = 'domain_event_dispatch_queue';
 
 const STATUS_ENUM = [
@@ -59,7 +60,7 @@ export async function up(knex) {
     table
       .timestamp('updated_at')
       .notNullable()
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      .defaultTo(updatedAtDefault(knex));
 
     table.index(['status', 'available_at'], 'dedq_status_available_idx');
     table.index(['locked_by', 'locked_at'], 'dedq_lock_idx');

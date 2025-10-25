@@ -1,3 +1,7 @@
+const MYSQL_REGEX = /mysql/i;
+
+const isMySqlClient = (knex) => MYSQL_REGEX.test(knex?.client?.config?.client ?? '');
+
 export async function up(knex) {
   const communicationsTable = 'support_operations_communications';
   const notificationPoliciesTable = 'support_notification_policies';
@@ -14,11 +18,13 @@ export async function up(knex) {
 
   const hasNotificationPoliciesTable = await knex.schema.hasTable(notificationPoliciesTable);
   if (hasNotificationPoliciesTable) {
-    await knex.schema.raw(
-      `ALTER TABLE ${notificationPoliciesTable}
-        MODIFY COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`
-    );
+    if (isMySqlClient(knex)) {
+      await knex.schema.raw(
+        `ALTER TABLE ${notificationPoliciesTable}
+          MODIFY COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`
+      );
+    }
     await knex(notificationPoliciesTable).update({ updated_at: knex.fn.now() });
   }
 }
@@ -38,7 +44,7 @@ export async function down(knex) {
   }
 
   const hasNotificationPoliciesTable = await knex.schema.hasTable(notificationPoliciesTable);
-  if (hasNotificationPoliciesTable) {
+  if (hasNotificationPoliciesTable && isMySqlClient(knex)) {
     await knex.schema.raw(
       `ALTER TABLE ${notificationPoliciesTable}
         MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

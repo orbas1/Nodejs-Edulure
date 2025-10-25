@@ -55,8 +55,16 @@ const VIEWS = [
 ];
 
 export async function up(knex) {
+  const client = String(knex?.client?.config?.client ?? '').toLowerCase();
+  const supportsOrReplace = !client.includes('sqlite');
   for (const view of VIEWS) {
-    await knex.raw(view.definition);
+    if (!supportsOrReplace) {
+      await knex.raw(`DROP VIEW IF EXISTS ${view.name}`);
+    }
+    const definition = supportsOrReplace
+      ? view.definition
+      : view.definition.replace('CREATE OR REPLACE VIEW', 'CREATE VIEW');
+    await knex.raw(definition);
   }
 }
 

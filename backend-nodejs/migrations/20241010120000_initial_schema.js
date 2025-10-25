@@ -1,21 +1,5 @@
+import { applyTableDefaults, updatedAtDefault } from './_helpers/tableDefaults.js';
 import { jsonDefault } from './_helpers/utils.js';
-
-const DEFAULT_CHARSET = 'utf8mb4';
-const DEFAULT_COLLATION = 'utf8mb4_unicode_ci';
-
-const applyTableDefaults = (table) => {
-  if (typeof table.engine === 'function') {
-    table.engine('InnoDB');
-  }
-
-  if (typeof table.charset === 'function') {
-    table.charset(DEFAULT_CHARSET);
-  }
-
-  if (typeof table.collate === 'function') {
-    table.collate(DEFAULT_COLLATION);
-  }
-};
 
 const ensureJsonColumn = (table, columnName, knex, { nullable = false, defaultValue = {} } = {}) => {
   const column = table.specificType(columnName, 'json');
@@ -45,10 +29,7 @@ export async function up(knex) {
       table.integer('age').unsigned();
       table.string('address', 255);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.index(['role'], 'idx_users_role');
       applyTableDefaults(table);
     });
@@ -72,10 +53,7 @@ export async function up(knex) {
       table.enum('visibility', ['public', 'private']).notNullable().defaultTo('public');
       ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.timestamp('deleted_at').nullable();
       table.index(['owner_id'], 'idx_communities_owner');
       table.index(['slug'], 'idx_communities_slug');
@@ -105,10 +83,7 @@ export async function up(knex) {
       table.enum('role', ['owner', 'admin', 'moderator', 'member']).notNullable().defaultTo('member');
       table.enum('status', ['active', 'pending', 'banned']).notNullable().defaultTo('active');
       table.timestamp('joined_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.timestamp('left_at');
       table.unique(['community_id', 'user_id'], 'community_members_unique_user');
       table.index(['user_id', 'status'], 'idx_community_members_user_status');
@@ -166,10 +141,7 @@ export async function up(knex) {
       table.timestamp('location_updated_at');
       ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.index(['status'], 'idx_field_service_providers_status');
       table.index(['user_id'], 'idx_field_service_providers_user');
       table.index(['location_updated_at'], 'idx_field_service_providers_location_updated');
@@ -215,10 +187,7 @@ export async function up(knex) {
       table.string('country', 2).notNullable().defaultTo('GB');
       ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.index(['status'], 'idx_field_service_orders_status');
       table.index(['customer_user_id'], 'idx_field_service_orders_customer');
       table.index(['provider_id'], 'idx_field_service_orders_provider');

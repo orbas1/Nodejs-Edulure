@@ -1,6 +1,35 @@
 import { jsonDefault } from './_helpers/utils.js';
 
+const SQLITE_REGEX = /sqlite/i;
+
+const COMMUNITY_ENGAGEMENT_VIEW_SQL = `
+  CREATE VIEW reporting_community_engagement_daily AS
+  SELECT
+    DATE(p.published_at) AS reporting_date,
+    p.community_id,
+    COUNT(*) AS published_posts,
+    SUM(p.comment_count) AS comment_count,
+    SUM(COALESCE(JSON_LENGTH(p.tags), 0)) AS tag_applications,
+    SUM(CASE WHEN p.visibility = 'public' THEN 1 ELSE 0 END) AS public_posts,
+    SUM(CASE WHEN p.post_type = 'event' THEN 1 ELSE 0 END) AS event_posts
+  FROM community_posts p
+  WHERE p.published_at IS NOT NULL
+  GROUP BY DATE(p.published_at), p.community_id
+`;
+
+const isSqliteClient = (knex) => SQLITE_REGEX.test(String(knex?.client?.config?.client ?? ''));
+
+async function recreateCommunityEngagementView(knex) {
+  await knex.raw('DROP VIEW IF EXISTS reporting_community_engagement_daily');
+  await knex.raw(COMMUNITY_ENGAGEMENT_VIEW_SQL);
+}
+
 export async function up(knex) {
+  const useSqliteStrategy = isSqliteClient(knex);
+  if (useSqliteStrategy) {
+    await knex.raw('DROP VIEW IF EXISTS reporting_community_engagement_daily');
+  }
+
   const hasMediaAssetColumn = await knex.schema.hasColumn('community_posts', 'media_asset_id');
   if (!hasMediaAssetColumn) {
     await knex.schema.alterTable('community_posts', (table) => {
@@ -50,9 +79,18 @@ export async function up(knex) {
       table.index(['experiment_id']);
     });
   }
+
+  if (useSqliteStrategy) {
+    await recreateCommunityEngagementView(knex);
+  }
 }
 
 export async function down(knex) {
+  const useSqliteStrategy = isSqliteClient(knex);
+  if (useSqliteStrategy) {
+    await knex.raw('DROP VIEW IF EXISTS reporting_community_engagement_daily');
+  }
+
   const hasImpressionsTable = await knex.schema.hasTable('community_feed_impressions');
   if (hasImpressionsTable) {
     await knex.schema.dropTable('community_feed_impressions');
@@ -70,5 +108,9 @@ export async function down(knex) {
       table.dropColumn('pinned_at');
       table.dropColumn('preview_metadata');
     });
+  }
+
+  if (useSqliteStrategy) {
+    await recreateCommunityEngagementView(knex);
   }
 }

@@ -35,6 +35,11 @@ export async function up(knex) {
     return;
   }
 
+  const client = String(knex?.client?.config?.client ?? '').toLowerCase();
+  if (client.includes('sqlite')) {
+    return;
+  }
+
   await knex.schema.alterTable('payment_intents', (table) => {
     table.enum('provider', ['stripe', 'paypal', 'escrow']).notNullable().alter();
   });
@@ -65,6 +70,11 @@ export async function down(knex) {
       );
       await trx.raw('DROP TYPE payment_intents_provider_old');
     });
+    return;
+  }
+
+  const client = String(knex?.client?.config?.client ?? '').toLowerCase();
+  if (client.includes('sqlite')) {
     return;
   }
 

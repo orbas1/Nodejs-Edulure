@@ -1,21 +1,5 @@
+import { applyTableDefaults, updatedAtDefault } from './_helpers/tableDefaults.js';
 import { jsonDefault } from './_helpers/utils.js';
-
-const DEFAULT_CHARSET = 'utf8mb4';
-const DEFAULT_COLLATION = 'utf8mb4_unicode_ci';
-
-const applyTableDefaults = (table) => {
-  if (typeof table.engine === 'function') {
-    table.engine('InnoDB');
-  }
-
-  if (typeof table.charset === 'function') {
-    table.charset(DEFAULT_CHARSET);
-  }
-
-  if (typeof table.collate === 'function') {
-    table.collate(DEFAULT_COLLATION);
-  }
-};
 
 const ensureJsonColumn = (table, columnName, knex, { nullable = false, defaultValue = {} } = {}) => {
   const column = table.specificType(columnName, 'json');
@@ -63,10 +47,7 @@ export async function up(knex) {
       table.timestamp('published_at');
       ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.timestamp('deleted_at');
       table.index(['type', 'status'], 'idx_content_assets_type_status');
       table.index(['created_by'], 'idx_content_assets_created_by');
@@ -98,10 +79,7 @@ export async function up(knex) {
       table.text('last_error');
       ensureJsonColumn(table, 'result_metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.timestamp('started_at');
       table.timestamp('completed_at');
       table.index(['status', 'created_at'], 'idx_asset_ingestion_jobs_status_created_at');
@@ -128,10 +106,7 @@ export async function up(knex) {
       table.bigInteger('size_bytes');
       ensureJsonColumn(table, 'metadata', knex);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.unique(['asset_id', 'format']);
       table.index(['asset_id'], 'idx_asset_conversion_outputs_asset');
       applyTableDefaults(table);
@@ -160,10 +135,7 @@ export async function up(knex) {
       table.string('last_location', 255);
       table.integer('time_spent_seconds').unsigned().defaultTo(0);
       table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .notNullable()
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('updated_at').notNullable().defaultTo(updatedAtDefault(knex));
       table.unique(['asset_id', 'user_id'], 'ebook_progress_unique_user_asset');
       table.index(['asset_id', 'updated_at'], 'idx_ebook_progress_asset_updated');
       applyTableDefaults(table);

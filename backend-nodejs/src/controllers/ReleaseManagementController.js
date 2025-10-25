@@ -115,9 +115,10 @@ function handleValidationError(error, next) {
     error.details = Array.isArray(error.details)
       ? error.details.map((detail) => detail.message)
       : error.details;
-    return next(error);
+    next(error);
+    return true;
   }
-  return null;
+  return false;
 }
 
 export default class ReleaseManagementController {

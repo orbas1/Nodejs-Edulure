@@ -403,7 +403,7 @@ function definePartitionArchiveTable(table, knex) {
 
 async function applyPartitioning(knex, tableName, dateColumn) {
   const dialect = resolveDialect(knex);
-  if (dialect.includes('mysql')) {
+  if (!dialect.includes('mysql')) {
     return;
   }
 

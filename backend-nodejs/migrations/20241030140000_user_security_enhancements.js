@@ -1,6 +1,16 @@
+import { applyTableDefaults } from './_helpers/tableDefaults.js';
+
+const MYSQL_REGEX = /mysql/i;
+
+const isMySqlClient = (knex) => MYSQL_REGEX.test(knex?.client?.config?.client ?? '');
+
 let cachedDatabaseName;
 
 const getDatabaseName = async (knex) => {
+  if (!isMySqlClient(knex)) {
+    return null;
+  }
+
   if (cachedDatabaseName) {
     return cachedDatabaseName;
   }
@@ -11,6 +21,10 @@ const getDatabaseName = async (knex) => {
 };
 
 const indexExists = async (knex, tableName, indexName) => {
+  if (!isMySqlClient(knex)) {
+    return false;
+  }
+
   const database = await getDatabaseName(knex);
   const [rows] = await knex.raw(
     `SELECT COUNT(1) AS count
@@ -23,6 +37,10 @@ const indexExists = async (knex, tableName, indexName) => {
 };
 
 const ensureIndex = async (knex, tableName, indexName, columns) => {
+  if (!isMySqlClient(knex)) {
+    return false;
+  }
+
   if (await indexExists(knex, tableName, indexName)) {
     return false;
   }
@@ -34,6 +52,10 @@ const ensureIndex = async (knex, tableName, indexName, columns) => {
 };
 
 const dropIndexIfExists = async (knex, tableName, indexName) => {
+  if (!isMySqlClient(knex)) {
+    return false;
+  }
+
   if (!(await indexExists(knex, tableName, indexName))) {
     return false;
   }
@@ -44,31 +66,19 @@ const dropIndexIfExists = async (knex, tableName, indexName) => {
   return true;
 };
 
-const applyTableDefaults = (table) => {
-  if (typeof table.engine === 'function') {
-    table.engine('InnoDB');
-  }
-
-  if (typeof table.charset === 'function') {
-    table.charset('utf8mb4');
-  }
-
-  if (typeof table.collate === 'function') {
-    table.collate('utf8mb4_unicode_ci');
-  }
-};
-
 export async function up(knex) {
   const hasUsersTable = await knex.schema.hasTable('users');
   if (!hasUsersTable) {
     return;
   }
 
+  const mysqlClient = isMySqlClient(knex);
+
   const ensureColumn = async (columnName, definition, options = {}) => {
     const exists = await knex.schema.hasColumn('users', columnName);
     if (!exists) {
       await knex.schema.alterTable('users', (table) => {
-        definition(table);
+        definition(table, mysqlClient);
         if (options.index) {
           const { columns = [columnName], indexName } = options.index;
           table.index(columns, indexName ?? `idx_users_${columns.join('_')}`);
@@ -87,76 +97,106 @@ export async function up(knex) {
 
   await ensureColumn(
     'email_verified_at',
-    (table) => {
-      table.timestamp('email_verified_at').nullable().after('email');
+    (table, isMySql) => {
+      const column = table.timestamp('email_verified_at').nullable();
+      if (isMySql && typeof column.after === 'function') {
+        column.after('email');
+      }
     },
     { index: { indexName: 'idx_users_email_verified_at' } }
   );
 
-  await ensureColumn('failed_login_attempts', (table) => {
-    table
+  await ensureColumn('failed_login_attempts', (table, isMySql) => {
+    const column = table
       .integer('failed_login_attempts')
       .unsigned()
       .notNullable()
-      .defaultTo(0)
-      .after('password_hash');
+      .defaultTo(0);
+    if (isMySql && typeof column.after === 'function') {
+      column.after('password_hash');
+    }
   });
 
-  await ensureColumn('last_failed_login_at', (table) => {
-    table.timestamp('last_failed_login_at').nullable().after('failed_login_attempts');
+  await ensureColumn('last_failed_login_at', (table, isMySql) => {
+    const column = table.timestamp('last_failed_login_at').nullable();
+    if (isMySql && typeof column.after === 'function') {
+      column.after('failed_login_attempts');
+    }
   });
 
   await ensureColumn(
     'locked_until',
-    (table) => {
-      table.timestamp('locked_until').nullable().after('last_failed_login_at');
+    (table, isMySql) => {
+      const column = table.timestamp('locked_until').nullable();
+      if (isMySql && typeof column.after === 'function') {
+        column.after('last_failed_login_at');
+      }
     },
     { index: { indexName: 'idx_users_locked_until' } }
   );
 
   await ensureColumn(
     'last_login_at',
-    (table) => {
-      table.timestamp('last_login_at').nullable().after('locked_until');
+    (table, isMySql) => {
+      const column = table.timestamp('last_login_at').nullable();
+      if (isMySql && typeof column.after === 'function') {
+        column.after('locked_until');
+      }
     },
     { index: { indexName: 'idx_users_last_login_at' } }
   );
 
-  await ensureColumn('password_changed_at', (table) => {
-    table.timestamp('password_changed_at').nullable().after('last_login_at');
+  await ensureColumn('password_changed_at', (table, isMySql) => {
+    const column = table.timestamp('password_changed_at').nullable();
+    if (isMySql && typeof column.after === 'function') {
+      column.after('last_login_at');
+    }
   });
 
-  await ensureColumn('last_verification_sent_at', (table) => {
-    table.timestamp('last_verification_sent_at').nullable().after('password_changed_at');
+  await ensureColumn('last_verification_sent_at', (table, isMySql) => {
+    const column = table.timestamp('last_verification_sent_at').nullable();
+    if (isMySql && typeof column.after === 'function') {
+      column.after('password_changed_at');
+    }
   });
 
   await ensureColumn(
     'two_factor_enabled',
-    (table) => {
-      table
+    (table, isMySql) => {
+      const column = table
         .boolean('two_factor_enabled')
         .notNullable()
-        .defaultTo(false)
-        .after('address');
+        .defaultTo(false);
+      if (isMySql && typeof column.after === 'function') {
+        column.after('address');
+      }
     },
     { index: { indexName: 'idx_users_two_factor_enabled' } }
   );
 
-  await ensureColumn('two_factor_secret', (table) => {
-    table
+  await ensureColumn('two_factor_secret', (table, isMySql) => {
+    const column = table
       .specificType('two_factor_secret', 'varbinary(255)')
-      .nullable()
-      .after('two_factor_enabled');
+      .nullable();
+    if (isMySql && typeof column.after === 'function') {
+      column.after('two_factor_enabled');
+    }
   });
 
-  await ensureColumn('two_factor_enrolled_at', (table) => {
-    table.timestamp('two_factor_enrolled_at').nullable().after('two_factor_secret');
+  await ensureColumn('two_factor_enrolled_at', (table, isMySql) => {
+    const column = table.timestamp('two_factor_enrolled_at').nullable();
+    if (isMySql && typeof column.after === 'function') {
+      column.after('two_factor_secret');
+    }
   });
 
   await ensureColumn(
     'two_factor_last_verified_at',
-    (table) => {
-      table.timestamp('two_factor_last_verified_at').nullable().after('two_factor_enrolled_at');
+    (table, isMySql) => {
+      const column = table.timestamp('two_factor_last_verified_at').nullable();
+      if (isMySql && typeof column.after === 'function') {
+        column.after('two_factor_enrolled_at');
+      }
     },
     { index: { indexName: 'idx_users_two_factor_last_verified' } }
   );
@@ -218,8 +258,10 @@ export async function down(knex) {
     'idx_users_two_factor_last_verified'
   ];
 
-  for (const indexName of indexNames) {
-    await dropIndexIfExists(knex, 'users', indexName);
+  if (isMySqlClient(knex)) {
+    for (const indexName of indexNames) {
+      await dropIndexIfExists(knex, 'users', indexName);
+    }
   }
 
   for (const column of columnNames) {
