@@ -2,6 +2,7 @@ import Joi from 'joi';
 
 import releaseOrchestrationService from '../services/ReleaseOrchestrationService.js';
 import { success } from '../utils/httpResponse.js';
+import { normalizeReleaseEnvironmentName } from '../utils/releaseEnvironment.js';
 
 const paginationSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(200).default(25),
@@ -77,10 +78,44 @@ const scheduleRunSchema = Joi.object({
   versionTag: Joi.string().trim().min(1).max(120).required(),
   environment: Joi.string()
     .trim()
-    .lowercase()
-    .pattern(/^[a-z][a-z0-9-]{1,31}$/)
+    .custom((value, helpers) => {
+      const normalised = normalizeReleaseEnvironmentName(value);
+
+      if (!normalised) {
+        return helpers.error('any.invalid', {
+          message: 'environment must contain at least one alphanumeric character'
+        });
+      }
+
+      if (!/^[a-z]/.test(normalised)) {
+        return helpers.error('string.pattern.base', {
+          message: 'environment must start with a letter after normalisation'
+        });
+      }
+
+      if (normalised.length < 2) {
+        return helpers.error('string.min', { limit: 2 });
+      }
+
+      if (normalised.length > 32) {
+        return helpers.error('string.max', { limit: 32 });
+      }
+
+      if (!/^[a-z][a-z0-9-]*$/.test(normalised)) {
+        return helpers.error('string.pattern.base', {
+          message: 'environment may only include letters, numbers, or hyphen separators after normalisation'
+        });
+      }
+
+      return normalised;
+    }, 'environment normaliser')
     .required()
-    .messages({ 'string.pattern.base': 'environment must be a lowercase identifier without spaces' }),
+    .messages({
+      'any.invalid': 'environment must contain at least one alphanumeric character',
+      'string.min': 'environment must be at least 2 characters once normalised',
+      'string.max': 'environment must be at most 32 characters once normalised',
+      'string.pattern.base': 'environment must start with a letter and may only contain letters, numbers, or hyphens'
+    }),
   initiatedByEmail: Joi.string().trim().email().required(),
   initiatedByName: Joi.string().trim().max(160).allow(null, '').optional(),
   changeWindowStart: Joi.date().iso().optional(),

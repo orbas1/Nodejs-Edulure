@@ -46,6 +46,26 @@ function getTableQuery(connection = db) {
   throw new TypeError('Invalid database connection provided to SetupRunModel');
 }
 
+function isMissingTableError(error) {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === 'SQLITE_ERROR' && /no such table/i.test(error.message ?? '')) {
+    return true;
+  }
+
+  if (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146) {
+    return true;
+  }
+
+  return false;
+}
+
+function isConnectionInvocationError(error) {
+  return error instanceof TypeError && /is not a function/i.test(error?.message ?? '');
+}
+
 function resolveNow(connection) {
   const nowFn = connection?.fn?.now ?? db.fn?.now;
   if (typeof nowFn === 'function') {
@@ -175,11 +195,18 @@ export default class SetupRunModel {
   }
 
   static async listRecent(limit = 10, connection = db) {
-    const rows = await getTableQuery(connection)
-      .select(BASE_COLUMNS)
-      .orderBy('created_at', 'desc')
-      .limit(Math.max(1, Math.min(50, Number(limit) || 10)));
-    return rows.map(deserialize);
+    try {
+      const rows = await getTableQuery(connection)
+        .select(BASE_COLUMNS)
+        .orderBy('created_at', 'desc')
+        .limit(Math.max(1, Math.min(50, Number(limit) || 10)));
+      return rows.map(deserialize);
+    } catch (error) {
+      if (isMissingTableError(error) || isConnectionInvocationError(error)) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   static async findLatest(connection = db) {

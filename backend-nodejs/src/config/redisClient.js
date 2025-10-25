@@ -54,11 +54,17 @@ export function createRedisClient(configuration = env.redis, log = redisLogger) 
 
   instance.on('error', (error) => {
     const now = Date.now();
+    const isConnectionRefused = error?.code === 'ECONNREFUSED';
+    const logMethod = isConnectionRefused ? 'warn' : 'error';
+    const message = isConnectionRefused
+      ? 'Redis connection unavailable (non-fatal)'
+      : 'Redis connection error';
+
     if (now - lastErrorLoggedAt > ERROR_LOG_THROTTLE_MS) {
-      log.error({ err: error }, 'Redis connection error');
+      log[logMethod]({ err: error }, message);
       lastErrorLoggedAt = now;
     } else {
-      log.debug({ err: error }, 'Redis connection error (suppressed)');
+      log.debug({ err: error }, `${message} (suppressed)`);
     }
   });
 
