@@ -5,17 +5,26 @@ import logger from '../config/logger.js';
 
 let sharedTransporter = null;
 
+function resolveMailConfig() {
+  const mailConfig = env.mail ?? {};
+  const host = mailConfig.smtpHost ?? 'localhost';
+  const port = Number(mailConfig.smtpPort ?? 587);
+  const secure = Boolean(mailConfig.smtpSecure);
+  const user = mailConfig.smtpUser ?? null;
+  const pass = mailConfig.smtpPassword ?? null;
+
+  const transport = { host, port, secure };
+
+  if (user && pass) {
+    transport.auth = { user, pass };
+  }
+
+  return transport;
+}
+
 function getTransporter() {
   if (!sharedTransporter) {
-    sharedTransporter = nodemailer.createTransport({
-      host: env.mail.smtpHost,
-      port: env.mail.smtpPort,
-      secure: env.mail.smtpSecure,
-      auth: {
-        user: env.mail.smtpUser,
-        pass: env.mail.smtpPassword
-      }
-    });
+    sharedTransporter = nodemailer.createTransport(resolveMailConfig());
   }
 
   return sharedTransporter;
@@ -127,10 +136,11 @@ export class MailService {
   }
 
   async sendMail(message) {
+    const mailConfig = env.mail ?? {};
     const mail = {
       from: {
-        name: env.mail.fromName,
-        address: env.mail.fromEmail
+        name: mailConfig.fromName ?? 'Edulure',
+        address: mailConfig.fromEmail ?? 'no-reply@edulure.local'
       },
       ...message
     };
@@ -159,7 +169,9 @@ export class MailService {
   }
 
   async sendEmailVerification({ to, name, token, expiresAt }) {
-    const verificationUrl = new URL(env.mail.verificationBaseUrl);
+    const mailConfig = env.mail ?? {};
+    const verificationBase = mailConfig.verificationBaseUrl ?? 'https://edulure.local/email/verify';
+    const verificationUrl = new URL(verificationBase);
     verificationUrl.searchParams.set('token', token);
 
     return this.sendMail({
