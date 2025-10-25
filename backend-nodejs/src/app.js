@@ -72,6 +72,32 @@ const STRIPE_WEBHOOK_VERSIONED_ROUTE = `${VERSIONED_API_BASE_PATH}${STRIPE_WEBHO
 
 const app = express();
 
+const isReleaseReadinessProbe = (req) => {
+  if (!req) {
+    return false;
+  }
+
+  const header = req.headers?.['x-release-check'];
+  return typeof header === 'string' && header.toLowerCase() === 'load-probe';
+};
+
+const normaliseRequestPath = (req) => {
+  if (!req) {
+    return '';
+  }
+
+  const url = req.originalUrl ?? req.url ?? '';
+  return typeof url === 'string' ? url.split('?')[0] : '';
+};
+
+const shouldSuppressProbeLogging = (req) => {
+  if (!req) {
+    return false;
+  }
+
+  return normaliseRequestPath(req) === '/health' && isReleaseReadinessProbe(req);
+};
+
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
@@ -93,6 +119,11 @@ app.use(
     logger,
     genReqId: (req) => req.id ?? randomUUID(),
     customLogLevel: (res, err) => {
+      const req = res?.req ?? res?.raw?.req;
+      if (!err && shouldSuppressProbeLogging(req)) {
+        return 'debug';
+      }
+
       if (err || res.statusCode >= 500) {
         return 'error';
       }
@@ -109,7 +140,8 @@ app.use(
       };
     },
     autoLogging: {
-      ignorePaths: ['/health']
+      ignorePaths: ['/health'],
+      ignore: (req) => shouldSuppressProbeLogging(req)
     }
   })
 );

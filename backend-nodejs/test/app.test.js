@@ -2,6 +2,8 @@ import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
+const pinoHttpMock = vi.fn(() => (_req, _res, next) => next());
+
 const envMock = {
   security: {
     rateLimitWindowMinutes: 15,
@@ -68,13 +70,14 @@ vi.mock('../src/observability/metrics.js', () => ({
 }));
 
 vi.mock('pino-http', () => ({
-  default: () => (_req, _res, next) => next()
+  default: pinoHttpMock
 }));
 
 let app;
 let registerReadinessProbe;
 let getCurrentReadinessReport;
 let defaultReadiness;
+let pinoHttpOptions;
 
 beforeAll(async () => {
   const module = await import('../src/app.js');
@@ -82,6 +85,7 @@ beforeAll(async () => {
   registerReadinessProbe = module.registerReadinessProbe;
   getCurrentReadinessReport = module.getCurrentReadinessReport;
   defaultReadiness = getCurrentReadinessReport();
+  pinoHttpOptions = pinoHttpMock.mock.calls[0]?.[0];
 });
 
 afterEach(() => {
@@ -154,5 +158,21 @@ describe('app service probes', () => {
     const response = await request(app).get('/health');
     expect(response.status).toBe(503);
     expect(response.body.success).toBe(false);
+  });
+
+  it('suppresses release readiness load probe logs', () => {
+    expect(pinoHttpOptions).toBeTruthy();
+
+    const loadProbeRequest = {
+      url: '/health',
+      headers: { 'x-release-check': 'load-probe' }
+    };
+    expect(pinoHttpOptions.autoLogging.ignore(loadProbeRequest)).toBe(true);
+
+    const response = { statusCode: 200, req: loadProbeRequest };
+    expect(pinoHttpOptions.customLogLevel(response, undefined)).toBe('debug');
+
+    const normalResponse = { statusCode: 200, req: { url: '/health', headers: {} } };
+    expect(pinoHttpOptions.customLogLevel(normalResponse, undefined)).toBe('info');
   });
 });
