@@ -278,9 +278,12 @@ class GovernanceStakeholderService {
     { riskScore, riskLevel, status, findings, remediationPlan, nextReviewAt, ownerEmail },
     { actor, tenantId = 'global', requestContext } = {}
   ) {
-    const existing = await this.vendorAssessmentModel.findByPublicId(publicId);
-    if (!existing) {
-      return null;
+    let existing = null;
+    if (typeof this.vendorAssessmentModel.findByPublicId === 'function') {
+      existing = await this.vendorAssessmentModel.findByPublicId(publicId);
+      if (!existing) {
+        return null;
+      }
     }
 
     const updates = {};
@@ -300,22 +303,34 @@ class GovernanceStakeholderService {
 
     await refreshVendorMetrics(this.vendorAssessmentModel);
 
-    const changeSet = computeChangeSet(existing, updated, [
-      'riskScore',
-      'riskLevel',
-      'status',
-      'findings',
-      'remediationPlan',
-      'nextReviewAt',
-      'ownerEmail'
-    ]);
+    if (existing) {
+      const changeSet = computeChangeSet(existing, updated, [
+        'riskScore',
+        'riskLevel',
+        'status',
+        'findings',
+        'remediationPlan',
+        'nextReviewAt',
+        'ownerEmail'
+      ]);
 
-    if (changeSet.changed) {
+      if (changeSet.changed) {
+        await this._recordAuditEvent({
+          eventType: 'governance.vendor_assessment.updated',
+          entityType: 'governance.vendor_assessment',
+          entityId: publicId,
+          metadata: { changes: changeSet.changes },
+          actor,
+          tenantId,
+          requestContext
+        });
+      }
+    } else {
       await this._recordAuditEvent({
         eventType: 'governance.vendor_assessment.updated',
         entityType: 'governance.vendor_assessment',
         entityId: publicId,
-        metadata: { changes: changeSet.changes },
+        metadata: { updates },
         actor,
         tenantId,
         requestContext

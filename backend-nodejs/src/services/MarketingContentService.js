@@ -61,12 +61,14 @@ export default class MarketingContentService {
     const plans = await MarketingPlanOfferModel.list({ includeFeatures: true, ...options });
     return plans.map((plan) => ({
       ...plan,
-      features: plan.features.map((feature) => ({
-        id: feature.id,
-        label: feature.label,
-        position: feature.position,
-        metadata: feature.metadata
-      }))
+      features: Array.isArray(plan.features)
+        ? plan.features.map((feature) => ({
+            id: feature.id,
+            label: feature.label,
+            position: feature.position,
+            metadata: feature.metadata
+          }))
+        : []
     }));
   }
 
@@ -130,12 +132,17 @@ export default class MarketingContentService {
       this.listActiveInvites(email),
       this.listTestimonials({ variants, surfaces })
     ]);
-    return {
+    const content = {
       blocks,
       plans,
-      invites,
-      testimonials
+      invites
     };
+
+    if (testimonials.length > 0) {
+      content.testimonials = testimonials;
+    }
+
+    return content;
   }
 
   static async createMarketingLead(payload = {}) {

@@ -574,15 +574,22 @@ function formatDocument(entity, hit) {
 
 export class ExplorerSearchService {
   constructor({
-    provider = resolveSearchProvider(),
+    provider,
+    documentModel,
     adsService = AdsPlacementService,
     loggerInstance = logger
   } = {}) {
-    this.provider = provider;
+    const backend = documentModel ?? provider ?? resolveSearchProvider();
+    this.backend = backend;
     this.adsService = adsService;
     this.logger = loggerInstance;
-    this.supportedEntities = Array.isArray(this.provider.getSupportedEntities?.())
-      ? this.provider.getSupportedEntities()
+    const supportedSource = documentModel ?? backend;
+    const declaredEntities =
+      supportedSource && typeof supportedSource.getSupportedEntities === 'function'
+        ? supportedSource.getSupportedEntities()
+        : null;
+    this.supportedEntities = Array.isArray(declaredEntities)
+      ? declaredEntities
       : MODEL_SUPPORTED_ENTITIES;
   }
 
@@ -631,7 +638,7 @@ export class ExplorerSearchService {
   async searchEntity(entity, { query, page, perPage, filters, globalFilters, sort, includeFacets }) {
     const effectiveFilters = this.buildFilters(entity, filters, globalFilters);
     const sortDirective = this.resolveSort(entity, sort);
-    const result = await this.provider.search(entity, {
+    const result = await this.backend.search(entity, {
       query,
       filters: effectiveFilters,
       sort: sortDirective,
