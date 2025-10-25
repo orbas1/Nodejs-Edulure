@@ -21,6 +21,7 @@ import auth from './middleware/auth.js';
 import requestContextMiddleware from './middleware/requestContext.js';
 import runtimeConfigMiddleware from './middleware/runtimeConfig.js';
 import { annotateLogContextFromRequest, httpMetricsMiddleware, metricsHandler } from './observability/metrics.js';
+import { determineHttpLogLevel } from './observability/httpLogLevel.js';
 import { mountVersionedApi } from './routes/registerApiRoutes.js';
 import { apiRouteRegistry } from './routes/routeRegistry.js';
 import { getServiceSpecDocument, getServiceSpecIndex } from './docs/serviceSpecRegistry.js';
@@ -92,15 +93,7 @@ app.use(
   pinoHttp({
     logger,
     genReqId: (req) => req.id ?? randomUUID(),
-    customLogLevel: (_req, res, err) => {
-      if (err || res.statusCode >= 500) {
-        return 'error';
-      }
-      if (res.statusCode >= 400) {
-        return 'warn';
-      }
-      return 'info';
-    },
+    customLogLevel: (req, res, err) => determineHttpLogLevel(req, res, err),
     customProps: (req) => {
       annotateLogContextFromRequest(req);
       return {
