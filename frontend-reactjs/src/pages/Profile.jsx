@@ -568,15 +568,41 @@ function normaliseVerificationTimeline({
     });
   });
 
-  Object.entries(documentStates ?? {}).forEach(([type, state]) => {
+  const requirementList = Array.isArray(documentRequirements) ? documentRequirements : [];
+  const stateEntries = (() => {
+    if (documentStates instanceof Map) {
+      return Array.from(documentStates.entries());
+    }
+    if (Array.isArray(documentStates)) {
+      return documentStates.map((value, index) => [index, value]);
+    }
+    if (documentStates && typeof documentStates === 'object') {
+      return Object.entries(documentStates);
+    }
+    return [];
+  })();
+
+  stateEntries.forEach(([rawKey, state], index) => {
     if (!state || (state.status !== 'attached' && state.status !== 'uploaded')) {
       return;
     }
-    const requirement = (documentRequirements ?? []).find((item) => item.type === type);
-    const title = requirement?.label ?? type;
+
+    const requirement = requirementList.find((item) => item.type === rawKey);
+    const fallbackRequirement = requirement ?? requirementList[index] ?? null;
+    const baseLabel =
+      requirement?.label ??
+      (typeof rawKey === 'string' && rawKey.trim().length
+        ? rawKey.replace(/_/g, ' ')
+        : fallbackRequirement?.label ?? fallbackRequirement?.type?.replace(/_/g, ' ') ?? null);
+    const label = baseLabel ?? `Document ${index + 1}`;
+    const idBase =
+      typeof rawKey === 'string' && rawKey.trim().length
+        ? rawKey
+        : requirement?.type ?? fallbackRequirement?.type ?? `document-${index}`;
+
     events.push({
-      id: `local-${type}`,
-      title: `${title} ready for submission`,
+      id: `local-${idBase}`,
+      title: `${label} ready for submission`,
       description: 'Document cached locally. Submit to trigger review.',
       timestamp: state.completedAt ? formatTimelineTimestamp(state.completedAt) : null,
       status: 'pending_review',
