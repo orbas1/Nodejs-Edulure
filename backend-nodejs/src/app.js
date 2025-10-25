@@ -92,7 +92,7 @@ app.use(
   pinoHttp({
     logger,
     genReqId: (req) => req.id ?? randomUUID(),
-    customLogLevel: (res, err) => {
+    customLogLevel: (_req, res, err) => {
       if (err || res.statusCode >= 500) {
         return 'error';
       }
