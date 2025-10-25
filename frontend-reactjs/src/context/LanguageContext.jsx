@@ -202,20 +202,20 @@ const TRANSLATIONS = {
         illustrationAlt: 'Collage of instructors and learners collaborating'
       },
       membership: {
-        pretitle: 'Commission snapshot',
-        title: 'Flat commissions, zero monthly fees',
+        pretitle: 'Fee snapshot',
+        title: 'Flat fees, zero monthly costs',
         subtitle:
           'Operate on transparent usage-based pricing designed for modern learning businesses.',
         defaults: {
-          feature: 'Transparent commission highlight'
+          feature: 'Transparent fee highlight'
         },
         plans: {
           communityTutor: {
             title: 'Communities & tutoring',
             tagline: 'Applied to memberships, subscriptions, and 1:1 bookings.',
-            price: '2.5% commission',
+            price: '2.5% fee',
             features: [
-              '2.5% platform commission on community subscriptions and tutor bookings.',
+              '2.5% platform fee on community subscriptions and tutor bookings.',
               'Zero minimum fees so every transaction settles in full.',
               'Creators control payout schedules and workforce compensation.'
             ],
@@ -224,20 +224,20 @@ const TRANSLATIONS = {
           catalogue: {
             title: 'Digital catalogues',
             tagline: 'Courses and e-book sales with built-in delivery.',
-            price: '5% commission',
+            price: '5% fee',
             features: [
-              '5% commission on courses and e-book sales across the marketplace.',
+              '5% platform fee on courses and e-book sales across the marketplace.',
               'Non-custodial settlement ensures funds move directly to you.',
-              'Share up to 25% of commission with affiliates automatically.'
+              'Share up to 25% of fees with affiliates automatically.'
             ],
             note: 'Perfect for asynchronous learning drops and evergreen content.'
           },
           liveDonations: {
             title: 'Live donations & tips',
             tagline: 'Supporters boost your live events in real time.',
-            price: '10% commission',
+            price: '10% fee',
             features: [
-              '10% commission on community live stream donations and tips.',
+              '10% platform fee on community live stream donations and tips.',
               'No minimum fees or extra payout delays.',
               'Built-in compliance narrative keeps sponsorships audit-ready.'
             ],
@@ -246,7 +246,7 @@ const TRANSLATIONS = {
         },
         cta: 'Launch your workspace',
         disclaimer:
-          'Commission defaults include a 25% affiliate share and non-custodial settlement.'
+          'Platform fees include a 25% affiliate share and non-custodial settlement.'
       },
       faq: {
         pretitle: 'FAQ',

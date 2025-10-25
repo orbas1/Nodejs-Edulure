@@ -155,6 +155,7 @@ export function MainLayoutContent({
       </a>
       <AppTopBar
         session={session}
+        isAuthenticated={isAuthenticated}
         onLogout={logout}
         primaryNavigation={PRIMARY_NAVIGATION}
         quickActions={quickActions}
@@ -168,6 +169,8 @@ export function MainLayoutContent({
         notificationCount={notificationCount}
         presence={presence}
         showQuickCreate={isAuthenticated}
+        showPrimaryNavigation={isAuthenticated}
+        showSearch={isAuthenticated}
         callToAction={callToAction}
       />
       <ServiceHealthBanner />
@@ -209,6 +212,7 @@ export function MainLayoutContent({
         preferences={notificationPreferences}
         onUpdatePreference={handleUpdateNotificationPreference}
         onNavigate={handleNavigate}
+        viewerRole={session?.user?.role ?? (isAuthenticated ? 'user' : 'guest')}
       />
     </div>
   );

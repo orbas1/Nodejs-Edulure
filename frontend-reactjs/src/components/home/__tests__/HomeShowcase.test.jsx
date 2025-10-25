@@ -107,8 +107,8 @@ describe('Home landing experiences', () => {
         <CoursesAdventure />
         <EbookShowcase />
         <PlanHighlights
-          eyebrow="Commission snapshot"
-          title="Flat commissions, zero monthly fees"
+          eyebrow="Fee snapshot"
+          title="Flat fees, zero monthly costs"
           subtitle="Operate on transparent usage-based pricing designed for modern learning businesses."
           plans={[
             {
@@ -116,7 +116,7 @@ describe('Home landing experiences', () => {
               icon: '🤝',
               heading: 'Community + tutor bundles',
               tagline: 'Keep partners paid without spinning up new tooling.',
-              price: '25% commission per transaction',
+              price: '25% fee per transaction',
               features: ['Guided onboarding', 'Shared payouts', 'Spotlight boosts'],
               note: 'Applies automatically across this revenue channel.'
             },
@@ -125,7 +125,7 @@ describe('Home landing experiences', () => {
               icon: '📚',
               heading: 'Course catalogue',
               tagline: 'Publish evergreen paths with session replays baked in.',
-              price: '12% commission per enrollment',
+              price: '12% fee per enrollment',
               features: ['Rich media lessons', 'Auto-updated syllabi'],
               note: 'Applies automatically across this revenue channel.'
             },
@@ -134,13 +134,13 @@ describe('Home landing experiences', () => {
               icon: '🎤',
               heading: 'Live donation drives',
               tagline: 'Spin up telethon-style moments with real-time receipts.',
-              price: '5% commission per donation',
+              price: '5% fee per donation',
               features: ['Live ticker overlays', 'Backstage chat'],
               note: 'Applies automatically across this revenue channel.'
             }
           ]}
           cta={{ to: '/register', label: 'Launch your workspace', icon: '✨' }}
-          disclaimer="Commission defaults include a 25% affiliate share and non-custodial settlement."
+          disclaimer="Platform fees include a 25% affiliate share and non-custodial settlement."
         />
         <PerksGrid />
         <TutorArcade />

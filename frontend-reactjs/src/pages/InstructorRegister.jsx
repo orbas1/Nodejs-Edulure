@@ -337,7 +337,7 @@ export default function InstructorRegister() {
         <AuthForm.Field
           label="Your goals"
           name="goalsInput"
-          placeholder="Launch Flow 5 masterclass, grow recurring revenue"
+          placeholder="Launch Edulure masterclass, grow recurring revenue"
           required={false}
           helper="Separate each goal with a comma or new line."
         >
@@ -407,7 +407,7 @@ export default function InstructorRegister() {
         <AuthForm.Field
           label="Campaign or creator"
           name="marketingCampaign"
-          placeholder="Flow 5 beta, Creator Growth Lab"
+          placeholder="Edulure beta, Creator Growth Lab"
           value={formState.marketingCampaign}
           onChange={handleChange}
           required={false}

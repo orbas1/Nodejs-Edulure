@@ -14,6 +14,7 @@ import HomeFaq from '../components/home/HomeFaq.jsx';
 import ClosingCtaBanner from '../components/home/ClosingCtaBanner.jsx';
 import TutorArcade from '../components/home/TutorArcade.jsx';
 import CoursesAdventure from '../components/home/CoursesAdventure.jsx';
+import LandingFooter from '../components/home/LandingFooter.jsx';
 import EbookShowcase from '../components/home/EbookShowcase.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import useMarketingContent from '../hooks/useMarketingContent.js';
@@ -138,12 +139,12 @@ const MAX_PLAN_FEATURES = 6;
 const HIGHLIGHT_KEYS = ['highlightOne', 'highlightTwo', 'highlightThree'];
 const HERO_VIDEO_SOURCES = [
   {
-    src: 'https://media.edulure.test/flow5/hero-loop.webm',
+    src: 'https://media.edulure.test/atlas/hero-loop.webm',
     type: 'video/webm',
     resolution: 1080
   },
   {
-    src: 'https://media.edulure.test/flow5/hero-loop.mp4',
+    src: 'https://media.edulure.test/atlas/hero-loop.mp4',
     type: 'video/mp4',
     resolution: 1080
   }
@@ -160,12 +161,12 @@ const CASE_STUDY_FALLBACKS = [
     slug: 'ops-guild',
     translationKey: 'home.caseStudies.opsGuild',
     fallback: {
-      title: 'Ops Guild scaled Flow 5 invites',
+      title: 'Ops Guild scaled onboarding invites',
       summary: 'Kai unified marketing experiments, onboarding checklists, and sponsor offers to lift enrolment 28%.',
       persona: 'Kai • Revenue Ops',
       metric: '+28% enrolment',
       ctaLabel: 'Read Ops Guild story',
-      href: 'https://stories.edulure.test/flow5-ops-guild'
+      href: 'https://stories.edulure.test/ops-guild-growth'
     },
     media: {
       imageSources: [
@@ -182,7 +183,7 @@ const CASE_STUDY_FALLBACKS = [
     translationKey: 'home.caseStudies.cohortStudio',
     fallback: {
       title: 'Cohort Studio halved production time',
-      summary: 'Amina replaced siloed spreadsheets with Flow 5 lesson kits and automated sponsor unlocks for each cohort.',
+      summary: 'Amina replaced siloed spreadsheets with Edulure lesson kits and automated sponsor unlocks for each cohort.',
       persona: 'Amina • Learning Designer',
       metric: '-50% build time',
       ctaLabel: 'Explore Cohort Studio playbook',
@@ -244,13 +245,16 @@ export default function Home() {
 
   const fallbackHero = useMemo(
     () => ({
-      eyebrow: t('home.hero.eyebrow', 'Learning community & marketplace'),
-      statusLabel: t('home.hero.status', 'Built for cohort-based learning'),
-      headline: t('home.hero.headline', 'Learn, teach, and build together.'),
-      subheadline: t('home.hero.subhead', 'Swap playbooks, host live jams, and grow with peers on Edulure.'),
-      primaryLabel: t('home.hero.ctaPrimary', 'Get started'),
-      secondaryLabel: t('home.hero.ctaSecondary', 'Preview the community'),
-      tertiaryLabel: t('home.hero.instructorPill', "I'm an instructor")
+      eyebrow: t('home.hero.eyebrow', 'Learning business OS'),
+      statusLabel: t('home.hero.status', 'Launch-ready at every scale'),
+      headline: t('home.hero.headline', 'Run your learning community in one place.'),
+      subheadline: t(
+        'home.hero.subhead',
+        'Unify live lessons, memberships, and payments with Edulure so your learners stay engaged.'
+      ),
+      primaryLabel: t('home.hero.ctaPrimary', 'Start your workspace'),
+      secondaryLabel: t('home.hero.ctaSecondary', 'Preview the platform'),
+      tertiaryLabel: t('home.hero.instructorPill', "I'm teaching")
     }),
     [t]
   );
@@ -279,11 +283,11 @@ export default function Home() {
     const blockMedia = heroBlock?.media ?? null;
     const fallbackCaption = t(
       'home.hero.media.caption',
-      'Flow 5 keeps marketing, onboarding, and payouts connected in one workspace.'
+      'Edulure keeps onboarding, scheduling, and payouts connected in one workspace.'
     );
     const fallbackAlt = t(
       'home.hero.media.alt',
-      getMarketingAltText('hero.flow-five', 'Operators collaborating inside the Flow 5 workspace.')
+      getMarketingAltText('hero.launchpad', 'Educators collaborating inside the Edulure command centre.')
     );
     if (!blockMedia) {
       return {
@@ -365,7 +369,7 @@ export default function Home() {
   }, [caseStudyBlock, t]);
 
   const caseStudyEyebrow = caseStudyBlock?.eyebrow ?? t('home.caseStudies.eyebrow', 'Operator proof');
-  const caseStudyTitle = caseStudyBlock?.title ?? t('home.caseStudies.title', 'Operators scaling with Flow 5');
+  const caseStudyTitle = caseStudyBlock?.title ?? t('home.caseStudies.title', 'Operators scaling with Edulure');
   const caseStudyCaption = caseStudyBlock?.subtitle ??
     t(
       'home.caseStudies.caption',
@@ -381,7 +385,7 @@ export default function Home() {
 
   const monetisationTitle = t(
     'home.monetization.title',
-    monetisationBlock?.title ?? 'Monetise every surface with Flow 5'
+    monetisationBlock?.title ?? 'Monetise every surface with Edulure'
   );
   const monetisationDescription = t(
     'home.monetization.description',
@@ -402,7 +406,7 @@ export default function Home() {
     if (base?.href && !base?.to) {
       return normaliseExternalAction(
         base,
-        'https://docs.edulure.test/flow5/monetisation',
+        'https://docs.edulure.com/monetisation',
         t('home.monetization.primaryCta', 'Activate monetisation')
       );
     }
@@ -425,7 +429,7 @@ export default function Home() {
     if (base.href && !base.to) {
       return normaliseExternalAction(
         base,
-        'https://docs.edulure.test/flow5/monetisation',
+        'https://docs.edulure.com/monetisation',
         t('home.monetization.secondaryCta', 'Review pricing')
       );
     }
@@ -539,7 +543,7 @@ export default function Home() {
       }
 
       if (features.length === 0) {
-        features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
+        features.push(t('home.membership.defaults.feature', 'Transparent fee highlight'));
       }
 
       return {
@@ -562,9 +566,9 @@ export default function Home() {
       const heading = t(`home.membership.plans.${plan.id}.title`, 'Channel title');
       const tagline = t(
         `home.membership.plans.${plan.id}.tagline`,
-        'Standard commission structure for this channel.'
+        'Simple fee structure for this channel.'
       );
-      const price = t(`home.membership.plans.${plan.id}.price`, 'Flat commission rate');
+      const price = t(`home.membership.plans.${plan.id}.price`, 'Flat fee rate');
       const features = [];
 
       for (let index = 0; index < MAX_PLAN_FEATURES; index += 1) {
@@ -577,7 +581,7 @@ export default function Home() {
       }
 
       if (features.length === 0) {
-        features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
+        features.push(t('home.membership.defaults.feature', 'Transparent fee highlight'));
       }
 
       const note = t(
@@ -669,8 +673,8 @@ export default function Home() {
       <TutorArcade />
       <EbookShowcase />
       <PlanHighlights
-        eyebrow={t('home.membership.pretitle', 'Commission snapshot')}
-        title={t('home.membership.title', 'Flat commissions, zero monthly fees')}
+        eyebrow={t('home.membership.pretitle', 'Fee snapshot')}
+        title={t('home.membership.title', 'Flat fees, zero monthly costs')}
         subtitle={t(
           'home.membership.subtitle',
           'Operate on transparent usage-based pricing designed for modern learning businesses.'
@@ -679,12 +683,13 @@ export default function Home() {
         cta={planCta}
         disclaimer={t(
           'home.membership.disclaimer',
-          'Commission defaults include a 25% affiliate share and non-custodial settlement.'
+          'Platform fees include a 25% affiliate share and non-custodial settlement.'
         )}
       />
       <HomeFaq />
       <ClosingCtaBanner />
       <CoursesAdventure />
+      <LandingFooter />
     </div>
   );
 }

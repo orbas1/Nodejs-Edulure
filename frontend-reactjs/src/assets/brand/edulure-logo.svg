@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="32" viewBox="0 0 120 32" role="img" aria-labelledby="edulureLogoTitle">
+  <title id="edulureLogoTitle">Edulure</title>
+  <defs>
+    <linearGradient id="edulureGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+  </defs>
+  <g fill="none" fill-rule="evenodd" stroke="none" stroke-width="1">
+    <path
+      d="M8 2c3.314 0 6 2.686 6 6v1.2c0 3.314-2.686 6-6 6H6v4.4c0 1.104-.896 2-2 2H2V8c0-3.314 2.686-6 6-6Z"
+      fill="url(#edulureGradient)"
+    />
+    <path
+      d="M24 6c0-1.657 1.343-3 3-3h7c1.657 0 3 1.343 3 3v20c0 1.657-1.343 3-3 3h-7c-1.657 0-3-1.343-3-3V6Zm5 2v12c0 .552.448 1 1 1h3c.552 0 1-.448 1-1V8h-5Z"
+      fill="#0f172a"
+      opacity="0.85"
+    />
+    <text x="44" y="22" font-family="'Inter', 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#0f172a">
+      Edulure
+    </text>
+  </g>
+</svg>

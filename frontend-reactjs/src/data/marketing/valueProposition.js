@@ -10,12 +10,12 @@ export const HERO_ANALYTICS_EVENT = 'marketing:hero_cta';
 
 export const HERO_VIDEO_SOURCES = [
   {
-    src: 'https://media.edulure.test/flow5/hero-loop.webm',
+    src: 'https://media.edulure.test/atlas/hero-loop.webm',
     type: 'video/webm',
     resolution: 1080
   },
   {
-    src: 'https://media.edulure.test/flow5/hero-loop.mp4',
+    src: 'https://media.edulure.test/atlas/hero-loop.mp4',
     type: 'video/mp4',
     resolution: 1080
   }
@@ -35,26 +35,25 @@ const HERO_CHIP_KEYS = [
 ];
 
 const HERO_COPY = {
-  eyebrow: { key: 'home.hero.eyebrow', fallback: 'Flow 5 marketing OS' },
-  statusLabel: { key: 'home.hero.status', fallback: 'Now shipping Annex A16 playbooks' },
+  eyebrow: { key: 'home.hero.eyebrow', fallback: 'Learning business OS' },
+  statusLabel: { key: 'home.hero.status', fallback: 'Launch-ready at every scale' },
   headline: {
     key: 'home.hero.headline',
-    fallback: 'Your launch, onboarding, and revenue funnels in one flow'
+    fallback: 'Run your learning community in one place'
   },
   subheadline: {
     key: 'home.hero.subheadline',
-    fallback:
-      'Flow 5 stitches landing pages, onboarding rituals, and live community activations so every campaign converts faster.'
+    fallback: 'Edulure unifies live classrooms, memberships, and payouts so your learners stay engaged from day one.'
   },
   mediaCaption: {
     key: 'home.hero.media.caption',
-    fallback: 'Flow 5 keeps marketing, onboarding, and payouts connected in one workspace.'
+    fallback: 'Edulure keeps onboarding, scheduling, and payouts connected in a single workspace.'
   },
   mediaAlt: {
     key: 'home.hero.media.alt',
     fallback: getMarketingAltText(
-      'hero.flow-five',
-      'Operators orchestrating onboarding, payments, and community sessions inside Flow 5.'
+      'hero.launchpad',
+      'Educators collaborating inside the Edulure command centre while reviewing live schedules and learner insights.'
     )
   }
 };
@@ -62,7 +61,7 @@ const HERO_COPY = {
 const HERO_ACTIONS = {
   primary: {
     key: 'home.hero.ctaPrimary',
-    fallback: 'Book a Flow 5 demo',
+    fallback: 'Start your workspace',
     to: '/register',
     analyticsId: 'cta-primary'
   },
@@ -74,7 +73,7 @@ const HERO_ACTIONS = {
   },
   tertiary: {
     key: 'home.hero.ctaTertiary',
-    fallback: 'Download the Annex A16 brief',
+    fallback: 'Download the overview',
     href: '/ebooks',
     analyticsId: 'cta-tertiary'
   }
@@ -95,7 +94,7 @@ export const VALUE_PROPOSITION_STATS = [
     labelKey: 'home.stats.creators.label',
     fallbackLabel: 'Creators monetising',
     helperKey: 'home.stats.creators.helper',
-    fallbackHelper: 'Flow 5 operators shipping new offers monthly'
+    fallbackHelper: 'Edulure teams shipping new offers monthly'
   },
   {
     key: 'retention',
@@ -103,7 +102,7 @@ export const VALUE_PROPOSITION_STATS = [
     labelKey: 'home.stats.retention.label',
     fallbackLabel: 'Average retention lift',
     helperKey: 'home.stats.retention.helper',
-    fallbackHelper: 'Comparing Flow 5 cohorts to pre-launch baselines'
+    fallbackHelper: 'Comparing Edulure cohorts to pre-launch baselines'
   },
   {
     key: 'knowledge',
@@ -124,7 +123,7 @@ export const VALUE_PROPOSITION_PILLARS = [
     fallback: {
       title: 'Program blueprints on day one',
       helper: 'Launch cohorts without detours',
-      description: 'Assemble Flow 5 templates for curriculum, onboarding, and sponsor funnels the moment you sign in.'
+      description: 'Assemble Edulure templates for curriculum, onboarding, and sponsor funnels the moment you sign in.'
     },
     analyticsId: 'pillar-programs',
     actions: [
@@ -133,7 +132,7 @@ export const VALUE_PROPOSITION_PILLARS = [
         labelKey: 'home.featureGrid.categories.programs.actions.workspace',
         descriptionKey: 'home.featureGrid.categories.programs.descriptions.workspace',
         fallbackLabel: 'Start a free workspace',
-        fallbackDescription: 'Spin up a Flow 5 launch workspace in three minutes.',
+        fallbackDescription: 'Spin up an Edulure launch workspace in three minutes.',
         to: '/register',
         badge: 'New',
         analyticsId: 'start-workspace'
@@ -207,7 +206,7 @@ export const VALUE_PROPOSITION_PILLARS = [
     fallback: {
       title: 'Revenue moments without spreadsheets',
       helper: 'Keep payouts transparent',
-      description: 'Affiliate, sponsorship, and tutor revenue pipelines roll up under one commission model.'
+      description: 'Affiliate, sponsorship, and tutor revenue pipelines roll up under one fee model.'
     },
     analyticsId: 'pillar-revenue',
     actions: [
@@ -226,7 +225,7 @@ export const VALUE_PROPOSITION_PILLARS = [
         descriptionKey: 'home.featureGrid.categories.revenue.descriptions.sponsors',
         fallbackLabel: 'Activate sponsors',
         fallbackDescription: 'Bundle sponsor perks into every onboarding flow.',
-        href: 'https://docs.edulure.test/flow5/sponsorships',
+        href: 'https://docs.edulure.com/sponsorships',
         analyticsId: 'activate-sponsors'
       },
       {
@@ -234,7 +233,7 @@ export const VALUE_PROPOSITION_PILLARS = [
         labelKey: 'home.featureGrid.categories.revenue.actions.payouts',
         descriptionKey: 'home.featureGrid.categories.revenue.descriptions.payouts',
         fallbackLabel: 'Open payout dashboard',
-        fallbackDescription: 'Monitor revenue, affiliates, and tutor commissions live.',
+        fallbackDescription: 'Monitor revenue, affiliates, and tutor fees live.',
         to: '/dashboard/instructor/payouts',
         analyticsId: 'open-payouts'
       }
