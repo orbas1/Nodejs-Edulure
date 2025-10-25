@@ -40,8 +40,10 @@ import {
   formatPersonDisplayName
 } from '../utils/socialGraph.js';
 
+const globalProcess = typeof globalThis !== 'undefined' ? globalThis.process : undefined;
+
 const isTestEnvironment =
-  (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
+  (globalProcess?.env?.NODE_ENV === 'test') ||
   (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
 
 const defaultProfile = {
