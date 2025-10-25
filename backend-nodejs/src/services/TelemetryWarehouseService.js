@@ -177,8 +177,7 @@ export class TelemetryWarehouseService {
     const startTime = Date.now();
     const batch = await this.batchModel.create({
       destination: this.config.export.destination,
-      metadata: { trigger, requestedSize: batchSize },
-      environment: this.environment
+      metadata: { trigger, requestedSize: batchSize }
     });
 
     let lineageRun = null;

@@ -293,7 +293,15 @@ export default class DirectMessageService {
     });
 
     const participants = await DirectMessageParticipantModel.listForThread(threadId);
-    realtimeService.broadcastMessage(threadId, message, participants);
+    if (typeof realtimeService.broadcastMessage === 'function') {
+      realtimeService.broadcastMessage(threadId, message, participants);
+    } else if (typeof realtimeService.broadcastThreadUpsert === 'function') {
+      realtimeService.broadcastThreadUpsert(
+        await DirectMessageThreadModel.findById(threadId),
+        participants,
+        { latestMessage: message }
+      );
+    }
 
     return message;
   }
@@ -345,15 +353,18 @@ export default class DirectMessageService {
         trx
       );
 
-      const participants = await DirectMessageParticipantModel.listForThread(threadId, trx);
-      if (participants.some((participant) => participant.archivedAt)) {
-        restoredThread = await DirectMessageThreadModel.findById(threadId, trx);
-      } else {
+      const participantsRaw = await DirectMessageParticipantModel.listForThread(threadId, trx);
+      const participants = participantsRaw.map((participant) =>
+        participant.userId === userId ? { ...participant, archivedAt: null } : participant
+      );
+      if (participants.some((participant) => !participant.archivedAt)) {
         restoredThread = await DirectMessageThreadModel.setArchiveState(
           threadId,
           { archivedAt: null, archivedBy: null, archiveMetadata: {} },
           trx
         );
+      } else {
+        restoredThread = await DirectMessageThreadModel.findById(threadId, trx);
       }
     });
 

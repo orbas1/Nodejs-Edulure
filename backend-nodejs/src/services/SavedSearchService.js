@@ -121,7 +121,7 @@ export class SavedSearchService {
       .filter((search) => search.lastUsedAt)
       .sort((a, b) => new Date(b.lastUsedAt) - new Date(a.lastUsedAt))
       .slice(0, 5)
-      .map((search) => decorateSearch(search));
+      .map((search) => ({ id: search.id, lastUsedAt: search.lastUsedAt }));
 
     return {
       total,
