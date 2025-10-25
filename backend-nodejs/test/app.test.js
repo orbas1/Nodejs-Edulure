@@ -14,6 +14,7 @@ const envMock = {
 };
 
 const healthcheckMock = vi.fn();
+let pinoHttpConfig;
 
 vi.mock('../src/config/env.js', () => ({
   env: envMock
@@ -26,6 +27,12 @@ vi.mock('../src/config/logger.js', () => ({
     error: vi.fn(),
     child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })
   }
+}));
+
+vi.mock('../src/config/storage.js', () => ({
+  storageDescriptor: { driver: 'local' },
+  storageBuckets: { public: 'public', uploads: 'uploads', private: 'private' },
+  localStorageConfig: { serveStatic: false, root: '/tmp' }
 }));
 
 vi.mock('../src/config/database.js', () => ({
@@ -68,7 +75,10 @@ vi.mock('../src/observability/metrics.js', () => ({
 }));
 
 vi.mock('pino-http', () => ({
-  default: () => (_req, _res, next) => next()
+  default: (options = {}) => {
+    pinoHttpConfig = options;
+    return (_req, _res, next) => next();
+  }
 }));
 
 let app;
@@ -154,5 +164,30 @@ describe('app service probes', () => {
     const response = await request(app).get('/health');
     expect(response.status).toBe(503);
     expect(response.body.success).toBe(false);
+  });
+});
+
+describe('logging middleware configuration', () => {
+  it('suppresses health check access logs', () => {
+    expect(pinoHttpConfig?.autoLogging?.ignorePaths).toBeDefined();
+    const matcher = pinoHttpConfig.autoLogging.ignorePaths[0];
+    expect(matcher.test('/health')).toBe(true);
+    expect(matcher.test('/health?foo=bar')).toBe(true);
+
+    const level = pinoHttpConfig.customLogLevel(
+      { originalUrl: '/health', method: 'GET' },
+      { statusCode: 200 }
+    );
+    expect(level).toBe('silent');
+  });
+
+  it('uses semantic log levels for other responses', () => {
+    const requestContext = { originalUrl: '/api/example', method: 'GET' };
+    expect(pinoHttpConfig.customLogLevel(requestContext, { statusCode: 200 })).toBe('info');
+    expect(pinoHttpConfig.customLogLevel(requestContext, { statusCode: 404 })).toBe('warn');
+    expect(pinoHttpConfig.customLogLevel(requestContext, { statusCode: 503 })).toBe('error');
+    expect(pinoHttpConfig.customLogLevel(requestContext, { statusCode: 200 }, new Error('boom'))).toBe(
+      'error'
+    );
   });
 });

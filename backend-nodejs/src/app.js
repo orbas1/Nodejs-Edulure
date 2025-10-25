@@ -70,6 +70,8 @@ const STRIPE_WEBHOOK_ROUTE_SUFFIX = '/payments/webhooks/stripe';
 const VERSIONED_API_BASE_PATH = '/api/v1';
 const STRIPE_WEBHOOK_VERSIONED_ROUTE = `${VERSIONED_API_BASE_PATH}${STRIPE_WEBHOOK_ROUTE_SUFFIX}`;
 
+const HEALTHCHECK_PATH_PATTERN = /^\/health(?:[\/?]|$)/;
+
 const app = express();
 
 app.disable('x-powered-by');
@@ -92,7 +94,12 @@ app.use(
   pinoHttp({
     logger,
     genReqId: (req) => req.id ?? randomUUID(),
-    customLogLevel: (_req, res, err) => {
+    customLogLevel: (req, res, err) => {
+      const route = req?.originalUrl ?? req?.url ?? '';
+      if (HEALTHCHECK_PATH_PATTERN.test(route)) {
+        return 'silent';
+      }
+
       if (err || res.statusCode >= 500) {
         return 'error';
       }
@@ -109,7 +116,7 @@ app.use(
       };
     },
     autoLogging: {
-      ignorePaths: ['/health']
+      ignorePaths: [HEALTHCHECK_PATH_PATTERN]
     }
   })
 );
