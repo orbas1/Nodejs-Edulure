@@ -18,6 +18,43 @@ const BASE_COLUMNS = [
   'updated_at as updatedAt'
 ];
 
+function getTableQuery(connection = db) {
+  if (!connection) {
+    throw new TypeError('A database connection instance is required');
+  }
+
+  if (typeof connection === 'function') {
+    return connection(TABLE);
+  }
+
+  if (typeof connection.table === 'function') {
+    return connection.table(TABLE);
+  }
+
+  if (typeof connection.from === 'function') {
+    return connection.from(TABLE);
+  }
+
+  if (typeof connection.clone === 'function' && typeof connection.select === 'function') {
+    return connection.clone();
+  }
+
+  if (typeof connection.select === 'function') {
+    return connection;
+  }
+
+  throw new TypeError('Invalid database connection provided to SetupRunModel');
+}
+
+function resolveNow(connection) {
+  const nowFn = connection?.fn?.now ?? db.fn?.now;
+  if (typeof nowFn === 'function') {
+    return nowFn.call(connection?.fn ?? db.fn);
+  }
+
+  return new Date().toISOString();
+}
+
 function parseJson(value, fallback) {
   if (!value) {
     return fallback;
@@ -85,20 +122,20 @@ export default class SetupRunModel {
   static async create(run, connection = db) {
     const payload = toDbPayload(run);
     if (!payload.started_at) {
-      payload.started_at = connection.fn.now();
+      payload.started_at = resolveNow(connection);
     }
 
-    const [id] = await connection(TABLE).insert(payload);
+    const [id] = await getTableQuery(connection).insert(payload);
     return this.findById(id, connection);
   }
 
   static async findById(id, connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).where({ id }).first();
+    const row = await getTableQuery(connection).select(BASE_COLUMNS).where({ id }).first();
     return row ? deserialize(row) : null;
   }
 
   static async findByPublicId(publicId, connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).where({ public_id: publicId }).first();
+    const row = await getTableQuery(connection).select(BASE_COLUMNS).where({ public_id: publicId }).first();
     return row ? deserialize(row) : null;
   }
 
@@ -130,15 +167,15 @@ export default class SetupRunModel {
       return this.findByPublicId(publicId, connection);
     }
 
-    await connection(TABLE)
+    await getTableQuery(connection)
       .where({ public_id: publicId })
-      .update({ ...payload, updated_at: connection.fn.now() });
+      .update({ ...payload, updated_at: resolveNow(connection) });
 
     return this.findByPublicId(publicId, connection);
   }
 
   static async listRecent(limit = 10, connection = db) {
-    const rows = await connection(TABLE)
+    const rows = await getTableQuery(connection)
       .select(BASE_COLUMNS)
       .orderBy('created_at', 'desc')
       .limit(Math.max(1, Math.min(50, Number(limit) || 10)));
@@ -146,7 +183,7 @@ export default class SetupRunModel {
   }
 
   static async findLatest(connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).orderBy('created_at', 'desc').first();
+    const row = await getTableQuery(connection).select(BASE_COLUMNS).orderBy('created_at', 'desc').first();
     return row ? deserialize(row) : null;
   }
 }
