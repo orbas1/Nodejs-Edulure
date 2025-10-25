@@ -7,6 +7,7 @@ const redisLogger = logger.child({ module: 'redis' });
 let client = null;
 let lastErrorLoggedAt = 0;
 const ERROR_LOG_THROTTLE_MS = 30000;
+const WARNABLE_REDIS_ERROR_CODES = new Set(['ECONNREFUSED', 'EHOSTUNREACH', 'ETIMEDOUT']);
 
 export function buildRedisOptions(configuration = env.redis) {
   const retryStrategy = (attempt) => Math.min(attempt * 200, 2000);
@@ -54,11 +55,14 @@ export function createRedisClient(configuration = env.redis, log = redisLogger) 
 
   instance.on('error', (error) => {
     const now = Date.now();
+    const level = WARNABLE_REDIS_ERROR_CODES.has(error?.code) ? 'warn' : 'error';
+    const message = level === 'warn' ? 'Redis connection unavailable' : 'Redis connection error';
+
     if (now - lastErrorLoggedAt > ERROR_LOG_THROTTLE_MS) {
-      log.error({ err: error }, 'Redis connection error');
+      log[level]({ err: error }, message);
       lastErrorLoggedAt = now;
     } else {
-      log.debug({ err: error }, 'Redis connection error (suppressed)');
+      log.debug({ err: error }, `${message} (suppressed)`);
     }
   });
 

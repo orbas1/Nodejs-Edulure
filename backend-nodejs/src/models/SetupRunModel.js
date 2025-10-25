@@ -23,16 +23,16 @@ function getTableQuery(connection = db) {
     throw new TypeError('A database connection instance is required');
   }
 
-  if (typeof connection === 'function') {
-    return connection(TABLE);
-  }
-
   if (typeof connection.table === 'function') {
     return connection.table(TABLE);
   }
 
   if (typeof connection.from === 'function') {
     return connection.from(TABLE);
+  }
+
+  if (typeof connection === 'function') {
+    return connection(TABLE);
   }
 
   if (typeof connection.clone === 'function' && typeof connection.select === 'function') {
@@ -44,6 +44,24 @@ function getTableQuery(connection = db) {
   }
 
   throw new TypeError('Invalid database connection provided to SetupRunModel');
+}
+
+function isMissingTableError(error) {
+  if (!error) {
+    return false;
+  }
+
+  const code = String(error.code ?? '').toUpperCase();
+  if (code === 'ER_NO_SUCH_TABLE' || error?.errno === 1146 || error?.sqlState === '42S02') {
+    return true;
+  }
+
+  const message = String(error.message ?? '').toLowerCase();
+  if (message.includes('no such table') && message.includes(TABLE)) {
+    return true;
+  }
+
+  return false;
 }
 
 function resolveNow(connection) {
@@ -130,13 +148,30 @@ export default class SetupRunModel {
   }
 
   static async findById(id, connection = db) {
-    const row = await getTableQuery(connection).select(BASE_COLUMNS).where({ id }).first();
-    return row ? deserialize(row) : null;
+    try {
+      const row = await getTableQuery(connection).select(BASE_COLUMNS).where({ id }).first();
+      return row ? deserialize(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   static async findByPublicId(publicId, connection = db) {
-    const row = await getTableQuery(connection).select(BASE_COLUMNS).where({ public_id: publicId }).first();
-    return row ? deserialize(row) : null;
+    try {
+      const row = await getTableQuery(connection)
+        .select(BASE_COLUMNS)
+        .where({ public_id: publicId })
+        .first();
+      return row ? deserialize(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   static async updateByPublicId(publicId, updates, connection = db) {
@@ -167,23 +202,47 @@ export default class SetupRunModel {
       return this.findByPublicId(publicId, connection);
     }
 
-    await getTableQuery(connection)
-      .where({ public_id: publicId })
-      .update({ ...payload, updated_at: resolveNow(connection) });
+    try {
+      await getTableQuery(connection)
+        .where({ public_id: publicId })
+        .update({ ...payload, updated_at: resolveNow(connection) });
 
-    return this.findByPublicId(publicId, connection);
+      return this.findByPublicId(publicId, connection);
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   static async listRecent(limit = 10, connection = db) {
-    const rows = await getTableQuery(connection)
-      .select(BASE_COLUMNS)
-      .orderBy('created_at', 'desc')
-      .limit(Math.max(1, Math.min(50, Number(limit) || 10)));
-    return rows.map(deserialize);
+    try {
+      const rows = await getTableQuery(connection)
+        .select(BASE_COLUMNS)
+        .orderBy('created_at', 'desc')
+        .limit(Math.max(1, Math.min(50, Number(limit) || 10)));
+      return rows.map(deserialize);
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   static async findLatest(connection = db) {
-    const row = await getTableQuery(connection).select(BASE_COLUMNS).orderBy('created_at', 'desc').first();
-    return row ? deserialize(row) : null;
+    try {
+      const row = await getTableQuery(connection)
+        .select(BASE_COLUMNS)
+        .orderBy('created_at', 'desc')
+        .first();
+      return row ? deserialize(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 }
