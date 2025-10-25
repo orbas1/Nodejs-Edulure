@@ -216,9 +216,11 @@ export default class DirectMessageService {
     });
 
     const participants = await DirectMessageParticipantModel.listForThread(result.thread.id);
-    realtimeService.broadcastThreadUpsert(result.thread, participants, {
-      initialMessage: result.initialMessage
-    });
+    if (typeof realtimeService.broadcastThreadUpsert === 'function') {
+      realtimeService.broadcastThreadUpsert(result.thread, participants, {
+        initialMessage: result.initialMessage
+      });
+    }
 
     return result;
   }
@@ -293,7 +295,9 @@ export default class DirectMessageService {
     });
 
     const participants = await DirectMessageParticipantModel.listForThread(threadId);
-    realtimeService.broadcastMessage(threadId, message, participants);
+    if (typeof realtimeService.broadcastMessage === 'function') {
+      realtimeService.broadcastMessage(threadId, message, participants);
+    }
 
     return message;
   }
@@ -328,7 +332,9 @@ export default class DirectMessageService {
     });
 
     const participants = await DirectMessageParticipantModel.listForThread(threadId);
-    realtimeService.broadcastThreadUpsert(archivedThread, participants, { archived: true });
+    if (typeof realtimeService.broadcastThreadUpsert === 'function') {
+      realtimeService.broadcastThreadUpsert(archivedThread, participants, { archived: true });
+    }
 
     return { thread: archivedThread, archivedAt };
   }
@@ -358,7 +364,9 @@ export default class DirectMessageService {
     });
 
     const participants = await DirectMessageParticipantModel.listForThread(threadId);
-    realtimeService.broadcastThreadUpsert(restoredThread, participants, { archived: false });
+    if (typeof realtimeService.broadcastThreadUpsert === 'function') {
+      realtimeService.broadcastThreadUpsert(restoredThread, participants, { archived: false });
+    }
 
     return { thread: restoredThread };
   }

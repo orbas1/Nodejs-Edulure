@@ -5,17 +5,31 @@ import logger from '../config/logger.js';
 
 let sharedTransporter = null;
 
+function resolveMailConfig() {
+  const config = env.mail ?? {};
+  const port = Number(config.smtpPort ?? 0);
+  const hasAuth = Boolean(config.smtpUser || config.smtpPassword);
+  return {
+    host: config.smtpHost ?? null,
+    port: Number.isFinite(port) && port > 0 ? port : 1025,
+    secure: Boolean(config.smtpSecure),
+    auth: hasAuth
+      ? {
+          user: config.smtpUser ?? '',
+          pass: config.smtpPassword ?? ''
+        }
+      : undefined
+  };
+}
+
 function getTransporter() {
   if (!sharedTransporter) {
-    sharedTransporter = nodemailer.createTransport({
-      host: env.mail.smtpHost,
-      port: env.mail.smtpPort,
-      secure: env.mail.smtpSecure,
-      auth: {
-        user: env.mail.smtpUser,
-        pass: env.mail.smtpPassword
-      }
-    });
+    const config = resolveMailConfig();
+    if (!config.host) {
+      sharedTransporter = nodemailer.createTransport({ jsonTransport: true });
+    } else {
+      sharedTransporter = nodemailer.createTransport(config);
+    }
   }
 
   return sharedTransporter;
@@ -129,8 +143,8 @@ export class MailService {
   async sendMail(message) {
     const mail = {
       from: {
-        name: env.mail.fromName,
-        address: env.mail.fromEmail
+        name: env.mail?.fromName ?? 'Edulure',
+        address: env.mail?.fromEmail ?? 'no-reply@example.com'
       },
       ...message
     };
