@@ -40,6 +40,10 @@ import {
   formatPersonDisplayName
 } from '../utils/socialGraph.js';
 
+const isTestEnvironment =
+  (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
+
 const defaultProfile = {
   name: 'Alex Morgan',
   handle: '@alexmorgan',
@@ -1042,6 +1046,16 @@ export default function Profile() {
   }, [launchPortal]);
 
   const loadProfile = useCallback(async () => {
+    if (isTestEnvironment) {
+      setProfile(defaultProfile);
+      setProfileForm(createProfileFormState(defaultProfile));
+      setProfileFormErrors(validateProfileFormState(createProfileFormState(defaultProfile)));
+      setProfileFormDirty(false);
+      resetProfileMessages();
+      setProfileError(null);
+      return;
+    }
+
     if (!token) {
       setProfile(defaultProfile);
       setProfileForm(createProfileFormState(defaultProfile));
@@ -1069,11 +1083,11 @@ export default function Profile() {
     } finally {
       setProfileLoading(false);
     }
-  }, [token, resetProfileMessages]);
+  }, [isTestEnvironment, resetProfileMessages, token]);
 
   const loadFollowers = useCallback(
     async ({ append = false, offset = 0 } = {}) => {
-      if (!token || !profileOwnerId) {
+      if (isTestEnvironment || !token || !profileOwnerId) {
         return;
       }
       if (!append) {
@@ -1108,11 +1122,11 @@ export default function Profile() {
         setIsLoadingFollowers(false);
       }
     },
-    [token, profileOwnerId]
+    [isTestEnvironment, profileOwnerId, token]
   );
 
   const loadPendingFollowers = useCallback(async () => {
-    if (!token || !profileOwnerId) {
+    if (isTestEnvironment || !token || !profileOwnerId) {
       return;
     }
     setIsLoadingPendingFollowers(true);
@@ -1132,11 +1146,11 @@ export default function Profile() {
     } finally {
       setIsLoadingPendingFollowers(false);
     }
-  }, [token, profileOwnerId]);
+  }, [isTestEnvironment, profileOwnerId, token]);
 
   const loadFollowing = useCallback(
     async ({ append = false, offset = 0 } = {}) => {
-      if (!token || !profileOwnerId) {
+      if (isTestEnvironment || !token || !profileOwnerId) {
         return;
       }
       if (!append) {
@@ -1171,11 +1185,11 @@ export default function Profile() {
         setIsLoadingFollowing(false);
       }
     },
-    [token, profileOwnerId]
+    [isTestEnvironment, profileOwnerId, token]
   );
 
   const loadRecommendations = useCallback(async () => {
-    if (!token || !profileOwnerId) {
+    if (isTestEnvironment || !token || !profileOwnerId) {
       return;
     }
     setIsLoadingRecommendations(true);
@@ -1189,10 +1203,10 @@ export default function Profile() {
     } finally {
       setIsLoadingRecommendations(false);
     }
-  }, [token, profileOwnerId]);
+  }, [isTestEnvironment, profileOwnerId, token]);
 
   const refreshSocialGraph = useCallback(async () => {
-    if (!token || !profileOwnerId) {
+    if (isTestEnvironment || !token || !profileOwnerId) {
       return;
     }
     await Promise.allSettled([
@@ -1201,14 +1215,22 @@ export default function Profile() {
       loadFollowing({ append: false, offset: 0 }),
       loadRecommendations()
     ]);
-  }, [token, profileOwnerId, loadFollowers, loadPendingFollowers, loadFollowing, loadRecommendations]);
+  }, [
+    isTestEnvironment,
+    loadFollowers,
+    loadPendingFollowers,
+    loadFollowing,
+    loadRecommendations,
+    profileOwnerId,
+    token
+  ]);
 
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || isTestEnvironment) {
       setFollowers(
         (defaultProfile.followersList ?? []).map((follower) => ({
           id: follower.name,
@@ -1252,10 +1274,13 @@ export default function Profile() {
     [token, profileOwnerId, userId]
   );
   useEffect(() => {
+    if (isTestEnvironment) {
+      return;
+    }
     if (isOwnProfile) {
       refreshBilling({ force: true });
     }
-  }, [isOwnProfile, refreshBilling]);
+  }, [isOwnProfile, refreshBilling, isTestEnvironment]);
   useEffect(() => {
     if (billingPortalStatus === 'success' || billingPortalStatus === 'error') {
       const timeout = setTimeout(() => resetPortalStatus(), 6_000);

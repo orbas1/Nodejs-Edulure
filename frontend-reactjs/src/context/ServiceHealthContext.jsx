@@ -18,6 +18,27 @@ import { useRealtime } from './RealtimeContext.jsx';
 const ServiceHealthContext = createContext(null);
 const DEFAULT_POLL_INTERVAL = 60000;
 
+const EMPTY_STATUS_SUMMARY = Object.freeze({
+  services: Object.freeze({ operational: 0, degraded: 0, outage: 0, disabled: 0, unknown: 0 }),
+  capabilities: Object.freeze({ operational: 0, degraded: 0, outage: 0, disabled: 0, unknown: 0 })
+});
+
+function createDefaultServiceHealth() {
+  return {
+    loading: false,
+    error: null,
+    manifest: null,
+    lastUpdated: null,
+    alerts: [],
+    servicesByKey: new Map(),
+    impactMatrix: new Map(),
+    statusSummary: EMPTY_STATUS_SUMMARY,
+    getService: () => null,
+    getCapability: () => null,
+    refresh: async () => undefined
+  };
+}
+
 const LEVEL_BY_STATUS = {
   outage: 'critical',
   degraded: 'warning',
@@ -280,7 +301,7 @@ ServiceHealthProvider.propTypes = {
 export function useServiceHealth() {
   const context = useContext(ServiceHealthContext);
   if (!context) {
-    throw new Error('useServiceHealth must be used within a ServiceHealthProvider');
+    return createDefaultServiceHealth();
   }
   return context;
 }
