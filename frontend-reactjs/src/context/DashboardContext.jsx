@@ -4,7 +4,32 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { fetchDashboard } from '../api/dashboardApi.js';
 import { useAuth } from './AuthContext.jsx';
 
-const DashboardContext = createContext(null);
+const defaultDashboardContext = {
+  activeRole: null,
+  setActiveRole: () => {},
+  profile: null,
+  roles: [],
+  dashboards: {},
+  searchIndex: [],
+  surfaceRegistry: {},
+  alerts: [],
+  tenantId: null,
+  lastLoadedAt: null,
+  operationsSnapshot: {
+    metrics: [],
+    sections: [],
+    alerts: [],
+    fetchedAt: null,
+    tenantId: null
+  },
+  getSection: () => null,
+  getDashboard: () => null,
+  loading: false,
+  error: null,
+  refresh: () => {}
+};
+
+const DashboardContext = createContext(defaultDashboardContext);
 
 const initialState = {
   profile: null,
@@ -228,7 +253,7 @@ DashboardProvider.propTypes = {
 export function useDashboard() {
   const context = useContext(DashboardContext);
   if (!context) {
-    throw new Error('useDashboard must be used within a DashboardProvider');
+    return defaultDashboardContext;
   }
   return context;
 }

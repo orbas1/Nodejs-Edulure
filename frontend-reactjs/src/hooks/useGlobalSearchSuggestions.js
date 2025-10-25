@@ -4,7 +4,9 @@ import { fetchExplorerSuggestions } from '../api/explorerApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export function useGlobalSearchSuggestions({ auto = false, limit = 12, sinceDays = 14 } = {}) {
-  const { session } = useAuth();
+  const safeUseAuth = typeof useAuth === 'function' ? useAuth : () => ({ session: null });
+  const auth = safeUseAuth();
+  const session = auth?.session ?? null;
   const token = session?.tokens?.accessToken;
 
   const [suggestions, setSuggestions] = useState([]);
