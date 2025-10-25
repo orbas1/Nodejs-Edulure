@@ -40,10 +40,14 @@ StatList.propTypes = {
   emptyLabel: PropTypes.string.isRequired,
   entries: PropTypes.arrayOf(
     PropTypes.shape({
-      label: PropTypes.string.isRequired,
-      value: PropTypes.string.isRequired
+      label: PropTypes.string,
+      value: PropTypes.string
     })
-  ).isRequired
+  )
+};
+
+StatList.defaultProps = {
+  entries: []
 };
 
 function formatTimestamp(value) {

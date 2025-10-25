@@ -291,9 +291,29 @@ function SalesInsights({ sales }) {
 
 SalesInsights.propTypes = {
   sales: PropTypes.shape({
-    metrics: PropTypes.object,
-    pipeline: PropTypes.array,
-    forecast: PropTypes.object
+    metrics: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        label: PropTypes.string,
+        value: PropTypes.node
+      })
+    ),
+    pipeline: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        stage: PropTypes.string,
+        deals: PropTypes.string,
+        velocity: PropTypes.string,
+        value: PropTypes.string,
+        conversion: PropTypes.string
+      })
+    ),
+    forecast: PropTypes.shape({
+      next30d: PropTypes.string,
+      committed: PropTypes.string,
+      upside: PropTypes.string,
+      lastUpdated: PropTypes.string
+    })
   })
 };
 

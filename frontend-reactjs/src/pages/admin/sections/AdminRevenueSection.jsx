@@ -283,21 +283,23 @@ AdminRevenueSection.propTypes = {
   token: PropTypes.string,
   revenueCards: PropTypes.arrayOf(
     PropTypes.shape({
-      label: PropTypes.string.isRequired,
-      value: PropTypes.string.isRequired,
+      label: PropTypes.string,
+      value: PropTypes.string,
       helper: PropTypes.string
     })
-  ).isRequired,
+  ),
   paymentHealthBreakdown: PropTypes.arrayOf(
     PropTypes.shape({
-      label: PropTypes.string.isRequired,
-      value: PropTypes.string.isRequired
+      label: PropTypes.string,
+      value: PropTypes.string
     })
-  ).isRequired,
+  ),
   onExport: PropTypes.func
 };
 
 AdminRevenueSection.defaultProps = {
   token: null,
+  revenueCards: [],
+  paymentHealthBreakdown: [],
   onExport: undefined
 };

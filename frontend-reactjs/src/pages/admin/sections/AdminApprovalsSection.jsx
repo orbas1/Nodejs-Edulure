@@ -177,15 +177,18 @@ export default function AdminApprovalsSection({
 }
 
 AdminApprovalsSection.propTypes = {
-  pendingCount: PropTypes.number.isRequired,
-  items: PropTypes.arrayOf(PropTypes.object).isRequired,
-  formatNumber: PropTypes.func.isRequired,
+  pendingCount: PropTypes.number,
+  items: PropTypes.arrayOf(PropTypes.object),
+  formatNumber: PropTypes.func,
   onRefresh: PropTypes.func,
   onDecision: PropTypes.func,
   onEscalate: PropTypes.func
 };
 
 AdminApprovalsSection.defaultProps = {
+  pendingCount: null,
+  items: [],
+  formatNumber: undefined,
   onRefresh: undefined,
   onDecision: undefined,
   onEscalate: undefined
