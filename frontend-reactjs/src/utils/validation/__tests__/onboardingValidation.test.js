@@ -16,10 +16,10 @@ describe('onboarding validation helpers', () => {
       lastName: '  Ops  ',
       email: 'operator@example.com ',
       persona: 'Community Operator',
-      goalsInput: 'Launch Flow 5, Grow revenue, launch flow 5',
-      inviteCodes: 'FLOW5-OPS, flow5-ops, ',
+      goalsInput: 'Launch Edulure, Grow revenue, launch edulure',
+      inviteCodes: 'EDULURE-OPS, edulure-ops, ',
       marketingSource: '  Conference ',
-      marketingCampaign: ' Flow5 Beta ',
+      marketingCampaign: ' Edulure Beta ',
       marketingOptIn: true,
       interestsInput: 'Analytics, analytics, community',
       timeCommitment: ' 5h/week ',
@@ -33,10 +33,10 @@ describe('onboarding validation helpers', () => {
       email: 'operator@example.com',
       firstName: 'Jordan',
       persona: 'Community Operator',
-      metadata: { source: 'Conference', campaign: 'Flow5 Beta' },
+      metadata: { source: 'Conference', campaign: 'Edulure Beta' },
       preferences: expect.objectContaining({ marketingOptIn: true })
     });
-    expect(draft.invites).toEqual([{ code: 'FLOW5-OPS' }]);
+    expect(draft.invites).toEqual([{ code: 'EDULURE-OPS' }]);
   });
 
   it('calculates onboarding completion checkpoints based on provided data', () => {
@@ -45,7 +45,7 @@ describe('onboarding validation helpers', () => {
       firstName: 'Jordan',
       email: 'jordan@example.com',
       persona: 'Ops',
-      goalsInput: 'Launch Flow 5',
+      goalsInput: 'Launch Edulure cohort',
       interestsInput: 'Analytics',
       password: 'SecurePass!234',
       confirmPassword: 'SecurePass!234',
@@ -87,7 +87,7 @@ describe('onboarding validation helpers', () => {
       firstName: 'River',
       email: 'river@example.com',
       persona: 'Instructor',
-      goalsInput: 'Launch Flow 5 cohort',
+      goalsInput: 'Launch Edulure cohort',
       termsAccepted: true
     };
 

@@ -1,11 +1,12 @@
 const ALT_TEXT = {
-  'hero.flow-five': 'Operators orchestrating onboarding, payments, and community sessions inside the Edulure Flow 5 dashboard.',
+  'hero.launchpad':
+    'Educators collaborating inside the Edulure command centre while reviewing live schedules and learner insights.',
   'case-study.ops-guild':
-    'Ops Guild founders presenting a dashboard with uplift metrics and enrolment charts for Flow 5 marketing.',
+    'Operations team reviewing growth metrics inside Edulure workspace dashboards.',
   'case-study.cohort-studio':
-    'Instructor cohort reviewing lesson plans with monetisation overlays in the Edulure studio.',
+    'Curriculum designer organising modules on Edulure while students take notes during a live session.',
   'case-study.tutor-league':
-    'Tutors celebrating after exceeding sponsorship revenue goals using Edulure payouts.'
+    'Tutoring collective celebrating new learner signups after hosting a live Edulure session.'
 };
 
 export function getMarketingAltText(key, fallback = '') {

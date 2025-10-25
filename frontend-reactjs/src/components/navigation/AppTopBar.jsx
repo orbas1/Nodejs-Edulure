@@ -2,19 +2,13 @@ import { Fragment, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
-import {
-  Bars3Icon,
-  BellIcon,
-  BoltIcon,
-  PlusIcon,
-  RectangleStackIcon,
-  SignalIcon
-} from '@heroicons/react/24/outline';
+import { Bars3Icon, BellIcon, BoltIcon, PlusIcon, SignalIcon } from '@heroicons/react/24/outline';
 
 import GlobalSearchBar from '../search/GlobalSearchBar.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
 import UserMenu from './UserMenu.jsx';
 import { buildFocusOrder } from '../../navigation/routes.js';
+import edulureLogo from '../../assets/brand/edulure-logo.svg';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -22,6 +16,7 @@ function classNames(...classes) {
 
 export default function AppTopBar({
   session,
+  isAuthenticated,
   primaryNavigation,
   quickActions,
   onNavigate,
@@ -40,6 +35,7 @@ export default function AppTopBar({
   showSidebarToggle = false,
   showQuickCreate = true,
   showSearch = true,
+  showPrimaryNavigation = true,
   className
 }) {
   const navigate = useNavigate();
@@ -100,18 +96,21 @@ export default function AppTopBar({
               <Bars3Icon className="h-5 w-5" />
             </button>
           ) : null}
-          <Link to="/" className="flex items-center gap-2 rounded-2xl px-2 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
-            <RectangleStackIcon className="h-6 w-6 text-primary" />
-            <span className="text-sm font-semibold tracking-tight text-slate-900">Edulure</span>
+          <Link
+            to="/"
+            className="flex items-center gap-2 rounded-2xl px-2 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            <img src={edulureLogo} alt="Edulure" className="h-8 w-auto" />
           </Link>
         </div>
-        <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="Primary">
-          {primaryNavigation.map((item, index) => {
-            const tabIndex = focusOrder.indexOf(item.id) + 1;
-            return (
-              <NavLink
-                key={item.id}
-                to={item.to}
+        {showPrimaryNavigation ? (
+          <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="Primary">
+            {primaryNavigation.map((item, index) => {
+              const tabIndex = focusOrder.indexOf(item.id) + 1;
+              return (
+                <NavLink
+                  key={item.id}
+                  to={item.to}
                 className={({ isActive }) =>
                   classNames(
                     'relative rounded-2xl px-3 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
@@ -125,9 +124,10 @@ export default function AppTopBar({
               >
                 <span>{item.label}</span>
               </NavLink>
-            );
-          })}
-        </nav>
+              );
+            })}
+          </nav>
+        ) : null}
         {showSearch ? (
           <div className="hidden flex-1 lg:block">
             <GlobalSearchBar
@@ -205,47 +205,67 @@ export default function AppTopBar({
               </Transition>
             </Menu>
           ) : null}
-          <button
-            type="button"
-            onClick={onOpenNotifications}
-            className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-primary/50 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-            aria-label="Open notifications panel"
-          >
-            <BellIcon className="h-5 w-5" />
-            {notificationCount ? (
-              <span className="absolute -right-1 -top-1 inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white">
-                {notificationCount > 99 ? '99+' : notificationCount}
-              </span>
-            ) : null}
-          </button>
+          {isAuthenticated ? (
+            <button
+              type="button"
+              onClick={onOpenNotifications}
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-primary/50 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              aria-label="Open notifications panel"
+            >
+              <BellIcon className="h-5 w-5" />
+              {notificationCount ? (
+                <span className="absolute -right-1 -top-1 inline-flex min-h-[1.25rem] min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white">
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
           <LanguageSelector size="compact" variant="light" align="end" showLabel={false} />
           {session?.user ? (
             <UserMenu session={session} onNavigate={handleNavigate} onLogout={onLogout} />
           ) : (
-            <div className="hidden items-center gap-2 lg:flex">
-              <Link
-                to="/login"
-                className="rounded-2xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-              >
-                Log in
-              </Link>
-              <Link
-                to="/register"
-                className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-              >
-                Join Edulure
-              </Link>
-            </div>
+            <>
+              <div className="hidden items-center gap-2 lg:flex">
+                <Link
+                  to="/login"
+                  className="rounded-2xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  Log in
+                </Link>
+                <Link
+                  to="/register"
+                  className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  Join Edulure
+                </Link>
+              </div>
+              <div className="flex items-center gap-2 lg:hidden">
+                <Link
+                  to="/login"
+                  className="rounded-2xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  Log in
+                </Link>
+                <Link
+                  to="/register"
+                  className="rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  Join
+                </Link>
+              </div>
+            </>
           )}
         </div>
       </div>
-      <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-xs text-slate-500 sm:px-6 lg:hidden" aria-live="polite">
-        {primaryNavigation.map((item) => (
-          <p key={item.id} id={`${item.id}-description`} className="sr-only">
-            {item.description}
-          </p>
-        ))}
-      </div>
+      {showPrimaryNavigation ? (
+        <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-xs text-slate-500 sm:px-6 lg:hidden" aria-live="polite">
+          {primaryNavigation.map((item) => (
+            <p key={item.id} id={`${item.id}-description`} className="sr-only">
+              {item.description}
+            </p>
+          ))}
+        </div>
+      ) : null}
       {showSearch ? (
         <div className="border-t border-slate-100 px-4 py-3 lg:hidden">
           <GlobalSearchBar
@@ -264,6 +284,7 @@ export default function AppTopBar({
 
 AppTopBar.propTypes = {
   session: PropTypes.object,
+  isAuthenticated: PropTypes.bool,
   primaryNavigation: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,
@@ -302,11 +323,13 @@ AppTopBar.propTypes = {
   showSidebarToggle: PropTypes.bool,
   showQuickCreate: PropTypes.bool,
   showSearch: PropTypes.bool,
+  showPrimaryNavigation: PropTypes.bool,
   className: PropTypes.string
 };
 
 AppTopBar.defaultProps = {
   session: null,
+  isAuthenticated: false,
   quickActions: [],
   onNavigate: null,
   onOpenNotifications: null,
@@ -324,6 +347,7 @@ AppTopBar.defaultProps = {
   showSidebarToggle: false,
   showQuickCreate: true,
   showSearch: true,
+  showPrimaryNavigation: true,
   className: ''
 };
 

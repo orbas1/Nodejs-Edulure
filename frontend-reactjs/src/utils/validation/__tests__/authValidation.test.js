@@ -54,7 +54,7 @@ describe('auth validation helpers', () => {
     const validation = validateRegisterAccountState({
       firstName: ' Alex ',
       lastName: '  Morgan ',
-      email: 'FLOW5@EXAMPLE.COM ',
+      email: 'LAUNCH@EXAMPLE.COM ',
       password: 'SecurePass!234',
       confirmPassword: 'SecurePass!234',
       role: 'instructor'
@@ -64,7 +64,7 @@ describe('auth validation helpers', () => {
     expect(validation.cleaned).toMatchObject({
       firstName: 'Alex',
       lastName: 'Morgan',
-      email: 'flow5@example.com',
+      email: 'launch@example.com',
       role: 'instructor'
     });
     expect(validation.cleaned.evaluation.isCompliant).toBe(true);

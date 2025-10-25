@@ -120,7 +120,7 @@ export default function ConversionPanel({ blockSlug, defaultCtaSource, defaultEm
       <HomeSection size="wide" pad="py-20">
         <div className="conversion-panel__inner">
           <div className="conversion-panel__copy">
-            <h2>Bring Flow 5 to your learners</h2>
+            <h2>Bring Edulure to your learners</h2>
             <p>
               Share a few details and we will queue your workspace walkthrough, plus unlock any community invites waiting for
               your email.
@@ -166,7 +166,7 @@ export default function ConversionPanel({ blockSlug, defaultCtaSource, defaultEm
                 name="company"
                 value={form.company}
                 onChange={handleChange}
-                placeholder="Flow 5 Collective"
+                placeholder="Edulure Collective"
                 autoComplete="organization"
               />
             </label>
@@ -191,7 +191,7 @@ export default function ConversionPanel({ blockSlug, defaultCtaSource, defaultEm
               />
             </label>
             <button type="submit" className="cta-button cta-button--primary" disabled={submitting}>
-              {submitting ? 'Sending…' : 'Request Flow 5 walkthrough'}
+              {submitting ? 'Sending…' : 'Request Edulure walkthrough'}
             </button>
           </form>
         </div>

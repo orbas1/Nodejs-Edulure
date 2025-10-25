@@ -6,7 +6,7 @@ export const MARKETING_TESTIMONIALS = [
     authorName: 'Lena Ortiz',
     authorTitle: 'Founder, CohortCraft',
     persona: 'Cohort operations lead',
-    featuredProduct: 'Flow 5 Launch Kits',
+    featuredProduct: 'Edulure Launch Kits',
     surfaces: ['home', 'learner-register'],
     metadata: {
       localeKeys: {
@@ -34,11 +34,11 @@ export const MARKETING_TESTIMONIALS = [
     }
   },
   {
-    slug: 'ops-director-flow5',
+    slug: 'ops-director-horizon',
     variant: 'social_proof',
     quote:
-      'Flow 5 onboarding kept our entire revenue pod aligned in the first week. We knew which communities to launch next.',
-    attribution: 'Operations Director · Flow 5',
+      'Edulure onboarding kept our entire revenue pod aligned in the first week. We knew which communities to launch next.',
+    attribution: 'Operations Director · Horizon Collective',
     persona: 'Revenue operations',
     surfaces: ['learner-register'],
     metadata: { channel: 'learner', emphasis: 'onboarding' }
