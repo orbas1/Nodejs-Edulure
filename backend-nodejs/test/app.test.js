@@ -5,10 +5,30 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 const envMock = {
   security: {
     rateLimitWindowMinutes: 15,
-    rateLimitMax: 200
+    rateLimitMax: 200,
+    jwtRefreshSecret: 'refresh-secret'
   },
   app: {
     corsOrigins: ['https://app.local']
+  },
+  storage: {
+    driver: 'r2',
+    publicBucket: 'public',
+    privateBucket: 'private',
+    uploadsBucket: 'uploads',
+    quarantineBucket: 'quarantine',
+    uploadTtlMinutes: 30,
+    downloadTtlMinutes: 30,
+    maxUploadBytes: 5 * 1024 * 1024,
+    uploadRetry: { attempts: 3 },
+    localRoot: '/tmp/edulure-test-storage',
+    localPublicUrl: 'http://localhost:3000/storage',
+    serveStatic: false,
+    accountId: 'test-account',
+    region: 'auto',
+    accessKeyId: 'test-access-key',
+    secretAccessKey: 'test-secret-key',
+    cdnUrl: null
   },
   isProduction: false
 };
