@@ -11,6 +11,7 @@ const communityChatServiceMock = {
   reactToMessage: vi.fn(),
   removeReaction: vi.fn(),
   moderateMessage: vi.fn(),
+  ensureCommunityMember: vi.fn(),
   listPresence: vi.fn(),
   updatePresence: vi.fn()
 };
@@ -60,6 +61,11 @@ beforeEach(() => {
   Object.values(communityChatServiceMock).forEach((fn) => fn.mockReset());
   Object.values(directMessageServiceMock).forEach((fn) => fn.mockReset());
   Object.values(realtimeServiceMock).forEach((fn) => fn.mockReset());
+
+  communityChatServiceMock.ensureCommunityMember.mockResolvedValue({
+    community: { id: 7 },
+    membership: { id: 42, role: 'member', status: 'active' }
+  });
 });
 
 describe('Community chat HTTP routes', () => {
