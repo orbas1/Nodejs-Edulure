@@ -70,8 +70,15 @@ export default function SocialSignOn({ onSelect, providers }) {
             key={provider.id}
             type="button"
             onClick={() => {
-              if (!disabled) {
-                onSelect(provider.id, provider);
+              if (disabled) {
+                return;
+              }
+              if (typeof onSelect === 'function') {
+                if (onSelect.length > 1) {
+                  onSelect(provider.id, provider);
+                } else {
+                  onSelect(provider.id);
+                }
               }
             }}
             disabled={disabled}

@@ -581,7 +581,8 @@ export default function BecomeInstructor() {
 
       {statusMessage ? (
         <div
-          role="status"
+          role={statusMessage.type === 'error' ? 'alert' : 'status'}
+          aria-live={statusMessage.type === 'error' ? 'assertive' : 'polite'}
           className={`rounded-3xl border px-4 py-3 text-sm ${
             statusMessage.type === 'error'
               ? 'border-rose-200 bg-rose-50 text-rose-700'

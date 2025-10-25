@@ -20,8 +20,8 @@ export default function SearchBar({
     const formData = new FormData(form);
     const submittedValue = formData.get('search');
     onSubmit(
-      event,
-      typeof submittedValue === 'string' ? submittedValue : ''
+      typeof submittedValue === 'string' ? submittedValue : '',
+      event
     );
   };
 
