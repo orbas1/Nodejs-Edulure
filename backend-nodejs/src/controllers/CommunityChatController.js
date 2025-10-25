@@ -417,13 +417,17 @@ export default class CommunityChatController {
         abortEarly: false,
         stripUnknown: true
       });
-      const communityId = Number(req.params.communityId);
-      await CommunityChatService.ensureCommunityMember(communityId, req.user.id);
+      const communityIdParam = req.params.communityId;
+      const numericCommunityId = Number.parseInt(communityIdParam, 10);
+      const communityIdForMetadata = Number.isNaN(numericCommunityId)
+        ? communityIdParam
+        : numericCommunityId;
+      await CommunityChatService.ensureCommunityMember(communityIdParam, req.user.id);
       const presencePayload = {
         ...payload,
         metadata: {
           ...(payload.metadata ?? {}),
-          communityId
+          communityId: communityIdForMetadata
         }
       };
       const session = await CommunityChatService.updatePresence(
@@ -431,13 +435,13 @@ export default class CommunityChatController {
         req.user.sessionId,
         presencePayload
       );
-      const presence = await CommunityChatService.listPresence(communityId);
-      await realtimeService.broadcastCommunityPresence(communityId, presence);
+      const presence = await CommunityChatService.listPresence(communityIdParam);
+      await realtimeService.broadcastCommunityPresence(communityIdParam, presence);
       return success(res, {
         data: session,
         message: 'Presence updated',
         meta: {
-          communityId,
+          communityId: communityIdForMetadata,
           presenceCount: presence.length
         }
       });

@@ -68,11 +68,18 @@ export default class TelemetryController {
       });
     } catch (error) {
       if (error instanceof ZodError) {
-        error.status = 422;
         const issues = Array.isArray(error.issues) ? error.issues : Array.isArray(error.errors) ? error.errors : [];
-        error.details = issues
-          .map((issue) => (typeof issue === 'string' ? issue : issue?.message))
+        const formattedIssues = formatZodIssues(issues);
+        const messages = formattedIssues
+          .map((issue) => issue.message)
           .filter((message) => message !== undefined && message !== null);
+        return res.status(422).json({
+          success: false,
+          message: 'Telemetry event payload is invalid',
+          code: 'INVALID_TELEMETRY_EVENT',
+          errors: messages,
+          details: formattedIssues
+        });
       }
       return next(error);
     }

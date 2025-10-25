@@ -108,6 +108,19 @@ function validateBrandSafety(raw = {}) {
   };
 }
 
+function normalisePreview(raw = {}) {
+  if (!raw || typeof raw !== 'object') {
+    return { theme: 'light', accent: 'primary' };
+  }
+  const theme = typeof raw.theme === 'string' && raw.theme.trim() ? raw.theme.trim() : 'light';
+  const accent = typeof raw.accent === 'string' && raw.accent.trim() ? raw.accent.trim() : 'primary';
+  return {
+    ...raw,
+    theme,
+    accent
+  };
+}
+
 function ensurePlacementCompatibility({ placements, targeting }) {
   const contexts = Array.isArray(placements) ? placements.map((placement) => placement.context) : [];
   const keywords = toStringArray(targeting?.keywords ?? []);
@@ -451,6 +464,19 @@ export default class AdsService {
 
     const placements = validatePlacements(payload.placements);
     const brandSafety = validateBrandSafety(payload.brandSafety);
+    const preview = normalisePreview(payload.preview);
+    const metadataDefaults = {
+      reviewChecklist: Array.isArray(payload.metadata?.reviewChecklist)
+        ? payload.metadata.reviewChecklist
+        : [],
+      landingPage: payload.creative?.url ?? null,
+      placements,
+      brandSafety,
+      creativeAsset: payload.creative?.asset ?? null,
+      preview,
+      lastFormSurface: payload.metadata?.lastFormSurface ?? 'dashboard_ads',
+      lastCompatibilityCheckAt: new Date().toISOString()
+    };
     const targeting = {
       keywords: toStringArray(payload.targeting?.keywords),
       audiences: toStringArray(payload.targeting?.audiences),
@@ -479,16 +505,7 @@ export default class AdsService {
           creativeUrl: payload.creative?.url,
           startAt: startAt ? startAt.toISOString() : null,
           endAt: endAt ? endAt.toISOString() : null,
-          metadata: {
-            reviewChecklist: payload.metadata?.reviewChecklist ?? [],
-            landingPage: payload.creative?.url ?? null,
-            placements,
-            brandSafety,
-            creativeAsset: payload.creative?.asset ?? null,
-            preview: payload.preview ?? { theme: 'light', accent: 'primary' },
-            lastFormSurface: payload.metadata?.lastFormSurface ?? 'dashboard_ads',
-            lastCompatibilityCheckAt: new Date().toISOString()
-          }
+          metadata: metadataDefaults
         },
         trx
       );
@@ -514,7 +531,51 @@ export default class AdsService {
     });
 
     const [hydrated] = await this.hydrateCampaignCollection([campaign]);
-    return hydrated;
+    if (!hydrated) {
+      return hydrated;
+    }
+
+    const ensuredPlacements = Array.isArray(hydrated.placements) && hydrated.placements.length
+      ? hydrated.placements
+      : placements;
+    const hydratedBrandSafety = hydrated.brandSafety ?? {};
+    const hydratedCategories = Array.isArray(hydratedBrandSafety.categories)
+      ? hydratedBrandSafety.categories.filter((value) => Boolean(value))
+      : [];
+    const fallbackCategories = Array.isArray(brandSafety.categories) ? brandSafety.categories : ['standard'];
+    const categories = Array.from(new Set([...fallbackCategories, ...hydratedCategories]));
+    if (!categories.length) {
+      categories.push('standard');
+    }
+    const ensuredBrandSafety = {
+      ...brandSafety,
+      ...hydratedBrandSafety,
+      excludedTopics:
+        Array.isArray(hydratedBrandSafety.excludedTopics) && hydratedBrandSafety.excludedTopics.length
+          ? hydratedBrandSafety.excludedTopics
+          : brandSafety.excludedTopics,
+      reviewNotes: hydratedBrandSafety.reviewNotes ?? brandSafety.reviewNotes ?? null,
+      categories
+    };
+    const ensuredPreview = {
+      ...(hydrated.preview ?? {}),
+      ...preview
+    };
+    const mergedMetadata = {
+      ...metadataDefaults,
+      ...(hydrated.metadata ?? {}),
+      placements: ensuredPlacements,
+      brandSafety: ensuredBrandSafety,
+      preview: ensuredPreview
+    };
+
+    return {
+      ...hydrated,
+      placements: ensuredPlacements,
+      brandSafety: ensuredBrandSafety,
+      preview: ensuredPreview,
+      metadata: mergedMetadata
+    };
   }
 
   static async updateCampaign(publicId, actor, payload) {
