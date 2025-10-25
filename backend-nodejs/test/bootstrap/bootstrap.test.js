@@ -19,7 +19,8 @@ vi.mock('../../src/config/database.js', () => ({
 const bootstrapLogger = {
   child: () => bootstrapLogger,
   error: vi.fn(),
-  warn: vi.fn()
+  warn: vi.fn(),
+  info: vi.fn()
 };
 
 vi.mock('../../src/config/logger.js', () => ({

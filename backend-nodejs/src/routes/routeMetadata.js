@@ -945,8 +945,8 @@ const ROUTE_DEFINITIONS = [
     tags: ['api', 'v1', 'operator'],
     rbac: {
       strategy: 'role-based',
-      defaultRole: 'admin',
-      allowedRoles: ['admin', 'staff'],
+      defaultRole: 'ops',
+      allowedRoles: ['ops', 'admin', 'staff'],
       elevatedRoles: ['admin']
     },
     cors: {
@@ -1253,7 +1253,7 @@ const ROUTE_DEFINITIONS = [
     defaultState: 'enabled',
     fallbackStatus: 404,
     disabledMessage: 'Quality automation APIs are not enabled for this deployment.',
-    audience: 'internal',
+    audience: 'admin',
     owners: ['quality-engineering'],
     serviceTier: 'supporting',
     tags: ['api', 'v1', 'qa'],
