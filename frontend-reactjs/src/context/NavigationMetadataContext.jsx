@@ -36,7 +36,7 @@ function normaliseRole(role) {
   return trimmed;
 }
 
-export function NavigationMetadataProvider({ role, token, children }) {
+export function NavigationMetadataProvider({ role, token, children, enabled }) {
   const [state, setState] = useState({ status: 'idle', data: defaultData, error: null });
   const abortRef = useRef(null);
   const resolvedRole = normaliseRole(role);
@@ -53,6 +53,11 @@ export function NavigationMetadataProvider({ role, token, children }) {
   useEffect(() => {
     if (abortRef.current) {
       abortRef.current.abort();
+      abortRef.current = null;
+    }
+    if (!enabled) {
+      setState({ status: 'idle', data: defaultData, error: null });
+      return undefined;
     }
     const controller = new AbortController();
     abortRef.current = controller;
@@ -77,10 +82,18 @@ export function NavigationMetadataProvider({ role, token, children }) {
       cancelled = true;
       controller.abort();
     };
-  }, [load, resolvedRole, token]);
+  }, [enabled, load, resolvedRole, token]);
 
   const refresh = useMemo(() => {
     return async () => {
+      if (!enabled) {
+        if (abortRef.current) {
+          abortRef.current.abort();
+          abortRef.current = null;
+        }
+        setState({ status: 'idle', data: defaultData, error: null });
+        return;
+      }
       if (abortRef.current) {
         abortRef.current.abort();
       }
@@ -98,7 +111,7 @@ export function NavigationMetadataProvider({ role, token, children }) {
         setState({ status: 'error', data: defaultData, error });
       }
     };
-  }, [load, resolvedRole, token]);
+  }, [enabled, load, resolvedRole, token]);
 
   const value = useMemo(() => ({
     ...defaultData,
@@ -114,12 +127,14 @@ export function NavigationMetadataProvider({ role, token, children }) {
 NavigationMetadataProvider.propTypes = {
   role: PropTypes.string,
   token: PropTypes.string,
-  children: PropTypes.node.isRequired
+  children: PropTypes.node.isRequired,
+  enabled: PropTypes.bool
 };
 
 NavigationMetadataProvider.defaultProps = {
   role: 'user',
-  token: undefined
+  token: undefined,
+  enabled: true
 };
 
 export function useNavigationMetadata() {

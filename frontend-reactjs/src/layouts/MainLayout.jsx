@@ -23,6 +23,24 @@ import {
 } from '../lib/analytics.js';
 import { useTheme } from '../providers/ThemeProvider.jsx';
 
+const CUSTOMER_ROLES = new Set(['learner', 'guardian', 'student']);
+
+function normaliseRole(role) {
+  if (typeof role !== 'string') {
+    return null;
+  }
+  const trimmed = role.trim().toLowerCase();
+  return trimmed || null;
+}
+
+function isCustomerRole(role) {
+  const resolved = normaliseRole(role);
+  if (!resolved) {
+    return true;
+  }
+  return CUSTOMER_ROLES.has(resolved);
+}
+
 export function MainLayoutContent({
   session,
   isAuthenticated,
@@ -233,9 +251,10 @@ export default function MainLayout({ variant = 'app' }) {
 
   const metadataRole = session?.user?.role ?? (isAuthenticated ? 'user' : 'guest');
   const metadataToken = session?.tokens?.accessToken ?? undefined;
+  const annexMetadataEnabled = !isCustomerRole(session?.user?.role) && isAuthenticated && variant !== 'marketing';
 
   return (
-    <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
+    <NavigationMetadataProvider role={metadataRole} token={metadataToken} enabled={annexMetadataEnabled}>
       <MainLayoutContent
         session={session}
         isAuthenticated={isAuthenticated}
