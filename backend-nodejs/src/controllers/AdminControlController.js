@@ -34,6 +34,8 @@ const communityCreateSchema = Joi.object({
 
 const communityUpdateSchema = communityCreateSchema.fork(['name', 'ownerId'], (schema) => schema.optional());
 
+const clusterKeySchema = Joi.string().valid(...LEARNING_CLUSTER_KEYS);
+
 const courseCreateSchema = Joi.object({
   instructorId: Joi.number().integer().positive().required(),
   title: Joi.string().trim().max(200).required(),
@@ -42,7 +44,7 @@ const courseCreateSchema = Joi.object({
   description: Joi.string().allow('', null).optional(),
   level: Joi.string().valid('beginner', 'intermediate', 'advanced', 'expert').default('beginner'),
   category: Joi.string().trim().max(120).default('general'),
-  clusterKey: Joi.string().valid(...LEARNING_CLUSTER_KEYS).default('general'),
+  clusterKey: clusterKeySchema.default('general'),
   skills: Joi.alternatives().try(Joi.array().items(Joi.string().trim().max(120)), Joi.string().allow('', null)).optional(),
   tags: Joi.alternatives().try(Joi.array().items(Joi.string().trim().max(120)), Joi.string().allow('', null)).optional(),
   languages: Joi.alternatives().try(Joi.array().items(Joi.string().trim().max(5)), Joi.string().allow('', null)).optional(),
@@ -62,7 +64,7 @@ const courseCreateSchema = Joi.object({
 
 const courseUpdateSchema = courseCreateSchema
   .fork(['title', 'instructorId'], (schema) => schema.optional())
-  .fork(['clusterKey'], (schema) => schema.optional().default(undefined));
+  .keys({ clusterKey: clusterKeySchema.optional() });
 
 const tutorCreateSchema = Joi.object({
   userId: Joi.number().integer().positive().required(),
@@ -124,13 +126,13 @@ const liveStreamCreateSchema = Joi.object({
   startAt: Joi.date().iso().required(),
   endAt: Joi.date().iso().required(),
   topics: Joi.alternatives().try(Joi.array().items(Joi.string().trim().max(120)), Joi.string().allow('', null)).optional(),
-  clusterKey: Joi.string().valid(...LEARNING_CLUSTER_KEYS).default('general'),
+  clusterKey: clusterKeySchema.default('general'),
   metadata: Joi.alternatives().try(Joi.object(), Joi.string().allow('', null)).default({})
 });
 
 const liveStreamUpdateSchema = liveStreamCreateSchema
   .fork(['title', 'startAt', 'endAt'], (schema) => schema.optional())
-  .fork(['clusterKey'], (schema) => schema.optional().default(undefined));
+  .keys({ clusterKey: clusterKeySchema.optional() });
 
 const podcastShowCreateSchema = Joi.object({
   communityId: Joi.number().integer().positive().allow(null).optional(),
