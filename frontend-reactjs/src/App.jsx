@@ -92,268 +92,270 @@ function App() {
         }
       >
         <Routes>
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/instructor" element={<InstructorRegister />} />
-        <Route
-          path="/communities"
-          element={(
-            <ProtectedRoute allowedRoles={['admin', 'moderator', 'owner', 'member', 'non-member']}>
-              <Communities />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/feed"
-          element={(
-            <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin', 'moderator']}>
-              <Feed />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/profile"
-          element={(
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/explorer"
-          element={(
-            <ProtectedRoute allowedRoles={['user', 'instructor', 'admin']}>
-              <Explorer />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/analytics"
-          element={(
-            <ProtectedRoute allowedRoles={['instructor', 'admin']}>
-              <Analytics />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/admin"
-          element={(
-            <ProtectedRoute allowedRoles={['admin']}>
-              <Admin />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/content"
-          element={(
-            <ProtectedRoute allowedRoles={['instructor', 'admin']}>
-              <ContentLibrary />
-            </ProtectedRoute>
-          )}
-        />
-        <Route path="/live-classrooms" element={<LiveClassrooms />} />
-        <Route path="/courses" element={<Courses />} />
-        <Route path="/ebooks" element={<Ebooks />} />
-        <Route path="/tutors" element={<TutorProfile />} />
-        <Route path="/blog" element={<Blog />} />
-        <Route path="/blog/:slug" element={<BlogPost />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/legal/contact" element={<LegalContact />} />
-        <Route path="/handbook/navigation-annex" element={<NavigationAnnex />} />
-        <Route path="/integrations/credential-invite/:token" element={<IntegrationCredentialInvite />} />
-        <Route path="/setup" element={<Setup />} />
-      </Route>
-      <Route path="/dashboard" element={<DashboardEntryRedirect />} />
-      <Route
-        path="/dashboard/:role"
-        element={(
-          <ProtectedRoute>
-            <DashboardLayout />
-          </ProtectedRoute>
-        )}
-      >
-        <Route index element={<DashboardHome />} />
-        <Route path="communities" element={<LearnerCommunities />} />
-        <Route path="community-chats" element={<LearnerCommunityChats />} />
-        <Route path="courses" element={<LearnerCourses />} />
-        <Route path="courses/:courseId" element={<CourseViewer />} />
-        <Route path="social" element={<LearnerSocial />} />
-        <Route path="assessments" element={<DashboardAssessments />} />
-        <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
-        <Route path="calendar" element={<DashboardCalendar />} />
-        <Route path="bookings" element={<DashboardBookingsSwitch />} />
-        <Route path="support" element={<LearnerSupport />} />
-        <Route path="ebooks" element={<DashboardEbooksSwitch />} />
-        <Route path="financial" element={<LearnerFinancial />} />
-        <Route path="settings" element={<LearnerSettings />} />
-        <Route path="growth" element={<LearnerGrowth />} />
-        <Route path="affiliate" element={<DashboardAffiliate />} />
-        <Route path="become-instructor" element={<BecomeInstructor />} />
-        <Route path="field-services" element={<FieldServices />} />
-        <Route
-          path="operations"
-          element={(
-            <ProtectedRoute allowedRoles={['community']}>
-              <CommunityOperations />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="programming"
-          element={(
-            <ProtectedRoute allowedRoles={['community']}>
-              <CommunityProgramming />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="monetisation"
-          element={(
-            <ProtectedRoute allowedRoles={['community']}>
-              <CommunityMonetisation />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="safety"
-          element={(
-            <ProtectedRoute allowedRoles={['community']}>
-              <CommunitySafety />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="communications"
-          element={(
-            <ProtectedRoute allowedRoles={['community']}>
-              <CommunityCommunications />
-            </ProtectedRoute>
-          )}
-        />
-        <Route path="communities/create" element={<InstructorCommunityCreate />} />
-        <Route path="communities/manage" element={<InstructorCommunityManage />} />
-        <Route
-          path="communities/operations"
-          element={(
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorCommunityOperations />
-            </ProtectedRoute>
-          )}
-        />
-        <Route path="communities/chats" element={<InstructorCommunityChats />} />
-        <Route path="communities/webinars" element={<InstructorCommunityWebinars />} />
-        <Route path="communities/podcasts" element={<InstructorCommunityPodcasts />} />
-        <Route
-          path="creation-studio"
-          element={(
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorCreationStudio />
-            </ProtectedRoute>
-          )}
-        />
-        <Route path="courses/create" element={<InstructorCourseCreate />} />
-        <Route path="courses/library" element={<InstructorCourseLibrary />} />
-        <Route path="courses/manage" element={<InstructorCourseManage />} />
-        <Route path="inbox" element={<DashboardInbox />} />
-        <Route path="growth" element={<InstructorGrowth />} />
-        <Route path="pricing" element={<InstructorPricing />} />
-        <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
-        <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
-        <Route path="tutor-management" element={<InstructorTutorManagement />} />
-        <Route
-          path="control"
-          element={(
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminControl />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="operator"
-          element={(
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminOperator />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="integrations"
-          element={(
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminIntegrations />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="finance"
-          element={(
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminFinanceMonetisation />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="trust-safety"
-          element={(
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminTrustSafety />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="support"
-          element={(
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminSupportHub />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="governance"
-          element={(
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminGovernance />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="services"
-          element={(
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorServiceSuite />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="projects"
-          element={(
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorProjects />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="ebooks/create"
-          element={(
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorEbookCreate />
-            </ProtectedRoute>
-          )}
-        />
-        <Route path="settings" element={<DashboardSettings />} />
-        <Route
-          path="ads"
-          element={(
-            <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin']}>
-              <EdulureAds />
-            </ProtectedRoute>
-          )}
-        />
-      </Route>
+          <Route path="/" element={<MainLayout variant="marketing" />}>
+            <Route index element={<Home />} />
+            <Route path="about" element={<About />} />
+            <Route path="blog" element={<Blog />} />
+            <Route path="blog/:slug" element={<BlogPost />} />
+            <Route path="courses" element={<Courses />} />
+            <Route path="ebooks" element={<Ebooks />} />
+            <Route path="live-classrooms" element={<LiveClassrooms />} />
+            <Route path="tutors" element={<TutorProfile />} />
+            <Route path="privacy" element={<Privacy />} />
+            <Route path="terms" element={<Terms />} />
+            <Route path="legal/contact" element={<LegalContact />} />
+          </Route>
+          <Route path="/" element={<MainLayout variant="app" />}>
+            <Route path="login" element={<Login />} />
+            <Route path="register" element={<Register />} />
+            <Route path="instructor" element={<InstructorRegister />} />
+            <Route
+              path="communities"
+              element={(
+                <ProtectedRoute allowedRoles={['admin', 'moderator', 'owner', 'member', 'non-member']}>
+                  <Communities />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="feed"
+              element={(
+                <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin', 'moderator']}>
+                  <Feed />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="profile"
+              element={(
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="explorer"
+              element={(
+                <ProtectedRoute allowedRoles={['user', 'instructor', 'admin']}>
+                  <Explorer />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="analytics"
+              element={(
+                <ProtectedRoute allowedRoles={['instructor', 'admin']}>
+                  <Analytics />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="admin"
+              element={(
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <Admin />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="content"
+              element={(
+                <ProtectedRoute allowedRoles={['instructor', 'admin']}>
+                  <ContentLibrary />
+                </ProtectedRoute>
+              )}
+            />
+            <Route path="handbook/navigation-annex" element={<NavigationAnnex />} />
+            <Route path="integrations/credential-invite/:token" element={<IntegrationCredentialInvite />} />
+            <Route path="setup" element={<Setup />} />
+          </Route>
+          <Route path="/dashboard" element={<DashboardEntryRedirect />} />
+          <Route
+            path="/dashboard/:role"
+            element={(
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            )}
+          >
+            <Route index element={<DashboardHome />} />
+            <Route path="communities" element={<LearnerCommunities />} />
+            <Route path="community-chats" element={<LearnerCommunityChats />} />
+            <Route path="courses" element={<LearnerCourses />} />
+            <Route path="courses/:courseId" element={<CourseViewer />} />
+            <Route path="social" element={<LearnerSocial />} />
+            <Route path="assessments" element={<DashboardAssessments />} />
+            <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
+            <Route path="calendar" element={<DashboardCalendar />} />
+            <Route path="bookings" element={<DashboardBookingsSwitch />} />
+            <Route path="support" element={<LearnerSupport />} />
+            <Route path="ebooks" element={<DashboardEbooksSwitch />} />
+            <Route path="financial" element={<LearnerFinancial />} />
+            <Route path="settings" element={<LearnerSettings />} />
+            <Route path="growth" element={<LearnerGrowth />} />
+            <Route path="affiliate" element={<DashboardAffiliate />} />
+            <Route path="become-instructor" element={<BecomeInstructor />} />
+            <Route path="field-services" element={<FieldServices />} />
+            <Route
+              path="operations"
+              element={(
+                <ProtectedRoute allowedRoles={['community']}>
+                  <CommunityOperations />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="programming"
+              element={(
+                <ProtectedRoute allowedRoles={['community']}>
+                  <CommunityProgramming />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="monetisation"
+              element={(
+                <ProtectedRoute allowedRoles={['community']}>
+                  <CommunityMonetisation />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="safety"
+              element={(
+                <ProtectedRoute allowedRoles={['community']}>
+                  <CommunitySafety />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="communications"
+              element={(
+                <ProtectedRoute allowedRoles={['community']}>
+                  <CommunityCommunications />
+                </ProtectedRoute>
+              )}
+            />
+            <Route path="communities/create" element={<InstructorCommunityCreate />} />
+            <Route path="communities/manage" element={<InstructorCommunityManage />} />
+            <Route
+              path="communities/operations"
+              element={(
+                <ProtectedRoute allowedRoles={['instructor']}>
+                  <InstructorCommunityOperations />
+                </ProtectedRoute>
+              )}
+            />
+            <Route path="communities/chats" element={<InstructorCommunityChats />} />
+            <Route path="communities/webinars" element={<InstructorCommunityWebinars />} />
+            <Route path="communities/podcasts" element={<InstructorCommunityPodcasts />} />
+            <Route
+              path="creation-studio"
+              element={(
+                <ProtectedRoute allowedRoles={['instructor']}>
+                  <InstructorCreationStudio />
+                </ProtectedRoute>
+              )}
+            />
+            <Route path="courses/create" element={<InstructorCourseCreate />} />
+            <Route path="courses/library" element={<InstructorCourseLibrary />} />
+            <Route path="courses/manage" element={<InstructorCourseManage />} />
+            <Route path="inbox" element={<DashboardInbox />} />
+            <Route path="growth" element={<InstructorGrowth />} />
+            <Route path="pricing" element={<InstructorPricing />} />
+            <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
+            <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
+            <Route path="tutor-management" element={<InstructorTutorManagement />} />
+            <Route
+              path="control"
+              element={(
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminControl />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="operator"
+              element={(
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminOperator />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="integrations"
+              element={(
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminIntegrations />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="finance"
+              element={(
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminFinanceMonetisation />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="trust-safety"
+              element={(
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminTrustSafety />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="support"
+              element={(
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminSupportHub />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="governance"
+              element={(
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminGovernance />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="services"
+              element={(
+                <ProtectedRoute allowedRoles={['instructor']}>
+                  <InstructorServiceSuite />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="projects"
+              element={(
+                <ProtectedRoute allowedRoles={['instructor']}>
+                  <InstructorProjects />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="ebooks/create"
+              element={(
+                <ProtectedRoute allowedRoles={['instructor']}>
+                  <InstructorEbookCreate />
+                </ProtectedRoute>
+              )}
+            />
+            <Route path="settings" element={<DashboardSettings />} />
+            <Route
+              path="ads"
+              element={(
+                <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin']}>
+                  <EdulureAds />
+                </ProtectedRoute>
+              )}
+            />
+          </Route>
         </Routes>
       </Suspense>
     </ThemeProvider>
