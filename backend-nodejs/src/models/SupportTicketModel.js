@@ -182,20 +182,19 @@ function normaliseBreadcrumbs(value) {
         return null;
       }
       const at = toIso(crumb.at ?? crumb.timestamp ?? crumb.occurredAt ?? new Date());
+      const actor = crumb.actor ?? crumb.source ?? 'system';
+      const baseId =
+        crumb.id ?? (at ? `crumb-${at}` : crumb.reference ?? `crumb-${actor}-${index}`);
       return {
-        id: crumb.id ?? `crumb-${crumb.actor ?? 'system'}-${index}`,
-        actor: crumb.actor ?? crumb.source ?? 'system',
+        id: baseId,
+        actor,
         label: crumb.label ?? crumb.title ?? 'Update',
         note: crumb.note ?? crumb.description ?? null,
         at
       };
     })
     .filter(Boolean)
-    .sort((a, b) => new Date(a.at ?? 0) - new Date(b.at ?? 0))
-    .map((crumb, index) => ({
-      ...crumb,
-      id: crumb.id ?? `crumb-${index}`
-    }));
+    .sort((a, b) => new Date(a.at ?? 0) - new Date(b.at ?? 0));
 }
 
 function mapMessage(row) {

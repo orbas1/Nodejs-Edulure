@@ -16,7 +16,6 @@ export async function startWebServer({ withSignalHandlers = true } = {}) {
       'feature-flags',
       'runtime-config',
       'search-cluster',
-      'graphql-gateway',
       'http-server',
       'socket-gateway',
       ...BACKGROUND_JOB_TARGETS
@@ -40,12 +39,14 @@ export async function startWebServer({ withSignalHandlers = true } = {}) {
   const server = http.createServer(app);
   const activeConnections = new Set();
 
-  server.on('connection', (socket) => {
-    activeConnections.add(socket);
-    socket.on('close', () => {
-      activeConnections.delete(socket);
+  if (typeof server.on === 'function') {
+    server.on('connection', (socket) => {
+      activeConnections.add(socket);
+      socket.on?.('close', () => {
+        activeConnections.delete(socket);
+      });
     });
-  });
+  }
   let httpServerPending = false;
   let jobRunner = null;
   let realtimeAttachment = null;

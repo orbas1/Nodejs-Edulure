@@ -102,7 +102,14 @@ export class TelemetryWarehouseService {
     this.freshnessModel = freshnessModel;
     this.lineageModel = lineageModel;
     this.storage = storage;
-    this.logger = loggerInstance;
+    const noop = () => {};
+    this.logger = {
+      debug: noop,
+      info: noop,
+      warn: noop,
+      error: noop,
+      ...loggerInstance
+    };
     this.encryptionService = encryptionService;
 
     const exportConfig = config?.export ?? {};

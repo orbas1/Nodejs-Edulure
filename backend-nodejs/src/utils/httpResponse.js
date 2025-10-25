@@ -116,7 +116,7 @@ export function paginated(
       perPage: safePagination.perPage ?? null,
       total: safePagination.total ?? null,
       totalPages: safePagination.totalPages ?? null
-    }).filter(([, value]) => value !== undefined)
+    }).filter(([, value]) => value !== undefined && value !== null)
   );
 
   return success(res, {

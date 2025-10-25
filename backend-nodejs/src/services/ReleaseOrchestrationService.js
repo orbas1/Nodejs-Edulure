@@ -11,6 +11,19 @@ import {
 
 const serviceLogger = logger.child({ module: 'release-orchestration-service' });
 
+async function resolveQualityGateMetricsSafe() {
+  try {
+    const metrics = await QaReadinessService.resolveQualityGateMetrics();
+    if (metrics && typeof metrics === 'object') {
+      return metrics;
+    }
+  } catch (error) {
+    serviceLogger.warn({ err: error }, 'Failed to resolve QA readiness metrics');
+  }
+
+  return { coverage: null, testFailureRate: null, evidence: [] };
+}
+
 function normaliseVersionTag(versionTag) {
   return String(versionTag ?? '')
     .trim()
@@ -243,7 +256,7 @@ class ReleaseOrchestrationService {
       const seed = gateSeed[item.slug] ?? {};
       let metrics = seed.metrics ?? {};
       if (item.slug === 'quality-verification' && (!metrics || Object.keys(metrics).length === 0)) {
-        qualityGateMetrics = qualityGateMetrics ?? (await QaReadinessService.resolveQualityGateMetrics());
+        qualityGateMetrics = qualityGateMetrics ?? (await resolveQualityGateMetricsSafe());
         metrics = {
           ...metrics,
           coverage: qualityGateMetrics.coverage ?? metrics?.coverage ?? null,
@@ -366,7 +379,7 @@ class ReleaseOrchestrationService {
       }
 
       if (gate.gateKey === 'quality-verification') {
-        evaluationQualityMetrics = evaluationQualityMetrics ?? (await QaReadinessService.resolveQualityGateMetrics());
+        evaluationQualityMetrics = evaluationQualityMetrics ?? (await resolveQualityGateMetricsSafe());
         gate.metrics = {
           ...gate.metrics,
           coverage: evaluationQualityMetrics.coverage ?? gate.metrics?.coverage ?? null,

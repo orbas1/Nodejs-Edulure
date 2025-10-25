@@ -4,7 +4,7 @@ import { env } from './env.js';
 
 const DEFAULT_FORCE_PATH_STYLE = false;
 
-export const storageDriver = env.storage.driver;
+export const storageDriver = env.storage.driver ?? 'r2';
 
 export const storageBuckets = {
   public: env.storage.publicBucket,
