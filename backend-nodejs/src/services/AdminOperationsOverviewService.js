@@ -131,6 +131,15 @@ export class AdminOperationsOverviewService {
         if (severityDelta !== 0) {
           return severityDelta;
         }
+        const statusPriority = (status) => {
+          if (status === 'escalated') return 2;
+          if (status === 'pending_renewal') return 1;
+          return 0;
+        };
+        const statusDelta = statusPriority(b.status) - statusPriority(a.status);
+        if (statusDelta !== 0) {
+          return statusDelta;
+        }
         const aDays = a.renewalDeltaDays ?? Number.POSITIVE_INFINITY;
         const bDays = b.renewalDeltaDays ?? Number.POSITIVE_INFINITY;
         return aDays - bDays;

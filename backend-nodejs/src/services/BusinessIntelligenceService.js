@@ -424,6 +424,9 @@ export class BusinessIntelligenceService {
       currentBreakdown,
       currentTotals.grossVolumeCents
     );
+    const shareByCurrency = new Map(
+      breakdownWithShare.map((entry) => [entry.currency ?? 'unknown', entry.share])
+    );
 
     const views = [];
 
@@ -512,7 +515,7 @@ export class BusinessIntelligenceService {
               refundedCents: Number(entry.refundedCents ?? 0),
               totalIntents: Number(entry.totalIntents ?? 0),
               succeededIntents: Number(entry.succeededIntents ?? 0),
-              share: 100
+              share: shareByCurrency.get(entry.currency ?? 'unknown') ?? 0
             }
           ]
         },

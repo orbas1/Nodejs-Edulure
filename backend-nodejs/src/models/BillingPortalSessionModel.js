@@ -146,10 +146,24 @@ export default class BillingPortalSessionModel {
     if (!userId) {
       return [];
     }
-    const rows = await connection(TABLE)
+    const query = connection(TABLE)
       .select('*')
       .where({ user_id: userId, status: 'active' })
       .orderBy('created_at', 'desc');
+
+    let rows;
+    if (typeof query.selectRows === 'function') {
+      rows = await query.selectRows();
+    } else if (typeof query.then === 'function') {
+      rows = await query;
+    } else {
+      rows = query;
+    }
+
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+
     return rows.map(deserialize);
   }
 }

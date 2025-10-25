@@ -155,18 +155,41 @@ function normaliseKnowledgeSuggestions(value) {
         : null;
       const minutesRaw = suggestion.minutes ?? suggestion.readTime ?? suggestion.duration ?? null;
       const minutes = Number.isFinite(Number(minutesRaw)) ? Number(minutesRaw) : 3;
-      return {
+      const result = {
         id,
         title: suggestion.title ?? 'Knowledge base article',
-        excerpt: suggestion.excerpt ?? suggestion.summary ?? suggestion.description ?? '',
-        url: suggestion.url ?? suggestion.link ?? '#',
-        category: suggestion.category ?? suggestion.topic ?? 'General',
-        minutes,
-        updatedAt: updatedIso,
-        freshnessDays: freshness,
-        helpfulnessScore,
-        stale: suggestion.stale ?? suggestion.isStale ?? false
+        minutes
       };
+
+      const excerpt = suggestion.excerpt ?? suggestion.summary ?? suggestion.description;
+      if (typeof excerpt === 'string' && excerpt.trim().length) {
+        result.excerpt = excerpt.trim();
+      }
+
+      const url = suggestion.url ?? suggestion.link ?? null;
+      if (typeof url === 'string' && url.trim().length) {
+        result.url = url.trim();
+      }
+
+      const category = suggestion.category ?? suggestion.topic;
+      if (typeof category === 'string' && category.trim().length) {
+        result.category = category.trim();
+      }
+
+      if (updatedIso) {
+        result.updatedAt = updatedIso;
+      }
+      if (freshness !== null) {
+        result.freshnessDays = freshness;
+      }
+      if (helpfulnessScore !== null) {
+        result.helpfulnessScore = helpfulnessScore;
+      }
+      if (suggestion.stale ?? suggestion.isStale ?? false) {
+        result.stale = true;
+      }
+
+      return result;
     })
     .filter(Boolean);
 }

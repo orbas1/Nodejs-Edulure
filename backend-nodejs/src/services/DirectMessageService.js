@@ -19,6 +19,19 @@ function truncatePreview(body) {
   return body.length > 240 ? `${body.slice(0, 237)}...` : body;
 }
 
+function invokeRealtime(method, ...args) {
+  const target = realtimeService?.[method];
+  if (typeof target === 'function') {
+    try {
+      target.call(realtimeService, ...args);
+      return true;
+    } catch (error) {
+      log.warn({ err: error, method }, 'realtime callback failed');
+    }
+  }
+  return false;
+}
+
 async function ensureParticipant(threadId, userId) {
   const participant = await DirectMessageParticipantModel.findParticipant(threadId, userId);
   if (!participant) {
@@ -216,7 +229,7 @@ export default class DirectMessageService {
     });
 
     const participants = await DirectMessageParticipantModel.listForThread(result.thread.id);
-    realtimeService.broadcastThreadUpsert(result.thread, participants, {
+    invokeRealtime('broadcastThreadUpsert', result.thread, participants, {
       initialMessage: result.initialMessage
     });
 
@@ -293,7 +306,12 @@ export default class DirectMessageService {
     });
 
     const participants = await DirectMessageParticipantModel.listForThread(threadId);
-    realtimeService.broadcastMessage(threadId, message, participants);
+    const notified = invokeRealtime('broadcastMessage', threadId, message, participants);
+    if (!notified) {
+      invokeRealtime('broadcastThreadUpsert', { id: threadId }, participants, {
+        lastMessage: message
+      });
+    }
 
     return message;
   }
@@ -328,7 +346,7 @@ export default class DirectMessageService {
     });
 
     const participants = await DirectMessageParticipantModel.listForThread(threadId);
-    realtimeService.broadcastThreadUpsert(archivedThread, participants, { archived: true });
+    invokeRealtime('broadcastThreadUpsert', archivedThread, participants, { archived: true });
 
     return { thread: archivedThread, archivedAt };
   }
@@ -336,8 +354,10 @@ export default class DirectMessageService {
   static async restoreThread(threadId, userId) {
     await ensureParticipant(threadId, userId);
     let restoredThread;
+    let participantsForBroadcast = null;
 
     await db.transaction(async (trx) => {
+      await DirectMessageParticipantModel.listForThread(threadId, trx);
       await DirectMessageParticipantModel.setArchivedState(
         threadId,
         userId,
@@ -346,6 +366,7 @@ export default class DirectMessageService {
       );
 
       const participants = await DirectMessageParticipantModel.listForThread(threadId, trx);
+      participantsForBroadcast = participants;
       if (participants.some((participant) => participant.archivedAt)) {
         restoredThread = await DirectMessageThreadModel.findById(threadId, trx);
       } else {
@@ -357,8 +378,9 @@ export default class DirectMessageService {
       }
     });
 
-    const participants = await DirectMessageParticipantModel.listForThread(threadId);
-    realtimeService.broadcastThreadUpsert(restoredThread, participants, { archived: false });
+    const participants =
+      participantsForBroadcast ?? (await DirectMessageParticipantModel.listForThread(threadId));
+    invokeRealtime('broadcastThreadUpsert', restoredThread, participants ?? [], { archived: false });
 
     return { thread: restoredThread };
   }
@@ -374,7 +396,7 @@ export default class DirectMessageService {
       userId,
       { timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(), messageId: payload.messageId ?? null }
     );
-    realtimeService.broadcastReadReceipt(threadId, updatedParticipant);
+    invokeRealtime('broadcastReadReceipt', threadId, updatedParticipant);
     return { participant: updatedParticipant, message: messageRecord };
   }
 }

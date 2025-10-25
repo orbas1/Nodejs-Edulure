@@ -17,12 +17,12 @@ function decorateSearch(search) {
       )
     : [];
 
-  if (Array.isArray(search.deliveryChannels)) {
-    search.deliveryChannels = channels;
-  } else if (channels.length > 0) {
+  if (channels.length > 0) {
     search.deliveryChannels = channels;
   } else {
-    search.deliveryChannels = [];
+    if ('deliveryChannels' in search) {
+      delete search.deliveryChannels;
+    }
   }
 
   return search;
