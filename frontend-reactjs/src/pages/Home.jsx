@@ -1,13 +1,10 @@
 import { useCallback, useMemo } from 'react';
 
 import { useLanguage } from '../context/LanguageContext.jsx';
-import LanguageSelector from '../components/navigation/LanguageSelector.jsx';
 import MarketingHero from '../components/marketing/MarketingHero.jsx';
 import ProductPreviewTabs from '../components/marketing/ProductPreviewTabs.jsx';
 import PlanHighlights from '../components/marketing/PlanHighlights.jsx';
 import CaseStudyGrid from '../components/marketing/CaseStudyGrid.jsx';
-import MonetizationRibbon from '../components/marketing/MonetizationRibbon.jsx';
-import ConversionPanel from '../components/marketing/ConversionPanel.jsx';
 import CommunitySpotlight from '../components/home/CommunitySpotlight.jsx';
 import PerksGrid from '../components/home/PerksGrid.jsx';
 import HomeFaq from '../components/home/HomeFaq.jsx';
@@ -21,7 +18,7 @@ import communitiesPreview from '../assets/home/preview/communities.svg';
 import coursesPreview from '../assets/home/preview/courses.svg';
 import liveEventsPreview from '../assets/home/preview/live-events.svg';
 import libraryPreview from '../assets/home/preview/library.svg';
-import heroIllustration from '../assets/home/hero/flow-five-hero.svg';
+import heroIllustration from '../assets/home/hero/campus-galaxy-hero.svg';
 import { trackEvent } from '../lib/analytics.js';
 import { getMarketingAltText } from '../data/marketingAltText.js';
 
@@ -53,10 +50,10 @@ function normaliseExternalAction(action, fallbackHref, fallbackLabel) {
 }
 
 const HERO_CHIP_KEYS = [
-  { key: 'home.hero.chips.communities', fallback: 'Communities' },
-  { key: 'home.hero.chips.courses', fallback: 'Courses' },
-  { key: 'home.hero.chips.ebooks', fallback: 'E-books' },
-  { key: 'home.hero.chips.tutors', fallback: '1:1 Tutors' }
+  { key: 'home.hero.chips.liveStudios', fallback: 'Live studios' },
+  { key: 'home.hero.chips.peerCircles', fallback: 'Peer circles' },
+  { key: 'home.hero.chips.library', fallback: 'Shared library' },
+  { key: 'home.hero.chips.tutorHotline', fallback: 'Tutor hotline' }
 ];
 
 const PREVIEW_TAB_CONFIG = [
@@ -66,9 +63,9 @@ const PREVIEW_TAB_CONFIG = [
     image: communitiesPreview,
     fallback: {
       label: 'Communities',
-      caption: 'Threaded clubhouses with rituals built in.',
-      description: 'Spin up themed rooms, layer rituals, and keep every cohort pulsing with guided prompts that surface fresh wins.',
-      highlights: ['Guided weekly prompts', 'Moderation cues baked in', 'Members see wins instantly'],
+      caption: 'Playful clubs with rituals built in.',
+      description: 'Host themed rooms with scheduled prompts, gentle moderation cues, and celebratory moments.',
+      highlights: ['Guided prompts arrive automatically', 'Safety tools for every host', 'Celebrate wins in real time'],
       imageAlt: 'Preview of Edulure community spaces'
     }
   },
@@ -78,9 +75,9 @@ const PREVIEW_TAB_CONFIG = [
     image: coursesPreview,
     fallback: {
       label: 'Courses',
-      caption: 'Story-based curricula without the spreadsheets.',
-      description: 'Design multi-week arcs, stack media-rich lessons, and publish refreshes without exporting a single syllabus spreadsheet.',
-      highlights: ['Drag-and-drop modules', 'Completion signals live', 'Scope updates in real time'],
+      caption: 'Story-led courses without spreadsheets.',
+      description: 'Design multi-week arcs, add media-rich lessons, and publish refreshes without juggling extra files.',
+      highlights: ['Drag-and-drop modules', 'Completion signals stream live', 'Update lessons in minutes'],
       imageAlt: 'Preview of Edulure course builder interface'
     }
   },
@@ -90,8 +87,8 @@ const PREVIEW_TAB_CONFIG = [
     image: liveEventsPreview,
     fallback: {
       label: 'Live events',
-      caption: 'Studio energy minus the chaos.',
-      description: 'Host jam sessions, AMAs, and office hours with a control room that keeps chat, back-channel notes, and recordings in sync.',
+      caption: 'Studio-grade live events minus the chaos.',
+      description: 'Run jam sessions, AMAs, and office hours with backstage chat, checklists, and auto-recordings.',
       highlights: ['Green-room checklists', 'Auto recordings ready', 'Backstage chat for hosts'],
       imageAlt: 'Preview of Edulure live event control center'
     }
@@ -102,9 +99,9 @@ const PREVIEW_TAB_CONFIG = [
     image: libraryPreview,
     fallback: {
       label: 'Resource library',
-      caption: 'A candy shop of downloads and replays.',
-      description: 'Curate templates, replays, and swipe files with smart filters so learners always find the exact asset they need.',
-      highlights: ['Filter by format fast', 'Smart recs rotate weekly', 'Brand-safe sharing links'],
+      caption: 'A playful library of downloads and replays.',
+      description: 'Curate templates, replays, and swipe files with smart filters so learners always find what they need.',
+      highlights: ['Filter by format fast', 'Smart recs rotate weekly', 'Share links with confidence'],
       imageAlt: 'Preview of Edulure resource library grid'
     }
   }
@@ -138,12 +135,12 @@ const MAX_PLAN_FEATURES = 6;
 const HIGHLIGHT_KEYS = ['highlightOne', 'highlightTwo', 'highlightThree'];
 const HERO_VIDEO_SOURCES = [
   {
-    src: 'https://media.edulure.test/flow5/hero-loop.webm',
+    src: 'https://media.edulure.test/campus/hero-loop.webm',
     type: 'video/webm',
     resolution: 1080
   },
   {
-    src: 'https://media.edulure.test/flow5/hero-loop.mp4',
+    src: 'https://media.edulure.test/campus/hero-loop.mp4',
     type: 'video/mp4',
     resolution: 1080
   }
@@ -160,8 +157,8 @@ const CASE_STUDY_FALLBACKS = [
     slug: 'ops-guild',
     translationKey: 'home.caseStudies.opsGuild',
     fallback: {
-      title: 'Ops Guild scaled Flow 5 invites',
-      summary: 'Kai unified marketing experiments, onboarding checklists, and sponsor offers to lift enrolment 28%.',
+      title: 'Ops Guild rallied invite-only clubs in Edulure',
+      summary: 'Kai unified marketing experiments, onboarding checklists, and sponsor offers in one campus to lift enrolment 28%.',
       persona: 'Kai • Revenue Ops',
       metric: '+28% enrolment',
       ctaLabel: 'Read Ops Guild story',
@@ -182,7 +179,7 @@ const CASE_STUDY_FALLBACKS = [
     translationKey: 'home.caseStudies.cohortStudio',
     fallback: {
       title: 'Cohort Studio halved production time',
-      summary: 'Amina replaced siloed spreadsheets with Flow 5 lesson kits and automated sponsor unlocks for each cohort.',
+      summary: 'Amina replaced siloed spreadsheets with Edulure lesson kits and automated sponsor unlocks for each cohort.',
       persona: 'Amina • Learning Designer',
       metric: '-50% build time',
       ctaLabel: 'Explore Cohort Studio playbook',
@@ -203,7 +200,7 @@ const CASE_STUDY_FALLBACKS = [
     translationKey: 'home.caseStudies.tutorLeague',
     fallback: {
       title: 'Tutor League unlocked sponsor-ready pods',
-      summary: 'Noah brought tutor pods, live donations, and affiliate payouts under one dashboard to grow recurring revenue.',
+      summary: 'Noah brought tutor pods, live donations, and affiliate payouts into one Edulure dashboard to grow recurring revenue.',
       persona: 'Noah • Tutor Collective Lead',
       metric: '+42% sponsor revenue',
       ctaLabel: 'See Tutor League results',
@@ -218,12 +215,6 @@ const CASE_STUDY_FALLBACKS = [
     },
     altKey: 'case-study.tutor-league'
   }
-];
-
-const MONETISATION_FALLBACK_HIGHLIGHTS = [
-  { key: 'home.monetization.highlights.ads', fallback: 'Ad pods with sponsor pacing controls' },
-  { key: 'home.monetization.highlights.tutors', fallback: 'Tutor pods synced with payouts dashboard' },
-  { key: 'home.monetization.highlights.affiliates', fallback: 'Affiliate revenue reconciled nightly' }
 ];
 
 export default function Home() {
@@ -244,13 +235,16 @@ export default function Home() {
 
   const fallbackHero = useMemo(
     () => ({
-      eyebrow: t('home.hero.eyebrow', 'Learning community & marketplace'),
-      statusLabel: t('home.hero.status', 'Built for cohort-based learning'),
-      headline: t('home.hero.headline', 'Learn, teach, and build together.'),
-      subheadline: t('home.hero.subhead', 'Swap playbooks, host live jams, and grow with peers on Edulure.'),
-      primaryLabel: t('home.hero.ctaPrimary', 'Get started'),
-      secondaryLabel: t('home.hero.ctaSecondary', 'Preview the community'),
-      tertiaryLabel: t('home.hero.instructorPill', "I'm an instructor")
+      eyebrow: t('home.hero.eyebrow', 'Community learning platform'),
+      statusLabel: t('home.hero.status', 'Built for shared learning loops'),
+      headline: t('home.hero.headline', 'Build your campus without the chaos.'),
+      subheadline: t(
+        'home.hero.subhead',
+        'Welcome learners, run live labs, and keep every resource humming inside one joyful workspace.'
+      ),
+      primaryLabel: t('home.hero.ctaPrimary', 'Launch your space'),
+      secondaryLabel: t('home.hero.ctaSecondary', 'Browse the campus'),
+      tertiaryLabel: t('home.hero.instructorPill', "I'm teaching")
     }),
     [t]
   );
@@ -279,11 +273,11 @@ export default function Home() {
     const blockMedia = heroBlock?.media ?? null;
     const fallbackCaption = t(
       'home.hero.media.caption',
-      'Flow 5 keeps marketing, onboarding, and payouts connected in one workspace.'
+      'Edulure keeps sessions, resources, and payments aligned so your campus always feels connected.'
     );
     const fallbackAlt = t(
       'home.hero.media.alt',
-      getMarketingAltText('hero.flow-five', 'Operators collaborating inside the Flow 5 workspace.')
+      getMarketingAltText('hero.campus-galaxy', 'Operators mapping a blended learning campus inside the Edulure workspace.')
     );
     if (!blockMedia) {
       return {
@@ -365,91 +359,12 @@ export default function Home() {
   }, [caseStudyBlock, t]);
 
   const caseStudyEyebrow = caseStudyBlock?.eyebrow ?? t('home.caseStudies.eyebrow', 'Operator proof');
-  const caseStudyTitle = caseStudyBlock?.title ?? t('home.caseStudies.title', 'Operators scaling with Flow 5');
+  const caseStudyTitle = caseStudyBlock?.title ?? t('home.caseStudies.title', 'Operators thriving on Edulure');
   const caseStudyCaption = caseStudyBlock?.subtitle ??
     t(
       'home.caseStudies.caption',
       'Revenue, community, and tutor teams growing through shared Edulure workflows.'
     );
-
-  const monetisationBlock = useMemo(() => {
-    if (!marketingData?.blocks?.length) {
-      return null;
-    }
-    return marketingData.blocks.find((block) => block.blockType === 'monetization-ribbon') ?? null;
-  }, [marketingData]);
-
-  const monetisationTitle = t(
-    'home.monetization.title',
-    monetisationBlock?.title ?? 'Monetise every surface with Flow 5'
-  );
-  const monetisationDescription = t(
-    'home.monetization.description',
-    monetisationBlock?.subtitle ??
-      'Blend sponsorships, tutor pods, and affiliate revenue without leaving the dashboard.'
-  );
-  const monetisationHighlights = useMemo(() => {
-    if (Array.isArray(monetisationBlock?.metadata?.highlights) && monetisationBlock.metadata.highlights.length) {
-      return monetisationBlock.metadata.highlights.map((highlight, index) =>
-        t(`home.monetization.highlights.dynamic.${index}`, typeof highlight === 'string' ? highlight : highlight?.label ?? '')
-      ).filter(Boolean);
-    }
-    return MONETISATION_FALLBACK_HIGHLIGHTS.map(({ key, fallback }) => t(key, fallback));
-  }, [monetisationBlock, t]);
-
-  const monetisationPrimaryAction = useMemo(() => {
-    const base = monetisationBlock?.primaryCta ?? null;
-    if (base?.href && !base?.to) {
-      return normaliseExternalAction(
-        base,
-        'https://docs.edulure.test/flow5/monetisation',
-        t('home.monetization.primaryCta', 'Activate monetisation')
-      );
-    }
-    return normaliseInternalAction(
-      base,
-      '/register',
-      t('home.monetization.primaryCta', 'Activate monetisation')
-    );
-  }, [monetisationBlock?.primaryCta, t]);
-
-  const monetisationSecondaryAction = useMemo(() => {
-    const base = monetisationBlock?.secondaryCta ?? null;
-    if (!base) {
-      return normaliseInternalAction(
-        base,
-        '/pricing',
-        t('home.monetization.secondaryCta', 'Review pricing')
-      );
-    }
-    if (base.href && !base.to) {
-      return normaliseExternalAction(
-        base,
-        'https://docs.edulure.test/flow5/monetisation',
-        t('home.monetization.secondaryCta', 'Review pricing')
-      );
-    }
-    return normaliseInternalAction(
-      base,
-      '/pricing',
-      t('home.monetization.secondaryCta', 'Review pricing')
-    );
-  }, [monetisationBlock?.secondaryCta, t]);
-
-  const monetisationAnalyticsKey = monetisationBlock?.metadata?.analyticsKey ?? 'monetization-ribbon';
-
-  const initialLeadInvites = useMemo(() => {
-    if (!marketingData || !Array.isArray(marketingData.invites)) {
-      return [];
-    }
-    return marketingData.invites;
-  }, [marketingData]);
-  const defaultLeadEmail = useMemo(() => {
-    if (!initialLeadInvites.length) {
-      return '';
-    }
-    return initialLeadInvites[0]?.email ?? '';
-  }, [initialLeadInvites]);
 
   const heroPrimaryAction = useMemo(() => {
     const base = normaliseInternalAction(heroBlock?.primaryCta, '/register', fallbackHero.primaryLabel);
@@ -539,7 +454,7 @@ export default function Home() {
       }
 
       if (features.length === 0) {
-        features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
+        features.push(t('home.membership.defaults.feature', 'Transparent fee highlight'));
       }
 
       return {
@@ -562,9 +477,9 @@ export default function Home() {
       const heading = t(`home.membership.plans.${plan.id}.title`, 'Channel title');
       const tagline = t(
         `home.membership.plans.${plan.id}.tagline`,
-        'Standard commission structure for this channel.'
+        'Standard fee structure for this channel.'
       );
-      const price = t(`home.membership.plans.${plan.id}.price`, 'Flat commission rate');
+      const price = t(`home.membership.plans.${plan.id}.price`, 'Flat fee rate');
       const features = [];
 
       for (let index = 0; index < MAX_PLAN_FEATURES; index += 1) {
@@ -577,7 +492,7 @@ export default function Home() {
       }
 
       if (features.length === 0) {
-        features.push(t('home.membership.defaults.feature', 'Transparent commission highlight'));
+        features.push(t('home.membership.defaults.feature', 'Transparent fee highlight'));
       }
 
       const note = t(
@@ -609,7 +524,7 @@ export default function Home() {
   const planCta = useMemo(
     () => ({
       to: '/register',
-      label: t('home.membership.cta', 'Launch your workspace'),
+      label: t('home.membership.cta', 'Open your workspace'),
       icon: '✨',
       onClick: handlePlanCta
     }),
@@ -623,10 +538,6 @@ export default function Home() {
         block={heroBlock}
         eyebrow={heroEyebrow}
         statusLabel={heroStatusLabel}
-        languageSelector={{
-          desktop: <LanguageSelector size="compact" variant="dark" align="end" />, 
-          mobile: <LanguageSelector size="compact" variant="dark" align="start" fullWidth />
-        }}
         chips={heroChips}
         headline={heroHeadline}
         subheadline={heroSubheadline}
@@ -637,20 +548,11 @@ export default function Home() {
         mediaCaption={heroMedia.caption}
         mediaAlt={heroMedia.alt}
       />
-      <ConversionPanel blockSlug={heroSurfaceId} defaultEmail={defaultLeadEmail} initialInvites={initialLeadInvites} />
       <CaseStudyGrid
         eyebrow={caseStudyEyebrow}
         title={caseStudyTitle}
         caption={caseStudyCaption}
         studies={caseStudies}
-      />
-      <MonetizationRibbon
-        title={monetisationTitle}
-        description={monetisationDescription}
-        highlights={monetisationHighlights}
-        primaryAction={monetisationPrimaryAction}
-        secondaryAction={monetisationSecondaryAction}
-        analyticsKey={monetisationAnalyticsKey}
       />
       <CommunitySpotlight />
       <PerksGrid />
@@ -669,17 +571,17 @@ export default function Home() {
       <TutorArcade />
       <EbookShowcase />
       <PlanHighlights
-        eyebrow={t('home.membership.pretitle', 'Commission snapshot')}
-        title={t('home.membership.title', 'Flat commissions, zero monthly fees')}
+        eyebrow={t('home.membership.pretitle', 'Fees')}
+        title={t('home.membership.title', 'Clear fees, zero monthly surprises')}
         subtitle={t(
           'home.membership.subtitle',
-          'Operate on transparent usage-based pricing designed for modern learning businesses.'
+          'Operate on usage-based pricing that keeps more of every payout in your hands.'
         )}
         plans={planCards}
         cta={planCta}
         disclaimer={t(
           'home.membership.disclaimer',
-          'Commission defaults include a 25% affiliate share and non-custodial settlement.'
+          'Fees include optional affiliate sharing and direct-to-you settlement.'
         )}
       />
       <HomeFaq />

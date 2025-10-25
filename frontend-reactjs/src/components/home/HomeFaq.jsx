@@ -28,12 +28,12 @@ export default function HomeFaq() {
             {t('home.faq.pretitle', 'FAQ')}
           </p>
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            {t('home.faq.title', 'Wondering how Edulure fits your flow?')}
+            {t('home.faq.title', 'Questions before you dive in?')}
           </h2>
           <p className="text-base text-slate-600">
             {t(
               'home.faq.subtitle',
-              'Tap on a bubble to see how other creators stitch Edulure into their day-to-day magic.'
+              'Tap a card to see how teams weave Edulure into their everyday routines.'
             )}
           </p>
           <div className="mt-6 space-y-5">

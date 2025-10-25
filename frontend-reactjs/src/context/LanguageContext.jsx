@@ -31,20 +31,21 @@ const TRANSLATIONS = {
     },
     home: {
       hero: {
-        headline: 'Learn, teach, and build together.',
+        eyebrow: 'Community learning platform',
+        headline: 'Build your campus without the chaos.',
         subhead:
-          'Swap playbooks, host live jams, and grow with peers on Edulure.',
-        title: 'Learn, teach, and build together.',
+          'Welcome learners, run live labs, and keep every resource humming inside one joyful workspace.',
+        title: 'Build your campus without the chaos.',
         description:
-          'Swap playbooks, host live jams, and turn shared knowledge into momentum with peers who cheer you on.',
-        status: 'Built for cohort-based learning',
-        ctaPrimary: 'Join the community',
-        ctaSecondary: 'Peek inside live circles',
+          'Welcome learners, run live labs, and keep every resource humming inside one joyful workspace.',
+        status: 'Built for shared learning loops',
+        ctaPrimary: 'Launch your space',
+        ctaSecondary: 'Browse the campus',
         chips: {
-          communities: 'Communities',
-          courses: 'Courses',
-          ebooks: 'E-books',
-          tutors: '1:1 Tutors'
+          liveStudios: 'Live studios',
+          peerCircles: 'Peer circles',
+          library: 'Shared library',
+          tutorHotline: 'Tutor hotline'
         },
         cards: {
           liveSession: {
@@ -64,38 +65,38 @@ const TRANSLATIONS = {
             cta: 'Read now'
           }
         },
-        instructorPill: "I'm an instructor",
-        illustrationAlt: 'Collage of instructors and learners collaborating'
+        instructorPill: "I'm teaching",
+        illustrationAlt: 'Collage of operators planning a connected Edulure campus'
       },
       ebooks: {
         tagline: 'Resource vault',
-        title: 'Playbooks built for modern learning operators',
+        title: 'Field guides from the Edulure campus',
         subtitle:
-          'Dive into living handbooks packed with launch templates, monetisation tips, and remixable rituals.',
-        meta: 'Fresh drops monthly',
-        carouselLabel: 'Featured Edulure e-books',
+          'Skim friendly playbooks packed with launch checklists, facilitation prompts, and revenue experiments.',
+        meta: 'Updated twice a month',
+        carouselLabel: 'Featured Edulure field guides',
         stickers: {
-          new: 'Just launched',
-          trending: 'Trending now',
-          remixable: 'Remix-friendly'
+          new: 'Fresh drop',
+          trending: 'Most bookmarked',
+          remixable: 'Remix ready'
         },
         cards: {
           builderNotebook: {
-            alt: 'Cover art for the Builder Notebook e-book',
+            alt: 'Cover art for the Campus Builder Notebook',
             tag: 'Operations',
-            title: "Builder's notebook",
+            title: 'Campus builder notebook',
             description:
-              'Launch rituals, onboarding flows, and retention loops with ready-to-run templates.'
+              'Lay out onboarding paths, schedules, and rituals with editable templates.'
           },
           communityCookbook: {
-            alt: 'Cover art for the Community Cookbook e-book',
+            alt: 'Cover art for the Community Cookbook playbook',
             tag: 'Community',
             title: 'Community cookbook',
             description:
-              'Collect facilitation recipes from top operators and remix them into your own gatherings.'
+              'Borrow facilitation recipes from top hosts and remix them for your next gathering.'
           },
           remixAtlas: {
-            alt: 'Cover art for the Remix Atlas e-book',
+            alt: 'Cover art for the Remix Atlas field guide',
             tag: 'Playbooks',
             title: 'Remix atlas',
             description:
@@ -104,21 +105,21 @@ const TRANSLATIONS = {
         },
         panels: {
           readers: {
-            label: 'For readers',
-            title: 'Stay in sync with your crew',
+            label: 'For learners',
+            title: 'Find the right ritual fast',
             bullets: {
-              discovery: 'Follow curated drops tailored to your active communities.',
-              sync: 'Save highlights that sync across desktop and mobile readers.',
-              community: 'Share notes, questions, and riffs directly with collaborators.'
+              discovery: 'Follow curated bundles for the spaces you already love.',
+              sync: 'Save highlights that sync to your library and tutor handoffs.',
+              community: 'Drop notes and ideas straight into community threads.'
             }
           },
           creators: {
-            label: 'For creators',
-            title: 'Ship knowledge faster',
+            label: 'For hosts',
+            title: 'Package your expertise once',
             bullets: {
-              publish: 'Publish interactive handbooks with audio, video, and checklists.',
-              analytics: 'Track opens, completions, and remix requests from one dashboard.',
-              revenue: 'Bundle e-books with cohorts and keep 95%+ of every sale.'
+              publish: 'Publish multimedia chapters with checklists and embeds.',
+              analytics: 'See which pages spark comments, saves, and shares.',
+              revenue: 'Bundle guides with memberships and keep 97.5% of each sale.'
             }
           }
         }
@@ -161,36 +162,36 @@ const TRANSLATIONS = {
         items: buildTestimonialDictionary()
       },
       perks: {
-        eyebrow: 'Playful perks',
-        headline: 'Perks that keep the learning energy high',
-        subhead: 'Playful boosts designed for curious learners and hands-on instructors.',
-        learnersLabel: 'For Learners',
-        instructorsLabel: 'For Instructors',
+        eyebrow: 'Daily delights',
+        headline: 'Perks that keep momentum feeling human',
+        subhead: 'Small boosts made for curious learners and encouraging hosts.',
+        learnersLabel: 'For learners',
+        instructorsLabel: 'For hosts',
         items: {
           communityMagnetism: {
             title: 'Community magnetism',
-            learners: 'Drop into cozy rooms, prompts, and rituals that make momentum feel fun.',
-            instructors: 'Spin up playful spaces and nudge everyone into flow without friction.'
+            learners: 'Drop into warm rooms with prompts that make it easy to speak up.',
+            instructors: 'Open inviting spaces and nudge participation without extra busywork.'
           },
           liveStudioVibes: {
             title: 'Live studio vibes',
-            learners: 'Jump into interactive jams with polls, whiteboards, and breakout sparks.',
-            instructors: 'Host agenda-driven sessions and remix formats without juggling ten tools.'
+            learners: 'Join interactive jams with polls, whiteboards, and playful breaks.',
+            instructors: 'Run agenda-led sessions and remix formats in a couple of clicks.'
           },
           contentPlayground: {
             title: 'Content playground',
-            learners: 'Binge micro lessons, swipeable clips, and peer-built templates on demand.',
-            instructors: 'Ship drops, challenges, and resources in minutes with beautiful defaults.'
+            learners: 'Save bite-sized lessons, swipe files, and replays when inspiration hits.',
+            instructors: 'Publish drops in minutes with polished defaults for every medium.'
           },
           signalBoosts: {
             title: 'Signal boosts',
-            learners: 'Show off wins, gather kudos, and feel the community cheering you on.',
-            instructors: 'Spot rising stars and amplify milestones automatically in the feed.'
+            learners: 'Showcase wins and gather encouragement from the whole crew.',
+            instructors: 'Spot rising stars automatically and highlight their progress.'
           },
           supportLoop: {
             title: 'Support loop',
-            learners: 'Ask for help in context-aware threads and get replies that stick.',
-            instructors: 'Keep DMs tidy while automations route FAQs and follow-ups for you.'
+            learners: 'Ask for help in context-aware threads and get answers that stick.',
+            instructors: 'Route FAQs and follow-ups with automations while keeping DMs tidy.'
           },
           growthOps: {
             title: 'Growth ops',
@@ -198,123 +199,123 @@ const TRANSLATIONS = {
             instructors: 'Track funnels, revenue, and experiments with dashboards built for learning ops.'
           }
         },
-        instructorPill: "I'm an instructor",
-        illustrationAlt: 'Collage of instructors and learners collaborating'
+        instructorPill: "I'm hosting",
+        illustrationAlt: 'Collage of hosts and learners celebrating progress'
       },
       membership: {
-        pretitle: 'Commission snapshot',
-        title: 'Flat commissions, zero monthly fees',
+        pretitle: 'Fees',
+        title: 'Clear fees, zero monthly surprises',
         subtitle:
-          'Operate on transparent usage-based pricing designed for modern learning businesses.',
+          'Operate on usage-based pricing that keeps more of every payout in your hands.',
         defaults: {
-          feature: 'Transparent commission highlight'
+          feature: 'Transparent fee highlight'
         },
         plans: {
           communityTutor: {
             title: 'Communities & tutoring',
-            tagline: 'Applied to memberships, subscriptions, and 1:1 bookings.',
-            price: '2.5% commission',
+            tagline: 'Memberships, subscriptions, and 1:1 bookings.',
+            price: '2.5% service fee',
             features: [
-              '2.5% platform commission on community subscriptions and tutor bookings.',
-              'Zero minimum fees so every transaction settles in full.',
-              'Creators control payout schedules and workforce compensation.'
+              '2.5% service fee on community subscriptions and tutor bookings.',
+              'No minimums or add-ons—learners pay exactly what you set.',
+              'Flexible payouts and teammate splits built in.'
             ],
-            note: 'Keep 97.5% of revenue while Edulure handles compliance and ledgers.'
+            note: 'Keep 97.5% of revenue while Edulure automates ledgers and taxes.'
           },
           catalogue: {
             title: 'Digital catalogues',
-            tagline: 'Courses and e-book sales with built-in delivery.',
-            price: '5% commission',
+            tagline: 'Courses, workshops, and downloadable drops.',
+            price: '5% service fee',
             features: [
-              '5% commission on courses and e-book sales across the marketplace.',
-              'Non-custodial settlement ensures funds move directly to you.',
-              'Share up to 25% of commission with affiliates automatically.'
+              '5% fee on courses and digital downloads across your storefront.',
+              'Files deliver instantly with branded confirmation flows.',
+              'Share up to 25% with affiliates without extra math.'
             ],
-            note: 'Perfect for asynchronous learning drops and evergreen content.'
+            note: 'Ideal for evergreen curriculum and resource bundles.'
           },
           liveDonations: {
             title: 'Live donations & tips',
             tagline: 'Supporters boost your live events in real time.',
-            price: '10% commission',
+            price: '10% service fee',
             features: [
-              '10% commission on community live stream donations and tips.',
-              'No minimum fees or extra payout delays.',
-              'Built-in compliance narrative keeps sponsorships audit-ready.'
+              '10% fee on live donations, tips, and pop-up campaigns.',
+              'Funds route straight to you with realtime dashboards.',
+              'Built-in compliance keeps sponsorships audit-ready.'
             ],
-            note: 'Amplify events with transparent supporter flows and audit trails.'
+            note: 'Spark energy during streams with transparent supporter flows.'
           }
         },
-        cta: 'Launch your workspace',
+        cta: 'Open your workspace',
         disclaimer:
-          'Commission defaults include a 25% affiliate share and non-custodial settlement.'
+          'Fees include optional affiliate sharing and direct-to-you settlement.'
       },
       faq: {
         pretitle: 'FAQ',
-        title: 'Wondering how Edulure fits your flow?',
-        subtitle: 'Tap on a bubble to see how other creators stitch Edulure into their day-to-day magic.',
+        title: 'Questions before you dive in?',
+        subtitle: 'Tap a card to see how teams weave Edulure into their everyday routines.',
         items: {
           orbit: {
-            question: 'How quickly can I orbit into a live learning space?',
-            answer: 'Spin up a fresh circle in under ten minutes. Pick a template, invite your crew, and Edulure auto-syncs invites, reminders, and discussion prompts.'
+            question: 'How fast can we spin up a shared space?',
+            answer: 'Launch from a template in under ten minutes. Invite your crew and Edulure auto-syncs schedules, reminders, and discussion threads.'
           },
           cohorts: {
-            question: 'Can I run asynchronous and live cohorts together?',
-            answer: 'Yes! Thread pre-recorded drops, async quests, and live jams into one rhythm. Learners see a single timeline that adapts to their pace.'
+            question: 'Can live and async cohorts live together?',
+            answer: 'Absolutely. Blend replays, quests, and live jams on one timeline that adapts to each learner.'
           },
           pricing: {
-            question: 'What happens if I want to shift plans later?',
-            answer: 'You can slide between tiers anytime. Billing adjusts on the next cycle and your spaces, analytics, and automations stay intact.'
+            question: 'What if our revenue mix changes?',
+            answer: 'Switch fee tiers anytime. Your spaces, analytics, and automations keep running while billing recalculates on the next cycle.'
           },
           support: {
-            question: 'Do you offer onboarding support for teams?',
-            answer: 'Community Captains receive white-glove onboarding, while every plan includes live office hours, tutorial vaults, and a buzzing peer support lounge.'
+            question: 'Who helps our team learn the ropes?',
+            answer: 'Community Captains get guided onboarding, and every plan includes live office hours plus a supportive peer lounge.'
           }
         },
         mascotAlt: 'Playful mascot waving hello',
-        mascotCaption: 'Our cosmic courier keeps track of your questions and beams answers back at light speed.'
+        mascotCaption: 'Our cosmic courier keeps tabs on your questions and beams back answers at light speed.'
       },
       closingCta: {
-        pretitle: 'Ready when you are',
-        title: 'Let the sunset spark your next learning orbit',
-        subtitle: 'Lean into the glow—whether you are building your first circle or guiding a galaxy of learners, Edulure is ready.',
-        ctaLearners: 'Start as a learner',
-        ctaInstructors: 'Launch as an instructor',
-        footer: 'Dual launchpads, one vibrant universe.'
+        pretitle: 'We saved you a seat',
+        title: 'Ready to open the doors to your campus?',
+        subtitle: 'Whether you are guiding your first circle or scaling a whole constellation of learners, Edulure keeps the lights warm.',
+        ctaLearners: 'Join as a learner',
+        ctaInstructors: 'Host as an instructor',
+        footer: 'One platform, countless playful cohorts.'
       },
       preview: {
-        title: 'See what’s waiting inside the Edulure clubhouse',
+        title: 'Peek at the spaces your crew will unlock',
         subtitle:
-          'Toggle between community rooms, curriculum, and live ops to feel the flow before you sign in.',
-        helper: 'Spotlights from this week’s launches',
+          'Flip through communities, curriculum, and live ops to feel the rhythm before you sign in.',
+        helper: 'This week inside Edulure',
         tablistLabel: 'Preview categories',
-        cta: 'Browse all spaces',
+        cta: 'Browse the campus',
         footnote: 'Fresh previews rotate every Monday at 09:00 UTC.',
         tabs: {
           communities: {
             label: 'Communities',
-            caption: 'Threaded clubhouses with rituals built in.',
+            caption: 'Playful clubs with rituals built in.',
             description:
-              'Spin up themed rooms, layer rituals, and keep every cohort pulsing with guided prompts that surface fresh wins.',
-            highlightOne: 'Guided weekly prompts',
-            highlightTwo: 'Moderation cues baked in',
-            highlightThree: 'Members see wins instantly',
+              'Host themed rooms with scheduled prompts, gentle moderation cues, and celebratory moments.',
+            highlightOne: 'Guided prompts arrive automatically',
+            highlightTwo: 'Safety tools for every host',
+            highlightThree: 'Celebrate wins in real time',
             imageAlt: 'Preview of Edulure community spaces'
           },
           courses: {
             label: 'Courses',
-            caption: 'Story-based curricula without the spreadsheets.',
+            caption: 'Story-led courses without spreadsheets.',
             description:
-              'Design multi-week arcs, stack media-rich lessons, and publish refreshes without exporting a single syllabus spreadsheet.',
+              'Design multi-week arcs, add media-rich lessons, and publish refreshes without juggling extra files.',
             highlightOne: 'Drag-and-drop modules',
-            highlightTwo: 'Completion signals live',
-            highlightThree: 'Scope updates in real time',
+            highlightTwo: 'Completion signals stream live',
+            highlightThree: 'Update lessons in minutes',
             imageAlt: 'Preview of Edulure course builder interface'
           },
           liveEvents: {
             label: 'Live events',
-            caption: 'Studio energy minus the chaos.',
+            caption: 'Studio-grade live events minus the chaos.',
             description:
-              'Host jam sessions, AMAs, and office hours with a control room that keeps chat, back-channel notes, and recordings in sync.',
+              'Run jam sessions, AMAs, and office hours with backstage chat, checklists, and auto-recordings.',
             highlightOne: 'Green-room checklists',
             highlightTwo: 'Auto recordings ready',
             highlightThree: 'Backstage chat for hosts',
@@ -322,21 +323,21 @@ const TRANSLATIONS = {
           },
           library: {
             label: 'Resource library',
-            caption: 'A candy shop of downloads and replays.',
+            caption: 'A playful library of downloads and replays.',
             description:
-              'Curate templates, replays, and swipe files with smart filters so learners always find the exact asset they need.',
+              'Curate templates, replays, and swipe files with smart filters so learners always find what they need.',
             highlightOne: 'Filter by format fast',
             highlightTwo: 'Smart recs rotate weekly',
-            highlightThree: 'Brand-safe sharing links',
+            highlightThree: 'Share links with confidence',
             imageAlt: 'Preview of Edulure resource library grid'
           }
         }
       },
       tutoring: {
         kicker: 'Tutor arcade',
-        headline: 'Queue up your next breakthrough session',
+        headline: 'Line up your next breakthrough session',
         subhead:
-          'Spin up on-demand mentors, drop goals into the queue, and leave every call with a power-up tailored to your momentum.',
+          'Drop a goal into the queue, match with mentors in seconds, and leave each call with an actionable boost.',
         ctaPrimary: 'Explore the tutor arcade',
         ctaSecondary: 'Book a lightning session',
         calendar: {
@@ -357,12 +358,12 @@ const TRANSLATIONS = {
               meta: '45 min • Zia (Analytics guide)'
             }
           },
-          footnote: 'Auto-matching refreshes every 30 seconds to keep energy high.'
+          footnote: 'Auto-matching refreshes every 30 seconds so the momentum never drops.'
         },
         learner: {
           title: 'Learner power-ups',
           items: {
-            0: 'Drop micro-goals and get laser feedback without waitlists.',
+            0: 'Set micro-goals and get focused feedback without waitlists.',
             1: 'Unlock curated practice quests after every session.',
             2: 'Sync notes and replays straight into your Edulure workspace.'
           }
@@ -370,19 +371,19 @@ const TRANSLATIONS = {
         instructor: {
           title: 'Instructor power-ups',
           items: {
-            0: 'Fill idle blocks with learners already primed for your craft.',
-            1: 'Launch reusable session templates with one neon tap.',
+            0: 'Fill open slots with learners already primed for your craft.',
+            1: 'Launch reusable session templates in one tap.',
             2: 'Earn spotlight boosts when five-star reviews roll in fast.'
           }
         }
       },
       courses: {
         kicker: 'Courses adventure',
-        title: 'Chart the shared courses adventure',
+        title: 'Follow the courses adventure from hello to celebration',
         subtitle:
-          'Follow the journey from discovery through celebration with aligned perks for learners and instructors.',
-        cta: 'Explore courses',
-        ctaHelper: 'Head straight to the full catalogue and start plotting your next cohort.',
+          'Trace how learners and instructors move together across every stage, with perks tuned for both sides.',
+        cta: 'Browse courses',
+        ctaHelper: 'Head straight to the full catalogue to plan your next cohort.',
         roles: {
           learners: 'Learners',
           instructors: 'Instructors'
@@ -390,37 +391,37 @@ const TRANSLATIONS = {
         stages: {
           discover: {
             title: 'Discover',
-            headline: 'Match every learner with the right cohort',
+            headline: 'Help every learner find their perfect cohort',
             learners: {
-              perk1: 'Browse curated cohorts by skill focus',
-              perk2: 'Preview syllabi, schedules and outcomes'
+              perk1: 'Browse curated cohorts by skills, pacing, and outcomes',
+              perk2: 'Preview syllabi, schedules, and facilitator intros'
             },
             instructors: {
-              perk1: 'Spotlight differentiators with rich metadata',
-              perk2: 'Publish waitlists and discovery-ready previews'
+              perk1: 'Spotlight differentiators with rich metadata cards',
+              perk2: 'Publish waitlists and previews that capture intent'
             }
           },
           enroll: {
             title: 'Enroll',
             headline: 'Make enrollment effortless and transparent',
             learners: {
-              perk1: 'Secure seats with flexible payment plans',
-              perk2: 'Track onboarding tasks and deadlines'
+              perk1: 'Secure seats with flexible payments or saved spots',
+              perk2: 'Track onboarding tasks, forms, and kickoff dates'
             },
             instructors: {
-              perk1: 'Automate acceptance and welcome flows',
-              perk2: 'Gate resources until kickoff'
+              perk1: 'Automate approvals, confirmations, and welcome flows',
+              perk2: 'Gate resources until kickoff with one toggle'
             }
           },
           coLearn: {
             title: 'Co-learn',
             headline: 'Keep momentum pulsing during the experience',
             learners: {
-              perk1: 'Join live studios, async threads and office hours',
+              perk1: 'Join live studios, async threads, and focus rooms',
               perk2: 'Earn badges for momentum and peer support'
             },
             instructors: {
-              perk1: 'Orchestrate sprints with templates and nudges',
+              perk1: 'Orchestrate sprints with ready-made templates and nudges',
               perk2: 'Spot at-risk learners with pulse dashboards'
             }
           },
@@ -428,12 +429,12 @@ const TRANSLATIONS = {
             title: 'Celebrate',
             headline: 'Capture the finish-line energy together',
             learners: {
-              perk1: 'Showcase capstone artefacts and reflections',
-              perk2: 'Share wins with the cohort and alumni'
+              perk1: 'Showcase capstone artefacts and reflections with pride',
+              perk2: 'Share wins with the cohort and alumni network'
             },
             instructors: {
-              perk1: 'Issue verifiable certificates in one click',
-              perk2: 'Collect testimonials and publish highlights'
+              perk1: 'Issue verifiable certificates with one click',
+              perk2: 'Collect testimonials and publish highlights automatically'
             }
           }
         }

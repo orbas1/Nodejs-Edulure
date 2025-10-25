@@ -37,17 +37,17 @@ const PERK_ITEMS = [
 export default function PerksGrid() {
   const { t } = useLanguage();
 
-  const eyebrow = t('home.perks.eyebrow', 'Playful perks');
+  const eyebrow = t('home.perks.eyebrow', 'Daily delights');
   const heading = t(
     'home.perks.headline',
-    'Perks that keep the learning energy high'
+    'Perks that keep momentum feeling human'
   );
   const subheading = t(
     'home.perks.subhead',
-    'Playful boosts designed for curious learners and hands-on instructors.'
+    'Small boosts made for curious learners and encouraging hosts.'
   );
-  const learnersLabel = t('home.perks.learnersLabel', 'For Learners');
-  const instructorsLabel = t('home.perks.instructorsLabel', 'For Instructors');
+  const learnersLabel = t('home.perks.learnersLabel', 'For learners');
+  const instructorsLabel = t('home.perks.instructorsLabel', 'For hosts');
 
   return (
     <section className="bg-gradient-to-b from-slate-50 via-white to-slate-100/70">

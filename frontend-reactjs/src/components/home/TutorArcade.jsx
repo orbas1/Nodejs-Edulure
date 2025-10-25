@@ -166,9 +166,9 @@ export default function TutorArcade() {
                   </div>
                 ))}
               </div>
-              <p className="mt-8 rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/10 px-4 py-3 text-xs text-fuchsia-100">
-                {t('home.tutoring.calendar.footnote', 'Auto-matching refreshes every 30 seconds to keep energy high.')}
-              </p>
+                <p className="mt-8 rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/10 px-4 py-3 text-xs text-fuchsia-100">
+                  {t('home.tutoring.calendar.footnote', 'Auto-matching refreshes every 30 seconds so the momentum never drops.')}
+                </p>
             </div>
           </div>
         </div>
@@ -178,12 +178,12 @@ export default function TutorArcade() {
               {t('home.tutoring.kicker', 'Tutor arcade')}
             </p>
             <h2 className="text-3xl font-semibold leading-tight text-white sm:text-4xl">
-              {t('home.tutoring.headline', 'Queue up your next breakthrough session')}
+              {t('home.tutoring.headline', 'Line up your next breakthrough session')}
             </h2>
             <p className="max-w-xl text-base text-white/80">
               {t(
                 'home.tutoring.subhead',
-                'Spin up on-demand mentors, drop goals into the queue, and leave every call with a power-up tailored to your momentum.'
+                'Drop a goal into the queue, match with mentors in seconds, and leave each call with an actionable boost.'
               )}
             </p>
           </div>

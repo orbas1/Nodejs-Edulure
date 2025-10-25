@@ -20,7 +20,7 @@ export default function FeatureGrid({ onActionClick, marketingContent }) {
   );
   const intro = t(
     'home.featureGrid.intro',
-    'These Flow 5 pillars pair landing funnels, live rituals, and monetisation guardrails so teams convert faster.'
+    'These Edulure pillars pair landing funnels, live rituals, and monetisation guardrails so teams convert faster.'
   );
 
   const features = useMemo(

@@ -31,15 +31,15 @@ export default function ClosingCtaBanner() {
       </div>
       <HomeSection className="relative text-center" size="narrow" pad="cozy">
         <p className="text-xs font-semibold uppercase tracking-[0.45em] text-white/70">
-          {t('home.closingCta.pretitle', 'Ready when you are')}
+          {t('home.closingCta.pretitle', 'We saved you a seat')}
         </p>
         <h2 className="mt-5 text-3xl font-semibold sm:text-4xl">
-          {t('home.closingCta.title', 'Let the sunset spark your next learning orbit')}
+          {t('home.closingCta.title', 'Ready to open the doors to your campus?')}
         </h2>
         <p className="mt-4 text-base text-white/80">
           {t(
             'home.closingCta.subtitle',
-            'Lean into the glow—whether you are building your first circle or guiding a galaxy of learners, Edulure is ready.'
+            'Whether you are guiding your first circle or scaling a constellation of learners, Edulure keeps the lights warm.'
           )}
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -47,17 +47,17 @@ export default function ClosingCtaBanner() {
             to="/register"
             className="inline-flex items-center justify-center rounded-full bg-white/95 px-6 py-3 text-sm font-semibold text-slate-900 shadow-[0_24px_60px_-28px_rgba(15,23,42,0.6)] transition hover:bg-white"
           >
-            {t('home.closingCta.ctaLearners', 'Start as a learner')}
+            {t('home.closingCta.ctaLearners', 'Join as a learner')}
           </Link>
           <Link
             to="/register?role=instructor"
             className="inline-flex items-center justify-center rounded-full border border-white/70 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:border-white hover:bg-white/20"
           >
-            {t('home.closingCta.ctaInstructors', 'Launch as an instructor')}
+            {t('home.closingCta.ctaInstructors', 'Host as an instructor')}
           </Link>
         </div>
         <p className="mt-6 text-xs text-white/70">
-          {t('home.closingCta.footer', 'Dual launchpads, one vibrant universe.')}
+          {t('home.closingCta.footer', 'One platform, countless playful cohorts.')}
         </p>
       </HomeSection>
     </section>

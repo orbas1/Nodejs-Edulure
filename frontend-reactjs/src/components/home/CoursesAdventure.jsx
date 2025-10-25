@@ -12,21 +12,21 @@ const STAGES = [
     learnerPerks: [
       {
         key: 'home.courses.stages.discover.learners.perk1',
-        fallback: 'Browse curated cohorts by skill focus'
+        fallback: 'Browse curated cohorts by skills, pacing, and outcomes'
       },
       {
         key: 'home.courses.stages.discover.learners.perk2',
-        fallback: 'Preview syllabi, schedules and outcomes'
+        fallback: 'Preview syllabi, schedules, and facilitator intros'
       }
     ],
     instructorPerks: [
       {
         key: 'home.courses.stages.discover.instructors.perk1',
-        fallback: 'Spotlight differentiators with rich metadata'
+        fallback: 'Spotlight differentiators with rich metadata cards'
       },
       {
         key: 'home.courses.stages.discover.instructors.perk2',
-        fallback: 'Publish waitlists and discovery-ready previews'
+        fallback: 'Publish waitlists and previews that capture intent'
       }
     ]
   },
@@ -37,21 +37,21 @@ const STAGES = [
     learnerPerks: [
       {
         key: 'home.courses.stages.enroll.learners.perk1',
-        fallback: 'Secure seats with flexible payment plans'
+        fallback: 'Secure seats with flexible payments or saved spots'
       },
       {
         key: 'home.courses.stages.enroll.learners.perk2',
-        fallback: 'Track onboarding tasks and deadlines'
+        fallback: 'Track onboarding tasks, forms, and kickoff dates'
       }
     ],
     instructorPerks: [
       {
         key: 'home.courses.stages.enroll.instructors.perk1',
-        fallback: 'Automate acceptance and welcome flows'
+        fallback: 'Automate approvals, confirmations, and welcome flows'
       },
       {
         key: 'home.courses.stages.enroll.instructors.perk2',
-        fallback: 'Gate resources until kickoff'
+        fallback: 'Gate resources until kickoff with one toggle'
       }
     ]
   },
@@ -62,7 +62,7 @@ const STAGES = [
     learnerPerks: [
       {
         key: 'home.courses.stages.coLearn.learners.perk1',
-        fallback: 'Join live studios, async threads and office hours'
+        fallback: 'Join live studios, async threads, and focus rooms'
       },
       {
         key: 'home.courses.stages.coLearn.learners.perk2',
@@ -72,7 +72,7 @@ const STAGES = [
     instructorPerks: [
       {
         key: 'home.courses.stages.coLearn.instructors.perk1',
-        fallback: 'Orchestrate sprints with templates and nudges'
+        fallback: 'Orchestrate sprints with ready-made templates and nudges'
       },
       {
         key: 'home.courses.stages.coLearn.instructors.perk2',
@@ -87,21 +87,21 @@ const STAGES = [
     learnerPerks: [
       {
         key: 'home.courses.stages.celebrate.learners.perk1',
-        fallback: 'Showcase capstone artefacts and reflections'
+        fallback: 'Showcase capstone artefacts and reflections with pride'
       },
       {
         key: 'home.courses.stages.celebrate.learners.perk2',
-        fallback: 'Share wins with the cohort and alumni'
+        fallback: 'Share wins with the cohort and alumni network'
       }
     ],
     instructorPerks: [
       {
         key: 'home.courses.stages.celebrate.instructors.perk1',
-        fallback: 'Issue verifiable certificates in one click'
+        fallback: 'Issue verifiable certificates with one click'
       },
       {
         key: 'home.courses.stages.celebrate.instructors.perk2',
-        fallback: 'Collect testimonials and publish highlights'
+        fallback: 'Collect testimonials and publish highlights automatically'
       }
     ]
   }
@@ -139,13 +139,13 @@ export default function CoursesAdventure() {
   const kicker = t('home.courses.kicker', 'Courses adventure');
   const title = t(
     'home.courses.title',
-    'Chart the shared courses adventure'
+    'Follow the courses adventure from hello to celebration'
   );
   const subtitle = t(
     'home.courses.subtitle',
-    'Follow the journey from discovery through celebration with aligned perks for learners and instructors.'
+    'Trace how learners and instructors move together across every stage, with perks tuned for both sides.'
   );
-  const ctaLabel = t('home.courses.cta', 'Explore courses');
+  const ctaLabel = t('home.courses.cta', 'Browse courses');
   const learnersLabel = t('home.courses.roles.learners', 'Learners');
   const instructorsLabel = t('home.courses.roles.instructors', 'Instructors');
 

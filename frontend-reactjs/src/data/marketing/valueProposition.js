@@ -1,4 +1,4 @@
-import heroIllustration from '../../assets/home/hero/flow-five-hero.svg';
+import heroIllustration from '../../assets/home/hero/campus-galaxy-hero.svg';
 
 import { getMarketingAltText } from '../marketingAltText.js';
 
@@ -10,12 +10,12 @@ export const HERO_ANALYTICS_EVENT = 'marketing:hero_cta';
 
 export const HERO_VIDEO_SOURCES = [
   {
-    src: 'https://media.edulure.test/flow5/hero-loop.webm',
+    src: 'https://media.edulure.test/campus/hero-loop.webm',
     type: 'video/webm',
     resolution: 1080
   },
   {
-    src: 'https://media.edulure.test/flow5/hero-loop.mp4',
+    src: 'https://media.edulure.test/campus/hero-loop.mp4',
     type: 'video/mp4',
     resolution: 1080
   }
@@ -28,33 +28,33 @@ export const HERO_IMAGE_SOURCES = [
 ];
 
 const HERO_CHIP_KEYS = [
-  { key: 'home.hero.chips.operators', fallback: 'Operators in control' },
-  { key: 'home.hero.chips.launches', fallback: 'Launches on autopilot' },
-  { key: 'home.hero.chips.monetisation', fallback: 'Monetisation connected' },
-  { key: 'home.hero.chips.community', fallback: 'Communities that convert' }
+  { key: 'home.hero.chips.liveStudios', fallback: 'Live studios' },
+  { key: 'home.hero.chips.peerCircles', fallback: 'Peer circles' },
+  { key: 'home.hero.chips.library', fallback: 'Shared library' },
+  { key: 'home.hero.chips.tutorHotline', fallback: 'Tutor hotline' }
 ];
 
 const HERO_COPY = {
-  eyebrow: { key: 'home.hero.eyebrow', fallback: 'Flow 5 marketing OS' },
-  statusLabel: { key: 'home.hero.status', fallback: 'Now shipping Annex A16 playbooks' },
+  eyebrow: { key: 'home.hero.eyebrow', fallback: 'Community learning platform' },
+  statusLabel: { key: 'home.hero.status', fallback: 'Built for shared learning loops' },
   headline: {
     key: 'home.hero.headline',
-    fallback: 'Your launch, onboarding, and revenue funnels in one flow'
+    fallback: 'Build your campus without the chaos.'
   },
   subheadline: {
     key: 'home.hero.subheadline',
     fallback:
-      'Flow 5 stitches landing pages, onboarding rituals, and live community activations so every campaign converts faster.'
+      'Welcome learners, run live labs, and keep every resource humming inside one joyful workspace.'
   },
   mediaCaption: {
     key: 'home.hero.media.caption',
-    fallback: 'Flow 5 keeps marketing, onboarding, and payouts connected in one workspace.'
+    fallback: 'Edulure keeps sessions, resources, and payouts aligned so your campus always feels connected.'
   },
   mediaAlt: {
     key: 'home.hero.media.alt',
     fallback: getMarketingAltText(
-      'hero.flow-five',
-      'Operators orchestrating onboarding, payments, and community sessions inside Flow 5.'
+      'hero.campus-galaxy',
+      'Operators mapping a blended learning campus inside the Edulure workspace.'
     )
   }
 };
@@ -62,19 +62,19 @@ const HERO_COPY = {
 const HERO_ACTIONS = {
   primary: {
     key: 'home.hero.ctaPrimary',
-    fallback: 'Book a Flow 5 demo',
+    fallback: 'Launch your space',
     to: '/register',
     analyticsId: 'cta-primary'
   },
   secondary: {
     key: 'home.hero.ctaSecondary',
-    fallback: 'Explore the product tour',
+    fallback: 'Browse the campus',
     to: '/courses',
     analyticsId: 'cta-secondary'
   },
   tertiary: {
     key: 'home.hero.ctaTertiary',
-    fallback: 'Download the Annex A16 brief',
+    fallback: 'Download the campus overview',
     href: '/ebooks',
     analyticsId: 'cta-tertiary'
   }
@@ -95,7 +95,7 @@ export const VALUE_PROPOSITION_STATS = [
     labelKey: 'home.stats.creators.label',
     fallbackLabel: 'Creators monetising',
     helperKey: 'home.stats.creators.helper',
-    fallbackHelper: 'Flow 5 operators shipping new offers monthly'
+    fallbackHelper: 'Edulure teams launching new offers monthly'
   },
   {
     key: 'retention',
@@ -103,7 +103,7 @@ export const VALUE_PROPOSITION_STATS = [
     labelKey: 'home.stats.retention.label',
     fallbackLabel: 'Average retention lift',
     helperKey: 'home.stats.retention.helper',
-    fallbackHelper: 'Comparing Flow 5 cohorts to pre-launch baselines'
+    fallbackHelper: 'Comparing Edulure cohorts to pre-launch baselines'
   },
   {
     key: 'knowledge',
@@ -124,7 +124,7 @@ export const VALUE_PROPOSITION_PILLARS = [
     fallback: {
       title: 'Program blueprints on day one',
       helper: 'Launch cohorts without detours',
-      description: 'Assemble Flow 5 templates for curriculum, onboarding, and sponsor funnels the moment you sign in.'
+      description: 'Assemble Edulure templates for curriculum, onboarding, and sponsor funnels the moment you sign in.'
     },
     analyticsId: 'pillar-programs',
     actions: [
@@ -133,7 +133,7 @@ export const VALUE_PROPOSITION_PILLARS = [
         labelKey: 'home.featureGrid.categories.programs.actions.workspace',
         descriptionKey: 'home.featureGrid.categories.programs.descriptions.workspace',
         fallbackLabel: 'Start a free workspace',
-        fallbackDescription: 'Spin up a Flow 5 launch workspace in three minutes.',
+        fallbackDescription: 'Spin up an Edulure launch workspace in three minutes.',
         to: '/register',
         badge: 'New',
         analyticsId: 'start-workspace'
