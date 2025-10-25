@@ -27,12 +27,25 @@ function slugifyEnvironmentIdentifier(input) {
 }
 
 function normaliseEnvironmentIdentifier(value, helpers) {
-  const slug = slugifyEnvironmentIdentifier(value);
-  if (!slug || !ENVIRONMENT_IDENTIFIER_PATTERN.test(slug)) {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) {
     return helpers.error('any.invalid');
   }
 
-  return slug;
+  if (!ENVIRONMENT_IDENTIFIER_PATTERN.test(raw)) {
+    return helpers.error('any.invalid');
+  }
+
+  const slug = slugifyEnvironmentIdentifier(raw);
+  if (slug !== raw) {
+    return helpers.error('any.invalid');
+  }
+
+  return raw;
 }
 
 const csvListSchema = Joi.alternatives()
