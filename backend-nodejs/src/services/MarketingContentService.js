@@ -101,7 +101,7 @@ export default class MarketingContentService {
     if (!email) {
       return [];
     }
-    const invites = await LearnerOnboardingInviteModel.listActiveForEmail(email, db);
+    const invites = await LearnerOnboardingInviteModel.listActiveForEmail(email, { connection: db });
     if (invites.length === 0) {
       return invites;
     }
@@ -114,28 +114,35 @@ export default class MarketingContentService {
       communities = new Map(rows.map((row) => [row.id, { slug: row.slug, name: row.name }]));
     }
     return invites.map((invite) => ({
-      code: invite.inviteCode,
+      code: invite.inviteCode ?? invite.code ?? null,
       email: invite.email,
       status: invite.status,
       expiresAt: invite.expiresAt,
       metadata: invite.metadata,
-      community: invite.communityId ? communities.get(invite.communityId) ?? null : null
+      community: invite.communityId
+        ? communities.get(invite.communityId) ?? null
+        : invite.community ?? null
     }));
   }
 
   static async getLandingContent({ types, email, surfaces, variants } = {}) {
-    const [blocks, plans, invites, testimonials] = await Promise.all([
-      this.listMarketingBlocks({ types, variants, surfaces }),
+    const variantList = normaliseArrayParam(variants);
+    const surfaceList = normaliseArrayParam(surfaces);
+
+    const [blocks, plans, invites] = await Promise.all([
+      this.listMarketingBlocks({ types, variants: variantList, surfaces: surfaceList }),
       this.listPlanOffers(),
-      this.listActiveInvites(email),
-      this.listTestimonials({ variants, surfaces })
+      this.listActiveInvites(email)
     ]);
-    return {
-      blocks,
-      plans,
-      invites,
-      testimonials
-    };
+
+    const includeTestimonials = variantList.length > 0 || surfaceList.length > 0;
+    const response = { blocks, plans, invites };
+
+    if (includeTestimonials) {
+      response.testimonials = await this.listTestimonials({ variants: variantList, surfaces: surfaceList });
+    }
+
+    return response;
   }
 
   static async createMarketingLead(payload = {}) {
@@ -151,11 +158,21 @@ export default class MarketingContentService {
     const ctaSource = normaliseString(payload.ctaSource ?? payload.cta_source) ?? 'home-inline';
     const blockSlug = normaliseString(payload.blockSlug ?? payload.block_slug);
 
-    const [invites] = await Promise.all([
-      this.listActiveInvites(email)
-    ]);
+    const invites = await this.listActiveInvites(email);
 
-    const lead = await MarketingLeadModel.create({
+    const inviteSummaries = invites.map((invite) => ({
+      code: invite.code,
+      community: invite.community,
+      status: invite.status,
+      expiresAt: invite.expiresAt
+    }));
+
+    const metadataPayload = {
+      ...(payload.metadata ?? {}),
+      invites: inviteSummaries
+    };
+
+    const leadRecord = await MarketingLeadModel.create({
       email,
       fullName,
       company,
@@ -164,20 +181,16 @@ export default class MarketingContentService {
       ctaSource,
       blockSlug,
       status: 'new',
-      metadata: {
-        ...(payload.metadata ?? {}),
-        invites: invites.map((invite) => ({
-          code: invite.code,
-          community: invite.community,
-          status: invite.status,
-          expiresAt: invite.expiresAt
-        }))
-      }
+      metadata: metadataPayload
     });
 
     return {
-      ...lead,
-      invites: invites
+      ...leadRecord,
+      metadata: {
+        ...metadataPayload,
+        ...(leadRecord.metadata ?? {})
+      },
+      invites
     };
   }
 }

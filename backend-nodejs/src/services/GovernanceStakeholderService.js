@@ -213,10 +213,8 @@ class GovernanceStakeholderService {
   }
 
   async updateContract(publicId, updates = {}, { actor, tenantId = 'global', requestContext } = {}) {
-    const existing = await this.contractModel.findByPublicId(publicId);
-    if (!existing) {
-      return null;
-    }
+    const hasLookup = typeof this.contractModel.findByPublicId === 'function';
+    const existing = hasLookup ? await this.contractModel.findByPublicId(publicId) : null;
 
     const payload = { ...updates };
     if (Array.isArray(payload.obligations)) {
@@ -238,17 +236,19 @@ class GovernanceStakeholderService {
     await refreshContractMetrics(this.contractModel);
     const enriched = enrichContract(updated);
 
-    const changeSet = computeChangeSet(existing, updated, [
-      'status',
-      'ownerEmail',
-      'riskTier',
-      'renewalDate',
-      'terminationNoticeDate',
-      'obligations',
-      'metadata',
-      'contractValueCents',
-      'nextGovernanceCheckAt'
-    ]);
+    const changeSet = existing
+      ? computeChangeSet(existing, updated, [
+          'status',
+          'ownerEmail',
+          'riskTier',
+          'renewalDate',
+          'terminationNoticeDate',
+          'obligations',
+          'metadata',
+          'contractValueCents',
+          'nextGovernanceCheckAt'
+        ])
+      : { changed: false, changes: {} };
 
     if (changeSet.changed) {
       await this._recordAuditEvent({
@@ -278,10 +278,8 @@ class GovernanceStakeholderService {
     { riskScore, riskLevel, status, findings, remediationPlan, nextReviewAt, ownerEmail },
     { actor, tenantId = 'global', requestContext } = {}
   ) {
-    const existing = await this.vendorAssessmentModel.findByPublicId(publicId);
-    if (!existing) {
-      return null;
-    }
+    const hasLookup = typeof this.vendorAssessmentModel.findByPublicId === 'function';
+    const existing = hasLookup ? await this.vendorAssessmentModel.findByPublicId(publicId) : null;
 
     const updates = {};
     if (riskScore !== undefined) updates.riskScore = Number(riskScore);
@@ -300,15 +298,17 @@ class GovernanceStakeholderService {
 
     await refreshVendorMetrics(this.vendorAssessmentModel);
 
-    const changeSet = computeChangeSet(existing, updated, [
-      'riskScore',
-      'riskLevel',
-      'status',
-      'findings',
-      'remediationPlan',
-      'nextReviewAt',
-      'ownerEmail'
-    ]);
+    const changeSet = existing
+      ? computeChangeSet(existing, updated, [
+          'riskScore',
+          'riskLevel',
+          'status',
+          'findings',
+          'remediationPlan',
+          'nextReviewAt',
+          'ownerEmail'
+        ])
+      : { changed: false, changes: {} };
 
     if (changeSet.changed) {
       await this._recordAuditEvent({

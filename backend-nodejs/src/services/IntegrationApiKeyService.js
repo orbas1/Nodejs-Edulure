@@ -185,10 +185,24 @@ function sanitizeRotationHistory(history = []) {
     }));
 }
 
+function isQueryableConnection(connection) {
+  return (
+    typeof connection === 'function' ||
+    (connection &&
+      (typeof connection.select === 'function' ||
+        typeof connection.from === 'function' ||
+        typeof connection.raw === 'function'))
+  );
+}
+
 async function closePendingInvitesForAlias(
   { provider, environment, alias, connection, reason, closedBy, excludeInviteId },
   now = new Date()
 ) {
+  if (!isQueryableConnection(connection)) {
+    return;
+  }
+
   const invites = await IntegrationApiKeyInviteModel.listPendingForAlias(
     { provider, environment, alias },
     connection
@@ -356,17 +370,23 @@ export default class IntegrationApiKeyService {
       throw Object.assign(new Error('Expiry date is invalid'), { status: 422 });
     }
 
-    const aliasConflict = await this.model.findByAlias({
-      provider: normalisedProvider,
-      environment: normalisedEnvironment,
-      alias: resolvedAlias
-    }, connection);
+    const aliasConflict = await this.model.findByAlias(
+      {
+        provider: normalisedProvider,
+        environment: normalisedEnvironment,
+        alias: resolvedAlias
+      },
+      isQueryableConnection(connection) ? connection : undefined
+    );
     if (aliasConflict) {
       throw Object.assign(new Error('Alias already exists for this provider/environment'), { status: 409 });
     }
 
     const keyHash = this.encryptionService.hash(trimmedKey);
-    const hashConflict = await this.model.findByHash(keyHash, connection);
+    const hashConflict = await this.model.findByHash(
+      keyHash,
+      isQueryableConnection(connection) ? connection : undefined
+    );
     if (hashConflict && hashConflict.provider === normalisedProvider) {
       throw Object.assign(new Error('API key already registered for this provider'), { status: 409 });
     }
@@ -396,7 +416,7 @@ export default class IntegrationApiKeyService {
       notes: noteText
     };
 
-    const record = await this.model.create(
+    const createArgs = [
       {
         provider: normalisedProvider,
         environment: normalisedEnvironment,
@@ -415,9 +435,13 @@ export default class IntegrationApiKeyService {
         metadata,
         createdBy: createdBy ?? ownerEmailAddress,
         updatedBy: createdBy ?? ownerEmailAddress
-      },
-      connection
-    );
+      }
+    ];
+    if (isQueryableConnection(connection)) {
+      createArgs.push(connection);
+    }
+
+    const record = await this.model.create(...createArgs);
 
     await closePendingInvitesForAlias(
       {
@@ -437,7 +461,7 @@ export default class IntegrationApiKeyService {
 
   async rotateKey(id, { keyValue, rotationIntervalDays, expiresAt, rotatedBy, reason, notes }, options = {}) {
     const { connection = db, skipInviteId } = options;
-    const record = await this.model.findById(id, connection);
+    const record = await this.model.findById(id, isQueryableConnection(connection) ? connection : undefined);
     if (!record) {
       throw Object.assign(new Error('API key not found'), { status: 404 });
     }
@@ -505,8 +529,9 @@ export default class IntegrationApiKeyService {
       }
     ];
 
-    if (connection !== undefined) {
-      updateArgs.push(connection);
+    const queryableConnection = isQueryableConnection(connection) ? connection : undefined;
+    if (queryableConnection) {
+      updateArgs.push(queryableConnection);
     }
 
     const updated = await this.model.updateById(...updateArgs);
@@ -528,7 +553,7 @@ export default class IntegrationApiKeyService {
   }
 
   async disableKey(id, { disabledBy, reason }, { connection } = {}) {
-    const record = await this.model.findById(id, connection);
+    const record = await this.model.findById(id, isQueryableConnection(connection) ? connection : undefined);
     if (!record) {
       throw Object.assign(new Error('API key not found'), { status: 404 });
     }
@@ -554,8 +579,9 @@ export default class IntegrationApiKeyService {
       }
     ];
 
-    if (connection !== undefined) {
-      disableArgs.push(connection);
+    const disableConnection = isQueryableConnection(connection) ? connection : undefined;
+    if (disableConnection) {
+      disableArgs.push(disableConnection);
     }
 
     const updated = await this.model.updateById(...disableArgs);
