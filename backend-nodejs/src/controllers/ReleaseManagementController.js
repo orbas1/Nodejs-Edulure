@@ -110,14 +110,17 @@ const dashboardQuerySchema = Joi.object({
 }).unknown(true);
 
 function handleValidationError(error, next) {
-  if (error) {
-    error.status = 422;
-    error.details = Array.isArray(error.details)
-      ? error.details.map((detail) => detail.message)
-      : error.details;
-    return next(error);
+  if (!error) {
+    return false;
   }
-  return null;
+
+  error.status = 422;
+  error.details = Array.isArray(error.details)
+    ? error.details.map((detail) => detail.message)
+    : error.details;
+
+  next(error);
+  return true;
 }
 
 export default class ReleaseManagementController {
