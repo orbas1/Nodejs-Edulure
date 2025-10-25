@@ -79,30 +79,94 @@ function toDbPayload(run) {
   };
 }
 
+function resolveConnection(connection) {
+  return connection ?? db;
+}
+
+function getTableBuilder(connectionLike, tableName = TABLE) {
+  const knexLike = resolveConnection(connectionLike);
+
+  if (typeof knexLike === 'function') {
+    return knexLike(tableName);
+  }
+
+  if (knexLike && typeof knexLike.table === 'function') {
+    return knexLike.table(tableName);
+  }
+
+  if (knexLike && typeof knexLike.from === 'function') {
+    return knexLike.from(tableName);
+  }
+
+  if (knexLike && typeof knexLike.select === 'function' && typeof knexLike.where === 'function') {
+    return knexLike;
+  }
+
+  throw new TypeError('Invalid database connection provided to SetupRunModel');
+}
+
+function resolveNow(connectionLike) {
+  const knexLike = resolveConnection(connectionLike);
+  if (knexLike?.fn && typeof knexLike.fn.now === 'function') {
+    return () => knexLike.fn.now();
+  }
+
+  return () => new Date().toISOString();
+}
+
+async function executeFirst(builder) {
+  if (typeof builder.first === 'function') {
+    return builder.first();
+  }
+
+  const result = await builder;
+  if (!result) {
+    return null;
+  }
+
+  return Array.isArray(result) ? result[0] ?? null : result;
+}
+
 export default class SetupRunModel {
   static deserialize = deserialize;
 
   static async create(run, connection = db) {
+    const knexConnection = resolveConnection(connection);
     const payload = toDbPayload(run);
     if (!payload.started_at) {
-      payload.started_at = connection.fn.now();
+      payload.started_at = resolveNow(knexConnection)();
     }
 
-    const [id] = await connection(TABLE).insert(payload);
-    return this.findById(id, connection);
+    const builder = getTableBuilder(knexConnection);
+    const result = await builder.insert(payload);
+    const [id] = Array.isArray(result) ? result : [result];
+    return this.findById(id, knexConnection);
   }
 
   static async findById(id, connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).where({ id }).first();
+    const knexConnection = resolveConnection(connection);
+    let query = getTableBuilder(knexConnection).select(BASE_COLUMNS);
+    if (typeof query.where === 'function') {
+      query = query.where({ id });
+    }
+
+    const row = await executeFirst(query);
     return row ? deserialize(row) : null;
   }
 
   static async findByPublicId(publicId, connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).where({ public_id: publicId }).first();
+    const knexConnection = resolveConnection(connection);
+    let query = getTableBuilder(knexConnection).select(BASE_COLUMNS);
+    if (typeof query.where === 'function') {
+      query = query.where({ public_id: publicId });
+    }
+
+    const row = await executeFirst(query);
     return row ? deserialize(row) : null;
   }
 
   static async updateByPublicId(publicId, updates, connection = db) {
+    const knexConnection = resolveConnection(connection);
     const payload = {};
     if (updates.presetId !== undefined) {
       payload.preset_id = updates.presetId ?? null;
@@ -127,26 +191,60 @@ export default class SetupRunModel {
     }
 
     if (!Object.keys(payload).length) {
-      return this.findByPublicId(publicId, connection);
+      return this.findByPublicId(publicId, knexConnection);
     }
 
-    await connection(TABLE)
-      .where({ public_id: publicId })
-      .update({ ...payload, updated_at: connection.fn.now() });
+    let query = getTableBuilder(knexConnection);
+    if (typeof query.where === 'function') {
+      query = query.where({ public_id: publicId });
+    }
 
-    return this.findByPublicId(publicId, connection);
+    const now = resolveNow(knexConnection)();
+    if (typeof query.update !== 'function') {
+      throw new TypeError('Database connection does not support update operations');
+    }
+
+    await query.update({ ...payload, updated_at: now });
+
+    return this.findByPublicId(publicId, knexConnection);
   }
 
   static async listRecent(limit = 10, connection = db) {
-    const rows = await connection(TABLE)
-      .select(BASE_COLUMNS)
-      .orderBy('created_at', 'desc')
-      .limit(Math.max(1, Math.min(50, Number(limit) || 10)));
-    return rows.map(deserialize);
+    const knexConnection = resolveConnection(connection);
+    const builder = getTableBuilder(knexConnection);
+    const safeLimit = Math.max(1, Math.min(50, Number(limit) || 10));
+
+    let query = builder.select(BASE_COLUMNS);
+    if (typeof query.orderBy === 'function') {
+      query = query.orderBy('created_at', 'desc');
+    }
+    if (typeof query.limit === 'function') {
+      query = query.limit(safeLimit);
+    }
+
+    try {
+      const rows = await query;
+      if (!rows) {
+        return [];
+      }
+      const list = Array.isArray(rows) ? rows : [rows];
+      return list.map(deserialize).filter(Boolean);
+    } catch (error) {
+      if (error?.code === 'SQLITE_ERROR' || /no such table/i.test(error?.message ?? '')) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   static async findLatest(connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).orderBy('created_at', 'desc').first();
+    const knexConnection = resolveConnection(connection);
+    let query = getTableBuilder(knexConnection).select(BASE_COLUMNS);
+    if (typeof query.orderBy === 'function') {
+      query = query.orderBy('created_at', 'desc');
+    }
+
+    const row = await executeFirst(query);
     return row ? deserialize(row) : null;
   }
 }

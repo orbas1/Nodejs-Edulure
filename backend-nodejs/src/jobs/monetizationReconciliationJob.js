@@ -9,6 +9,12 @@ import MonetizationReconciliationRunModel from '../models/MonetizationReconcilia
 import MonetizationAlertNotificationService from '../services/MonetizationAlertNotificationService.js';
 import { recordBackgroundJobRun } from '../observability/metrics.js';
 
+function safeRecordBackgroundJobRun(payload) {
+  if (typeof recordBackgroundJobRun === 'function') {
+    recordBackgroundJobRun(payload);
+  }
+}
+
 function ensurePositiveInteger(value, fallback) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -240,7 +246,7 @@ export class MonetizationReconciliationJob {
       );
       const outcome = hasSevere || totalAlerts > 0 ? 'partial' : 'succeeded';
 
-      recordBackgroundJobRun({
+      safeRecordBackgroundJobRun({
         job: this.jobKey,
         trigger,
         outcome,
@@ -287,7 +293,7 @@ export class MonetizationReconciliationJob {
         );
       }
 
-      recordBackgroundJobRun({
+      safeRecordBackgroundJobRun({
         job: this.jobKey,
         trigger,
         outcome: 'failed',
