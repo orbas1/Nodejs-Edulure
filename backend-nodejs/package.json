@@ -16,6 +16,7 @@
     "start:worker": "node src/bin/worker.js",
     "start:realtime": "node src/bin/realtime.js",
     "start:stack": "node src/bin/stack.js",
+    "build": "node scripts/run-backend-build.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "test": "vitest run --coverage",

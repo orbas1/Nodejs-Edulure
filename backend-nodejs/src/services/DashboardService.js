@@ -34,6 +34,15 @@ function safeJsonParse(value, fallback) {
   }
 }
 
+function toDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 let operatorDashboardService;
 const log = logger.child({ service: 'DashboardService' });

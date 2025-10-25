@@ -6,8 +6,7 @@ function resolveExecutor(connection) {
 
 function ensureExecutor(connection) {
   const executor = resolveExecutor(connection);
-  const fn = executor?.fn ?? db.fn;
-  return { executor, fn };
+  return { executor, fn: executor?.fn ?? db.fn };
 }
 
 function parseJson(value, fallback) {
@@ -48,7 +47,7 @@ function mapRow(row) {
 
 export default class ModerationFollowUpModel {
   static async schedule(followUp, connection = db) {
-    const { executor, fn } = ensureExecutor(connection);
+    const { executor } = ensureExecutor(connection);
     const payload = {
       case_id: followUp.caseId,
       action_id: followUp.actionId ?? null,

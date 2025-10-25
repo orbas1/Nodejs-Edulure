@@ -57,6 +57,9 @@ The authentication stack enforces account lockouts, refresh session ceilings, an
 - `npm run test --workspace backend-nodejs` runs the Vitest suite. Prometheus collectors and other infrastructure dependencies
   are safely mocked in `test/setupMocks.js` so feature flag/runtime configuration logic and retention schedulers execute without
   external services.
+- `npm run build` runs the consolidated backend build: ESLint, OpenAPI documentation generation, and the Vitest suite. Append
+  `--with-release` to also invoke release verification tests or `--skip-*` flags (for example, `--skip-tests`) when iterating
+  locally.
 
 ### Rotating JWT signing keys
 
