@@ -32,7 +32,11 @@ export function announcePolite(message) {
   const region = ensureLiveRegion();
   if (!region) return;
   region.textContent = '';
-  window.requestAnimationFrame(() => {
+  const schedule =
+    typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame
+      : (callback) => setTimeout(callback, 0);
+  schedule(() => {
     region.textContent = message;
   });
 }

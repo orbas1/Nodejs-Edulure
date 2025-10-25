@@ -6,6 +6,7 @@ import CommunityOperations from '../../../../src/pages/dashboard/community/Commu
 const publishRunbookMock = vi.fn();
 const acknowledgeEscalationMock = vi.fn();
 const useAuthMock = vi.fn();
+const useDashboardMock = vi.fn();
 
 vi.mock('../../../../src/api/communityApi.js', () => ({
   publishCommunityRunbook: (...args) => publishRunbookMock(...args),
@@ -14,6 +15,10 @@ vi.mock('../../../../src/api/communityApi.js', () => ({
 
 vi.mock('../../../../src/context/AuthContext.jsx', () => ({
   useAuth: () => useAuthMock()
+}));
+
+vi.mock('../../../../src/context/DashboardContext.jsx', () => ({
+  useDashboard: () => useDashboardMock()
 }));
 
 describe('CommunityOperations', () => {
@@ -48,7 +53,11 @@ describe('CommunityOperations', () => {
   beforeEach(() => {
     publishRunbookMock.mockReset();
     acknowledgeEscalationMock.mockReset();
-    useAuthMock.mockReturnValue({ session: { tokens: { accessToken: 'test-token' } } });
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      session: { tokens: { accessToken: 'test-token' } }
+    });
+    useDashboardMock.mockReturnValue({ roles: ['community'] });
     vi.spyOn(window, 'prompt').mockImplementation(() => '');
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
@@ -108,7 +117,7 @@ describe('CommunityOperations', () => {
   });
 
   it('prevents runbook publishing without authentication', async () => {
-    useAuthMock.mockReturnValue({ session: null });
+    useAuthMock.mockReturnValue({ isAuthenticated: false, session: null });
     window.prompt.mockReset();
 
     render(<CommunityOperations dashboard={dashboard} />);
@@ -126,6 +135,8 @@ describe('CommunityOperations', () => {
       operations: { runbooks: [], escalations: [{ id: 'case-2', title: 'Resolve issue', status: 'pending' }] },
       health: { moderators: [] }
     };
+
+    useDashboardMock.mockReturnValue({ roles: ['community'] });
 
     render(<CommunityOperations dashboard={dashboardWithoutCommunities} />);
 
