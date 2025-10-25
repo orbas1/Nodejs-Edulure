@@ -186,7 +186,8 @@ export default function useSystemPreferencesForm({ token, onStatus, onAfterSave 
     setSaving(true);
     onStatus?.({ type: 'pending', message: 'Saving system preferences…' });
     try {
-      const { recommendationPreview, ...preferencesPayload } = form.preferences;
+      const preferencesPayload = { ...form.preferences };
+      delete preferencesPayload.recommendationPreview;
       await updateSystemPreferences({
         token,
         payload: {

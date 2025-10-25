@@ -103,7 +103,7 @@ export default function AppTopBar({
           </Link>
         </div>
         <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="Primary">
-          {primaryNavigation.map((item, index) => {
+          {primaryNavigation.map((item) => {
             const tabIndex = focusOrder.indexOf(item.id) + 1;
             return (
               <NavLink
@@ -173,7 +173,7 @@ export default function AppTopBar({
                 <Menu.Items className="absolute right-0 z-50 mt-3 w-80 origin-top-right rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
                   <p className="px-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Quick actions</p>
                   <ul className="mt-2 space-y-2">
-                    {quickActions.map((action, index) => {
+                    {quickActions.map((action) => {
                       const tabIndex = focusOrder.indexOf(action.id) + 1;
                       return (
                         <Menu.Item key={action.id}>
