@@ -8,6 +8,21 @@ import { describeRouteRegistry } from './registryValidator.js';
 const DEFAULT_API_VERSION = 'v1';
 const DEFAULT_API_PREFIX = '/api';
 
+function resolveLogger(loggerInstance) {
+  if (loggerInstance && typeof loggerInstance.info === 'function' && typeof loggerInstance.child === 'function') {
+    return loggerInstance;
+  }
+
+  if (loggerInstance && typeof loggerInstance.info === 'function') {
+    return {
+      ...loggerInstance,
+      child: (...args) => logger.child(...args)
+    };
+  }
+
+  return logger;
+}
+
 export function mountVersionedApi(app, {
   version = DEFAULT_API_VERSION,
   prefix = DEFAULT_API_PREFIX,
@@ -21,13 +36,14 @@ export function mountVersionedApi(app, {
   const versionRouter = Router({ mergeParams: true });
   const versionBasePath = `${prefix}/${version}`;
   const mountedRoutes = [];
+  const effectiveLogger = resolveLogger(loggerInstance);
 
   for (const entry of registry) {
     if (!entry?.router || !entry.basePath) {
       continue;
     }
 
-    const routeLogger = loggerInstance.child({
+    const routeLogger = effectiveLogger.child({
       component: 'api-router',
       route: entry.name,
       capability: entry.capability,
@@ -76,7 +92,7 @@ export function mountVersionedApi(app, {
     throw new Error('No routes were mounted. Ensure the registry contains valid route descriptors.');
   }
 
-  loggerInstance.info(
+  effectiveLogger.info(
     {
       component: 'api-router',
       version,
@@ -87,7 +103,7 @@ export function mountVersionedApi(app, {
 
   versionRouter.use(
     createRouteErrorBoundary({
-      loggerInstance: loggerInstance.child({ component: 'api-router', version, scope: 'fallback' }),
+      loggerInstance: effectiveLogger.child({ component: 'api-router', version, scope: 'fallback' }),
       scope: `api:${version}:fallback`
     })
   );

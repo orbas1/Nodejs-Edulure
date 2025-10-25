@@ -57,6 +57,10 @@ function buildPayload({ success, message, data, errors, code, meta }) {
     payload.errors = errors;
   }
 
+  if (!success && payload.errors !== undefined) {
+    payload.details = payload.errors;
+  }
+
   const normalisedMeta = normaliseMeta(meta);
   if (normalisedMeta !== undefined) {
     payload.meta = normalisedMeta;
