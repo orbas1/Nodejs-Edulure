@@ -118,42 +118,65 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
         setFeedback({ tone: "error", message: "You must be signed in to publish runbooks." });
         return;
       }
-      if (!runbookForm.communityId) {
+      let submission = { ...runbookForm };
+      const canPrompt =
+        typeof window !== "undefined" && typeof window.prompt === "function" && !runbookForm.title?.trim();
+
+      if (canPrompt) {
+        const responses = [
+          ["title", "Runbook title", runbookForm.title ?? ""],
+          ["summary", "Runbook summary (optional)", runbookForm.summary ?? ""],
+          ["owner", "Runbook owner", runbookForm.owner ?? "Operations team"],
+          ["linkUrl", "Documentation link (optional)", runbookForm.linkUrl ?? ""]
+        ];
+        const collected = { ...submission };
+        responses.forEach(([field, message, fallback]) => {
+          const answer = window.prompt(message, fallback ?? "");
+          collected[field] = (answer ?? "").trim();
+        });
+        submission = collected;
+        setRunbookForm((previous) => ({ ...previous, ...collected }));
+      }
+
+      const targetCommunityId = submission.communityId;
+      const trimmedTitle = submission.title?.trim() ?? "";
+
+      if (!targetCommunityId) {
         setFeedback({ tone: "error", message: "Select a community to attach the runbook to." });
         return;
       }
-      if (!runbookForm.title) {
+      if (!trimmedTitle) {
         setFeedback({ tone: "error", message: "Runbook title is required." });
         return;
       }
       setIsSubmitting(true);
       setFeedback(null);
-      const tags = runbookForm.tagsInput
+      const tags = (submission.tagsInput ?? "")
         .split(",")
         .map((entry) => entry.trim())
         .filter(Boolean);
       const optimistic = {
         id: `temp-${Date.now()}`,
-        title: runbookForm.title,
-        summary: runbookForm.summary,
-        owner: runbookForm.owner || "Operations team",
-        automationReady: runbookForm.automationReady,
+        title: trimmedTitle,
+        summary: submission.summary,
+        owner: submission.owner || "Operations team",
+        automationReady: submission.automationReady,
         tags,
-        linkUrl: runbookForm.linkUrl || null,
+        linkUrl: submission.linkUrl || null,
         updatedAt: new Date().toISOString(),
-        communityId: runbookForm.communityId
+        communityId: targetCommunityId
       };
       setRunbooks((previous) => [optimistic, ...previous]);
       try {
         const response = await publishCommunityRunbook({
-          communityId: runbookForm.communityId,
+          communityId: targetCommunityId,
           token,
           payload: {
-            title: runbookForm.title,
-            summary: runbookForm.summary,
-            owner: runbookForm.owner || "Operations team",
-            automationReady: runbookForm.automationReady,
-            linkUrl: runbookForm.linkUrl || undefined,
+            title: trimmedTitle,
+            summary: submission.summary,
+            owner: submission.owner || "Operations team",
+            automationReady: submission.automationReady,
+            linkUrl: submission.linkUrl || undefined,
             tags
           }
         });
@@ -165,8 +188,8 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
         }
         setRunbookForm({
           ...emptyRunbookForm,
-          owner: runbookForm.owner,
-          communityId: runbookForm.communityId
+          owner: submission.owner || "Operations team",
+          communityId: targetCommunityId
         });
       } catch (error) {
         setRunbooks((previous) => previous.filter((runbook) => runbook.id !== optimistic.id));
@@ -192,7 +215,16 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
       }
       setAckPendingId(task.id);
       setFeedback(null);
-      const note = ackNotes[task.id] ?? "";
+      let note = ackNotes[task.id] ?? "";
+      if (!note && typeof window !== "undefined" && typeof window.prompt === "function") {
+        const response = window.prompt("Add acknowledgement note (optional)", "");
+        if (response !== null) {
+          note = response.trim();
+          if (note) {
+            setAckNotes((previous) => ({ ...previous, [task.id]: note }));
+          }
+        }
+      }
       const optimistic = { ...task, status: "Acknowledged" };
       setEscalations((previous) => previous.map((item) => (item.id === task.id ? optimistic : item)));
       try {
@@ -205,7 +237,11 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
         setFeedback({ tone: "success", message: "Escalation acknowledged." });
       } catch (error) {
         setEscalations((previous) => previous.map((item) => (item.id === task.id ? task : item)));
-        setFeedback({ tone: "error", message: error?.message ?? "Failed to acknowledge escalation." });
+        setFeedback({
+          tone: "error",
+          message: "Failed to acknowledge escalation.",
+          detail: error?.message && error.message !== "Failed to acknowledge escalation." ? error.message : undefined
+        });
       } finally {
         setAckPendingId(null);
       }

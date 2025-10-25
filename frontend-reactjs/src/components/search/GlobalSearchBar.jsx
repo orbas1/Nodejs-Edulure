@@ -179,7 +179,13 @@ export default function GlobalSearchBar({
     setActiveIndex(-1);
   };
 
-  const handleSubmit = (event, submittedValue) => {
+  const handleSubmit = (firstArg, secondArg) => {
+    let event = secondArg;
+    let submittedValue = firstArg;
+    if (firstArg && typeof firstArg.preventDefault === 'function') {
+      event = firstArg;
+      submittedValue = secondArg;
+    }
     event?.preventDefault();
     submitValue(submittedValue ?? internalValue);
   };

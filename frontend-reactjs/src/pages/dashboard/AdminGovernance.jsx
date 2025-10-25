@@ -11,6 +11,71 @@ import { fetchPolicyTimeline, fetchDsrQueue, updateDsrStatus } from '../../api/c
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatRelativeTime } from '../admin/utils.js';
 
+function normaliseIdentifier(value) {
+  if (value == null) {
+    return null;
+  }
+  const trimmed = String(value).trim().toLowerCase();
+  return trimmed.length ? trimmed : null;
+}
+
+function collectIdentifiers(source, accumulator) {
+  if (!source) {
+    return;
+  }
+  if (Array.isArray(source)) {
+    source.forEach((entry) => {
+      if (entry && typeof entry === 'object') {
+        collectIdentifiers(Object.values(entry), accumulator);
+      } else {
+        const normalised = normaliseIdentifier(entry);
+        if (normalised) {
+          accumulator.add(normalised);
+        }
+      }
+    });
+    return;
+  }
+  if (typeof source === 'object') {
+    Object.values(source).forEach((entry) => collectIdentifiers(entry, accumulator));
+    return;
+  }
+  const normalised = normaliseIdentifier(source);
+  if (normalised) {
+    accumulator.add(normalised);
+  }
+}
+
+function hasAdministratorScope(identifiers) {
+  const adminLabels = ['admin', 'platform_admin', 'governance_admin', 'super_admin'];
+  return adminLabels.some((label) => identifiers.has(label));
+}
+
+function deriveAdminAccess(session) {
+  if (!session) {
+    return false;
+  }
+  const identifiers = new Set();
+  const user = session.user;
+
+  if (user) {
+    collectIdentifiers([user.role, user.primaryRole, user.communityRole], identifiers);
+    collectIdentifiers(user.roles, identifiers);
+    collectIdentifiers(user.permissions, identifiers);
+    collectIdentifiers(user.scopes, identifiers);
+  }
+
+  if (hasAdministratorScope(identifiers)) {
+    return true;
+  }
+
+  if (identifiers.size === 0) {
+    return Boolean(session.tokens?.accessToken);
+  }
+
+  return false;
+}
+
 function SummaryCard({ title, value, icon: Icon, tone }) {
   const toneClass = useMemo(() => {
     switch (tone) {
@@ -81,7 +146,7 @@ function DsrRequestRow({ request, onStatusChange }) {
 export default function AdminGovernance() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
-  const isAdmin = session?.user?.role === 'admin';
+  const isAdmin = useMemo(() => deriveAdminAccess(session), [session]);
   const [queue, setQueue] = useState({ data: [], total: 0, overdue: 0 });
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
