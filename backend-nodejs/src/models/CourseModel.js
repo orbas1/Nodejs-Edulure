@@ -366,38 +366,81 @@ export default class CourseModel {
 
     const { changeSummary, updatedBy, ...courseUpdates } = updates ?? {};
     const payload = {};
-    if (courseUpdates.title !== undefined) payload.title = courseUpdates.title;
-    if (courseUpdates.slug !== undefined)
+    if (courseUpdates.title !== undefined) {
+      payload.title = courseUpdates.title;
+    }
+    if (courseUpdates.slug !== undefined) {
       payload.slug = this.normaliseSlug(courseUpdates.slug, courseUpdates.title ?? existing.title);
-    if (courseUpdates.summary !== undefined) payload.summary = courseUpdates.summary ?? null;
-    if (courseUpdates.description !== undefined) payload.description = courseUpdates.description ?? null;
-    if (courseUpdates.level !== undefined) payload.level = courseUpdates.level ?? 'beginner';
-    if (courseUpdates.category !== undefined) payload.category = courseUpdates.category ?? 'general';
-    if (courseUpdates.skills !== undefined) payload.skills = serialiseArray(courseUpdates.skills ?? []);
-    if (courseUpdates.tags !== undefined) payload.tags = serialiseArray(courseUpdates.tags ?? []);
-    if (courseUpdates.languages !== undefined)
+    }
+    if (courseUpdates.summary !== undefined) {
+      payload.summary = courseUpdates.summary ?? null;
+    }
+    if (courseUpdates.description !== undefined) {
+      payload.description = courseUpdates.description ?? null;
+    }
+    if (courseUpdates.level !== undefined) {
+      payload.level = courseUpdates.level ?? 'beginner';
+    }
+    if (courseUpdates.category !== undefined) {
+      payload.category = courseUpdates.category ?? 'general';
+    }
+    if (courseUpdates.skills !== undefined) {
+      payload.skills = serialiseArray(courseUpdates.skills ?? []);
+    }
+    if (courseUpdates.tags !== undefined) {
+      payload.tags = serialiseArray(courseUpdates.tags ?? []);
+    }
+    if (courseUpdates.languages !== undefined) {
       payload.languages = serialiseArray(courseUpdates.languages ?? ['en']);
-    if (courseUpdates.deliveryFormat !== undefined)
+    }
+    if (courseUpdates.deliveryFormat !== undefined) {
       payload.delivery_format = courseUpdates.deliveryFormat ?? 'self_paced';
-    if (courseUpdates.thumbnailUrl !== undefined) payload.thumbnail_url = courseUpdates.thumbnailUrl ?? null;
-    if (courseUpdates.heroImageUrl !== undefined) payload.hero_image_url = courseUpdates.heroImageUrl ?? null;
-    if (courseUpdates.trailerUrl !== undefined) payload.trailer_url = courseUpdates.trailerUrl ?? null;
-    if (courseUpdates.promoVideoUrl !== undefined) payload.promo_video_url = courseUpdates.promoVideoUrl ?? null;
-    if (courseUpdates.syllabusUrl !== undefined) payload.syllabus_url = courseUpdates.syllabusUrl ?? null;
-    if (courseUpdates.priceCurrency !== undefined)
+    }
+    if (courseUpdates.thumbnailUrl !== undefined) {
+      payload.thumbnail_url = courseUpdates.thumbnailUrl ?? null;
+    }
+    if (courseUpdates.heroImageUrl !== undefined) {
+      payload.hero_image_url = courseUpdates.heroImageUrl ?? null;
+    }
+    if (courseUpdates.trailerUrl !== undefined) {
+      payload.trailer_url = courseUpdates.trailerUrl ?? null;
+    }
+    if (courseUpdates.promoVideoUrl !== undefined) {
+      payload.promo_video_url = courseUpdates.promoVideoUrl ?? null;
+    }
+    if (courseUpdates.syllabusUrl !== undefined) {
+      payload.syllabus_url = courseUpdates.syllabusUrl ?? null;
+    }
+    if (courseUpdates.priceCurrency !== undefined) {
       payload.price_currency = courseUpdates.priceCurrency ?? 'USD';
-    if (courseUpdates.priceAmount !== undefined) payload.price_amount = courseUpdates.priceAmount ?? 0;
-    if (courseUpdates.ratingAverage !== undefined) payload.rating_average = courseUpdates.ratingAverage ?? 0;
-    if (courseUpdates.ratingCount !== undefined) payload.rating_count = courseUpdates.ratingCount ?? 0;
-    if (courseUpdates.enrolmentCount !== undefined)
+    }
+    if (courseUpdates.priceAmount !== undefined) {
+      payload.price_amount = courseUpdates.priceAmount ?? 0;
+    }
+    if (courseUpdates.ratingAverage !== undefined) {
+      payload.rating_average = courseUpdates.ratingAverage ?? 0;
+    }
+    if (courseUpdates.ratingCount !== undefined) {
+      payload.rating_count = courseUpdates.ratingCount ?? 0;
+    }
+    if (courseUpdates.enrolmentCount !== undefined) {
       payload.enrolment_count = courseUpdates.enrolmentCount ?? 0;
-    if (courseUpdates.isPublished !== undefined) payload.is_published = courseUpdates.isPublished;
-    if (courseUpdates.releaseAt !== undefined) payload.release_at = courseUpdates.releaseAt ?? null;
-    if (courseUpdates.status !== undefined) payload.status = courseUpdates.status;
-    if (courseUpdates.metadata !== undefined)
+    }
+    if (courseUpdates.isPublished !== undefined) {
+      payload.is_published = courseUpdates.isPublished;
+    }
+    if (courseUpdates.releaseAt !== undefined) {
+      payload.release_at = courseUpdates.releaseAt ?? null;
+    }
+    if (courseUpdates.status !== undefined) {
+      payload.status = courseUpdates.status;
+    }
+    if (courseUpdates.metadata !== undefined) {
       payload.metadata = serialiseJson(courseUpdates.metadata ?? {}, {});
-    if (courseUpdates.clusterKey !== undefined)
+    }
+    if (courseUpdates.clusterKey !== undefined) {
       payload.cluster_key = normaliseClusterKey(courseUpdates.clusterKey);
+    }
     if (courseUpdates.instructorId !== undefined) payload.instructor_id = courseUpdates.instructorId;
 
     if (Object.keys(payload).length === 0) {

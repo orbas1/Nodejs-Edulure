@@ -137,8 +137,8 @@ export class MonetizationReconciliationJob {
     const startTime = process.hrtime.bigint();
     let windowStartIso = null;
     let windowEndIso = null;
-    let tenantSummaries = [];
-    let failures = [];
+    const tenantSummaries = [];
+    const failures = [];
     let attemptedTenants = [];
 
     try {

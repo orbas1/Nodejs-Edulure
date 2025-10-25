@@ -16,7 +16,7 @@ function normaliseEnvironmentName(value) {
 }
 
 function normaliseString(value, { fieldName, maxLength = 255 } = {}) {
-  const normalised = normaliseOptionalString(value, { maxLength });
+  const normalised = normaliseOptionalString(value, { maxLength, fieldName });
   if (!normalised) {
     return null;
   }

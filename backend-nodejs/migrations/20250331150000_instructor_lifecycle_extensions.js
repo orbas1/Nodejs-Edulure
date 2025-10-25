@@ -372,7 +372,6 @@ export async function down(knex) {
   ];
 
   for (const table of tables) {
-    // eslint-disable-next-line no-await-in-loop
     await knex.schema.dropTableIfExists(table);
   }
 }

@@ -1,5 +1,5 @@
 import db from '../config/database.js';
-import { normaliseReactionSummary as normaliseReactionSummaryAggregate, withReactionTotals } from '../services/ReactionAggregationService.js';
+import { withReactionTotals } from '../services/ReactionAggregationService.js';
 
 const POST_COLUMNS = [
   'cp.id',
@@ -91,10 +91,6 @@ function normaliseTags(tags) {
     }
   }
   return [];
-}
-
-function normaliseReactionSummary(summary) {
-  return normaliseReactionSummaryAggregate(summary);
 }
 
 function encodeCursor(payload) {

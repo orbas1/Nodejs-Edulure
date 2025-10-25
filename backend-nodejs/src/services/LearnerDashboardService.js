@@ -93,6 +93,19 @@ function normaliseOptionalString(value, maxLength = 160) {
   return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
 }
 
+function optionalIsoDateField(value, fieldLabel) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${fieldLabel} must be a valid ISO 8601 date`);
+  }
+
+  return date.toISOString();
+}
+
 function normaliseGoalList(goals) {
   if (!Array.isArray(goals)) {
     return [];
@@ -1212,23 +1225,25 @@ export default class LearnerDashboardService {
     const reimbursementsPayload =
       payload.reimbursements && typeof payload.reimbursements === 'object' ? payload.reimbursements : {};
 
+    const resolvedTaxId = payload.taxId ?? payload.profile?.taxId;
+    const resolvedInvoiceDelivery = payload.invoiceDelivery ?? payload.profile?.invoiceDelivery;
+    const resolvedPayoutSchedule = payload.payoutSchedule ?? payload.profile?.payoutSchedule;
+    const resolvedExpensePolicyUrl = payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl;
+
     const preferences = {
       currency: normaliseCurrency(payload.currency ?? payload.profile?.currency ?? 'USD'),
-      taxId:
-        typeof (payload.taxId ?? payload.profile?.taxId) === 'string'
-          ? (payload.taxId ?? payload.profile?.taxId).trim() || null
-          : null,
+      taxId: typeof resolvedTaxId === 'string' ? resolvedTaxId.trim() || null : null,
       invoiceDelivery:
-        typeof (payload.invoiceDelivery ?? payload.profile?.invoiceDelivery) === 'string'
-          ? (payload.invoiceDelivery ?? payload.profile?.invoiceDelivery).trim() || 'email'
+        typeof resolvedInvoiceDelivery === 'string'
+          ? resolvedInvoiceDelivery.trim() || 'email'
           : 'email',
       payoutSchedule:
-        typeof (payload.payoutSchedule ?? payload.profile?.payoutSchedule) === 'string'
-          ? (payload.payoutSchedule ?? payload.profile?.payoutSchedule).trim() || 'monthly'
+        typeof resolvedPayoutSchedule === 'string'
+          ? resolvedPayoutSchedule.trim() || 'monthly'
           : 'monthly',
       expensePolicyUrl:
-        typeof (payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl) === 'string'
-          ? (payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl).trim() || null
+        typeof resolvedExpensePolicyUrl === 'string'
+          ? resolvedExpensePolicyUrl.trim() || null
           : null,
       alerts: normaliseFinanceAlerts({ ...DEFAULT_FINANCE_ALERTS, ...alertsPayload }),
       reimbursements: normaliseFinanceReimbursements(reimbursementsPayload)

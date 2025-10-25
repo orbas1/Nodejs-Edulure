@@ -568,7 +568,7 @@ function normaliseResourceCollection(value, fallbackLabel) {
   return result;
 }
 
-function resolveSessionResources(metadata, joinHref, lobbyHref) {
+function resolveSessionResources(metadata, joinHref) {
   const resourcesMeta = typeof metadata.resources === 'object' ? metadata.resources : {};
   const prepSources = resourcesMeta.prep ?? metadata.prep ?? metadata.prepLinks ?? null;
   const materialSources =
@@ -668,7 +668,7 @@ function resolveSessionPricing(session, metadata) {
   };
 }
 
-function resolvePreferredSlot(metadata, now = new Date()) {
+function resolvePreferredSlot(metadata) {
   if (!metadata) {
     return null;
   }
@@ -2445,7 +2445,7 @@ export function buildLearnerDashboard({
       passcodeRequired: securityMeta.passcodeRequired !== false
     };
 
-    const resources = resolveSessionResources(metadata, joinHref, lobbyHref);
+    const resources = resolveSessionResources(metadata, joinHref);
     const support = resolveSessionSupport(metadata, facilitators);
     const alerts = resolveSessionAlerts({ occupancyRate, metadata, security, now });
     const pricing = resolveSessionPricing(session, metadata);
@@ -4784,7 +4784,7 @@ function buildTutorNotifications({ bookings = [], now }) {
     .forEach((booking) => {
       const learnerName = resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner');
       const topic = booking.metadata?.topic ?? 'Mentorship session';
-      const preferredLabel = resolvePreferredSlot(booking.metadata, now);
+      const preferredLabel = resolvePreferredSlot(booking.metadata);
       const slaCandidate =
         booking.metadata?.slaDueAt ??
         booking.metadata?.preferredSlot?.startAt ??
@@ -4967,7 +4967,7 @@ export function buildInstructorDashboard({
         requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
         topic: metadata.topic ?? 'Mentorship session',
         segment: resolveBookingSegment(metadata),
-        preferred: resolvePreferredSlot(metadata, now),
+          preferred: resolvePreferredSlot(metadata),
         risk: metadata.risk ?? metadata.routing?.risk ?? null
       };
     });

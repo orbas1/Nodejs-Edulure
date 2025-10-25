@@ -35,7 +35,6 @@ export async function up(knex) {
     }
 
     if (!documentationUrl) {
-      // eslint-disable-next-line no-continue
       continue;
     }
 
