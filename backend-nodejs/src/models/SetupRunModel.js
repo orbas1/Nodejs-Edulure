@@ -23,16 +23,16 @@ function getTableQuery(connection = db) {
     throw new TypeError('A database connection instance is required');
   }
 
-  if (typeof connection === 'function') {
-    return connection(TABLE);
-  }
-
   if (typeof connection.table === 'function') {
     return connection.table(TABLE);
   }
 
   if (typeof connection.from === 'function') {
     return connection.from(TABLE);
+  }
+
+  if (typeof connection === 'function') {
+    return connection(TABLE);
   }
 
   if (typeof connection.clone === 'function' && typeof connection.select === 'function') {
