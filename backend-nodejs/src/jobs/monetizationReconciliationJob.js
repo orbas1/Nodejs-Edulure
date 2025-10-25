@@ -7,7 +7,18 @@ import logger from '../config/logger.js';
 import MonetizationFinanceService from '../services/MonetizationFinanceService.js';
 import MonetizationReconciliationRunModel from '../models/MonetizationReconciliationRunModel.js';
 import MonetizationAlertNotificationService from '../services/MonetizationAlertNotificationService.js';
-import { recordBackgroundJobRun } from '../observability/metrics.js';
+import * as metrics from '../observability/metrics.js';
+
+function recordJobRun(payload) {
+  if (typeof metrics.recordBackgroundJobRun === 'function') {
+    metrics.recordBackgroundJobRun(payload);
+    return;
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    logger.debug({ payload }, 'recordBackgroundJobRun metric unavailable; skipping emission');
+  }
+}
 
 function ensurePositiveInteger(value, fallback) {
   const numeric = Number(value);
@@ -240,7 +251,7 @@ export class MonetizationReconciliationJob {
       );
       const outcome = hasSevere || totalAlerts > 0 ? 'partial' : 'succeeded';
 
-      recordBackgroundJobRun({
+      recordJobRun({
         job: this.jobKey,
         trigger,
         outcome,
@@ -287,7 +298,7 @@ export class MonetizationReconciliationJob {
         );
       }
 
-      recordBackgroundJobRun({
+      recordJobRun({
         job: this.jobKey,
         trigger,
         outcome: 'failed',
