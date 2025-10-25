@@ -26,6 +26,24 @@ import {
 } from '../lib/analytics.js';
 import { useTheme } from '../providers/ThemeProvider.jsx';
 
+const CUSTOMER_ROLES = new Set(['learner', 'guardian', 'student']);
+
+function normaliseRole(role) {
+  if (typeof role !== 'string') {
+    return null;
+  }
+  const trimmed = role.trim().toLowerCase();
+  return trimmed || null;
+}
+
+function isCustomerRole(role) {
+  const resolved = normaliseRole(role);
+  if (!resolved) {
+    return true;
+  }
+  return CUSTOMER_ROLES.has(resolved);
+}
+
 function coerceNumber(value, fallback = 0) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -619,9 +637,10 @@ export default function DashboardLayout() {
   const { session, isAuthenticated } = useAuth();
   const metadataRole = session?.user?.role ?? (isAuthenticated ? 'user' : 'guest');
   const metadataToken = session?.tokens?.accessToken ?? undefined;
+  const annexMetadataEnabled = !isCustomerRole(session?.user?.role) && isAuthenticated;
 
   return (
-    <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
+    <NavigationMetadataProvider role={metadataRole} token={metadataToken} enabled={annexMetadataEnabled}>
       <DashboardLayoutInner />
     </NavigationMetadataProvider>
   );
