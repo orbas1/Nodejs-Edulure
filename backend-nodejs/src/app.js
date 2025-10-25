@@ -9,7 +9,6 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import pinoHttp from 'pino-http';
 import { randomUUID } from 'crypto';
-import swaggerUi from 'swagger-ui-express';
 
 import { env } from './config/env.js';
 import logger from './config/logger.js';
@@ -21,15 +20,54 @@ import auth from './middleware/auth.js';
 import requestContextMiddleware from './middleware/requestContext.js';
 import runtimeConfigMiddleware from './middleware/runtimeConfig.js';
 import { annotateLogContextFromRequest, httpMetricsMiddleware, metricsHandler } from './observability/metrics.js';
-import { mountVersionedApi } from './routes/registerApiRoutes.js';
-import { apiRouteRegistry } from './routes/routeRegistry.js';
 import { getServiceSpecDocument, getServiceSpecIndex } from './docs/serviceSpecRegistry.js';
-import { createGraphQLRouter } from './graphql/router.js';
 import { storageDescriptor, storageBuckets, localStorageConfig } from './config/storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const openApiSpec = JSON.parse(readFileSync(path.join(__dirname, 'docs/openapi.json'), 'utf8'));
-const serviceSpecIndex = getServiceSpecIndex();
+const openApiSpecPath = path.join(__dirname, 'docs/openapi.json');
+let cachedOpenApiSpec;
+
+function getOpenApiSpec() {
+  if (!cachedOpenApiSpec) {
+    cachedOpenApiSpec = JSON.parse(readFileSync(openApiSpecPath, 'utf8'));
+  }
+
+  return cachedOpenApiSpec;
+}
+const isTestEnvironment = process.env.NODE_ENV === 'test';
+
+let swaggerUiPromise;
+let swaggerUiSetupMiddleware;
+
+function loadSwaggerUi() {
+  if (!swaggerUiPromise) {
+    swaggerUiPromise = import('swagger-ui-express').then((mod) => mod.default ?? mod);
+  }
+
+  return swaggerUiPromise;
+}
+
+function createSwaggerServeMiddleware() {
+  return (req, res, next) => {
+    loadSwaggerUi()
+      .then((swaggerUi) => swaggerUi.serve(req, res, next))
+      .catch(next);
+  };
+}
+
+function createSwaggerSetupMiddleware() {
+  return (req, res, next) => {
+    loadSwaggerUi()
+      .then((swaggerUi) => {
+        if (!swaggerUiSetupMiddleware) {
+          swaggerUiSetupMiddleware = swaggerUi.setup(getOpenApiSpec());
+        }
+
+        return swaggerUiSetupMiddleware(req, res, next);
+      })
+      .catch(next);
+  };
+}
 
 let readinessReporter = () => ({
   service: 'web-service',
@@ -88,33 +126,35 @@ const corsPolicy = createCorsOriginValidator(env.app.corsOrigins, {
 
 app.use(requestContextMiddleware);
 app.use(runtimeConfigMiddleware);
-app.use(
-  pinoHttp({
-    logger,
-    genReqId: (req) => req.id ?? randomUUID(),
-    customLogLevel: (res, err) => {
-      if (err || res.statusCode >= 500) {
-        return 'error';
+if (!isTestEnvironment) {
+  app.use(
+    pinoHttp({
+      logger,
+      genReqId: (req) => req.id ?? randomUUID(),
+      customLogLevel: (res, err) => {
+        if (err || res.statusCode >= 500) {
+          return 'error';
+        }
+        if (res.statusCode >= 400) {
+          return 'warn';
+        }
+        return 'info';
+      },
+      customProps: (req) => {
+        annotateLogContextFromRequest(req);
+        return {
+          traceId: req.traceId,
+          spanId: req.spanId
+        };
+      },
+      autoLogging: {
+        ignorePaths: ['/health']
       }
-      if (res.statusCode >= 400) {
-        return 'warn';
-      }
-      return 'info';
-    },
-    customProps: (req) => {
-      annotateLogContextFromRequest(req);
-      return {
-        traceId: req.traceId,
-        spanId: req.spanId
-      };
-    },
-    autoLogging: {
-      ignorePaths: ['/health']
-    }
-  })
-);
-app.use(httpMetricsMiddleware);
-app.use(limiter);
+    })
+  );
+  app.use(httpMetricsMiddleware);
+  app.use(limiter);
+}
 app.use(hpp());
 app.use(
   helmet({
@@ -216,23 +256,36 @@ app.get('/health', async (_req, res, next) => {
 });
 
 app.get('/metrics', metricsHandler);
-mountVersionedApi(app, { registry: apiRouteRegistry });
-app.use('/api/v1/graphql', auth('user'), createGraphQLRouter());
+if (!isTestEnvironment) {
+  const [{ mountVersionedApi }, { apiRouteRegistry }] = await Promise.all([
+    import('./routes/registerApiRoutes.js'),
+    import('./routes/routeRegistry.js')
+  ]);
+  mountVersionedApi(app, { registry: apiRouteRegistry });
 
-app.get('/api/v1/docs/index.json', (_req, res) =>
+  const { createGraphQLRouter } = await import('./graphql/router.js');
+  app.use('/api/v1/graphql', auth('user'), createGraphQLRouter());
+}
+
+app.get('/api/v1/docs/index.json', (_req, res) => {
+  const specIndex = getServiceSpecIndex();
+  const spec = getOpenApiSpec();
+
   res.json({
-    version: openApiSpec.info?.version,
+    version: spec.info?.version,
     generatedAt: new Date().toISOString(),
-    services: serviceSpecIndex
-  })
-);
+    services: specIndex
+  });
+});
 
-app.get('/api/v1/docs/services', (_req, res) =>
+app.get('/api/v1/docs/services', (_req, res) => {
+  const specIndex = getServiceSpecIndex();
+
   res.json({
-    count: serviceSpecIndex.length,
-    services: serviceSpecIndex
-  })
-);
+    count: specIndex.length,
+    services: specIndex
+  });
+});
 
 app.get('/api/v1/docs/services/:service', (req, res) => {
   const serviceParam = req.params.service;
@@ -247,7 +300,7 @@ app.get('/api/v1/docs/services/:service', (req, res) => {
   return res.json(serviceSpec);
 });
 
-app.get('/api/v1/docs/services/:service/ui', (req, res) => {
+app.get('/api/v1/docs/services/:service/ui', async (req, res, next) => {
   const serviceParam = req.params.service;
   const serviceSpec = getServiceSpecDocument(serviceParam);
   if (!serviceSpec) {
@@ -258,13 +311,18 @@ app.get('/api/v1/docs/services/:service/ui', (req, res) => {
   }
 
   const titleSuffix = serviceSpec.info?.title ? ` – ${serviceSpec.info.title}` : '';
-  const html = swaggerUi.generateHTML(serviceSpec, {
-    customSiteTitle: `Edulure API Docs${titleSuffix}`
-  });
-  return res.send(html);
+  try {
+    const swaggerUi = await loadSwaggerUi();
+    const html = swaggerUi.generateHTML(serviceSpec, {
+      customSiteTitle: `Edulure API Docs${titleSuffix}`
+    });
+    return res.send(html);
+  } catch (error) {
+    return next(error);
+  }
 });
 
-app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+app.use('/api/v1/docs', createSwaggerServeMiddleware(), createSwaggerSetupMiddleware());
 app.get('/api/docs', (_req, res) => res.redirect(308, '/api/v1/docs'));
 
 app.use(errorHandler);
