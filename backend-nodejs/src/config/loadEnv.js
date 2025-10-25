@@ -45,11 +45,39 @@ export function loadEnvironmentFiles({ nodeEnv = process.env.NODE_ENV, includeEx
     loadedFiles.push(filePath);
   }
 
-  if (shouldLoadExample) {
-    const examplePath = path.resolve(projectRoot, '.env.example');
-    if (fs.existsSync(examplePath)) {
-      dotenv.config({ path: examplePath, override: false });
+  const examplePath = path.resolve(projectRoot, '.env.example');
+
+  if (shouldLoadExample && fs.existsSync(examplePath)) {
+    dotenv.config({ path: examplePath, override: false });
+    loadedFiles.push(examplePath);
+  }
+
+  if (loadedFiles.length === 0 && fs.existsSync(examplePath)) {
+    try {
+      const parsed = dotenv.parse(fs.readFileSync(examplePath));
+      for (const [key, value] of Object.entries(parsed)) {
+        if (process.env[key] !== undefined) {
+          continue;
+        }
+
+        if (typeof value !== 'string' || value.trim().length === 0) {
+          continue;
+        }
+
+        process.env[key] = value;
+      }
       loadedFiles.push(examplePath);
+    } catch (error) {
+      console.warn('Unable to load fallback environment example file', {
+        examplePath,
+        error: error.message
+      });
+    }
+  }
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value === 'string' && value.trim().length === 0) {
+      delete process.env[key];
     }
   }
 

@@ -261,8 +261,34 @@ export async function executeRuntimeConfig(options, dependencies = {}) {
 
   const format = VALID_FORMATS.has(options.format) ? options.format : 'log';
 
-  await dbClient.migrate.latest();
-  await Promise.all([featureFlags.start(), runtimeConfigs.start()]);
+  let featureFlagsStarted = false;
+  let runtimeConfigsStarted = false;
+  let databaseReady = true;
+
+  try {
+    await dbClient.migrate.latest();
+  } catch (error) {
+    databaseReady = false;
+    loggerInstance.warn({ err: error }, 'Database unavailable – skipping migrations for runtime config snapshot');
+  }
+
+  if (databaseReady && options.includeFlags) {
+    try {
+      await featureFlags.start();
+      featureFlagsStarted = true;
+    } catch (error) {
+      loggerInstance.warn({ err: error }, 'Failed to warm feature flag cache – continuing without flag data');
+    }
+  }
+
+  if (databaseReady && options.includeConfigs) {
+    try {
+      await runtimeConfigs.start();
+      runtimeConfigsStarted = true;
+    } catch (error) {
+      loggerInstance.warn({ err: error }, 'Failed to warm runtime config cache – continuing without config data');
+    }
+  }
 
   try {
     const snapshot = {
@@ -274,28 +300,38 @@ export async function executeRuntimeConfig(options, dependencies = {}) {
     const context = { environment: options.environment };
 
     if (options.includeFlags) {
-      const evaluations = featureFlags.evaluateAll(context, { includeDefinition: true });
-      const { filtered, missing } = filterKeys(evaluations, options.flags, {
-        strict: options.strict,
-        loggerInstance,
-        type: 'Feature flag'
-      });
-      snapshot.featureFlags = filtered ?? {};
-      snapshot.missingFlags = missing;
+      if (featureFlagsStarted) {
+        const evaluations = featureFlags.evaluateAll(context, { includeDefinition: true });
+        const { filtered, missing } = filterKeys(evaluations, options.flags, {
+          strict: options.strict,
+          loggerInstance,
+          type: 'Feature flag'
+        });
+        snapshot.featureFlags = filtered ?? {};
+        snapshot.missingFlags = missing;
+      } else {
+        snapshot.featureFlags = {};
+        snapshot.missingFlags = options.flags?.length ? [...options.flags] : [];
+      }
     }
 
     if (options.includeConfigs) {
-      const configs = runtimeConfigs.listForAudience(options.environment, {
-        audience: options.audience,
-        includeSensitive: options.includeSensitive
-      });
-      const { filtered, missing } = filterKeys(configs, options.configs, {
-        strict: options.strict,
-        loggerInstance,
-        type: 'Runtime config'
-      });
-      snapshot.runtimeConfig = filtered ?? {};
-      snapshot.missingConfigs = missing;
+      if (runtimeConfigsStarted) {
+        const configs = runtimeConfigs.listForAudience(options.environment, {
+          audience: options.audience,
+          includeSensitive: options.includeSensitive
+        });
+        const { filtered, missing } = filterKeys(configs, options.configs, {
+          strict: options.strict,
+          loggerInstance,
+          type: 'Runtime config'
+        });
+        snapshot.runtimeConfig = filtered ?? {};
+        snapshot.missingConfigs = missing;
+      } else {
+        snapshot.runtimeConfig = {};
+        snapshot.missingConfigs = options.configs?.length ? [...options.configs] : [];
+      }
     }
 
     const stats = {
@@ -324,8 +360,12 @@ export async function executeRuntimeConfig(options, dependencies = {}) {
     loggerInstance.error({ err: error }, 'Failed to generate runtime configuration snapshot');
     throw error;
   } finally {
-    featureFlags.stop();
-    runtimeConfigs.stop();
+    if (featureFlagsStarted) {
+      featureFlags.stop();
+    }
+    if (runtimeConfigsStarted) {
+      runtimeConfigs.stop();
+    }
   }
 }
 

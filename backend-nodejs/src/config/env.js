@@ -203,6 +203,15 @@ function normalizePrefix(value, fallback = '') {
   return source.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
+function optionalNonEmptyString() {
+  return z
+    .preprocess(
+      (value) => (typeof value === 'string' && value.trim().length === 0 ? undefined : value),
+      z.string().min(1)
+    )
+    .optional();
+}
+
 function clampRate(rate) {
   if (typeof rate !== 'number' || Number.isNaN(rate)) {
     return 0;
@@ -761,14 +770,14 @@ const envSchema = z
     LOCAL_STORAGE_ROOT: z.string().min(1).optional(),
     LOCAL_STORAGE_PUBLIC_URL: z.string().url().optional(),
     LOCAL_STORAGE_SERVE_STATIC: z.coerce.boolean().default(true),
-    R2_ACCOUNT_ID: z.string().min(1).optional(),
-    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
-    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    R2_ACCOUNT_ID: optionalNonEmptyString(),
+    R2_ACCESS_KEY_ID: optionalNonEmptyString(),
+    R2_SECRET_ACCESS_KEY: optionalNonEmptyString(),
     R2_REGION: z.string().min(1).default('auto'),
-    R2_PUBLIC_BUCKET: z.string().min(1).optional(),
-    R2_PRIVATE_BUCKET: z.string().min(1).optional(),
-    R2_UPLOADS_BUCKET: z.string().min(1).optional(),
-    R2_QUARANTINE_BUCKET: z.string().min(1).optional(),
+    R2_PUBLIC_BUCKET: optionalNonEmptyString(),
+    R2_PRIVATE_BUCKET: optionalNonEmptyString(),
+    R2_UPLOADS_BUCKET: optionalNonEmptyString(),
+    R2_QUARANTINE_BUCKET: optionalNonEmptyString(),
     R2_CDN_URL: z.string().url().optional(),
     ANTIVIRUS_ENABLED: z.coerce.boolean().default(true),
     ANTIVIRUS_HOST: z.string().min(1).default('127.0.0.1'),

@@ -162,7 +162,7 @@ export default function CampaignEditor({
       const stored = window.localStorage.getItem(draftStorageKey);
       if (stored) {
         const parsed = JSON.parse(stored);
-        setState((current) => {
+        setState(() => {
           const next = createInitialState(initialCampaign, placementOptions, budgetPolicy);
           const placements = Array.isArray(parsed?.placements)
             ? parsed.placements.filter((context) => placementLookup.has(context))
