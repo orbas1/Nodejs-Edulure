@@ -2,6 +2,7 @@ import Joi from 'joi';
 
 import releaseOrchestrationService from '../services/ReleaseOrchestrationService.js';
 import { success } from '../utils/httpResponse.js';
+import { ENVIRONMENT_SLUG_PATTERN, normaliseEnvironmentSlug } from '../utils/environment.js';
 
 const paginationSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(200).default(25),
@@ -73,14 +74,22 @@ const gateSeedSchema = Joi.object({
   .unknown(false)
   .optional();
 
+const environmentSlugSchema = Joi.string()
+  .trim()
+  .required()
+  .custom((value, helpers) => {
+    const slug = normaliseEnvironmentSlug(value, { fallback: null });
+    if (!slug) {
+      return helpers.error('string.pattern.base', { value });
+    }
+    return slug;
+  }, 'environment normaliser')
+  .pattern(ENVIRONMENT_SLUG_PATTERN)
+  .messages({ 'string.pattern.base': 'environment must be a lowercase identifier without spaces' });
+
 const scheduleRunSchema = Joi.object({
   versionTag: Joi.string().trim().min(1).max(120).required(),
-  environment: Joi.string()
-    .trim()
-    .lowercase()
-    .pattern(/^[a-z][a-z0-9-]{1,31}$/)
-    .required()
-    .messages({ 'string.pattern.base': 'environment must be a lowercase identifier without spaces' }),
+  environment: environmentSlugSchema,
   initiatedByEmail: Joi.string().trim().email().required(),
   initiatedByName: Joi.string().trim().max(160).allow(null, '').optional(),
   changeWindowStart: Joi.date().iso().optional(),

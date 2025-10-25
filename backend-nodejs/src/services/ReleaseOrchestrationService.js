@@ -3,6 +3,7 @@ import ReleaseRunModel from '../models/ReleaseRunModel.js';
 import ReleaseGateResultModel from '../models/ReleaseGateResultModel.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
+import { normaliseEnvironmentSlug } from '../utils/environment.js';
 import QaReadinessService from './QaReadinessService.js';
 import {
   recordReleaseGateEvaluation,
@@ -35,10 +36,7 @@ function normaliseVersionTag(versionTag) {
 }
 
 function sanitiseEnvironment(environment) {
-  return String(environment ?? 'production')
-    .trim()
-    .replace(/[^a-z0-9-]/gi, '')
-    .toLowerCase();
+  return normaliseEnvironmentSlug(environment, { fallback: 'production' });
 }
 
 function serialiseChecklistSnapshot(items) {

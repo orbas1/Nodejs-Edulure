@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import { getNowValue, getTable, isMissingTableError, resolveConnection } from './utils/connection.js';
 
 const TABLE = 'setup_runs';
 
@@ -83,26 +84,49 @@ export default class SetupRunModel {
   static deserialize = deserialize;
 
   static async create(run, connection = db) {
+    const client = resolveConnection(connection);
     const payload = toDbPayload(run);
     if (!payload.started_at) {
-      payload.started_at = connection.fn.now();
+      payload.started_at = getNowValue(client);
     }
 
-    const [id] = await connection(TABLE).insert(payload);
-    return this.findById(id, connection);
+    const [id] = await getTable(client, TABLE).insert(payload);
+    return this.findById(id, client);
   }
 
   static async findById(id, connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).where({ id }).first();
-    return row ? deserialize(row) : null;
+    const client = resolveConnection(connection);
+
+    try {
+      const row = await getTable(client, TABLE).select(BASE_COLUMNS).where({ id }).first();
+      return row ? deserialize(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   static async findByPublicId(publicId, connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).where({ public_id: publicId }).first();
-    return row ? deserialize(row) : null;
+    const client = resolveConnection(connection);
+
+    try {
+      const row = await getTable(client, TABLE)
+        .select(BASE_COLUMNS)
+        .where({ public_id: publicId })
+        .first();
+      return row ? deserialize(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   static async updateByPublicId(publicId, updates, connection = db) {
+    const client = resolveConnection(connection);
     const payload = {};
     if (updates.presetId !== undefined) {
       payload.preset_id = updates.presetId ?? null;
@@ -127,26 +151,52 @@ export default class SetupRunModel {
     }
 
     if (!Object.keys(payload).length) {
-      return this.findByPublicId(publicId, connection);
+      return this.findByPublicId(publicId, client);
     }
 
-    await connection(TABLE)
-      .where({ public_id: publicId })
-      .update({ ...payload, updated_at: connection.fn.now() });
+    try {
+      await getTable(client, TABLE)
+        .where({ public_id: publicId })
+        .update({ ...payload, updated_at: getNowValue(client) });
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return this.findByPublicId(publicId, client);
+      }
+      throw error;
+    }
 
-    return this.findByPublicId(publicId, connection);
+    return this.findByPublicId(publicId, client);
   }
 
   static async listRecent(limit = 10, connection = db) {
-    const rows = await connection(TABLE)
-      .select(BASE_COLUMNS)
-      .orderBy('created_at', 'desc')
-      .limit(Math.max(1, Math.min(50, Number(limit) || 10)));
-    return rows.map(deserialize);
+    const client = resolveConnection(connection);
+    const resultLimit = Math.max(1, Math.min(50, Number(limit) || 10));
+
+    try {
+      const rows = await getTable(client, TABLE)
+        .select(BASE_COLUMNS)
+        .orderBy('created_at', 'desc')
+        .limit(resultLimit);
+      return rows.map(deserialize);
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   static async findLatest(connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).orderBy('created_at', 'desc').first();
-    return row ? deserialize(row) : null;
+    const client = resolveConnection(connection);
+
+    try {
+      const row = await getTable(client, TABLE).select(BASE_COLUMNS).orderBy('created_at', 'desc').first();
+      return row ? deserialize(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 }

@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { getNowValue, getTable, isMissingTableError, resolveConnection } from './utils/connection.js';
 
 const TABLE = 'setup_run_tasks';
 
@@ -96,6 +97,7 @@ export default class SetupRunTaskModel {
       return [];
     }
 
+    const client = resolveConnection(connection);
     const payloads = tasks.map((task, index) =>
       toDbPayload({
         runId,
@@ -110,24 +112,54 @@ export default class SetupRunTaskModel {
       })
     );
 
-    await connection.batchInsert(TABLE, payloads, 50);
-    return this.listByRunId(runId, connection);
+    try {
+      await client.batchInsert(TABLE, payloads, 50);
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return [];
+      }
+      throw error;
+    }
+
+    return this.listByRunId(runId, client);
   }
 
   static async listByRunId(runId, connection = db) {
-    const rows = await connection(TABLE)
-      .select(BASE_COLUMNS)
-      .where({ run_id: runId })
-      .orderBy('order_index', 'asc');
-    return rows.map(deserialize);
+    const client = resolveConnection(connection);
+
+    try {
+      const rows = await getTable(client, TABLE)
+        .select(BASE_COLUMNS)
+        .where({ run_id: runId })
+        .orderBy('order_index', 'asc');
+      return rows.map(deserialize);
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   static async findByRunAndTask(runId, taskId, connection = db) {
-    const row = await connection(TABLE).select(BASE_COLUMNS).where({ run_id: runId, task_id: taskId }).first();
-    return row ? deserialize(row) : null;
+    const client = resolveConnection(connection);
+
+    try {
+      const row = await getTable(client, TABLE)
+        .select(BASE_COLUMNS)
+        .where({ run_id: runId, task_id: taskId })
+        .first();
+      return row ? deserialize(row) : null;
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   static async updateByRunAndTask(runId, taskId, updates, connection = db) {
+    const client = resolveConnection(connection);
     const payload = {};
     if (updates.status !== undefined) {
       payload.status = updates.status;
@@ -152,14 +184,21 @@ export default class SetupRunTaskModel {
     }
 
     if (!Object.keys(payload).length) {
-      return this.findByRunAndTask(runId, taskId, connection);
+      return this.findByRunAndTask(runId, taskId, client);
     }
 
-    await connection(TABLE)
-      .where({ run_id: runId, task_id: taskId })
-      .update({ ...payload, updated_at: connection.fn.now() });
+    try {
+      await getTable(client, TABLE)
+        .where({ run_id: runId, task_id: taskId })
+        .update({ ...payload, updated_at: getNowValue(client) });
+    } catch (error) {
+      if (isMissingTableError(error)) {
+        return this.findByRunAndTask(runId, taskId, client);
+      }
+      throw error;
+    }
 
-    return this.findByRunAndTask(runId, taskId, connection);
+    return this.findByRunAndTask(runId, taskId, client);
   }
 
   static async appendLog(runId, taskId, message, connection = db) {
