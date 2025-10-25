@@ -176,7 +176,7 @@ export function MainLayoutContent({
 
   const mainShellClassName =
     variant === 'marketing'
-      ? 'flex w-full flex-1 flex-col px-4 pb-20 pt-10 sm:px-6 lg:px-12 xl:px-20'
+      ? 'flex w-full flex-1 flex-col px-0 pb-20 pt-10 sm:px-0'
       : 'mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8';
 
   const footerBackground =
@@ -184,6 +184,10 @@ export function MainLayoutContent({
       ? shellBackground
       : classes.panel;
   const footerBase = 'border-t border-slate-200 px-6 py-10 text-sm shadow-sm dark:border-slate-800 sm:px-8 lg:px-12 xl:px-20';
+  const footerContentClass =
+    variant === 'marketing'
+      ? 'flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between'
+      : 'mx-auto flex w-full max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between';
 
   return (
     <div className={`flex min-h-screen flex-col ${shellBackground}`}>
@@ -206,13 +210,14 @@ export function MainLayoutContent({
         presence={presence}
         showQuickCreate={isAuthenticated}
         callToAction={callToAction}
+        fullWidth={variant === 'marketing'}
       />
       <ServiceHealthBanner />
       <main id="main-content" tabIndex={-1} className={mainShellClassName}>
         <Outlet />
       </main>
       <footer className={`${footerBase} ${footerBackground}`}>
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className={footerContentClass}>
           <p className="text-center md:text-left">&copy; {new Date().getFullYear()} Edulure. All rights reserved.</p>
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-center md:justify-end md:text-left">
             <a className="transition hover:text-primary" href="/privacy">

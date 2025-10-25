@@ -4,7 +4,6 @@ import { useLanguage } from '../context/LanguageContext.jsx';
 import MarketingHero from '../components/marketing/MarketingHero.jsx';
 import ProductPreviewTabs from '../components/marketing/ProductPreviewTabs.jsx';
 import PlanHighlights from '../components/marketing/PlanHighlights.jsx';
-import CaseStudyGrid from '../components/marketing/CaseStudyGrid.jsx';
 import CommunitySpotlight from '../components/home/CommunitySpotlight.jsx';
 import PerksGrid from '../components/home/PerksGrid.jsx';
 import HomeFaq from '../components/home/HomeFaq.jsx';
@@ -151,72 +150,6 @@ const HERO_IMAGE_SOURCES = [
   { src: heroIllustration, width: 540 }
 ];
 
-const CASE_STUDY_FALLBACKS = [
-  {
-    id: 'opsGuild',
-    slug: 'ops-guild',
-    translationKey: 'home.caseStudies.opsGuild',
-    fallback: {
-      title: 'Ops Guild rallied invite-only clubs in Edulure',
-      summary: 'Kai unified marketing experiments, onboarding checklists, and sponsor offers in one campus to lift enrolment 28%.',
-      persona: 'Kai • Revenue Ops',
-      metric: '+28% enrolment',
-      ctaLabel: 'Read Ops Guild story',
-      href: 'https://stories.edulure.test/flow5-ops-guild'
-    },
-    media: {
-      imageSources: [
-        { src: 'https://images.edulure.test/case-studies/ops-guild-960.webp', width: 960 },
-        { src: 'https://images.edulure.test/case-studies/ops-guild-720.webp', width: 720 },
-        { src: 'https://images.edulure.test/case-studies/ops-guild-480.webp', width: 480 }
-      ]
-    },
-    altKey: 'case-study.ops-guild'
-  },
-  {
-    id: 'cohortStudio',
-    slug: 'cohort-studio',
-    translationKey: 'home.caseStudies.cohortStudio',
-    fallback: {
-      title: 'Cohort Studio halved production time',
-      summary: 'Amina replaced siloed spreadsheets with Edulure lesson kits and automated sponsor unlocks for each cohort.',
-      persona: 'Amina • Learning Designer',
-      metric: '-50% build time',
-      ctaLabel: 'Explore Cohort Studio playbook',
-      href: 'https://stories.edulure.test/cohort-studio'
-    },
-    media: {
-      imageSources: [
-        { src: 'https://images.edulure.test/case-studies/cohort-studio-960.webp', width: 960 },
-        { src: 'https://images.edulure.test/case-studies/cohort-studio-720.webp', width: 720 },
-        { src: 'https://images.edulure.test/case-studies/cohort-studio-480.webp', width: 480 }
-      ]
-    },
-    altKey: 'case-study.cohort-studio'
-  },
-  {
-    id: 'tutorLeague',
-    slug: 'tutor-league',
-    translationKey: 'home.caseStudies.tutorLeague',
-    fallback: {
-      title: 'Tutor League unlocked sponsor-ready pods',
-      summary: 'Noah brought tutor pods, live donations, and affiliate payouts into one Edulure dashboard to grow recurring revenue.',
-      persona: 'Noah • Tutor Collective Lead',
-      metric: '+42% sponsor revenue',
-      ctaLabel: 'See Tutor League results',
-      href: 'https://stories.edulure.test/tutor-league'
-    },
-    media: {
-      imageSources: [
-        { src: 'https://images.edulure.test/case-studies/tutor-league-960.webp', width: 960 },
-        { src: 'https://images.edulure.test/case-studies/tutor-league-720.webp', width: 720 },
-        { src: 'https://images.edulure.test/case-studies/tutor-league-480.webp', width: 480 }
-      ]
-    },
-    altKey: 'case-study.tutor-league'
-  }
-];
-
 export default function Home() {
   const { t } = useLanguage();
   usePageMetadata({
@@ -306,65 +239,6 @@ export default function Home() {
       alt: blockMedia.alt ?? fallbackAlt
     };
   }, [heroBlock, t]);
-
-  const caseStudyBlock = useMemo(() => {
-    if (!marketingData?.blocks?.length) {
-      return null;
-    }
-    return marketingData.blocks.find((block) => block.blockType === 'case-study') ?? null;
-  }, [marketingData]);
-
-  const caseStudies = useMemo(() => {
-    return CASE_STUDY_FALLBACKS.map((fallback) => {
-      const payload = Array.isArray(caseStudyBlock?.metadata?.caseStudies)
-        ? caseStudyBlock.metadata.caseStudies.find(
-            (study) => study.slug === fallback.slug || study.id === fallback.slug
-          ) ?? null
-        : null;
-      const title = t(`${fallback.translationKey}.title`, payload?.title ?? fallback.fallback.title);
-      const summary = t(`${fallback.translationKey}.summary`, payload?.summary ?? fallback.fallback.summary);
-      const persona = t(`${fallback.translationKey}.persona`, payload?.persona ?? fallback.fallback.persona);
-      const metric = t(`${fallback.translationKey}.metric`, payload?.metric ?? fallback.fallback.metric);
-      const ctaLabel = t(`${fallback.translationKey}.ctaLabel`, payload?.cta?.label ?? fallback.fallback.ctaLabel);
-      const href = payload?.cta?.href ?? payload?.href ?? fallback.fallback.href;
-      const alt = t(
-        `${fallback.translationKey}.alt`,
-        getMarketingAltText(fallback.altKey, fallback.fallback.title)
-      );
-      const media = payload?.media ?? fallback.media;
-
-      return {
-        id: fallback.id,
-        title,
-        summary,
-        persona,
-        metric,
-        media,
-        alt,
-        cta: href
-          ? {
-              href,
-              label: ctaLabel,
-              onClick: () =>
-                trackEvent('marketing:case_study_cta', {
-                  surface: 'home',
-                  slug: payload?.slug ?? fallback.slug,
-                  destination: href,
-                  label: ctaLabel
-                })
-            }
-          : null
-      };
-    });
-  }, [caseStudyBlock, t]);
-
-  const caseStudyEyebrow = caseStudyBlock?.eyebrow ?? t('home.caseStudies.eyebrow', 'Operator proof');
-  const caseStudyTitle = caseStudyBlock?.title ?? t('home.caseStudies.title', 'Operators thriving on Edulure');
-  const caseStudyCaption = caseStudyBlock?.subtitle ??
-    t(
-      'home.caseStudies.caption',
-      'Revenue, community, and tutor teams growing through shared Edulure workflows.'
-    );
 
   const heroPrimaryAction = useMemo(() => {
     const base = normaliseInternalAction(heroBlock?.primaryCta, '/register', fallbackHero.primaryLabel);
@@ -547,12 +421,6 @@ export default function Home() {
         media={heroMedia}
         mediaCaption={heroMedia.caption}
         mediaAlt={heroMedia.alt}
-      />
-      <CaseStudyGrid
-        eyebrow={caseStudyEyebrow}
-        title={caseStudyTitle}
-        caption={caseStudyCaption}
-        studies={caseStudies}
       />
       <CommunitySpotlight />
       <PerksGrid />

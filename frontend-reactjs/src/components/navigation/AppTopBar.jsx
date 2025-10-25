@@ -2,19 +2,13 @@ import { Fragment, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
-import {
-  Bars3Icon,
-  BellIcon,
-  BoltIcon,
-  PlusIcon,
-  RectangleStackIcon,
-  SignalIcon
-} from '@heroicons/react/24/outline';
+import { Bars3Icon, BellIcon, BoltIcon, PlusIcon, SignalIcon } from '@heroicons/react/24/outline';
 
 import GlobalSearchBar from '../search/GlobalSearchBar.jsx';
 import LanguageSelector from './LanguageSelector.jsx';
 import UserMenu from './UserMenu.jsx';
 import { buildFocusOrder } from '../../navigation/routes.js';
+const EDULURE_LOGO_URL = 'https://i.ibb.co/yn5zf0N2/Edulure-Logo.png';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -40,7 +34,8 @@ export default function AppTopBar({
   showSidebarToggle = false,
   showQuickCreate = true,
   showSearch = true,
-  className
+  className,
+  fullWidth = false
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,6 +76,9 @@ export default function AppTopBar({
 
   const resolvedCallToAction = callToAction ?? activePresenceCta;
 
+  const containerBase = 'flex items-center gap-4 px-4 py-3 sm:px-6 lg:px-8';
+  const containerSizing = fullWidth ? 'w-full xl:px-12 2xl:px-16' : 'mx-auto max-w-7xl';
+
   return (
     <header
       className={classNames(
@@ -88,7 +86,7 @@ export default function AppTopBar({
         className
       )}
     >
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
+      <div className={`${containerBase} ${containerSizing}`}>
         <div className="flex items-center gap-3">
           {showSidebarToggle ? (
             <button
@@ -101,8 +99,7 @@ export default function AppTopBar({
             </button>
           ) : null}
           <Link to="/" className="flex items-center gap-2 rounded-2xl px-2 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
-            <RectangleStackIcon className="h-6 w-6 text-primary" />
-            <span className="text-sm font-semibold tracking-tight text-slate-900">Edulure</span>
+            <img src={EDULURE_LOGO_URL} alt="Edulure" className="h-8 w-auto" />
           </Link>
         </div>
         <nav className="hidden flex-1 items-center gap-1 lg:flex" aria-label="Primary">
@@ -302,7 +299,8 @@ AppTopBar.propTypes = {
   showSidebarToggle: PropTypes.bool,
   showQuickCreate: PropTypes.bool,
   showSearch: PropTypes.bool,
-  className: PropTypes.string
+  className: PropTypes.string,
+  fullWidth: PropTypes.bool
 };
 
 AppTopBar.defaultProps = {
@@ -324,6 +322,7 @@ AppTopBar.defaultProps = {
   showSidebarToggle: false,
   showQuickCreate: true,
   showSearch: true,
-  className: ''
+  className: '',
+  fullWidth: false
 };
 

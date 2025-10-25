@@ -6,9 +6,7 @@ import SocialSignOn from '../components/SocialSignOn.jsx';
 import { API_BASE_URL, httpClient } from '../api/httpClient.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import useOnboardingForm from '../hooks/useOnboardingForm.js';
-import useMarketingContent from '../hooks/useMarketingContent.js';
 import { fetchPasswordPolicy } from '../api/authApi.js';
-import { resolveSocialProofFallback } from '../data/marketing/socialProof.js';
 import {
   DEFAULT_PASSWORD_POLICY,
   evaluatePasswordStrength,
@@ -22,7 +20,6 @@ import {
 import {
   trackAuthAttempt,
   trackAuthAutoSave,
-  trackAuthInteraction,
   trackAuthView,
   trackNavigationSelect
 } from '../lib/analytics.js';
@@ -39,7 +36,6 @@ const ROLE_OPTIONS = [
   { value: 'user', label: 'Learner' }
 ];
 
-const ENFORCED_TWO_FACTOR_ROLES = new Set();
 const ADMIN_REQUEST_NOTE =
   "Need administrator access? Contact your organisation's Edulure operations representative to provision it securely.";
 const AUTO_SAVE_DELAY_MS = 1200;
@@ -65,18 +61,10 @@ export default function Register() {
     'learner',
     onboardingOverrides
   );
-  const { data: marketingContent } = useMarketingContent({
-    surfaces: ['learner-register'],
-    variants: ['social_proof']
-  });
-
   const [passwordPolicy, setPasswordPolicy] = useState(DEFAULT_PASSWORD_POLICY);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(ENFORCED_TWO_FACTOR_ROLES.has(defaultRole));
-  const [twoFactorLocked, setTwoFactorLocked] = useState(ENFORCED_TWO_FACTOR_ROLES.has(defaultRole));
-  const [twoFactorEnrollment, setTwoFactorEnrollment] = useState(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle');
 
   const autoSaveTimer = useRef(null);
@@ -89,15 +77,13 @@ export default function Register() {
     canonicalPath: '/register',
     robots: 'noindex, nofollow',
     analytics: {
-      page_type: 'register',
-      enforced_two_factor_roles: ENFORCED_TWO_FACTOR_ROLES.size
+      page_type: 'register'
     }
   });
 
   useEffect(() => {
     trackAuthView('register', {
       default_role: defaultRole,
-      enforced_two_factor_roles: ENFORCED_TWO_FACTOR_ROLES.size,
       social_providers: Object.keys(SOCIAL_ROUTES).length
     });
   }, [defaultRole]);
@@ -134,25 +120,6 @@ export default function Register() {
     [formState, passwordPolicy]
   );
 
-  const socialProofEntries = useMemo(() => {
-    const testimonials = Array.isArray(marketingContent?.testimonials)
-      ? marketingContent.testimonials.filter((entry) => entry.variant === 'social_proof')
-      : [];
-
-    if (testimonials.length > 0) {
-      return testimonials.map((entry) => ({
-        id: entry.id ?? entry.slug,
-        quote: entry.quote,
-        attribution:
-          entry.attribution ??
-          [entry.authorName, entry.authorTitle].filter(Boolean).join(' • ') ??
-          'Edulure operator'
-      }));
-    }
-
-    return resolveSocialProofFallback('learner-register');
-  }, [marketingContent]);
-
   useEffect(() => {
     if (autoSaveStatus === 'idle') return;
     trackAuthAutoSave('register', autoSaveStatus, {
@@ -164,13 +131,6 @@ export default function Register() {
   const handleNavigateToLogin = useCallback(() => {
     trackNavigationSelect('auth:login', { from: 'register' });
   }, []);
-
-  useEffect(() => {
-    if (!twoFactorEnrollment?.enabled) return;
-    trackAuthInteraction('register', 'two_factor_enrolled', {
-      enforced: Boolean(twoFactorEnrollment.enforced)
-    });
-  }, [twoFactorEnrollment]);
 
   const handleSocialSignOn = useCallback(
     (provider) => {
@@ -206,16 +166,6 @@ export default function Register() {
     const { name, value } = event.target;
     updateField(name, value);
     clearFieldError(name);
-    if (name === 'role') {
-      const enforced = ENFORCED_TWO_FACTOR_ROLES.has(value);
-      setTwoFactorLocked(enforced);
-      setTwoFactorEnabled((prev) => (enforced ? true : prev));
-      setTwoFactorEnrollment(null);
-      trackAuthInteraction('register', 'role_change', {
-        role: value,
-        enforced
-      });
-    }
   };
 
   const handleTermsChange = (event) => {
@@ -263,7 +213,6 @@ export default function Register() {
     event.preventDefault();
     setError(null);
     setSuccess(null);
-    setTwoFactorEnrollment(null);
 
     const validation = validateOnboardingState('learner', formState, { passwordPolicy });
     setErrors(validation.errors);
@@ -284,9 +233,7 @@ export default function Register() {
 
     trackAuthAttempt('register', 'submit', {
       role: cleaned.role,
-      has_date_of_birth: Boolean(cleaned.dateOfBirth),
-      two_factor_locked: twoFactorLocked,
-      two_factor_enabled: twoFactorLocked ? true : twoFactorEnabled
+      has_date_of_birth: Boolean(cleaned.dateOfBirth)
     });
 
     try {
@@ -295,31 +242,23 @@ export default function Register() {
 
       const finalRegisterPayload = {
         ...registerPayload,
-        role: cleaned.role,
-        twoFactor: { enabled: twoFactorLocked ? true : twoFactorEnabled }
+        role: cleaned.role
       };
 
       const response = await httpClient.post('/auth/register', finalRegisterPayload);
       const result = response?.data ?? {};
-      setTwoFactorEnrollment(result.twoFactor ?? null);
-      if (result.twoFactor?.enabled) {
-        setTwoFactorEnabled(true);
-        setTwoFactorLocked(Boolean(result.twoFactor.enforced));
-      }
       const verificationStatus = result.verification?.status ?? null;
       const baseMessage =
         verificationStatus === 'pending'
           ? 'Account created. Check your inbox to verify your email before signing in.'
           : 'Account created successfully.';
-      const securityMessage = result.twoFactor?.enabled
-        ? ' Email one-time codes are now active and will be sent whenever you sign in.'
-        : '';
+      const followUpMessage =
+        ' Once you have access, visit Settings → Security to enable multi-factor authentication for extra protection.';
       trackAuthAttempt('register', 'success', {
         role: cleaned.role,
-        verification_status: verificationStatus ?? 'unknown',
-        two_factor_enabled: Boolean(result.twoFactor?.enabled)
+        verification_status: verificationStatus ?? 'unknown'
       });
-      setSuccess(`${baseMessage}${securityMessage}`.trim());
+      setSuccess(`${baseMessage}${followUpMessage}`.trim());
       setTimeout(() => navigate('/login'), 1600);
     } catch (err) {
       const message =
@@ -347,7 +286,6 @@ export default function Register() {
         requirements: passwordAssessment.requirements,
         description: passwordAssessment.description
       }}
-      socialProof={socialProofEntries}
       footer={resolveAutoSaveMessage(autoSaveStatus)}
       actions={
         <span>
@@ -431,64 +369,6 @@ export default function Register() {
         required
         error={errors.confirmPassword}
       />
-      <div className="form-section space-y-3">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-slate-700">Multi-factor authentication</p>
-            <p className="form-field__helper">
-              Secure your account with email-delivered one-time passcodes.
-              {twoFactorLocked
-                ? ' This role requires multi-factor authentication on every sign in.'
-                : ' Opt in now to receive sign-in codes by email whenever you log in.'}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={twoFactorLocked ? true : twoFactorEnabled}
-              aria-disabled={twoFactorLocked}
-              onClick={() => {
-                if (twoFactorLocked) return;
-                setTwoFactorEnabled((prev) => {
-                  const next = !prev;
-                  trackAuthInteraction('register', 'two_factor_toggle', { next, locked: false });
-                  return next;
-                });
-              }}
-              className={`relative inline-flex h-7 w-14 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
-                (twoFactorLocked ? true : twoFactorEnabled) ? 'bg-primary' : 'bg-slate-300'
-              } ${twoFactorLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition ${
-                  (twoFactorLocked ? true : twoFactorEnabled) ? 'translate-x-7' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            <span className="text-xs font-semibold text-slate-600">
-              {twoFactorLocked ? 'Required' : twoFactorEnabled ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
-        </div>
-        {!twoFactorLocked && !twoFactorEnabled ? (
-          <p className="form-field__helper">Turn this on to have email one-time codes enabled right after registration.</p>
-        ) : null}
-      </div>
-      {twoFactorEnrollment?.enabled ? (
-        <div className="form-section space-y-4 border border-primary/30 ring-1 ring-primary/15">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-primary">Email codes are ready</p>
-            <p className="form-field__helper">
-              We will send a six-digit security code to {formState.email || 'your email'} on every sign in. Check your inbox
-              (and spam folder) when prompted.
-            </p>
-          </div>
-          <button type="button" onClick={() => navigate('/login')} className="cta-button cta-button--primary w-full">
-            Proceed to secure login
-          </button>
-        </div>
-      ) : null}
       <label className="flex items-start gap-3 text-sm text-slate-600">
         <input
           type="checkbox"
