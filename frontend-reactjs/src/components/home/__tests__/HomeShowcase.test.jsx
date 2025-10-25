@@ -107,16 +107,16 @@ describe('Home landing experiences', () => {
         <CoursesAdventure />
         <EbookShowcase />
         <PlanHighlights
-          eyebrow="Commission snapshot"
-          title="Flat commissions, zero monthly fees"
-          subtitle="Operate on transparent usage-based pricing designed for modern learning businesses."
+          eyebrow="Fees"
+          title="Clear fees, zero monthly surprises"
+          subtitle="Operate on usage-based pricing that keeps more of every payout in your hands."
           plans={[
             {
               id: 'communityTutor',
               icon: '🤝',
               heading: 'Community + tutor bundles',
               tagline: 'Keep partners paid without spinning up new tooling.',
-              price: '25% commission per transaction',
+              price: '2.5% service fee per transaction',
               features: ['Guided onboarding', 'Shared payouts', 'Spotlight boosts'],
               note: 'Applies automatically across this revenue channel.'
             },
@@ -125,7 +125,7 @@ describe('Home landing experiences', () => {
               icon: '📚',
               heading: 'Course catalogue',
               tagline: 'Publish evergreen paths with session replays baked in.',
-              price: '12% commission per enrollment',
+              price: '5% service fee per enrollment',
               features: ['Rich media lessons', 'Auto-updated syllabi'],
               note: 'Applies automatically across this revenue channel.'
             },
@@ -134,7 +134,7 @@ describe('Home landing experiences', () => {
               icon: '🎤',
               heading: 'Live donation drives',
               tagline: 'Spin up telethon-style moments with real-time receipts.',
-              price: '5% commission per donation',
+              price: '10% service fee per donation',
               features: ['Live ticker overlays', 'Backstage chat'],
               note: 'Applies automatically across this revenue channel.'
             }

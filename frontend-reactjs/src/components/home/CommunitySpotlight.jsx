@@ -6,7 +6,7 @@ import HomeSection from './HomeSection.jsx';
 const LEARNER_BENEFITS = [
   {
     key: 'home.community.learners.benefits.one',
-    fallback: 'Drop into live build labs with peers and mentors who keep things upbeat.'
+    fallback: 'Pop into live build labs with peers who cheer every win.'
   },
   {
     key: 'home.community.learners.benefits.two',
@@ -14,14 +14,14 @@ const LEARNER_BENEFITS = [
   },
   {
     key: 'home.community.learners.benefits.three',
-    fallback: 'Score accountability check-ins that feel more like pep talks than homework.'
+    fallback: 'Schedule accountability check-ins that feel more like pep talks than homework.'
   }
 ];
 
 const INSTRUCTOR_BENEFITS = [
   {
     key: 'home.community.instructors.benefits.one',
-    fallback: 'Spin up vibrant cohorts with zero-fuss tooling built for experimentation.'
+    fallback: 'Spin up vibrant cohorts with zero-fuss tools built for experimentation.'
   },
   {
     key: 'home.community.instructors.benefits.two',
@@ -37,10 +37,10 @@ export default function CommunitySpotlight() {
   const { t } = useLanguage();
 
   const eyebrow = t('home.community.eyebrow', 'Community spotlight');
-  const heading = t('home.community.heading', 'Two tracks. One buzzing campus.');
+  const heading = t('home.community.heading', 'Two tracks, one welcoming campus.');
   const description = t(
     'home.community.description',
-    'Pick your lane and plug into gatherings designed for momentum, cheer, and meaningful progress.'
+    'Plug in as a learner or instructor—each lane keeps momentum friendly and flexible.'
   );
 
   return (
@@ -77,15 +77,15 @@ export default function CommunitySpotlight() {
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">
                 {t('home.community.learners.label', 'For learners')}
               </p>
-              <h3 className="text-2xl font-semibold text-slate-900">
-                {t('home.community.learners.title', 'Find your flow, one playful sprint at a time.')}
-              </h3>
-              <p className="text-base leading-7 text-slate-600">
-                {t(
-                  'home.community.learners.description',
-                  'Join squads who learn out loud, swap experiments, and celebrate the little wins that build big confidence.'
-                )}
-              </p>
+            <h3 className="text-2xl font-semibold text-slate-900">
+              {t('home.community.learners.title', 'Settle into a crew that meets you where you are.')}
+            </h3>
+            <p className="text-base leading-7 text-slate-600">
+              {t(
+                'home.community.learners.description',
+                'Join squads who learn out loud, share experiments, and celebrate the little wins that build big confidence.'
+              )}
+            </p>
             </header>
             <ul className="mt-8 space-y-4 text-sm text-slate-700">
               {LEARNER_BENEFITS.map(({ key, fallback }) => (

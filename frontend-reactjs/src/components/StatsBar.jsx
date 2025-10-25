@@ -19,7 +19,7 @@ export default function StatsBar({ stats, className, eyebrow, headline, marketin
       : DEFAULT_STATS;
 
   const resolvedEyebrow = eyebrow ?? 'Proof points';
-  const resolvedHeadline = headline ?? 'Operators trust Flow 5 to hit their numbers';
+  const resolvedHeadline = headline ?? 'Operators trust Edulure to hit their numbers';
 
   return (
     <section

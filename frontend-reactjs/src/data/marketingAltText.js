@@ -1,7 +1,7 @@
 const ALT_TEXT = {
-  'hero.flow-five': 'Operators orchestrating onboarding, payments, and community sessions inside the Edulure Flow 5 dashboard.',
+  'hero.campus-galaxy': 'Operators mapping a blended learning campus inside the Edulure workspace.',
   'case-study.ops-guild':
-    'Ops Guild founders presenting a dashboard with uplift metrics and enrolment charts for Flow 5 marketing.',
+    'Ops Guild founders reviewing uplift metrics and enrolment charts inside the Edulure dashboard.',
   'case-study.cohort-studio':
     'Instructor cohort reviewing lesson plans with monetisation overlays in the Edulure studio.',
   'case-study.tutor-league':
