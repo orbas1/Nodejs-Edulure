@@ -19,9 +19,7 @@ export function normaliseCurrencyCode(value, { fallback = 'USD' } = {}) {
   throw new Error('currency must be a 3-letter ISO code');
 }
 
-export function normalizeCurrencyCode(value, options) {
-  return normaliseCurrencyCode(value, options);
-}
+export const normalizeCurrencyCode = (value, options) => normaliseCurrencyCode(value, options);
 
 export function centsToCurrencyString(value, { fractionDigits = 2, useGrouping = true } = {}) {
   const cents = Number(value ?? 0);
