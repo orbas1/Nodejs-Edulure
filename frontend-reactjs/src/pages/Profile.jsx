@@ -694,6 +694,19 @@ export default function Profile() {
   const affiliateComplianceSettings = affiliate.compliance;
   const affiliateRecentReferrals = affiliate.recentReferrals;
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
+  const {
+    overview: billingOverview,
+    paymentMethods: billingPaymentMethods,
+    invoices: billingInvoices,
+    loading: billingLoading,
+    error: billingError,
+    portalStatus: billingPortalStatus,
+    portalError: billingPortalError,
+    lastLoadedAt: billingLastLoadedAt,
+    refresh: refreshBilling,
+    launchPortal,
+    resetPortalStatus
+  } = useBillingPortal({ autoLoad: false });
   const billingOverviewWithSync = useMemo(
     () => (billingOverview ? { ...billingOverview, lastSyncedAt: billingOverview.lastSyncedAt ?? billingLastLoadedAt } : null),
     [billingOverview, billingLastLoadedAt]
@@ -724,20 +737,6 @@ export default function Profile() {
     token,
     onStatus: setSystemStatusMessage
   });
-  const {
-    overview: billingOverview,
-    paymentMethods: billingPaymentMethods,
-    invoices: billingInvoices,
-    loading: billingLoading,
-    error: billingError,
-    portalStatus: billingPortalStatus,
-    portalError: billingPortalError,
-    lastLoadedAt: billingLastLoadedAt,
-    refresh: refreshBilling,
-    launchPortal,
-    resetPortalStatus
-  } = useBillingPortal({ autoLoad: false });
-
   const systemStatusBanner = useMemo(() => {
     if (!systemStatusMessage) return undefined;
     const mappedType =

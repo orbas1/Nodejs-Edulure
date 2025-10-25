@@ -7,12 +7,13 @@ const menuStates = {
 };
 
 export default function SkewedMenu({ activeState = 'all', onSelect, activeItem, items }) {
-  const resolvedItems = items?.length ? items : menuStates[activeState] ?? menuStates.all;
+  const resolvedState = menuStates[activeState] ? activeState : 'all';
+  const resolvedItems = items?.length ? items : menuStates[resolvedState];
 
   return (
     <div className="relative overflow-hidden rounded-3xl bg-white/70">
       <div className="pointer-events-none absolute inset-y-0 left-0 w-1/5 -skew-x-12 bg-primary/10" aria-hidden />
-      <nav className="relative flex gap-3 overflow-x-auto py-4" aria-label={`${activeState} navigation`}>
+      <nav className="relative flex gap-3 overflow-x-auto py-4" aria-label={`${resolvedState} navigation`}>
         {resolvedItems.map((item) => {
           const isActive = activeItem === item;
           return (
@@ -35,7 +36,7 @@ export default function SkewedMenu({ activeState = 'all', onSelect, activeItem, 
 }
 
 SkewedMenu.propTypes = {
-  activeState: PropTypes.oneOf(Object.keys(menuStates)),
+  activeState: PropTypes.oneOfType([PropTypes.oneOf(Object.keys(menuStates)), PropTypes.string]),
   onSelect: PropTypes.func,
   activeItem: PropTypes.string,
   items: PropTypes.arrayOf(PropTypes.string)
