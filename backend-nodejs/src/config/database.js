@@ -216,6 +216,40 @@ export async function initialiseConnection(connection, options = {}) {
 }
 
 export function buildKnexConfig(databaseEnv = env.database) {
+  const normalizedClient = String(databaseEnv.client ?? '').toLowerCase();
+  const isTestEnvironment = env.nodeEnv === 'test';
+  const prefersSqlite =
+    normalizedClient === 'sqlite3' ||
+    (isTestEnvironment && normalizedClient !== 'mysql' && normalizedClient !== 'mysql2');
+
+  if (prefersSqlite) {
+    const sqliteConfig = {
+      client: 'sqlite3',
+      connection: { filename: ':memory:' },
+      pool: {
+        min: 1,
+        max: 1,
+        idleTimeoutMillis: 500
+      },
+      useNullAsDefault: true,
+      log: {
+        warn: (event) => logKnexEvent('warn', event),
+        error: (event) => logKnexEvent('error', event),
+        deprecate: (event) => logKnexEvent('warn', { ...normaliseKnexEvent(event), deprecation: true }),
+        debug: (event) => logKnexEvent('debug', event)
+      },
+      migrations: {
+        tableName: databaseEnv.migrations?.tableName ?? 'schema_migrations'
+      }
+    };
+
+    return {
+      knex: sqliteConfig,
+      session: { timezone: 'UTC', statementTimeoutMs: 0 },
+      replicas: []
+    };
+  }
+
   const urlSettings = databaseEnv.url ? parseDatabaseUrl(databaseEnv.url) : {};
   const timezone = normalizeTimezoneInput(databaseEnv.timezone ?? urlSettings.timezone ?? 'UTC');
   const driverTimezone = resolveDriverTimezone(timezone);

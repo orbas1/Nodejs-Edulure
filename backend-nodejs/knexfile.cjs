@@ -54,6 +54,21 @@ const toBool = (value, fallback = false) => {
   return fallback;
 };
 
+const resolveDbClient = () => {
+  const configured = process.env.DB_CLIENT;
+  if (configured) {
+    return configured.trim().toLowerCase();
+  }
+
+  if (nodeEnv === 'test') {
+    return 'sqlite3';
+  }
+
+  return 'mysql2';
+};
+
+const dbClient = resolveDbClient();
+
 const buildConnectionFromUrl = (databaseUrl) => {
   const url = new URL(databaseUrl);
   return {
@@ -119,20 +134,18 @@ const enrichConnection = (connection) => {
   return enriched;
 };
 
-const connection = enrichConnection(resolveConnection());
-
-const poolMin = toInt(process.env.DB_POOL_MIN, 2);
-const poolMax = toInt(process.env.DB_POOL_MAX, 10);
-
-module.exports = {
-  client: 'mysql2',
-  connection,
+const sqliteConfig = () => ({
+  client: 'sqlite3',
+  connection: {
+    filename: process.env.DB_SQLITE_FILENAME
+      ? path.resolve(__dirname, process.env.DB_SQLITE_FILENAME)
+      : ':memory:'
+  },
+  useNullAsDefault: true,
   pool: {
-    min: Math.min(poolMin, poolMax),
-    max: Math.max(poolMax, poolMin),
-    idleTimeoutMillis: toInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 30000),
-    createTimeoutMillis: toInt(process.env.DB_POOL_CREATE_TIMEOUT_MS, 3000),
-    acquireTimeoutMillis: toInt(process.env.DB_POOL_ACQUIRE_TIMEOUT_MS, 60000)
+    min: 1,
+    max: 1,
+    idleTimeoutMillis: 500
   },
   migrations: {
     directory: path.resolve(__dirname, 'migrations'),
@@ -151,4 +164,42 @@ module.exports = {
       console.warn(message);
     }
   }
+});
+
+const mysqlConfig = () => {
+  const connection = enrichConnection(resolveConnection());
+
+  const poolMin = toInt(process.env.DB_POOL_MIN, 2);
+  const poolMax = toInt(process.env.DB_POOL_MAX, 10);
+
+  return {
+    client: 'mysql2',
+    connection,
+    pool: {
+      min: Math.min(poolMin, poolMax),
+      max: Math.max(poolMax, poolMin),
+      idleTimeoutMillis: toInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 30000),
+      createTimeoutMillis: toInt(process.env.DB_POOL_CREATE_TIMEOUT_MS, 3000),
+      acquireTimeoutMillis: toInt(process.env.DB_POOL_ACQUIRE_TIMEOUT_MS, 60000)
+    },
+    migrations: {
+      directory: path.resolve(__dirname, 'migrations'),
+      tableName: 'schema_migrations',
+      loadExtensions: ['.js']
+    },
+    seeds: {
+      directory: path.resolve(__dirname, 'seeds')
+    },
+    log: {
+      warn(message) {
+        if (typeof message === 'string' && message.includes('FS_EVENT')) {
+          return;
+        }
+
+        console.warn(message);
+      }
+    }
+  };
 };
+
+module.exports = dbClient === 'sqlite3' ? sqliteConfig() : mysqlConfig();
