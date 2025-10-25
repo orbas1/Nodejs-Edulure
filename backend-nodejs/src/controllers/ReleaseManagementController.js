@@ -8,6 +8,33 @@ const paginationSchema = Joi.object({
   offset: Joi.number().integer().min(0).default(0)
 });
 
+const ENVIRONMENT_IDENTIFIER_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
+const ENVIRONMENT_IDENTIFIER_ERROR = 'environment must be a lowercase identifier without spaces';
+
+function slugifyEnvironmentIdentifier(input) {
+  if (input === undefined || input === null) {
+    return '';
+  }
+
+  return String(input)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-');
+}
+
+function normaliseEnvironmentIdentifier(value, helpers) {
+  const slug = slugifyEnvironmentIdentifier(value);
+  if (!slug || !ENVIRONMENT_IDENTIFIER_PATTERN.test(slug)) {
+    return helpers.error('any.invalid');
+  }
+
+  return slug;
+}
+
 const csvListSchema = Joi.alternatives()
   .try(
     Joi.array().items(Joi.string().trim().min(1).max(120)),
@@ -31,12 +58,71 @@ const csvListSchema = Joi.alternatives()
   }, 'CSV normaliser')
   .optional();
 
+const environmentIdentifierSchema = Joi.string()
+  .trim()
+  .max(120)
+  .custom(normaliseEnvironmentIdentifier, 'environment normaliser')
+  .messages({
+    'any.invalid': ENVIRONMENT_IDENTIFIER_ERROR,
+    'string.base': ENVIRONMENT_IDENTIFIER_ERROR,
+    'string.empty': ENVIRONMENT_IDENTIFIER_ERROR
+  });
+
+const environmentListSchema = Joi.alternatives()
+  .try(
+    Joi.array()
+      .items(Joi.any())
+      .custom((values, helpers) => {
+        const rawEntries = Array.isArray(values) ? values : [];
+        const trimmed = rawEntries
+          .map((entry) => (typeof entry === 'string' ? entry.trim() : String(entry ?? '').trim()))
+          .filter(Boolean);
+
+        if (!trimmed.length) {
+          return undefined;
+        }
+
+        const unique = new Set();
+        for (const entry of trimmed) {
+          unique.add(normaliseEnvironmentIdentifier(entry, helpers));
+        }
+
+        return Array.from(unique);
+      }, 'environment array normaliser'),
+    Joi.string()
+      .trim()
+      .max(512)
+      .custom((value, helpers) => {
+        if (!value) {
+          return undefined;
+        }
+
+        const entries = value
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+
+        if (!entries.length) {
+          return undefined;
+        }
+
+        const unique = new Set();
+        for (const entry of entries) {
+          unique.add(normaliseEnvironmentIdentifier(entry, helpers));
+        }
+
+        return Array.from(unique);
+      }, 'environment csv normaliser')
+  )
+  .messages({ 'any.invalid': ENVIRONMENT_IDENTIFIER_ERROR })
+  .optional();
+
 const checklistQuerySchema = paginationSchema.append({
   category: csvListSchema
 });
 
 const runsQuerySchema = paginationSchema.append({
-  environment: csvListSchema,
+  environment: environmentListSchema,
   status: csvListSchema,
   versionTag: Joi.string().trim().max(120).optional()
 });
@@ -75,12 +161,14 @@ const gateSeedSchema = Joi.object({
 
 const scheduleRunSchema = Joi.object({
   versionTag: Joi.string().trim().min(1).max(120).required(),
-  environment: Joi.string()
-    .trim()
-    .lowercase()
-    .pattern(/^[a-z][a-z0-9-]{1,31}$/)
+  environment: environmentIdentifierSchema
     .required()
-    .messages({ 'string.pattern.base': 'environment must be a lowercase identifier without spaces' }),
+    .messages({
+      'any.required': 'environment is required',
+      'string.base': ENVIRONMENT_IDENTIFIER_ERROR,
+      'string.empty': ENVIRONMENT_IDENTIFIER_ERROR,
+      'any.invalid': ENVIRONMENT_IDENTIFIER_ERROR
+    }),
   initiatedByEmail: Joi.string().trim().email().required(),
   initiatedByName: Joi.string().trim().max(160).allow(null, '').optional(),
   changeWindowStart: Joi.date().iso().optional(),
@@ -106,7 +194,7 @@ const gateEvaluationSchema = Joi.object({
 });
 
 const dashboardQuerySchema = Joi.object({
-  environment: Joi.string().trim().pattern(/^[a-z][a-z0-9-]{1,31}$/).optional()
+  environment: environmentIdentifierSchema.optional()
 }).unknown(true);
 
 function handleValidationError(error, next) {
