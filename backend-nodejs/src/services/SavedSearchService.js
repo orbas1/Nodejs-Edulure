@@ -6,6 +6,7 @@ function decorateSearch(search) {
   if (!search) {
     return null;
   }
+
   const channels = Array.isArray(search.deliveryChannels)
     ? Array.from(
         new Set(
@@ -15,17 +16,30 @@ function decorateSearch(search) {
         )
       )
     : [];
-  return {
-    ...search,
-    deliveryChannels: channels
-  };
+
+  if (Array.isArray(search.deliveryChannels)) {
+    search.deliveryChannels = channels;
+  } else if (channels.length > 0) {
+    search.deliveryChannels = channels;
+  } else {
+    search.deliveryChannels = [];
+  }
+
+  return search;
 }
 
 export class SavedSearchService {
   constructor({ savedSearchModel = SavedSearchModel, dbClient = db, loggerInstance = logger } = {}) {
     this.model = savedSearchModel;
     this.db = dbClient;
-    this.logger = loggerInstance;
+    const noop = () => {};
+    this.logger = {
+      debug: noop,
+      info: noop,
+      warn: noop,
+      error: noop,
+      ...loggerInstance
+    };
   }
 
   async list(userId) {

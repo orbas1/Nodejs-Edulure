@@ -11,7 +11,7 @@ function normaliseHash(value) {
 export class InMemoryPersistedQueryStore {
   constructor({ maxSize = 500, ttlMs = 24 * 60 * 60 * 1000, now = () => Date.now() } = {}) {
     this.maxSize = Math.max(10, Number.parseInt(maxSize, 10) || 500);
-    this.ttlMs = Math.max(60_000, Number.parseInt(ttlMs, 10) || 24 * 60 * 60 * 1000);
+    this.ttlMs = Math.max(1, Number.parseInt(ttlMs, 10) || 24 * 60 * 60 * 1000);
     this.now = typeof now === 'function' ? now : () => Date.now();
     this.entries = new Map();
   }
