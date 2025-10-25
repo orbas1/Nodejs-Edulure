@@ -7,11 +7,19 @@ import { sessionRegistry } from './SessionRegistry.js';
 import UserModel from '../models/UserModel.js';
 import DirectMessageParticipantModel from '../models/DirectMessageParticipantModel.js';
 import courseLiveService from './CourseLiveService.js';
-import CommunityChatService from './CommunityChatService.js';
 import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
 import { createCorsOriginValidator } from '../config/corsPolicy.js';
 
 const log = logger.child({ service: 'RealtimeService' });
+
+let communityChatService;
+async function getCommunityChatService() {
+  if (!communityChatService) {
+    const module = await import('./CommunityChatService.js');
+    communityChatService = module.default ?? module;
+  }
+  return communityChatService;
+}
 
 function buildAvatarUrl(name) {
   const seed = encodeURIComponent(name ?? 'Edulure Member');
@@ -173,7 +181,8 @@ class RealtimeService {
           return;
         }
         try {
-          await CommunityChatService.ensureCommunityMember(communityId, user.id);
+          const chatService = await getCommunityChatService();
+          await chatService.ensureCommunityMember(communityId, user.id);
           socket.join(`community:${communityId}`);
           socket.data.joinedCommunities.add(communityId);
           socket.emit('community.joined', { communityId });
@@ -214,7 +223,8 @@ class RealtimeService {
         }
 
         try {
-          await CommunityChatService.ensureChannelAccess(communityId, channelId, user.id);
+          const chatService = await getCommunityChatService();
+          await chatService.ensureChannelAccess(communityId, channelId, user.id);
           socket.join(`community:${communityId}:channel:${channelId}`);
           const joinedChannels = socket.data.joinedCommunityChannels.get(communityId) ?? new Set();
           joinedChannels.add(channelId);
@@ -452,7 +462,8 @@ class RealtimeService {
     let presence = presenceList;
     if (!presence) {
       try {
-        presence = await CommunityChatService.listPresence(numericCommunityId);
+        const chatService = await getCommunityChatService();
+        presence = await chatService.listPresence(numericCommunityId);
       } catch (error) {
         log.warn({ err: error, communityId: numericCommunityId }, 'failed to load presence for broadcast');
         return;

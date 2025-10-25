@@ -84,7 +84,9 @@ function serialiseEntityRecord(entityType, entityResult) {
 export class ExplorerAnalyticsService {
   constructor({ loggerInstance = log, environmentDescriptor } = {}) {
     this.logger = loggerInstance;
-    this.environment = getEnvironmentDescriptor(environmentDescriptor);
+    const descriptor = getEnvironmentDescriptor(environmentDescriptor);
+    this.environmentDescriptor = descriptor;
+    this.environment = formatEnvironmentResponse(descriptor);
   }
 
   async recordSearchExecution({

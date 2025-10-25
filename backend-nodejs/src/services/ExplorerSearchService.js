@@ -78,6 +78,26 @@ function resolvePersonaLabel(metadata = {}) {
   return persona ? toTitleCase(persona) : null;
 }
 
+function normaliseSupportedEntities(list) {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  const seen = new Set();
+  const normalised = [];
+  for (const entry of list) {
+    if (typeof entry !== 'string') {
+      continue;
+    }
+    const trimmed = entry.trim().toLowerCase();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    normalised.push(trimmed);
+  }
+  return normalised;
+}
+
 function computeMomentumDescriptor(popularityScore, freshnessScore, metadataMomentum = null) {
   if (metadataMomentum && typeof metadataMomentum === 'object') {
     const score = Number(metadataMomentum.score ?? metadataMomentum.value ?? metadataMomentum.numeric);
@@ -299,10 +319,14 @@ function buildHighlights(...sources) {
         return;
       }
       const key = label.toLowerCase();
-      if (seen.has(key)) {
+      const canonicalKey = key.replace(/[^a-z0-9]+/g, '');
+      if (seen.has(key) || (canonicalKey && seen.has(canonicalKey))) {
         return;
       }
       seen.add(key);
+      if (canonicalKey) {
+        seen.add(canonicalKey);
+      }
       highlights.push(label);
     });
   });
@@ -499,7 +523,6 @@ function formatDocument(entity, hit) {
       base.url = `/tutors/${hit.slug ?? hit.entityId}`;
       fallbackAction = { label: 'Hire tutor', href: base.url, type: 'primary' };
       fallbackHighlights = [
-        hit.completedSessions ? `${formatNumber(hit.completedSessions)} sessions` : null,
         hit.responseTimeMinutes ? `Responds in ${hit.responseTimeMinutes}m` : null,
         hit.metadata?.languages?.[0] ? `Speaks ${hit.metadata.languages[0]}` : null
       ];
@@ -574,16 +597,51 @@ function formatDocument(entity, hit) {
 
 export class ExplorerSearchService {
   constructor({
-    provider = resolveSearchProvider(),
+    provider,
+    documentModel,
     adsService = AdsPlacementService,
     loggerInstance = logger
   } = {}) {
-    this.provider = provider;
+    const resolvedProvider = (() => {
+      if (provider) {
+        return provider;
+      }
+      if (documentModel && typeof documentModel.search === 'function') {
+        const getSupported =
+          typeof documentModel.getSupportedEntities === 'function'
+            ? () => documentModel.getSupportedEntities()
+            : undefined;
+        return {
+          name: documentModel.name ?? 'document-model',
+          search: (...args) => documentModel.search(...args),
+          getSupportedEntities: getSupported
+        };
+      }
+      return resolveSearchProvider();
+    })();
+
+    this.provider = resolvedProvider;
     this.adsService = adsService;
     this.logger = loggerInstance;
-    this.supportedEntities = Array.isArray(this.provider.getSupportedEntities?.())
-      ? this.provider.getSupportedEntities()
-      : MODEL_SUPPORTED_ENTITIES;
+
+    const modelSupportedRaw = documentModel?.getSupportedEntities?.();
+    const modelSupported = normaliseSupportedEntities(
+      Array.isArray(modelSupportedRaw) && modelSupportedRaw.length
+        ? modelSupportedRaw
+        : MODEL_SUPPORTED_ENTITIES
+    );
+    const providerSupported = normaliseSupportedEntities(this.provider.getSupportedEntities?.());
+
+    const allowedEntities = modelSupported.length
+      ? modelSupported
+      : normaliseSupportedEntities(MODEL_SUPPORTED_ENTITIES);
+    const allowedSet = new Set(allowedEntities);
+    const providerCandidates = providerSupported.length ? providerSupported : [];
+    const combined = (providerCandidates.length ? providerCandidates : allowedEntities).filter((entity) =>
+      allowedSet.has(entity)
+    );
+
+    this.supportedEntities = combined.length ? combined : allowedEntities;
   }
 
   getSupportedEntities() {
@@ -602,7 +660,17 @@ export class ExplorerSearchService {
 
   buildFilters(entity, filters = {}, globalFilters = {}) {
     const merged = { ...globalFilters };
-    const entityFilters = filters?.[entity] ?? filters ?? {};
+
+    const filtersIsObject = filters && typeof filters === 'object' && !Array.isArray(filters);
+    const entityFiltersCandidate = filtersIsObject ? filters[entity] : undefined;
+    const hasEntitySpecificKeys =
+      filtersIsObject && Object.keys(filters).some((key) => this.supportedEntities.includes(key));
+    const entityFilters =
+      entityFiltersCandidate && typeof entityFiltersCandidate === 'object'
+        ? entityFiltersCandidate
+        : hasEntitySpecificKeys
+          ? {}
+          : filters ?? {};
     for (const [key, value] of Object.entries(entityFilters)) {
       if (value === undefined || value === null) {
         continue;

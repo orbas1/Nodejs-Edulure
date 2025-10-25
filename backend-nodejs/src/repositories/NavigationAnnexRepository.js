@@ -99,7 +99,7 @@ function ensureNode(nodes, row) {
         tasks: []
       },
       design: {
-        tokens: new Set(),
+        tokens: [],
         qa: new Map(),
         references: new Set()
       },
@@ -212,7 +212,7 @@ export default class NavigationAnnexRepository {
     const nodes = new Map();
     const productBacklogIndex = new Map();
     const aggregatedDesign = {
-      tokens: new Set(),
+      tokens: [],
       qa: new Map(),
       references: new Set()
     };
@@ -304,8 +304,8 @@ export default class NavigationAnnexRepository {
       switch (row.dependencyType) {
         case 'token': {
           if (row.value) {
-            node.design.tokens.add(row.value);
-            aggregatedDesign.tokens.add(row.value);
+            node.design.tokens.push(row.value);
+            aggregatedDesign.tokens.push(row.value);
           }
           break;
         }
@@ -403,7 +403,7 @@ export default class NavigationAnnexRepository {
         .map(({ priority, displayOrder, ...rest }) => rest);
 
       const design = {
-        tokens: Array.from(node.design.tokens).sort(),
+        tokens: node.design.tokens.slice(),
         qa: Array.from(node.design.qa.values())
           .sort(sortByPriority)
           .map(({ id, label }) => ({ id, label })),
@@ -467,7 +467,7 @@ export default class NavigationAnnexRepository {
       .map(({ priority, displayOrder, ...rest }) => rest);
 
     const designDependencies = {
-      tokens: Array.from(aggregatedDesign.tokens).sort(),
+      tokens: aggregatedDesign.tokens.slice(),
       qa: Array.from(aggregatedDesign.qa.values())
         .sort(sortByPriority)
         .map(({ id, label }) => ({ id, label })),
@@ -504,8 +504,7 @@ export default class NavigationAnnexRepository {
         href: entry.href,
         usageCount: entry.usageCount,
         categories: Array.from(entry.categories).sort((a, b) => a.localeCompare(b)),
-        navItems: Array.from(entry.navItemIds).sort((a, b) => a.localeCompare(b)),
-        navItemLabels: Array.from(entry.navItemLabels).sort((a, b) => a.localeCompare(b))
+        navItems: Array.from(entry.navItemIds).sort((a, b) => a.localeCompare(b))
       }));
 
     return {
