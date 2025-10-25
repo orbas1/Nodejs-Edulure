@@ -29,7 +29,27 @@ const ACCENT_PRESETS = {
   }
 };
 
-const ThemeContext = createContext(null);
+const defaultThemeContext = {
+  mode: 'system',
+  resolvedMode: 'light',
+  accent: 'primary',
+  density: 'comfortable',
+  radius: 'rounded',
+  contrast: 'standard',
+  classes: {
+    surface: '',
+    panel: '',
+    muted: ''
+  },
+  setMode: () => {},
+  setAccent: () => {},
+  setDensity: () => {},
+  setRadius: () => {},
+  setContrast: () => {},
+  applyThemeSettings: () => {}
+};
+
+const ThemeContext = createContext(defaultThemeContext);
 
 function getSystemMode() {
   if (typeof window === 'undefined' || !window.matchMedia) {
@@ -199,7 +219,7 @@ export function ThemeProvider({ children }) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    return defaultThemeContext;
   }
   return context;
 }

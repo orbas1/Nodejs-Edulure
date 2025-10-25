@@ -694,10 +694,6 @@ export default function Profile() {
   const affiliateComplianceSettings = affiliate.compliance;
   const affiliateRecentReferrals = affiliate.recentReferrals;
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
-  const billingOverviewWithSync = useMemo(
-    () => (billingOverview ? { ...billingOverview, lastSyncedAt: billingOverview.lastSyncedAt ?? billingLastLoadedAt } : null),
-    [billingOverview, billingLastLoadedAt]
-  );
   const activeConsents = useMemo(
     () => consents.filter((consent) => consent.status === 'granted' && consent.active),
     [consents]
@@ -737,6 +733,11 @@ export default function Profile() {
     launchPortal,
     resetPortalStatus
   } = useBillingPortal({ autoLoad: false });
+
+  const billingOverviewWithSync = useMemo(
+    () => (billingOverview ? { ...billingOverview, lastSyncedAt: billingOverview.lastSyncedAt ?? billingLastLoadedAt } : null),
+    [billingOverview, billingLastLoadedAt]
+  );
 
   const systemStatusBanner = useMemo(() => {
     if (!systemStatusMessage) return undefined;
