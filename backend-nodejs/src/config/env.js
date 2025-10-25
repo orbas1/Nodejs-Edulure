@@ -9,6 +9,8 @@ import { loadEnvironmentFiles, resolveProjectRoot } from './loadEnv.js';
 const projectRoot = resolveProjectRoot();
 
 loadEnvironmentFiles();
+
+const defaultDbClient = process.env.NODE_ENV === 'test' ? 'sqlite3' : 'mysql2';
 const defaultSchemaBaselinePath = path.resolve(
   projectRoot,
   'database',
@@ -649,6 +651,7 @@ function parseHostList(value, { allowEmpty = false } = {}) {
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    DB_CLIENT: z.enum(['mysql2', 'mysql', 'sqlite3']).default(defaultDbClient),
     PORT: z.coerce.number().int().min(1).max(65535).default(4000),
     WEB_PORT: z.coerce.number().int().min(1).max(65535).optional(),
     WEB_PROBE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
@@ -1575,6 +1578,7 @@ export const env = {
     }
   },
   database: {
+    client: raw.DB_CLIENT,
     url: databaseUrl,
     readReplicaUrls,
     host: raw.DB_HOST,
