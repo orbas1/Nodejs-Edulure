@@ -50,7 +50,7 @@ export default function PrimaryHero({ block, languageSelector, rightPanel, media
         <div className="absolute -bottom-40 right-12 h-[28rem] w-[28rem] rounded-full bg-fuchsia-500/30 blur-[160px]" />
         <div className="absolute bottom-10 left-1/3 h-60 w-60 -translate-x-1/2 rounded-full bg-sky-400/20 blur-3xl" />
       </div>
-      <HomeSection className="relative flex flex-col gap-12 lg:flex-row lg:items-center" size="wide">
+      <HomeSection className="relative flex flex-col gap-12 lg:flex-row lg:items-center" size="full">
         <div className="flex w-full flex-col gap-10 lg:w-1/2">
           {(statusLabel || languageSelector?.desktop) && (
             <div className="flex flex-col gap-3 text-xs uppercase tracking-[0.2em] text-white/70 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
