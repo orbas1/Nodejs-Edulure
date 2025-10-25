@@ -92,11 +92,20 @@ app.use(
   pinoHttp({
     logger,
     genReqId: (req) => req.id ?? randomUUID(),
-    customLogLevel: (res, err) => {
-      if (err || res.statusCode >= 500) {
+    customLogLevel: (...args) => {
+      // pino-http <=10 passes (res, err) while >=11 passes (req, res, err).
+      // Support both signatures so successful requests don't appear as errors.
+      const hasThreeArgs = args.length === 3;
+      const req = hasThreeArgs ? args[0] : undefined;
+      const res = hasThreeArgs ? args[1] : args[0];
+      const err = hasThreeArgs ? args[2] : args[1];
+
+      const statusCode = res?.statusCode ?? req?.res?.statusCode ?? 0;
+
+      if (err || statusCode >= 500) {
         return 'error';
       }
-      if (res.statusCode >= 400) {
+      if (statusCode >= 400) {
         return 'warn';
       }
       return 'info';
