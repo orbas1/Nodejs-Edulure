@@ -1,5 +1,15 @@
 import db from '../config/database.js';
 
+function resolveExecutor(connection) {
+  return typeof connection === 'function' ? connection : db;
+}
+
+function ensureExecutor(connection) {
+  const executor = resolveExecutor(connection);
+  const fn = executor?.fn ?? db.fn;
+  return { executor, fn };
+}
+
 function parseJson(value, fallback) {
   if (!value) return fallback;
   if (typeof value === 'object') return value;
@@ -38,6 +48,7 @@ function mapRow(row) {
 
 export default class ModerationFollowUpModel {
   static async schedule(followUp, connection = db) {
+    const { executor, fn } = ensureExecutor(connection);
     const payload = {
       case_id: followUp.caseId,
       action_id: followUp.actionId ?? null,
@@ -54,8 +65,8 @@ export default class ModerationFollowUpModel {
       Object.entries(payload).filter(([, value]) => value !== undefined)
     );
 
-    const [id] = await connection('moderation_follow_ups').insert(insertPayload);
-    const row = await connection('moderation_follow_ups')
+    const [id] = await executor('moderation_follow_ups').insert(insertPayload);
+    const row = await executor('moderation_follow_ups')
       .select({
         id: 'id',
         caseId: 'case_id',
@@ -74,7 +85,8 @@ export default class ModerationFollowUpModel {
   }
 
   static async listDue({ now = new Date(), limit = 50 } = {}, connection = db) {
-    const rows = await connection('moderation_follow_ups')
+    const { executor } = ensureExecutor(connection);
+    const rows = await executor('moderation_follow_ups')
       .select({
         id: 'id',
         caseId: 'case_id',
@@ -95,7 +107,8 @@ export default class ModerationFollowUpModel {
   }
 
   static async listForCase(caseId, connection = db) {
-    const rows = await connection('moderation_follow_ups')
+    const { executor } = ensureExecutor(connection);
+    const rows = await executor('moderation_follow_ups')
       .select({
         id: 'id',
         caseId: 'case_id',
@@ -118,7 +131,8 @@ export default class ModerationFollowUpModel {
       return [];
     }
 
-    const rows = await connection('moderation_follow_ups')
+    const { executor } = ensureExecutor(connection);
+    const rows = await executor('moderation_follow_ups')
       .select({
         id: 'id',
         caseId: 'case_id',
@@ -138,10 +152,11 @@ export default class ModerationFollowUpModel {
   }
 
   static async markCompleted(id, updates = {}, connection = db) {
+    const { executor, fn } = ensureExecutor(connection);
     const payload = {
       status: updates.status ?? 'completed',
       completed_at: updates.completedAt ?? new Date(),
-      updated_at: connection.fn.now(),
+      updated_at: fn.now(),
       metadata: updates.metadata !== undefined ? serialiseJson(updates.metadata, {}) : undefined
     };
 
@@ -149,8 +164,8 @@ export default class ModerationFollowUpModel {
       Object.entries(payload).filter(([, value]) => value !== undefined)
     );
 
-    await connection('moderation_follow_ups').where({ id }).update(updatePayload);
-    const row = await connection('moderation_follow_ups')
+    await executor('moderation_follow_ups').where({ id }).update(updatePayload);
+    const row = await executor('moderation_follow_ups')
       .select({
         id: 'id',
         caseId: 'case_id',
@@ -173,12 +188,13 @@ export default class ModerationFollowUpModel {
       return 0;
     }
 
+    const { executor, fn } = ensureExecutor(connection);
     const payload = {
       status: 'cancelled',
-      updated_at: connection.fn.now()
+      updated_at: fn.now()
     };
 
-    return connection('moderation_follow_ups')
+    return executor('moderation_follow_ups')
       .where({ action_id: actionId, status: 'pending' })
       .update(payload);
   }
