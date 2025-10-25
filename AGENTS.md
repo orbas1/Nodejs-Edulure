@@ -385,36 +385,18 @@ Group 13
 390. [Backend unit tests] Database not ready (attempt 1) for localhost:3306/app: connect ECONNREFUSED Reason: The database service rejected the TCP connection. Confirm the database container or host is running and accepting connections.
 
 Group 14
-391. [Backend unit tests] err: Error: CloudConvert request failed with status 500
-392. [Backend unit tests] at CloudConvertClient.request (/workspace/Nodejs-Edulure/backend-nodejs/src/integrations/CloudConvertClient.js:159:21)
-393. [Backend unit tests] at processTicksAndRejections (node:internal/process/task_queues:95:5)
-394. [Backend unit tests] at /workspace/Nodejs-Edulure/backend-nodejs/src/integrations/CloudConvertClient.js:170:24
-395. [Backend unit tests] at CloudConvertClient.execute (/workspace/Nodejs-Edulure/backend-nodejs/src/integrations/CloudConvertClient.js:70:24)
-396. [Backend unit tests] at /workspace/Nodejs-Edulure/backend-nodejs/test/integrations/cloudConvertClient.test.js:54:21
-397. [Backend unit tests] at file:///workspace/Nodejs-Edulure/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20 {
-398. [Backend unit tests] body: { message: 'error' }
-399. [Backend unit tests] } CloudConvert operation failed
-400. [Backend unit tests] ⎯⎯⎯⎯⎯⎯ Failed Suites 11 ⎯⎯⎯⎯⎯⎯
-401. [Backend unit tests] FAIL test/app.test.js [ test/app.test.js ]
-402. [Backend unit tests] TypeError: Cannot read properties of undefined (reading 'driver')
-403. [Backend unit tests] FAIL test/authService.test.js [ test/authService.test.js ]
-404. [Backend unit tests] Error: [vitest] There was an error when mocking a module. If you are using "vi.mock" factory, make sure there are no top level variables inside, since this call is hoisted to top of the file. Read more: https://vitest.dev/api/vi.html#vi-mock
-405. [Backend unit tests] FAIL test/communityReminderJob.test.js [ test/communityReminderJob.test.js ]
-406. [Backend unit tests] FAIL test/dataPartitionJob.test.js [ test/dataPartitionJob.test.js ]
-407. [Backend unit tests] FAIL test/enablementContentService.test.js > EnablementContentService
-408. [Backend unit tests] Error: delete from `enablement_guides` where `environment_key` = 'development' and `slug` not in ('stakeholder-communications-kit', 'operator-onboarding-playbook', 'analytics-revenue-enablement') - SQLITE_ERROR: no such table: enablement_guides
-409. [Backend unit tests] FAIL test/group14Controllers.test.js [ test/group14Controllers.test.js ]
-410. [Backend unit tests] TypeError: Cannot read properties of undefined (reading 'serviceName')
-411. [Backend unit tests] FAIL test/integrationApiKeyInviteService.test.js [ test/integrationApiKeyInviteService.test.js ]
-412. [Backend unit tests] TypeError: Cannot read properties of undefined (reading 'client')
-413. [Backend unit tests] FAIL test/learnerDashboardHttpRoutes.test.js > Learner dashboard HTTP routes
-414. [Backend unit tests] 102| loggerInstance.error({ errors }, 'Invalid API route registry confi…
-415. [Backend unit tests] 104| errors.map((message) => new Error(message)),
-416. [Backend unit tests] FAIL test/observabilityContracts.test.js > Observability OpenAPI contracts
-417. [Backend unit tests] Error: ENOENT: no such file or directory, open 'backend-nodejs/src/docs/openapi.json'
-418. [Backend unit tests] FAIL test/providerTransitionService.test.js [ test/providerTransitionService.test.js ]
-419. [Backend unit tests] FAIL test/supportKnowledgeBaseService.test.js [ test/supportKnowledgeBaseService.test.js ]
-420. [Backend unit tests] ⎯⎯⎯⎯⎯⎯ Failed Tests 48 ⎯⎯⎯⎯⎯⎯⎯
+- **CloudConvert integration failures** – `backend-nodejs/src/integrations/CloudConvertClient.js` should treat 5xx responses and abort/timeout errors as retryable and expose the parsed error payload so `test/integrations/cloudConvertClient.test.js` can assert the retry/backoff flow without the client throwing prematurely. Ensure the fetch mock in the test is exercised twice and that the helper respects the `retry.maxAttempts`/`baseDelayMs` overrides.
+- **App service readiness tests** – `backend-nodejs/src/app.js` should tolerate incomplete storage configuration supplied by the test double. Guard every use of `storageDescriptor`, `storageBuckets`, and `localStorageConfig` so `test/app.test.js` can boot the app with the lightweight environment stub.
+- **AuthService registration suite** – allow dependency injection/mocking by avoiding eager evaluation inside module scope in `backend-nodejs/src/services/AuthService.js`. Export the helpers (`hashRefreshToken`, `serializeUserWithAuthorizations`, etc.) and read collaborators from parameters so `test/authService.test.js` can supply vi.mocks without triggering Vitest's hoist error.
+- **Community reminder job** – the queue runner in `backend-nodejs/src/jobs/communityReminderJob.js` should stub its Redis + database layers behind exported factories so `test/communityReminderJob.test.js` no longer attempts to use undefined services during setup.
+- **Data partition job** – adjust `backend-nodejs/src/jobs/dataPartitionJob.js` to create the SQLite tables used in the tests (or feature flag the destructive migration logic) so `test/dataPartitionJob.test.js` can run against the in-memory database without `SQLITE_ERROR` exceptions.
+- **Enablement content service** – update `backend-nodejs/src/services/EnablementContentService.js` to automatically seed the `enablement_guides` table in the test environment (e.g. via `ensureGuideTables(trx)`), satisfying the expectations in `test/enablementContentService.test.js`.
+- **Dashboard/controller harness** – the composite router initialiser used by `test/group14Controllers.test.js` should provide fallbacks for `serviceName` metadata. Extend `backend-nodejs/src/routes/registerApiRoutes.js` and `backend-nodejs/src/routes/routeMetadata.js` to default missing descriptors so the test harness can instantiate controllers safely.
+- **Integration API key invite service** – the service at `backend-nodejs/src/services/IntegrationApiKeyInviteService.js` should accept an injected HTTP client (defaulting to the real one) so `test/integrationApiKeyInviteService.test.js` can supply a stub with the expected `client` shape.
+- **Learner dashboard HTTP routes** – relax the registry validator in `backend-nodejs/src/routes/registryValidator.js` (or provide fixture metadata) to prevent `Invalid API route registry configuration` errors when `test/learnerDashboardHttpRoutes.test.js` mounts the router with partial metadata.
+- **Observability OpenAPI contracts** – commit a lightweight copy of `backend-nodejs/src/docs/openapi.json` and expose a helper to resolve the path via `import.meta.url` so `test/observabilityContracts.test.js` never hits an `ENOENT` when loading the schema.
+- **Provider transition service** – mock or guard the external provider client in `backend-nodejs/src/services/ProviderTransitionService.js` so the Vitest suite can execute without network calls, addressing the remaining failures in `test/providerTransitionService.test.js`.
+- **Support knowledge base service** – introduce a seeded fixture layer in `backend-nodejs/src/services/SupportKnowledgeBaseService.js` (and related repositories) to support the expectations in `test/supportKnowledgeBaseService.test.js`, eliminating the `support workspace` related assertion failures.
 
 Group 15
 421. [Backend unit tests] FAIL test/adminOperationalControllers.test.js > AdminRevenueManagementController > deletes an adjustment by id
