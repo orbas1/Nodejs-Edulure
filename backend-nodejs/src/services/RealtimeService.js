@@ -7,11 +7,27 @@ import { sessionRegistry } from './SessionRegistry.js';
 import UserModel from '../models/UserModel.js';
 import DirectMessageParticipantModel from '../models/DirectMessageParticipantModel.js';
 import courseLiveService from './CourseLiveService.js';
-import CommunityChatService from './CommunityChatService.js';
-import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
 import { createCorsOriginValidator } from '../config/corsPolicy.js';
 
 const log = logger.child({ service: 'RealtimeService' });
+
+let communityChatServiceInstance;
+let userPresenceSessionModelInstance;
+async function getCommunityChatService() {
+  if (!communityChatServiceInstance) {
+    const module = await import('./CommunityChatService.js');
+    communityChatServiceInstance = module.default ?? module;
+  }
+  return communityChatServiceInstance;
+}
+
+async function getUserPresenceSessionModel() {
+  if (!userPresenceSessionModelInstance) {
+    const module = await import('../models/UserPresenceSessionModel.js');
+    userPresenceSessionModelInstance = module.default ?? module;
+  }
+  return userPresenceSessionModelInstance;
+}
 
 function buildAvatarUrl(name) {
   const seed = encodeURIComponent(name ?? 'Edulure Member');
@@ -173,7 +189,8 @@ class RealtimeService {
           return;
         }
         try {
-          await CommunityChatService.ensureCommunityMember(communityId, user.id);
+          const communityChatService = await getCommunityChatService();
+          await communityChatService.ensureCommunityMember(communityId, user.id);
           socket.join(`community:${communityId}`);
           socket.data.joinedCommunities.add(communityId);
           socket.emit('community.joined', { communityId });
@@ -214,7 +231,8 @@ class RealtimeService {
         }
 
         try {
-          await CommunityChatService.ensureChannelAccess(communityId, channelId, user.id);
+          const communityChatService = await getCommunityChatService();
+          await communityChatService.ensureChannelAccess(communityId, channelId, user.id);
           socket.join(`community:${communityId}:channel:${channelId}`);
           const joinedChannels = socket.data.joinedCommunityChannels.get(communityId) ?? new Set();
           joinedChannels.add(channelId);
@@ -305,7 +323,8 @@ class RealtimeService {
         (async () => {
           try {
             if (user.sessionId) {
-              await UserPresenceSessionModel.clear(user.sessionId);
+              const userPresenceSessionModel = await getUserPresenceSessionModel();
+              await userPresenceSessionModel.clear(user.sessionId);
             }
           } catch (error) {
             log.warn({ err: error, userId: user.id }, 'failed to clear presence session on disconnect');
@@ -452,7 +471,8 @@ class RealtimeService {
     let presence = presenceList;
     if (!presence) {
       try {
-        presence = await CommunityChatService.listPresence(numericCommunityId);
+        const communityChatService = await getCommunityChatService();
+        presence = await communityChatService.listPresence(numericCommunityId);
       } catch (error) {
         log.warn({ err: error, communityId: numericCommunityId }, 'failed to load presence for broadcast');
         return;

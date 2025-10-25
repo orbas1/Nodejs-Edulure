@@ -145,28 +145,9 @@ function normaliseKnowledgeSuggestions(value) {
         return null;
       }
       const id = suggestion.id ?? suggestion.slug ?? `kb-${index}`;
-      const updatedAt = suggestion.updatedAt ?? suggestion.updated_at ?? null;
-      const updatedIso = updatedAt ? toIso(updatedAt) : null;
-      const freshness = Number.isFinite(Number(suggestion.freshnessDays))
-        ? Number(suggestion.freshnessDays)
-        : null;
-      const helpfulnessScore = Number.isFinite(Number(suggestion.helpfulnessScore))
-        ? Number(suggestion.helpfulnessScore)
-        : null;
       const minutesRaw = suggestion.minutes ?? suggestion.readTime ?? suggestion.duration ?? null;
       const minutes = Number.isFinite(Number(minutesRaw)) ? Number(minutesRaw) : 3;
-      return {
-        id,
-        title: suggestion.title ?? 'Knowledge base article',
-        excerpt: suggestion.excerpt ?? suggestion.summary ?? suggestion.description ?? '',
-        url: suggestion.url ?? suggestion.link ?? '#',
-        category: suggestion.category ?? suggestion.topic ?? 'General',
-        minutes,
-        updatedAt: updatedIso,
-        freshnessDays: freshness,
-        helpfulnessScore,
-        stale: suggestion.stale ?? suggestion.isStale ?? false
-      };
+      return { id, title: suggestion.title ?? 'Knowledge base article', minutes };
     })
     .filter(Boolean);
 }
@@ -182,11 +163,15 @@ function normaliseBreadcrumbs(value) {
         return null;
       }
       const at = toIso(crumb.at ?? crumb.timestamp ?? crumb.occurredAt ?? new Date());
+      const actor = crumb.actor ?? crumb.source ?? 'system';
+      const label = crumb.label ?? crumb.title ?? 'Update';
+      const note = crumb.note ?? crumb.description ?? null;
+      const fallbackId = at ? `crumb-${at}` : null;
       return {
-        id: crumb.id ?? `crumb-${crumb.actor ?? 'system'}-${index}`,
-        actor: crumb.actor ?? crumb.source ?? 'system',
-        label: crumb.label ?? crumb.title ?? 'Update',
-        note: crumb.note ?? crumb.description ?? null,
+        id: crumb.id ?? fallbackId ?? `crumb-${index}`,
+        actor,
+        label,
+        note,
         at
       };
     })

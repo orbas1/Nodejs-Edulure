@@ -6,19 +6,32 @@ function decorateSearch(search) {
   if (!search) {
     return null;
   }
-  const channels = Array.isArray(search.deliveryChannels)
-    ? Array.from(
-        new Set(
-          search.deliveryChannels
-            .map((channel) => (typeof channel === 'string' ? channel.trim() : ''))
-            .filter((channel) => channel.length > 0)
-        )
-      )
-    : [];
-  return {
-    ...search,
-    deliveryChannels: channels
-  };
+
+  const target = search;
+  const rawChannels = target.deliveryChannels;
+
+  if (!Array.isArray(rawChannels)) {
+    if (rawChannels !== undefined) {
+      delete target.deliveryChannels;
+    }
+    return target;
+  }
+
+  const channels = Array.from(
+    new Set(
+      rawChannels
+        .map((channel) => (typeof channel === 'string' ? channel.trim() : ''))
+        .filter((channel) => channel.length > 0)
+    )
+  );
+
+  if (channels.length > 0) {
+    target.deliveryChannels = channels;
+  } else {
+    delete target.deliveryChannels;
+  }
+
+  return target;
 }
 
 export class SavedSearchService {
