@@ -69,7 +69,10 @@ export default class TelemetryController {
     } catch (error) {
       if (error instanceof ZodError) {
         error.status = 422;
-        error.details = error.errors.map((issue) => issue.message);
+        const issues = Array.isArray(error.issues) ? error.issues : Array.isArray(error.errors) ? error.errors : [];
+        error.details = issues
+          .map((issue) => (typeof issue === 'string' ? issue : issue?.message))
+          .filter((message) => message !== undefined && message !== null);
       }
       return next(error);
     }
@@ -118,7 +121,10 @@ export default class TelemetryController {
       });
       if (error instanceof ZodError) {
         error.status = 422;
-        error.details = error.errors.map((issue) => issue.message);
+        const issues = Array.isArray(error.issues) ? error.issues : Array.isArray(error.errors) ? error.errors : [];
+        error.details = issues
+          .map((issue) => (typeof issue === 'string' ? issue : issue?.message))
+          .filter((message) => message !== undefined && message !== null);
       }
       return next(error);
     }
@@ -132,7 +138,10 @@ export default class TelemetryController {
       });
       if (error) {
         error.status = 422;
-        error.details = error.details.map((detail) => detail.message);
+        const details = Array.isArray(error.details) ? error.details : [];
+        error.details = details
+          .map((detail) => (typeof detail === 'string' ? detail : detail?.message))
+          .filter((message) => message !== undefined && message !== null);
         throw error;
       }
 
