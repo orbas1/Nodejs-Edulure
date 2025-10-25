@@ -7,7 +7,7 @@ import {
   acknowledgeCommunityEscalation,
   publishCommunityRunbook
 } from "../../../api/communityApi.js";
-import { useAuth } from "../../../context/AuthContext.jsx";
+import { defaultAuthContext, useAuth } from "../../../context/AuthContext.jsx";
 import useRoleGuard from "../../../hooks/useRoleGuard.js";
 
 const emptyRunbookForm = {
@@ -22,7 +22,7 @@ const emptyRunbookForm = {
 
 export default function CommunityOperations({ dashboard, onRefresh }) {
   const { allowed, explanation } = useRoleGuard(["community", "admin"]);
-  const { session } = useAuth();
+  const { session } = useAuth() ?? defaultAuthContext;
   const token = session?.tokens?.accessToken;
   const initialRunbooks = useMemo(
     () => (Array.isArray(dashboard?.operations?.runbooks) ? dashboard.operations.runbooks : []),
@@ -111,6 +111,17 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
     }));
   }, []);
 
+  const promptForField = useCallback((message, currentValue = "") => {
+    if (typeof window === "undefined" || typeof window.prompt !== "function") {
+      return currentValue ?? "";
+    }
+    const result = window.prompt(message, currentValue ?? "");
+    if (result == null) {
+      return currentValue ?? "";
+    }
+    return result.trim();
+  }, []);
+
   const handleRunbookSubmit = useCallback(
     async (event) => {
       event.preventDefault();
@@ -118,42 +129,70 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
         setFeedback({ tone: "error", message: "You must be signed in to publish runbooks." });
         return;
       }
-      if (!runbookForm.communityId) {
+      const formDraft = { ...runbookForm };
+
+      if (!formDraft.communityId) {
+        formDraft.communityId = defaultCommunityId || "";
+      }
+      if (!formDraft.communityId) {
         setFeedback({ tone: "error", message: "Select a community to attach the runbook to." });
         return;
       }
-      if (!runbookForm.title) {
-        setFeedback({ tone: "error", message: "Runbook title is required." });
+      const communityIdNumeric = Number.parseInt(formDraft.communityId, 10);
+      if (Number.isNaN(communityIdNumeric)) {
+        setFeedback({ tone: "error", message: "Select a valid community to attach the runbook to." });
         return;
       }
+      if (!formDraft.title) {
+        const promptedTitle = promptForField("Runbook title", formDraft.title);
+        if (!promptedTitle) {
+          setFeedback({ tone: "error", message: "Runbook title is required." });
+          return;
+        }
+        formDraft.title = promptedTitle;
+      }
+
+      if (!formDraft.summary) {
+        const promptedSummary = promptForField("Runbook summary", formDraft.summary);
+        formDraft.summary = promptedSummary;
+      }
+
+      const promptedOwner = promptForField("Runbook owner", formDraft.owner ?? "");
+      formDraft.owner = promptedOwner || "Operations team";
+
+      const promptedLink = promptForField("Runbook link URL", formDraft.linkUrl ?? "");
+      formDraft.linkUrl = promptedLink;
+
+      setRunbookForm((previous) => ({ ...previous, ...formDraft }));
+
       setIsSubmitting(true);
       setFeedback(null);
-      const tags = runbookForm.tagsInput
+      const tags = formDraft.tagsInput
         .split(",")
         .map((entry) => entry.trim())
         .filter(Boolean);
       const optimistic = {
         id: `temp-${Date.now()}`,
-        title: runbookForm.title,
-        summary: runbookForm.summary,
-        owner: runbookForm.owner || "Operations team",
-        automationReady: runbookForm.automationReady,
+        title: formDraft.title,
+        summary: formDraft.summary,
+        owner: formDraft.owner || "Operations team",
+        automationReady: formDraft.automationReady,
         tags,
-        linkUrl: runbookForm.linkUrl || null,
+        linkUrl: formDraft.linkUrl || null,
         updatedAt: new Date().toISOString(),
-        communityId: runbookForm.communityId
+        communityId: communityIdNumeric
       };
       setRunbooks((previous) => [optimistic, ...previous]);
       try {
         const response = await publishCommunityRunbook({
-          communityId: runbookForm.communityId,
+          communityId: communityIdNumeric,
           token,
           payload: {
-            title: runbookForm.title,
-            summary: runbookForm.summary,
-            owner: runbookForm.owner || "Operations team",
-            automationReady: runbookForm.automationReady,
-            linkUrl: runbookForm.linkUrl || undefined,
+            title: formDraft.title,
+            summary: formDraft.summary,
+            owner: formDraft.owner || "Operations team",
+            automationReady: formDraft.automationReady,
+            linkUrl: formDraft.linkUrl || undefined,
             tags
           }
         });
@@ -165,8 +204,8 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
         }
         setRunbookForm({
           ...emptyRunbookForm,
-          owner: runbookForm.owner,
-          communityId: runbookForm.communityId
+          owner: formDraft.owner,
+          communityId: formDraft.communityId
         });
       } catch (error) {
         setRunbooks((previous) => previous.filter((runbook) => runbook.id !== optimistic.id));
@@ -175,7 +214,7 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
         setIsSubmitting(false);
       }
     },
-    [runbookForm, token]
+    [defaultCommunityId, promptForField, runbookForm, token]
   );
 
   const handleAcknowledge = useCallback(
@@ -205,7 +244,12 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
         setFeedback({ tone: "success", message: "Escalation acknowledged." });
       } catch (error) {
         setEscalations((previous) => previous.map((item) => (item.id === task.id ? task : item)));
-        setFeedback({ tone: "error", message: error?.message ?? "Failed to acknowledge escalation." });
+        const errorMessage = error instanceof Error ? error.message : null;
+        setFeedback({
+          tone: "error",
+          message: "Failed to acknowledge escalation",
+          detail: errorMessage ?? undefined
+        });
       } finally {
         setAckPendingId(null);
       }
@@ -287,7 +331,6 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
             <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Title
               <input
-                required
                 name="title"
                 value={runbookForm.title}
                 onChange={handleRunbookFieldChange}

@@ -67,6 +67,7 @@ export default function DashboardActionFeedback({ feedback = null, onDismiss, pe
   }, [autoDismiss, feedback, dismissed, onDismiss]);
 
   const tone = useMemo(() => toneConfig[feedback?.tone] ?? toneConfig.info, [feedback?.tone]);
+  const isAlertTone = feedback?.tone === 'error' || feedback?.tone === 'warning';
   const Icon = tone.icon;
 
   if (!feedback || dismissed) {
@@ -76,8 +77,8 @@ export default function DashboardActionFeedback({ feedback = null, onDismiss, pe
   return (
     <div
       className={`flex flex-wrap items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${tone.wrapper}`}
-      role="status"
-      aria-live="polite"
+      role={isAlertTone ? 'alert' : 'status'}
+      aria-live={isAlertTone ? 'assertive' : 'polite'}
     >
       <Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${tone.accent}`} />
       <div className="flex-1 space-y-1">

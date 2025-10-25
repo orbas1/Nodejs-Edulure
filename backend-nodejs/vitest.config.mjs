@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./test/setupEnv.js', './test/setupMocks.js'],
     include: ['test/**/*.test.js'],
+    clearMocks: true,
+    restoreMocks: true,
+    mockReset: true,
     server: {
       deps: {
         inline: ['graphql', 'graphql-http'],

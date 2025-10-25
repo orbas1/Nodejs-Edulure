@@ -13,7 +13,7 @@ import {
 } from '../api/learnerDashboardApi.js';
 import { listPublicTutors } from '../api/catalogueApi.js';
 import { createPaymentIntent } from '../api/paymentsApi.js';
-import { useAuth } from '../context/AuthContext.jsx';
+import { defaultAuthContext, useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
@@ -418,7 +418,7 @@ function TutorForm({ form, onChange, onSubmit, onCancel, submitting, mode, curre
 }
 
 export default function TutorProfile() {
-  const { session, isAuthenticated } = useAuth();
+  const { session, isAuthenticated } = useAuth() ?? defaultAuthContext;
   const token = session?.tokens?.accessToken;
   const role = String(session?.user?.role ?? '').toLowerCase();
   const isAdmin = role === 'admin';

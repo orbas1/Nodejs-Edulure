@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
-import { useAuth } from '../context/AuthContext.jsx';
-import { useDashboard } from '../context/DashboardContext.jsx';
+import { defaultAuthContext, useAuth } from '../context/AuthContext.jsx';
+import { defaultDashboardContext, useDashboard } from '../context/DashboardContext.jsx';
 
 const hasListFormat = typeof Intl !== 'undefined' && typeof Intl.ListFormat === 'function';
 const listFormatter = hasListFormat ? new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }) : null;
@@ -109,8 +109,8 @@ function buildRoleSet(session, dashboardRoles) {
 }
 
 export default function useRoleGuard(requiredRoles = []) {
-  const { isAuthenticated, session } = useAuth();
-  const { roles: dashboardRoles } = useDashboard();
+  const { isAuthenticated, session } = useAuth() ?? defaultAuthContext;
+  const { roles: dashboardRoles } = useDashboard() ?? defaultDashboardContext;
 
   return useMemo(() => {
     const aggregatedRoles = buildRoleSet(session, dashboardRoles);
@@ -127,16 +127,17 @@ export default function useRoleGuard(requiredRoles = []) {
       return { allowed: true, explanation: null, roles: aggregatedRoles, missingRoles: [] };
     }
 
-    const missingRoles = normalisedRequired.filter((role) => !aggregatedRoles.has(role));
+    const hasRequiredRole = normalisedRequired.some((role) => aggregatedRoles.has(role));
 
-    if (missingRoles.length === 0) {
+    if (hasRequiredRole) {
       return { allowed: true, explanation: null, roles: aggregatedRoles, missingRoles: [] };
     }
 
-    const label = joinRoleLabels(missingRoles);
+    const missingRoles = normalisedRequired.filter((role) => !aggregatedRoles.has(role));
+    const label = joinRoleLabels(normalisedRequired);
     const explanation = !isAuthenticated
       ? 'Sign in to access this workspace. Your session is required to confirm permissions.'
-      : `Your account is missing the required ${label} permission${missingRoles.length > 1 ? 's' : ''}. Contact an administrator to request access.`;
+      : `Your account requires at least one of the following permissions: ${label}. Contact an administrator to request access.`;
 
     return { allowed: false, explanation, roles: aggregatedRoles, missingRoles };
   }, [dashboardRoles, isAuthenticated, requiredRoles, session]);

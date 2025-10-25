@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchExplorerSuggestions } from '../api/explorerApi.js';
-import { useAuth } from '../context/AuthContext.jsx';
+import { defaultAuthContext, useAuth } from '../context/AuthContext.jsx';
 
 export function useGlobalSearchSuggestions({ auto = false, limit = 12, sinceDays = 14 } = {}) {
-  const { session } = useAuth();
-  const token = session?.tokens?.accessToken;
+  const { session } = useAuth() ?? defaultAuthContext;
+  const token = session?.tokens?.accessToken ?? null;
 
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);

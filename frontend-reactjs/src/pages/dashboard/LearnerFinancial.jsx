@@ -9,11 +9,11 @@ import {
   updatePaymentMethod,
   removePaymentMethod
 } from '../../api/learnerDashboardApi.js';
-import { useAuth } from '../../context/AuthContext.jsx';
+import { defaultAuthContext, useAuth } from '../../context/AuthContext.jsx';
 
 export default function LearnerFinancial() {
   const { isLearner, section: financial, refresh, loading, error } = useLearnerDashboardSection('financial');
-  const { session } = useAuth();
+  const { session } = useAuth() ?? defaultAuthContext;
   const token = session?.tokens?.accessToken ?? null;
 
   const [statusMessage, setStatusMessage] = useState(null);
@@ -73,38 +73,8 @@ export default function LearnerFinancial() {
     }
   }, [financial?.preferences?.autoPay?.enabled, financial?.preferences?.reserveTarget]);
 
-  if (!isLearner) {
-    return (
-      <DashboardStateMessage
-        variant="error"
-        title="Learner Learnspace required"
-        description="Switch to the learner dashboard to access tuition insights and invoice history."
-      />
-    );
-  }
-
-  if (loading) {
-    return (
-      <DashboardStateMessage
-        title="Loading billing overview"
-        description="We are synchronising invoices, scholarships, and mentorship credits."
-      />
-    );
-  }
-
-  if (!financial) {
-    return (
-      <DashboardStateMessage
-        title="Financial insights unavailable"
-        description="Your tuition and credit summaries have not been generated yet. Refresh to sync billing records."
-        actionLabel="Refresh"
-        onAction={() => refresh?.()}
-      />
-    );
-  }
-
-  const summary = financial.summary ?? [];
-  const invoices = financial.invoices ?? [];
+  const summary = Array.isArray(financial?.summary) ? financial.summary : [];
+  const invoices = Array.isArray(financial?.invoices) ? financial.invoices : [];
   const filteredInvoices = useMemo(() => {
     const search = invoiceSearch.trim().toLowerCase();
     const status = invoiceStatusFilter.toLowerCase();
@@ -626,6 +596,44 @@ export default function LearnerFinancial() {
       validateBillingContactForm
     ]
   );
+
+  const gatingView = (() => {
+    if (!isLearner) {
+      return (
+        <DashboardStateMessage
+          variant="error"
+          title="Learner Learnspace required"
+          description="Switch to the learner dashboard to access tuition insights and invoice history."
+        />
+      );
+    }
+
+    if (loading) {
+      return (
+        <DashboardStateMessage
+          title="Loading billing overview"
+          description="We are synchronising invoices, scholarships, and mentorship credits."
+        />
+      );
+    }
+
+    if (!financial) {
+      return (
+        <DashboardStateMessage
+          title="Financial insights unavailable"
+          description="Your tuition and credit summaries have not been generated yet. Refresh to sync billing records."
+          actionLabel="Refresh"
+          onAction={() => refresh?.()}
+        />
+      );
+    }
+
+    return null;
+  })();
+
+  if (gatingView) {
+    return gatingView;
+  }
 
   return (
     <div className="space-y-8">
