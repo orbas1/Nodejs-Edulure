@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
 
 vi.mock('nodemailer', () => {
   return {
@@ -117,3 +117,7 @@ vi.mock('../src/models/ConfigurationEntryModel.js', () => ({
     all: vi.fn(async () => [])
   }
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
