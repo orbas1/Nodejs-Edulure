@@ -1,4 +1,6 @@
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import Ajv from 'ajv';
 import request from 'supertest';
@@ -17,7 +19,11 @@ let validateDetailResponse;
 describe('Observability OpenAPI contracts', () => {
   beforeAll(async () => {
     ({ default: app } = await import('../src/app.js'));
-    const spec = JSON.parse(fs.readFileSync('backend-nodejs/src/docs/openapi.json', 'utf8'));
+    const specPath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../src/docs/openapi.json'
+    );
+    const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
     const ajv = new Ajv({ allErrors: true, strict: false });
     const schemas = spec.components?.schemas ?? {};
     for (const [name, schema] of Object.entries(schemas)) {
