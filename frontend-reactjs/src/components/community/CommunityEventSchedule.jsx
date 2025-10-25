@@ -89,7 +89,7 @@ function formatEventTime(start, end) {
   if (sameDay) {
     const startTime = startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const endTime = endDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return `${dateFormatter.format(startDate)} – ${endTime}`;
+    return `${dateFormatter.format(startDate)} ${startTime} – ${endTime}`;
   }
 
   return `${dateFormatter.format(startDate)} → ${dateFormatter.format(endDate)}`;

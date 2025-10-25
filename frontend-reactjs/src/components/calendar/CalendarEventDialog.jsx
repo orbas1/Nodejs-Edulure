@@ -237,10 +237,6 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) {
-    return null;
-  }
-
   const updateField = useCallback(
     (name, value) => {
       setForm((prev) => {
@@ -380,6 +376,10 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
   }, [form.startAt]);
 
   const timezoneOptions = useMemo(() => TIMEZONE_OPTION_LABELS, []);
+
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div

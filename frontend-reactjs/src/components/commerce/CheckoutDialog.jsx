@@ -15,10 +15,6 @@ export default function CheckoutDialog({
   blockingIssues = [],
   onPrefetch
 }) {
-  if (!open) {
-    return null;
-  }
-
   const title = product?.title ?? 'Secure checkout';
   const subtitle = product?.subtitle ?? product?.description ?? null;
   const Icon = product?.icon ?? CreditCardIcon;
@@ -76,6 +72,10 @@ export default function CheckoutDialog({
       onClose?.();
     }
   };
+
+  if (!open) {
+    return null;
+  }
 
   return (
     <div

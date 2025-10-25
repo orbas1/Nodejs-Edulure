@@ -497,9 +497,9 @@ export default function AppNotificationPanel({
                       </h2>
                       <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 text-center">
                         <CheckCircleIcon className="mx-auto h-8 w-8 text-slate-300" aria-hidden="true" />
-                        <p className="mt-3 text-sm font-semibold text-slate-700">You're up to date</p>
+                        <p className="mt-3 text-sm font-semibold text-slate-700">You&rsquo;re up to date</p>
                         <p className="mt-2 text-xs text-slate-500">
-                          We'll highlight new feature launches and community updates here. Visit our product updates blog for the latest announcements.
+                          We&rsquo;ll highlight new feature launches and community updates here. Visit our product updates blog for the latest announcements.
                         </p>
                         <a
                           href="/blog"
