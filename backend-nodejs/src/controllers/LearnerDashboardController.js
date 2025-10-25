@@ -115,6 +115,7 @@ const onboardingSchema = Joi.object({
   role: Joi.string().valid('user', 'instructor').default('user'),
   firstName: Joi.string().trim().min(2).max(120).required(),
   lastName: Joi.string().trim().max(120).allow('', null).default(null),
+  dateOfBirth: Joi.date().iso().less('now').greater('1905-01-01').allow(null).default(null),
   persona: Joi.string().trim().max(160).allow('', null).default(null),
   goals: Joi.array().items(Joi.string().trim().max(160)).max(10).default([]),
   invites: Joi.array().items(onboardingInviteSchema).max(10).default([]),

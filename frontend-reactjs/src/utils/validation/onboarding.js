@@ -7,6 +7,106 @@ import {
   normaliseText
 } from './auth.js';
 
+const LEARNER_DEFAULT_ROLE = 'instructor';
+const LEARNER_ALLOWED_ROLES = ['user', 'instructor', 'admin'];
+
+function normaliseRole(value, fallback = LEARNER_DEFAULT_ROLE) {
+  const resolved = normaliseText(value, 32);
+  return resolved || fallback;
+}
+
+function clampToUtcDate(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function parseDateOfBirth(value) {
+  const trimmed = normaliseText(value, 32);
+  if (!trimmed) {
+    return { value: undefined };
+  }
+
+  let candidate;
+  const shortDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (shortDateMatch) {
+    const [, year, month, day] = shortDateMatch;
+    candidate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  } else {
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) {
+      return { error: 'Enter a valid date of birth' };
+    }
+    candidate = clampToUtcDate(parsed);
+  }
+
+  if (Number.isNaN(candidate.getTime())) {
+    return { error: 'Enter a valid date of birth' };
+  }
+
+  const today = clampToUtcDate(new Date());
+  if (candidate > today) {
+    return { error: 'Date of birth cannot be in the future' };
+  }
+
+  const minimumAgeDate = new Date(Date.UTC(today.getUTCFullYear() - 16, today.getUTCMonth(), today.getUTCDate()));
+  if (candidate > minimumAgeDate) {
+    return { error: 'You must be at least 16 years old' };
+  }
+
+  const maximumAgeDate = new Date(Date.UTC(today.getUTCFullYear() - 120, today.getUTCMonth(), today.getUTCDate()));
+  if (candidate < maximumAgeDate) {
+    return { error: 'Enter a valid date of birth' };
+  }
+
+  return { value: clampToUtcDate(candidate).toISOString() };
+}
+
+function buildLearnerState(state, passwordPolicy = DEFAULT_PASSWORD_POLICY) {
+  const firstName = normaliseText(state.firstName, 120);
+  const lastName = normaliseText(state.lastName, 120);
+  const email = normaliseEmail(state.email);
+  const role = normaliseRole(state.role);
+  const termsAccepted = Boolean(state.termsAccepted);
+
+  const password = typeof state.password === 'string' ? state.password : '';
+  const confirmPassword = typeof state.confirmPassword === 'string' ? state.confirmPassword : '';
+  const passwordEvaluation = evaluatePasswordStrength(password, passwordPolicy);
+  const dateOfBirthResult = parseDateOfBirth(state.dateOfBirth);
+
+  const cleaned = {
+    firstName,
+    lastName,
+    email,
+    role,
+    termsAccepted,
+    password,
+    confirmPassword,
+    passwordEvaluation,
+    dateOfBirth: dateOfBirthResult.value,
+    dateOfBirthError: dateOfBirthResult.error
+  };
+
+  const bootstrapPayload = {
+    email,
+    role,
+    firstName,
+    lastName,
+    termsAccepted,
+    ...(dateOfBirthResult.value ? { dateOfBirth: dateOfBirthResult.value } : {})
+  };
+
+  const registerPayload = {
+    firstName,
+    lastName,
+    email,
+    password,
+    confirmPassword,
+    role,
+    ...(dateOfBirthResult.value ? { dateOfBirth: dateOfBirthResult.value } : {})
+  };
+
+  return { cleaned, bootstrapPayload, registerPayload };
+}
+
 function normaliseListInput(value, { maxItems = 10, maxLength = 160 } = {}) {
   if (!value) {
     return [];
@@ -34,18 +134,6 @@ function normaliseListInput(value, { maxItems = 10, maxLength = 160 } = {}) {
     }
   }
   return result;
-}
-
-function parseAge(value) {
-  const trimmed = normaliseText(value, 3);
-  if (!trimmed) {
-    return undefined;
-  }
-  const numeric = Number.parseInt(trimmed, 10);
-  if (Number.isNaN(numeric) || numeric < 16 || numeric > 120) {
-    return { error: 'Age must be a number between 16 and 120' };
-  }
-  return { value: numeric };
 }
 
 function sanitiseAddress(address) {
@@ -82,7 +170,7 @@ function buildMetadata({ marketingSource, marketingCampaign }) {
   };
 }
 
-function buildNormalisedOnboardingState(mode, state, passwordPolicy = DEFAULT_PASSWORD_POLICY) {
+function buildInstructorState(state, passwordPolicy = DEFAULT_PASSWORD_POLICY) {
   const firstName = normaliseText(state.firstName, 120);
   const lastName = normaliseText(state.lastName, 120);
   const email = normaliseEmail(state.email);
@@ -97,12 +185,10 @@ function buildNormalisedOnboardingState(mode, state, passwordPolicy = DEFAULT_PA
   const onboardingPath = normaliseText(state.onboardingPath, 120);
   const termsAccepted = Boolean(state.termsAccepted);
   const address = sanitiseAddress(state.address);
-  const ageResult = parseAge(state.age);
 
   const password = typeof state.password === 'string' ? state.password : '';
   const confirmPassword = typeof state.confirmPassword === 'string' ? state.confirmPassword : '';
-  const defaultRole = mode === 'learner' ? 'instructor' : 'instructor';
-  const role = normaliseText(state.role, 32) || defaultRole;
+  const role = normaliseText(state.role, 32) || 'instructor';
   const passwordEvaluation = evaluatePasswordStrength(password, passwordPolicy);
 
   const preferences = buildPreferences({
@@ -127,7 +213,6 @@ function buildNormalisedOnboardingState(mode, state, passwordPolicy = DEFAULT_PA
     timeCommitment,
     onboardingPath,
     termsAccepted,
-    age: ageResult?.value,
     address,
     password,
     confirmPassword,
@@ -138,8 +223,7 @@ function buildNormalisedOnboardingState(mode, state, passwordPolicy = DEFAULT_PA
     audience: normaliseText(state.audience, 240),
     preferences,
     metadata,
-    passwordEvaluation,
-    ageError: ageResult?.error
+    passwordEvaluation
   };
 
   const bootstrapPayload = {
@@ -155,26 +239,33 @@ function buildNormalisedOnboardingState(mode, state, passwordPolicy = DEFAULT_PA
     termsAccepted
   };
 
-  const registerPayload =
-    mode === 'learner'
-      ? {
-          firstName,
-          lastName,
-          email,
-          password,
-          confirmPassword,
-          role,
-          age: ageResult?.value,
-          address,
-          marketingOptIn
-        }
-      : null;
+  const registerPayload = null;
 
   return { cleaned, bootstrapPayload, registerPayload };
 }
 
+function buildNormalisedOnboardingState(mode, state, passwordPolicy = DEFAULT_PASSWORD_POLICY) {
+  if (mode === 'learner') {
+    return buildLearnerState(state, passwordPolicy);
+  }
+  return buildInstructorState(state, passwordPolicy);
+}
+
 export function createOnboardingState(mode = 'learner') {
-  const base = {
+  if (mode === 'learner') {
+    return {
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      role: LEARNER_DEFAULT_ROLE,
+      dateOfBirth: '',
+      termsAccepted: false
+    };
+  }
+
+  return {
     firstName: '',
     lastName: '',
     email: '',
@@ -187,32 +278,14 @@ export function createOnboardingState(mode = 'learner') {
     marketingCampaign: '',
     timeCommitment: '',
     onboardingPath: '',
-    termsAccepted: false
-  };
-  if (mode === 'learner') {
-    return {
-      ...base,
-      password: '',
-      confirmPassword: '',
-      role: 'instructor',
-      age: '',
-      address: {
-        streetAddress: '',
-        addressLine2: '',
-        town: '',
-        city: '',
-        country: '',
-        postcode: ''
-      }
-    };
-  }
-  return {
-    ...base,
+    termsAccepted: false,
     role: 'instructor',
     headline: '',
     portfolio: '',
     expertise: '',
-    audience: ''
+    audience: '',
+    password: '',
+    confirmPassword: ''
   };
 }
 
@@ -235,13 +308,12 @@ export function validateOnboardingState(mode, state, options = {}) {
     if (cleaned.password !== cleaned.confirmPassword) {
       errors.confirmPassword = 'Passwords must match';
     }
-    if (!['user', 'instructor', 'admin'].includes(cleaned.role)) {
+    if (!LEARNER_ALLOWED_ROLES.includes(cleaned.role)) {
       errors.role = 'Select a valid role';
     }
-  }
-
-  if (cleaned.ageError) {
-    errors.age = cleaned.ageError;
+    if (cleaned.dateOfBirthError) {
+      errors.dateOfBirth = cleaned.dateOfBirthError;
+    }
   }
 
   if (!cleaned.termsAccepted) {
@@ -268,16 +340,26 @@ export function buildOnboardingDraftPayload(mode, state, options = {}) {
 export function calculateOnboardingCompletion(mode, state, options = {}) {
   const passwordPolicy = normalisePasswordPolicy(options.passwordPolicy ?? DEFAULT_PASSWORD_POLICY);
   const { cleaned } = buildNormalisedOnboardingState(mode, state, passwordPolicy);
-  const checkpoints = [
-    Boolean(cleaned.firstName),
-    Boolean(cleaned.email),
-    Boolean(cleaned.persona),
-    cleaned.goals.length > 0,
-    cleaned.interests.length > 0,
-    cleaned.termsAccepted,
-    mode === 'learner' ? cleaned.passwordEvaluation.isCompliant : true,
-    mode === 'learner' ? Boolean(cleaned.password && cleaned.password === cleaned.confirmPassword) : true
-  ];
+  let checkpoints;
+
+  if (mode === 'learner') {
+    checkpoints = [
+      Boolean(cleaned.firstName),
+      Boolean(cleaned.email),
+      cleaned.passwordEvaluation.isCompliant,
+      Boolean(cleaned.password && cleaned.password === cleaned.confirmPassword),
+      cleaned.termsAccepted
+    ];
+  } else {
+    checkpoints = [
+      Boolean(cleaned.firstName),
+      Boolean(cleaned.email),
+      Boolean(cleaned.persona),
+      cleaned.goals.length > 0,
+      cleaned.interests.length > 0,
+      cleaned.termsAccepted
+    ];
+  }
   const completed = checkpoints.filter(Boolean).length;
   const total = checkpoints.length;
   return {

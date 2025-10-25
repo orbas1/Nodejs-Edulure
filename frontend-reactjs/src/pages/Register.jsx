@@ -44,50 +44,16 @@ const ADMIN_REQUEST_NOTE =
   "Need administrator access? Contact your organisation's Edulure operations representative to provision it securely.";
 const AUTO_SAVE_DELAY_MS = 1200;
 
-function pruneAddress(address) {
-  if (!address || typeof address !== 'object') {
-    return undefined;
-  }
-  const cleaned = Object.entries(address).reduce((acc, [key, value]) => {
-    if (typeof value !== 'string') {
-      return acc;
-    }
-    const trimmed = value.trim();
-    if (trimmed) {
-      acc[key] = trimmed;
-    }
-    return acc;
-  }, {});
-  return Object.keys(cleaned).length ? cleaned : undefined;
-}
-
-function getPersonaInsight(persona) {
-  if (!persona) {
-    return 'Share your role so we can tailor resources and invitations to your day-to-day goals.';
-  }
-  const value = persona.toLowerCase();
-  if (value.includes('community')) {
-    return 'Community builders unlock curated launch playbooks and warm introductions to sponsor collectives.';
-  }
-  if (value.includes('operations') || value.includes('ops')) {
-    return 'Operations leaders get workflow automations, finance dashboards, and quick-start governance checklists.';
-  }
-  if (value.includes('instructor') || value.includes('coach')) {
-    return 'Instructors see best-practice curriculum templates and fast-tracked tutor collaboration invites.';
-  }
-  return 'We will use this to recommend cohorts, monetisation tactics, and partner programmes that match your focus area.';
-}
-
 function resolveAutoSaveMessage(status) {
   switch (status) {
     case 'saving':
-      return 'Saving your onboarding responses…';
+      return 'Saving your account setup details…';
     case 'saved':
-      return 'Responses auto-saved. You can close this window and resume later.';
+      return 'Details saved. You can return later without losing progress.';
     case 'error':
       return 'Auto-save ran into a problem. We will retry after your next edit.';
     default:
-      return 'Auto-save keeps your onboarding answers synced to your profile.';
+      return 'Auto-save keeps your registration details synced to your profile.';
   }
 }
 
@@ -95,7 +61,7 @@ export default function Register() {
   const navigate = useNavigate();
   const defaultRole = ROLE_OPTIONS[0]?.value ?? 'instructor';
   const onboardingOverrides = useMemo(() => ({ role: defaultRole }), [defaultRole]);
-  const { formState, errors, setErrors, updateField, updateAddressField } = useOnboardingForm(
+  const { formState, errors, setErrors, updateField } = useOnboardingForm(
     'learner',
     onboardingOverrides
   );
@@ -167,8 +133,6 @@ export default function Register() {
     () => calculateOnboardingCompletion('learner', formState, { passwordPolicy }),
     [formState, passwordPolicy]
   );
-
-  const personaInsight = useMemo(() => getPersonaInsight(formState.persona), [formState.persona]);
 
   const socialProofEntries = useMemo(() => {
     const testimonials = Array.isArray(marketingContent?.testimonials)
@@ -254,17 +218,6 @@ export default function Register() {
     }
   };
 
-  const handleAddressChange = (event) => {
-    const { name, value } = event.target;
-    updateAddressField(name, value);
-  };
-
-  const toggleMarketingOptIn = () => {
-    const nextValue = !formState.marketingOptIn;
-    updateField('marketingOptIn', nextValue);
-    trackAuthInteraction('register', 'marketing_opt_in_toggle', { enabled: nextValue });
-  };
-
   const handleTermsChange = (event) => {
     updateField('termsAccepted', event.target.checked);
     clearFieldError('termsAccepted');
@@ -324,36 +277,14 @@ export default function Register() {
     }
 
     const { bootstrapPayload, registerPayload, cleaned } = validation;
-    const address = pruneAddress(cleaned.address);
-    const metadata = {
-      ...bootstrapPayload.metadata,
-      ...(cleaned.age ? { age: cleaned.age } : {}),
-      ...(address ? { address } : {}),
-      persona: cleaned.persona || undefined,
-      marketingOptIn: cleaned.marketingOptIn
-    };
-    const preferences = {
-      ...bootstrapPayload.preferences,
-      marketingOptIn: cleaned.marketingOptIn,
-      ...(cleaned.timeCommitment ? { timeCommitment: cleaned.timeCommitment } : {}),
-      ...(cleaned.onboardingPath ? { onboardingPath: cleaned.onboardingPath } : {}),
-      ...(cleaned.interests?.length ? { interests: cleaned.interests } : {})
-    };
-
     const onboardingPayload = {
       ...bootstrapPayload,
-      metadata,
-      preferences
+      submittedAt: new Date().toISOString()
     };
-
-    if (!onboardingPayload.invites?.length) {
-      delete onboardingPayload.invites;
-    }
 
     trackAuthAttempt('register', 'submit', {
       role: cleaned.role,
-      marketing_opt_in: cleaned.marketingOptIn,
-      has_invites: Boolean(onboardingPayload.invites?.length),
+      has_date_of_birth: Boolean(cleaned.dateOfBirth),
       two_factor_locked: twoFactorLocked,
       two_factor_enabled: twoFactorLocked ? true : twoFactorEnabled
     });
@@ -367,16 +298,6 @@ export default function Register() {
         role: cleaned.role,
         twoFactor: { enabled: twoFactorLocked ? true : twoFactorEnabled }
       };
-
-      if (cleaned.age) {
-        finalRegisterPayload.age = cleaned.age;
-      }
-      if (address) {
-        finalRegisterPayload.address = address;
-      }
-      if ('marketingOptIn' in finalRegisterPayload) {
-        delete finalRegisterPayload.marketingOptIn;
-      }
 
       const response = await httpClient.post('/auth/register', finalRegisterPayload);
       const result = response?.data ?? {};
@@ -416,7 +337,7 @@ export default function Register() {
   return (
     <AuthForm
       title="Create your Edulure Learnspace"
-      subtitle="Tell us about yourself so we can tailor onboarding for your communities, instructors, and learners."
+      subtitle="Share just the essentials to activate your secure learning workspace."
       onSubmit={handleSubmit}
       submitLabel={isSubmitting ? 'Creating account…' : 'Launch Learnspace'}
       busy={isSubmitting}
@@ -425,10 +346,6 @@ export default function Register() {
       passwordChecklist={{
         requirements: passwordAssessment.requirements,
         description: passwordAssessment.description
-      }}
-      progress={{
-        progress: onboardingProgress.progress,
-        label: `${onboardingProgress.completed} of ${onboardingProgress.total} onboarding steps complete`
       }}
       socialProof={socialProofEntries}
       footer={resolveAutoSaveMessage(autoSaveStatus)}
@@ -465,7 +382,7 @@ export default function Register() {
         />
       </div>
       <AuthForm.Field
-        label="Email address"
+        label="Email"
         type="email"
         name="email"
         placeholder="you@company.com"
@@ -473,15 +390,6 @@ export default function Register() {
         onChange={handleChange}
         error={errors.email}
         required
-      />
-      <AuthForm.Field
-        label="What best describes you?"
-        name="persona"
-        placeholder="Community architect, Learning ops lead, etc."
-        value={formState.persona}
-        onChange={handleChange}
-        required={false}
-        helper={personaInsight}
       />
       <AuthForm.Field label="Role" name="role" error={errors.role}>
         <select name="role" value={formState.role} onChange={handleChange} className="form-field__input">
@@ -494,182 +402,15 @@ export default function Register() {
         <p className="form-field__helper">{ADMIN_REQUEST_NOTE}</p>
       </AuthForm.Field>
       <AuthForm.Field
-        label="Age"
-        name="age"
-        type="number"
-        placeholder="Optional"
-        value={formState.age}
+        label="Date of birth"
+        name="dateOfBirth"
+        type="date"
+        value={formState.dateOfBirth}
         onChange={handleChange}
-        min="16"
+        error={errors.dateOfBirth}
         required={false}
-        error={errors.age}
+        helper="Used only to confirm you meet our minimum age requirements."
       />
-      <div className="form-section space-y-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-700">Address (optional)</p>
-          <p className="form-field__helper">Provide as much detail as possible to help us tailor regional onboarding.</p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <AuthForm.Field
-            label="Street address"
-            name="streetAddress"
-            placeholder="123 Example Street"
-            value={formState.address.streetAddress}
-            onChange={handleAddressChange}
-            required={false}
-          />
-          <AuthForm.Field
-            label="Address line 2"
-            name="addressLine2"
-            placeholder="Apartment, suite, etc."
-            value={formState.address.addressLine2}
-            onChange={handleAddressChange}
-            required={false}
-          />
-          <AuthForm.Field
-            label="Town"
-            name="town"
-            placeholder="Town"
-            value={formState.address.town}
-            onChange={handleAddressChange}
-            required={false}
-          />
-          <AuthForm.Field
-            label="City"
-            name="city"
-            placeholder="City"
-            value={formState.address.city}
-            onChange={handleAddressChange}
-            required={false}
-          />
-          <AuthForm.Field
-            label="Country"
-            name="country"
-            placeholder="Country"
-            value={formState.address.country}
-            onChange={handleAddressChange}
-            required={false}
-          />
-          <AuthForm.Field
-            label="Postcode"
-            name="postcode"
-            placeholder="Postal code"
-            value={formState.address.postcode}
-            onChange={handleAddressChange}
-            required={false}
-          />
-        </div>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <AuthForm.Field
-          label="Your goals"
-          name="goalsInput"
-          placeholder="Launch Flow 5, grow community revenue, etc."
-          required={false}
-          helper="Separate each goal with a comma or new line."
-        >
-          <textarea
-            name="goalsInput"
-            value={formState.goalsInput}
-            onChange={handleChange}
-            className="form-field__input min-h-[120px] resize-y"
-          />
-        </AuthForm.Field>
-        <AuthForm.Field
-          label="Invitation codes"
-          name="inviteCodes"
-          placeholder="FLOW5-OPS-GUILD"
-          required={false}
-          helper="Paste any invite codes you've received to automatically connect communities."
-        >
-          <textarea
-            name="inviteCodes"
-            value={formState.inviteCodes}
-            onChange={handleChange}
-            className="form-field__input min-h-[120px] resize-y"
-          />
-        </AuthForm.Field>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <AuthForm.Field
-          label="Estimated weekly time commitment"
-          name="timeCommitment"
-          placeholder="4h/week"
-          value={formState.timeCommitment}
-          onChange={handleChange}
-          required={false}
-        />
-        <AuthForm.Field
-          label="Preferred onboarding path"
-          name="onboardingPath"
-          placeholder="Community-first, course-first, etc."
-          value={formState.onboardingPath}
-          onChange={handleChange}
-          required={false}
-        />
-      </div>
-      <AuthForm.Field
-        label="Areas of interest"
-        name="interestsInput"
-        placeholder="Live cohorts, sponsor onboarding, analytics"
-        required={false}
-        helper="Separate each interest with a comma or new line."
-      >
-        <textarea
-          name="interestsInput"
-          value={formState.interestsInput}
-          onChange={handleChange}
-          className="form-field__input min-h-[120px] resize-y"
-        />
-      </AuthForm.Field>
-      <div className="grid gap-4 md:grid-cols-2">
-        <AuthForm.Field
-          label="How did you hear about Edulure?"
-          name="marketingSource"
-          placeholder="Referral, conference, newsletter"
-          value={formState.marketingSource}
-          onChange={handleChange}
-          required={false}
-        />
-        <AuthForm.Field
-          label="Campaign or creator"
-          name="marketingCampaign"
-          placeholder="Flow 5 beta, Creator Growth Lab"
-          value={formState.marketingCampaign}
-          onChange={handleChange}
-          required={false}
-        />
-      </div>
-      <div className="form-section space-y-3">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-slate-700">Marketing updates</p>
-            <p className="form-field__helper">
-              Opt in to receive onboarding tips, Flow 5 experiments, and community launch playbooks by email.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={formState.marketingOptIn}
-              onClick={toggleMarketingOptIn}
-              className={`relative inline-flex h-7 w-14 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
-                formState.marketingOptIn ? 'bg-primary' : 'bg-slate-300'
-              }`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition ${
-                  formState.marketingOptIn ? 'translate-x-7' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            <span className="text-xs font-semibold text-slate-600">
-              {formState.marketingOptIn ? 'Subscribed' : 'Not now'}
-            </span>
-          </div>
-        </div>
-      </div>
       <AuthForm.Field
         label="Password"
         type="password"

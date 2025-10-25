@@ -23,42 +23,13 @@ const registerSchema = Joi.object({
     'string.pattern.base': resolvedPasswordPolicy.description
   }),
   role: Joi.string().valid('user', 'instructor', 'admin').default('user'),
-  age: Joi.number().integer().min(16).max(120).optional(),
-  address: Joi.object({
-    streetAddress: Joi.string().trim().max(255).allow('', null),
-    addressLine2: Joi.string().trim().max(255).allow('', null),
-    town: Joi.string().trim().max(120).allow('', null),
-    city: Joi.string().trim().max(120).allow('', null),
-    country: Joi.string().trim().max(120).allow('', null),
-    postcode: Joi.string().trim().max(60).allow('', null)
-  })
-    .optional()
-    .default({}),
+  dateOfBirth: Joi.date().iso().less('now').greater('1905-01-01').allow(null),
   twoFactor: Joi.object({
     enabled: Joi.boolean().default(false)
   })
     .optional()
     .default({ enabled: false })
 });
-
-function normalizeAddress(address) {
-  if (!address || typeof address !== 'object') {
-    return null;
-  }
-
-  const normalized = Object.entries(address).reduce((acc, [key, value]) => {
-    if (typeof value !== 'string') {
-      return acc;
-    }
-    const trimmed = value.trim();
-    if (trimmed.length > 0) {
-      acc[key] = trimmed;
-    }
-    return acc;
-  }, {});
-
-  return Object.keys(normalized).length > 0 ? normalized : null;
-}
 
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -116,10 +87,7 @@ export default class AuthController {
         abortEarly: false,
         stripUnknown: true
       });
-      const result = await AuthService.register(
-        { ...payload, address: normalizeAddress(payload.address) },
-        buildContext(req)
-      );
+      const result = await AuthService.register(payload, buildContext(req));
       return success(res, {
         data: result.data,
         message: 'Account created. We have sent a verification email to confirm ownership.',

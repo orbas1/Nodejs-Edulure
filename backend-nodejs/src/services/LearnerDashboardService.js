@@ -695,6 +695,7 @@ export default class LearnerDashboardService {
     const preferences = mergeOnboardingPreferences({}, payload.preferences);
     const metadata = mergeOnboardingMetadata({}, payload.metadata);
     const termsAccepted = Boolean(payload.termsAccepted);
+    const dateOfBirth = optionalIsoDateField(payload.dateOfBirth, 'dateOfBirth');
 
     const requestedInvites = Array.isArray(payload.invites) ? payload.invites : [];
     const submittedAt = payload.submittedAt ?? new Date().toISOString();
@@ -757,6 +758,7 @@ export default class LearnerDashboardService {
           firstName,
           lastName,
           persona,
+          dateOfBirth,
           goals,
           invites: inviteLedger,
           preferences: mergedPreferences,
@@ -777,6 +779,7 @@ export default class LearnerDashboardService {
         firstName: record.firstName,
         lastName: record.lastName,
         persona: record.persona,
+        dateOfBirth: record.dateOfBirth,
         goals: record.goals,
         invites: record.invites,
         preferences: record.preferences,

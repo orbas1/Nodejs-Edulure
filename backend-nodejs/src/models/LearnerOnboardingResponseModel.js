@@ -26,6 +26,10 @@ function mapRecord(record) {
     firstName: record.first_name,
     lastName: record.last_name ?? null,
     persona: record.persona ?? null,
+    dateOfBirth:
+      record.date_of_birth instanceof Date
+        ? record.date_of_birth.toISOString()
+        : record.date_of_birth ?? null,
     goals: parseJson(record.goals, []),
     invites: parseJson(record.invites, []),
     preferences: parseJson(record.preferences, {}),
@@ -88,6 +92,7 @@ export default class LearnerOnboardingResponseModel {
       first_name: response.firstName,
       last_name: response.lastName ?? null,
       persona: response.persona ?? null,
+      date_of_birth: response.dateOfBirth ? new Date(response.dateOfBirth) : null,
       goals: serialiseJson(response.goals ?? [], '[]'),
       invites: serialiseJson(response.invites ?? [], '[]'),
       preferences: serialiseJson(response.preferences ?? {}, '{}'),
