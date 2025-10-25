@@ -45,6 +45,101 @@ vi.mock('../../api/operatorDashboardApi.js', () => ({
   fetchSupportTenants: vi.fn()
 }));
 
+vi.mock('../../context/AuthContext.jsx', () => {
+  const authState = {
+    session: {
+      user: { id: 'user-1', role: 'admin' },
+      tokens: { accessToken: 'token-123' }
+    },
+    isAuthenticated: true
+  };
+
+  const resetAuthState = () => {
+    authState.session = {
+      user: { id: 'user-1', role: 'admin' },
+      tokens: { accessToken: 'token-123' }
+    };
+    authState.isAuthenticated = true;
+  };
+
+  return {
+    __esModule: true,
+    useAuth: () => authState,
+    AuthProvider: ({ children }) => children,
+    __setAuthState: ({ session, isAuthenticated } = {}) => {
+      if (session) {
+        authState.session = session;
+      }
+      if (typeof isAuthenticated === 'boolean') {
+        authState.isAuthenticated = isAuthenticated;
+      }
+    },
+    __resetAuthState: resetAuthState
+  };
+});
+
+vi.mock('../../context/ServiceHealthContext.jsx', () => {
+  const serviceHealthState = {
+    statusSummary: { healthy: 1, degraded: 0, down: 0 },
+    alerts: []
+  };
+
+  return {
+    __esModule: true,
+    useServiceHealth: () => serviceHealthState,
+    ServiceHealthProvider: ({ children }) => children,
+    __setServiceHealthState: (next = {}) => {
+      if (next.statusSummary) {
+        serviceHealthState.statusSummary = next.statusSummary;
+      }
+      if (Array.isArray(next.alerts)) {
+        serviceHealthState.alerts = next.alerts;
+      }
+    },
+    __resetServiceHealthState: () => {
+      serviceHealthState.statusSummary = { healthy: 1, degraded: 0, down: 0 };
+      serviceHealthState.alerts = [];
+    }
+  };
+});
+
+vi.mock('../../context/RealtimeContext.jsx', () => {
+  const subscribe = vi.fn(() => () => {});
+  const emit = vi.fn();
+
+  return {
+    __esModule: true,
+    useRealtime: () => ({
+      subscribe,
+      emit,
+      connected: false,
+      status: 'disconnected'
+    }),
+    RealtimeProvider: ({ children }) => children,
+    __resetRealtimeContext: () => {
+      subscribe.mockReset();
+      emit.mockReset();
+    }
+  };
+});
+
+vi.mock('../../context/RuntimeConfigContext.jsx', () => {
+  const isFeatureEnabled = vi.fn(() => true);
+  const getFeatureVariant = vi.fn(() => null);
+
+  return {
+    __esModule: true,
+    useRuntimeConfig: () => ({ isFeatureEnabled, getFeatureVariant }),
+    RuntimeConfigProvider: ({ children }) => children,
+    __resetRuntimeConfig: () => {
+      isFeatureEnabled.mockReset();
+      isFeatureEnabled.mockReturnValue(true);
+      getFeatureVariant.mockReset();
+      getFeatureVariant.mockReturnValue(null);
+    }
+  };
+});
+
 describe('useSupportDashboard', () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -62,6 +157,14 @@ describe('useSupportDashboard', () => {
     });
     const { __stores } = await import('../../utils/persistentCache.js');
     __stores.clear();
+    const { __resetAuthState } = await import('../../context/AuthContext.jsx');
+    const { __resetServiceHealthState } = await import('../../context/ServiceHealthContext.jsx');
+    const { __resetRuntimeConfig } = await import('../../context/RuntimeConfigContext.jsx');
+    const { __resetRealtimeContext } = await import('../../context/RealtimeContext.jsx');
+    __resetAuthState();
+    __resetServiceHealthState();
+    __resetRuntimeConfig();
+    __resetRealtimeContext();
   });
 
   afterEach(() => {
