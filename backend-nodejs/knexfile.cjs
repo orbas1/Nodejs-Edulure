@@ -54,6 +54,12 @@ const toBool = (value, fallback = false) => {
   return fallback;
 };
 
+const sqliteFilename = path.resolve(
+  __dirname,
+  'database',
+  process.env.DB_SQLITE_FILENAME ?? `${nodeEnv}.sqlite3`
+);
+
 const buildConnectionFromUrl = (databaseUrl) => {
   const url = new URL(databaseUrl);
   return {
@@ -65,15 +71,19 @@ const buildConnectionFromUrl = (databaseUrl) => {
   };
 };
 
-const resolveConnection = () => {
-  if (process.env.DATABASE_URL) {
-    return buildConnectionFromUrl(process.env.DATABASE_URL);
+const resolveMysqlConnection = () => {
+  const urlSource = process.env.DATABASE_URL ?? process.env.DB_URL ?? null;
+  if (urlSource) {
+    if (urlSource.startsWith('sqlite:')) {
+      return null;
+    }
+    return buildConnectionFromUrl(urlSource);
   }
 
   const required = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length) {
-    throw new Error(`Missing required database environment variables: ${missing.join(', ')}`);
+    return null;
   }
 
   return {
@@ -119,21 +129,54 @@ const enrichConnection = (connection) => {
   return enriched;
 };
 
-const connection = enrichConnection(resolveConnection());
+const preferredClient = String(process.env.DB_CLIENT ?? '').trim().toLowerCase();
+const mysqlConnection = resolveMysqlConnection();
+const shouldUseSqlite =
+  preferredClient === 'sqlite' ||
+  preferredClient === 'sqlite3' ||
+  !mysqlConnection;
+
+const sqliteConnection = {
+  filename:
+    process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('sqlite:')
+      ? (() => {
+          const rawUrl = process.env.DATABASE_URL.replace(/^sqlite:/, '');
+          const normalised = rawUrl.replace(/^\/\//, '');
+          if (!normalised || normalised === ':memory:') {
+            return normalised || ':memory:';
+          }
+          return path.isAbsolute(normalised)
+            ? normalised
+            : path.resolve(__dirname, normalised);
+        })()
+      : sqliteFilename
+};
+
+if (shouldUseSqlite && !mysqlConnection && preferredClient !== 'sqlite' && preferredClient !== 'sqlite3') {
+  console.warn(
+    `Falling back to SQLite database at ${sqliteConnection.filename} because MySQL environment variables are not fully configured.`
+  );
+}
+
+const client = shouldUseSqlite ? 'sqlite3' : 'mysql2';
+const connection = shouldUseSqlite ? sqliteConnection : enrichConnection(mysqlConnection);
 
 const poolMin = toInt(process.env.DB_POOL_MIN, 2);
 const poolMax = toInt(process.env.DB_POOL_MAX, 10);
+const poolConfig = shouldUseSqlite
+  ? { min: 1, max: 1, idleTimeoutMillis: 500, createTimeoutMillis: 500, acquireTimeoutMillis: 5000 }
+  : {
+      min: Math.min(poolMin, poolMax),
+      max: Math.max(poolMax, poolMin),
+      idleTimeoutMillis: toInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 30000),
+      createTimeoutMillis: toInt(process.env.DB_POOL_CREATE_TIMEOUT_MS, 3000),
+      acquireTimeoutMillis: toInt(process.env.DB_POOL_ACQUIRE_TIMEOUT_MS, 60000)
+    };
 
 module.exports = {
-  client: 'mysql2',
+  client,
   connection,
-  pool: {
-    min: Math.min(poolMin, poolMax),
-    max: Math.max(poolMax, poolMin),
-    idleTimeoutMillis: toInt(process.env.DB_POOL_IDLE_TIMEOUT_MS, 30000),
-    createTimeoutMillis: toInt(process.env.DB_POOL_CREATE_TIMEOUT_MS, 3000),
-    acquireTimeoutMillis: toInt(process.env.DB_POOL_ACQUIRE_TIMEOUT_MS, 60000)
-  },
+  pool: poolConfig,
   migrations: {
     directory: path.resolve(__dirname, 'migrations'),
     tableName: 'schema_migrations',
@@ -152,3 +195,7 @@ module.exports = {
     }
   }
 };
+
+if (client === 'sqlite3') {
+  module.exports.useNullAsDefault = true;
+}

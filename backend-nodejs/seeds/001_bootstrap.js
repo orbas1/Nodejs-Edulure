@@ -726,7 +726,7 @@ export async function seed(knex) {
       }
     ]);
 
-    const nowIso = new Date().toISOString();
+    const communityNowIso = new Date().toISOString();
     const learningOpsCover = await ensureSeedImage('community-learning-ops', {
       title: 'Learning Ops Guild',
       subtitle: 'Incident-proof live classrooms',
@@ -762,7 +762,7 @@ export async function seed(knex) {
         }
       },
       momentum: {
-        lastActivityAt: nowIso,
+        lastActivityAt: communityNowIso,
         boost: 12,
         recencyWindowDays: 35,
         trailing30Days: {
@@ -789,7 +789,7 @@ export async function seed(knex) {
           role: 'VP Learning Ops, Aurora',
           rating: 5,
           comment: 'Runbooks, escalation drills, and monetisation guardrails in one place.',
-          publishedAt: nowIso
+          publishedAt: communityNowIso
         },
         {
           id: 'ops-review-2',
@@ -797,12 +797,12 @@ export async function seed(knex) {
           role: 'Director of Enablement, Alloy',
           rating: 5,
           comment: 'The automation labs and weekly war room keep launches resilient.',
-          publishedAt: nowIso
+          publishedAt: communityNowIso
         }
       ],
       membershipMap: {
         totalCountries: 18,
-        lastUpdatedAt: nowIso,
+        lastUpdatedAt: communityNowIso,
         clusters: [
           { region: 'North America', percentage: 0.38, change: '+3.8%' },
           { region: 'EMEA', percentage: 0.31, change: '+2.1%' },
@@ -953,7 +953,7 @@ export async function seed(knex) {
         }
       },
       momentum: {
-        lastActivityAt: nowIso,
+        lastActivityAt: communityNowIso,
         boost: 18,
         recencyWindowDays: 30,
         trailing30Days: {
@@ -980,12 +980,12 @@ export async function seed(knex) {
           role: 'Growth Lead, Nova',
           rating: 5,
           comment: 'Campaign retros and benchmark dashboards make optimisation effortless.',
-          publishedAt: nowIso
+          publishedAt: communityNowIso
         }
       ],
       membershipMap: {
         totalCountries: 22,
-        lastUpdatedAt: nowIso,
+        lastUpdatedAt: communityNowIso,
         clusters: [
           { region: 'North America', percentage: 0.34, change: '+4.1%' },
           { region: 'EMEA', percentage: 0.27, change: '+1.9%' },
@@ -1771,7 +1771,7 @@ export async function seed(knex) {
       contactEmail: 'amina.diallo@edulure.test',
       tags: ['Automation', 'Playbooks', 'Escalations'],
       recommended: true,
-      lastActiveAt: nowIso,
+      lastActiveAt: communityNowIso,
       avatarUrl: adminAvatar.url
     };
     const opsLearnerMemberMetadata = {
@@ -1781,7 +1781,7 @@ export async function seed(knex) {
       contactEmail: 'noemi.carvalho@edulure.test',
       tags: ['QA', 'Telemetry'],
       recommended: true,
-      lastActiveAt: nowIso,
+      lastActiveAt: communityNowIso,
       avatarUrl: learnerAvatar.url
     };
     const growthModeratorMetadata = {
@@ -1791,7 +1791,7 @@ export async function seed(knex) {
       contactEmail: 'kai.watanabe@edulure.test',
       tags: ['Attribution', 'Paid media'],
       recommended: true,
-      lastActiveAt: nowIso,
+      lastActiveAt: communityNowIso,
       avatarUrl: instructorAvatar.url
     };
     const growthMemberMetadata = {
@@ -1801,7 +1801,7 @@ export async function seed(knex) {
       contactEmail: 'noemi.carvalho@edulure.test',
       tags: ['Benchmarks', 'Affiliates'],
       recommended: false,
-      lastActiveAt: nowIso,
+      lastActiveAt: communityNowIso,
       avatarUrl: learnerAvatar.url
     };
 
@@ -3399,7 +3399,7 @@ export async function seed(knex) {
 
     const notificationQueueInserts = [];
     const jobStateInserts = [];
-    const nowIso = new Date().toISOString();
+    const reminderTimestampIso = new Date().toISOString();
 
     for (const row of seededReminderRows) {
       let reminderMetadata = {};
@@ -3420,12 +3420,12 @@ export async function seed(knex) {
         jobStateInserts.push({
           job_key: 'community_reminder',
           state_key: `reminder:${row.id}`,
-          version: row.remindAt ? new Date(row.remindAt).toISOString() : nowIso,
+          version: row.remindAt ? new Date(row.remindAt).toISOString() : reminderTimestampIso,
           state_value: JSON.stringify({
             status: 'sent',
             channel: row.channel,
             persona: personaLabel,
-            sentAt: row.sentAt ? new Date(row.sentAt).toISOString() : nowIso,
+            sentAt: row.sentAt ? new Date(row.sentAt).toISOString() : reminderTimestampIso,
             delivery: { provider: 'seed', channel: row.channel }
           }),
           metadata: JSON.stringify({ seeded: true, source: '001_bootstrap' })
@@ -3434,7 +3434,7 @@ export async function seed(knex) {
 
       if (row.channel === pushChannel || row.channel === 'in_app') {
         const personaLabel = reminderMetadata.persona ?? reminderMetadata.audienceLabel ?? 'member';
-        const remindIso = row.remindAt ? new Date(row.remindAt).toISOString() : nowIso;
+        const remindIso = row.remindAt ? new Date(row.remindAt).toISOString() : reminderTimestampIso;
         notificationQueueInserts.push({
           user_id: row.userId,
           channel: row.channel,
@@ -3468,7 +3468,7 @@ export async function seed(knex) {
       jobStateInserts.push({
         job_key: 'community_reminder',
         state_key: 'last_run',
-        version: nowIso,
+        version: reminderTimestampIso,
         state_value: JSON.stringify({
           runId: 'seed-bootstrap',
           processed: seededReminderRows.length,
@@ -3482,10 +3482,10 @@ export async function seed(knex) {
     jobStateInserts.push({
       job_key: 'data_partition',
       state_key: 'last_summary',
-      version: nowIso,
+      version: reminderTimestampIso,
       state_value: JSON.stringify({
         outcome: 'success',
-        executedAt: nowIso,
+        executedAt: reminderTimestampIso,
         dryRun: false,
         results: [
           {
@@ -6133,7 +6133,7 @@ export async function seed(knex) {
       }
     ]);
 
-    const previewDigestUpdatedAt = nowIso;
+    const previewDigestUpdatedAt = reminderTimestampIso;
     const previewDigestCourses = [
       {
         id: String(opsAutomationCourseId),

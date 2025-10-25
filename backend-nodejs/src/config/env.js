@@ -1344,7 +1344,21 @@ const sloConfig = buildSloConfiguration({
   defaults: sloDefaults
 });
 const telemetryAllowedSources = parseCsv(raw.TELEMETRY_ALLOWED_SOURCES ?? '');
-const storageDriver = raw.ASSET_STORAGE_DRIVER ?? 'r2';
+const requestedStorageDriver = String(raw.ASSET_STORAGE_DRIVER ?? 'r2').trim().toLowerCase();
+const supportedStorageDrivers = new Set(['local', 'r2']);
+let storageDriver = supportedStorageDrivers.has(requestedStorageDriver)
+  ? requestedStorageDriver
+  : 'r2';
+
+const missingR2Keys = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_PUBLIC_BUCKET', 'R2_PRIVATE_BUCKET', 'R2_UPLOADS_BUCKET', 'R2_QUARANTINE_BUCKET']
+  .filter((key) => !raw[key] || String(raw[key]).trim().length === 0);
+
+if (storageDriver === 'r2' && missingR2Keys.length) {
+  console.warn(
+    `Falling back to local storage because Cloudflare R2 configuration is incomplete: ${missingR2Keys.join(', ')}`
+  );
+  storageDriver = 'local';
+}
 
 const localStorageRoot = path.resolve(
   projectRoot,
@@ -1352,16 +1366,6 @@ const localStorageRoot = path.resolve(
 );
 const localStoragePublicUrl = raw.LOCAL_STORAGE_PUBLIC_URL ?? null;
 const localStorageServeStatic = raw.LOCAL_STORAGE_SERVE_STATIC;
-
-if (storageDriver === 'r2') {
-  const missingR2 = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_PUBLIC_BUCKET', 'R2_PRIVATE_BUCKET', 'R2_UPLOADS_BUCKET', 'R2_QUARANTINE_BUCKET']
-    .filter((key) => !raw[key] || String(raw[key]).trim().length === 0);
-  if (missingR2.length) {
-    throw new Error(
-      `Cloudflare R2 storage selected but missing required configuration keys: ${missingR2.join(', ')}`
-    );
-  }
-}
 
 const storageBuckets = {
   public: storageDriver === 'local' ? 'public' : raw.R2_PUBLIC_BUCKET,
@@ -1601,7 +1605,7 @@ export const env = {
     accountId: storageDriver === 'local' ? 'local-storage' : raw.R2_ACCOUNT_ID,
     accessKeyId: raw.R2_ACCESS_KEY_ID ?? null,
     secretAccessKey: raw.R2_SECRET_ACCESS_KEY ?? null,
-    region: raw.R2_REGION,
+    region: storageDriver === 'local' ? 'auto' : raw.R2_REGION,
     publicBucket: storageBuckets.public,
     privateBucket: storageBuckets.private,
     uploadsBucket: storageBuckets.uploads,
@@ -1629,7 +1633,7 @@ export const env = {
     failOpen: raw.ANTIVIRUS_FAIL_OPEN,
     cacheTtlMs: raw.ANTIVIRUS_CACHE_TTL_SECONDS * 1000,
     skipMetadataTag: raw.ANTIVIRUS_SKIP_TAG,
-    quarantineBucket: raw.R2_QUARANTINE_BUCKET
+    quarantineBucket: storageBuckets.quarantine
   },
   integrations: {
     cloudConvertApiKey: raw.CLOUDCONVERT_API_KEY ?? null,
