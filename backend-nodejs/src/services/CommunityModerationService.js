@@ -13,6 +13,10 @@ import ModerationFollowUpModel from '../models/ModerationFollowUpModel.js';
 const log = logger.child({ service: 'CommunityModerationService' });
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 
+function resolveConnection(connection) {
+  return typeof connection === 'function' ? connection : db;
+}
+
 function parseJsonColumn(value, fallback) {
   if (!value) return fallback;
   if (typeof value === 'object') return value;
@@ -175,7 +179,8 @@ function normaliseTagList(value) {
 }
 
 async function fetchPolicyLibrary(connection = db) {
-  const rows = await GovernanceContractModel.buildBaseQuery(connection)
+  const executor = resolveConnection(connection);
+  const rows = await GovernanceContractModel.buildBaseQuery(executor)
     .whereIn('contract_type', ['policy', 'code_of_conduct', 'guideline'])
     .whereIn('status', ['active', 'draft'])
     .orderBy('risk_tier', 'desc')

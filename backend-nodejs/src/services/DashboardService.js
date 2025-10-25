@@ -849,6 +849,18 @@ export function buildLearnerDashboard({
     Array.isArray(supportKnowledgeBase) && supportKnowledgeBase.length
       ? supportKnowledgeBase
       : DEFAULT_SUPPORT_KB;
+  const knowledgeBaseMeta = (() => {
+    const metricsMeta = supportMetricsSummary.knowledgeBase;
+    const staleArticles = knowledgeBaseArticles.filter((article) => article?.stale || article?.isStale).length;
+    return {
+      totalArticles: metricsMeta?.totalArticles ?? knowledgeBaseArticles.length,
+      staleArticles: metricsMeta?.staleArticles ?? staleArticles,
+      categories: Array.isArray(metricsMeta?.categories) ? metricsMeta.categories : [],
+      lastUpdatedAt: metricsMeta?.lastUpdatedAt ?? null,
+      staleThresholdDays: metricsMeta?.staleThresholdDays ?? SUPPORT_KB_STALE_THRESHOLD_DAYS,
+      generatedAt: metricsMeta?.generatedAt ?? new Date().toISOString()
+    };
+  })();
 
   const courseMap = new Map();
   const instructorDirectoryMap = ensureMap(instructorDirectory);
