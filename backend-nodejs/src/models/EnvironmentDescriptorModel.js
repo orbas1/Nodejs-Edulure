@@ -1,10 +1,5 @@
 import db from '../config/database.js';
-import {
-  ensureNonEmptyString,
-  normaliseOptionalString,
-  safeJsonParse,
-  safeJsonStringify
-} from '../utils/modelUtils.js';
+import { ensureNonEmptyString, safeJsonParse, safeJsonStringify } from '../utils/modelUtils.js';
 
 const TABLE = 'environment_descriptors';
 
@@ -16,10 +11,20 @@ function normaliseEnvironmentName(value) {
 }
 
 function normaliseString(value, { fieldName, maxLength = 255 } = {}) {
-  const normalised = normaliseOptionalString(value, { maxLength });
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalised = String(value).trim();
   if (!normalised) {
     return null;
   }
+
+  if (maxLength && normalised.length > maxLength) {
+    const label = fieldName ?? 'value';
+    throw new Error(`${label} must be at most ${maxLength} characters`);
+  }
+
   return normalised;
 }
 

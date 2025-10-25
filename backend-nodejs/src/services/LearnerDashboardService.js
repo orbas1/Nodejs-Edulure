@@ -82,6 +82,19 @@ function formatCurrencyValue(amountCents, currency = 'USD') {
   }
 }
 
+function optionalIsoDateField(value, fieldLabel) {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const candidate = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(candidate.getTime())) {
+    throw new Error(`${fieldLabel} must be a valid ISO 8601 date`);
+  }
+
+  return candidate.toISOString();
+}
+
 function normaliseOptionalString(value, maxLength = 160) {
   if (value === undefined || value === null) {
     return null;
@@ -1212,24 +1225,21 @@ export default class LearnerDashboardService {
     const reimbursementsPayload =
       payload.reimbursements && typeof payload.reimbursements === 'object' ? payload.reimbursements : {};
 
+    const currencyCandidate = payload.currency ?? payload.profile?.currency;
+    const rawTaxId = payload.taxId ?? payload.profile?.taxId;
+    const rawInvoiceDelivery = payload.invoiceDelivery ?? payload.profile?.invoiceDelivery;
+    const rawPayoutSchedule = payload.payoutSchedule ?? payload.profile?.payoutSchedule;
+    const rawExpensePolicyUrl = payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl;
+
     const preferences = {
-      currency: normaliseCurrency(payload.currency ?? payload.profile?.currency ?? 'USD'),
-      taxId:
-        typeof (payload.taxId ?? payload.profile?.taxId) === 'string'
-          ? (payload.taxId ?? payload.profile?.taxId).trim() || null
-          : null,
+      currency: normaliseCurrency(currencyCandidate ?? 'USD'),
+      taxId: typeof rawTaxId === 'string' ? rawTaxId.trim() || null : null,
       invoiceDelivery:
-        typeof (payload.invoiceDelivery ?? payload.profile?.invoiceDelivery) === 'string'
-          ? (payload.invoiceDelivery ?? payload.profile?.invoiceDelivery).trim() || 'email'
-          : 'email',
+        typeof rawInvoiceDelivery === 'string' ? rawInvoiceDelivery.trim() || 'email' : 'email',
       payoutSchedule:
-        typeof (payload.payoutSchedule ?? payload.profile?.payoutSchedule) === 'string'
-          ? (payload.payoutSchedule ?? payload.profile?.payoutSchedule).trim() || 'monthly'
-          : 'monthly',
+        typeof rawPayoutSchedule === 'string' ? rawPayoutSchedule.trim() || 'monthly' : 'monthly',
       expensePolicyUrl:
-        typeof (payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl) === 'string'
-          ? (payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl).trim() || null
-          : null,
+        typeof rawExpensePolicyUrl === 'string' ? rawExpensePolicyUrl.trim() || null : null,
       alerts: normaliseFinanceAlerts({ ...DEFAULT_FINANCE_ALERTS, ...alertsPayload }),
       reimbursements: normaliseFinanceReimbursements(reimbursementsPayload)
     };

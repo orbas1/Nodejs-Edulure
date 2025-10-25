@@ -568,7 +568,7 @@ function normaliseResourceCollection(value, fallbackLabel) {
   return result;
 }
 
-function resolveSessionResources(metadata, joinHref, lobbyHref) {
+  function resolveSessionResources(metadata, joinHref, _lobbyHref) {
   const resourcesMeta = typeof metadata.resources === 'object' ? metadata.resources : {};
   const prepSources = resourcesMeta.prep ?? metadata.prep ?? metadata.prepLinks ?? null;
   const materialSources =
@@ -598,7 +598,7 @@ function resolveSessionSupport(metadata, facilitators) {
   };
 }
 
-function resolveSessionAlerts({ occupancyRate, metadata, security, now }) {
+  function resolveSessionAlerts({ occupancyRate, metadata, security, now: _now }) {
   const alerts = [];
   const metaAlerts = Array.isArray(metadata.alerts)
     ? metadata.alerts
@@ -668,7 +668,7 @@ function resolveSessionPricing(session, metadata) {
   };
 }
 
-function resolvePreferredSlot(metadata, now = new Date()) {
+  function resolvePreferredSlot(metadata) {
   if (!metadata) {
     return null;
   }
@@ -1161,14 +1161,14 @@ export function buildLearnerDashboard({
     0
   );
   const referralCreditCents = Math.max(1500, Math.round(totalInvoiceCents * 0.08));
-  const primaryCourse = activeCourses[0] ?? null;
-  const coursePromotions = primaryCourse
+  const primaryLearnerCourse = activeCourses[0] ?? null;
+  const coursePromotions = primaryLearnerCourse
     ? [
         {
-          id: `learner-referral-${primaryCourse.courseId ?? primaryCourse.id}`,
-          courseId: primaryCourse.courseId ?? primaryCourse.id ?? null,
+          id: `learner-referral-${primaryLearnerCourse.courseId ?? primaryLearnerCourse.id}`,
+          courseId: primaryLearnerCourse.courseId ?? primaryLearnerCourse.id ?? null,
           headline: `Earn ${formatCurrency(referralCreditCents)} in learning credits`,
-          body: `Invite a peer to ${primaryCourse.title} and unlock tutoring bonuses when they enrol.`,
+          body: `Invite a peer to ${primaryLearnerCourse.title} and unlock tutoring bonuses when they enrol.`,
           actionLabel: 'Share invite link',
           actionHref: '/dashboard/learner/growth'
         }
@@ -1177,7 +1177,7 @@ export function buildLearnerDashboard({
 
   if (coursePromotions.length) {
     const promotionByCourseId = new Map(
-      coursePromotions.map((promotion) => [promotion.courseId ?? primaryCourse?.courseId ?? primaryCourse?.id, promotion])
+      coursePromotions.map((promotion) => [promotion.courseId ?? primaryLearnerCourse?.courseId ?? primaryLearnerCourse?.id, promotion])
     );
     activeCourses.forEach((course) => {
       const promotion = promotionByCourseId.get(course.courseId ?? course.id);
@@ -1188,7 +1188,7 @@ export function buildLearnerDashboard({
   }
 
   const microSurvey = (() => {
-    if (!primaryCourse && learnerGoalsCombined.length === 0) {
+    if (!primaryLearnerCourse && learnerGoalsCombined.length === 0) {
       return null;
     }
     const leadGoal = learnerGoalsCombined[0] ?? null;
@@ -1209,8 +1209,8 @@ export function buildLearnerDashboard({
       channel: 'learner-dashboard',
       surface: 'dashboard.home',
       scale: { ahead: 5, 'on-track': 3, 'need-support': 1 },
-      courseContext: primaryCourse
-        ? { courseId: primaryCourse.courseId ?? primaryCourse.id, title: primaryCourse.title }
+      courseContext: primaryLearnerCourse
+        ? { courseId: primaryLearnerCourse.courseId ?? primaryLearnerCourse.id, title: primaryLearnerCourse.title }
         : null,
       suggestedAction: remainingLessons > 0 ? 'resume-course' : 'capture-win',
       secondaryAction: { label: 'Adjust goals', href: '/dashboard/courses' }

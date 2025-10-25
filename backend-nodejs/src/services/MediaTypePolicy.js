@@ -114,9 +114,11 @@ export {
   normaliseKind as normaliseMediaKind
 };
 
-export default {
+const mediaTypePolicyService = {
   assertMediaTypeCompliance,
-  getMediaTypePolicy,
+  getMediaTypePolicy: getPolicy,
   listAllowedMimeTypes,
-  normaliseMediaKind
+  normaliseMediaKind: normaliseKind
 };
+
+export default mediaTypePolicyService;

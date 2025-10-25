@@ -19,6 +19,36 @@ export function normaliseCurrencyCode(value, { fallback = 'USD' } = {}) {
   throw new Error('currency must be a 3-letter ISO code');
 }
 
+export function normalizeCurrencyCode(value, fallback = 'USD') {
+  return normaliseCurrencyCode(value, { fallback });
+}
+
+export function currencyStringToCents(value, { fieldName = 'amount' } = {}) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`${fieldName} must be a finite number`);
+    }
+    return Math.round(value * 100);
+  }
+
+  const trimmed = toSanitisedString(value);
+  if (!trimmed) {
+    return 0;
+  }
+
+  const normalised = trimmed.replace(/[,$\s]/g, '');
+  const amount = Number.parseFloat(normalised);
+  if (!Number.isFinite(amount)) {
+    throw new Error(`${fieldName} must be a valid currency amount`);
+  }
+
+  return Math.round(amount * 100);
+}
+
 export function toMinorUnit(value, { allowNegative = false, fieldName = 'amount' } = {}) {
   if (value === null || value === undefined || value === '') {
     return 0;
@@ -44,4 +74,21 @@ export function snapCurrencyPayload(payload = {}, options = {}) {
   });
   const currency = normaliseCurrencyCode(payload.currency, { fallback: fallbackCurrency });
   return { amountCents, currency };
+}
+
+export function centsToCurrencyString(amountCents, { currency = 'USD', minimumFractionDigits = 2, maximumFractionDigits = 2 } = {}) {
+  const cents = Number(amountCents ?? 0);
+  if (!Number.isFinite(cents)) {
+    throw new Error('amountCents must be a finite number');
+  }
+
+  const unitAmount = cents / 100;
+  const resolvedCurrency = normaliseCurrencyCode(currency, { fallback: 'USD' });
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: resolvedCurrency,
+    minimumFractionDigits,
+    maximumFractionDigits
+  }).format(unitAmount);
 }

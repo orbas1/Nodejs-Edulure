@@ -737,7 +737,7 @@ export default class IntegrationApiKeyInviteService {
 
   async submitInvitation(token, { key, rotationIntervalDays, keyExpiresAt, actorEmail, actorName, reason }, context = {}) {
     const invite = await this.loadInviteByToken(token);
-    const sanitizedKey = validateKeyStrength(key, { provider: invite.provider });
+    const validatedKey = validateKeyStrength(key, { provider: invite.provider });
     const rotationDays = clampRotationInterval(rotationIntervalDays ?? invite.rotationIntervalDays, invite.provider);
     const expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : invite.keyExpiresAt;
     if (expiresAt && Number.isNaN(expiresAt.getTime())) {
@@ -767,7 +767,7 @@ export default class IntegrationApiKeyInviteService {
         result = await this.apiKeyService.rotateKey(
           invite.apiKeyId,
           {
-            keyValue: sanitizedKey,
+            keyValue: validatedKey,
             rotationIntervalDays: rotationDays,
             expiresAt: expiresAt ? expiresAt.toISOString() : null,
             rotatedBy: actor,
@@ -783,7 +783,7 @@ export default class IntegrationApiKeyInviteService {
             environment: invite.environment,
             alias: invite.alias,
             ownerEmail: invite.ownerEmail,
-            keyValue: sanitizedKey,
+            keyValue: validatedKey,
             rotationIntervalDays: rotationDays,
             expiresAt: expiresAt ? expiresAt.toISOString() : null,
             createdBy: actor,

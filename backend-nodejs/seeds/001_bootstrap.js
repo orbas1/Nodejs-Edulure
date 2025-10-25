@@ -3399,7 +3399,7 @@ export async function seed(knex) {
 
     const notificationQueueInserts = [];
     const jobStateInserts = [];
-    const nowIso = new Date().toISOString();
+    const reminderNowIso = new Date().toISOString();
 
     for (const row of seededReminderRows) {
       let reminderMetadata = {};
@@ -3420,12 +3420,12 @@ export async function seed(knex) {
         jobStateInserts.push({
           job_key: 'community_reminder',
           state_key: `reminder:${row.id}`,
-          version: row.remindAt ? new Date(row.remindAt).toISOString() : nowIso,
+          version: row.remindAt ? new Date(row.remindAt).toISOString() : reminderNowIso,
           state_value: JSON.stringify({
             status: 'sent',
             channel: row.channel,
             persona: personaLabel,
-            sentAt: row.sentAt ? new Date(row.sentAt).toISOString() : nowIso,
+            sentAt: row.sentAt ? new Date(row.sentAt).toISOString() : reminderNowIso,
             delivery: { provider: 'seed', channel: row.channel }
           }),
           metadata: JSON.stringify({ seeded: true, source: '001_bootstrap' })
@@ -3434,7 +3434,7 @@ export async function seed(knex) {
 
       if (row.channel === pushChannel || row.channel === 'in_app') {
         const personaLabel = reminderMetadata.persona ?? reminderMetadata.audienceLabel ?? 'member';
-        const remindIso = row.remindAt ? new Date(row.remindAt).toISOString() : nowIso;
+        const remindIso = row.remindAt ? new Date(row.remindAt).toISOString() : reminderNowIso;
         notificationQueueInserts.push({
           user_id: row.userId,
           channel: row.channel,
@@ -3468,7 +3468,7 @@ export async function seed(knex) {
       jobStateInserts.push({
         job_key: 'community_reminder',
         state_key: 'last_run',
-        version: nowIso,
+        version: reminderNowIso,
         state_value: JSON.stringify({
           runId: 'seed-bootstrap',
           processed: seededReminderRows.length,
@@ -3482,10 +3482,10 @@ export async function seed(knex) {
     jobStateInserts.push({
       job_key: 'data_partition',
       state_key: 'last_summary',
-      version: nowIso,
+      version: reminderNowIso,
       state_value: JSON.stringify({
         outcome: 'success',
-        executedAt: nowIso,
+        executedAt: reminderNowIso,
         dryRun: false,
         results: [
           {

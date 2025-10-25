@@ -93,10 +93,6 @@ function normaliseTags(tags) {
   return [];
 }
 
-function normaliseReactionSummary(summary) {
-  return normaliseReactionSummaryAggregate(summary);
-}
-
 function encodeCursor(payload) {
   try {
     return Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -154,7 +150,7 @@ function toDomain(record) {
     scheduledAt: record.scheduledAt ?? null,
     publishedAt: record.publishedAt ?? null,
     commentCount: Number(record.commentCount ?? 0),
-    reactionSummary: parseJson(record.reactionSummary, {}),
+    reactionSummary: normaliseReactionSummaryAggregate(parseJson(record.reactionSummary, {})),
     metadata: parseJson(record.metadata, {}),
     mediaAssetId: record.mediaAssetId ?? null,
     previewMetadata: parseJson(record.previewMetadata, {}),
@@ -220,7 +216,7 @@ export default class CommunityPostModel {
       scheduled_at: post.scheduledAt ?? null,
       published_at: post.publishedAt ?? null,
       comment_count: post.commentCount ?? 0,
-      reaction_summary: JSON.stringify(parseJson(post.reactionSummary, {})),
+      reaction_summary: JSON.stringify(normaliseReactionSummaryAggregate(parseJson(post.reactionSummary, {}))),
       metadata: JSON.stringify(parseJson(post.metadata, {})),
       media_asset_id: post.mediaAssetId ?? null,
       pinned_at: post.pinnedAt ?? null,

@@ -253,7 +253,7 @@ function pickBestDay(series, field) {
   };
 }
 
-function generateInsightRecommendations({ campaign, summary, trends, pacing, daysObserved }) {
+function generateInsightRecommendations({ summary, trends, pacing, daysObserved }) {
   const recommendations = [];
 
   if (trends.ctrChange !== null && trends.ctrChange <= -0.1) {
@@ -824,7 +824,6 @@ export default class AdsService {
     };
 
     const recommendations = generateInsightRecommendations({
-      campaign,
       summary: summaryMetrics,
       trends,
       pacing,
