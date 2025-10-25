@@ -668,6 +668,15 @@ export class EnvironmentParityService {
     evaluate('scripts', manifest.scripts, runtime.scripts);
     evaluate('root', manifest.root, runtime.root);
     evaluate('blueprints', manifest.blueprints, runtime.blueprints);
+
+    const expectedBlueprints = manifest.blueprints ?? {};
+    const actualBlueprints = runtime.blueprints ?? {};
+    for (const [blueprintKey, expectedDescriptor] of Object.entries(expectedBlueprints)) {
+      const actualDescriptor = actualBlueprints[blueprintKey];
+      if (actualDescriptor) {
+        compareBlueprintRegistry(blueprintKey, expectedDescriptor, actualDescriptor);
+      }
+    }
     compareDescriptors(descriptorExpectations, runtime.descriptors ?? {});
 
     return mismatches;

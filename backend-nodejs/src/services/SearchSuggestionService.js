@@ -138,7 +138,7 @@ export class SearchSuggestionService {
     }
   }
 
-  async buildPreviewSuggestions({ since, limit, previewPool }) {
+  async buildPreviewSuggestions({ limit, previewPool }) {
     const suggestions = [];
     for (const [entityType, previews] of previewPool.entries()) {
       if (entityType === 'all') {
@@ -190,7 +190,6 @@ export class SearchSuggestionService {
 
     if (suggestions.length < limit) {
       const previewSuggestions = await this.buildPreviewSuggestions({
-        since,
         limit: limit - suggestions.length,
         previewPool
       });

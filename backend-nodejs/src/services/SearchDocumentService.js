@@ -102,19 +102,6 @@ function serialiseTokenList(values, options) {
   return tokens.join(TOKEN_SEPARATOR);
 }
 
-function parseTokenList(value) {
-  if (!value) {
-    return [];
-  }
-  if (Array.isArray(value)) {
-    return value.filter(Boolean);
-  }
-  return String(value)
-    .split(TOKEN_SEPARATOR)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
 function parseJson(value, fallback) {
   if (value === null || value === undefined) {
     return fallback;

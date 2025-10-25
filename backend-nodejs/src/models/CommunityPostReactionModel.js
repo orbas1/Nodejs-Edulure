@@ -58,14 +58,16 @@ export default class CommunityPostReactionModel {
       .where({ post_id: Number(postId) })
       .groupBy('reaction');
 
-    return rows.reduce((summary, row) => {
+    const summary = {};
+    for (const row of rows) {
       const key = normaliseReaction(row.reaction);
-      if (!key) return summary;
+      if (!key) {
+        continue;
+      }
       const count = Number(row.count ?? 0);
-      // eslint-disable-next-line no-param-reassign
       summary[key] = count;
-      return summary;
-    }, {});
+    }
+    return summary;
   }
 
   static async listForPosts(postIds, userId, connection = db) {
