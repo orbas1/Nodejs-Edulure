@@ -1,4 +1,5 @@
-import { readFileSync } from 'fs';
+import { createHash } from 'crypto';
+import { readFileSync, statSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { z } from 'zod';
@@ -90,6 +91,34 @@ const specCache = new Map();
 
 const REQUIRED_DESCRIPTOR_FIELDS = ['service', 'capability', 'description', 'version'];
 
+function wrapIndexError(error, detailMessage) {
+  const suffix = detailMessage ?? error?.message;
+  const message = suffix
+    ? `Failed to load service spec index: ${suffix}`
+    : 'Failed to load service spec index';
+
+  const wrapped = new Error(message);
+  wrapped.cause = error;
+
+  if (error && typeof error === 'object' && 'code' in error && error.code) {
+    wrapped.code = error.code;
+  }
+
+  return wrapped;
+}
+
+function computeFileChecksum(filePath) {
+  const hash = createHash('sha256');
+  const content = readFileSync(filePath);
+  hash.update(content);
+  return hash.digest('hex');
+}
+
+function resolveLastUpdated(filePath) {
+  const stats = statSync(filePath);
+  return new Date(stats.mtimeMs).toISOString();
+}
+
 function normalizeServiceKey(value) {
   if (value === undefined || value === null) {
     return '';
@@ -180,6 +209,9 @@ function sanitizeDescriptor(rawDescriptor, indexPath, descriptorIndex) {
   }
   const basePath = ensureLeadingSlash(rawDescriptor.basePath, serviceId);
   const documentPath = resolveDocumentPath(rawDescriptor.file, serviceId, version);
+  const documentationUrl = rawDescriptor.documentationUrl ?? undefined;
+  const checksum = rawDescriptor.checksum ?? computeFileChecksum(documentPath);
+  const lastUpdated = rawDescriptor.lastUpdated ?? resolveLastUpdated(documentPath);
 
   return {
     service: serviceId,
@@ -188,7 +220,10 @@ function sanitizeDescriptor(rawDescriptor, indexPath, descriptorIndex) {
     version,
     description,
     basePath,
-    documentPath
+    documentPath,
+    documentationUrl,
+    checksum,
+    lastUpdated
   };
 }
 
@@ -205,17 +240,28 @@ function loadRegistry() {
     return cachedRegistry;
   }
 
-  const indexJson = readJsonFile(INDEX_FILE_PATH, 'OpenAPI service index');
+  let indexJson;
+  try {
+    indexJson = readJsonFile(INDEX_FILE_PATH, 'OpenAPI service index');
+  } catch (error) {
+    throw wrapIndexError(error);
+  }
+
   const parsedIndex = SPEC_INDEX_SCHEMA.safeParse(indexJson);
 
   if (!parsedIndex.success) {
     const message = parsedIndex.error.issues.map((issue) => issue.message).join('; ');
-    throw new Error(`OpenAPI index at ${INDEX_FILE_PATH} failed validation: ${message}`);
+    throw wrapIndexError(parsedIndex.error, `OpenAPI index at ${INDEX_FILE_PATH} failed validation: ${message}`);
   }
 
-  const descriptors = parsedIndex.data.services.map((descriptor, idx) =>
-    sanitizeDescriptor(descriptor, INDEX_FILE_PATH, idx)
-  );
+  let descriptors;
+  try {
+    descriptors = parsedIndex.data.services.map((descriptor, idx) =>
+      sanitizeDescriptor(descriptor, INDEX_FILE_PATH, idx)
+    );
+  } catch (error) {
+    throw wrapIndexError(error);
+  }
 
   const lookup = new Map();
   for (const descriptor of descriptors) {
