@@ -7,7 +7,7 @@ const BASE_COLUMNS = [
   'id',
   'payment_intent_id as paymentIntentId',
   'entry_type as entryType',
-  'amount as amountCents',
+  'amount_cents as amountCents',
   'currency',
   'details',
   'recorded_at as recordedAt'
@@ -74,7 +74,7 @@ export default class PaymentLedgerEntryModel {
     const payload = {
       payment_intent_id: entry.paymentIntentId,
       entry_type: entryType,
-      amount: amountCents,
+      amount_cents: amountCents,
       currency,
       details: JSON.stringify({ ...details, currency, entryType }),
       recorded_at: entry.recordedAt ?? connection.fn.now()
