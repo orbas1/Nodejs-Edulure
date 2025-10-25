@@ -4,6 +4,26 @@ import db from '../config/database.js';
 
 const TABLE = 'setup_runs';
 
+function buildTableQuery(connection, table = TABLE) {
+  if (!connection) {
+    return null;
+  }
+
+  if (typeof connection === 'function') {
+    return connection(table);
+  }
+
+  if (typeof connection.table === 'function') {
+    return connection.table(table);
+  }
+
+  if (typeof connection.from === 'function') {
+    return connection.from(table);
+  }
+
+  return connection;
+}
+
 const BASE_COLUMNS = [
   'id',
   'public_id as publicId',
@@ -138,11 +158,25 @@ export default class SetupRunModel {
   }
 
   static async listRecent(limit = 10, connection = db) {
-    const rows = await connection(TABLE)
-      .select(BASE_COLUMNS)
-      .orderBy('created_at', 'desc')
-      .limit(Math.max(1, Math.min(50, Number(limit) || 10)));
-    return rows.map(deserialize);
+    const safeLimit = Math.max(1, Math.min(50, Number(limit) || 10));
+    const query = buildTableQuery(connection);
+
+    if (!query || typeof query.select !== 'function') {
+      return [];
+    }
+
+    let builder = query.select(BASE_COLUMNS);
+
+    if (typeof builder.orderBy === 'function') {
+      builder = builder.orderBy('created_at', 'desc');
+    }
+
+    if (typeof builder.limit === 'function') {
+      builder = builder.limit(safeLimit);
+    }
+
+    const rows = typeof builder.then === 'function' ? await builder : [];
+    return Array.isArray(rows) ? rows.map(deserialize) : [];
   }
 
   static async findLatest(connection = db) {
