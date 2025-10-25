@@ -1,7 +1,30 @@
 import type { ApiRequestOptions } from '../generated/core/ApiRequestOptions';
 import type { OpenAPIConfig } from '../generated/core/OpenAPI';
+import type { BackgroundRefreshOptions, SessionManager, SessionManagerEvents, SessionManagerOptions, TokenRefreshHandler } from './auth';
+import type { HeaderDictionary } from './base';
+import type { TokenStore } from './tokenStore';
+import type { TokenStoreOptions } from './tokenStore';
 type TokenResolver = () => Promise<string | null | undefined> | string | null | undefined;
-export type HeaderResolver = Record<string, string | number | boolean | null | undefined> | ((options: ApiRequestOptions) => Promise<Record<string, string>> | Record<string, string>);
+type HeaderResolverFunction = (options: ApiRequestOptions) => Promise<HeaderDictionary> | HeaderDictionary;
+export type HeaderResolver = HeaderDictionary | HeaderResolverFunction;
+export type ConfigureAuthOptions = {
+    sessionManager?: SessionManager;
+    tokenStore?: TokenStore;
+    tokenStoreOptions?: TokenStoreOptions;
+    refresh?: TokenRefreshHandler;
+    refreshMarginMs?: number;
+    autoRefresh?: boolean;
+    allowAnonymous?: boolean;
+    scheme?: string;
+    headerName?: string;
+    getAccessToken?: TokenResolver;
+    onSession?: (session: SessionManager) => void;
+    onRefreshStart?: SessionManagerEvents['onRefreshStart'];
+    onRefreshSuccess?: SessionManagerEvents['onRefreshSuccess'];
+    onRefreshError?: SessionManagerEvents['onRefreshError'];
+    clock?: SessionManagerOptions['clock'];
+    backgroundRefresh?: boolean | BackgroundRefreshOptions;
+};
 export type ConfigureSdkOptions = {
     baseUrl: string;
     version?: string;
@@ -11,7 +34,8 @@ export type ConfigureSdkOptions = {
     credentials?: OpenAPIConfig['CREDENTIALS'];
     userAgent?: string;
     onConfig?: (config: OpenAPIConfig) => void;
+    auth?: ConfigureAuthOptions;
 };
-export declare function configureSdk({ baseUrl, version, getAccessToken, defaultHeaders, withCredentials, credentials, userAgent, onConfig }: ConfigureSdkOptions): OpenAPIConfig;
+export declare function configureSdk({ baseUrl, version, getAccessToken, defaultHeaders, withCredentials, credentials, userAgent, onConfig, auth, }: ConfigureSdkOptions): OpenAPIConfig;
 export {};
 //# sourceMappingURL=configure.d.ts.map

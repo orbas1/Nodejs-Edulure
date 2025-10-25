@@ -8,6 +8,13 @@ import type { ExplorerAnalyticsRange } from './ExplorerAnalyticsRange';
 import type { ExplorerAnalyticsTimeseriesPoint } from './ExplorerAnalyticsTimeseriesPoint';
 import type { ExplorerAnalyticsTotals } from './ExplorerAnalyticsTotals';
 export type ExplorerAnalyticsSummary = {
+    environment?: {
+        key?: string;
+        name?: string;
+        tier?: string | null;
+        region?: string | null;
+        workspace?: string | null;
+    };
     range: ExplorerAnalyticsRange;
     totals: ExplorerAnalyticsTotals;
     entityBreakdown: Array<ExplorerAnalyticsEntityBreakdown>;
@@ -21,5 +28,6 @@ export type ExplorerAnalyticsSummary = {
         clickThroughRate?: Array<ExplorerAnalyticsForecastEntry>;
     };
     alerts: Array<ExplorerAnalyticsAlert>;
+    lastComputedAt?: string;
 };
 //# sourceMappingURL=ExplorerAnalyticsSummary.d.ts.map

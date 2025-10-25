@@ -490,10 +490,21 @@ export default function AdminControl() {
               ...DEFAULT_NOTIFICATIONS,
               ...notificationState,
               [key]: value
-  }
-}
+            }
+          }
+        });
+        const notifications = payload?.notifications ?? {};
+        setNotificationState({ ...DEFAULT_NOTIFICATIONS, ...notifications });
+        setNotificationStatus('ready');
+      } catch (error) {
+        setNotificationStatus('error');
+        setNotificationError(error);
+      }
+    },
+    [notificationState, token]
+  );
 
-function ComplianceAlertList({ alerts, status, error, dateFormatter, onRetry }) {
+  function ComplianceAlertList({ alerts, status, error, dateFormatter, onRetry }) {
   if ((status === 'loading' || status === 'refreshing') && !alerts.length) {
     return (
       <DashboardStateMessage
@@ -621,18 +632,6 @@ function ReleaseChecklistSummary({ checklist }) {
     </div>
   );
 }
-        });
-        const notifications = payload?.notifications ?? {};
-        setNotificationState({ ...DEFAULT_NOTIFICATIONS, ...notifications });
-        setNotificationStatus('ready');
-      } catch (error) {
-        setNotificationStatus('error');
-        setNotificationError(error);
-      }
-    },
-    [notificationState, token]
-  );
-
   useEffect(() => {
     const controller = new AbortController();
     if (token) {

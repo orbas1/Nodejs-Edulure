@@ -174,10 +174,14 @@ export default function IntegrationCredentialInvite() {
     });
     const result = await submit();
     if (result?.ok) {
+      const rotationInterval =
+        result.payload?.invite?.rotationIntervalDays ??
+        form.rotationIntervalDays ??
+        null;
       trackIntegrationInviteSubmit('success', {
         provider,
         environment,
-        rotation_interval: result.payload?.invite?.rotationIntervalDays ?? form.rotationIntervalDays || null,
+        rotation_interval: rotationInterval,
         duration_seconds: durationSeconds
       });
     } else {

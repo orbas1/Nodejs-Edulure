@@ -540,11 +540,11 @@ const normaliseDirectParticipant = (participant, viewerId) => {
   const firstName = participant.firstName ?? participant.first_name ?? user.firstName ?? user.first_name ?? null;
   const lastName = participant.lastName ?? participant.last_name ?? user.lastName ?? user.last_name ?? null;
   const email = participant.email ?? user.email ?? null;
+  const nameFromParts = [firstName, lastName].filter(Boolean).join(' ');
   const displayNameCandidate =
     participant.displayName ??
     participant.name ??
-    [firstName, lastName].filter(Boolean).join(' ') ||
-    email;
+    (nameFromParts ? nameFromParts : email);
   const roles = Array.isArray(participant.roles)
     ? participant.roles
     : participant.role

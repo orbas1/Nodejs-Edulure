@@ -126,4 +126,5 @@ export function useNavigationMetadata() {
   return useContext(NavigationMetadataContext);
 }
 
+export { NavigationMetadataContext };
 export default NavigationMetadataContext;

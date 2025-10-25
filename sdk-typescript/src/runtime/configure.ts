@@ -16,8 +16,6 @@ import { sdkManifest } from './manifest';
 import type { TokenStore } from './tokenStore';
 import type { TokenStoreOptions } from './tokenStore';
 import { MissingAccessTokenError } from './errors';
-import type { RequestHooks } from '../generated/core/OpenAPI';
-
 type TokenResolver = () => Promise<string | null | undefined> | string | null | undefined;
 
 type AsyncTokenResolver = (options: ApiRequestOptions) => Promise<string | undefined>;
@@ -55,8 +53,6 @@ export type ConfigureSdkOptions = {
   userAgent?: string;
   onConfig?: (config: OpenAPIConfig) => void;
   auth?: ConfigureAuthOptions;
-  hooks?: RequestHooks;
-  errorDomain?: string;
 };
 
 function normaliseBaseUrl(baseUrl: string): string {
@@ -159,14 +155,10 @@ export function configureSdk({
   userAgent,
   onConfig,
   auth,
-  hooks,
-  errorDomain,
 }: ConfigureSdkOptions): OpenAPIConfig {
   const normalisedBase = normaliseBaseUrl(baseUrl);
   OpenAPI.BASE = normalisedBase;
   OpenAPI.VERSION = version ?? sdkManifest.specVersion;
-  OpenAPI.REQUEST_HOOKS = hooks;
-  OpenAPI.ERROR_DOMAIN = errorDomain ?? undefined;
 
   const session = buildSessionManager(auth);
   if (session && auth?.onSession) {

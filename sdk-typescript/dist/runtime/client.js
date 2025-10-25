@@ -31,8 +31,21 @@ const registry = Object.freeze({
     core: DefaultService
 });
 export function createSdkClient(options) {
-    const openApi = configureSdk(options);
-    return Object.freeze({ ...registry, openApi, manifest: sdkManifest });
+    const originalAuth = options.auth;
+    let session;
+    const openApi = configureSdk({
+        ...options,
+        auth: originalAuth
+            ? {
+                ...originalAuth,
+                onSession: (value) => {
+                    session = value;
+                    originalAuth.onSession?.(value);
+                },
+            }
+            : undefined,
+    });
+    return Object.freeze({ ...registry, openApi, manifest: sdkManifest, session });
 }
 export function getService(key) {
     return registry[key];
