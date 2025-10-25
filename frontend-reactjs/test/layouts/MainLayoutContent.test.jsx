@@ -10,7 +10,8 @@ vi.mock('../../src/lib/analytics.js', () => ({
   trackNavigationImpression: vi.fn(),
   trackNavigationSelect: vi.fn(),
   trackNotificationOpen: vi.fn(),
-  trackNotificationPreferenceChange: vi.fn()
+  trackNotificationPreferenceChange: vi.fn(),
+  trackNotificationPanelView: vi.fn()
 }));
 
 vi.mock('../../src/components/navigation/AppNotificationPanel.jsx', () => ({

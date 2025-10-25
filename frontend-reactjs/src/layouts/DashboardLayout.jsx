@@ -22,7 +22,8 @@ import {
   trackNavigationSelect,
   trackNotificationOpen,
   trackNotificationPreferenceChange,
-  trackDashboardSurfaceView
+  trackDashboardSurfaceView,
+  trackNotificationPanelView
 } from '../lib/analytics.js';
 import { useTheme } from '../providers/ThemeProvider.jsx';
 
@@ -319,6 +320,7 @@ export function DashboardLayoutInner() {
   const paramRole = rawRole?.toLowerCase() ?? null;
   const fallbackRole = activeRole?.toLowerCase() ?? roles[0]?.id?.toLowerCase() ?? 'learner';
   const resolvedRole = availableRoles.includes(paramRole) ? paramRole : fallbackRole;
+  const showAnnexSections = resolvedRole !== 'learner';
 
   useEffect(() => {
     if (!roles.length) return;
@@ -477,13 +479,18 @@ export function DashboardLayoutInner() {
 
   const handleOpenNotifications = useCallback(() => {
     setNotificationsOpen(true);
+    trackNotificationPanelView({
+      origin: 'dashboard-shell',
+      role: resolvedRole,
+      hasAnnexSections: showAnnexSections
+    });
     notifications.forEach((notification) => {
       if (notification.unread) {
         trackNotificationOpen(notification.id, { groupId: notification.groupId, role: resolvedRole });
       }
     });
     setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })));
-  }, [notifications, resolvedRole]);
+  }, [notifications, resolvedRole, showAnnexSections]);
 
   const handleUpdateNotificationPreference = useCallback((groupId, enabled) => {
     setNotificationPreferences((prev) => ({ ...prev, [groupId]: enabled }));
@@ -610,6 +617,7 @@ export function DashboardLayoutInner() {
         preferences={notificationPreferences}
         onUpdatePreference={handleUpdateNotificationPreference}
         onNavigate={handleNavigate}
+        showAnnexSections={showAnnexSections}
       />
     </div>
   );
@@ -617,11 +625,16 @@ export function DashboardLayoutInner() {
 
 export default function DashboardLayout() {
   const { session, isAuthenticated } = useAuth();
+  const rawRole =
+    typeof session?.user?.role === 'string' && session.user.role.trim()
+      ? session.user.role.trim().toLowerCase()
+      : null;
   const metadataRole = session?.user?.role ?? (isAuthenticated ? 'user' : 'guest');
   const metadataToken = session?.tokens?.accessToken ?? undefined;
+  const metadataEnabled = Boolean(rawRole) && rawRole !== 'learner';
 
   return (
-    <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
+    <NavigationMetadataProvider role={metadataRole} token={metadataToken} enabled={metadataEnabled}>
       <DashboardLayoutInner />
     </NavigationMetadataProvider>
   );

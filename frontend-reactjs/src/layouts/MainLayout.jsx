@@ -19,7 +19,8 @@ import {
   trackNavigationImpression,
   trackNavigationSelect,
   trackNotificationOpen,
-  trackNotificationPreferenceChange
+  trackNotificationPreferenceChange,
+  trackNotificationPanelView
 } from '../lib/analytics.js';
 import { useTheme } from '../providers/ThemeProvider.jsx';
 
@@ -29,10 +30,12 @@ export function MainLayoutContent({
   logout,
   navigate,
   getConfigValue,
-  realtimeConnected
+  realtimeConnected,
+  showAnnexSections = true
 }) {
   const { classes, resolvedMode } = useTheme();
   const { initiatives } = useNavigationMetadata();
+  const sessionRole = session?.user?.role ?? null;
   const [searchTerm, setSearchTerm] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState(() => buildShellNotifications(session));
@@ -133,13 +136,18 @@ export function MainLayoutContent({
 
   const handleOpenNotifications = useCallback(() => {
     setNotificationsOpen(true);
+    trackNotificationPanelView({
+      origin: 'main-shell',
+      hasAnnexSections: showAnnexSections,
+      role: sessionRole ?? (isAuthenticated ? 'user' : 'guest')
+    });
     notifications.forEach((notification) => {
       if (notification.unread) {
         trackNotificationOpen(notification.id, { groupId: notification.groupId });
       }
     });
     setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })));
-  }, [notifications]);
+  }, [notifications, showAnnexSections, sessionRole, isAuthenticated]);
 
   const handleUpdateNotificationPreference = useCallback((groupId, enabled) => {
     setNotificationPreferences((prev) => ({ ...prev, [groupId]: enabled }));
@@ -209,6 +217,7 @@ export function MainLayoutContent({
         preferences={notificationPreferences}
         onUpdatePreference={handleUpdateNotificationPreference}
         onNavigate={handleNavigate}
+        showAnnexSections={showAnnexSections}
       />
     </div>
   );
@@ -220,11 +229,16 @@ export default function MainLayout() {
   const { getConfigValue } = useRuntimeConfig();
   const { connected: realtimeConnected } = useRealtime();
 
+  const normalisedRole =
+    typeof session?.user?.role === 'string' && session.user.role.trim()
+      ? session.user.role.trim().toLowerCase()
+      : null;
+  const showAnnexSections = Boolean(normalisedRole) && !['learner', 'user'].includes(normalisedRole);
   const metadataRole = session?.user?.role ?? (isAuthenticated ? 'user' : 'guest');
   const metadataToken = session?.tokens?.accessToken ?? undefined;
 
   return (
-    <NavigationMetadataProvider role={metadataRole} token={metadataToken}>
+    <NavigationMetadataProvider role={metadataRole} token={metadataToken} enabled={showAnnexSections}>
       <MainLayoutContent
         session={session}
         isAuthenticated={isAuthenticated}
@@ -232,6 +246,7 @@ export default function MainLayout() {
         navigate={navigate}
         getConfigValue={getConfigValue}
         realtimeConnected={realtimeConnected}
+        showAnnexSections={showAnnexSections}
       />
     </NavigationMetadataProvider>
   );

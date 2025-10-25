@@ -31,6 +31,10 @@ export function trackNotificationPreferenceChange(groupId, enabled) {
   trackEvent('notification:preference_change', { groupId, enabled });
 }
 
+export function trackNotificationPanelView(metadata = {}) {
+  trackEvent('notification:panel_view', metadata);
+}
+
 export function trackDashboardSurfaceView(surfaceId, metadata = {}) {
   if (!surfaceId) return;
   trackEvent('dashboard:surface_view', { surfaceId, ...metadata });

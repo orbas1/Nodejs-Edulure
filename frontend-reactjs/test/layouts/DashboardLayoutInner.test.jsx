@@ -77,7 +77,8 @@ vi.mock('../../src/lib/analytics.js', () => ({
   trackNavigationSelect: vi.fn(),
   trackNotificationOpen: vi.fn(),
   trackNotificationPreferenceChange: vi.fn(),
-  trackDashboardSurfaceView: vi.fn()
+  trackDashboardSurfaceView: vi.fn(),
+  trackNotificationPanelView: vi.fn()
 }));
 
 function buildMetadata(overrides = {}) {

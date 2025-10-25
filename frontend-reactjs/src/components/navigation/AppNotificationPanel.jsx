@@ -22,7 +22,8 @@ export default function AppNotificationPanel({
   groups,
   preferences,
   onUpdatePreference,
-  onNavigate
+  onNavigate,
+  showAnnexSections
 }) {
   const notificationGroups = groups && groups.length ? groups : NOTIFICATION_GROUPS;
   const notificationsByGroup = useMemo(() => {
@@ -192,8 +193,9 @@ export default function AppNotificationPanel({
                     </div>
                   </section>
                 </div>
-                <div className="space-y-8 border-t border-slate-100 px-6 py-6">
-                  <section aria-labelledby="operational-readiness">
+                {showAnnexSections ? (
+                  <div className="space-y-8 border-t border-slate-100 px-6 py-6">
+                    <section aria-labelledby="operational-readiness">
                     <div className="flex items-center justify-between">
                       <h2
                         id="operational-readiness"
@@ -482,6 +484,29 @@ export default function AppNotificationPanel({
                     </ul>
                   </section>
                 </div>
+                ) : (
+                  <section aria-labelledby="notification-panel-overview" className="border-t border-slate-100 px-6 py-6">
+                    <div
+                      className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-5 text-sm text-slate-600"
+                      role="note"
+                      aria-live="polite"
+                    >
+                      <h2
+                        id="notification-panel-overview"
+                        className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+                      >
+                        Stay connected
+                      </h2>
+                      <p className="mt-2 text-sm text-slate-600">
+                        Keep an eye on updates from your communities, courses, and monetisation tools. Operational checklists
+                        and roadmap tasks only appear when you join an instructor or admin workspace.
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Update the notification types above to choose how we reach you.
+                      </p>
+                    </div>
+                  </section>
+                )}
               </Dialog.Panel>
             </Transition.Child>
           </div>
@@ -515,7 +540,8 @@ AppNotificationPanel.propTypes = {
   ),
   preferences: PropTypes.object,
   onUpdatePreference: PropTypes.func,
-  onNavigate: PropTypes.func
+  onNavigate: PropTypes.func,
+  showAnnexSections: PropTypes.bool
 };
 
 AppNotificationPanel.defaultProps = {
@@ -523,6 +549,7 @@ AppNotificationPanel.defaultProps = {
   groups: null,
   preferences: {},
   onUpdatePreference: null,
-  onNavigate: null
+  onNavigate: null,
+  showAnnexSections: true
 };
 
