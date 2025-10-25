@@ -95,83 +95,91 @@ export async function resolveContentAppeal({ token, appealId, payload, signal } 
   return response?.data ?? response;
 }
 
+export async function listCases({ token, communityId, params, signal } = {}) {
+  ensureToken(token);
+  ensureIdentifier(communityId, 'A community identifier is required to list moderation cases');
+
+  const response = await httpClient.get(
+    `/community-moderation/communities/${encodeURIComponent(communityId)}/cases`,
+    {
+      token,
+      params,
+      signal,
+      cache: { ttl: 10_000, tags: ['moderation:cases', communityId] }
+    }
+  );
+
+  return mapPaginatedResponse(response);
+}
+
+export async function getCase({ token, communityId, caseId, signal } = {}) {
+  ensureToken(token);
+  const safeCommunityId = ensureIdentifier(
+    communityId,
+    'A community identifier is required to retrieve a moderation case'
+  );
+  const safeCaseId = ensureIdentifier(caseId, 'A moderation case identifier is required');
+
+  const response = await httpClient.get(
+    `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}`,
+    {
+      token,
+      signal,
+      cache: { ttl: 5_000, tags: ['moderation:cases', communityId, safeCaseId] }
+    }
+  );
+
+  return response?.data ?? response;
+}
+
+export async function applyCaseAction({ token, communityId, caseId, payload, signal } = {}) {
+  ensureToken(token);
+  const safeCommunityId = ensureIdentifier(
+    communityId,
+    'A community identifier is required to apply moderation actions'
+  );
+  const safeCaseId = ensureIdentifier(caseId, 'A moderation case identifier is required');
+
+  const response = await httpClient.post(
+    `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}/actions`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      invalidateTags: ['moderation:cases', communityId]
+    }
+  );
+
+  return response?.data ?? response;
+}
+
+export async function undoCaseAction({ token, communityId, caseId, actionId, signal } = {}) {
+  ensureToken(token);
+  const safeCommunityId = ensureIdentifier(
+    communityId,
+    'A community identifier is required to undo moderation actions'
+  );
+  const safeCaseId = ensureIdentifier(caseId, 'A moderation case identifier is required');
+  const safeActionId = ensureIdentifier(actionId, 'An action identifier is required to undo');
+
+  const response = await httpClient.post(
+    `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}/actions/${safeActionId}/undo`,
+    {},
+    {
+      token,
+      signal,
+      invalidateTags: ['moderation:cases', communityId]
+    }
+  );
+
+  return response?.data ?? response;
+}
+
 export const moderationApi = {
-  listCases: async ({ token, communityId, params, signal } = {}) => {
-    ensureToken(token);
-    ensureIdentifier(communityId, 'A community identifier is required to list moderation cases');
-
-    const response = await httpClient.get(
-      `/community-moderation/communities/${encodeURIComponent(communityId)}/cases`,
-      {
-        token,
-        params,
-        signal,
-        cache: { ttl: 10_000, tags: ['moderation:cases', communityId] }
-      }
-    );
-
-    return mapPaginatedResponse(response);
-  },
-  getCase: async ({ token, communityId, caseId, signal } = {}) => {
-    ensureToken(token);
-    const safeCommunityId = ensureIdentifier(
-      communityId,
-      'A community identifier is required to retrieve a moderation case'
-    );
-    const safeCaseId = ensureIdentifier(caseId, 'A moderation case identifier is required');
-
-    const response = await httpClient.get(
-      `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}`,
-      {
-        token,
-        signal,
-        cache: { ttl: 5_000, tags: ['moderation:cases', communityId, safeCaseId] }
-      }
-    );
-
-    return response?.data ?? response;
-  },
-  applyCaseAction: async ({ token, communityId, caseId, payload, signal } = {}) => {
-    ensureToken(token);
-    const safeCommunityId = ensureIdentifier(
-      communityId,
-      'A community identifier is required to apply moderation actions'
-    );
-    const safeCaseId = ensureIdentifier(caseId, 'A moderation case identifier is required');
-
-    const response = await httpClient.post(
-      `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}/actions`,
-      payload ?? {},
-      {
-        token,
-        signal,
-        invalidateTags: ['moderation:cases', communityId]
-      }
-    );
-
-    return response?.data ?? response;
-  },
-  undoCaseAction: async ({ token, communityId, caseId, actionId, signal } = {}) => {
-    ensureToken(token);
-    const safeCommunityId = ensureIdentifier(
-      communityId,
-      'A community identifier is required to undo moderation actions'
-    );
-    const safeCaseId = ensureIdentifier(caseId, 'A moderation case identifier is required');
-    const safeActionId = ensureIdentifier(actionId, 'An action identifier is required to undo');
-
-    const response = await httpClient.post(
-      `/community-moderation/communities/${safeCommunityId}/cases/${safeCaseId}/actions/${safeActionId}/undo`,
-      {},
-      {
-        token,
-        signal,
-        invalidateTags: ['moderation:cases', communityId]
-      }
-    );
-
-    return response?.data ?? response;
-  },
+  listCases,
+  getCase,
+  applyCaseAction,
+  undoCaseAction,
   listScamReports,
   updateScamReport,
   escalateScamReport,

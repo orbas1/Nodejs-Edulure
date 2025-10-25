@@ -7,13 +7,7 @@ import type { ApiRequestOptions } from './ApiRequestOptions';
 import type { ApiResult } from './ApiResult';
 import { CancelablePromise } from './CancelablePromise';
 import type { OnCancel } from './CancelablePromise';
-import type {
-    ErrorHookContext,
-    OpenAPIConfig,
-    RequestHookContext,
-    RequestHooks,
-    ResponseHookContext,
-} from './OpenAPI';
+import type { OpenAPIConfig } from './OpenAPI';
 
 export const isDefined = <T>(value: T | null | undefined): value is Exclude<T, null | undefined> => {
     return value !== undefined && value !== null;
@@ -85,45 +79,6 @@ export const getQueryString = (params: Record<string, any>): string => {
     }
 
     return '';
-};
-
-const ensureError = (error: unknown): Error => {
-    if (error instanceof Error) {
-        return error;
-    }
-    const message = typeof error === 'string' ? error : 'Unknown error occurred.';
-    const fallback = new Error(message);
-    (fallback as any).originalError = error;
-    return fallback;
-};
-
-const augmentError = (error: unknown, domain?: string): Error => {
-    const resolved = ensureError(error);
-    if (domain) {
-        if (!(resolved as any).sdkDomain) {
-            (resolved as any).sdkDomain = domain;
-        }
-        if (!(resolved as any).domain) {
-            (resolved as any).domain = domain;
-        }
-    }
-    return resolved;
-};
-
-const safeInvoke = async <TContext>(
-    hook: ((context: TContext) => void | Promise<void>) | undefined,
-    context: TContext,
-): Promise<void> => {
-    if (!hook) {
-        return;
-    }
-    try {
-        await hook(context);
-    } catch (error) {
-        if (typeof console !== 'undefined' && typeof console.error === 'function') {
-            console.error('Request hook execution failed', error);
-        }
-    }
 };
 
 const getUrl = (config: OpenAPIConfig, options: ApiRequestOptions): string => {
@@ -244,10 +199,8 @@ export const sendRequest = async (
     body: any,
     formData: FormData | undefined,
     headers: Headers,
-    onCancel: OnCancel,
-    hooks: RequestHooks | undefined,
-    startTime: number,
-): Promise<{ response: Response; request: RequestInit }> => {
+    onCancel: OnCancel
+): Promise<Response> => {
     const controller = new AbortController();
 
     const request: RequestInit = {
@@ -263,40 +216,7 @@ export const sendRequest = async (
 
     onCancel(() => controller.abort());
 
-    const requestContext: RequestHookContext = {
-        url,
-        options,
-        request,
-    };
-
-    try {
-        if (hooks?.beforeRequest) {
-            await hooks.beforeRequest(requestContext);
-        }
-    } catch (error) {
-        const failure = ensureError(error);
-        const durationMs = Date.now() - startTime;
-        await safeInvoke<ErrorHookContext>(hooks?.onError, {
-            ...requestContext,
-            error: failure,
-            durationMs,
-        });
-        throw failure;
-    }
-
-    try {
-        const response = await fetch(url, request);
-        return { response, request };
-    } catch (error) {
-        const failure = ensureError(error);
-        const durationMs = Date.now() - startTime;
-        await safeInvoke<ErrorHookContext>(hooks?.onError, {
-            ...requestContext,
-            error: failure,
-            durationMs,
-        });
-        throw failure;
-    }
+    return await fetch(url, request);
 };
 
 export const getResponseHeader = (response: Response, responseHeader?: string): string | undefined => {
@@ -373,25 +293,13 @@ export const catchErrorCodes = (options: ApiRequestOptions, result: ApiResult): 
 export const request = <T>(config: OpenAPIConfig, options: ApiRequestOptions): CancelablePromise<T> => {
     return new CancelablePromise(async (resolve, reject, onCancel) => {
         try {
-            const hooks = config.REQUEST_HOOKS;
-            const startTime = Date.now();
             const url = getUrl(config, options);
             const formData = getFormData(options);
             const body = getRequestBody(options);
             const headers = await getHeaders(config, options);
 
             if (!onCancel.isCancelled) {
-                const { response, request } = await sendRequest(
-                    config,
-                    options,
-                    url,
-                    body,
-                    formData,
-                    headers,
-                    onCancel,
-                    hooks,
-                    startTime,
-                );
+                const response = await sendRequest(config, options, url, body, formData, headers, onCancel);
                 const responseBody = await getResponseBody(response);
                 const responseHeader = getResponseHeader(response, options.responseHeader);
 
@@ -403,37 +311,12 @@ export const request = <T>(config: OpenAPIConfig, options: ApiRequestOptions): C
                     body: responseHeader ?? responseBody,
                 };
 
-                try {
-                    catchErrorCodes(options, result);
-                } catch (error) {
-                    const failure = augmentError(error, config.ERROR_DOMAIN);
-                    const durationMs = Date.now() - startTime;
-                    await safeInvoke<ErrorHookContext>(hooks?.onError, {
-                        url,
-                        options,
-                        request,
-                        response,
-                        result,
-                        error: failure,
-                        durationMs,
-                    });
-                    throw failure;
-                }
-
-                const durationMs = Date.now() - startTime;
-                await safeInvoke<ResponseHookContext>(hooks?.afterResponse, {
-                    url,
-                    options,
-                    request,
-                    response,
-                    result,
-                    durationMs,
-                });
+                catchErrorCodes(options, result);
 
                 resolve(result.body);
             }
         } catch (error) {
-            reject(augmentError(error, config.ERROR_DOMAIN));
+            reject(error);
         }
     });
 };

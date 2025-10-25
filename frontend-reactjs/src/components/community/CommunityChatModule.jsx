@@ -576,12 +576,12 @@ export default function CommunityChatModule({
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
   const viewerId = session?.user?.id ?? null;
+  const viewerNameFromParts =
+    [session?.user?.firstName, session?.user?.lastName].filter(Boolean).join(' ').trim();
   const viewerDisplayName =
     session?.user?.name ??
     session?.user?.fullName ??
-    [session?.user?.firstName, session?.user?.lastName].filter(Boolean).join(' ').trim() ||
-    session?.user?.email ||
-    'You';
+    (viewerNameFromParts ? viewerNameFromParts : session?.user?.email ?? 'You');
 
   const seededChannels = useMemo(() => {
     const source = Array.isArray(initialChannels) && initialChannels.length ? initialChannels : defaultChannels;

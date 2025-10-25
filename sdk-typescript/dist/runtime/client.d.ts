@@ -14,6 +14,7 @@ import { ReleaseService } from '../generated/services/ReleaseService';
 import { SecurityOperationsService } from '../generated/services/SecurityOperationsService';
 import { TelemetryService } from '../generated/services/TelemetryService';
 import type { ConfigureSdkOptions } from './configure';
+import type { SessionManager } from './auth';
 import type { SdkManifest } from './manifest';
 export type ServiceRegistry = {
     adminMonetization: typeof AdminMonetizationService;
@@ -34,6 +35,7 @@ export type ServiceRegistry = {
 export type SdkClient = ServiceRegistry & {
     readonly openApi: OpenAPIConfig;
     readonly manifest: SdkManifest;
+    readonly session?: SessionManager;
 };
 export declare function createSdkClient(options: ConfigureSdkOptions): SdkClient;
 export declare function getService<K extends keyof ServiceRegistry>(key: K): ServiceRegistry[K];

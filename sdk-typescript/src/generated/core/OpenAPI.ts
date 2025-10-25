@@ -3,32 +3,6 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { ApiRequestOptions } from './ApiRequestOptions';
-import type { ApiResult } from './ApiResult';
-
-export type RequestHookContext = {
-    url: string;
-    options: ApiRequestOptions;
-    request: RequestInit;
-};
-
-export type ResponseHookContext = RequestHookContext & {
-    response: Response;
-    result: ApiResult;
-    durationMs: number;
-};
-
-export type ErrorHookContext = RequestHookContext & {
-    error: unknown;
-    response?: Response;
-    result?: ApiResult;
-    durationMs: number;
-};
-
-export type RequestHooks = {
-    beforeRequest?: (context: RequestHookContext) => void | Promise<void>;
-    afterResponse?: (context: ResponseHookContext) => void | Promise<void>;
-    onError?: (context: ErrorHookContext) => void | Promise<void>;
-};
 
 type Resolver<T> = (options: ApiRequestOptions) => Promise<T>;
 type Headers = Record<string, string>;
@@ -43,8 +17,6 @@ export type OpenAPIConfig = {
     PASSWORD?: string | Resolver<string> | undefined;
     HEADERS?: Headers | Resolver<Headers> | undefined;
     ENCODE_PATH?: ((path: string) => string) | undefined;
-    REQUEST_HOOKS?: RequestHooks | undefined;
-    ERROR_DOMAIN?: string | undefined;
 };
 
 export const OpenAPI: OpenAPIConfig = {
@@ -57,6 +29,4 @@ export const OpenAPI: OpenAPIConfig = {
     PASSWORD: undefined,
     HEADERS: undefined,
     ENCODE_PATH: undefined,
-    REQUEST_HOOKS: undefined,
-    ERROR_DOMAIN: undefined,
 };

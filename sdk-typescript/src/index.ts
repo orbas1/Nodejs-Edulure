@@ -40,9 +40,3 @@ export {
   MissingAccessTokenError,
   TokenRefreshFailedError,
 } from './runtime/errors';
-export type {
-  RequestHooks,
-  RequestHookContext,
-  ResponseHookContext,
-  ErrorHookContext,
-} from './generated/core/OpenAPI';
