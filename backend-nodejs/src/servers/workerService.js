@@ -6,18 +6,33 @@ import { createServiceRuntime } from './runtimeEnvironment.js';
 import resolveRuntimeToggles from './runtimeToggles.js';
 import { BACKGROUND_JOB_TARGETS, startBackgroundJobs } from './workerRoutines.js';
 
+const DEFAULT_BACKGROUND_TARGETS = [
+  'asset-ingestion',
+  'data-retention',
+  'community-reminder',
+  'moderation-follow-up',
+  'data-partitioning',
+  'telemetry-warehouse',
+  'monetization-reconciliation',
+  'integration-orchestrator',
+  'webhook-event-bus',
+  'domain-event-dispatcher'
+];
+
 export async function startWorkerService({ withSignalHandlers = true } = {}) {
   const toggles = resolveRuntimeToggles();
+  const readinessTargets = [
+    'database',
+    'feature-flags',
+    'runtime-config',
+    'search-cluster',
+    ...new Set([...DEFAULT_BACKGROUND_TARGETS, ...BACKGROUND_JOB_TARGETS]),
+    'probe-server'
+  ];
+
   const runtime = await createServiceRuntime({
     serviceName: 'worker-service',
-    readinessTargets: [
-      'database',
-      'feature-flags',
-      'runtime-config',
-      'search-cluster',
-      ...BACKGROUND_JOB_TARGETS,
-      'probe-server'
-    ],
+    readinessTargets,
     runMigrations: false
   });
 

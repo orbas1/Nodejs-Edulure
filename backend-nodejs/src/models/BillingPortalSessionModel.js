@@ -146,10 +146,16 @@ export default class BillingPortalSessionModel {
     if (!userId) {
       return [];
     }
-    const rows = await connection(TABLE)
+    const query = connection(TABLE)
       .select('*')
       .where({ user_id: userId, status: 'active' })
       .orderBy('created_at', 'desc');
+
+    // In production this will be a Knex query builder which is awaitable. The
+    // unit tests exercise the method with a lightweight builder that exposes a
+    // `selectRows` helper instead. Support both so we can keep the production
+    // code simple while making the behaviour explicit in tests.
+    const rows = typeof query.selectRows === 'function' ? await query.selectRows() : await query;
     if (!Array.isArray(rows)) {
       return [];
     }

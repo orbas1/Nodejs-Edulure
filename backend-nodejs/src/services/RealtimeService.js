@@ -7,7 +7,6 @@ import { sessionRegistry } from './SessionRegistry.js';
 import UserModel from '../models/UserModel.js';
 import DirectMessageParticipantModel from '../models/DirectMessageParticipantModel.js';
 import courseLiveService from './CourseLiveService.js';
-import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
 import { createCorsOriginValidator } from '../config/corsPolicy.js';
 
 const log = logger.child({ service: 'RealtimeService' });
@@ -19,6 +18,15 @@ async function getCommunityChatService() {
     communityChatService = module.default ?? module;
   }
   return communityChatService;
+}
+
+let userPresenceSessionModel;
+async function getUserPresenceSessionModel() {
+  if (!userPresenceSessionModel) {
+    const module = await import('../models/UserPresenceSessionModel.js');
+    userPresenceSessionModel = module.default ?? module;
+  }
+  return userPresenceSessionModel;
 }
 
 function buildAvatarUrl(name) {
@@ -315,7 +323,8 @@ class RealtimeService {
         (async () => {
           try {
             if (user.sessionId) {
-              await UserPresenceSessionModel.clear(user.sessionId);
+              const presenceModel = await getUserPresenceSessionModel();
+              await presenceModel.clear(user.sessionId);
             }
           } catch (error) {
             log.warn({ err: error, userId: user.id }, 'failed to clear presence session on disconnect');

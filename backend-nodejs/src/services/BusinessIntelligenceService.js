@@ -424,6 +424,9 @@ export class BusinessIntelligenceService {
       currentBreakdown,
       currentTotals.grossVolumeCents
     );
+    const shareByCurrency = new Map(
+      breakdownWithShare.map((entry) => [entry.currency ?? 'UNKNOWN', entry.share])
+    );
 
     const views = [];
 
@@ -501,21 +504,22 @@ export class BusinessIntelligenceService {
             Number(previousEntry.recognisedVolumeCents ?? 0)
           )
         },
-        breakdown: {
-          currencies: [
-            {
-              currency: entry.currency ?? 'USD',
-              grossVolumeCents: Number(entry.grossVolumeCents ?? 0),
-              recognisedVolumeCents: Number(entry.recognisedVolumeCents ?? 0),
-              discountCents: Number(entry.discountCents ?? 0),
-              taxCents: Number(entry.taxCents ?? 0),
-              refundedCents: Number(entry.refundedCents ?? 0),
-              totalIntents: Number(entry.totalIntents ?? 0),
-              succeededIntents: Number(entry.succeededIntents ?? 0),
-              share: 100
-            }
-          ]
-        },
+          breakdown: {
+            currencies: [
+              {
+                currency: entry.currency ?? 'USD',
+                grossVolumeCents: Number(entry.grossVolumeCents ?? 0),
+                recognisedVolumeCents: Number(entry.recognisedVolumeCents ?? 0),
+                discountCents: Number(entry.discountCents ?? 0),
+                taxCents: Number(entry.taxCents ?? 0),
+                refundedCents: Number(entry.refundedCents ?? 0),
+                totalIntents: Number(entry.totalIntents ?? 0),
+                succeededIntents: Number(entry.succeededIntents ?? 0),
+                share:
+                  shareByCurrency.get(entry.currency ?? 'UNKNOWN') ?? 0
+              }
+            ]
+          },
         intents: {
           totalIntents: Number(entry.totalIntents ?? 0),
           succeededIntents: Number(entry.succeededIntents ?? 0)

@@ -4,6 +4,7 @@ import releaseOrchestrationService from './ReleaseOrchestrationService.js';
 import { AdminAuditLogService } from './AdminAuditLogService.js';
 
 const SEVERITY_RANK = { critical: 3, warning: 2, info: 1 };
+const STATUS_PRIORITY = { escalated: 3, pending_renewal: 2, active: 1 };
 
 function clampLimit(value, { min = 1, max = 50, fallback = 5 } = {}) {
   const numeric = Number.parseInt(value ?? fallback, 10);
@@ -131,11 +132,20 @@ export class AdminOperationsOverviewService {
         if (severityDelta !== 0) {
           return severityDelta;
         }
+        const statusDelta = this.#rankStatus(b.status) - this.#rankStatus(a.status);
+        if (statusDelta !== 0) {
+          return statusDelta;
+        }
         const aDays = a.renewalDeltaDays ?? Number.POSITIVE_INFINITY;
         const bDays = b.renewalDeltaDays ?? Number.POSITIVE_INFINITY;
         return aDays - bDays;
       })
       .slice(0, limit);
+  }
+
+  #rankStatus(status) {
+    const key = String(status ?? '').toLowerCase();
+    return STATUS_PRIORITY[key] ?? 0;
   }
 
   #determineAlertSeverity(contract, renewalDeltaDays) {
