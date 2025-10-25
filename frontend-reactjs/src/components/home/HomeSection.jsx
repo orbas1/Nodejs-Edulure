@@ -6,7 +6,8 @@ const SIZE_CLASSES = {
   snug: 'max-w-5xl',
   narrow: 'max-w-4xl',
   wide: 'max-w-7xl',
-  full: 'max-w-none'
+  fluid: 'w-full max-w-7xl xl:max-w-none',
+  full: 'w-full max-w-none'
 };
 
 const PAD_CLASSES = {
@@ -19,21 +20,25 @@ const PAD_CLASSES = {
   none: 'py-0'
 };
 
+const DEFAULT_GUTTER = 'px-4 sm:px-6 lg:px-10 xl:px-16';
+const FULL_GUTTER = 'px-4 sm:px-6 lg:px-12 xl:px-20';
+
 export default function HomeSection({
   as: Component = 'div',
   children,
   className,
   pad = 'default',
   size = 'default',
-  px = 'px-4 sm:px-6 lg:px-10',
+  px,
   ...props
 }) {
   const resolvedSize = SIZE_CLASSES[size] ?? size;
   const resolvedPad = PAD_CLASSES[pad] ?? pad;
+  const resolvedPx = typeof px === 'string' ? px : size === 'full' ? FULL_GUTTER : DEFAULT_GUTTER;
 
   return (
     <Component
-      className={clsx('mx-auto', px, resolvedSize, resolvedPad, className)}
+      className={clsx('mx-auto w-full', resolvedPx, resolvedSize, resolvedPad, className)}
       {...props}
     >
       {children}

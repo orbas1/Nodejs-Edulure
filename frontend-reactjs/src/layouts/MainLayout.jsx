@@ -29,7 +29,8 @@ export function MainLayoutContent({
   logout,
   navigate,
   getConfigValue,
-  realtimeConnected
+  realtimeConnected,
+  variant = 'app'
 }) {
   const { classes, resolvedMode } = useTheme();
   const { initiatives } = useNavigationMetadata();
@@ -148,8 +149,26 @@ export function MainLayoutContent({
 
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
 
+  const shellBackground =
+    variant === 'marketing'
+      ? resolvedMode === 'dark'
+        ? 'bg-slate-950 text-slate-100'
+        : 'bg-white text-slate-900'
+      : classes.surface;
+
+  const mainShellClassName =
+    variant === 'marketing'
+      ? 'flex w-full flex-1 flex-col px-4 pb-20 pt-10 sm:px-6 lg:px-12 xl:px-20'
+      : 'mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8';
+
+  const footerBackground =
+    variant === 'marketing'
+      ? shellBackground
+      : classes.panel;
+  const footerBase = 'border-t border-slate-200 px-6 py-10 text-sm shadow-sm dark:border-slate-800 sm:px-8 lg:px-12 xl:px-20';
+
   return (
-    <div className={`flex min-h-screen flex-col ${classes.surface}`}>
+    <div className={`flex min-h-screen flex-col ${shellBackground}`}>
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
@@ -171,21 +190,13 @@ export function MainLayoutContent({
         callToAction={callToAction}
       />
       <ServiceHealthBanner />
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 pt-6 sm:px-6 lg:px-8"
-      >
+      <main id="main-content" tabIndex={-1} className={mainShellClassName}>
         <Outlet />
       </main>
-      <footer
-        className={`border-t px-4 py-6 text-sm sm:px-6 lg:px-8 ${
-          resolvedMode === 'dark' ? 'border-slate-800' : 'border-slate-200'
-        } ${classes.panel}`}
-      >
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p>&copy; {new Date().getFullYear()} Edulure. All rights reserved.</p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <footer className={`${footerBase} ${footerBackground}`}>
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <p className="text-center md:text-left">&copy; {new Date().getFullYear()} Edulure. All rights reserved.</p>
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-center md:justify-end md:text-left">
             <a className="transition hover:text-primary" href="/privacy">
               Privacy
             </a>
@@ -214,7 +225,7 @@ export function MainLayoutContent({
   );
 }
 
-export default function MainLayout() {
+export default function MainLayout({ variant = 'app' }) {
   const navigate = useNavigate();
   const { session, isAuthenticated, logout } = useAuth();
   const { getConfigValue } = useRuntimeConfig();
@@ -232,6 +243,7 @@ export default function MainLayout() {
         navigate={navigate}
         getConfigValue={getConfigValue}
         realtimeConnected={realtimeConnected}
+        variant={variant}
       />
     </NavigationMetadataProvider>
   );
