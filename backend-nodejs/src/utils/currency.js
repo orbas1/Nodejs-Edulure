@@ -4,6 +4,7 @@ function toSanitisedString(value) {
   if (value === null || value === undefined) {
     return '';
   }
+
   return String(value).trim();
 }
 
@@ -12,30 +13,38 @@ export function normaliseCurrencyCode(value, { fallback = 'USD' } = {}) {
   if (candidate && ISO_4217_REGEX.test(candidate)) {
     return candidate;
   }
+
   const fallbackCandidate = toSanitisedString(fallback).toUpperCase();
   if (ISO_4217_REGEX.test(fallbackCandidate)) {
     return fallbackCandidate;
   }
+
   throw new Error('currency must be a 3-letter ISO code');
 }
 
-export function normalizeCurrencyCode(value, options) {
-  return normaliseCurrencyCode(value, options);
-}
+export const normalizeCurrencyCode = (value, options) => normaliseCurrencyCode(value, options);
 
-export function centsToCurrencyString(value, { fractionDigits = 2, useGrouping = true } = {}) {
+export function centsToCurrencyString(
+  value,
+  { fractionDigits = 2, useGrouping = true, currency = null, locale = 'en-US' } = {}
+) {
   const cents = Number(value ?? 0);
   if (!Number.isFinite(cents)) {
     throw new Error('amount must be a finite number');
   }
 
-  const formatter = new Intl.NumberFormat('en-US', {
+  const amount = cents / 100;
+  const formatterOptions = {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
     useGrouping
-  });
+  };
 
-  return formatter.format(cents / 100);
+  if (currency) {
+    Object.assign(formatterOptions, { style: 'currency', currency });
+  }
+
+  return new Intl.NumberFormat(locale, formatterOptions).format(amount);
 }
 
 export function currencyStringToCents(value, { allowNegative = true, fieldName = 'amount' } = {}) {
@@ -47,10 +56,12 @@ export function currencyStringToCents(value, { allowNegative = true, fieldName =
     if (!Number.isFinite(value)) {
       throw new Error(`${fieldName} must be a finite number`);
     }
+
     const cents = Math.round(value * 100);
     if (!allowNegative && cents < 0) {
       throw new Error(`${fieldName} cannot be negative`);
     }
+
     return cents;
   }
 
@@ -121,6 +132,7 @@ export function toMinorUnit(value, { allowNegative = false, fieldName = 'amount'
   if (!allowNegative && rounded < 0) {
     throw new Error(`${fieldName} cannot be negative`);
   }
+
   return rounded;
 }
 
@@ -131,58 +143,6 @@ export function snapCurrencyPayload(payload = {}, options = {}) {
     fieldName: options.fieldName ?? 'amountCents'
   });
   const currency = normaliseCurrencyCode(payload.currency, { fallback: fallbackCurrency });
+
   return { amountCents, currency };
 }
-
-export function currencyStringToCents(value, { allowNegative = false } = {}) {
-  if (value === null || value === undefined || value === '') {
-    return 0;
-  }
-
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const cents = Math.round(value * 100);
-    if (!allowNegative && cents < 0) {
-      throw new Error('amountCents cannot be negative');
-    }
-    return cents;
-  }
-
-  const sanitized = toSanitisedString(value);
-  if (!sanitized) {
-    return 0;
-  }
-
-  const cleaned = sanitized.replace(/[^0-9,.-]/g, '').replace(/,/g, '');
-  if (!cleaned) {
-    return 0;
-  }
-
-  const numeric = Number.parseFloat(cleaned);
-  if (!Number.isFinite(numeric)) {
-    throw new Error('amountCents must be numeric');
-  }
-
-  const cents = Math.round(numeric * 100);
-  if (!allowNegative && cents < 0) {
-    throw new Error('amountCents cannot be negative');
-  }
-  return cents;
-}
-
-export function centsToCurrencyString(amountCents, { currency = 'USD', locale = 'en-US' } = {}) {
-  const amount = Number(amountCents ?? 0) / 100;
-  if (!Number.isFinite(amount)) {
-    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(0);
-  }
-
-  const formatter = new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-
-  return formatter.format(amount);
-}
-
-export const normalizeCurrencyCode = normaliseCurrencyCode;

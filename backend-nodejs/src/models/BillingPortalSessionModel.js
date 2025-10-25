@@ -150,6 +150,10 @@ export default class BillingPortalSessionModel {
       .select('*')
       .where({ user_id: userId, status: 'active' })
       .orderBy('created_at', 'desc');
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+
     return rows.map(deserialize);
   }
 }
