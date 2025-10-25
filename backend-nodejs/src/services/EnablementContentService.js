@@ -256,37 +256,58 @@ class EnablementContentService {
     this.cache = null;
     this.cacheExpiresAt = 0;
     this.environmentDescriptor = getEnvironmentDescriptor();
+    this.persistenceFailed = false;
   }
 
   async refreshCache() {
     this.cache = await this.buildCache();
-    await EnablementGuideModel.replaceAll(
-      this.cache.articles.map((article) => ({
-        slug: article.slug,
-        title: article.metadata.title,
-        summary: article.metadata.summary,
-        excerpt: article.excerpt,
-        owner: article.metadata.owner,
-        audience: article.metadata.audience,
-        products: article.metadata.products,
-        tags: article.metadata.tags,
-        capabilities: article.metadata.capabilities,
-        deliverables: article.metadata.deliverables,
-        readingTimeMinutes: article.readingTimeMinutes,
-        timeToCompleteMinutes: article.metadata.timeToCompleteMinutes,
-        wordCount: article.wordCount,
-        contentHash: article.contentHash,
-        sourcePath: article.filePath,
-        metadata: {
-          ...article.metadata,
-          estimatedReadingMinutes: article.readingTimeMinutes
-        },
-        publishedAt: article.metadata.publishedAt ?? null,
-        lastIndexedAt: new Date(article.updatedAt ?? Date.now()),
-        searchText: article.searchText
-      })),
-      { environment: this.environmentDescriptor }
-    );
+
+    try {
+      await EnablementGuideModel.replaceAll(
+        this.cache.articles.map((article) => ({
+          slug: article.slug,
+          title: article.metadata.title,
+          summary: article.metadata.summary,
+          excerpt: article.excerpt,
+          owner: article.metadata.owner,
+          audience: article.metadata.audience,
+          products: article.metadata.products,
+          tags: article.metadata.tags,
+          capabilities: article.metadata.capabilities,
+          deliverables: article.metadata.deliverables,
+          readingTimeMinutes: article.readingTimeMinutes,
+          timeToCompleteMinutes: article.metadata.timeToCompleteMinutes,
+          wordCount: article.wordCount,
+          contentHash: article.contentHash,
+          sourcePath: article.filePath,
+          metadata: {
+            ...article.metadata,
+            estimatedReadingMinutes: article.readingTimeMinutes
+          },
+          publishedAt: article.metadata.publishedAt ?? null,
+          lastIndexedAt: new Date(article.updatedAt ?? Date.now()),
+          searchText: article.searchText
+        })),
+        { environment: this.environmentDescriptor }
+      );
+      if (this.persistenceFailed) {
+        serviceLogger.info('Enablement article persistence restored after previous failure');
+      }
+      this.persistenceFailed = false;
+    } catch (error) {
+      if (!this.persistenceFailed) {
+        serviceLogger.warn(
+          { err: error },
+          'Failed to persist enablement articles to database; serving from in-memory cache'
+        );
+      } else {
+        serviceLogger.debug(
+          { err: error },
+          'Enablement article persistence still unavailable; continuing with cached data'
+        );
+      }
+      this.persistenceFailed = true;
+    }
     this.cacheExpiresAt = Date.now() + this.cacheTtlMs;
     return {
       articles: this.cache.articles.length,
