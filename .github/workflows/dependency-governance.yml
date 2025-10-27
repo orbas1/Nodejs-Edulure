@@ -80,7 +80,7 @@ jobs:
           path: reports/trivy-results.sarif
 
       - name: Publish Trivy SARIF to code scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: reports/trivy-results.sarif
 
