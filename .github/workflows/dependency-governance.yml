@@ -45,7 +45,7 @@ jobs:
         run: npm run license:report
 
       - name: Upload license reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: license-reports
           path: reports/licenses
@@ -57,7 +57,7 @@ jobs:
           output-file: sbom/edulure-cyclonedx.json
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cyclonedx-sbom
           path: sbom/edulure-cyclonedx.json
@@ -74,7 +74,7 @@ jobs:
           output: 'reports/trivy-results.sarif'
 
       - name: Upload Trivy results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-scan
           path: reports/trivy-results.sarif
@@ -91,7 +91,7 @@ jobs:
           publish_results: true
 
       - name: Upload Scorecard report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: scorecard-report
           path: reports/scorecard-results.json
